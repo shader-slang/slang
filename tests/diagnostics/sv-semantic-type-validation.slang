@@ -15,6 +15,8 @@
 // Tests for unsized-array element-type path in isSemanticTypeCompatible:
 //TEST:SIMPLE(filecheck=CHECK14): -target hlsl -entry vsClipDistanceFloat -stage vertex
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK15): -target hlsl -entry vsClipDistanceInt -stage vertex
+// The Metal SV_InstanceID rewrite relies on this front-end check admitting only scalars:
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK16): -target metal -entry vsVectorInstanceID -stage vertex
 
 // Test type validation for system value semantics.
 // Each SV_ semantic declares its accepted types. Shape mismatches (e.g., vector for a
@@ -131,5 +133,13 @@ float4 vsClipDistanceInt(uint id: SV_VertexID, out int cd[4]: SV_ClipDistance) :
 {
     for (int i = 0; i < 4; ++i)
         cd[i] = 0;
+    return float4(0, 0, 0, 1);
+}
+
+// Test 16: uint2 is rejected for SV_InstanceID on every target, before Metal's base_instance rewrite
+[shader("vertex")]
+float4 vsVectorInstanceID(uint2 id: SV_InstanceID) : SV_Position
+//CHECK16:                      ^^ type 'vector<uint,2>' is not valid for system value semantic 'SV_InstanceID'; expected 'uint'
+{
     return float4(0, 0, 0, 1);
 }

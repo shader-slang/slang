@@ -40,7 +40,7 @@ The system-value semantics are translated to the following Metal attributes:
 | `SV_GroupID`                | `[[threadgroup_position_in_grid]]`                   |
 | `SV_GroupThreadID`          | `[[thread_position_in_threadgroup]]`                 |
 | `SV_GroupIndex`             | Calculated from `SV_GroupThreadID` and group extents |
-| `SV_InstanceID`             | `[[instance_id]]`                                    |
+| `SV_InstanceID`             | `[[instance_id]] - [[base_instance]]`                |
 | `SV_IsFrontFace`            | `[[front_facing]]`                                   |
 | `SV_PointSize`              | `[[point_size]]`                                     |
 | `SV_PointCoord`             | `[[point_coord]]`                                    |
@@ -55,6 +55,10 @@ The system-value semantics are translated to the following Metal attributes:
 | `SV_VulkanInstanceID`       | `[[instance_id]]`                                    |
 | `SV_VulkanSamplePosition`   | `(Not supported)`                                    |
 | `SV_VulkanVertexID`         | `[[vertex_id]]`                                      |
+
+_Note_ that `SV_InstanceID` counts from zero within a draw call, as in D3D, while Metal's
+`[[instance_id]]` includes the base instance, so the two are not the same value. Use
+`SV_VulkanInstanceID` for direct access to `[[instance_id]]`.
 
 Custom semantics are mapped to user attributes:
 
