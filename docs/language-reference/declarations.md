@@ -220,6 +220,24 @@ Under those assumptions, the `out` and `inout` cases may be optimized to use pas
 
 > Note: Applications that rely on the precise order in which write-back for `out` and `in out` parameters is performed are already on shaky semantic ground.
 
+### Group-shared parameters are passed by reference
+
+A parameter marked `groupshared` names a single storage location in the group-shared address space that is shared by the whole thread group, so it is always passed *by reference* rather than copied per invocation:
+
+```hlsl
+void scan(uint tid, groupshared uint scratch[N]) { ... }
+```
+
+Writes through such a parameter are visible to every invocation in the group. The reference is read-write by default; the preferred read-only spelling is `const groupshared`:
+
+```hlsl
+uint total(const groupshared uint scratch[N]) { ... }
+```
+
+`const groupshared` is accepted on a parameter and is equivalent to `__constref groupshared`, which is what the compiler rewrites it to. Prefer the `const` form in Slang source. Because a `groupshared` parameter denotes shared storage rather than a per-invocation value, the copy-direction modifiers `in`, `out`, and `inout` cannot be used with `groupshared` and are reported as an error.
+
+A `groupshared` parameter may be a whole `struct`, and an argument may name a field of a group-shared variable; either way the group-shared storage is passed by reference rather than copied.
+
 Body
 ----
 
