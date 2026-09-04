@@ -50,8 +50,28 @@ SerialSourceLocData::SourceLoc SerialSourceLocWriter::addSourceLoc(SourceLoc sou
     SourceView* sourceView = m_sourceManager->findSourceView(sourceLoc);
     if (!sourceView)
     {
-        // If not found we just ingore
-        return SerialSourceLocData::SourceLoc(0);
+        // sourceLoc may be a per-invocation macro-expansion-range loc produced by
+        // MacroInvocation::_remapBodyLoc (slang-preprocessor.cpp), which has no direct
+        // SourceView of its own. Unmap it to its definition-file position instead of dropping
+        // it, so instructions originating inside a macro body (including, notably, every
+        // instruction from a core-module macro in an embedded/serialized core module) still
+        // carry a usable source location after a serialize/deserialize round trip.
+        //
+        // This intentionally collapses distinct invocations of the same macro to the same
+        // serialized loc -- that is fine here, matching what an IR inst's loc looked like
+        // before per-invocation expansion tracking existed: this path only needs a location to
+        // point at for -g/diagnostic purposes, not per-invocation identity (that distinction is
+        // only needed by the live in-process macro-expansion side table, which is not
+        // serialized). SerialContainerUtil::verifyIRSerialize (slang-serialize-container.cpp)
+        // performs the same unmap on the original loc before comparing, so the two stay in sync.
+        SourceLoc unmappedLoc = sourceLoc;
+        sourceView = m_sourceManager->findSourceViewThroughExpansion(unmappedLoc);
+        if (!sourceView)
+        {
+            // Genuinely unresolvable loc — ignore it.
+            return SerialSourceLocData::SourceLoc(0);
+        }
+        sourceLoc = unmappedLoc;
     }
 
     SourceFile* sourceFile = sourceView->getSourceFile();
