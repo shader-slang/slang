@@ -735,6 +735,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void checkCallableDeclCommon(CallableDecl* decl);
     void maybeInferPrefixModifierForOperator(CallableDecl* decl);
+    void maybeDiagnoseOperatorDeclaredAsMember(FuncDecl* decl);
     void checkPublicCallableOperandVisibility(CallableDecl* decl);
 
     void checkCallableConstraints(CallableDecl* decl);
@@ -15513,6 +15514,30 @@ void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
     }
 }
 
+// True if `name` is an *actual* operator: a name that can appear as the operator in a prefix,
+// postfix, or infix operator expression (`-a`, `a++`, `a + b`). This is intentionally not every
+// name that may be spelled with `operator <op>` syntax -- `operator()`, `operator[]`/`__subscript`,
+// and `operator=` are written that way for historical reasons but are not operators in this sense
+// (call and subscript are resolved by member lookup on the operand; assignment is checked as an
+// `AssignExpr`), so this predicate returns false for them.
+static bool isOperatorName(Name* name)
+{
+    if (!name)
+        return false;
+    auto text = name->text.getUnownedSlice();
+    static const char* const kOperatorNames[] = {
+        "+",  "-",  "*",  "/",   "%",   "!",  "~",  "<<", ">>", "==", "!=", ">",
+        "<",  ">=", "<=", "&&",  "||",  "&",  "|",  "^",  "++", "--", "+=", "-=",
+        "*=", "/=", "%=", "<<=", ">>=", "&=", "|=", "^=", ",",  "?:",
+    };
+    for (auto op : kOperatorNames)
+    {
+        if (text == op)
+            return true;
+    }
+    return false;
+}
+
 // True if `name` is an operator that can appear in prefix (unary) position:
 // `-`, `+`, `~`, or `!`. These are the unary operators the core module declares
 // with `__prefix` and that a user may overload. `~`/`!` are unary-only, while
@@ -15575,6 +15600,27 @@ void SemanticsDeclHeaderVisitor::maybeInferPrefixModifierForOperator(CallableDec
     auto prefixModifier = m_astBuilder->create<PrefixModifier>();
     prefixModifier->loc = decl->loc;
     addModifier(decl, prefixModifier);
+}
+
+// Diagnose an operator function declared as a member of a type or extension. A prefix/postfix/infix
+// operator call site (`a + b`) resolves the operator name only through the enclosing lexical
+// scopes, never by member lookup on the operand type, so an operator declared as a member can never
+// be found from such a call and the user hits a confusing "no overload" at every use. We reject it
+// at the declaration and steer the user to the free-function spelling instead (see #12761).
+void SemanticsDeclHeaderVisitor::maybeDiagnoseOperatorDeclaredAsMember(FuncDecl* decl)
+{
+    // Only an actual operator name is relevant; `operator()`/`__subscript` (member-looked-up) and
+    // ordinary function names are not.
+    if (!isOperatorName(decl->getName()))
+        return;
+
+    // `getParentAggTypeDeclBase` (which walks past a wrapping `GenericDecl`) is null at
+    // module/namespace scope -- where a free operator function is the supported form -- and
+    // non-null for a type/interface/extension member.
+    if (getParentAggTypeDeclBase(decl) == nullptr)
+        return;
+
+    getSink()->diagnose(Diagnostics::OperatorDeclaredAsMember{.decl = decl});
 }
 
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
@@ -15696,6 +15742,7 @@ void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
     }
 
     checkCallableDeclCommon(funcDecl);
+    maybeDiagnoseOperatorDeclaredAsMember(funcDecl);
 }
 
 IntegerLiteralValue SemanticsVisitor::GetMinBound(IntVal* val)
