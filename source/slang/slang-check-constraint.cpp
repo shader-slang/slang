@@ -2876,6 +2876,33 @@ private:
         return nullptr;
     }
 
+    // Check a requirement projection in `ioType` and resolve it when semantic checking can produce
+    // its witness. Abstract and recursively owned projections remain valid symbolic inputs to
+    // ordinary subtype checking. Return false only when checking a concrete requirement failed.
+    bool checkRequirementProjectionForConstraint(Type*& ioType)
+    {
+        auto resolution = m_visitor->ensureAndResolveRequirementProjection(ioType);
+        switch (resolution.status)
+        {
+        case SemanticsVisitor::RequirementProjectionResolutionStatus::Resolved:
+            {
+                auto resolvedType = as<Type>(resolution.value);
+                SLANG_RELEASE_ASSERT(resolvedType);
+                ioType = resolvedType;
+                return true;
+            }
+        case SemanticsVisitor::RequirementProjectionResolutionStatus::Unchanged:
+            // Abstract projections remain valid inputs to ordinary subtype checking. Only a
+            // projection through a concrete conformance is forceable here. A recursively requested
+            // entry is likewise owned by an enclosing semantic operation rather than another item
+            // in this solver worklist, so blocking this item cannot wake it.
+            return true;
+        case SemanticsVisitor::RequirementProjectionResolutionStatus::Failed:
+            return false;
+        }
+        SLANG_UNREACHABLE("unhandled requirement projection resolution result");
+    }
+
     // Try to solve the witness for a subtype or equality constraint.
     Val* trySolveSubtypeWitnessForConstraint(GenericTypeConstraintDecl* constraintDecl)
     {
@@ -2886,6 +2913,10 @@ private:
         auto constraintDeclRef = buildSubstDeclRef(constraintDecl).as<GenericTypeConstraintDecl>();
         auto sub = getSub(m_astBuilder, constraintDeclRef);
         auto sup = getSup(m_astBuilder, constraintDeclRef);
+
+        if (!checkRequirementProjectionForConstraint(sub) ||
+            !checkRequirementProjectionForConstraint(sup))
+            return nullptr;
 
         // The raw declaration also matters for overload ranking: `T : IFoo`
         // makes this candidate more specific even if `T` has already been

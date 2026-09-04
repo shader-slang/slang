@@ -709,149 +709,52 @@ RequirementWitness RequirementWitness::specialize(
     }
 }
 
-// TODO: Make it so we can handle a recursive lookup (don't substitute the entire
-// table at each lookup, just find the entry and make all the substitutions at once).
-//
-RequirementWitness tryLookUpRequirementWitness(
-    ASTBuilder* astBuilder,
-    SubtypeWitness* subtypeWitness,
-    Decl* requirementKey)
-{
-    if (auto packBranchWitness = as<PackBranchSubtypeWitness>(subtypeWitness))
-    {
-        switch (getKnownPackCardinality(packBranchWitness->getPackOperand()))
-        {
-        case VariadicPackCardinality::Empty:
-            return tryLookUpRequirementWitness(
-                astBuilder,
-                packBranchWitness->getEmptyWitness(),
-                requirementKey);
-        case VariadicPackCardinality::NonEmpty:
-            return tryLookUpRequirementWitness(
-                astBuilder,
-                packBranchWitness->getNonEmptyWitness(),
-                requirementKey);
-        default:
-            return RequirementWitness();
-        }
-    }
-
-    if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subtypeWitness))
-    {
-        if (auto inheritanceDeclRef = declaredSubtypeWitness->getDeclRef().as<InheritanceDecl>())
-        {
-            // A conformance that was declared as part of an inheritance clause
-            // will have built up a dictionary of the satisfying declarations
-            // for each of its requirements.
-            RequirementWitness requirementWitness;
-            auto witnessTable = inheritanceDeclRef.getDecl()->witnessTable;
-            if (witnessTable && witnessTable->getRequirementDictionary().tryGetValue(
-                                    requirementKey,
-                                    requirementWitness))
-            {
-                // The `inheritanceDeclRef` has substitutions applied to it that
-                // *aren't* present in the `requirementWitness`, because it was
-                // derived by the front-end when looking at the `InheritanceDecl` alone.
-                //
-                // We need to apply these substitutions here for the result to make sense.
-                //
-                // E.g., if we have a case like:
-                //
-                //      interface ISidekick { associatedtype Hero; void follow(Hero hero); }
-                //      struct Sidekick<H> : ISidekick { typedef H Hero; void follow(H hero) {} };
-                //
-                //      void followHero<S : ISidekick>(S s, S.Hero h)
-                //      {
-                //          s.follow(h);
-                //      }
-                //
-                //      Batman batman;
-                //      Sidekick<Batman> robin;
-                //      followHero<Sidekick<Batman>>(robin, batman);
-                //
-                // The second argument to `followHero` is `batman`, which has type `Batman`.
-                // The parameter declaration lists the type `S.Hero`, which is a reference
-                // to an associated type. The front  end will expand this into something
-                // like `S.{S:ISidekick}.Hero` - that is, we'll end up with a declaration
-                // reference to `ISidekick.Hero` with a this-type substitution that references
-                // the `{S:ISidekick}` declaration as a witness.
-                //
-                // The front-end will expand the generic application `followHero<Sidekick<Batman>>`
-                // to `followHero<Sidekick<Batman>, {Sidekick<H>:ISidekick}[H->Batman]>`
-                // (that is, the hidden second parameter will reference the inheritance
-                // clause on `Sidekick<H>`, with a substitution to map `H` to `Batman`.
-                //
-                // This step should map the `{S:ISidekick}` declaration over to the
-                // concrete `{Sidekick<H>:ISidekick}[H->Batman]` inheritance declaration.
-                // At that point `tryLookupRequirementWitness` might be called, because
-                // we want to look up the witness for the key `ISidekick.Hero` in the
-                // inheritance decl-ref that is `{Sidekick<H>:ISidekick}[H->Batman]`.
-                //
-                // That lookup will yield us a reference to the typedef `Sidekick<H>.Hero`,
-                // *without* any substitution for `H` (or rather, with a default one that
-                // maps `H` to `H`.
-                //
-                // So, in order to get the *right* end result, we need to apply
-                // the substitutions from the inheritance decl-ref to the witness.
-                //
-                requirementWitness =
-                    requirementWitness.specialize(astBuilder, SubstitutionSet(inheritanceDeclRef));
-
-                return requirementWitness;
-            }
-        }
-    }
-    else if (auto transitiveTypeWitness = as<TransitiveSubtypeWitness>(subtypeWitness))
-    {
-        if (auto declaredSubtypeWitnessMidToSup =
-                as<DeclaredSubtypeWitness>(transitiveTypeWitness->getMidToSup()))
-        {
-            auto midKey = declaredSubtypeWitnessMidToSup->getDeclRef();
-            auto midWitness = tryLookUpRequirementWitness(
-                astBuilder,
-                as<SubtypeWitness>(transitiveTypeWitness->getSubToMid()),
-                midKey.getDecl());
-            if (midWitness.getFlavor() == RequirementWitness::Flavor::witnessTable)
-            {
-                auto table = midWitness.getWitnessTable();
-                RequirementWitness result;
-                if (table->getRequirementDictionary().tryGetValue(requirementKey, result))
-                {
-                    result = result.specialize(astBuilder, SubstitutionSet(midKey));
-                }
-                return result;
-            }
-        }
-    }
-
-    // If we are looking for `ThisType`, just return subtype.
-    if (as<ThisTypeDecl>(requirementKey))
-    {
-        RequirementWitness result;
-        result.m_flavor = RequirementWitness::Flavor::val;
-        result.m_val = subtypeWitness->getSub();
-        return result;
-    }
-    // If we are looking for `ThisTypeConstraint`, just return the witness itself.
-    if (as<ThisTypeConstraintDecl>(requirementKey))
-    {
-        RequirementWitness result;
-        result.m_flavor = RequirementWitness::Flavor::val;
-        result.m_val = subtypeWitness;
-        return result;
-    }
-    // TODO: should handle the transitive case here too
-
-    return RequirementWitness();
-}
-
 //
 // WitnessTable
 //
 
-void WitnessTable::add(Decl* decl, RequirementWitness const& witness)
+InterfaceRequirementKey::InterfaceRequirementKey(Decl* requirementDecl)
+    : InterfaceRequirementKey(requirementDecl, nullptr)
 {
-    m_requirementDictionary.add(decl, witness);
+}
+
+InterfaceRequirementKey InterfaceRequirementKey::createWithGenericWrapperCount(
+    Decl* requirementDecl,
+    UCount& outGenericWrapperCount)
+{
+    return InterfaceRequirementKey(requirementDecl, &outGenericWrapperCount);
+}
+
+InterfaceRequirementKey::InterfaceRequirementKey(
+    Decl* requirementDecl,
+    UCount* outGenericWrapperCount)
+{
+    SLANG_RELEASE_ASSERT(requirementDecl);
+    UCount genericWrapperCount = 0;
+    while (auto genericDecl = as<GenericDecl>(requirementDecl))
+    {
+        genericWrapperCount++;
+        requirementDecl = genericDecl->inner;
+    }
+    if (outGenericWrapperCount)
+        *outGenericWrapperCount = genericWrapperCount;
+    m_decl = requirementDecl;
+}
+
+void WitnessTable::add(Decl* requirementDecl, RequirementWitness const& witness)
+{
+    add(InterfaceRequirementKey(requirementDecl), witness);
+}
+
+void WitnessTable::add(InterfaceRequirementKey key, RequirementWitness const& witness)
+{
+    m_requirementDictionary.add(key.getDecl(), witness);
+}
+
+void WitnessTable::removeRequirement(InterfaceRequirementKey key)
+{
+    m_requirementDictionary.remove(key.getDecl());
+    m_requirementCheckStates.remove(key.getDecl());
 }
 
 // TODO: need to figure out how to unify this with the logic
