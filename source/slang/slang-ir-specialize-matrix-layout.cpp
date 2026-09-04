@@ -28,22 +28,27 @@ void specializeMatrixLayout(IRModule* module, TargetProgram* target)
     if (!matrixLayoutModeType)
         return;
 
-    IRBuilder builder(module);
-
-    // `MatrixLayoutMode.Unknown` is a single deduplicated constant, so every unspecified layout
-    // in the module, including one passed as a generic argument, is a use of this instruction.
-    auto unknownLayout =
-        builder.getIntValue(matrixLayoutModeType, SLANG_MATRIX_LAYOUT_MODE_UNKNOWN);
-    if (!unknownLayout->hasUses())
-        return;
-
     IRIntegerValue defaultLayout = target->getOptionSet().getMatrixLayoutMode();
     if (defaultLayout == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
         defaultLayout = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
 
-    // Users are hoistable, so `replaceUsesWith` re-deduplicates them: a matrix type with the
-    // resolved layout merges with an existing identical one instead of becoming a duplicate.
-    unknownLayout->replaceUsesWith(builder.getIntValue(matrixLayoutModeType, defaultLayout));
+    IRBuilder builder(module);
+    auto unknownLayout =
+        builder.getIntValue(matrixLayoutModeType, SLANG_MATRIX_LAYOUT_MODE_UNKNOWN);
+    auto resolvedLayout = builder.getIntValue(matrixLayoutModeType, defaultLayout);
+
+    // `Unknown` is one deduplicated constant, so every unspecified layout is a use of it: a matrix
+    // type's layout operand, or a `specialize` argument headed into one. Other uses are enum values
+    // the user wrote (e.g. a `switch` case label) and must keep their value. `replaceOperand`
+    // re-deduplicates the user, so no duplicate matrix types are left behind.
+    for (auto use = unknownLayout->firstUse; use;)
+    {
+        auto nextUse = use->nextUse; // `replaceOperand` unlinks `use`.
+        auto user = use->getUser();
+        if (as<IRMatrixType>(user) || as<IRSpecialize>(user))
+            builder.replaceOperand(use, resolvedLayout);
+        use = nextUse;
+    }
 }
 
 } // namespace Slang
