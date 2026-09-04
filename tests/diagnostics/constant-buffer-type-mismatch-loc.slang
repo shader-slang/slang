@@ -1,9 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
 
-// Regression test for https://github.com/shader-slang/slang/issues/12911:
-// a ConstantBuffer<A> vs ConstantBuffer<B> argument mismatch must produce a
+// A ConstantBuffer<A> vs ConstantBuffer<B> argument mismatch must produce a
 // LOCATED E30019 (caret + "expected/got" detail), like the plain-struct and
-// StructuredBuffer cases below.
+// StructuredBuffer cases below. Regression for issue #12911.
 //
 // The ConstantBuffer message reports the dereferenced element type ('B'), not
 // the full 'ConstantBuffer<B>', because the buffer is implicitly dereferenced
