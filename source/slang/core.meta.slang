@@ -172,6 +172,10 @@ interface IArithmetic : IComparable
 
         /// Initialize from the same type.
     __init(This value);
+
+    /// Initialize from a `float`. `IFloat` refines this to be value-preserving; other conformers
+    /// satisfy it with their available `float` conversion (integers truncate toward zero).
+    __init(float val);
 }
 
 /// Represents types that provide logical operations.
