@@ -117,14 +117,15 @@ or `slang-workspace.json`.
 - `init` creates the manifest, conventional directories, license placeholder, and ignore rules.
 - `validate` checks the closed manifest schema, license, export directories, module declarations,
   and installed toolchain. A package with no dependencies does not need a lock.
-- `build` repeats full validation, emits the source bundle under `build/bundle/source`, collects
-  Markdown under `build/docs/`, and regenerates `build/search-paths`.
+- `build` checks that the available graph is legal and buildable, emits the source bundle under
+  `build/bundle/source`, collects Markdown under `build/docs/`, and regenerates
+  `build/search-paths`.
 
 ### Current gaps and pitfalls
 
 - `init` is intentionally scoped to the manifest, directories, ignore rules, and license reminder.
   It does not write a first source file, and its placeholder license makes the default `validate`,
-  `update`, and `build` paths fail until you choose a real license.
+  fail until you choose a real license. The placeholder does not prevent a local `build`.
 - `slang package test` is reserved but not implemented. The generated `tests/` directory is only a
   convention today.
 - `docs` does not regenerate documentation. Run `build` first.
@@ -228,12 +229,13 @@ version, dependencies, and exports selected for this workspace.
   exactly what the committed lock already records. `--yes` is required when no interactive terminal
   is available. Declining the prompt leaves the workspace untouched and succeeds; it is a decision,
   not a command failure.
-- A real update materializes Git source under `deps/NAME`, validates the selected graph, writes
-  `slang-package-lock.json`, and regenerates `build/search-paths`.
-- `status` checks that the root manifest, lock, local registrations, materialized manifests, and
-  every tool-owned Git checkout agree. It aggregates wrong origins, changed/untracked counts,
-  commit divergence, and stashes without inspecting `build/` or contacting remotes. Active edits
-  and overrides make status nonzero because the graph is not portable.
+- A real update materializes Git source under `deps/NAME`, publish-checks new or changed Git
+  packages, checks closure-wide buildability, writes `slang-package-lock.json`, and regenerates
+  `build/search-paths`.
+- `status` reports how the root manifest, lock, local registrations, materialized manifests, and
+  every tool-owned Git checkout relate. It aggregates wrong origins, changed/untracked counts,
+  commit divergence, stashes, and buildability without inspecting `build/` or contacting remotes.
+  Reportable drift, including active edits and overrides, does not make status fail.
 - `fetch` subsequently reproduces that lock without consulting newer tags, publisher retractions,
   or version selection:
 
@@ -1088,16 +1090,15 @@ package and asks once. Pass `--yes` only when that destruction was pre-approved.
 **Use it when:** a validation bug or temporarily invalid source tree blocks an investigation and
 you accept that later compilation may fail. It is a workaround, not the CI path.
 
-**It skips:** license content, the first `module` / `implementing` declaration rules, and
-graph-wide import uniqueness.
+**It skips:** new-release license and portability checks, the first `module` / `implementing`
+declaration rules, and graph-wide import uniqueness.
 
 **It keeps:** manifest parsing, lock identity, dependency closure, materialized manifest checks,
 toolchain constraints, export-directory traversal, dirty-checkout protection, and the rest of the
 command's normal side effects. It always prints a warning.
 
-**Combinations:** `update --dry-run --skip-validate` skips workspace source validation but still
-cannot inspect remote source that dry-run did not materialize. `validate` intentionally has no
-skip flag.
+**Combinations:** `update --dry-run --skip-validate` still cannot inspect remote source that
+dry-run did not materialize. `validate` intentionally has no skip flag.
 
 ### `override add NAME PATH [AS]`
 
@@ -1137,12 +1138,12 @@ validation fail. This is an onboarding gap, not a desired invariant. App/library
 produce a source scaffold and make the remaining human obligation obvious; whether a generated
 license can ever be valid requires an explicit license choice.
 
-### Status can pass when validate fails
+### Status reports state; validate gates sharing
 
-`status` checks whether materialized manifests and Git checkouts match the lock. It does not inspect
-license content or module declarations. This distinction is intentional, but the command names do
-not make the boundary obvious. Use `status` to diagnose workspace state and `validate` as the
-package-quality gate.
+`status` reports whether materialized manifests and Git checkouts match the lock and whether the
+available graph is buildable. Like `git status`, reportable drift still returns success; malformed
+required JSON is an error because no reliable report can be produced. `validate` applies the
+license, source-layout, and path-portability rules to the workspace package as a sharing gate.
 
 ### Fetch ignores retractions but honors root excludes
 
@@ -1225,7 +1226,7 @@ belongs in the package tool.
    initialization with application/library policy.
 2. Add package registry search if Slang later gains a registry.
 3. Implement a package testing contract for the generated `tests/` directory.
-4. Add a package-content preview analogous to pack/publish dry-run.
+4. Add a package-content listing to complement the sharing checks performed by `validate`.
 
 ### Multi-package development
 
@@ -1251,7 +1252,8 @@ them or update this chapter and its regression tests in the same change.
 ### Bootstrap contract
 
 - `init` creates the manifest, conventional directories, placeholder license, and ignore entries.
-- Default `validate`, `update`, and `build` reject the license placeholder.
+- Default `validate` rejects the workspace license placeholder. Build allows it, while update and
+  fetch reject it only when it appears in a new or changed Git dependency checkout.
 - A dependency-free valid package can validate and build without a lock.
 
 ### Resolve and reproduce contract
@@ -1281,7 +1283,9 @@ them or update this chapter and its regression tests in the same change.
 - A package split can preserve a Slang import only when the new graph exports that import exactly
   once.
 - Nested package locks never constrain the consuming root.
-- Selection and validation consider the complete reachable graph, including unchanged rows.
+- Legal-graph and buildability checks consider the complete reachable graph, including unchanged
+  rows. Publishability is checked only for the workspace (`validate`) or a changed Git selection
+  (`fetch` and `update`).
 
 ### Local-development contract
 
@@ -1304,13 +1308,15 @@ them or update this chapter and its regression tests in the same change.
 
 ### Validation contract
 
-- Default fetch, update, build, and validate enforce licenses, exports, module-header placement,
-  toolchain constraints, and graph-wide import uniqueness.
+- Fetch and update always enforce graph legality, publish-check changed Git selections, and enforce
+  source layout and import uniqueness across the closure. Build enforces graph legality and
+  buildability. Validate checks workspace publishability and lock portability.
 - `--skip-validate` exists only on fetch, update, and build; it warns and keeps lock, manifest,
   closure, toolchain, export, and dirty-checkout checks.
 - `status` diagnoses lock, registration, and checkout state without mutation or remote access. It
-  inventories all discovered problems, never inspects `build/`, and is not the package-quality
-  gate. Active edits and overrides produce a nonzero result.
+  inventories all discovered observations, reports buildability, never inspects `build/`, and is
+  not the package-quality gate. Reportable drift returns success; unreadable or malformed required
+  JSON returns failure.
 
 ### Output and side-effect contract
 

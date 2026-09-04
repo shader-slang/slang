@@ -87,6 +87,34 @@ SlangResult validateLockedDependency(
     return SLANG_OK;
 }
 
+SlangResult validateLockedWorkspaceExclusions(
+    const Manifest& workspaceManifest,
+    const LockFile& lock,
+    String& outError)
+{
+    for (const auto& exclusion : workspaceManifest.workspace.exclusions)
+    {
+        Index packageIndex = findLockedPackageIndex(lock, exclusion.packageName);
+        if (packageIndex < 0)
+            continue;
+        const LockedPackage& package = lock.packages[packageIndex];
+        if (package.path.getLength())
+            continue;
+        SemanticVersion version;
+        String versionError;
+        SLANG_RELEASE_ASSERT(
+            SLANG_SUCCEEDED(parseExactVersion(package.version, version, versionError)));
+        if (matchesVersionPolicy(exclusion.version, version))
+        {
+            outError = String("Locked package '") + package.name + "' version " + package.version +
+                       " is excluded by the workspace: " + exclusion.reason +
+                       ". Run 'slang package update'.";
+            return SLANG_FAIL;
+        }
+    }
+    return SLANG_OK;
+}
+
 SlangResult validateLockedPackageManifest(
     const LockedPackage& package,
     const Manifest& manifest,

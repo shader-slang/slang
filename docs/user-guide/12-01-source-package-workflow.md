@@ -110,13 +110,15 @@ checkout. Once a lock exists, fetch reproduces it and never reselects versions.
 slang package status
 ```
 
-After a successful fetch, status should report that the lock is current, that there is no active
-local edit or override state, and that tool-owned Git checkouts are clean. It inventories all
-manifest/lock mismatches, missing materialization, wrong origins, changed or untracked files,
-commit divergence, and stashes. Status does not inspect `build/`, fetch, update, or contact
-remotes. When something is wrong, it names the corrective command.
+After a successful fetch, status should report `Buildable: yes`, no active local edit or override
+state, and clean tool-owned Git checkouts. It inventories all manifest/lock mismatches, missing
+materialization, wrong origins, changed or untracked files, commit divergence, and stashes. Status
+does not inspect `build/`, fetch, update, or contact remotes. When it finds drift, it reports the
+state and names the corrective command without returning a failure merely because the workspace is
+dirty or incomplete.
 
-If you run status before fetch, it fails because the locked packages are not materialized yet.
+If you run status before fetch, it reports the missing lock or materialization and
+`Buildable: no`. Status returns nonzero only when required JSON cannot be read and parsed.
 
 ## Preview a new solve, then apply it
 
@@ -146,13 +148,13 @@ encoding range (`>=1.1.0`) and the
 publisher retraction of `1.0.0` agree: the shared leaf is `color-encoding@v1.1.0`, once, in the
 lock.
 
-Before changing checkouts, update validates the workspace package. After materializing the
-selection, it validates every reachable package's manifest, licenses, exports, and module layout,
-and checks module import uniqueness across the graph. The new lock and successful resolution
-report are written only after those checks pass. Fetch performs the same pre- and
-post-materialization validation while reproducing the existing lock. `--skip-validate` is an
-escape hatch that leaves lock identity checks in place but skips source, license, and
-module-layout validation.
+After materializing a selection, update checks the license, exports, and module layout of each new
+or changed Git checkout, and checks module layout and import uniqueness across the complete graph.
+The new lock and successful resolution report are written only after those checks pass. Fetch
+applies the same checks while reproducing the existing lock. Unchanged dependencies are still part
+of closure-wide buildability, but their publish checks are not repeated. `--skip-validate` is an
+escape hatch that leaves graph, materialized-manifest, export-inventory, and toolchain checks in
+place while skipping source-layout and new-release publish validation.
 
 `v1.1.0` of the preview prints full-precision luma weights `(0.2126, 0.7152, 0.0722)` instead of
 the truncated `(0.2130, 0.7150, 0.0720)` from `v1.0.0`.
@@ -171,7 +173,8 @@ walkthrough demonstrates `.slang-module` output. A stable `slang package build` 
 source bundle and docs only; binary module generation and host executable compilation are
 experimental. Source interpretation with `run` is stable.
 
-Build validates the materialized graph, then:
+Build checks that the materialized graph is legal and buildable, without requiring publish
+licenses or a portable workspace, then:
 
 - When `workspace.bundle.modules` is enabled (the default), emits a `.slang-module` for every
   primary in the workspace and its dependencies under `build/bundle/modules/`, preserving

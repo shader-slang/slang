@@ -27,6 +27,12 @@ SlangResult validateLockedDependency(
     Index& outPackageIndex,
     String& outError);
 
+/// Fail when the lock selects a Git release excluded by the workspace manifest.
+SlangResult validateLockedWorkspaceExclusions(
+    const Manifest& workspaceManifest,
+    const LockFile& lock,
+    String& outError);
+
 /// Verify that a package manifest matches the identity and exports recorded in the lock.
 SlangResult validateLockedPackageManifest(
     const LockedPackage& package,

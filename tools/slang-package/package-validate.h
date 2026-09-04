@@ -30,23 +30,37 @@ struct ExportedSourceFile
 /// Return the placeholder text written by `slang package init`.
 const char* getLicensePlaceholderText();
 
-/// Validate one package tree independently of dependency resolution.
+/// Validate that one package is suitable for sharing as a dependency.
 ///
-/// This checks licenses, exported source roots, and every `.slang` file's primary `module` or
-/// companion `implementing` declaration. Graph-wide import collisions are checked by
-/// `validateResolvedProject`.
-SlangResult validatePackageTree(
+/// In addition to the buildable source shape, this requires non-placeholder licenses and rejects a
+/// path dependency that resolves outside the package. It does not inspect transitive package
+/// source trees; closure-wide build invariants are checked separately.
+SlangResult validatePublishablePackage(
     const String& packageRoot,
     const Manifest& manifest,
-    String& outError,
-    bool skipSourceValidation = false);
+    String& outError);
 
-/// Validate a proposed materialized graph without reading its lock from disk.
+/// Validate the identities and paths in a materialized dependency graph.
 ///
-/// `fetch` and `update` use this after materialization so the lock being fetched or proposed by
-/// the solver is the source of truth. Every reachable package is validated, even when its lock row
-/// did not change, because module import uniqueness is a graph-wide invariant.
-SlangResult validateResolvedProject(
+/// This checks dependency-to-lock correspondence, trusted reachability, materialized manifests,
+/// local registrations, path identities, and the combined toolchain constraint. It deliberately
+/// does not inspect licenses, exports, or source declarations.
+SlangResult validateLegalResolvedProject(
+    const String& projectRoot,
+    const Manifest& rootManifest,
+    const LockFile& lock,
+    const List<LocalPackage>& localPackages,
+    String& outError,
+    List<String>* outWarnings = nullptr);
+
+/// Validate that a proposed materialized graph has the source shape needed by a build.
+///
+/// `fetch` and `update` use this after materialization so the proposed lock is the source of truth.
+/// Every reachable package participates in graph-wide import uniqueness and toolchain selection,
+/// including packages whose lock row did not change. `skipSourceValidation` still inventories
+/// exports and verifies the legal materialized graph and toolchain, but does not check source
+/// declarations or import uniqueness.
+SlangResult validateBuildableResolvedProject(
     const String& projectRoot,
     const Manifest& rootManifest,
     const LockFile& lock,
@@ -57,11 +71,12 @@ SlangResult validateResolvedProject(
     List<ExportedSourceFile>* outSourceFiles = nullptr,
     bool skipSourceValidation = false);
 
-/// Validate the workspace package and its materialized, locked dependency closure. When requested,
-/// return every primary module in the resolved graph in import-path order, and every exported
-/// `.slang` file for bundle source copy. `skipSourceValidation` still walks exports for the build
-/// inventory, but does not enforce licenses, first-declaration placement, or import uniqueness.
-SlangResult validateProject(
+/// Validate the workspace package and its materialized, locked dependency closure for a build.
+///
+/// When requested, return every primary module in import-path order and every exported `.slang`
+/// file for bundle source copy. Licenses and publish portability are intentionally outside this
+/// predicate.
+SlangResult validateBuildableProject(
     const String& projectRoot,
     String& outError,
     List<String>* outWarnings = nullptr,

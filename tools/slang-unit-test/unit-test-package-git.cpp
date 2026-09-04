@@ -6,6 +6,7 @@
 #include "package-json.h"
 #include "package-local.h"
 #include "package-tool.h"
+#include "package-validate.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -350,17 +351,20 @@ SLANG_UNIT_TEST(PackageToolStatusReportsUnmaterializedCheckouts)
 
     Path::removeNonEmpty(Path::combine(temp.path, "deps/noise"));
     error = String();
-    SLANG_CHECK(SLANG_FAILED(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
+    String statusReport;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
     SLANG_CHECK(
-        error.getUnownedSlice().indexOf(UnownedStringSlice("are not materialized under 'deps/'")) >=
-        0);
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("noise")) >= 0);
+        statusReport.getUnownedSlice().indexOf(
+            UnownedStringSlice("are not materialized under 'deps/'")) >= 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("noise")) >= 0);
     // The absent checkout is reported once: neither the dependency-manifest read nor Git's own
     // missing-directory text should restate it, and the present sibling must not be implicated.
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("dependency manifest")) < 0);
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("cannot change to")) < 0);
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("color")) < 0);
+    SLANG_CHECK(
+        statusReport.getUnownedSlice().indexOf(UnownedStringSlice("dependency manifest")) < 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("cannot change to")) < 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("color")) < 0);
 
     const char* fetchArguments[] = {"slang-package", "fetch"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -373,14 +377,71 @@ SLANG_UNIT_TEST(PackageToolStatusReportsUnmaterializedCheckouts)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         File::writeAllText(Path::combine(temp.path, "deps/color/stray.txt"), "stray\n")));
     error = String();
-    SLANG_CHECK(SLANG_FAILED(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
     SLANG_CHECK(
-        error.getUnownedSlice().indexOf(UnownedStringSlice("are not materialized under 'deps/'")) >=
-        0);
+        statusReport.getUnownedSlice().indexOf(
+            UnownedStringSlice("are not materialized under 'deps/'")) >= 0);
     SLANG_CHECK(
-        error.getUnownedSlice().indexOf(
+        statusReport.getUnownedSlice().indexOf(
             UnownedStringSlice("Package checkout 'color' is not clean")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageToolPublishChecksOnlyChangedGitPackages)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+
+    String repository = Path::combine(temp.path, "upstream-noise");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(repository));
+    Manifest noise;
+    noise.name = "noise";
+    noise.exports.add("src");
+    noise.licenseFiles.add("LICENSE");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(repository, "slang-package.json"), noise, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(repository, "LICENSE"), getLicensePlaceholderText())));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(repository, "src/noise.slang"), "module noise;\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+
+    Manifest root;
+    String rootManifestPath = Path::combine(temp.path, "slang-package.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    Dependency dependency;
+    dependency.name = "noise";
+    dependency.git = repository;
+    dependency.version = "1.0.0";
+    root.dependencies.add(dependency);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+
+    const char* updateArguments[] = {"slang-package", "update", "--yes"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("license placeholder")) >= 0);
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "slang-package-lock.json")));
+
+    const char* skipUpdateArguments[] =
+        {"slang-package", "update", "--skip-validate", "--clean", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(skipUpdateArguments),
+        skipUpdateArguments,
+        error)));
+    const char* fetchArguments[] = {"slang-package", "fetch"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
+    Path::removeNonEmpty(Path::combine(temp.path, "deps/noise"));
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("license placeholder")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
@@ -439,13 +500,22 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
         executeInDirectory(temp.path, SLANG_COUNT_OF(editArguments), editArguments, error)));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "slang-workspace.json")));
     SLANG_CHECK(File::exists(checkoutSource));
+    const char* validateArguments[] = {"slang-package", "validate"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(validateArguments),
+        validateArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("edit mode")) >= 0);
     const char* statusArguments[] = {"slang-package", "status"};
     root.dependencies.clear();
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
-    SLANG_CHECK(SLANG_FAILED(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("edit mode")) >= 0);
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("unreachable")) >= 0);
+    String statusReport;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("edit mode")) >= 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("unreachable")) >= 0);
     root.dependencies.add(dependency);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
 
@@ -595,6 +665,11 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
         searchPaths.getUnownedSlice().indexOf(UnownedStringSlice("upstream-noise/src")) < 0);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(validateArguments),
+        validateArguments,
+        error)));
     const char* removeOverrideArguments[] = {
         "slang-package",
         "override",

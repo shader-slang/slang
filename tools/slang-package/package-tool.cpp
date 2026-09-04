@@ -46,7 +46,8 @@ static void _printHelp(bool experimental = false)
         "                   --dry-run reports the selected graph without writing the lock.\n"
         "                   --minimal prints one-line package changes without rationale.\n"
         "                   --yes applies without an interactive confirmation.\n"
-        "                   --skip-validate skips source, license, and module-layout checks.\n"
+        "                   --skip-validate skips source-layout and publish checks.\n"
+        "                   Graph, manifest, checkout, and toolchain checks still run.\n"
         "  build [--skip-validate]\n"
         "                   Build the distributable source bundle and docs.\n"
         "  run [name] [args...]\n"
@@ -54,8 +55,8 @@ static void _printHelp(bool experimental = false)
         "  test             Reserved. Package testing is not implemented yet.\n"
         "  docs [--print]   Open build/docs/index.md with the registered application.\n"
         "                   --print writes the path instead of launching.\n"
-        "  status           Check lock, local state, materialized packages, and checkouts.\n"
-        "  validate         Validate package structure and the locked dependency closure.\n"
+        "  status           Report lock, buildability, local state, and checkouts.\n"
+        "  validate         Check that this package is suitable for sharing.\n"
         "  tree             Print the selected dependency graph.\n"
         "  why <name>       Print every graph path that requires a package.\n"
         "  dependency add <name> --git <url> --version <range>\n"
@@ -282,8 +283,11 @@ static SlangResult _materialize(
     const LockFile* previousLock,
     const List<LocalPackage>& localPackages,
     bool allowClean,
+    List<String>* outChangedPackageNames,
     String& outError)
 {
+    if (outChangedPackageNames)
+        outChangedPackageNames->clear();
     String depsRoot = Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest));
     if (!Path::createDirectoryRecursive(depsRoot))
     {
@@ -385,6 +389,8 @@ static SlangResult _materialize(
             outError));
         if (didMaterialize)
         {
+            if (outChangedPackageNames)
+                outChangedPackageNames->add(package.name);
             fprintf(
                 stdout,
                 "Checked out '%s' at %s (%s).\n",
@@ -513,40 +519,12 @@ static SlangResult _readProjectLock(const String& projectRoot, LockFile& outLock
 ///
 /// Each lock entry stores the dependency requirements from the manifest that produced it. This
 /// lets fetch validate both Git and local package graphs without rediscovering metadata.
-static SlangResult _validateLockExclusions(
-    const Manifest& manifest,
-    const LockFile& lock,
-    String& outError)
-{
-    for (const auto& exclusion : manifest.workspace.exclusions)
-    {
-        Index packageIndex = findLockedPackageIndex(lock, exclusion.packageName);
-        if (packageIndex < 0)
-            continue;
-        const LockedPackage& package = lock.packages[packageIndex];
-        if (package.path.getLength())
-            continue;
-        SemanticVersion version;
-        String versionError;
-        SLANG_RELEASE_ASSERT(
-            SLANG_SUCCEEDED(parseExactVersion(package.version, version, versionError)));
-        if (matchesVersionPolicy(exclusion.version, version))
-        {
-            outError = String("Locked package '") + package.name + "' version " + package.version +
-                       " is excluded by the workspace: " + exclusion.reason +
-                       ". Run 'slang package update'.";
-            return SLANG_FAIL;
-        }
-    }
-    return SLANG_OK;
-}
-
 static SlangResult _validateLockAgainstManifest(
     const Manifest& manifest,
     const LockFile& lock,
     String& outError)
 {
-    SLANG_RETURN_ON_FAIL(_validateLockExclusions(manifest, lock, outError));
+    SLANG_RETURN_ON_FAIL(validateLockedWorkspaceExclusions(manifest, lock, outError));
     List<bool> reachablePackages;
     reachablePackages.setCount(lock.packages.getCount());
     for (auto& reachable : reachablePackages)
@@ -668,13 +646,18 @@ static SlangResult _validateLocalPackages(
     return SLANG_OK;
 }
 
-static SlangResult _validateMaterializedManifests(
+/// Validate enough of the locked graph to regenerate search paths after a local registration
+/// changes.
+///
+/// The lock remains the dependency source of truth for an active local package until the next
+/// update adopts that package's manifest, so this deliberately validates the local root and uses
+/// the locked dependency edges instead of requiring the two manifests to match.
+static SlangResult _validateGraphAfterLocalRegistrationChange(
     const String& projectRoot,
     const Manifest& rootManifest,
     const LockFile& lock,
     const List<LocalPackage>& localPackages,
     String& outError,
-    bool allowLocalManifestChanges = false,
     List<String>* outWarnings = nullptr)
 {
     List<bool> trusted;
@@ -726,13 +709,12 @@ static SlangResult _validateMaterializedManifests(
                        package.name + "'. " + outError;
             return SLANG_FAIL;
         }
-        if (!(allowLocalManifestChanges && localIndex >= 0))
+        if (localIndex < 0)
             SLANG_RETURN_ON_FAIL(validateLockedPackageManifest(package, manifest, outError));
         addSlangToolchainConstraint(manifest, toolchainConstraints);
         addUnadoptedWorkspaceExclusionWarnings(rootManifest, package.name, manifest, outWarnings);
-        const List<Dependency>& dependencies = allowLocalManifestChanges && localIndex >= 0
-                                                   ? package.dependencies
-                                                   : manifest.dependencies;
+        const List<Dependency>& dependencies =
+            localIndex >= 0 ? package.dependencies : manifest.dependencies;
         for (const auto& dependency : dependencies)
         {
             Index dependencyIndex = findLockedPackageIndex(lock, dependency.name);
@@ -764,9 +746,48 @@ static SlangResult _writeValidatedSearchPathsAfterLocalChange(
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
-    SLANG_RETURN_ON_FAIL(
-        _validateMaterializedManifests(projectRoot, manifest, lock, localPackages, outError, true));
+    SLANG_RETURN_ON_FAIL(_validateGraphAfterLocalRegistrationChange(
+        projectRoot,
+        manifest,
+        lock,
+        localPackages,
+        outError));
     return _writeSearchPaths(projectRoot, manifest, lock, localPackages, outError);
+}
+
+/// Validate packages whose Git checkout changed during materialization as newly accepted releases.
+///
+/// An unchanged package cannot develop a new license or source-layout defect, while the separate
+/// buildable-closure check still catches interactions such as an import collision between a
+/// changed package and an unchanged one.
+static SlangResult _validateChangedPublishablePackages(
+    const String& projectRoot,
+    const Manifest& rootManifest,
+    const LockFile& lock,
+    const List<LocalPackage>& localPackages,
+    const List<String>& changedPackageNames,
+    String& outError)
+{
+    for (const auto& packageName : changedPackageNames)
+    {
+        Index packageIndex = findLockedPackageIndex(lock, packageName);
+        SLANG_RELEASE_ASSERT(packageIndex >= 0);
+        const LockedPackage& package = lock.packages[packageIndex];
+        SLANG_ASSERT(isGitBackedLockedPackage(package));
+        String packageRoot;
+        SLANG_RETURN_ON_FAIL(getLockedPackageRoot(
+            projectRoot,
+            getWorkspaceDepsDirectory(rootManifest),
+            package,
+            localPackages,
+            packageRoot,
+            outError));
+        Manifest manifest;
+        SLANG_RETURN_ON_FAIL(
+            readManifest(Path::combine(packageRoot, kManifestName), manifest, outError));
+        SLANG_RETURN_ON_FAIL(validatePublishablePackage(packageRoot, manifest, outError));
+    }
+    return SLANG_OK;
 }
 
 static SlangResult _init(const String& projectRoot, String& outError)
@@ -978,7 +999,7 @@ static void _warnSkippedSourceValidation()
 {
     fprintf(
         stderr,
-        "slang-package: warning: skipped source, license, and module-layout validation "
+        "slang-package: warning: skipped source-layout and new-release publish validation "
         "(--skip-validate).\n");
 }
 
@@ -1034,8 +1055,6 @@ static SlangResult _fetch(
         _validateLocalPackages(projectRoot, lock, localPackages, outError, &warnings));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
-    if (!skipValidate)
-        SLANG_RETURN_ON_FAIL(validatePackageTree(projectRoot, manifest, outError));
     List<String> cleanReplacements;
     if (allowClean)
     {
@@ -1061,21 +1080,28 @@ static SlangResult _fetch(
         }
     }
     SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, manifest, outError));
-    if (SLANG_FAILED(
-            _materialize(projectRoot, manifest, lock, &lock, localPackages, allowClean, outError)))
+    List<String> changedPackageNames;
+    if (SLANG_FAILED(_materialize(
+            projectRoot,
+            manifest,
+            lock,
+            &lock,
+            localPackages,
+            allowClean,
+            &changedPackageNames,
+            outError)))
     {
         _appendIncompleteMaterializationAdvice(outError, true);
         return SLANG_FAIL;
     }
     if (skipValidate)
     {
-        if (SLANG_FAILED(_validateMaterializedManifests(
+        if (SLANG_FAILED(validateLegalResolvedProject(
                 projectRoot,
                 manifest,
                 lock,
                 localPackages,
                 outError,
-                false,
                 &warnings)))
         {
             _appendIncompleteMaterializationAdvice(outError, true);
@@ -1085,13 +1111,24 @@ static SlangResult _fetch(
     }
     else
     {
-        if (SLANG_FAILED(validateResolvedProject(
+        if (SLANG_FAILED(validateBuildableResolvedProject(
                 projectRoot,
                 manifest,
                 lock,
                 localPackages,
                 outError,
                 &warnings)))
+        {
+            _appendIncompleteMaterializationAdvice(outError, true);
+            return SLANG_FAIL;
+        }
+        if (SLANG_FAILED(_validateChangedPublishablePackages(
+                projectRoot,
+                manifest,
+                lock,
+                localPackages,
+                changedPackageNames,
+                outError)))
         {
             _appendIncompleteMaterializationAdvice(outError, true);
             return SLANG_FAIL;
@@ -1154,8 +1191,6 @@ static SlangResult _update(
     for (const auto& localPackage : effectiveLocalPackages)
         useLocalResolver =
             useLocalResolver || (!isEditedLocalPackage(localPackage) && localPackage.enabled);
-    if (!skipValidate)
-        SLANG_RETURN_ON_FAIL(validatePackageTree(projectRoot, manifest, outError));
 
     LockFile previousLock;
     LockFile* previousLockPtr = nullptr;
@@ -1255,6 +1290,7 @@ static SlangResult _update(
             return SLANG_OK;
     }
     SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, manifest, outError));
+    List<String> changedPackageNames;
     if (SLANG_FAILED(_materialize(
             projectRoot,
             manifest,
@@ -1262,6 +1298,7 @@ static SlangResult _update(
             previousLockPtr,
             effectiveLocalPackages,
             allowClean,
+            &changedPackageNames,
             outError)))
     {
         _appendIncompleteMaterializationAdvice(outError, previousLockPtr != nullptr);
@@ -1269,13 +1306,12 @@ static SlangResult _update(
     }
     if (skipValidate)
     {
-        if (SLANG_FAILED(_validateMaterializedManifests(
+        if (SLANG_FAILED(validateLegalResolvedProject(
                 projectRoot,
                 manifest,
                 lock,
                 effectiveLocalPackages,
                 outError,
-                false,
                 &warnings)))
         {
             _appendIncompleteMaterializationAdvice(outError, previousLockPtr != nullptr);
@@ -1284,13 +1320,24 @@ static SlangResult _update(
     }
     else
     {
-        if (SLANG_FAILED(validateResolvedProject(
+        if (SLANG_FAILED(validateBuildableResolvedProject(
                 projectRoot,
                 manifest,
                 lock,
                 effectiveLocalPackages,
                 outError,
                 &warnings)))
+        {
+            _appendIncompleteMaterializationAdvice(outError, previousLockPtr != nullptr);
+            return SLANG_FAIL;
+        }
+        if (SLANG_FAILED(_validateChangedPublishablePackages(
+                projectRoot,
+                manifest,
+                lock,
+                effectiveLocalPackages,
+                changedPackageNames,
+                outError)))
         {
             _appendIncompleteMaterializationAdvice(outError, previousLockPtr != nullptr);
             return SLANG_FAIL;
@@ -1312,63 +1359,126 @@ static SlangResult _update(
 
 static SlangResult _validate(const String& projectRoot, String& outError)
 {
-    List<String> warnings;
-    SLANG_RETURN_ON_FAIL(validateProject(projectRoot, outError, &warnings));
-    for (const auto& warning : warnings)
-        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
-    fprintf(stdout, "Package and locked dependencies are valid.\n");
-    return SLANG_OK;
-}
-
-/// Report whether committed resolution, local package state, and materialized checkouts agree.
-static SlangResult _status(const String& projectRoot, String& outError)
-{
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
-
-    String lockPath = Path::combine(projectRoot, kLockName);
-    if (!File::exists(lockPath))
-    {
-        if (manifest.dependencies.getCount())
-        {
-            outError = "Workspace has dependencies but no slang-package-lock.json. Run "
-                       "'slang package fetch' to select the initial graph.";
-            return SLANG_FAIL;
-        }
-        List<LocalPackage> localPackages;
-        SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-        if (localPackages.getCount())
-        {
-            outError =
-                "Workspace has local package registrations but no dependency lock to attach them "
-                "to.";
-            return SLANG_FAIL;
-        }
-        fprintf(
-            stdout,
-            "Package '%s': no dependency lock is required; workspace is clean and portable.\n",
-            manifest.name.getBuffer());
-        return SLANG_OK;
-    }
-    LockFile lock;
-    SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
+    SLANG_RETURN_ON_FAIL(validatePublishablePackage(projectRoot, manifest, outError));
 
     List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-    StringBuilder issues;
-    Index issueCount = 0;
-    auto addIssue = [&](const String& issue)
+    for (const auto& localPackage : localPackages)
     {
-        ++issueCount;
-        issues << "  - " << issue << "\n";
+        if (!isActiveLocalPackage(localPackage))
+            continue;
+        outError = String("Package cannot be published while local package '") + localPackage.name +
+                   "' is in " +
+                   (isEditedLocalPackage(localPackage) ? "edit mode." : "override mode.");
+        return SLANG_FAIL;
+    }
+
+    String lockPath = Path::combine(projectRoot, kLockName);
+    LockFile lock;
+    if (File::exists(lockPath))
+    {
+        SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
+    }
+    else if (manifest.dependencies.getCount())
+    {
+        outError = "Package dependencies require slang-package-lock.json before publishing.";
+        return SLANG_FAIL;
+    }
+    SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
+    for (const auto& package : lock.packages)
+    {
+        if (!isLocalOverrideLockedPackage(package))
+            continue;
+        outError = String("Package lock requires local override '") + package.name +
+                   "' and is not portable.";
+        return SLANG_FAIL;
+    }
+
+    List<String> warnings;
+    SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
+        projectRoot,
+        manifest,
+        lock,
+        localPackages,
+        outError,
+        &warnings));
+    for (const auto& warning : warnings)
+        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+    fprintf(stdout, "Package is valid and suitable for sharing.\n");
+    return SLANG_OK;
+}
+
+/// Report committed resolution, local package state, buildability, and materialized checkouts.
+///
+/// Like `git status`, reportable drift is data rather than command failure. This function fails
+/// only when the root manifest, an existing lock, or workspace-local JSON cannot be read and
+/// parsed well enough to produce a report.
+SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outReport, String& outError)
+{
+    outReport = String();
+    Manifest manifest;
+    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
+
+    List<LocalPackage> localPackages;
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+
+    String lockPath = Path::combine(projectRoot, kLockName);
+    LockFile lock;
+    bool hasLock = File::exists(lockPath);
+    if (hasLock)
+        SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
+
+    StringBuilder observations;
+    StringBuilder report;
+    Index observationCount = 0;
+    auto addObservation = [&](const String& observation)
+    {
+        ++observationCount;
+        observations << "  - " << observation << "\n";
     };
 
+    String gitRoot;
+    String gitError;
+    bool hasGitRoot = SLANG_SUCCEEDED(getGitWorkingTreeRoot(projectRoot, gitRoot, gitError));
+    String workspaceGitOrigin;
+    String workspaceGitCommit;
+    GitWorkingTreeStatus workspaceGitStatus;
+    bool hasWorkspaceGitOrigin =
+        hasGitRoot && SLANG_SUCCEEDED(getRepositoryOrigin(gitRoot, workspaceGitOrigin, gitError));
+    bool hasWorkspaceGitCommit =
+        hasGitRoot &&
+        SLANG_SUCCEEDED(getRepositoryHeadCommit(gitRoot, workspaceGitCommit, gitError));
+    bool hasWorkspaceGitStatus =
+        hasWorkspaceGitCommit &&
+        SLANG_SUCCEEDED(
+            getWorkingTreeStatus(gitRoot, workspaceGitCommit, workspaceGitStatus, gitError));
+
     String issue;
-    if (SLANG_FAILED(_validateLockAgainstManifest(manifest, lock, issue)))
-        addIssue(issue);
-    issue = String();
-    if (SLANG_FAILED(_validateLocalPackages(projectRoot, lock, localPackages, issue)))
-        addIssue(issue);
+    if (!hasLock)
+    {
+        if (manifest.dependencies.getCount())
+        {
+            addObservation(
+                "Workspace has dependencies but no slang-package-lock.json. Run 'slang package "
+                "fetch' to select the initial graph.");
+        }
+        if (localPackages.getCount())
+        {
+            addObservation(
+                "Workspace has local package registrations but no dependency lock to attach them "
+                "to.");
+        }
+    }
+    else
+    {
+        if (SLANG_FAILED(_validateLockAgainstManifest(manifest, lock, issue)))
+            addObservation(issue);
+        issue = String();
+        if (SLANG_FAILED(_validateLocalPackages(projectRoot, lock, localPackages, issue)))
+            addObservation(issue);
+    }
 
     // Find the tool-owned checkouts that are absent before inspecting anything inside them.
     // Reading a dependency's own `slang-package.json` and asking Git about its checkout both fail
@@ -1400,30 +1510,7 @@ static SlangResult _status(const String& projectRoot, String& outError)
         for (Index i = 0; i < unmaterializedNames.getCount(); ++i)
             detail << (i ? ", " : "") << unmaterializedNames[i];
         detail << ". Run 'slang package fetch' to materialize them.";
-        addIssue(detail);
-    }
-    else
-    {
-        // Validating the manifest closure requires walking every reachable dependency manifest, so
-        // it can only run once all of them are present.
-        List<String> warnings;
-        issue = String();
-        if (SLANG_FAILED(_validateMaterializedManifests(
-                projectRoot,
-                manifest,
-                lock,
-                localPackages,
-                issue,
-                false,
-                &warnings)))
-        {
-            appendErrorAdvice(
-                issue,
-                "Run 'slang package update' if a path or override package manifest changed.");
-            addIssue(issue);
-        }
-        for (const auto& warning : warnings)
-            fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+        addObservation(detail);
     }
 
     // Inspect each checkout that is present, even when a sibling is absent. A present checkout can
@@ -1440,7 +1527,7 @@ static SlangResult _status(const String& projectRoot, String& outError)
         issue = String();
         if (SLANG_FAILED(getRepositoryOrigin(packageRoot, origin, issue)))
         {
-            addIssue(
+            addObservation(
                 String("Package checkout '") + package.name +
                 "' is not a Git repository with an 'origin' remote. Run 'slang package fetch "
                 "--clean' to replace it.");
@@ -1448,7 +1535,7 @@ static SlangResult _status(const String& projectRoot, String& outError)
         }
         if (origin != package.git)
         {
-            addIssue(
+            addObservation(
                 String("Package checkout '") + package.name +
                 "' has a different Git origin. Run 'slang package fetch --clean' to restore it.");
             continue;
@@ -1458,7 +1545,7 @@ static SlangResult _status(const String& projectRoot, String& outError)
         issue = String();
         if (SLANG_FAILED(getWorkingTreeStatus(packageRoot, package.commit, gitStatus, issue)))
         {
-            addIssue(issue);
+            addObservation(issue);
             continue;
         }
         if (gitStatus.changedFileCount || gitStatus.commitsAhead || gitStatus.commitsBehind ||
@@ -1471,24 +1558,48 @@ static SlangResult _status(const String& projectRoot, String& outError)
                    << " commit(s) behind, " << gitStatus.stashCount
                    << " stash(es)). Run 'slang package edit " << package.name
                    << "' to keep the work, or 'slang package fetch --clean' to discard it.";
-            addIssue(detail);
+            addObservation(detail);
             continue;
         }
         ++cleanCheckoutCount;
     }
 
-    fprintf(
-        stdout,
-        "Package '%s': lock is current with %lld package(s).\n",
-        manifest.name.getBuffer(),
-        (long long)lock.packages.getCount());
-    if (localPackages.getCount() == 0)
+    report << "Package '" << manifest.name << "'.\n";
+    if (hasGitRoot)
     {
-        fprintf(stdout, "Local package state: none.\n");
+        report << "Git root: " << gitRoot << ".\n";
+        report << "Git origin: "
+               << (hasWorkspaceGitOrigin ? workspaceGitOrigin : String("unavailable")) << ".\n";
+        report << "Git commit: "
+               << (hasWorkspaceGitCommit ? workspaceGitCommit : String("unavailable")) << ".\n";
+        if (hasWorkspaceGitStatus)
+        {
+            report << "Git work tree: " << workspaceGitStatus.changedFileCount
+                   << " changed/untracked file(s), " << workspaceGitStatus.stashCount
+                   << " stash(es).\n";
+        }
+        else
+        {
+            report << "Git work tree: unavailable.\n";
+        }
+        if (gitRoot != projectRoot)
+            report << "Package root: " << projectRoot << " (inside the Git work tree).\n";
     }
     else
     {
-        fprintf(stdout, "Local package state:\n");
+        report << "Git root: unavailable (not in a work tree or Git is unavailable).\n";
+    }
+    if (hasLock)
+        report << "Lock: " << lock.packages.getCount() << " selected package(s).\n";
+    else
+        report << "Lock: absent.\n";
+    if (localPackages.getCount() == 0)
+    {
+        report << "Local package state: none.\n";
+    }
+    else
+    {
+        report << "Local package state:\n";
         for (const auto& package : localPackages)
         {
             if (isEditedLocalPackage(package))
@@ -1504,34 +1615,23 @@ static SlangResult _status(const String& projectRoot, String& outError)
                                             gitError));
                 if (haveGitStatus)
                 {
-                    fprintf(
-                        stdout,
-                        "  %s: edit at %s (%lld changed/untracked file(s), %lld commit(s) ahead, "
-                        "%lld commit(s) behind, %lld stash(es))\n",
-                        package.name.getBuffer(),
-                        package.path.getBuffer(),
-                        (long long)gitStatus.changedFileCount,
-                        (long long)gitStatus.commitsAhead,
-                        (long long)gitStatus.commitsBehind,
-                        (long long)gitStatus.stashCount);
+                    report << "  " << package.name << ": edit at " << package.path << " ("
+                           << gitStatus.changedFileCount << " changed/untracked file(s), "
+                           << gitStatus.commitsAhead << " commit(s) ahead, "
+                           << gitStatus.commitsBehind << " commit(s) behind, "
+                           << gitStatus.stashCount << " stash(es))\n";
                 }
                 else if (lockedIndex < 0)
                 {
-                    fprintf(
-                        stdout,
-                        "  %s: edit at %s (not in the current lock; checkout left in place)\n",
-                        package.name.getBuffer(),
-                        package.path.getBuffer());
+                    report << "  " << package.name << ": edit at " << package.path
+                           << " (not in the current lock; checkout left in place)\n";
                 }
                 else
                 {
-                    fprintf(
-                        stdout,
-                        "  %s: edit at %s (Git state unavailable)\n",
-                        package.name.getBuffer(),
-                        package.path.getBuffer());
+                    report << "  " << package.name << ": edit at " << package.path
+                           << " (Git state unavailable)\n";
                 }
-                addIssue(
+                addObservation(
                     String("Package '") + package.name +
                     "' is in edit mode; the workspace is not portable.");
             }
@@ -1544,16 +1644,12 @@ static SlangResult _status(const String& projectRoot, String& outError)
                     if (lockedIndex >= 0)
                         effectiveVersion = lock.packages[lockedIndex].version;
                 }
-                fprintf(
-                    stdout,
-                    "  %s: override %s at %s as %s\n",
-                    package.name.getBuffer(),
-                    package.enabled ? "enabled" : "disabled",
-                    package.path.getBuffer(),
-                    effectiveVersion.getBuffer());
+                report << "  " << package.name << ": override "
+                       << (package.enabled ? "enabled" : "disabled") << " at " << package.path
+                       << " as " << effectiveVersion << "\n";
                 if (package.enabled)
                 {
-                    addIssue(
+                    addObservation(
                         String("Package '") + package.name +
                         "' has an enabled override; the workspace is not portable.");
                 }
@@ -1562,18 +1658,40 @@ static SlangResult _status(const String& projectRoot, String& outError)
     }
     if (toolOwnedNames.getCount())
     {
-        fprintf(
-            stdout,
-            "%lld of %lld tool-owned Git checkout(s) are clean.\n",
-            (long long)cleanCheckoutCount,
-            (long long)toolOwnedNames.getCount());
+        report << cleanCheckoutCount << " of " << toolOwnedNames.getCount()
+               << " tool-owned Git checkout(s) are clean.\n";
     }
-    if (issueCount)
+
+    List<String> buildWarnings;
+    issue = String();
+    bool canCheckBuildability =
+        unmaterializedNames.getCount() == 0 && (hasLock || !manifest.dependencies.getCount());
+    bool isBuildable =
+        canCheckBuildability &&
+        SLANG_SUCCEEDED(validateBuildableProject(projectRoot, issue, &buildWarnings));
+    report << "Buildable: " << (isBuildable ? "yes" : "no") << ".\n";
+    if (canCheckBuildability && !isBuildable)
+        addObservation(issue);
+    for (const auto& warning : buildWarnings)
+        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+
+    if (observationCount)
     {
-        outError = String("Workspace is not clean or portable:\n") + issues;
-        return SLANG_FAIL;
+        report << "Workspace observations:\n" << observations;
     }
-    fprintf(stdout, "Workspace is clean, portable, and consistent.\n");
+    else
+    {
+        report << "Workspace state has no reported drift.\n";
+    }
+    outReport = report.produceString();
+    return SLANG_OK;
+}
+
+static SlangResult _status(const String& projectRoot, String& outError)
+{
+    String report;
+    SLANG_RETURN_ON_FAIL(getWorkspaceStatusReport(projectRoot, report, outError));
+    fprintf(stdout, "%s", report.getBuffer());
     return SLANG_OK;
 }
 
@@ -1967,7 +2085,7 @@ static SlangResult _build(
     List<PrimaryModule> primaryModules;
     List<ExportedSourceFile> sourceFiles;
     List<String> warnings;
-    SLANG_RETURN_ON_FAIL(validateProject(
+    SLANG_RETURN_ON_FAIL(validateBuildableProject(
         projectRoot,
         outError,
         &warnings,

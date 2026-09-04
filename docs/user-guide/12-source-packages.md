@@ -147,12 +147,14 @@ the minimum compiler it needs to work correctly: a builtin such as `neural`, a s
 API, or a compiler fix that did not exist (or was broken) before that version. There is no
 separate way to depend on those builtins, so the toolchain version stands in for them.
 
-Every package in the graph may declare the field; `update`, `fetch`, `status`, `build`, and
-`validate` intersect those constraints against the installed compiler. `slang package init` writes
-`>=` that installed version when it can parse it. Slang compiler versions are calendar-based, not
-API levels, so a toolchain constraint should be a lower bound such as `>=2026.8.0`. Do not cap it
-at a speculative future date. Use `!=` to skip one known-bad compiler version without inventing an
-upper bound, for example `>=2026.8.0 !=2026.9.0`.
+Every package in the graph may declare the field; `update`, `fetch`, `status`, and `build`
+intersect those constraints against the installed compiler. `validate` checks the workspace
+package's constraint while checking that package for sharing, and verifies the materialized lock
+graph when it has dependencies. `slang package init` writes `>=` that installed version when it can
+parse it. Slang compiler versions are calendar-based, not API levels, so a toolchain constraint
+should be a lower bound such as `>=2026.8.0`. Do not cap it at a speculative future date. Use `!=`
+to skip one known-bad compiler version without inventing an upper bound, for example
+`>=2026.8.0 !=2026.9.0`.
 
 Later schemas may add other system tools, or split Slang into separately versioned components if
 distributions start shipping them independently. Unknown `tools` keys are errors today.
@@ -232,10 +234,10 @@ identity. The tool warns that the Git source was shadowed. The path package's tr
 dependencies are still resolved normally.
 
 A path in the workspace package or another local package may use `..` to leave the package that
-declares it, which supports sibling packages in a larger checkout. `slang package update` and
-`slang package validate` warn because fetching the declaring package alone may not reproduce that
-layout. A path inside a Git release must remain in that release's checkout. A missing target is
-always an error.
+declares it, which supports sibling packages in a larger checkout. Such a path is valid for a
+local build, and `update`, `fetch`, and `status` warn that the declaring package is not independently
+portable. `slang package validate` rejects the path when it checks that package for sharing. A path
+inside a Git release must remain in that release's checkout. A missing target is always an error.
 
 ## Locking and fetching
 
@@ -288,38 +290,49 @@ paths into compiler sessions automatically.
 
 ## Validating packages
 
-`slang package validate` checks the current package and every materialized package reachable
-through `slang-package-lock.json`. It validates each manifest and license file, requires all source
-exports to exist, and rejects module import paths exported by more than one package.
+Package validation has three layers:
 
-The same validation is part of commands that establish or consume a dependency graph:
+- The **legal graph** checks closed JSON schemas, dependency and lock identities, trusted path
+  selections, materialized manifests, and toolchain constraints. Commands never skip this layer.
+- A **buildable workspace** additionally requires every export in the materialized closure to
+  exist, every source file to use the required `module` or `implementing` declaration, and every
+  primary import path to be unique across the graph. Local edits, overrides, and escaping path
+  dependencies remain valid build inputs.
+- A **publishable package** is one package whose source tree is buildable, whose license files are
+  present and no longer contain the generated placeholder, and whose path dependencies stay
+  inside that package.
 
-- `fetch` validates the workspace package before changing dependency checkouts, then validates the
-  complete reachable graph after materialization.
-- `update` validates the workspace package before solving, then validates the complete selected
-  graph after materialization and before writing the new lock. It does not validate the old graph
-  first, so a broken old dependency cannot prevent an update to a fixed release.
-- `update --dry-run` validates the workspace package and every manifest read by the solver. It
-  cannot validate source files from remote candidates because it does not materialize them.
-- `build` performs the same full graph validation before compiling anything.
+`slang package validate` is the sharing check. It applies the publishable-package rules to the
+workspace package, rejects active edits or overrides and a lock that requires local override state,
+and checks that the materialized lock graph is legal. It does not repeat license or source-layout
+checks for unchanged transitive dependencies.
 
-Successful `fetch`, `update`, and `build` therefore require the workspace package and every
-reachable dependency to conform to the closed manifest schema, license and export rules, module
-layout, and graph-wide module import uniqueness. Validation covers the whole reachable graph, not
-only changed lock rows, because an unchanged package can conflict with a newly selected module.
+`build` requires a legal, buildable workspace. It deliberately permits the generated license
+placeholder, edits, overrides, and local path dependencies because those do not prevent
+compilation.
 
-Pass `--skip-validate` on `fetch`, `update`, or `build` only as an escape hatch. It still checks
-the lock against declared dependencies and materialized manifests, but it skips license files,
-first-declaration placement, and import uniqueness. The command prints a warning. Do not use it
-in CI; `slang package validate` has no skip flag.
+`fetch` and `update` always verify the legal graph. After materialization, they apply the
+publishable-package checks to each Git package whose checkout was newly created or changed, then
+check source layout and import uniqueness across the complete selected graph. The closure check
+includes unchanged packages because a new module can collide with one already selected.
+`update --dry-run` cannot inspect source from remote candidates because it does not materialize
+them.
 
-`slang package status` inventories the root manifest and lock, registered edits and overrides,
-materialized manifests, origins, changed and untracked file counts, commit divergence, and stashes
-for every tool-owned checkout. It reports all discovered problems and the corrective `fetch`,
-`update`, `edit`, or `--clean` command instead of stopping at the first one. Enabled overrides and
-edits make status return nonzero because the workspace is not portable; disabled overrides remain
-listed without making an otherwise published graph dirty. Status does not inspect `build/`, modify
-package state, or contact remotes.
+Pass `--skip-validate` on `fetch`, `update`, or `build` only as an escape hatch. It skips source
+declaration, import-uniqueness, and new-release publish checks, but still checks the lock against
+declared dependencies, reads materialized manifests, inventories exports needed by build, and
+checks toolchain constraints. The command prints a warning. `slang package validate` has no skip
+flag.
+
+`slang package status` inventories the root manifest and lock, buildability, registered edits and
+overrides, materialized manifests, the workspace Git root, origin, commit, and dirty state when
+available, plus origins, commit divergence, changed and untracked file counts, and stashes for
+every tool-owned checkout. Like
+`git status`, reportable drift does not make the command fail: missing materialization, stale lock
+state, active local state, dirty checkouts, and `Buildable: no` are part of the report. Status
+returns nonzero only when required root manifest, existing lock, or workspace JSON cannot be read
+and parsed well enough to produce a report. It does not inspect `build/`, modify package state, or
+contact remotes.
 
 Use `slang package dependency add` and `dependency remove` to edit direct manifest edges, and
 `dependency list` to inspect them. Add accepts exactly one source shape:

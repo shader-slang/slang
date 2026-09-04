@@ -286,7 +286,7 @@ static SlangResult _addModule(
     const String& relativePath,
     List<ModuleLocation>& ioModules,
     String& outError,
-    bool skipSourceValidation)
+    bool validateSourceLayout)
 {
     String normalizedImport = _normalizePath(Path::getPathWithoutExt(relativePath));
     StringBuilder canonicalImportBuilder;
@@ -296,7 +296,7 @@ static SlangResult _addModule(
     String fullPath = Path::combine(exportRoot, relativePath);
     for (const auto& existing : ioModules)
     {
-        if (!skipSourceValidation &&
+        if (validateSourceLayout &&
             existing.canonicalImport.getUnownedSlice().caseInsensitiveEquals(
                 canonicalImport.getUnownedSlice()))
         {
@@ -334,7 +334,7 @@ static SlangResult _validateExport(
     List<ModuleLocation>& ioModules,
     List<ExportedSourceFile>& ioSourceFiles,
     String& outError,
-    bool skipSourceValidation)
+    bool validateSourceLayout)
 {
     SlangPathType exportType;
     if (SLANG_FAILED(Path::getPathType(exportRoot, &exportType)) ||
@@ -360,7 +360,7 @@ static SlangResult _validateExport(
         String owner = _findOwningModule(relativePath, normalizedSourcePaths);
         bool isPrimary = owner.getLength() == 0;
         String fullPath = Path::combine(exportRoot, relativePath);
-        if (!skipSourceValidation)
+        if (validateSourceLayout)
         {
             String expectedName = _canonicalModuleName(isPrimary ? relativePath : owner);
             ModuleHeaderKind kind;
@@ -398,7 +398,7 @@ static SlangResult _validateExport(
                 relativePath,
                 ioModules,
                 outError,
-                skipSourceValidation));
+                validateSourceLayout));
         }
     }
     return SLANG_OK;
@@ -459,9 +459,10 @@ static SlangResult _validatePackageTree(
     List<ModuleLocation>& ioModules,
     List<ExportedSourceFile>& ioSourceFiles,
     String& outError,
-    bool skipSourceValidation)
+    bool validateLicenses,
+    bool validateSourceLayout)
 {
-    if (!skipSourceValidation)
+    if (validateLicenses)
         SLANG_RETURN_ON_FAIL(_validateLicenseFiles(packageRoot, manifest, outError));
     if (manifest.exports.getCount() == 0)
     {
@@ -491,7 +492,40 @@ static SlangResult _validatePackageTree(
             ioModules,
             ioSourceFiles,
             outError,
-            skipSourceValidation));
+            validateSourceLayout));
+    }
+    return SLANG_OK;
+}
+
+/// Reject local dependency edges that would refer outside a shared copy of this package.
+static SlangResult _validatePublishablePathDependencies(
+    const String& packageRoot,
+    const Manifest& manifest,
+    String& outError)
+{
+    String canonicalPackageRoot;
+    if (SLANG_FAILED(Path::getCanonical(packageRoot, canonicalPackageRoot)))
+    {
+        outError = String("Cannot canonicalize package root: ") + packageRoot;
+        return SLANG_FAIL;
+    }
+    for (const auto& dependency : manifest.dependencies)
+    {
+        if (!dependency.path.getLength())
+            continue;
+        String path = Path::combine(packageRoot, dependency.path);
+        String canonicalPath;
+        if (SLANG_FAILED(Path::getCanonical(path, canonicalPath)))
+        {
+            outError = String("Path dependency does not exist: ") + dependency.name + " at " + path;
+            return SLANG_FAIL;
+        }
+        if (!isCanonicalPathWithin(canonicalPackageRoot, canonicalPath))
+        {
+            outError = String("Path dependency '") + dependency.name +
+                       "' escapes the package and cannot be published: " + dependency.path;
+            return SLANG_FAIL;
+        }
     }
     return SLANG_OK;
 }
@@ -537,44 +571,26 @@ static SlangResult _readMaterializedManifest(
     return validateLockedPackageManifest(package, outManifest, outError);
 }
 
-SlangResult validatePackageTree(
+SlangResult validatePublishablePackage(
     const String& packageRoot,
     const Manifest& manifest,
-    String& outError,
-    bool skipSourceValidation)
+    String& outError)
 {
+    SLANG_RETURN_ON_FAIL(_validatePublishablePathDependencies(packageRoot, manifest, outError));
     List<ModuleLocation> modules;
     List<ExportedSourceFile> sourceFiles;
-    return _validatePackageTree(
-        packageRoot,
-        manifest,
-        modules,
-        sourceFiles,
-        outError,
-        skipSourceValidation);
+    return _validatePackageTree(packageRoot, manifest, modules, sourceFiles, outError, true, true);
 }
 
-SlangResult validateResolvedProject(
+SlangResult validateLegalResolvedProject(
     const String& projectRoot,
     const Manifest& rootManifest,
     const LockFile& lock,
     const List<LocalPackage>& localPackages,
     String& outError,
-    List<String>* outWarnings,
-    List<PrimaryModule>* outPrimaryModules,
-    List<ExportedSourceFile>* outSourceFiles,
-    bool skipSourceValidation)
+    List<String>* outWarnings)
 {
-    List<ModuleLocation> modules;
-    List<ExportedSourceFile> sourceFiles;
-    SLANG_RETURN_ON_FAIL(_validatePackageTree(
-        projectRoot,
-        rootManifest,
-        modules,
-        sourceFiles,
-        outError,
-        skipSourceValidation));
-
+    SLANG_RETURN_ON_FAIL(validateLockedWorkspaceExclusions(rootManifest, lock, outError));
     List<Manifest> packageManifests;
     packageManifests.setCount(lock.packages.getCount());
     List<String> packageRoots;
@@ -587,12 +603,21 @@ SlangResult validateResolvedProject(
     {
         if (!isActiveLocalPackage(localPackage))
             continue;
-        if (findLockedPackageIndex(lock, localPackage.name) < 0)
+        Index packageIndex = findLockedPackageIndex(lock, localPackage.name);
+        if (packageIndex < 0)
         {
             if (isParkedEdit(localPackage, lock))
                 continue;
             outError =
                 String("Registered local package is not present in the lock: ") + localPackage.name;
+            return SLANG_FAIL;
+        }
+        const LockedPackage& package = lock.packages[packageIndex];
+        if (!isEditedLocalPackage(localPackage) && localPackage.as.getLength() &&
+            package.version != localPackage.as)
+        {
+            outError = String("Locked version for local override '") + package.name +
+                       "' does not match slang-workspace.json. Run 'slang package update'.";
             return SLANG_FAIL;
         }
     }
@@ -656,20 +681,8 @@ SlangResult validateResolvedProject(
                 pending.add(dependencyIndex);
             }
         }
-
-        SLANG_RETURN_ON_FAIL(_validatePackageTree(
-            packageRoots[index],
-            manifest,
-            modules,
-            sourceFiles,
-            outError,
-            skipSourceValidation));
     }
     SLANG_RETURN_ON_FAIL(requireAllLockPackagesTrusted(lock, reachable, outError));
-    if (outPrimaryModules)
-        _collectPrimaryModules(modules, *outPrimaryModules);
-    if (outSourceFiles)
-        _collectExportedSourceFiles(sourceFiles, *outSourceFiles);
     List<ToolchainConstraint> toolchainConstraints;
     addSlangToolchainConstraint(rootManifest, toolchainConstraints);
     for (Index i = 0; i < lock.packages.getCount(); ++i)
@@ -688,7 +701,64 @@ SlangResult validateResolvedProject(
     return selectSlangToolchain(toolchainConstraints, outError);
 }
 
-SlangResult validateProject(
+SlangResult validateBuildableResolvedProject(
+    const String& projectRoot,
+    const Manifest& rootManifest,
+    const LockFile& lock,
+    const List<LocalPackage>& localPackages,
+    String& outError,
+    List<String>* outWarnings,
+    List<PrimaryModule>* outPrimaryModules,
+    List<ExportedSourceFile>* outSourceFiles,
+    bool skipSourceValidation)
+{
+    SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
+        projectRoot,
+        rootManifest,
+        lock,
+        localPackages,
+        outError,
+        outWarnings));
+
+    List<ModuleLocation> modules;
+    List<ExportedSourceFile> sourceFiles;
+    SLANG_RETURN_ON_FAIL(_validatePackageTree(
+        projectRoot,
+        rootManifest,
+        modules,
+        sourceFiles,
+        outError,
+        false,
+        !skipSourceValidation));
+    for (const auto& package : lock.packages)
+    {
+        String packageRoot;
+        Manifest manifest;
+        SLANG_RETURN_ON_FAIL(_readMaterializedManifest(
+            projectRoot,
+            getWorkspaceDepsDirectory(rootManifest),
+            package,
+            localPackages,
+            packageRoot,
+            manifest,
+            outError));
+        SLANG_RETURN_ON_FAIL(_validatePackageTree(
+            packageRoot,
+            manifest,
+            modules,
+            sourceFiles,
+            outError,
+            false,
+            !skipSourceValidation));
+    }
+    if (outPrimaryModules)
+        _collectPrimaryModules(modules, *outPrimaryModules);
+    if (outSourceFiles)
+        _collectExportedSourceFiles(sourceFiles, *outSourceFiles);
+    return SLANG_OK;
+}
+
+SlangResult validateBuildableProject(
     const String& projectRoot,
     String& outError,
     List<String>* outWarnings,
@@ -716,7 +786,7 @@ SlangResult validateProject(
         return SLANG_FAIL;
     }
 
-    return validateResolvedProject(
+    return validateBuildableResolvedProject(
         projectRoot,
         rootManifest,
         lock,

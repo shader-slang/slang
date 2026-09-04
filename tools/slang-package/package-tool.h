@@ -26,6 +26,15 @@ SlangResult executeInDirectory(
 /// with its own manifest) keeps that nearer root. `init` does not use this discovery path.
 SlangResult discoverPackageRoot(const String& startDirectory, String& outRoot, String& outError);
 
+/// Produce the same workspace-state report printed by `slang package status`.
+///
+/// Reportable drift is returned in `outReport` with `SLANG_OK`. Unreadable or malformed required
+/// JSON is returned through `outError` as a failure.
+SlangResult getWorkspaceStatusReport(
+    const String& projectRoot,
+    String& outReport,
+    String& outError);
+
 /// Format one command failure exactly as the `slang-package` executable writes it to stderr.
 String formatCommandError(const String& error);
 
