@@ -46,6 +46,12 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
 {
     for (auto& option : options)
     {
+        // `classifyCommandLineOption` is the single source of truth for what this reconstruction
+        // emits; routing every option through it (rather than an open-coded set here) is what lets
+        // the exhaustiveness unit test force a deliberate classification for each new enumerator.
+        if (classifyCommandLineOption(option.key) != CommandLineOptionClass::Serialize)
+            continue;
+
         // Most emitted options resolve their flag name from the command-option catalog; a few keys
         // that are not registered as their own command option (e.g. DebugInformationFormat,
         // EmitSpirvMethod) build the flag inline in their case below, so a missing registration is
@@ -365,8 +371,15 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                 sb << " " << name;
             break;
         default:
-            // Other option kinds are currently omitted.
-            break;
+            // Unreachable for the current enum: the gate above admits only `Serialize` options and
+            // every one has an emit case here (the classification and this switch are kept in
+            // lockstep). A `Serialize` option with no case is a bug — it would emit nothing — so
+            // fail loudly. Note this catches such a mistake only at run time and only where
+            // debug-only asserts fire: under `SLANG_ASSERT=release-assert-only` it is skipped, so a
+            // future unpaired `Serialize` option would silently drop in that mode. The
+            // exhaustiveness unit test guards classification completeness but not this pairing; a
+            // reviewer adding a `Serialize` option must add a matching emit arm to this switch.
+            SLANG_ASSERT_FAILURE("serialized CompilerOptionName has no writeCommandLineArgs case");
         }
     }
 }
