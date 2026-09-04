@@ -571,6 +571,18 @@ struct FossilizedTypeTraits<List<T>>
     using FossilizedType = FossilizedArray<Fossilized<T>>;
 };
 
+// A `SerializedArray<T>` stores exactly as a `List<T>` does; it differs only in
+// whether the reader copies the elements or points at them. Declared here rather
+// than included, to keep this header free of the serializer front end.
+template<typename T>
+struct SerializedArray;
+
+template<typename T>
+struct FossilizedTypeTraits<SerializedArray<T>>
+{
+    using FossilizedType = FossilizedArray<Fossilized<T>>;
+};
+
 template<typename T, int N>
 struct FossilizedTypeTraits<ShortList<T, N>>
 {

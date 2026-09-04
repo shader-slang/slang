@@ -178,6 +178,11 @@ them rather than replacing either: a test that can be written against the public
 API belongs in `slang-unit-test`, which additionally exercises the shared library
 as it ships.
 
+A test that needs another build artifact beside it belongs in `slang-unit-test`
+too — spawning `slangc`, for instance. The per-PR job for this suite builds only
+the `slang-static-unit-test` target, so nothing else is on disk next to the
+binary, and such a test would pass locally in a full build and fail in CI.
+
 ## Building and running
 
 ```bash

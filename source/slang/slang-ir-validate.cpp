@@ -98,7 +98,7 @@ void validateIRInstChildren(IRValidateContext* context, IRInst* parent)
         // We need to check the integrity of the parent/next/prev links of
         // all of our instructions
         validate(context, child->parent == parent, child, "parent link");
-        validate(context, child->prev == prevChild, child, "next/prev link");
+        validate(context, child->getPrevInst() == prevChild, child, "next/prev link");
 
         // Recursively validate the instruction itself.
         validateIRInst(context, child);
@@ -426,8 +426,8 @@ void validateIRModule(IRModule* module, DiagnosticSink* sink)
 
     validate(context, moduleInst != nullptr, moduleInst, "module instruction");
     validate(context, moduleInst->parent == nullptr, moduleInst, "module instruction parent");
-    validate(context, moduleInst->prev == nullptr, moduleInst, "module instruction prev");
-    validate(context, moduleInst->next == nullptr, moduleInst, "module instruction next");
+    validate(context, moduleInst->getPrevInst() == nullptr, moduleInst, "module instruction prev");
+    validate(context, moduleInst->getNextInst() == nullptr, moduleInst, "module instruction next");
 
     validateIRInst(context, moduleInst);
 }

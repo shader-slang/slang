@@ -676,8 +676,12 @@ static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
                 return SLANG_FAIL;
             }
 
+            // No blob: these bytes are `memoryStream`'s contents, which belong to this
+            // function and are gone when it returns. Passing null keeps instruction
+            // bodies from being deferred, since a deferred body would be decoded out of
+            // storage that no longer exists.
             SLANG_RETURN_ON_FAIL(
-                readSerializedModuleIR(irChunk, session, sourceLocReader, irReadModule));
+                readSerializedModuleIR(irChunk, session, sourceLocReader, nullptr, irReadModule));
         }
     }
 

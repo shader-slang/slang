@@ -2366,7 +2366,7 @@ struct SpecializationContext
         //
         for (auto newBodyInst = tempHeaderBlock->getFirstChild(); newBodyInst;)
         {
-            auto next = newBodyInst->next;
+            auto next = newBodyInst->getNextInst();
             newBodyInst->insertBefore(newFirstOrdinary);
             newBodyInst = next;
         }
@@ -3253,9 +3253,9 @@ struct SpecializationContext
         if (isMultiBlock)
         {
             auto currentBlock = builder.getBlock();
-            for (auto nextInst = expandInst->next; nextInst;)
+            for (auto nextInst = expandInst->getNextInst(); nextInst;)
             {
-                auto next = nextInst->next;
+                auto next = nextInst->getNextInst();
                 nextInst->insertAtEnd(currentBlock);
                 nextInst = next;
             }

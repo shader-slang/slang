@@ -1721,10 +1721,35 @@ SlangResult EndToEndCompileRequest::addLibraryReference(
     // We need to deserialize and add the modules
     ComPtr<IModuleLibrary> library;
 
+    // Parsing has to read from `libBlob`'s own bytes, not from `libData` directly.
+    //
+    // `RawBlob::create` *copies*, so `libBlob` holds the data at a different address than
+    // `libData`. Passing `libData` as the thing to parse while retaining `libBlob` left the
+    // RIFF chunk pointers, and every fossil cursor derived from them, referring into the
+    // caller's buffer while the object keeping memory alive was a different allocation --
+    // and `spAddLibraryReference`'s contract lets the caller free that buffer as soon as
+    // this call returns.
+    //
+    // This is a use-after-free that predates leaving instruction bodies encoded. AST
+    // declarations are already read on demand: `readSerializedModuleAST` keeps an
+    // `ASTSerialReadContext` alive past its own return and decodes the library's
+    // declarations later, during semantic checking of whatever `import`s them. Deferring
+    // IR bodies adds a second route into the same freed bytes, further out still --
+    // `SerializedArray` views decoded during linking and emit.
+    //
+    // The sibling overload in slang-module-library.cpp already does this correctly; this one
+    // just handed over the wrong pointer.
     auto libBlob = RawBlob::create((const Byte*)libData, libDataSize);
+    if (!libBlob)
+        return SLANG_E_OUT_OF_MEMORY;
 
-    SLANG_RETURN_ON_FAIL(
-        loadModuleLibrary(libBlob, (const Byte*)libData, libDataSize, basePath, this, library));
+    SLANG_RETURN_ON_FAIL(loadModuleLibrary(
+        libBlob,
+        (const Byte*)libBlob->getBufferPointer(),
+        libBlob->getBufferSize(),
+        basePath,
+        this,
+        library));
 
     // Create an artifact without any name (as one is not provided)
     auto artifact =

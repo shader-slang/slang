@@ -5154,7 +5154,7 @@ void legalizeConstantBufferLoadForGLSL(IRModule* module)
                 for (auto inst = block->getFirstInst(); inst;)
                 {
                     auto load = as<IRLoad>(inst);
-                    inst = inst->next;
+                    inst = inst->getNextInst();
                     if (!load)
                         continue;
                     auto bufferType = load->getPtr()->getDataType();

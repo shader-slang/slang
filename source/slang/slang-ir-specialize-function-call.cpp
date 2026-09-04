@@ -1132,7 +1132,7 @@ struct FunctionParameterSpecializationContext
         }
         for (auto newBodyInst = funcInfo.newBodyInsts->getFirstChild(); newBodyInst;)
         {
-            auto next = newBodyInst->next;
+            auto next = newBodyInst->getNextInst();
             newBodyInst->insertBefore(newFirstOrdinary);
             newBodyInst = next;
         }
