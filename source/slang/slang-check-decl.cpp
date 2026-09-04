@@ -19819,12 +19819,14 @@ bool tryCheckDerivativeOfAttributeImpl(
 
 void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
-    // A supported global atomic counter has a GLSL `layout(binding = ...)` modifier. During
-    // parsing, that modifier also creates an explicit or implicit offset, which the checked
-    // modifier and parameter-layout paths preserve for the backing-storage rewrite. Diagnose a
-    // declaration that never entered that producer path while its source-level context is still
-    // available; otherwise it would become a decoration-less `kIROp_GLSLAtomicUintType` global
-    // that no target can emit.
+    // This producer check is selected by the semantic `GLSLAtomicUintType`, independently of the
+    // source language. A supported GLSL global atomic counter has a `layout(binding = ...)`
+    // modifier; parsing that modifier also creates an explicit or implicit offset that the checked
+    // modifier and parameter-layout paths preserve for the backing-storage rewrite. By contrast,
+    // `import glsl; atomic_uint counter;` in Slang source creates the same semantic type but does
+    // not pass through that GLSL layout producer, so it is deliberately rejected here. Otherwise
+    // the declaration would become a decoration-less `kIROp_GLSLAtomicUintType` global that no
+    // target can emit.
     //
     // Existing atomic-counter legalization supports only directly-declared globals. Reject arrays
     // at this producer boundary even when they have a binding; otherwise their element type
@@ -19836,15 +19838,27 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         Type* arrayElementType = unwrapArrayType(declaredType);
         if (as<GLSLAtomicUintType>(arrayElementType))
         {
-            if (arrayElementType != declaredType)
+            const bool isAtomicCounterArray = as<ArrayExpressionType>(declaredType) != nullptr;
+            if (isAtomicCounterArray)
             {
                 getSink()->diagnose(Diagnostics::GlslAtomicCounterArraysNotSupported{
                     .location = varDecl->nameAndLoc.loc});
             }
-            else if (!varDecl->findModifier<GLSLOffsetLayoutAttribute>())
+            else
             {
-                getSink()->diagnose(Diagnostics::GlslAtomicCounterRequiresBinding{
-                    .location = varDecl->nameAndLoc.loc});
+                const bool hasBinding = varDecl->findModifier<GLSLBindingAttribute>() != nullptr;
+                const bool hasOffset =
+                    varDecl->findModifier<GLSLOffsetLayoutAttribute>() != nullptr;
+
+                // The earlier ModifiersChecked phase emits MissingLayoutBindingModifier for
+                // `hasOffset && !hasBinding`. Diagnose the remaining binding-less shape here:
+                // `!hasOffset && !hasBinding`, such as an `atomic_uint` introduced into Slang
+                // source by `import glsl`. A binding-producing GLSL declaration has both.
+                if (!hasBinding && !hasOffset)
+                {
+                    getSink()->diagnose(Diagnostics::GlslAtomicCounterRequiresBinding{
+                        .location = varDecl->nameAndLoc.loc});
+                }
             }
         }
     }

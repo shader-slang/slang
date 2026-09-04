@@ -1,5 +1,5 @@
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/image/imageAsParamWithMemoryQualifiersError.slang -stage compute -entry computeMain -target glsl -Wno-118
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/image/imageAsParamWithMemoryQualifiersError.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -Wno-118
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang glsl tests/glsl-intrinsic/image/imageAsParamWithMemoryQualifiersError.slang -stage compute -entry computeMain -target glsl -Wno-118
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang glsl tests/glsl-intrinsic/image/imageAsParamWithMemoryQualifiersError.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -Wno-118
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
 {
@@ -11,7 +11,6 @@ layout(local_size_x = 4) in;
 //TEST_INPUT: set someImage = RWTexture2D(format=RGBA16Float, size=1, content=one, mipMaps = 1)
 uniform layout(binding=0,rgba16f) readonly image2D someImage;
 
-// CHECK: error[E30048]
 bool checkAllImageSizes(writeonly image2D val)
 {
     return true
@@ -23,5 +22,9 @@ void computeMain()
 {
     outputBuffer.data[0] = true
         && checkAllImageSizes(someImage);
+        /*CHECK:
+                              ^^^^^^^^^ error E30048
+                              ^^^^^^^^^ argument passed in to parameter has a memory qualifier the parameter type is missing: 'readonly'
+        */
         ;
 }

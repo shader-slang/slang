@@ -1772,6 +1772,8 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
     static const Entry entries[] = {
         {".slang.md", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
         {".slang", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
+        // Literate Slang historically accepts any Markdown path, not only `.slang.md`.
+        {".md", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
 
         {".hlsl", SLANG_SOURCE_LANGUAGE_HLSL, SLANG_STAGE_NONE},
         {".fx", SLANG_SOURCE_LANGUAGE_HLSL, SLANG_STAGE_NONE},

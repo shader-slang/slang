@@ -4,7 +4,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 #language 2026
+/*CHECK:
+ ^^^^^^^^ the translation unit's first source-language directive is here
+*/
 #version 450
-//CHECK: conflicting source-language directives in one translation unit
-//CHECK: this directive selects a different source language
-//CHECK: the translation unit's first source-language directive is here
+/*CHECK:
+ ^^^^^^^ error E00121
+ ^^^^^^^ this directive selects a different source language
+*/

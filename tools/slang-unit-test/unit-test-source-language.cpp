@@ -29,7 +29,7 @@ SLANG_UNIT_TEST(sourceLanguageRejectsConflictingPrimaryFileExtensions)
     request->addTranslationUnitSourceString(
         translationUnit,
         "second.vert",
-        "void fromGlslFile() {}\n");
+        "#version 450\nvoid fromGlslFile() {}\n");
 
     SlangResult result = request->compile();
     SLANG_ALLOW_DEPRECATED_END
@@ -39,6 +39,11 @@ SLANG_UNIT_TEST(sourceLanguageRejectsConflictingPrimaryFileExtensions)
     SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("error[E00122]")) >= 0);
     SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("first.slang")) >= 0);
     SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("second.vert")) >= 0);
+
+    // The conflicting extensions provide no coherent lower-precedence selection for the GLSL
+    // directive to override. E00122 fully diagnoses the invalid input; emitting E00120 as well
+    // would misleadingly describe the first extension's deterministic recovery mode as provenance.
+    SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("warning[E00120]")) < 0);
 }
 
 SLANG_UNIT_TEST(sourceLanguageAllowGLSLNormalizesThroughDeprecatedAPI)
@@ -361,4 +366,31 @@ SLANG_UNIT_TEST(sourceLanguageModuleSourceStringUsesFileExtension)
         diagnostics.writeRef()));
 
     SLANG_CHECK(module != nullptr);
+}
+
+SLANG_UNIT_TEST(sourceLanguageCommandLineAcceptsBareMarkdownPath)
+{
+    const char* source = "# Literate Slang\n\n```slang\nvoid main() {}\n```\n";
+    ComPtr<ISlangFileSystemExt> fileSystem = ComPtr<ISlangFileSystemExt>(new MemoryFileSystem());
+    auto memoryFileSystem = static_cast<MemoryFileSystem*>(fileSystem.get());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        memoryFileSystem->saveFile("bare-markdown-input.md", source, strlen(source))));
+
+    ComPtr<slang::ICompileRequest> request;
+    SLANG_ALLOW_DEPRECATED_BEGIN
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        unitTestContext->slangGlobalSession->createCompileRequest(request.writeRef())));
+    request->setFileSystem(fileSystem);
+
+    // Literate Slang historically accepts any `.md` path, not only `.slang.md`. Do not pass
+    // `-lang`, so command-line input routing must select Slang from the path and preprocessing must
+    // reduce the Markdown source to its fenced Slang block before parsing.
+    const char* args[] = {"bare-markdown-input.md"};
+    SLANG_CHECK(SLANG_SUCCEEDED(request->processCommandLineArguments(args, SLANG_COUNT_OF(args))));
+    request->setCompileFlags(SLANG_COMPILE_FLAG_NO_CODEGEN);
+
+    SlangResult result = request->compile();
+    SLANG_ALLOW_DEPRECATED_END
+
+    SLANG_CHECK(SLANG_SUCCEEDED(result));
 }

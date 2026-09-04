@@ -7,5 +7,9 @@
 //CHECK: source-language directive selects glsl and overrides the file-extension-implied slang source language
 //CHECK: the source directive selects glsl instead of slang
 
+// This declaration is valid only in GLSL, so the test observes the effective parser mode as well
+// as the compatibility warning.
+layout(local_size_x = 1) in;
+
 void main()
 {}

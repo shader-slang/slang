@@ -30,11 +30,13 @@ public:
 
     /// The effective source language of this translation unit.
     ///
-    /// A translation unit has exactly one source language. The language explicitly requested by
-    /// an API or command-line caller takes precedence over a language inferred from the primary
-    /// source-file extensions. Source directives are expected to agree with that choice. For
-    /// backward compatibility, preprocessing currently diagnoses but honors a conflicting
-    /// `#version` or `#language` directive before parsing begins.
+    /// A translation unit has exactly one source language. Its initial selection is an explicit
+    /// API or command-line request when present, or otherwise the language agreed on by the primary
+    /// source-file extensions. Source directives are expected to agree with that selection. For
+    /// backward compatibility, however, preprocessing diagnoses but honors a conflicting
+    /// `#version` or `#language` directive before parsing begins. Effective precedence is therefore
+    /// a source directive, then an explicit request, then the primary-file extensions; the
+    /// provenance fields below preserve every selection so that conflicts can be diagnosed.
     ///
     /// Parser and semantic-checking code must use only this resolved field. In particular, the
     /// deprecated request-wide `-allow-glsl` option is normalized into this per-translation-unit
@@ -51,6 +53,9 @@ public:
     ///
     /// This field is `Unknown` when no extension identifies a language or when the extensions
     /// disagree. Disagreement is an error unless an explicitly requested language resolves it.
+    /// On the error-recovery path, `sourceLanguage` may still retain the first recognized language
+    /// as a deterministic parser mode while this field remains `Unknown`: conflicting extensions
+    /// do not constitute one coherent provenance selection that a source directive can override.
     SourceLanguage sourceLanguageImpliedByFileExtension = SourceLanguage::Unknown;
 
     /// The language selected by a primary source-file directive, if any.

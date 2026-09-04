@@ -1827,9 +1827,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             .entryPoint = entryPointName->text,
             .location = entryPointFuncDecl->loc});
 
-        // The missing stage was just diagnosed as an error. Stop here because all remaining
-        // validation interprets the signature in a stage-specific context; continuing would make
-        // semantic accessors and capability inference invent a stage that the user never supplied.
+        // The remaining entry-point contract cannot be validated without a concrete stage.
+        // In particular, system-semantic accessor resolution maps this value through
+        // `getAtomFromStage()`, where `Stage::Unknown` is an internal error, while later parameter
+        // classification and profile validation also use the stage to select their rules. Stop
+        // after the prerequisite diagnostic instead of emitting secondary diagnostics from an
+        // invented stage or entering those out-of-contract paths.
         return;
     }
 

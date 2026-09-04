@@ -4505,6 +4505,12 @@ static void HandleExtensionDirective(PreprocessorDirectiveContext* context)
 /// `slangLanguageVersion` is meaningful only for Slang. The return value is true when the
 /// directive agrees with the first selection and the caller may commit its version-specific state;
 /// false means a diagnostic was emitted and the first selection must remain in force.
+///
+/// Consider a source segment containing `#version 450` followed by `#language slang 2026`. The
+/// first directive records GLSL. The second emits `ConflictingSourceLanguageDirectives`, returns
+/// false, and leaves GLSL as the segment's selection so preprocessing cannot change grammars
+/// partway through one source file.
+///
 /// `_applySourceLanguageDirective` diagnoses the same conflict across primary files, while
 /// `Linkage::findAndIncludeFile` handles directives discovered by a semantic `__include`.
 static bool _tryApplySourceLanguageDirective(

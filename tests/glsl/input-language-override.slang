@@ -1,4 +1,4 @@
-//TEST:SIMPLE_EX: -lang glsl tests/glsl/input-language-override.slang -no-codegen -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/input-language-override.slang -entry main -stage compute -target spirv -emit-spirv-directly -Wno-118
 
 #version 450
 
@@ -13,3 +13,5 @@ void main()
 {
     outputBuffer.values[gl_GlobalInvocationID.x] = 1;
 }
+
+// CHECK: OpEntryPoint GLCompute

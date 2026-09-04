@@ -144,7 +144,7 @@ public:
 
     void parseTranslationUnit(TranslationUnitRequest* translationUnit);
 
-    /// Apply the legacy `AllowGLSL` option to this request's input translation units.
+    /// Apply the legacy `AllowGLSL` option to all of this request's input translation units.
     ///
     /// For example, a request containing two `.slang` inputs plus `-allow-glsl` is normalized to
     /// two translation units that each record an explicit GLSL selection. Parser, semantic, IR,
@@ -165,7 +165,7 @@ public:
     /// reused request after an earlier compilation without mutating either owner's option storage;
     /// the diagnostic is emitted only once per front-end request, and later phases ignore
     /// `AllowGLSL`.
-    void applyLegacyAllowGLSLInputOption();
+    void applyLegacyAllowGLSLInputOptionToAllTranslationUnits();
 
     /// Whether this request has already diagnosed the legacy GLSL-input option.
     ///
@@ -187,7 +187,7 @@ public:
     /// Add a translation unit to be compiled.
     ///
     /// @param language The source language that the translation unit will use (e.g.,
-    /// `SourceLanguage::Slang`
+    /// `SourceLanguage::Slang`).
     /// @param moduleName The name that will be used for the module compile from the translation
     /// unit.
     ///

@@ -98,7 +98,9 @@ struct ParserOptions
 {
     bool enableEffectAnnotations = false;
 
-    /// Whether the effective translation-unit language enables GLSL grammar extensions.
+    /// Whether the effective translation-unit language is GLSL.
+    ///
+    /// This enables GLSL syntax and modifier rules and the synthetic import of GLSL builtins.
     bool isGLSLInput = false;
     bool isInLanguageServer = false;
     bool isCoreModule = false;

@@ -135,9 +135,11 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // behaviors without changing the declared language of any translation unit. Reduce it to the
     // single meaning that this request's input translation units are GLSL. The compatibility bit
     // is request-local because source modules loaded during semantic checking share the linkage
-    // but are not additional inputs governed by this option.
+    // but are not additional inputs governed by this option. `parseTranslationUnit()` separately
+    // handles the session-owned spelling stored in the front-end option set; the front-end
+    // request's once-only diagnostic guard makes both paths safe when a session supplies both.
     if (getLegacyAllowGLSLInput())
-        getFrontEndReq()->applyLegacyAllowGLSLInputOption();
+        getFrontEndReq()->applyLegacyAllowGLSLInputOptionToAllTranslationUnits();
 
     // If no code-generation target was specified, then try to infer one from the source language,
     // just to make sure we can do something reasonable when invoked from the command line.

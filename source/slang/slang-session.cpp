@@ -2102,7 +2102,7 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
             // retained location lets the diagnostic identify both conflicting directives. If the
             // effective language came only from an API request or file extension, there is no
             // earlier directive to cite, so E00123 instead explains that the unit was already
-            // parsed under the other language. `_handleSourceLanguageDirective` emits E00121 for
+            // parsed under the other language. `_tryApplySourceLanguageDirective` emits E00121 for
             // conflicts within one preprocessing unit, while `_applySourceLanguageDirective`
             // emits it across primary source files.
             if (translationUnit->sourceLanguageImpliedBySourceContentsLoc.isValid())

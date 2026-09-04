@@ -389,6 +389,11 @@ static void _resolveSourceLanguageFromPrimarySourceFiles(
         }
     }
 
+    // `Unknown` records that there is no single extension-implied language, whether because no
+    // extension was recognized or because recognized extensions disagreed. The latter case is
+    // already an error, so no valid downstream path needs to distinguish the two. Consumers parse
+    // through `sourceLanguage`; below it retains the first extension only as deterministic error
+    // recovery rather than treating the collapsed provenance as a valid absence of an opinion.
     translationUnit->sourceLanguageImpliedByFileExtension =
         extensionsAgree ? languageImpliedByFirstExtension : SourceLanguage::Unknown;
 
@@ -408,13 +413,15 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 {
     SLANG_PROFILE;
 
-    // Direct module loads call this method without executing the complete front-end request. A
-    // session-level `AllowGLSL` policy applies to every translation unit owned by that request, so
-    // the idempotent helper intentionally normalizes sibling translation units as well as the one
-    // passed here and emits W00117 at most once. A request-local option has already reached the
-    // same helper through the end-to-end path.
+    // Direct module loads call this method without executing the complete front-end request. This
+    // branch reads only the session-owned `AllowGLSL` option inherited by the front-end request;
+    // request-local state is deliberately absent from that option set and reaches the same helper
+    // through the end-to-end path. The call does not target only `translationUnit`: a session
+    // policy applies to the entire request, and repeating the idempotent fan-out also covers
+    // siblings added after an earlier compilation. The helper's front-end-owned guard emits the
+    // deprecation warning at most once even when both owners select the compatibility behavior.
     if (optionSet.getBoolOption(CompilerOptionName::AllowGLSL))
-        applyLegacyAllowGLSLInputOption();
+        applyLegacyAllowGLSLInputOptionToAllTranslationUnits();
 
     if (translationUnit->isChecked)
         return;
@@ -771,7 +778,7 @@ void FrontEndCompileRequest::generateIR()
     }
 }
 
-void FrontEndCompileRequest::applyLegacyAllowGLSLInputOption()
+void FrontEndCompileRequest::applyLegacyAllowGLSLInputOptionToAllTranslationUnits()
 {
     // This is the only compatibility interpretation of `-allow-glsl`: it is a deprecated,
     // request-wide spelling for explicitly selecting GLSL on every input translation unit.
@@ -785,8 +792,8 @@ void FrontEndCompileRequest::applyLegacyAllowGLSLInputOption()
 
     // The legacy request-wide switch deliberately wins over an explicit non-GLSL selection.
     // Keeping both would recreate the old hybrid mode where a translation unit declared one
-    // language while independent compiler phases enabled GLSL behavior. W00117 states this
-    // compatibility rule: every input translation unit is treated as GLSL.
+    // language while independent compiler phases enabled GLSL behavior. The deprecation warning
+    // states this compatibility rule: every input translation unit is treated as GLSL.
     for (auto translationUnit : translationUnits)
     {
         translationUnit->sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
