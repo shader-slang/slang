@@ -1,5 +1,6 @@
 #include "slang-ir-use-uninitialized-values.h"
 
+#include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-reachability.h"
 #include "slang-ir-util.h"
@@ -587,6 +588,169 @@ static IRBlock* getInfeasibleBranchFromPredecessor(IRBlock* block, IRBlock* from
     return argVal->getValue() ? ifElse->getFalseBlock() : ifElse->getTrueBlock();
 }
 
+// A `if (WaveIsFirstLane()) { ... }` guard found in the function being analyzed, recorded
+// once per function rather than once per tracked variable (see `WaveElectionContext` below).
+//
+// `trueBlock` is the guard's true-branch entry block (the "elected lane" region); `mergeBlock`
+// is the `ifElse`'s reconvergence block (`IRIfElse::getAfterBlock()`). Together with
+// `isEveryPathFromBlockedByStore`, these license the must-init relaxation implemented in
+// `cancelLoadsByDefiniteAssignment` for the pattern reported in
+// https://github.com/shader-slang/slang/issues/12545: a store inside the guard, read back via
+// `WaveReadLaneFirst()`, is not actually reachable while uninitialized -- `WaveReadLaneFirst`
+// broadcasts from the first active lane, which is exactly the lane for which
+// `WaveIsFirstLane()` was true and which therefore took `trueBlock`.
+struct WaveElectionGuard
+{
+    IRBlock* trueBlock;
+    IRBlock* mergeBlock;
+};
+
+// Find every `if (WaveIsFirstLane())` guard in `func`.
+//
+// The condition must be *directly* a call to the `WaveIsFirstLane` known builtin -- no
+// unwrapping of `!`/boolean negation. This is deliberate: `!WaveIsFirstLane()` lowers to an
+// explicit `not(...)` operand feeding the `ifElse`, not a swapped true/false block, so requiring
+// a direct call correctly excludes `if (!WaveIsFirstLane()) { store }`, which must keep warning
+// (a non-elected lane never executes that store, so a later `WaveReadLaneFirst` read is a
+// genuine may-init/must-init bug).
+static List<WaveElectionGuard> collectWaveElectionGuards(IRGlobalValueWithCode* func)
+{
+    List<WaveElectionGuard> guards;
+    for (auto block : func->getBlocks())
+    {
+        auto ifElse = as<IRIfElse>(block->getTerminator());
+        if (!ifElse)
+            continue;
+        auto call = as<IRCall>(ifElse->getCondition());
+        if (!call)
+            continue;
+        if (getBuiltinFuncEnum(call->getCallee()) != KnownBuiltinDeclName::WaveIsFirstLane)
+            continue;
+        guards.add(WaveElectionGuard{ifElse->getTrueBlock(), ifElse->getAfterBlock()});
+    }
+    return guards;
+}
+
+// Function-wide context for the `WaveIsFirstLane()`/`WaveReadLaneFirst()` must-init relaxation.
+// Computed once per function and threaded through by reference (mirroring how
+// `ReachabilityContext` is built once in `checkUninitializedValues`), because both `guards` and
+// `dominatorTree` are variable-independent -- rebuilding them per tracked variable would be
+// wasted work. `dominatorTree` is only built when `guards` is non-empty, since the
+// overwhelming majority of functions contain no `WaveIsFirstLane()` guard at all and shouldn't
+// pay for a dominator tree they'll never query.
+struct WaveElectionContext
+{
+    List<WaveElectionGuard> guards;
+    RefPtr<IRDominatorTree> dominatorTree;
+};
+
+static WaveElectionContext collectWaveElectionContext(IRGlobalValueWithCode* func)
+{
+    WaveElectionContext context;
+    context.guards = collectWaveElectionGuards(func);
+    if (context.guards.getCount() != 0)
+        context.dominatorTree = computeDominatorTree(func);
+    return context;
+}
+
+// Does every control-flow path from `from` to `to` pass through at least one block in
+// `blocksWithStore`? Used to decide whether a store inside a `WaveIsFirstLane()` guard's
+// true-branch (`from`) is guaranteed to execute before the elected lane reaches the guard's
+// merge block (`to`).
+//
+// This must be a walk scoped to `from`'s own sub-CFG, not a whole-function dominance query
+// (`dominates(store, to)`): in the diamond CFG that `if`/`else` produces, the false-branch edge
+// always reaches `to` without passing through a store inside the true branch, so
+// `dominates(store, to)` in the *global* CFG is never satisfiable and would make this
+// relaxation never fire. Framing the question as "does every path within `from`'s own region
+// pass through a store before reaching `to`" is what correctly rejects a store nested inside a
+// further conditional within the guard, e.g.:
+//
+//     if (WaveIsFirstLane())
+//     {
+//         if (rareCondition)
+//             nBaseIndex = ...;   // does NOT dominate `to` within this sub-CFG
+//     }
+//     uint nIndex = WaveReadLaneFirst(nBaseIndex) + ...;
+//
+// Here the elected lane can reach the merge block without ever executing the inner store (when
+// `rareCondition` is false), so this walk correctly finds a store-free path and the relaxation
+// below declines to fire -- the read stays flagged, as it must.
+static bool isEveryPathFromBlockedByStore(
+    IRBlock* from,
+    IRBlock* to,
+    const HashSet<IRBlock*>& blocksWithStore)
+{
+    HashSet<IRBlock*> visited;
+    List<IRBlock*> worklist;
+    visited.add(from);
+    worklist.add(from);
+    while (worklist.getCount())
+    {
+        auto block = worklist.getLast();
+        worklist.removeLast();
+        if (block == to)
+            return false; // Reached `to` along a path with no preceding store.
+        if (blocksWithStore.contains(block))
+            continue; // A store in this block blocks propagation past it.
+        for (auto succ : block->getSuccessors())
+        {
+            if (visited.add(succ))
+                worklist.add(succ);
+        }
+    }
+    return true;
+}
+
+// Is `readingInst` -- an instruction already classified as a read of the tracked value by
+// `getInstructionUsageType` -- a use that this file's must-init walk would otherwise flag, but
+// which is actually a `WaveReadLaneFirst` broadcast of it?
+//
+// This has to account for two different IR shapes for the same source-level
+// `WaveReadLaneFirst(x)`, because `getInstructionUsageType`/`getCallUsageType` classify a call
+// that takes `x` directly as an "in" argument as itself being the read (no separate load
+// instruction exists for it at this point in the pipeline -- that only appears once a later
+// pass, e.g. SSA construction, hoists the argument into its own temporary). So:
+//
+//  - `readingInst` may itself be the call to `WaveReadLaneFirst`, with the tracked value
+//    passed straight in as its argument; or
+//  - `readingInst` may be a plain load (or other Load-classified instruction) whose result is
+//    consumed *only* (ignoring meta ops, per `isMetaOp`) as the argument to such a call.
+//
+// Either way, the tracked value's only real consumer must be the `WaveReadLaneFirst` call --
+// this is what ties the must-init relaxation to the specific broadcast read that makes it
+// sound. A plain read that also does something else with the value does not qualify and stays
+// flagged. It also does not see through a user-defined wrapper function around
+// `WaveReadLaneFirst` (e.g. `T MyBroadcast(T x) { return WaveReadLaneFirst(x); }`): the call
+// here must resolve directly to the known-builtin declaration. That is an accepted, narrow
+// scope limit -- unrecognized wrapper calls simply fail to qualify, which just leaves the
+// pre-existing (over-)warning in place rather than suppressing anything incorrectly.
+static bool isWaveReadLaneFirstUse(IRInst* readingInst)
+{
+    if (auto call = as<IRCall>(readingInst))
+    {
+        if (getBuiltinFuncEnum(call->getCallee()) == KnownBuiltinDeclName::WaveReadLaneFirst)
+            return true;
+    }
+
+    IRInst* realUse = nullptr;
+    int numRealUses = 0;
+    for (auto use = readingInst->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (isMetaOp(user))
+            continue;
+        numRealUses++;
+        realUse = user;
+    }
+    if (numRealUses != 1)
+        return false;
+    auto call = as<IRCall>(realUse);
+    if (!call)
+        return false;
+    return getBuiltinFuncEnum(call->getCallee()) == KnownBuiltinDeclName::WaveReadLaneFirst;
+}
+
 // Remove all loads that are "definitely assigned": every control-flow path from
 // the function entry to the load passes through at least one store.
 //
@@ -606,7 +770,8 @@ static IRBlock* getInfeasibleBranchFromPredecessor(IRBlock* block, IRBlock* from
 static void cancelLoadsByDefiniteAssignment(
     IRGlobalValueWithCode* func,
     const List<IRInst*>& stores,
-    List<IRInst*>& loads)
+    List<IRInst*>& loads,
+    const WaveElectionContext& waveElection)
 {
     if (loads.getCount() == 0)
         return;
@@ -635,6 +800,43 @@ static void cancelLoadsByDefiniteAssignment(
             storeSet.add(store);
         }
     }
+
+    // Wave-broadcast relaxation for https://github.com/shader-slang/slang/issues/12545: a load
+    // that is read back only through `WaveReadLaneFirst()` is exempted from the must-init walk
+    // below when every store-free path out of some `WaveIsFirstLane()` guard's true-branch is
+    // blocked by a store before it can leave the guard, and the load itself is only reachable
+    // after that guard has reconverged. Such a load is not actually reachable while
+    // uninitialized: `WaveReadLaneFirst` broadcasts from the first active lane, which is
+    // exactly the lane that took the guard's true branch and therefore executed the store.
+    //
+    // Known, accepted scope limit: this is a single-thread CFG proof (see
+    // `isEveryPathFromBlockedByStore` and `isWaveReadLaneFirstUse` for the two halves of it).
+    // It does not model whether the wave's active-lane mask could shift between the guard and
+    // the read -- e.g. an intervening `discard`/`return` taken by only some lanes -- since
+    // Slang has no dynamic-uniformity/wave-reconvergence analysis anywhere, and this relaxation
+    // does not add one.
+    for (auto& guard : waveElection.guards)
+    {
+        if (!isEveryPathFromBlockedByStore(guard.trueBlock, guard.mergeBlock, blocksWithStore))
+            continue;
+        for (Index i = 0; i < loads.getCount();)
+        {
+            auto load = loads[i];
+            auto block = as<IRBlock>(load->getParent());
+            if (block && waveElection.dominatorTree->dominates(guard.mergeBlock, block) &&
+                isWaveReadLaneFirstUse(load))
+            {
+                loads.fastRemoveAt(i);
+            }
+            else
+            {
+                i++;
+            }
+        }
+    }
+
+    if (loads.getCount() == 0)
+        return;
 
     // For blocks that contain both a store and a load, the relative order matters:
     // a load that appears before any store in the same block is reachable while
@@ -872,7 +1074,8 @@ struct UninitializedUseLoads
 static UninitializedUseLoads getUninitializedUseLoads(
     ReachabilityContext& reachability,
     IRGlobalValueWithCode* func,
-    IRInst* inst)
+    IRInst* inst,
+    const WaveElectionContext& waveElection)
 {
     // Collect the aliasable loads/stores once and derive both violation sets from it.
     List<IRInst*> stores;
@@ -895,7 +1098,7 @@ static UninitializedUseLoads getUninitializedUseLoads(
         mayInitSet.add(load);
 
     result.mustInit = allLoads;
-    cancelLoadsByDefiniteAssignment(func, stores, result.mustInit);
+    cancelLoadsByDefiniteAssignment(func, stores, result.mustInit, waveElection);
 
     // Keep the two sets disjoint: drop loads already reported as may-init violations.
     for (Index i = 0; i < result.mustInit.getCount();)
@@ -1150,6 +1353,10 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
 
     ReachabilityContext reachability(func);
 
+    // Computed once per function (not once per tracked variable) -- see the comment on
+    // `WaveElectionContext` for why.
+    auto waveElection = collectWaveElectionContext(func);
+
     // Used for a further analysis and to skip usual return checks
     auto constructor = func->findDecoration<IRConstructorDecoration>();
 
@@ -1189,7 +1396,7 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
 
             // Collect both may-init and must-init violations from a single shared
             // load/store collection pass.
-            auto useLoads = getUninitializedUseLoads(reachability, func, inst);
+            auto useLoads = getUninitializedUseLoads(reachability, func, inst, waveElection);
 
             // May-init: the variable is read on a path where no store reaches it at all.
             diagnoseUninitializedUses<
