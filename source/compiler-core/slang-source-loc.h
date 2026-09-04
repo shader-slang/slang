@@ -122,7 +122,7 @@ struct PathInfo
         return PathInfo{Type::FromString, userPath, String()};
     }
 
-    Type type;             ///< The type of path
+    Type type = Type::Unknown; ///< The type of path
     String foundPath;      ///< The path where the file was found (might contain relative elements)
     String uniqueIdentity; ///< The unique identity of the file on the path found
 };
