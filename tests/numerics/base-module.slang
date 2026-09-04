@@ -6,6 +6,8 @@ import slang.numerics;
 // HLSL-NOT: IAdditive
 // HLSL-NOT: ITrigonometricFunctions
 // HLSL: sin(
+// HLSL-NOT: IAdditive
+// HLSL-NOT: ITrigonometricFunctions
 
 RWStructuredBuffer<float4> outputBuffer;
 

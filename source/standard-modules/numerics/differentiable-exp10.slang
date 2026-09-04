@@ -6,6 +6,11 @@ implementing differentiable;
 // private forwarding declaration here. Derivative registrations are resolved while checking the
 // module that contains the differentiable call, so this forwarding declaration must live in the
 // differentiable annex rather than in the adapter module.
+
+// The derivative of 10^x is ln(10) * 10^x. Keep the chain-rule factor in one place so the
+// scalar/vector and forward/backward implementations cannot drift apart.
+static const float __numericsNaturalLogarithmOfTen = 2.302585092994045901;
+
 [__readNone]
 T __differentiableNumericsRegisteredExp10<T : __BuiltinFloatingPointType>(T value)
 {
@@ -27,7 +32,7 @@ DifferentialPair<T> __fwdDifferentiableNumericsExp10<T : __BuiltinFloatingPointT
 {
     T primal = __differentiableNumericsExp10(value.p);
     T.Differential differential = __slang_noop_cast<T.Differential>(
-        primal * T(2.302585092994045901) * __slang_noop_cast<T>(value.d));
+        primal * T(__numericsNaturalLogarithmOfTen) * __slang_noop_cast<T>(value.d));
     return diffPair(primal, differential);
 }
 
@@ -38,7 +43,7 @@ DifferentialPair<vector<T, N>> __fwdDifferentiableNumericsExp10<
     let N : int>(DifferentialPair<vector<T, N>> value)
 {
     vector<T, N> primal = __differentiableNumericsExp10(value.p);
-    vector<T, N> differential = primal * T(2.302585092994045901) * value.d;
+    vector<T, N> differential = primal * T(__numericsNaturalLogarithmOfTen) * value.d;
     return diffPair(primal, differential);
 }
 
@@ -49,7 +54,7 @@ void __bwdDifferentiableNumericsExp10<T : __BuiltinFloatingPointType>(
     T.Differential outputDifferential)
 {
     T differential =
-        __differentiableNumericsExp10(value.p) * T(2.302585092994045901) *
+        __differentiableNumericsExp10(value.p) * T(__numericsNaturalLogarithmOfTen) *
         __slang_noop_cast<T>(outputDifferential);
     value = diffPair(value.p, __slang_noop_cast<T.Differential>(differential));
 }
@@ -63,6 +68,7 @@ void __bwdDifferentiableNumericsExp10<
         vector<T, N>.Differential outputDifferential)
 {
     vector<T, N> differential =
-        __differentiableNumericsExp10(value.p) * T(2.302585092994045901) * outputDifferential;
+        __differentiableNumericsExp10(value.p) * T(__numericsNaturalLogarithmOfTen) *
+        outputDifferential;
     value = diffPair(value.p, differential);
 }

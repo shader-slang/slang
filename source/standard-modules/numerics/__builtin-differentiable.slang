@@ -52,7 +52,7 @@ public matrix<TDestination, R, C, L> __differentiableNumericsConstructMatrixFrom
 // constraining their element type instead. The bodies deliberately use the member operations:
 // an ordinary matrix `operator*` can mean matrix multiplication rather than component-wise
 // multiplication.
-#define NUMERICS_DIFFERENTIABLE_ARITHMETIC_ADAPTER(NAME, METHOD)                 \
+#define SLANG_NUMERICS_DIFFERENTIABLE_ARITHMETIC_ADAPTER(NAME, METHOD)                 \
     [__readNone] [Differentiable] [__unsafeForceInlineEarly]                    \
     public T NAME<T : __BuiltinFloatingPointType>(T left, T right)              \
     {                                                                            \
@@ -79,12 +79,12 @@ public matrix<TDestination, R, C, L> __differentiableNumericsConstructMatrixFrom
         return left.METHOD(right);                                               \
     }
 
-NUMERICS_DIFFERENTIABLE_ARITHMETIC_ADAPTER(__differentiableNumericsAdd, add)
-NUMERICS_DIFFERENTIABLE_ARITHMETIC_ADAPTER(__differentiableNumericsSub, sub)
-NUMERICS_DIFFERENTIABLE_ARITHMETIC_ADAPTER(__differentiableNumericsMul, mul)
-NUMERICS_DIFFERENTIABLE_ARITHMETIC_ADAPTER(__differentiableNumericsDiv, div)
+SLANG_NUMERICS_DIFFERENTIABLE_ARITHMETIC_ADAPTER(__differentiableNumericsAdd, add)
+SLANG_NUMERICS_DIFFERENTIABLE_ARITHMETIC_ADAPTER(__differentiableNumericsSub, sub)
+SLANG_NUMERICS_DIFFERENTIABLE_ARITHMETIC_ADAPTER(__differentiableNumericsMul, mul)
+SLANG_NUMERICS_DIFFERENTIABLE_ARITHMETIC_ADAPTER(__differentiableNumericsDiv, div)
 
-#undef NUMERICS_DIFFERENTIABLE_ARITHMETIC_ADAPTER
+#undef SLANG_NUMERICS_DIFFERENTIABLE_ARITHMETIC_ADAPTER
 
 [__readNone]
 [Differentiable]
@@ -118,7 +118,7 @@ public matrix<T, R, C, L> __differentiableNumericsNeg<
 
 // Matrix conformances apply these scalar and vector adapters component-wise so that they preserve
 // the matrix layout parameter in their result type.
-#define NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(NAME, BUILTIN)                    \
+#define SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(NAME, BUILTIN)                    \
     [__readNone] [Differentiable] [__unsafeForceInlineEarly]                    \
     public T NAME<T : __BuiltinFloatingPointType>(T value)                      \
     {                                                                            \
@@ -132,30 +132,30 @@ public matrix<T, R, C, L> __differentiableNumericsNeg<
         return ::BUILTIN(value);                                                 \
     }
 
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAbs, abs)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAcos, acos)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAcosh, acosh)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAsin, asin)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAsinh, asinh)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAtan, atan)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAtanh, atanh)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsCos, cos)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsCosh, cosh)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsExp, exp)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsExp2, exp2)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsFractionalPart, frac)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsLog, log)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsLog10, log10)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsLog2, log2)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsRcp, rcp)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsRsqrt, rsqrt)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsSin, sin)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsSinh, sinh)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsSqrt, sqrt)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsTan, tan)
-NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsTanh, tanh)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAbs, abs)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAcos, acos)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAcosh, acosh)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAsin, asin)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAsinh, asinh)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAtan, atan)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsAtanh, atanh)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsCos, cos)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsCosh, cosh)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsExp, exp)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsExp2, exp2)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsFractionalPart, frac)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsLog, log)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsLog10, log10)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsLog2, log2)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsRcp, rcp)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsRsqrt, rsqrt)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsSin, sin)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsSinh, sinh)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsSqrt, sqrt)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsTan, tan)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsTanh, tanh)
 
-#undef NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER
+#undef SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER
 
 // Core `exp10` does not currently provide the complete derivative registrations needed by an
 // adapter marked `[Differentiable]`. The differentiable annex therefore attaches forward and
@@ -176,7 +176,7 @@ public vector<T, N> __differentiableNumericsExp10<
     return ::exp10(value);
 }
 
-#define NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(NAME, BUILTIN)                   \
+#define SLANG_NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(NAME, BUILTIN)                   \
     [__readNone] [Differentiable] [__unsafeForceInlineEarly]                    \
     public T NAME<T : __BuiltinFloatingPointType>(T left, T right)              \
     {                                                                            \
@@ -191,14 +191,14 @@ public vector<T, N> __differentiableNumericsExp10<
         return ::BUILTIN(left, right);                                           \
     }
 
-NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsAtan2, atan2)
-NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsCopySign, copysign)
-NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsMaximum, max)
-NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsMinimum, min)
-NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsPow, pow)
-NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsRemainder, fmod)
+SLANG_NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsAtan2, atan2)
+SLANG_NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsCopySign, copysign)
+SLANG_NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsMaximum, max)
+SLANG_NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsMinimum, min)
+SLANG_NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsPow, pow)
+SLANG_NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsRemainder, fmod)
 
-#undef NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER
+#undef SLANG_NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER
 
 [__readNone]
 [Differentiable]

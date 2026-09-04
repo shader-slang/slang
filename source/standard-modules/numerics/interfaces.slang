@@ -237,23 +237,8 @@ public interface IFractional : ISignedNumeric, IConstructibleFromBuiltinFloating
 {
     __constraint Scalar : IScalarFractional;
 
-    /// Returns the component-wise sum with `other`.
-    This plus(This other);
-
-    /// Returns the component-wise difference from `other`.
-    This minus(This other);
-
-    /// Returns the component-wise product with `other`.
-    This multipliedBy(This other);
-
     /// Returns the component-wise quotient after division by `other`.
     This dividedBy(This other);
-
-    /// Returns the component-wise arithmetic negation.
-    This negated();
-
-    /// Returns the component-wise absolute value in the same representation.
-    This absoluteValue();
 
     /// Returns the component-wise reciprocal.
     This reciprocal();

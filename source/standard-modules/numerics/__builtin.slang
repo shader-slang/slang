@@ -45,7 +45,7 @@ public TDestination __numericsBuiltinConstructFromFloatingPoint<
 // can select the interface-generic wrapper and cycle back to the witness being implemented. The
 // established core members are also preferable for matrices because `mul` is component-wise while
 // matrix `operator*` has matrix-algebra semantics.
-#define NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(NAME, METHOD)                       \
+#define SLANG_NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(NAME, METHOD)                       \
     [__readNone] [__unsafeForceInlineEarly]                                     \
     public vector<T, N> NAME<T : __BuiltinIntegerType, let N : int>(           \
         vector<T, N> left,                                                       \
@@ -74,12 +74,12 @@ public TDestination __numericsBuiltinConstructFromFloatingPoint<
         return left.METHOD(right);                                               \
     }
 
-NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(__numericsBuiltinAdd, add)
-NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(__numericsBuiltinSubtract, sub)
-NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(__numericsBuiltinMultiply, mul)
-NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(__numericsBuiltinDivide, div)
+SLANG_NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(__numericsBuiltinAdd, add)
+SLANG_NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(__numericsBuiltinSubtract, sub)
+SLANG_NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(__numericsBuiltinMultiply, mul)
+SLANG_NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(__numericsBuiltinDivide, div)
 
-#undef NUMERICS_BUILTIN_ARITHMETIC_ADAPTER
+#undef SLANG_NUMERICS_BUILTIN_ARITHMETIC_ADAPTER
 
 [__readNone]
 [__unsafeForceInlineEarly]
@@ -173,14 +173,14 @@ public bool __numericsBuiltinAll<let R : int, let C : int, let L : int>(
     return true;
 }
 
-#define NUMERICS_SCALAR_COMPARISON_ADAPTER(NAME, OP)                            \
+#define SLANG_NUMERICS_SCALAR_COMPARISON_ADAPTER(NAME, OP)                            \
     [__readNone] [__unsafeForceInlineEarly]                                     \
     public bool NAME<T : __BuiltinArithmeticType>(T left, T right)              \
     {                                                                            \
         return left OP right;                                                    \
     }
 
-#define NUMERICS_VECTOR_COMPARISON_ADAPTER(NAME, OP)                            \
+#define SLANG_NUMERICS_VECTOR_COMPARISON_ADAPTER(NAME, OP)                            \
     [__readNone] [__unsafeForceInlineEarly]                                     \
     public vector<bool, N> NAME<T : __BuiltinArithmeticType, let N : int>(      \
         vector<T, N> left,                                                       \
@@ -189,17 +189,17 @@ public bool __numericsBuiltinAll<let R : int, let C : int, let L : int>(
         return left OP right;                                                    \
     }
 
-NUMERICS_SCALAR_COMPARISON_ADAPTER(__numericsBuiltinEqual, ==)
-NUMERICS_SCALAR_COMPARISON_ADAPTER(__numericsBuiltinLess, <)
-NUMERICS_SCALAR_COMPARISON_ADAPTER(__numericsBuiltinLessEqual, <=)
-NUMERICS_VECTOR_COMPARISON_ADAPTER(__numericsBuiltinEqual, ==)
-NUMERICS_VECTOR_COMPARISON_ADAPTER(__numericsBuiltinLess, <)
-NUMERICS_VECTOR_COMPARISON_ADAPTER(__numericsBuiltinLessEqual, <=)
+SLANG_NUMERICS_SCALAR_COMPARISON_ADAPTER(__numericsBuiltinEqual, ==)
+SLANG_NUMERICS_SCALAR_COMPARISON_ADAPTER(__numericsBuiltinLess, <)
+SLANG_NUMERICS_SCALAR_COMPARISON_ADAPTER(__numericsBuiltinLessEqual, <=)
+SLANG_NUMERICS_VECTOR_COMPARISON_ADAPTER(__numericsBuiltinEqual, ==)
+SLANG_NUMERICS_VECTOR_COMPARISON_ADAPTER(__numericsBuiltinLess, <)
+SLANG_NUMERICS_VECTOR_COMPARISON_ADAPTER(__numericsBuiltinLessEqual, <=)
 
-#undef NUMERICS_VECTOR_COMPARISON_ADAPTER
-#undef NUMERICS_SCALAR_COMPARISON_ADAPTER
+#undef SLANG_NUMERICS_VECTOR_COMPARISON_ADAPTER
+#undef SLANG_NUMERICS_SCALAR_COMPARISON_ADAPTER
 
-#define NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER(NAME, OP)                        \
+#define SLANG_NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER(NAME, OP)                        \
     [__readNone] [__unsafeForceInlineEarly]                                     \
     public vector<T, N> NAME<T : __BuiltinIntegerType, let N : int>(            \
         vector<T, N> left,                                                       \
@@ -208,26 +208,26 @@ NUMERICS_VECTOR_COMPARISON_ADAPTER(__numericsBuiltinLessEqual, <=)
         return left OP right;                                                    \
     }
 
-#define NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER(NAME, OP)                        \
+#define SLANG_NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER(NAME, OP)                        \
     [__readNone] [__unsafeForceInlineEarly]                                     \
     public T NAME<T : __BuiltinIntegerType>(T left, T right)                    \
     {                                                                            \
         return left OP right;                                                    \
     }
 
-NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER(__numericsBuiltinIntegerDivide, /)
-NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER(__numericsBuiltinIntegerRemainder, %)
-NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER(__numericsBuiltinBitAnd, &)
-NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER(__numericsBuiltinBitOr, |)
-NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER(__numericsBuiltinBitXor, ^)
-NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER(__numericsBuiltinIntegerDivide, /)
-NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER(__numericsBuiltinIntegerRemainder, %)
-NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER(__numericsBuiltinBitAnd, &)
-NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER(__numericsBuiltinBitOr, |)
-NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER(__numericsBuiltinBitXor, ^)
+SLANG_NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER(__numericsBuiltinIntegerDivide, /)
+SLANG_NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER(__numericsBuiltinIntegerRemainder, %)
+SLANG_NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER(__numericsBuiltinBitAnd, &)
+SLANG_NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER(__numericsBuiltinBitOr, |)
+SLANG_NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER(__numericsBuiltinBitXor, ^)
+SLANG_NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER(__numericsBuiltinIntegerDivide, /)
+SLANG_NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER(__numericsBuiltinIntegerRemainder, %)
+SLANG_NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER(__numericsBuiltinBitAnd, &)
+SLANG_NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER(__numericsBuiltinBitOr, |)
+SLANG_NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER(__numericsBuiltinBitXor, ^)
 
-#undef NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER
-#undef NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER
+#undef SLANG_NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER
+#undef SLANG_NUMERICS_INTEGER_SCALAR_BINARY_ADAPTER
 
 [__readNone]
 [__unsafeForceInlineEarly]
@@ -276,7 +276,7 @@ public vector<T, N> __numericsBuiltinBitNot<T : __BuiltinIntegerType, let N : in
     return ~value;
 }
 
-#define NUMERICS_UNARY_ADAPTER(NAME, BUILTIN, ELEMENT_CONSTRAINT)                \
+#define SLANG_NUMERICS_UNARY_ADAPTER(NAME, BUILTIN, ELEMENT_CONSTRAINT)                \
     [__readNone] [__unsafeForceInlineEarly]                                     \
     public T NAME<T : ELEMENT_CONSTRAINT>(T value)                               \
     {                                                                            \
@@ -290,35 +290,41 @@ public vector<T, N> __numericsBuiltinBitNot<T : __BuiltinIntegerType, let N : in
         return ::BUILTIN(value);                                                 \
     }
 
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinRcp, rcp, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinAcos, acos, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinAcosh, acosh, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinAsin, asin, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinAsinh, asinh, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinAtan, atan, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinAtanh, atanh, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinCeil, ceil, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinCos, cos, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinCosh, cosh, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinExp, exp, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinExp10, exp10, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinExp2, exp2, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinFloor, floor, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinFractionalPart, frac, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinLog, log, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinLog10, log10, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinLog2, log2, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinReciprocalSqrt, rsqrt, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinRound, round, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinRoundEven, rint, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinSin, sin, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinSinh, sinh, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinSqrt, sqrt, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinTan, tan, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinTanh, tanh, __BuiltinFloatingPointType)
-NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinTruncate, trunc, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinRcp, rcp, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinAcos, acos, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinAcosh, acosh, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinAsin, asin, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinAsinh, asinh, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinAtan, atan, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinAtanh, atanh, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinCeil, ceil, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinCos, cos, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinCosh, cosh, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinExp, exp, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinExp10, exp10, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinExp2, exp2, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinFloor, floor, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(
+    __numericInterfaceBuiltinFractionalPart,
+    frac,
+    __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinLog, log, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinLog10, log10, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinLog2, log2, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(
+    __numericInterfaceBuiltinReciprocalSqrt,
+    rsqrt,
+    __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinRound, round, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinRoundEven, rint, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinSin, sin, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinSinh, sinh, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinSqrt, sqrt, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinTan, tan, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinTanh, tanh, __BuiltinFloatingPointType)
+SLANG_NUMERICS_UNARY_ADAPTER(__numericInterfaceBuiltinTruncate, trunc, __BuiltinFloatingPointType)
 
-#undef NUMERICS_UNARY_ADAPTER
+#undef SLANG_NUMERICS_UNARY_ADAPTER
 
 [__readNone]
 [__unsafeForceInlineEarly]
@@ -353,7 +359,7 @@ public vector<T, N> __numericInterfaceBuiltinAbs<
     return ::abs(value);
 }
 
-#define NUMERICS_BINARY_ADAPTER(NAME, BUILTIN)                                  \
+#define SLANG_NUMERICS_BINARY_ADAPTER(NAME, BUILTIN)                                  \
     [__readNone] [__unsafeForceInlineEarly]                                     \
     public T NAME<T : __BuiltinFloatingPointType>(T left, T right)              \
     {                                                                            \
@@ -368,16 +374,16 @@ public vector<T, N> __numericInterfaceBuiltinAbs<
         return ::BUILTIN(left, right);                                           \
     }
 
-NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinAtan2, atan2)
-NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinCopySign, copysign)
-NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinPow, pow)
-NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinRemainder, fmod)
-NUMERICS_BINARY_ADAPTER(__numericsBuiltinMaximum, max)
-NUMERICS_BINARY_ADAPTER(__numericsBuiltinMinimum, min)
+SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinAtan2, atan2)
+SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinCopySign, copysign)
+SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinPow, pow)
+SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinRemainder, fmod)
+SLANG_NUMERICS_BINARY_ADAPTER(__numericsBuiltinMaximum, max)
+SLANG_NUMERICS_BINARY_ADAPTER(__numericsBuiltinMinimum, min)
 
-#undef NUMERICS_BINARY_ADAPTER
+#undef SLANG_NUMERICS_BINARY_ADAPTER
 
-#define NUMERICS_CLASSIFICATION_ADAPTER(NAME, BUILTIN)                          \
+#define SLANG_NUMERICS_CLASSIFICATION_ADAPTER(NAME, BUILTIN)                          \
     [__readNone] [__unsafeForceInlineEarly]                                     \
     public bool NAME<T : __BuiltinFloatingPointType>(T value)                   \
     {                                                                            \
@@ -391,11 +397,11 @@ NUMERICS_BINARY_ADAPTER(__numericsBuiltinMinimum, min)
         return ::BUILTIN(value);                                                 \
     }
 
-NUMERICS_CLASSIFICATION_ADAPTER(__numericInterfaceBuiltinIsFinite, isfinite)
-NUMERICS_CLASSIFICATION_ADAPTER(__numericInterfaceBuiltinIsInfinite, isinf)
-NUMERICS_CLASSIFICATION_ADAPTER(__numericInterfaceBuiltinIsNaN, isnan)
+SLANG_NUMERICS_CLASSIFICATION_ADAPTER(__numericInterfaceBuiltinIsFinite, isfinite)
+SLANG_NUMERICS_CLASSIFICATION_ADAPTER(__numericInterfaceBuiltinIsInfinite, isinf)
+SLANG_NUMERICS_CLASSIFICATION_ADAPTER(__numericInterfaceBuiltinIsNaN, isnan)
 
-#undef NUMERICS_CLASSIFICATION_ADAPTER
+#undef SLANG_NUMERICS_CLASSIFICATION_ADAPTER
 
 [__readNone]
 [__unsafeForceInlineEarly]

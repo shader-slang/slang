@@ -1,8 +1,14 @@
 // Verify that user-defined scalar and shaped integer types can conform to the public integer
 // interfaces and use the corresponding generic operators.
 
-//TEST:SIMPLE: -target hlsl -entry main -stage compute -o numeric-interfaces-custom-integer.hlsl -experimental-feature
-//TEST:SIMPLE: -target spirv -entry main -stage compute -o numeric-interfaces-custom-integer.spv -experimental-feature
+//TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o numeric-interfaces-custom-integer.hlsl -experimental-feature
+//TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o numeric-interfaces-custom-integer.spv -experimental-feature
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
+
+// CHECK: type: int32_t
+// CHECK-NEXT: 44
+
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 
 import slang.numerics;
 
@@ -298,7 +304,7 @@ T scalarIdentity<T : IScalarSignedIntegerType>(T value)
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void main()
+void computeMain()
 {
     WrappedInt scalar = scalarIdentity(integerCurve(
         constructFromBuiltinInteger<WrappedInt>(int8_t(7)), WrappedInt(3)));

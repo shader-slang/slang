@@ -7,7 +7,7 @@
 
 import slang.numerics.differentiable;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [Differentiable]
@@ -26,6 +26,30 @@ float3 repeatVectorScalar(float value)
 float2x2 repeatMatrixScalar(float value)
 {
     return repeatScalar<float2x2>(value);
+}
+
+[Differentiable]
+T genericExp10<T : IDifferentiableExponentialFunctions>(T value)
+{
+    return exp10(value);
+}
+
+[Differentiable]
+float useGenericExp10(float value)
+{
+    return genericExp10(value);
+}
+
+[Differentiable]
+T genericSin<T : IDifferentiableTrigonometricFunctions>(T value)
+{
+    return sin(value);
+}
+
+[Differentiable]
+float useGenericSin(float value)
+{
+    return genericSin(value);
 }
 
 struct CustomPair : IDifferentiableNumericShapedType
@@ -74,4 +98,15 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     var customReverse = diffPair(2.0, 0.0);
     bwd_diff(repeatCustomScalar)(customReverse, CustomPair(4.0, 5.0));
     outputBuffer[5] = customReverse.d; // CHECK: 9.0
+
+    let exp10Forward = fwd_diff(useGenericExp10)(diffPair(0.0, 1.0));
+    outputBuffer[6] = exp10Forward.p; // CHECK: 1.000000
+    outputBuffer[7] = exp10Forward.d; // CHECK: 2.302585
+
+    var exp10Reverse = diffPair(0.0, 0.0);
+    bwd_diff(useGenericExp10)(exp10Reverse, 1.0);
+    outputBuffer[8] = exp10Reverse.d; // CHECK: 2.302585
+
+    let sinForward = fwd_diff(useGenericSin)(diffPair(0.0, 1.0));
+    outputBuffer[9] = sinForward.d; // CHECK: 1.000000
 }
