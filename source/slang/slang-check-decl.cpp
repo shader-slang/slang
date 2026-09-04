@@ -14559,6 +14559,22 @@ DeclRef<Decl> SemanticsVisitor::getRequirementAsLookedUpDecl(ASTBuilder* astBuil
     // decl. This will form the full reference to the function as a lookup on itself.
     //
 
+    // An accessor is reached through its storage declaration, not as a direct member lookup on
+    // `This`. Consider this example:
+    //
+    //     interface IValueHolder
+    //     {
+    //         property Value : float { [Differentiable] get; }
+    //     }
+    //
+    // A checked reference to the getter has the shape
+    // `MemberDeclRef(Lookup(This, Value), get)`. Build the differentiability requirement with that
+    // same shape so lookup-derived inheritance can match the two canonical types. A generic
+    // subscript uses the same rule, except that the storage lookup is specialized before selecting
+    // its accessor.
+    auto accessorDecl = as<AccessorDecl>(decl);
+    Decl* lookupTargetDecl = accessorDecl ? accessorDecl->parentDecl : decl;
+
     List<GenericDecl*> genericParentDecls;
     for (auto dd = decl->parentDecl; dd != interfaceDeclRef.getDecl(); dd = dd->parentDecl)
     {
@@ -14571,7 +14587,7 @@ DeclRef<Decl> SemanticsVisitor::getRequirementAsLookedUpDecl(ASTBuilder* astBuil
     DeclRef<Decl> lookupDeclRef;
     if (genericParentDecls.getCount() == 0)
     {
-        lookupDeclRef = astBuilder->getLookupDeclRef(declaredSubtypeWitness, decl);
+        lookupDeclRef = astBuilder->getLookupDeclRef(declaredSubtypeWitness, lookupTargetDecl);
     }
     else
     {
@@ -14586,8 +14602,7 @@ DeclRef<Decl> SemanticsVisitor::getRequirementAsLookedUpDecl(ASTBuilder* astBuil
             Decl* innerDecl = nullptr;
             if (i == 0 && decl->isChildOf(genericParentDecls[i]))
             {
-                // Accessors belong to their storage declaration, not directly to the generic
-                // environment. Consider this example:
+                // Consider this generic form of the accessor case described above:
                 //
                 //     interface ITensor<T, int D>
                 //     {
@@ -14606,10 +14621,7 @@ DeclRef<Decl> SemanticsVisitor::getRequirementAsLookedUpDecl(ASTBuilder* astBuil
                 // `MemberDeclRef::resolve` can then remap the accessor after the subscript
                 // lookup resolves through the witness table entry installed by
                 // `doesSubscriptMatchRequirement`.
-                if (as<AccessorDecl>(decl))
-                    innerDecl = decl->parentDecl;
-                else
-                    innerDecl = decl;
+                innerDecl = lookupTargetDecl;
             }
             lookupDeclRef = astBuilder->getGenericAppDeclRef(
                 lookupDeclRef.as<GenericDecl>(),
@@ -14620,10 +14632,9 @@ DeclRef<Decl> SemanticsVisitor::getRequirementAsLookedUpDecl(ASTBuilder* astBuil
 
     if (lookupDeclRef.getDecl() != decl)
     {
-        if (as<AccessorDecl>(decl))
+        if (accessorDecl)
         {
-            // If it's an accessor, then the lookup would be referring to the parent
-            // subscript-decl. We just need to access the member.
+            // The lookup refers to the parent property or subscript. Select its accessor.
             //
             lookupDeclRef = astBuilder->getMemberDeclRef(lookupDeclRef, decl);
         }

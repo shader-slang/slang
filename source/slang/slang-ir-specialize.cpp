@@ -1773,6 +1773,10 @@ struct SpecializationContext
             if (!iterChanged || sink->getErrorCount())
                 break;
         }
+
+        // DifferentialPairInfoType remains semantic until the final specialization phase. Autodiff
+        // can synthesize and inline more witness-table wrappers after this loop, and those rewrites
+        // must still be able to distinguish a pair from an ordinary two-element tuple.
     }
 
     void addInstsToWorkListRec(IRInst* inst)

@@ -859,6 +859,17 @@ local insts = {
 				--
 				-- Only operand is a SetBase
 			} }, 
+			{ DifferentialPairInfoType = {
+				struct_name = "DifferentialPairInfoType",
+				operands = { { "primalInfo", "IRType" }, { "differentialInfo", "IRType" } },
+				hoistable = true,
+				-- Represents the type-flow form of a differential pair.
+				--
+				-- The two operands are propagation information for the primal and
+				-- differential components. Keeping this semantic wrapper distinct from
+				-- TupleType prevents ordinary tuple logic from having to infer whether a
+				-- two-element tuple was originally a DifferentialPair.
+			} },
 			{ TaggedUnionType = {
 				hoistable = true,
 				-- Represents a tagged union type.
