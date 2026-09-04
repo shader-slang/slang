@@ -131,7 +131,10 @@ struct TupleLoweringContext
         auto loweredTupleInfo = getLoweredTupleType(builder, base->getDataType());
         SLANG_ASSERT(loweredTupleInfo);
         auto elementIndex = getIntVal(inst->getElementIndex());
-        SLANG_ASSERT((Index)elementIndex < loweredTupleInfo->fields.getCount());
+        // An index past the lowered field list indicates malformed IR (a `getTupleElement` beyond
+        // the tuple's arity); keep this check active in release builds so it fails diagnosably
+        // rather than reading `fields` out of bounds.
+        SLANG_RELEASE_ASSERT((Index)elementIndex < loweredTupleInfo->fields.getCount());
 
         auto field = loweredTupleInfo->fields[(Index)elementIndex];
         auto getElement = builder->emitFieldExtract(field->getFieldType(), base, field->getKey());

@@ -856,6 +856,51 @@ struct SpecializationContext
         }
     }
 
+    // Unlike `flattenPackOperand`, this returns false when a leaf is a still-unresolved pack of
+    // unknown length, so the caller defers rather than miscounting it as one element — the deferral
+    // `getPackBranchCardinality`/`maybeSpecializeCountOf` also apply for unknown cardinality.
+    // `ioCount` receives the flattened element count of the resolved-concrete case.
+    bool tryGetFlattenedPackArity(IRInst* inst, UInt& ioCount)
+    {
+        if (auto makeValuePack = as<IRMakeValuePack>(inst))
+        {
+            for (UInt i = 0; i < makeValuePack->getOperandCount(); i++)
+                if (!tryGetFlattenedPackArity(makeValuePack->getOperand(i), ioCount))
+                    return false;
+            return true;
+        }
+        if (auto typePack = as<IRTypePack>(inst))
+        {
+            for (UInt i = 0; i < typePack->getOperandCount(); i++)
+                if (!tryGetFlattenedPackArity(typePack->getOperand(i), ioCount))
+                    return false;
+            return true;
+        }
+        // A pack-producing leaf has unknown length. Matched by op because a symbolic type-pack
+        // carries a pack `Kind`, not a pack type; the type check below then also catches a
+        // pack-typed value of any op (e.g. an unbound `each` value parameter).
+        switch (inst->getOp())
+        {
+        case kIROp_Expand:
+        case kIROp_ExpandTypeOrVal:
+        case kIROp_TrimFirstOfPack:
+        case kIROp_TrimLastOfPack:
+        case kIROp_ShapeConcat:
+        case kIROp_ShapePermute:
+        case kIROp_ShapeSwap:
+        case kIROp_ShapeReduce:
+        case kIROp_PackBranch:
+            return false;
+        default:
+            break;
+        }
+        if (as<IRTypePack>(inst->getDataType()) || as<IRValuePackType>(inst->getDataType()) ||
+            as<IRTypeParameterPackKind>(inst->getDataType()))
+            return false;
+        ioCount++;
+        return true;
+    }
+
     bool maybeSpecializeTypePackOrTupleType(IRInst* inst)
     {
         // If any element of the type pack or tuple is a TypePack, we want to
@@ -3176,15 +3221,17 @@ struct SpecializationContext
         IRBuilder builder(expandInst);
         builder.setInsertBefore(expandInst);
         List<IRInst*> elements;
+
+        // The unroll count is the first capture's *flattened* arity, not its raw
+        // `getOperandCount()`: a capture may be a concatenation `makeValuePack(scalar, nestedPack)`
+        // that `maybeSpecializeMakeValuePackOrTuple` later flattens, and the body's
+        // `getTupleElement(capture, i)` follows that flattened form. All captures are expanded with
+        // this single index and are expected to share this arity; consistent with the pre-existing
+        // behavior we derive it from capture 0 only and do not re-screen captures 1..N here. If
+        // capture 0 is not yet fully resolved, defer so a later pass retries.
         UInt elementCount = 0;
-        if (auto firstTypePack = as<IRTypePack>(expandInst->getCapture(0)))
-        {
-            elementCount = firstTypePack->getOperandCount();
-        }
-        else if (auto firstValuePack = as<IRMakeValuePack>(expandInst->getCapture(0)))
-        {
-            elementCount = firstValuePack->getOperandCount();
-        }
+        if (!tryGetFlattenedPackArity(expandInst->getCapture(0), elementCount))
+            return false;
         if (elementCount == 0)
         {
             auto resultPack =
