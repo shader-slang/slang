@@ -37,6 +37,18 @@ a = 6; // Error, `a` is immutable.
 ```
 
 
+## Compile-Time Constants (`constexpr`)
+The Slang language allows `constexpr` to be used as a modifier, but at present it is not fully implemented and will not behave as users familiar with `constexpr` in C++ might expect. Use of `constexpr` in Slang code is currently discouraged.
+
+Slang does not evaluate user-defined function bodies at compile time, so `constexpr` will parse but does not cause an expression to be evaluated at compile time. Depending on where the modifier appears, Slang currently reacts as follows:
+- On a **variable or global**, `constexpr` is treated as `const`, and Slang emits `warning 31227`. Use `static const` for a global constant instead.
+- On a **function or other callable declaration** (a method, initializer, subscript, accessor, or operator), `constexpr` is ignored, and Slang emits `warning 31228`.
+
+These warnings may be turned into errors in a future version of the Slang language.
+
+When you need a value that is guaranteed to be known at compile time, use a literal, a `static const` initialized from a compile-time constant, a preprocessor `#define`, or a generic value parameter (`struct Foo<int N> { ... }`).
+
+
 ## Namespaces
 
 You can use the `namespace` syntax to define symbols in a namespace:
