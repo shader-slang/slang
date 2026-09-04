@@ -11,9 +11,13 @@
 
 
 //METAL: "dir"
-//METAL: "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
+//METAL: "bindings": [
+//METAL: {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
+//METAL: {"kind": "metalArgumentBufferElement", "index": 0}
 //METAL: "color"
-//METAL: "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
+//METAL: "bindings": [
+//METAL: {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
+//METAL: {"kind": "metalArgumentBufferElement", "index": 1}
 
 struct Params
 {
