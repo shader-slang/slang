@@ -2383,6 +2383,141 @@ private:
         }
     }
 
+    // Force the conformances of any concrete type whose associated-type
+    // projection appears unreduced inside `val`, returning whether any decl was
+    // advanced.
+    //
+    // A constraint such as `where T.Element == ConcreteElement`, applied as
+    // `R<Container>`, substitutes to a `sub` of `Container.Element`. Reducing
+    // that projection to its satisfying type reads `Container`'s conformance
+    // witness table, which is built only once `Container` reaches
+    // `ReadyForConformances`. When this application is checked from a function
+    // body every module-scope type is already conformance-ready, so the
+    // projection folds; but at header scope (a global variable, struct field,
+    // typealias, or function signature) `Container` may still be pending, so the
+    // projection stays symbolic and the constraint fails for want of readiness
+    // rather than a genuine type mismatch. We only reach here on that failure,
+    // so force the concrete lookup base's conformances (and bump the AST epoch to
+    // invalidate the cached symbolic projection) and let the caller re-resolve.
+    //
+    // The base must be a concrete nominal type (an aggregate, not an interface
+    // whose `associatedtype` is still abstract) and must not be mid-check: a
+    // self-referential definition whose own member forms the projection would
+    // otherwise only trip a cyclic-reference diagnostic here, so it is left to
+    // fail on its own.
+    bool ensureConformancesForUnreducedAssocTypeProjections(Val* val)
+    {
+        HashSet<Val*> visitedVals;
+        bool forcedAny = false;
+        ensureConformancesForUnreducedAssocTypeProjectionsRec(val, visitedVals, forcedAny);
+        return forcedAny;
+    }
+
+    void ensureConformancesForUnreducedAssocTypeProjectionsRec(
+        Val* val,
+        HashSet<Val*>& ioVisitedVals,
+        bool& ioForcedAny)
+    {
+        if (!val || ioVisitedVals.contains(val))
+            return;
+        ioVisitedVals.add(val);
+
+        // An unreduced projection is a `DeclRefType` whose decl-ref is a
+        // `LookupDeclRef` naming an `associatedtype`; its witness's subject type
+        // is the concrete type that should supply the satisfying declaration.
+        if (auto declRefType = as<DeclRefType>(val))
+        {
+            if (auto lookupDeclRef = as<LookupDeclRef>(declRefType->getDeclRef().declRefBase))
+            {
+                if (as<AssocTypeDecl>(lookupDeclRef->getDecl()))
+                {
+                    if (auto subDeclRefType =
+                            as<DeclRefType>(lookupDeclRef->getWitness()->getSub()))
+                    {
+                        // Only a concrete nominal type (a `struct`, `class`, or
+                        // `enum`) carries a conformance witness table that would
+                        // reduce the projection. The abstract `AggTypeDecl`s --
+                        // an `interface`, a `ThisType`, an `associatedtype`, or a
+                        // global generic parameter -- name a subject whose
+                        // associated types are not yet pinned to a concrete
+                        // satisfier, so forcing their conformances would neither
+                        // reduce the projection nor be safe during core-module
+                        // checking.
+                        auto subDecl = subDeclRefType->getDeclRef().getDecl();
+                        if (isConcreteConformingAggType(subDecl))
+                            ioForcedAny |= ensureConformancesForConcreteType(subDecl);
+                    }
+                }
+            }
+        }
+
+        for (auto operand : val->m_operands)
+        {
+            if (operand.kind == ValNodeOperandKind::ValNode)
+                ensureConformancesForUnreducedAssocTypeProjectionsRec(
+                    operand.getVal(),
+                    ioVisitedVals,
+                    ioForcedAny);
+        }
+    }
+
+    // Return true if `decl` is a concrete nominal aggregate that can carry
+    // interface conformances -- every `AggTypeDecl` subclass except the abstract
+    // ones whose associated types are not yet pinned to a concrete satisfier:
+    // `interface`, `ThisType`, `associatedtype`, and a global generic type
+    // parameter. Concrete kinds therefore include `struct`, `class`, `enum`, and
+    // the other non-abstract aggregate decls (`SynthesizedStructDecl`,
+    // `GLSLInterfaceBlockDecl`).
+    static bool isConcreteConformingAggType(Decl* decl)
+    {
+        return as<AggTypeDecl>(decl) && !as<InterfaceDecl>(decl) && !as<ThisTypeDecl>(decl) &&
+               !as<AssocTypeDecl>(decl) && !as<GlobalGenericParamDecl>(decl);
+    }
+
+    // Bring a concrete type's conformances to `ReadyForConformances` so its
+    // associated-type witnesses can be looked up, returning whether any decl was
+    // advanced. The satisfying `typealias` for the projected associated type may
+    // be declared either on the type itself or in an `extension`, so ready both
+    // the type and its candidate extensions: `struct Container : IHasElement`
+    // and `extension Container : IHasElement` both need to be checked for
+    // `Container.Element` to reduce. A decl already checked or mid-check is
+    // skipped -- the latter avoids a spurious cyclic-reference diagnostic on a
+    // self-referential definition whose own member forms the projection.
+    bool ensureConformancesForConcreteType(Decl* typeDecl)
+    {
+        bool forcedAny = false;
+        auto ready = [&](Decl* decl)
+        {
+            if (decl && !decl->checkState.isBeingChecked() &&
+                !decl->isChecked(DeclCheckState::ReadyForConformances))
+            {
+                m_visitor->ensureDecl(decl, DeclCheckState::ReadyForConformances);
+                forcedAny = true;
+            }
+        };
+
+        ready(typeDecl);
+        // Which extension supplies the associated type is unknown until candidate
+        // conformances are checked, so ready all of this type's candidates. Copy
+        // the list first: `ensureDecl` can register a new candidate extension and
+        // append to the same cached list this loop iterates.
+        List<ExtensionDecl*> candidateExtensions =
+            m_visitor->getShared()->getCandidateExtensionsForTypeDecl(typeDecl);
+        for (auto extensionDecl : candidateExtensions)
+            ready(extensionDecl);
+
+        // Invalidate the resolve cache so the caller's re-resolve observes the
+        // freshly built witness tables. In practice the concrete type also
+        // advances here and readying it through `checkAggTypeConformance` already
+        // bumps the epoch. Bumping explicitly on any advance keeps the retry
+        // self-contained -- correct even if only an extension ends up advancing,
+        // since `checkExtensionConformance` does not bump the epoch itself.
+        if (forcedAny)
+            m_astBuilder->incrementEpoch();
+
+        return forcedAny;
+    }
+
     // Add one declaration to a dependency list.
     void addDependentDecl(ShortList<Decl*>& ioDependencies, Decl* dependencyDecl)
     {
@@ -2945,6 +3080,42 @@ private:
 
         if (constraintDecl->isEqualityConstraint && !isTypeEqualityWitness(subTypeWitness))
             subTypeWitness = nullptr;
+
+        // If the witness could not be proven, the cause may be an associated-type
+        // projection on a concrete argument (`Container.Element`) that has not
+        // reduced because the argument's conformances are not built yet at header
+        // scope. Force those conformances and retry the proof once. The walks
+        // below recurse the whole `sub`/`sup` `Val` graph, so they ready the
+        // concrete base of every unreduced projection they contain -- including
+        // the inner base of a chained projection such as `T.Element.Element`,
+        // whose subjects are all reachable in the pre-retry graph -- and one
+        // re-substitution then reduces them (covered by the chained regression
+        // test). The retry re-substitutes so the reduced projection reaches
+        // `isSubtype`; this is the same readiness the function-body path already
+        // enjoys. The extension-closure path (`additionalSubtypeWitnesses`) is
+        // left alone: it is building a type's inheritance graph and must not force
+        // conformances mid-linearization.
+        if (!subTypeWitness && !m_context.additionalSubtypeWitnesses)
+        {
+            // Evaluate both walks for their conformance-forcing side effect: `sup`
+            // must be readied even when `sub` already forced something (e.g.
+            // `where T.Element == U.Other`, both sides projections), so this must
+            // not short-circuit.
+            bool forcedSub = ensureConformancesForUnreducedAssocTypeProjections(sub);
+            bool forcedSup = ensureConformancesForUnreducedAssocTypeProjections(sup);
+            if (forcedSub || forcedSup)
+            {
+                constraintDeclRef =
+                    buildSubstDeclRef(constraintDecl).as<GenericTypeConstraintDecl>();
+                sub = getSub(m_astBuilder, constraintDeclRef);
+                sup = getSup(m_astBuilder, constraintDeclRef);
+                // This retry is guarded to the non-extension-closure path above,
+                // so the normal caching subtype query applies.
+                subTypeWitness = m_visitor->isSubtype(sub, sup, IsSubTypeOptions::None);
+                if (constraintDecl->isEqualityConstraint && !isTypeEqualityWitness(subTypeWitness))
+                    subTypeWitness = nullptr;
+            }
+        }
 
         // Optionality can come from either the witness found by subtype checking
         // or the source constraint itself. A real unchecked-optional witness is
