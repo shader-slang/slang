@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -render-feature cooperative-matrix
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda
 
 // CHECK: 1
