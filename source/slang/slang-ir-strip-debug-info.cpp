@@ -19,6 +19,7 @@ static void findDebugInfo(IRInst* inst, List<IRInst*>& debugInstructions)
     case kIROp_DebugFunction:
     case kIROp_DebugBuildIdentifier:
     case kIROp_DebugCompilationUnit:
+    case kIROp_DebugGlobalConstant:
         debugInstructions.add(inst);
         break;
     default:

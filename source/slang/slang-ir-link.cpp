@@ -2333,6 +2333,13 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                 // DebugCompilationUnit references a DebugSource; clone it along with source.
                 cloneValue(context, inst);
                 break;
+            case kIROp_DebugGlobalConstant:
+                // DebugGlobalConstant records debug info for named global const values.
+                // It is not referenced by any other instruction (it references the value,
+                // not the other way around), so it must be explicitly cloned here to survive
+                // the link step.
+                cloneValue(context, inst);
+                break;
             }
         }
     }

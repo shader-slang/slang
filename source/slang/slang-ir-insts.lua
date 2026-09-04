@@ -3011,6 +3011,11 @@ local insts = {
 			hoistable = true,
 		},
 	},
+	{
+		DebugGlobalConstant = {
+			min_operands = 6,
+		},
+	},
 	-- Embedded Precompiled Libraries
 	{ EmbeddedDownstreamIR = { operands = { { "targetOperand", "IRIntLit" }, { "blob", "IRBlobLit" } } } },
 	-- Inline assembly

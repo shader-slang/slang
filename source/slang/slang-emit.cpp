@@ -443,6 +443,7 @@ void calcRequiredLoweringPassSet(
     case kIROp_DebugFunction:
     case kIROp_DebugBuildIdentifier:
     case kIROp_DebugCompilationUnit:
+    case kIROp_DebugGlobalConstant:
         result.debugInfo = true;
         break;
     case kIROp_ResultType:

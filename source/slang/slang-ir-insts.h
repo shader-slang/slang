@@ -2732,6 +2732,18 @@ struct IRDebugCompilationUnit : IRInst
 };
 
 FIDDLE()
+struct IRDebugGlobalConstant : IRInst
+{
+    FIDDLE(leafInst())
+    IRInst* getName() { return getOperand(0); }      // IRStringLit: variable name
+    IRInst* getDebugType() { return getOperand(1); } // IRType
+    IRInst* getSource() { return getOperand(2); }    // IRDebugSource
+    IRInst* getLine() { return getOperand(3); }      // IRIntLit
+    IRInst* getCol() { return getOperand(4); }       // IRIntLit
+    IRInst* getValue() { return getOperand(5); }     // the constant value (e.g., IRFloatLit)
+};
+
+FIDDLE()
 struct IRDebugLine : IRInst
 {
     FIDDLE(leafInst())
@@ -3689,6 +3701,20 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* file,
         IRInst* debugType,
         IRInst* parentScope = nullptr);
+    /// Emit an IRDebugGlobalConstant instruction that carries debug metadata for a named
+    /// global constant declaration. The SPIRV emitter uses this to emit a
+    /// DebugGlobalVariable instruction in NonSemantic.Shader.DebugInfo.100. `type` is the
+    /// IR type of the constant (must match the type used by emitGlobalConstant for the same
+    /// declaration), and `value` is the folded initializer value stored inside the
+    /// IRGlobalConstant (i.e., IRGlobalConstant::getValue()), which may be a same-domain
+    /// cast wrapping a literal.
+    IRInst* emitDebugGlobalConstant(
+        IRType* type,
+        IRInst* name,
+        IRInst* source,
+        IRInst* line,
+        IRInst* col,
+        IRInst* value);
 
     /// Emit an LiveRangeStart instruction indicating the referenced item is live following this
     /// instruction
