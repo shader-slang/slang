@@ -513,7 +513,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::linkWithOptions(
 
     if (linked)
     {
-        static_cast<ComponentType*>(linked)->getOptionSet().load(count, entries);
+        static_cast<ComponentType*>(linked)->getOptionSet().load(
+            count,
+            entries,
+            CapabilitySource::TargetOption);
     }
 
     return SLANG_OK;
