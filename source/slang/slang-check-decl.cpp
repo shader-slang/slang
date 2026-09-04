@@ -556,8 +556,7 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         if (isGlobalDecl(decl) && (hasConst || hasUniform) && !hasStatic &&
             !hasSpecializationConstant && decl->initExpr)
         {
-            auto moduleDecl = getModuleDecl(decl);
-            if (!moduleDecl || !moduleDecl->hasModifier<GLSLModuleModifier>())
+            if (!getShared()->isGLSLSourceLanguage())
             {
                 getSink()->diagnose(
                     Diagnostics::ConstGlobalVarWithInitRequiresStatic{.decl = decl});
@@ -2881,7 +2880,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     if (as<NamespaceDeclBase>(varDecl->parentDecl))
     {
-        if (getModuleDecl(varDecl)->hasModifier<GLSLModuleModifier>())
+        if (getShared()->isGLSLSourceLanguage())
         {
             // If we are in GLSL compatiblity mode, we want to treat all global variables
             // without any `uniform` modifiers as true global variables by default.
@@ -17056,8 +17055,11 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
 
     if (getText(moduleDecl->getName()) == "glsl")
     {
-        getShared()->glslModuleDecl = moduleDecl;
-        getShared()->m_isGLSLModuleImported = true;
+        // This is deliberately narrower than selecting GLSL as the source language. The parser
+        // has already run, and all other language-dependent behavior continues to use the
+        // translation unit's effective `sourceLanguage`. Retain only the historical effect that
+        // importing this module enables GLSL's builtin operator rules.
+        getShared()->m_hasImportedGLSLModule = true;
     }
 
     importedModulesList.add(moduleDecl);
@@ -17101,6 +17103,7 @@ void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
     auto name = decl->moduleNameAndLoc.name;
     if (!name)
         return;
+
     auto scope = getModuleDecl(decl)->ownedScope;
 
     // Try to load a module matching the name
@@ -19816,6 +19819,50 @@ bool tryCheckDerivativeOfAttributeImpl(
 
 void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
+    // This producer check is selected by the semantic `GLSLAtomicUintType`, independently of the
+    // source language. A supported GLSL global atomic counter has a `layout(binding = ...)`
+    // modifier; parsing that modifier also creates an explicit or implicit offset that the checked
+    // modifier and parameter-layout paths preserve for the backing-storage rewrite. By contrast,
+    // `import glsl; atomic_uint counter;` in Slang source creates the same semantic type but does
+    // not pass through that GLSL layout producer, so it is deliberately rejected here. Otherwise
+    // the declaration would become a decoration-less `kIROp_GLSLAtomicUintType` global that no
+    // target can emit.
+    //
+    // Existing atomic-counter legalization supports only directly-declared globals. Reject arrays
+    // at this producer boundary even when they have a binding; otherwise their element type
+    // remains an unhandled placeholder at emission. Supporting arrays requires a corresponding
+    // aggregate representation and legalization design, not a recursive scan in the linker.
+    if (isGlobalDecl(varDecl))
+    {
+        Type* declaredType = varDecl->getType();
+        Type* arrayElementType = unwrapArrayType(declaredType);
+        if (as<GLSLAtomicUintType>(arrayElementType))
+        {
+            const bool isAtomicCounterArray = as<ArrayExpressionType>(declaredType) != nullptr;
+            if (isAtomicCounterArray)
+            {
+                getSink()->diagnose(Diagnostics::GlslAtomicCounterArraysNotSupported{
+                    .location = varDecl->nameAndLoc.loc});
+            }
+            else
+            {
+                const bool hasBinding = varDecl->findModifier<GLSLBindingAttribute>() != nullptr;
+                const bool hasOffset =
+                    varDecl->findModifier<GLSLOffsetLayoutAttribute>() != nullptr;
+
+                // The earlier ModifiersChecked phase emits MissingLayoutBindingModifier for
+                // `hasOffset && !hasBinding`. Diagnose the remaining binding-less shape here:
+                // `!hasOffset && !hasBinding`, such as an `atomic_uint` introduced into Slang
+                // source by `import glsl`. A binding-producing GLSL declaration has both.
+                if (!hasBinding && !hasOffset)
+                {
+                    getSink()->diagnose(Diagnostics::GlslAtomicCounterRequiresBinding{
+                        .location = varDecl->nameAndLoc.loc});
+                }
+            }
+        }
+    }
+
     bool hasSpecConstAttr = false;
     bool hasPushConstAttr = false;
     for (auto modifier : varDecl->modifiers)

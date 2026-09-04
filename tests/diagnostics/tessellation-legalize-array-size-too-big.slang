@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHK):-target glsl -entry hullMain -stage hull -allow-glsl
-//TEST:SIMPLE(filecheck=CHK):-target spirv-asm -entry hullMain -stage hull -allow-glsl
+//TEST:SIMPLE(filecheck=CHK):-target glsl -entry hullMain -stage hull
+//TEST:SIMPLE(filecheck=CHK):-target spirv-asm -entry hullMain -stage hull
 
 // Tessllation outsie factor must be an array of size 4 or less
 // Tessllation inside factor must be an array of size 2 or less

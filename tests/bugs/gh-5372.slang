@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=SPV): -allow-glsl -target spirv-asm -entry vertexMain -stage vertex
+//TEST:SIMPLE_EX(filecheck=SPV): -lang glsl tests/bugs/gh-5372.slang -target spirv-asm -entry vertexMain -stage vertex -Wno-118
 
 // This test is to make sure the constant-folding works for the switch-case label.
 // The shader code is from VK-CTS but modified,

@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -allow-glsl -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -allow-glsl
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -Wno-120 -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -Wno-120
 
 #version 450 core
 layout(location = 0) in highp vec4 a_position;

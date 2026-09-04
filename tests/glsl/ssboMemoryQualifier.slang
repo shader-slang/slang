@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -stage compute -entry computeMain -allow-glsl -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl/ssboMemoryQualifier.slang -stage compute -entry computeMain -target glsl -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl/ssboMemoryQualifier.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -Wno-118
 
 // CHECK_SPV: OpEntryPoint
 

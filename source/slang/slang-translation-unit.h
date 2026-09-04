@@ -28,9 +28,46 @@ public:
     // The parent compile request
     FrontEndCompileRequest* compileRequest = nullptr;
 
-    // The language in which the source file(s)
-    // are assumed to be written
+    /// The effective source language of this translation unit.
+    ///
+    /// A translation unit has exactly one source language. Its initial selection is an explicit
+    /// API or command-line request when present, or otherwise the language agreed on by the primary
+    /// source-file extensions. Source directives are expected to agree with that selection. For
+    /// backward compatibility, however, preprocessing diagnoses but honors a conflicting
+    /// `#version` or `#language` directive before parsing begins. Effective precedence is therefore
+    /// a source directive, then an explicit request, then the primary-file extensions; the
+    /// provenance fields below preserve every selection so that conflicts can be diagnosed.
+    ///
+    /// Parser and semantic-checking code must use only this resolved field. In particular, the
+    /// deprecated request-wide `-allow-glsl` option is normalized into this per-translation-unit
+    /// value before preprocessing and has no independent meaning later in the pipeline.
     SourceLanguage sourceLanguage = SourceLanguage::Unknown;
+
+    /// The language explicitly requested through the API or command-line options, if any.
+    ///
+    /// Normalizing the deprecated `-allow-glsl` option records `GLSL` here because that option's
+    /// only remaining meaning is an explicit request to treat every translation unit as GLSL.
+    SourceLanguage sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
+
+    /// The language agreed on by the primary source-file extensions, if any.
+    ///
+    /// This field is `Unknown` when no extension identifies a language or when the extensions
+    /// disagree. Disagreement is an error unless an explicitly requested language resolves it.
+    /// On the error-recovery path, `sourceLanguage` may still retain the first recognized language
+    /// as a deterministic parser mode while this field remains `Unknown`: conflicting extensions
+    /// do not constitute one coherent provenance selection that a source directive can override.
+    SourceLanguage sourceLanguageImpliedByFileExtension = SourceLanguage::Unknown;
+
+    /// The language selected by a primary source-file directive, if any.
+    ///
+    /// The first primary-source directive is retained here. If it conflicts with an API request or
+    /// file-extension choice, preprocessing diagnoses but honors it as a backward-compatibility
+    /// concession. A later directive for the same language confirms the selection; a later
+    /// directive for a different language is a fatal conflict and does not replace this field.
+    SourceLanguage sourceLanguageImpliedBySourceContents = SourceLanguage::Unknown;
+
+    /// The location of the directive that selected `sourceLanguageImpliedBySourceContents`.
+    SourceLoc sourceLanguageImpliedBySourceContentsLoc;
 
     /// Makes any source artifact available as a SourceFile.
     /// If successful any of the source artifacts will be represented by the same index

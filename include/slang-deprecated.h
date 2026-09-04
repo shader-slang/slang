@@ -1400,7 +1400,11 @@ struct ICompileRequest : public ISlangUnknown
         int slotIndex,
         char const* typeName) = 0;
 
-    /** Enable or disable an experimental, best-effort GLSL frontend
+    /** Deprecated. When enabled, treat every translation unit in this request as GLSL.
+
+    Prefer selecting the source language for each translation unit when calling
+    `addTranslationUnit()`. Enabling this compatibility path emits deprecation diagnostic 117
+    when the request is compiled.
      */
     virtual SLANG_NO_THROW void SLANG_MCALL setAllowGLSLInput(bool value) = 0;
 

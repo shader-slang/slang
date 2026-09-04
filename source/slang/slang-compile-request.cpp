@@ -4,12 +4,14 @@
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "compiler-core/slang-artifact-util.h"
 #include "core/slang-performance-profiler.h"
+#include "core/slang-type-text-util.h"
 #include "slang-ast-dump.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-emit-source-writer.h"
 #include "slang-lower-to-ir.h"
 #include "slang-markdown.h"
+#include "slang-options.h"
 #include "slang-parser.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-serialize-container.h"
@@ -247,9 +249,180 @@ static void _outputIncludes(
     }
 }
 
+/// Merge one preprocessed source unit's language directive into translation-unit provenance.
+///
+/// Consider a `.slang` input that was explicitly selected as Slang but starts with `#version 450`.
+/// The first directive diagnoses that it overrides the lower-precedence request, then selects GLSL
+/// so every primary source in the translation unit is parsed under one grammar. If a later primary
+/// source says `#language 2026`, this function diagnoses the conflict and retains the first GLSL
+/// selection; a translation unit cannot be reparsed under multiple language grammars. Slang
+/// directives similarly select one version for the module because semantic checking stores and
+/// consumes the version at module granularity. `ioSlangLanguageVersion` and its location retain
+/// the first accepted Slang version so a conflicting directive cannot make parsing order-dependent.
+/// `_tryApplySourceLanguageDirective` diagnoses the same conflict within one preprocessing unit,
+/// while `Linkage::findAndIncludeFile` handles directives discovered by a semantic `__include`.
+static void _applySourceLanguageDirective(
+    TranslationUnitRequest* translationUnit,
+    SourceLanguageDirective const& directive,
+    SlangLanguageVersion& ioSlangLanguageVersion,
+    SourceLoc& ioSlangLanguageVersionLoc,
+    DiagnosticSink* sink)
+{
+    if (directive.language == SourceLanguage::Unknown)
+        return;
+
+    if (translationUnit->sourceLanguageImpliedBySourceContents == SourceLanguage::Unknown)
+    {
+        translationUnit->sourceLanguageImpliedBySourceContents = directive.language;
+        translationUnit->sourceLanguageImpliedBySourceContentsLoc = directive.location;
+
+        SourceLanguage lowerPrecedenceLanguage = translationUnit->sourceLanguageExplicitlyRequested;
+        const char* lowerPrecedenceSource = "explicitly requested";
+        if (lowerPrecedenceLanguage == SourceLanguage::Unknown)
+        {
+            lowerPrecedenceLanguage = translationUnit->sourceLanguageImpliedByFileExtension;
+            lowerPrecedenceSource = "file-extension-implied";
+        }
+
+        if (lowerPrecedenceLanguage != SourceLanguage::Unknown &&
+            lowerPrecedenceLanguage != directive.language)
+        {
+            auto languageInfos = TypeTextUtil::getLanguageInfos();
+            auto selectedLanguage =
+                NameValueUtil::findName(languageInfos, ValueInt(lowerPrecedenceLanguage));
+            auto directiveLanguage =
+                NameValueUtil::findName(languageInfos, ValueInt(directive.language));
+            SLANG_RELEASE_ASSERT(selectedLanguage.getLength() != 0);
+            SLANG_RELEASE_ASSERT(directiveLanguage.getLength() != 0);
+            sink->diagnose(Diagnostics::SourceLanguageDirectiveOverridesSelectedLanguage{
+                .directiveLanguage = directiveLanguage,
+                .selectionSource = lowerPrecedenceSource,
+                .selectedLanguage = selectedLanguage,
+                .location = directive.location});
+        }
+
+        // Source directives should agree with the translation-unit language. Honoring a
+        // conflicting directive after diagnosing it is a backward-compatibility concession; every
+        // phase after preprocessing still reads the resulting single effective value.
+        translationUnit->sourceLanguage = directive.language;
+    }
+    else if (translationUnit->sourceLanguageImpliedBySourceContents != directive.language)
+    {
+        // Keep the first content-level selection. Parsing different source files in one
+        // translation unit under different language rules would be incoherent.
+        sink->diagnose(Diagnostics::ConflictingSourceLanguageDirectives{
+            .location = directive.location,
+            .firstLocation = translationUnit->sourceLanguageImpliedBySourceContentsLoc});
+        return;
+    }
+
+    SLANG_RELEASE_ASSERT(
+        directive.language != SourceLanguage::Slang ||
+        directive.slangLanguageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN);
+    if (directive.slangLanguageVersion == SLANG_LANGUAGE_VERSION_UNKNOWN)
+        return; // GLSL source directives intentionally carry no Slang language version.
+
+    if (ioSlangLanguageVersion == SLANG_LANGUAGE_VERSION_UNKNOWN)
+    {
+        ioSlangLanguageVersion = directive.slangLanguageVersion;
+        ioSlangLanguageVersionLoc = directive.location;
+    }
+    else if (ioSlangLanguageVersion != directive.slangLanguageVersion)
+    {
+        sink->diagnose(Diagnostics::ConflictingSlangLanguageVersionDirectives{
+            .location = directive.location,
+            .firstLocation = ioSlangLanguageVersionLoc});
+    }
+}
+
+/// Resolve the extension-implied language of the primary source files and diagnose conflicts.
+///
+/// With an explicit language, every recognized extension that disagrees emits
+/// `ExplicitSourceLanguageOverridesFileExtension`, and the explicit language remains effective.
+/// It also resolves any disagreement among the extensions, so that disagreement does not emit
+/// `ConflictingSourceFileExtensionLanguages`. Without an explicit language, differing recognized
+/// extensions emit that conflict; their shared provenance is recorded as `Unknown`, while the
+/// first recognized language is retained only as a deterministic parser recovery mode.
+///
+/// Slang command-line inputs may share a translation unit, while API callers may construct one
+/// directly with multiple files. Resolving them together ensures that every primary file
+/// participates in the same validation before either entry path begins parsing.
+static void _resolveSourceLanguageFromPrimarySourceFiles(
+    TranslationUnitRequest* translationUnit,
+    List<SourceFile*> const& primarySourceFiles,
+    DiagnosticSink* sink)
+{
+    SourceLanguage languageImpliedByFirstExtension = SourceLanguage::Unknown;
+    String pathOfFirstLanguageImplyingExtension;
+    bool extensionsAgree = true;
+
+    for (auto sourceFile : primarySourceFiles)
+    {
+        auto& pathInfo = sourceFile->getPathInfo();
+        String path = pathInfo.getName();
+        Stage stageImpliedByExtension = Stage::Unknown;
+        SourceLanguage languageImpliedByExtension =
+            SourceLanguage(findSourceLanguageFromPath(path, stageImpliedByExtension));
+        if (languageImpliedByExtension == SourceLanguage::Unknown)
+            continue;
+
+        if (languageImpliedByFirstExtension == SourceLanguage::Unknown)
+        {
+            languageImpliedByFirstExtension = languageImpliedByExtension;
+            pathOfFirstLanguageImplyingExtension = path;
+        }
+        else if (languageImpliedByFirstExtension != languageImpliedByExtension)
+        {
+            extensionsAgree = false;
+            if (translationUnit->sourceLanguageExplicitlyRequested == SourceLanguage::Unknown)
+            {
+                sink->diagnose(Diagnostics::ConflictingSourceFileExtensionLanguages{
+                    .firstPath = pathOfFirstLanguageImplyingExtension,
+                    .conflictingPath = path});
+            }
+        }
+
+        if (translationUnit->sourceLanguageExplicitlyRequested != SourceLanguage::Unknown &&
+            translationUnit->sourceLanguageExplicitlyRequested != languageImpliedByExtension)
+        {
+            sink->diagnose(Diagnostics::ExplicitSourceLanguageOverridesFileExtension{.path = path});
+        }
+    }
+
+    // `Unknown` records that there is no single extension-implied language, whether because no
+    // extension was recognized or because recognized extensions disagreed. The latter case is
+    // already an error, so no valid downstream path needs to distinguish the two. Consumers parse
+    // through `sourceLanguage`; below it retains the first extension only as deterministic error
+    // recovery rather than treating the collapsed provenance as a valid absence of an opinion.
+    translationUnit->sourceLanguageImpliedByFileExtension =
+        extensionsAgree ? languageImpliedByFirstExtension : SourceLanguage::Unknown;
+
+    if (translationUnit->sourceLanguageExplicitlyRequested != SourceLanguage::Unknown)
+    {
+        translationUnit->sourceLanguage = translationUnit->sourceLanguageExplicitlyRequested;
+    }
+    else if (languageImpliedByFirstExtension != SourceLanguage::Unknown)
+    {
+        // On conflicting extensions the diagnostic above makes the request invalid. Keep the
+        // first language only to give subsequent parsing a deterministic recovery mode.
+        translationUnit->sourceLanguage = languageImpliedByFirstExtension;
+    }
+}
+
 void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* translationUnit)
 {
     SLANG_PROFILE;
+
+    // Direct module loads call this method without executing the complete front-end request. This
+    // branch reads only the session-owned `AllowGLSL` option inherited by the front-end request;
+    // request-local state is deliberately absent from that option set and reaches the same helper
+    // through the end-to-end path. The call does not target only `translationUnit`: a session
+    // policy applies to the entire request, and repeating the idempotent fan-out also covers
+    // siblings added after an earlier compilation. The helper's front-end-owned guard emits the
+    // deprecation warning at most once even when both owners select the compatibility behavior.
+    if (optionSet.getBoolOption(CompilerOptionName::AllowGLSL))
+        applyLegacyAllowGLSLInputOptionToAllTranslationUnits();
+
     if (translationUnit->isChecked)
         return;
 
@@ -267,6 +440,18 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
         &linkage->getSearchDirectories(),
         linkage->getFileSystemExt(),
         linkage->getSourceManager());
+
+    // Preprocessing adds `#include` dependencies to the translation unit's source-file list for
+    // source and debug tracking. Snapshot the primary inputs so those dependencies are not
+    // mistaken for additional files to preprocess, validate, and parse independently.
+    List<SourceFile*> sourceFilesToParse = translationUnit->getSourceFiles();
+
+    _resolveSourceLanguageFromPrimarySourceFiles(translationUnit, sourceFilesToParse, getSink());
+
+    // A translation unit is parsed once. Source-content provenance is populated only by the
+    // preprocessing loop below, so a pre-existing value would indicate an unsupported reparse.
+    SLANG_ASSERT(translationUnit->sourceLanguageImpliedBySourceContents == SourceLanguage::Unknown);
+    SLANG_ASSERT(!translationUnit->sourceLanguageImpliedBySourceContentsLoc.isValid());
 
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
 
@@ -305,7 +490,7 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
     //
     FrontEndPreprocessorHandler preprocessorHandler(module, astBuilder, getSink(), translationUnit);
 
-    for (auto sourceFile : translationUnit->getSourceFiles())
+    for (auto sourceFile : sourceFilesToParse)
     {
         module->getIncludedSourceFileMap().addIfNotExists(sourceFile, nullptr);
     }
@@ -318,55 +503,82 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
     // the tracker to preserve pragma states within the module.
     getSink()->setSourceWarningStateTracker(nullptr);
 
-    for (auto sourceFile : translationUnit->getSourceFiles())
-    {
-        SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
-        SlangLanguageVersion languageVersion =
-            translationUnit->compileRequest->optionSet.getLanguageVersion();
+    List<List<PreprocessedSegment>> preprocessedSources;
+    SlangLanguageVersion slangLanguageVersionFromSource = SLANG_LANGUAGE_VERSION_UNKNOWN;
+    SourceLoc slangLanguageVersionFromSourceLoc;
 
+    // Preprocess every source file before parsing any of them. This lets us resolve one effective
+    // source language for the entire translation unit even when the selecting directive appears
+    // in a later source file.
+    for (auto sourceFile : sourceFilesToParse)
+    {
+        // Start each primary file from the same request-level default. This in/out value allows a
+        // directive to control version-dependent preprocessing later in that file. Its post-call
+        // value is deliberately not propagated to another primary file: the directive and source
+        // location returned on each segment are the source of truth merged below into the one
+        // module-wide `slangLanguageVersionFromSource`.
+        SlangLanguageVersion slangLanguageVersion =
+            translationUnit->compileRequest->optionSet.getLanguageVersion();
         auto segments = extractSourceSegments(sourceFile, getSourceManager());
 
         auto preprocessed = preprocessSourceSegments(
             segments,
-            sourceLanguage,
-            languageVersion,
+            slangLanguageVersion,
             getSink(),
             &includeSystem,
             combinedPreprocessorDefinitions,
             getLinkage(),
             &preprocessorHandler);
 
-        translationUnitSyntax->languageVersion = languageVersion;
-
-        if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
+        for (auto& segment : preprocessed)
         {
-            if (m_writers)
+            _applySourceLanguageDirective(
+                translationUnit,
+                segment.sourceLanguageDirective,
+                slangLanguageVersionFromSource,
+                slangLanguageVersionFromSourceLoc,
+                getSink());
+        }
+
+        preprocessedSources.add(_Move(preprocessed));
+    }
+
+    // Parser and semantic checks both consult `ModuleDecl::languageVersion`, so a translation unit
+    // must resolve one version before any primary file is parsed. A `#language` directive in any
+    // primary file overrides the request-level default for the complete module; conflicting
+    // directives were diagnosed while collecting provenance above, and the first one is retained
+    // as the deterministic recovery version. Set the field even for preprocessor-only requests so
+    // the translation unit accurately records the directive that preprocessing just observed.
+    translationUnitSyntax->languageVersion =
+        slangLanguageVersionFromSource != SLANG_LANGUAGE_VERSION_UNKNOWN
+            ? slangLanguageVersionFromSource
+            : translationUnit->compileRequest->optionSet.getLanguageVersion();
+
+    if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
+    {
+        if (m_writers)
+        {
+            for (auto& preprocessed : preprocessedSources)
             {
                 for (auto& seg : preprocessed)
+                {
                     _outputPreprocessorTokens(
                         seg.tokens,
                         m_writers->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT));
+                }
             }
-            continue;
         }
+        return;
+    }
 
-        Scope* languageScope = nullptr;
-        switch (sourceLanguage)
-        {
-        case SourceLanguage::HLSL:
-            languageScope = getSession()->hlslLanguageScope;
-            break;
-        case SourceLanguage::GLSL:
-            languageScope = getSession()->glslLanguageScope;
-            break;
-        case SourceLanguage::Slang:
-        default:
-            languageScope = getSession()->slangLanguageScope;
-            break;
-        }
+    Scope* languageScope = translationUnit->getLanguageScope();
 
+    SLANG_ASSERT(preprocessedSources.getCount() == sourceFilesToParse.getCount());
+    for (Index sourceIndex = 0; sourceIndex < sourceFilesToParse.getCount(); ++sourceIndex)
+    {
+        SourceFile* sourceFile = sourceFilesToParse[sourceIndex];
         parsePreprocessedSegments(
-            preprocessed,
+            preprocessedSources[sourceIndex],
             astBuilder,
             translationUnit,
             getSink(),
@@ -440,7 +652,6 @@ List<SourceFile*> extractSourceSegments(SourceFile* sourceFile, SourceManager* s
 
 List<PreprocessedSegment> preprocessSourceSegments(
     List<SourceFile*> const& segments,
-    SourceLanguage defaultSourceLanguage,
     SlangLanguageVersion& ioLanguageVersion,
     DiagnosticSink* sink,
     IncludeSystem* includeSystem,
@@ -453,7 +664,6 @@ List<PreprocessedSegment> preprocessSourceSegments(
     for (auto segmentFile : segments)
     {
         PreprocessedSegment seg;
-        seg.sourceLanguage = defaultSourceLanguage;
 
         seg.tokens = preprocessSource(
             segmentFile,
@@ -461,12 +671,9 @@ List<PreprocessedSegment> preprocessSourceSegments(
             includeSystem,
             preprocessorDefinitions,
             linkage,
-            seg.sourceLanguage,
+            seg.sourceLanguageDirective,
             ioLanguageVersion,
             preprocessorHandler);
-
-        if (seg.sourceLanguage == SourceLanguage::Unknown)
-            seg.sourceLanguage = defaultSourceLanguage;
 
         result.add(_Move(seg));
     }
@@ -487,7 +694,7 @@ void parsePreprocessedSegments(
         parseSourceFile(
             astBuilder,
             translationUnit,
-            seg.sourceLanguage,
+            translationUnit->sourceLanguage,
             seg.tokens,
             sink,
             outerScope,
@@ -568,6 +775,29 @@ void FrontEndCompileRequest::generateIR()
 
         // Set the module on the translation unit
         translationUnit->getModule()->setIRModule(irModule);
+    }
+}
+
+void FrontEndCompileRequest::applyLegacyAllowGLSLInputOptionToAllTranslationUnits()
+{
+    // This is the only compatibility interpretation of `-allow-glsl`: it is a deprecated,
+    // request-wide spelling for explicitly selecting GLSL on every input translation unit.
+    // Reducing it to the ordinary per-translation-unit field here prevents parser, semantic, IR,
+    // and code-generation code from growing separate notions of a "GLSL mode."
+    if (!hasDiagnosedLegacyAllowGLSLInputOption)
+    {
+        getSink()->diagnose(Diagnostics::DeprecatedAllowGlslOption{});
+        hasDiagnosedLegacyAllowGLSLInputOption = true;
+    }
+
+    // The legacy request-wide switch deliberately wins over an explicit non-GLSL selection.
+    // Keeping both would recreate the old hybrid mode where a translation unit declared one
+    // language while independent compiler phases enabled GLSL behavior. The deprecation warning
+    // states this compatibility rule: every input translation unit is treated as GLSL.
+    for (auto translationUnit : translationUnits)
+    {
+        translationUnit->sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
+        translationUnit->sourceLanguage = SourceLanguage::GLSL;
     }
 }
 
@@ -656,6 +886,7 @@ int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language, Name* mo
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(this);
     translationUnit->compileRequest = this;
     translationUnit->sourceLanguage = SourceLanguage(language);
+    translationUnit->sourceLanguageExplicitlyRequested = SourceLanguage(language);
 
     translationUnit->setModuleName(moduleName);
     return addTranslationUnit(translationUnit);

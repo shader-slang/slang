@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target cpp -entry computeMain -stage compute -allow-glsl
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/language-feature/capability/cpp-target-has-cpp-impl-from-default.slang -target cpp -entry computeMain -stage compute -Wno-118
 
 // CHECK: computeMain(
 

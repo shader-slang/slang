@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -allow-glsl
+//TEST:SIMPLE_EX(filecheck=GLSL): -lang glsl tests/spirv/specialization-constant.slang -target glsl -Wno-118
 //TEST:SIMPLE(filecheck=GLSL): -target glsl
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -allow-glsl
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/spirv/specialization-constant.slang -target spirv -Wno-118
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 // METAL-DAG: constant bool fc_constValue2{{.*}} {{\[\[}}function_constant(1){{\]\]}};

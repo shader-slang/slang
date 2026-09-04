@@ -1,9 +1,9 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -stage compute -entry computeMain -allow-glsl -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -stage compute -entry computeMain -target hlsl -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK_CUDA): -stage compute -entry computeMain -target cuda -allow-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -stage compute -entry computeMain -Wno-120 -target glsl
+//TEST:SIMPLE(filecheck=CHECK_SPV): -stage compute -entry computeMain -Wno-120 -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK_HLSL): -stage compute -entry computeMain -target hlsl -Wno-120
+//TEST:SIMPLE(filecheck=CHECK_CUDA): -stage compute -entry computeMain -target cuda -Wno-120
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -Wno-118
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -Wno-118 -emit-spirv-directly
 
 #version 450
 

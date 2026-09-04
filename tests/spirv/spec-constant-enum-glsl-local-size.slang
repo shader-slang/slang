@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv -stage compute -entry main -allow-glsl
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -stage compute -entry main -Wno-120
 // SPIR-V-only: validates LocalSizeId/SpecId emission for GLSL local_size_* enum specialization constants.
 
 #version 450

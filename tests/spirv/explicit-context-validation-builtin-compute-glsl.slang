@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -target spirv -emit-spirv-directly -stage compute -entry computeMain -enable-experimental-passes
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/spirv/explicit-context-validation-builtin-compute-glsl.slang -target spirv -emit-spirv-directly -stage compute -entry computeMain -enable-experimental-passes -Wno-118
 
 // Check to ensure builtin is not moved into a kernelContext (part of entry-point). Ensure builtin is referenced directly.
 

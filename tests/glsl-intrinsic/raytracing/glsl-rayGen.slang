@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage raygeneration -entry main -target glsl -capability GL_NV_shader_invocation_reorder -capability GL_NV_ray_tracing_motion_blur
-//TEST:SIMPLE(filecheck=CHECK_SPV): -allow-glsl -emit-spirv-directly -stage raygeneration -entry main -target spirv-assembly -capability spvShaderInvocationReorderNV -capability spvRayTracingMotionBlurNV
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayGen.slang -stage raygeneration -entry main -target glsl -capability GL_NV_shader_invocation_reorder -capability GL_NV_ray_tracing_motion_blur -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayGen.slang -emit-spirv-directly -stage raygeneration -entry main -target spirv-assembly -capability spvShaderInvocationReorderNV -capability spvRayTracingMotionBlurNV -Wno-118
 
 layout(binding = 0) uniform accelerationStructureEXT as;
 

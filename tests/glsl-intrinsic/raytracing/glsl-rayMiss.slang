@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage miss -entry main -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -allow-glsl -emit-spirv-directly -stage miss -entry main -target spirv-assembly
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayMiss.slang -stage miss -entry main -target glsl -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayMiss.slang -emit-spirv-directly -stage miss -entry main -target spirv-assembly -Wno-118
 
 layout(binding = 0) uniform accelerationStructureEXT as;
 

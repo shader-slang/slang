@@ -194,11 +194,33 @@ Slang supports multiple file-name extensions for input files, but the most commo
 
 If multiple source files are passed to `slangc`, they will be grouped into translation units using the following rules:
 
-* If there are any `.slang` files, then all of them will be grouped into a single translation unit
+* If there are any `.slang` files, then all of them will be grouped into a single translation unit.
 
 * Each `.hlsl` file will be grouped into a distinct translation unit of its own.
 
+* Each GLSL file (`.glsl`, `.vert`, `.frag`, `.geom`, `.tesc`, `.tese`, `.comp`, `.mesh`, `.task`, `.rgen`, `.rint`, `.rahit`, `.rchit`, `.rmiss`, or `.rcall`) will be grouped into a distinct translation unit of its own.
+
 * Each `.slang-module` file forms its own translation unit.
+
+Every translation unit has one effective source language.
+An explicit `-lang` option selects that language for the following input files; otherwise, `slangc` infers it from each file-name extension.
+Primary source files grouped into one translation unit must agree on the inferred language unless `-lang` resolves the disagreement.
+
+A Slang `#language` directive or GLSL `#version` directive is expected to agree with the translation unit's selected language.
+For backward compatibility, the compiler currently warns and honors a conflicting source directive before parsing the translation unit.
+Code should not rely on this override: select the intended language with `-lang` or an appropriate file-name extension, and use `#language` only to select a Slang language version.
+
+The command-line tool may infer a default output target from the language known before preprocessing.
+That convenience inference does not account for a later compatibility override from `#language` or `#version`, so invocations using such an override should specify `-target` explicitly.
+
+The deprecated `-allow-glsl` option is a request-wide compatibility spelling that forces every input translation unit to use GLSL.
+New invocations should use a GLSL file-name extension or `-lang glsl` for each GLSL input instead.
+
+An `import glsl;` declaration is not a source-language selector.
+In legacy Slang source it imports GLSL declarations and preserves historical GLSL operator behavior without enabling GLSL syntax.
+This compatibility path is not available in Slang 202c or later.
+In HLSL source the import is accepted for compatibility, but produces a warning because it adds GLSL declarations and operator rules to HLSL source without enabling GLSL syntax.
+GLSL source imports the builtin `glsl` module implicitly, so an explicit `import glsl;` there is redundant.
 
 To read source from standard input, pass `-` as an input after `--` and specify the source language with `-lang`, because the language cannot be inferred from a file extension:
 

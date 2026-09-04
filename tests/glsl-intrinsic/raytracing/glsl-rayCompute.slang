@@ -1,8 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -allow-glsl -emit-spirv-directly -stage compute -entry computeMain -target spirv-assembly
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayCompute.slang -stage compute -entry computeMain -target glsl -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayCompute.slang -emit-spirv-directly -stage compute -entry computeMain -target spirv-assembly -Wno-118
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -allow-glsl -vk -compute -output-using-type -render-feature ray-query -entry computeMain 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -allow-glsl -vk -compute -output-using-type -render-feature ray-query -emit-spirv-directly -entry computeMain 
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -source-language glsl -vk -compute -output-using-type -render-feature ray-query -entry computeMain -Xslang -Wno-118
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -source-language glsl -vk -compute -output-using-type -render-feature ray-query -emit-spirv-directly -entry computeMain -Xslang -Wno-118
 
 // note: the referenced input data is in render-test-main kVertexData; 1 triangle at {(0,0,0.5),(0,1,0.5),(1,0,0.5)}
 //TEST_INPUT: set scene = AccelerationStructure

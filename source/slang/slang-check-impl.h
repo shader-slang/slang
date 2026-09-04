@@ -895,9 +895,6 @@ struct SharedSemanticsContext : public RefObject
 
     DiagnosticSink* m_sink = nullptr;
 
-    // Whether the current module has imported the GLSL module.
-    ModuleDecl* glslModuleDecl = nullptr;
-
     /// (optional) modules that comes from previously processed translation units in the
     /// front-end request that are made visible to the module being checked. This allows
     /// `import` to use them instead of trying to find the files in file system.
@@ -943,20 +940,26 @@ struct SharedSemanticsContext : public RefObject
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
 
-    // Whether the `glsl` module has been imported into this checking session. Set when the
-    // `glsl` import is handled (see `importModuleIntoScope`), rather than scanning the imported
-    // module list on demand, because the builtin-operator fast path consults
-    // `isGLSLOperatorScope()` for every operator expression.
-    bool m_isGLSLModuleImported = false;
+    /// Whether semantic checking has imported the `glsl` module.
+    bool m_hasImportedGLSLModule = false;
 
 public:
-    /// Is the current checking session in GLSL operator scope? True when `-allow-glsl` is set or
-    /// the `glsl` module has been imported (its overloads give builtin operators GLSL semantics).
-    bool isGLSLOperatorScope()
+    /// Whether the translation unit being checked uses the GLSL source language.
+    ///
+    /// A null translation-unit request denotes a module/reflection checking context that has no
+    /// parser-language provenance, so it cannot establish GLSL source semantics and returns false.
+    bool isGLSLSourceLanguage()
     {
-        return getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL) ||
-               m_isGLSLModuleImported;
+        return m_translationUnitRequest &&
+               m_translationUnitRequest->sourceLanguage == SourceLanguage::GLSL;
     }
+
+    /// Whether builtin operators should use the legacy GLSL operator rules.
+    ///
+    /// Actual GLSL source always uses those rules. For backward compatibility, explicitly
+    /// importing the `glsl` module into non-GLSL source also opts operator checking into them
+    /// without changing the source language or parser behavior.
+    bool isGLSLOperatorScope() { return isGLSLSourceLanguage() || m_hasImportedGLSLModule; }
 
 private:
     static SlangLanguageVersion _getModuleLanguageVersion(Module* module)
@@ -4087,9 +4090,9 @@ private:
         Expr*& outLeftArg,
         Expr*& outRightArg);
 
-    // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either
-    // `-allow-glsl` is set, or the `glsl` module is in scope (its `operator*` overloads
-    // make `mat * mat` a matrix product). The builtin-operator fast path is disabled then.
+    // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either the
+    // translation unit is GLSL, or the `glsl` module is in scope (its `operator*` overloads make
+    // `mat * mat` a matrix product). The builtin-operator fast path is disabled then.
     bool isGLSLOperatorScope();
 };
 

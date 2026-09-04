@@ -1,8 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target glsl -DSLANG
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target spirv -DSLANG
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-specifying-two-modes.slang -stage compute -entry computeMain -target glsl -DSLANG -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-specifying-two-modes.slang -stage compute -entry computeMain -target spirv -DSLANG -Wno-118
 
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target glsl -DGLSL
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target spirv -DGLSL
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-specifying-two-modes.slang -stage compute -entry computeMain -target glsl -DGLSL -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-specifying-two-modes.slang -stage compute -entry computeMain -target spirv -DGLSL -Wno-118
 // CHECK: error[E31212]
 
 buffer MyBlockName

@@ -430,6 +430,11 @@ void calcRequiredLoweringPassSet(
             result.autodiff = true;
     }
 
+    // The replacement pass owns the opcode classification so this scan cannot silently omit a
+    // location-operand role that the pass knows how to consume.
+    if (isRayTracingLocationOperand(inst->getOp()))
+        result.rayTracingLocationOperand = true;
+
     switch (inst->getOp())
     {
     case kIROp_DebugValue:
@@ -2739,9 +2744,10 @@ Result linkAndOptimizeIR(
         }
     }
 
-    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    if (isKhronosTarget(targetRequest) && emitSpirvDirectly &&
+        requiredLoweringPassSet.rayTracingLocationOperand)
     {
-        SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, targetProgram, sink);
+        SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, sink);
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);

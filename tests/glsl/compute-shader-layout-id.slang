@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry main -allow-glsl
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry main -Wno-120
 #version 450
 
 [vk::constant_id(1)]

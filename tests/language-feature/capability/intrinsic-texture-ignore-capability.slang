@@ -1,8 +1,8 @@
 #version 450 core
 #extension GL_EXT_texture_shadow_lod : enable
 
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl -DCOMPUTE -ignore-capabilities -capability GL_NV_compute_shader_derivatives
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage fragment -entry computeMain -target glsl -ignore-capabilities
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -lang glsl -Wno-118 -stage compute -entry computeMain -target glsl -DCOMPUTE -ignore-capabilities -capability GL_NV_compute_shader_derivatives
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -lang glsl -Wno-118 -stage fragment -entry computeMain -target glsl -ignore-capabilities
 //RWStructuredBuffer<float> outputBuffer;
 //layout(location = 0) out vec4 o_color;
 

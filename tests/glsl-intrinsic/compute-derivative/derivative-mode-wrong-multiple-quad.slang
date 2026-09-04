@@ -1,8 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target glsl -DQUAD_SLANG
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target spirv -DQUAD_SLANG
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-quad.slang -stage compute -entry computeMain -target glsl -DQUAD_SLANG -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-quad.slang -stage compute -entry computeMain -target spirv -DQUAD_SLANG -Wno-118
 
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target glsl -DQUAD_GLSL
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target spirv -DQUAD_GLSL
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-quad.slang -stage compute -entry computeMain -target glsl -DQUAD_GLSL -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-quad.slang -stage compute -entry computeMain -target spirv -DQUAD_GLSL -Wno-118
 // CHECK: error[E31210]
 
 buffer MyBlockName

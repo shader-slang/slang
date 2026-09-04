@@ -144,6 +144,36 @@ public:
 
     void parseTranslationUnit(TranslationUnitRequest* translationUnit);
 
+    /// Apply the legacy `AllowGLSL` option to all of this request's input translation units.
+    ///
+    /// For example, a request containing two `.slang` inputs plus `-allow-glsl` is normalized to
+    /// two translation units that each record an explicit GLSL selection. Parser, semantic, IR,
+    /// and code-generation logic then consult that per-translation-unit selection rather than the
+    /// deprecated request-wide flag.
+    ///
+    /// The legacy option deliberately takes precedence over an existing non-GLSL selection from
+    /// `-lang` or `addTranslationUnit`. Retaining both would recreate a hybrid mode where the
+    /// translation unit declares one language while unrelated phases independently enable GLSL
+    /// behavior; the deprecation diagnostic instead states that every input is treated as GLSL.
+    ///
+    /// `EndToEndCompileRequest` calls this method for request-local compatibility state, while
+    /// translation-unit parsing calls it when the request inherited a legacy `AllowGLSL` session
+    /// option. The latter spelling is still deprecated and warning-producing; session ownership
+    /// means only that every compilation in the session must honor it without consuming it. A
+    /// command-line or compile-request option, in contrast, must not affect source modules loaded
+    /// later on the same linkage. Reapplying the operation covers translation units added to a
+    /// reused request after an earlier compilation without mutating either owner's option storage;
+    /// the diagnostic is emitted only once per front-end request, and later phases ignore
+    /// `AllowGLSL`.
+    void applyLegacyAllowGLSLInputOptionToAllTranslationUnits();
+
+    /// Whether this request has already diagnosed the legacy GLSL-input option.
+    ///
+    /// End-to-end requests may carry request-local compatibility state while this front-end request
+    /// also inherits session options from its linkage. Tracking the diagnostic here prevents those
+    /// two entry paths, or repeated compilation of one request, from emitting duplicate warnings.
+    bool hasDiagnosedLegacyAllowGLSLInputOption = false;
+
     // Perform primary semantic checking on all
     // of the translation units in the program
     void checkAllTranslationUnits();
@@ -157,7 +187,7 @@ public:
     /// Add a translation unit to be compiled.
     ///
     /// @param language The source language that the translation unit will use (e.g.,
-    /// `SourceLanguage::Slang`
+    /// `SourceLanguage::Slang`).
     /// @param moduleName The name that will be used for the module compile from the translation
     /// unit.
     ///
@@ -365,14 +395,17 @@ class ContainerDecl;
 struct PreprocessedSegment
 {
     TokenList tokens;
-    SourceLanguage sourceLanguage;
+
+    /// The first source-language directive found in this segment, if any.
+    SourceLanguageDirective sourceLanguageDirective;
 };
 
+/// Split a physical source file into the source segments represented by a literate input.
 List<SourceFile*> extractSourceSegments(SourceFile* sourceFile, SourceManager* sourceManager);
 
+/// Preprocess every segment while preserving their source-language directives and language version.
 List<PreprocessedSegment> preprocessSourceSegments(
     List<SourceFile*> const& segments,
-    SourceLanguage defaultSourceLanguage,
     SlangLanguageVersion& ioLanguageVersion,
     DiagnosticSink* sink,
     IncludeSystem* includeSystem,
@@ -380,6 +413,7 @@ List<PreprocessedSegment> preprocessSourceSegments(
     Linkage* linkage,
     PreprocessorHandler* preprocessorHandler);
 
+/// Parse all segments into one translation unit using its already-resolved effective language.
 void parsePreprocessedSegments(
     List<PreprocessedSegment> const& segments,
     ASTBuilder* astBuilder,

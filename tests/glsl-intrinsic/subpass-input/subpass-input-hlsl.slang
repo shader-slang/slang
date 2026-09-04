@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage fragment -entry main -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv -emit-spirv-directly -stage fragment -entry main -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -stage fragment -entry main -allow-glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/subpass-input/subpass-input-hlsl.slang -target glsl -stage fragment -entry main -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/subpass-input/subpass-input-hlsl.slang -target spirv -emit-spirv-directly -stage fragment -entry main -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/subpass-input/subpass-input-hlsl.slang -target hlsl -stage fragment -entry main -Wno-118
 
 // CHECK_SPV-DAG: OpEntryPoint
 // CHECK_SPV-DAG: OpCapability InputAttachment

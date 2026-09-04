@@ -1,8 +1,8 @@
 // Test that structs containing arrays of ParameterBlocks are also NonAddressable
 // and therefore cannot be used in arrays
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -allow-glsl -stage compute -entry computeMain
-//TEST_DISABLED:SIMPLE(filecheck=CHECK): -target glsl -allow-glsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -stage compute -entry computeMain
+//TEST_DISABLED:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
 
 // Test case: struct containing array of ParameterBlock
 struct StructWithParameterBlockArray

@@ -5,12 +5,13 @@
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -xslang -DMETAL
 
 
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-directly -xslang -DUSE_GLSL_SYNTAX -allow-glsl
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -emit-spirv-via-glsl -allow-glsl -profile sm_6_0 -Xslang... -DUSE_GLSL_SYNTAX -capability GL_KHR_shader_subgroup_rotate -X.
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -xslang -DMETAL -xslang -DUSE_GLSL_SYNTAX -allow-glsl
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-directly -xslang -DUSE_GLSL_SYNTAX
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -emit-spirv-via-glsl -profile sm_6_0 -Xslang... -DUSE_GLSL_SYNTAX -capability GL_KHR_shader_subgroup_rotate -X.
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -xslang -DMETAL -xslang -DUSE_GLSL_SYNTAX
 
 
 #if defined(USE_GLSL_SYNTAX)
+import glsl;
 #define __rotate subgroupRotate
 #else
 #define __rotate WaveRotate

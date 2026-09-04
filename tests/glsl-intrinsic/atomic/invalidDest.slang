@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):  -allow-glsl -stage compute -entry computeMain -target glsl -DTARGET_GLSL
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):  -allow-glsl -stage compute -entry computeMain -target spirv -skip-spirv-validation -emit-spirv-directly -DTARGET_SPIRV
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -Wno-120 -stage compute -entry computeMain -target glsl -DTARGET_GLSL
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -Wno-120 -stage compute -entry computeMain -target spirv -skip-spirv-validation -emit-spirv-directly -DTARGET_SPIRV
 #version 430
 
 uint notShared;

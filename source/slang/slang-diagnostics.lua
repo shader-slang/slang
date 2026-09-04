@@ -267,6 +267,89 @@ err(
     span { loc = "location" }
 )
 
+warning(
+    "deprecated-allow-glsl-option",
+    117,
+    "`-allow-glsl` and `setAllowGLSLInput()` are deprecated and now treat every input translation unit as GLSL; select GLSL for each translation unit instead"
+)
+
+warning(
+    "explicit-source-language-overrides-file-extension",
+    118,
+    "explicitly requested source language overrides the language implied by the extension of input file '~path'"
+)
+
+warning(
+    "redundant-glsl-module-import",
+    119,
+    "redundant import of the builtin `glsl` module",
+    span { loc = "location", message = "GLSL input already imports the builtin `glsl` module implicitly" }
+)
+
+warning(
+    "source-language-directive-overrides-selected-language",
+    120,
+    "source-language directive selects ~directiveLanguage and overrides the ~selectionSource ~selectedLanguage source language",
+    span { loc = "location", message = "the source directive selects ~directiveLanguage instead of ~selectedLanguage" }
+)
+
+err(
+    "conflicting-source-language-directives",
+    121,
+    "conflicting source-language directives in one translation unit",
+    span { loc = "location", message = "this directive selects a different source language" },
+    note { message = "the translation unit's first source-language directive is here", span { loc = "firstLocation" } }
+)
+
+err(
+    "conflicting-source-file-extension-languages",
+    122,
+    "input files '~firstPath' and '~conflictingPath' have extensions that imply different source languages, but belong to the same translation unit"
+)
+
+err(
+    "source-language-directive-conflicts-with-translation-unit",
+    123,
+    "source-language directive conflicts with the effective source language of its translation unit",
+    span { loc = "location", message = "the translation unit has already been parsed using a different source language" }
+)
+
+err(
+    "glsl-module-import-not-allowed-in-slang-202c",
+    124,
+    "importing the builtin `glsl` module is not allowed in Slang 202c or later",
+    span { loc = "location", message = "select GLSL as the source language instead of importing its builtin module into Slang source" }
+)
+
+warning(
+    "glsl-module-import-in-hlsl",
+    125,
+    "importing the builtin `glsl` module into HLSL source may introduce conflicting language semantics",
+    span { loc = "location", message = "the module exposes GLSL declarations and operator rules without enabling GLSL syntax" }
+)
+
+err(
+    "conflicting-slang-language-version-directives",
+    126,
+    "conflicting Slang language-version directives in one translation unit",
+    span { loc = "location", message = "this directive selects a different Slang language version" },
+    note { message = "the translation unit's first Slang language-version directive is here", span { loc = "firstLocation" } }
+)
+
+err(
+    "glsl-atomic-counter-requires-binding",
+    127,
+    "global `atomic_uint` declarations require a GLSL `layout(binding = ...)` qualifier",
+    span { loc = "location", message = "this atomic counter has no GLSL binding layout" }
+)
+
+err(
+    "glsl-atomic-counter-arrays-not-supported",
+    128,
+    "arrays of `atomic_uint` are not supported",
+    span { loc = "location", message = "declare each supported atomic counter as a directly-bound global" }
+)
+
 err(
     "unknown-source-language",
     19,

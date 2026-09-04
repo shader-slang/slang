@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage vertex -allow-glsl
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage vertex -Wno-120
 
 // CHECK: OpDecorate %{{.*}} Flat
 

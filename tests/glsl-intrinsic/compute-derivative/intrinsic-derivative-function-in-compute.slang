@@ -1,45 +1,45 @@
 #version 450 core
 #extension GL_EXT_texture_shadow_lod : enable
 
-//TEST:SIMPLE(filecheck=CHECK_GLSL_QUAD_C): -allow-glsl -stage compute -entry computeMain -target glsl -DCOMPUTE -DQUAD -capability GL_NV_compute_shader_derivatives
+//TEST:SIMPLE(filecheck=CHECK_GLSL_QUAD_C): -lang glsl -Wno-118 -stage compute -entry computeMain -target glsl -DCOMPUTE -DQUAD -capability GL_NV_compute_shader_derivatives
 // CHECK_GLSL_QUAD_C: GL_NV_compute_shader_derivatives
 // CHECK_GLSL_QUAD_C: layout(derivative_group_quadsNV)
 
-//TEST:SIMPLE(filecheck=CHECK_GLSL_LINEAR_C): -allow-glsl -stage compute -entry computeMain -target glsl -DCOMPUTE -DLINEAR -capability GL_NV_compute_shader_derivatives
+//TEST:SIMPLE(filecheck=CHECK_GLSL_LINEAR_C): -lang glsl -Wno-118 -stage compute -entry computeMain -target glsl -DCOMPUTE -DLINEAR -capability GL_NV_compute_shader_derivatives
 // CHECK_GLSL_LINEAR_C: GL_NV_compute_shader_derivatives
 // CHECK_GLSL_LINEAR_C: layout(derivative_group_linearNV)
 
-//TEST:SIMPLE(filecheck=CHECK_SPV_QUAD_C): -allow-glsl -stage compute -entry computeMain -target spirv -DQUAD -DCOMPUTE -capability GL_NV_compute_shader_derivatives
+//TEST:SIMPLE(filecheck=CHECK_SPV_QUAD_C): -lang glsl -Wno-118 -stage compute -entry computeMain -target spirv -DQUAD -DCOMPUTE -capability GL_NV_compute_shader_derivatives
 // CHECK_SPV_QUAD_C: DerivativeGroupQuads{{NV|KHR}}
 // CHECK_SPV_QUAD_C-NOT: DerivativeGroupQuads{{NV|KHR}}
 // CHECK_SPV_QUAD_C: "SPV_KHR_compute_shader_derivatives"
 // CHECK_SPV_QUAD_C-NOT: "SPV_KHR_compute_shader_derivatives"
 
-//TEST:SIMPLE(filecheck=CHECK_SPV_LINEAR_C): -allow-glsl -stage compute -entry computeMain -target spirv -DLINEAR -DCOMPUTE -capability GL_NV_compute_shader_derivatives
+//TEST:SIMPLE(filecheck=CHECK_SPV_LINEAR_C): -lang glsl -Wno-118 -stage compute -entry computeMain -target spirv -DLINEAR -DCOMPUTE -capability GL_NV_compute_shader_derivatives
 // CHECK_SPV_LINEAR_C: DerivativeGroupLinear{{NV|KHR}}
 // CHECK_SPV_LINEAR_C-NOT: DerivativeGroupLinear{{NV|KHR}}
 // CHECK_SPV_LINEAR_C: "SPV_KHR_compute_shader_derivatives"
 // CHECK_SPV_LINEAR_C-NOT: "SPV_KHR_compute_shader_derivatives"
 
-//TEST:SIMPLE(filecheck=CHECK_HLSL_C): -allow-glsl -stage compute -entry computeMain -target hlsl -DCOMPUTE
+//TEST:SIMPLE(filecheck=CHECK_HLSL_C): -lang glsl -Wno-118 -stage compute -entry computeMain -target hlsl -DCOMPUTE
 // CHECK_HLSL_C: error[E41400]:
 
-//TEST:SIMPLE(filecheck=CHECK_GLSL_F): -allow-glsl -stage fragment -entry computeMain -target glsl 
+//TEST:SIMPLE(filecheck=CHECK_GLSL_F): -lang glsl -Wno-118 -stage fragment -entry computeMain -target glsl
 // CHECK_GLSL_F-NOT: GL_NV_compute_shader_derivatives
 
-//TEST:SIMPLE(filecheck=CHECK_SPV_QUAD_F): -allow-glsl -stage fragment -entry computeMain -target spirv -DQUAD
+//TEST:SIMPLE(filecheck=CHECK_SPV_QUAD_F): -lang glsl -Wno-118 -stage fragment -entry computeMain -target spirv -DQUAD
 // CHECK_SPV_QUAD_F-NOT: DerivativeGroupQuads{{NV|KHR}}
 // CHECK_SPV_QUAD_F-NOT: "SPV_KHR_compute_shader_derivatives"
 
-//TEST:SIMPLE(filecheck=CHECK_SPV_LINEAR_F): -allow-glsl -stage fragment -entry computeMain -target spirv -DLINEAR
+//TEST:SIMPLE(filecheck=CHECK_SPV_LINEAR_F): -lang glsl -Wno-118 -stage fragment -entry computeMain -target spirv -DLINEAR
 // CHECK_SPV_LINEAR_F-NOT: DerivativeGroupLinear{{NV|KHR}}
 // CHECK_SPV_LINEAR_F-NOT: "SPV_KHR_compute_shader_derivatives"
 
-//TEST:SIMPLE(filecheck=CHECK_GLSL_QUAD_F): -allow-glsl -stage fragment -entry computeMain -target glsl
+//TEST:SIMPLE(filecheck=CHECK_GLSL_QUAD_F): -lang glsl -Wno-118 -stage fragment -entry computeMain -target glsl
 // CHECK_GLSL_QUAD_F-NOT: GL_NV_compute_shader_derivatives
 // CHECK_GLSL_QUAD_F-NOT: layout(derivative_group_quadsNV)
 
-//TEST:SIMPLE(filecheck=CHECK_HLSL_F): -allow-glsl -stage fragment -entry computeMain -target hlsl
+//TEST:SIMPLE(filecheck=CHECK_HLSL_F): -lang glsl -Wno-118 -stage fragment -entry computeMain -target hlsl
 // CHECK_HLSL_F: computeMain(
 
 buffer MyBlockName
