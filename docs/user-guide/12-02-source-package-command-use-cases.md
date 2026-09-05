@@ -662,9 +662,8 @@ Return to `image-viewer`. Its `src/color/math.slang` has become useful enough to
 
 ### Goal
 
-Move code behind a package boundary without unnecessarily rewriting Slang imports, then choose
-whether the new package is committed with the application, developed in a sibling repository, or
-published independently.
+Move code behind a package boundary without unnecessarily rewriting Slang imports, then develop
+that package as a sidecar until it has a Git remote.
 
 ### Human does
 
@@ -689,25 +688,25 @@ Before moving files, identify:
 - which modules belong together;
 - whether other application modules use internal symbols that must become `public`;
 - which dependencies the extracted package itself needs;
-- whether the package should be a permanent part of this repository or an independently released
-  project.
+- whether the package should remain a vendored tree in this repository or become an independently
+  released sidecar.
 
-The tool does not analyze or perform this split.
+The tool does not analyze or perform this split. There is no `extract` command.
 
-#### Option A: commit a child package with the application
+#### Extract: sidecar package
 
-Create a package below the repository:
+Create the package in a sibling directory (recommended):
 
 ```sh
-mkdir -p packages/color-math
-cd packages/color-math
+mkdir -p ../color-math
+cd ../color-math
 slang package init
 ```
 
-Replace its license placeholder, do not add application-only `build.host` settings, and move the source:
+Replace its license placeholder, move the source, and initialize git in that sidecar:
 
 ```text
-packages/color-math/
+color-math/
 ├── LICENSE
 ├── slang-package.json
 └── src/
@@ -720,13 +719,46 @@ packages/color-math/
 Delete the old `image-viewer/src/color/math.slang` and companion directory after the move. Keeping
 both copies would export `color.math` twice and make root graph validation fail.
 
-Validate it from its own directory:
+Back in `image-viewer`, declare the eventual Git identity and point the solver at the sidecar so
+the application uses **one** tree:
 
 ```sh
-slang package validate
+slang package dependency add color-math --git https://example.com/color-math.git --version ">=1.0.0 <2.0.0"
+slang package override add color-math ../color-math 1.0.0
+slang package update --dry-run
+slang package update
 ```
 
-In the root `image-viewer/slang-package.json`, add a committed path dependency:
+Do not `dependency add --git ../color-math` (or any other path to that same tree) without an
+override. Fetch would clone that git onto `deps/color-math`, a second copy of the files you are
+already editing.
+
+`deps/color-math` is gitignored. Use it only as a laptop override (`override add color-math
+deps/color-math 1.0.0`, including promoting an in-place edit). A sidecar there is not in the
+application repository until that inner git has a remote.
+
+`slang package validate color-math` and root `build` use this workspace's lock pins. They do not
+materialize a nested graph under the sidecar. When the sidecar origin exists, push tags, keep
+`git` pointed at that origin, then restore a portable lock:
+
+```sh
+slang package override disable color-math
+slang package update
+slang package override remove color-math
+```
+
+#### Vendoring: path dependency, not extract
+
+A path dependency vendors a tree that lives in this repository. That is committed co-development,
+not extract:
+
+```sh
+mkdir -p packages/color-math
+cd packages/color-math
+slang package init
+```
+
+In the root `image-viewer/slang-package.json`, add:
 
 ```json
 "color-math": {
@@ -735,60 +767,10 @@ In the root `image-viewer/slang-package.json`, add a committed path dependency:
 }
 ```
 
-Then return to the root workspace:
+Then `update` from the root. The path package stays under `packages/color-math`; it is not copied
+to `deps/`. Clone of the application repository reproduces it without `slang-workspace.json`.
 
-```sh
-slang package update --dry-run
-slang package update
-slang package build
-```
-
-The path package stays under `packages/color-math`; it is not copied to `deps/`. Commit the child
-package, root manifest, and root lock together. Only the root lock controls the application's
-solve; the child can have its own lock when developed independently, but that lock is ignored by
-the root.
-
-This is the most reproducible current form of a repository-local split. It is explicit in the
-published root manifest and works on another machine without `slang-workspace.json`.
-
-#### Option B: develop the extracted package in a sibling repository
-
-Suppose the intended published identity is
-`https://example.com/color-math.git`, but no release exists yet. Add the intended portable
-dependency to the root manifest:
-
-```json
-"color-math": {
-  "git": "https://example.com/color-math.git",
-  "version": ">=1.0.0 <2.0.0"
-}
-```
-
-Register the sibling directory with an explicit version:
-
-```sh
-slang package override add color-math ../color-math 1.0.0
-slang package update --dry-run
-slang package update
-```
-
-The override lets the solver use the local manifest without a release tag. The resulting lock is
-machine-local and requires the matching gitignored workspace registration. Do not use this lock
-as the portable state for CI. A normal update cannot satisfy the Git edge until a compatible
-release tag exists.
-
-After publishing `v1.0.0`, run a normal update to replace the local row with the Git tag, then
-remove the registration:
-
-```sh
-slang package override disable color-math
-slang package update
-slang package override remove color-math
-git add slang-package.json slang-package-lock.json
-git commit
-```
-
-#### Option C: publish first, then consume
+#### Publish first, then consume
 
 Create the package in its own Git repository, validate it, tag `v1.0.0`, and push it as in
 Journey 3. Add `git` plus `version` to the application's manifest and run normal `update`.
@@ -797,7 +779,9 @@ application can consume it.
 
 ### Tool does
 
-- `init` scaffolds each package, and `validate` checks each package independently.
+- `init` scaffolds each package. `validate NAME` in the application workspace checks that
+  sidecar against this workspace lock; bare `validate` in the sidecar's own repository is the
+  library sharing gate there.
 - Root `update` resolves the path, override, or Git identity into one application graph.
 - Graph validation catches duplicate imports if the old file was not removed from the root export,
   and catches case-only collisions on case-insensitive filesystems.
@@ -808,11 +792,11 @@ application can consume it.
 
 - There is no `extract`, `new --lib`, `workspace add`, or source-move command. You create the
   manifest, license, directories, public API boundary, and dependency edge manually.
-- There is no committed multi-member workspace model. The root treats the child as an ordinary
-  path dependency; commands run in the child start a separate solve.
+- There is no committed multi-member workspace model. The root treats a vendored child as an
+  ordinary path dependency; commands run in the child start a separate solve.
 - A sibling `../color-math` path dependency is allowed but warns because cloning only the root
-  repository will not reproduce it. Use a child path for committed co-development or a local
-  override for machine-local work.
+  repository will not reproduce it. Use a child path for committed vendoring or an override for
+  sidecar extract.
 - Path dependencies require a manually chosen exact `as` version even when they have never been
   published.
 - A manifest path dependency cannot later be locally overridden with `override`; change the

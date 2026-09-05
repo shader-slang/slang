@@ -269,8 +269,33 @@ you remove the registration or commit.
 you can certify a library after promoting an in-place override before a remote tag exists. Bare
 `validate` still rejects the workspace while any edit or override is enabled.
 
-Do not commit `slang-workspace.json`. Path dependencies in `slang-package.json` are the published
-way to vendor a tree; overrides are the laptop way to redirect one.
+Do not commit `slang-workspace.json`. Path dependencies in `slang-package.json` are in-package
+vendoring, not extract. Overrides are the laptop way to redirect one identity at a local tree.
+
+## Extract a package from this application
+
+There is no `slang package extract` command. Create a sidecar package by hand, then point this
+workspace at that one tree.
+
+A sibling directory is the recommended layout (`../color-math` next to `image-viewer`). `deps/NAME`
+is gitignored, so it is only a laptop override: the inner tree is not in the application
+repository until that sidecar git has a remote.
+
+Wire it with a declared Git identity plus an override so the application uses **one** tree:
+
+```sh
+slang package dependency add color-math --git https://example.com/color-math.git --version ">=1.0.0 <2.0.0"
+slang package override add color-math ../color-math 1.0.0
+slang package update
+```
+
+Do not `dependency add --git` that same sidecar path without an override. Fetch would clone the
+path onto itself under `deps/NAME`. Path dependencies in the root manifest vendor a tree that
+lives in this repository; they are not extract.
+
+`slang package validate color-math` and root `build` use this workspace's lock pins, not a nested
+lock under the sidecar. When the sidecar has an origin, push tags, keep `git` pointed at that
+origin, disable the override, and `update` so the lock records the published pin.
 
 ## Retractions and excludes
 
