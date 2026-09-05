@@ -673,17 +673,46 @@ static SlangResult _loadResolvedPackage(
         return validateLockedPackageManifest(package, out.manifest, outError);
     }
 
-    String cachePath =
-        Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
-    SLANG_RETURN_ON_FAIL(ensureRepository(projectRoot, package.git, cachePath, outError));
+    String cachePath = Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
+    String cacheError;
     String manifestText;
-    SLANG_RETURN_ON_FAIL(
-        readFileAtRevision(cachePath, package.commit, kManifestName, manifestText, outError));
-    String sourceName = package.git + "@" + package.ref + ":slang-package.json";
-    SLANG_RETURN_ON_FAIL(readManifestText(sourceName, manifestText, out.manifest, outError));
-    out.packageRoot = Path::combine(projectRoot, depsDirectory, package.name);
-    out.gitRepositoryPath = cachePath;
-    out.gitRevision = package.commit;
+    if (package.commit.getLength() &&
+        SLANG_SUCCEEDED(ensureRepository(projectRoot, package.git, cachePath, cacheError)) &&
+        SLANG_SUCCEEDED(
+            readFileAtRevision(cachePath, package.commit, kManifestName, manifestText, cacheError)))
+    {
+        String sourceName = package.git + "@" + package.ref + ":slang-package.json";
+        SLANG_RETURN_ON_FAIL(readManifestText(sourceName, manifestText, out.manifest, outError));
+        out.packageRoot = Path::combine(projectRoot, depsDirectory, package.name);
+        out.gitRepositoryPath = cachePath;
+        out.gitRevision = package.commit;
+        return validateLockedPackageManifest(package, out.manifest, outError);
+    }
+
+    // Workspace validate and tests may have a materialized checkout without a fetchable origin
+    // (for example a lock that names `memory:b`). Read that tree when the cache cannot supply
+    // the locked revision.
+    if (SLANG_FAILED(getLockedPackageRoot(
+            projectRoot,
+            depsDirectory,
+            package,
+            localPackages,
+            out.packageRoot,
+            outError)))
+    {
+        if (cacheError.getLength())
+            outError = cacheError;
+        return SLANG_FAIL;
+    }
+    if (SLANG_FAILED(
+            readManifest(Path::combine(out.packageRoot, kManifestName), out.manifest, outError)))
+    {
+        outError = cacheError.getLength()
+                       ? cacheError
+                       : String("Cannot validate materialized package manifest '") + package.name +
+                             "'. Run 'slang package fetch'. " + outError;
+        return SLANG_FAIL;
+    }
     return validateLockedPackageManifest(package, out.manifest, outError);
 }
 

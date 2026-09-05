@@ -768,10 +768,23 @@ static SlangResult _writeValidatedSearchPathsAfterLocalChange(
 /// An unchanged package cannot develop a new license or source-layout defect, while the separate
 /// buildable-closure check still catches interactions such as an import collision between a
 /// changed package and an unchanged one.
-static bool _lockedPackageRowChanged(const LockFile* previousLock, const LockedPackage& package)
+/// Return whether fetch/update should run shareable-package checks on this lock row.
+///
+/// Git rematerialization is handled separately via `changedPackageNames`. This covers an
+/// edit, enabled override, or path row whose identity in the lock just changed. A first lock
+/// (no previous file) still certifies active local registrations, but not every vendored path
+/// tree: those trees are how an application consumes in-repo packages, not a new library
+/// identity being published.
+static bool _shouldPublishCheckChangedLocalOrPathPackage(
+    const LockFile* previousLock,
+    const LockedPackage& package,
+    const List<LocalPackage>& localPackages)
 {
+    const bool isActiveLocal = findActiveLocalPackageIndex(localPackages, package.name) >= 0;
+    if (!isActiveLocal && !isPathOnlyLockedPackage(package))
+        return false;
     if (!previousLock)
-        return true;
+        return isActiveLocal;
     Index previousIndex = findLockedPackageIndex(*previousLock, package.name);
     if (previousIndex < 0)
         return true;
@@ -835,13 +848,8 @@ static SlangResult _validateChangedPublishablePackages(
     }
     for (const auto& package : lock.packages)
     {
-        if (!_lockedPackageRowChanged(previousLock, package))
+        if (!_shouldPublishCheckChangedLocalOrPathPackage(previousLock, package, localPackages))
             continue;
-        if (findActiveLocalPackageIndex(localPackages, package.name) < 0 &&
-            !isPathOnlyLockedPackage(package))
-        {
-            continue;
-        }
         if (names.indexOf(package.name) < 0)
             names.add(package.name);
     }

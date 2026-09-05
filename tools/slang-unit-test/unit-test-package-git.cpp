@@ -1571,7 +1571,8 @@ SLANG_UNIT_TEST(PackageToolUpdateContentFailureAdvisesFetch)
     const char* updateArguments[] = {"slang-package", "update", "--yes"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not declare")) >= 0);
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("must start with 'module'")) >= 0);
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("slang package fetch")) >= 0);
 
     PackageTool::LockFile lockAfter;
