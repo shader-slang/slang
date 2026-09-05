@@ -323,18 +323,18 @@ package's tree. Neither named form materializes packages or walks the legal grap
 placeholder, edits, overrides, and local path dependencies because those do not prevent
 compilation.
 
-`fetch` and `update` always verify the legal graph. After materialization, they apply the
-publishable-package checks to each Git package whose checkout was newly created or changed, and
-to each local registration or path lock row that changed, then check source layout and import
-uniqueness across the complete selected graph. The closure check includes unchanged packages
-because a new module can collide with one already selected. `update --dry-run` cannot inspect
-source from remote candidates because it does not materialize them.
+`fetch` and `update` always verify the legal graph from selected manifests **before** they clear
+search paths or materialize `deps/`. Git pins without an active local path are read from
+`.slang/cache` at the locked commit. After materialization, they apply the publishable-package
+checks to each Git package whose checkout was newly created or changed, and to each local
+registration or path lock row that changed, then check source layout and import uniqueness across
+the complete selected graph. The closure check includes unchanged packages because a new module can
+collide with one already selected. `update --dry-run` runs that legal-graph check and still cannot
+claim source-layout success, because it does not materialize remote trees.
 
-Pass `--skip-validate` on `fetch`, `update`, or `build` only as an escape hatch. It skips source
-declaration, import-uniqueness, and new-release publish checks, but still checks the lock against
-declared dependencies, reads materialized manifests, inventories exports needed by build, and
-checks toolchain constraints. The command prints a warning. `slang package validate` has no skip
-flag.
+Pass `--skip-validate` on `fetch`, `update`, or `build` only as an escape hatch. It skips
+source-layout and new-release publish checks **after** materialize. The legal graph still runs
+first. The command prints a warning. `slang package validate` has no skip flag.
 
 `slang package status` prints one header line when the workspace is current, for example
 `Package 'video-preview': lock current, 3 packages, buildable.` Extra lines appear only when

@@ -48,8 +48,8 @@ static void _printHelp(bool experimental = false)
         "                   --dry-run reports the selected graph without writing the lock.\n"
         "                   --minimal prints one-line package changes without rationale.\n"
         "                   --yes applies without an interactive confirmation.\n"
-        "                   --skip-validate skips source-layout and publish checks.\n"
-        "                   Graph, manifest, checkout, and toolchain checks still run.\n"
+        "                   --skip-validate skips source-layout and publish checks after\n"
+        "                   materialize. The legal graph is still checked first.\n"
         "                   Stops before resolving when a checkout holds local state;\n"
         "                   --clean discards that state instead.\n"
         "  build [--skip-validate]\n"
@@ -1331,8 +1331,18 @@ static SlangResult _fetch(
     List<String> warnings;
     SLANG_RETURN_ON_FAIL(
         _validateLocalPackages(projectRoot, lock, localPackages, outError, &warnings));
+    SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
+        projectRoot,
+        manifest,
+        lock,
+        localPackages,
+        outError,
+        &warnings));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+    warnings.clear();
+    if (skipValidate)
+        _warnSkippedSourceValidation();
     List<String> cleanReplacements;
     if (allowClean)
     {
@@ -1372,22 +1382,7 @@ static SlangResult _fetch(
         _appendIncompleteMaterializationAdvice(outError, true);
         return SLANG_FAIL;
     }
-    if (skipValidate)
-    {
-        if (SLANG_FAILED(validateLegalResolvedProject(
-                projectRoot,
-                manifest,
-                lock,
-                localPackages,
-                outError,
-                &warnings)))
-        {
-            _appendIncompleteMaterializationAdvice(outError, true);
-            return SLANG_FAIL;
-        }
-        _warnSkippedSourceValidation();
-    }
-    else
+    if (!skipValidate)
     {
         if (SLANG_FAILED(validateBuildableResolvedProject(
                 projectRoot,
@@ -1395,7 +1390,11 @@ static SlangResult _fetch(
                 lock,
                 localPackages,
                 outError,
-                &warnings)))
+                &warnings,
+                nullptr,
+                nullptr,
+                false,
+                true)))
         {
             _appendIncompleteMaterializationAdvice(outError, true);
             return SLANG_FAIL;
@@ -1538,6 +1537,13 @@ static SlangResult _update(
         outError));
     SLANG_RETURN_ON_FAIL(
         _validateLocalPackages(projectRoot, lock, effectiveLocalPackages, outError, &warnings));
+    SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
+        projectRoot,
+        manifest,
+        lock,
+        effectiveLocalPackages,
+        outError,
+        &warnings));
     // The report is printed before anything is materialized, so it always describes a plan. Only
     // the summary printed after the lock and the checkouts have been written may claim the work
     // happened.
@@ -1605,21 +1611,7 @@ static SlangResult _update(
         _appendIncompleteMaterializationAdvice(outError, previousLockPtr != nullptr);
         return SLANG_FAIL;
     }
-    if (skipValidate)
-    {
-        if (SLANG_FAILED(validateLegalResolvedProject(
-                projectRoot,
-                manifest,
-                lock,
-                effectiveLocalPackages,
-                outError,
-                &warnings)))
-        {
-            _appendIncompleteMaterializationAdvice(outError, previousLockPtr != nullptr);
-            return SLANG_FAIL;
-        }
-    }
-    else
+    if (!skipValidate)
     {
         if (SLANG_FAILED(validateBuildableResolvedProject(
                 projectRoot,
@@ -1627,7 +1619,11 @@ static SlangResult _update(
                 lock,
                 effectiveLocalPackages,
                 outError,
-                &warnings)))
+                &warnings,
+                nullptr,
+                nullptr,
+                false,
+                true)))
         {
             _appendIncompleteMaterializationAdvice(outError, previousLockPtr != nullptr);
             return SLANG_FAIL;

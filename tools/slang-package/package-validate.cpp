@@ -4,6 +4,7 @@
 
 #include "compiler-core/slang-lexer.h"
 #include "core/slang-io.h"
+#include "package-git.h"
 #include "package-json.h"
 #include "package-local.h"
 #include "package-lock.h"
@@ -571,6 +572,121 @@ static SlangResult _readMaterializedManifest(
     return validateLockedPackageManifest(package, outManifest, outError);
 }
 
+struct ResolvedPackageLoad
+{
+    Manifest manifest;
+    String packageRoot;
+    String gitRepositoryPath;
+    String gitRevision;
+    String gitRelativeRoot;
+};
+
+/// Load the manifest the legal graph needs for one lock row without requiring `deps/`.
+///
+/// Consider this example: `update` selects `noise@v1.1.0` and `noise` vendors `vendor/math` as a
+/// path dependency. Stage 1 must check those identities before it clears search paths or clones
+/// `deps/noise`. Git pins are read from `.slang/cache` at the locked commit; nested path packages
+/// of that git tree use `git show`. Edits, overrides, and ordinary path packages still use the
+/// real directory.
+static SlangResult _loadResolvedPackage(
+    const String& projectRoot,
+    const String& depsDirectory,
+    const LockedPackage& package,
+    const List<LocalPackage>& localPackages,
+    const ResolvedPackageLoad& parent,
+    const Dependency& incoming,
+    ResolvedPackageLoad& out,
+    String& outError)
+{
+    out = ResolvedPackageLoad();
+    Index localIndex = findActiveLocalPackageIndex(localPackages, package.name);
+    if (localIndex >= 0)
+    {
+        if (package.path.getLength() && package.path != localPackages[localIndex].path)
+        {
+            outError = String("Locked path for package '") + package.name +
+                       "' does not match slang-workspace.json.";
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(
+            getLocalPackageRoot(projectRoot, localPackages[localIndex], out.packageRoot, outError));
+        if (SLANG_FAILED(readManifest(
+                Path::combine(out.packageRoot, kManifestName),
+                out.manifest,
+                outError)))
+        {
+            outError =
+                String("Cannot read local package manifest '") + package.name + "': " + outError;
+            return SLANG_FAIL;
+        }
+        return validateLockedPackageManifest(package, out.manifest, outError);
+    }
+
+    if (incoming.path.getLength() && parent.gitRevision.getLength())
+    {
+        String gitRelativeRoot =
+            Path::simplify(Path::combine(parent.gitRelativeRoot, incoming.path));
+        if (Path::isAbsolute(gitRelativeRoot) || pathStartsWithParentComponent(gitRelativeRoot))
+        {
+            outError = String("Path dependency '") + package.name +
+                       "' escapes its Git package checkout: " + incoming.path;
+            return SLANG_FAIL;
+        }
+        String manifestPath = gitRelativeRoot.getLength()
+                                  ? Path::combine(gitRelativeRoot, kManifestName)
+                                  : kManifestName;
+        String manifestText;
+        SLANG_RETURN_ON_FAIL(readFileAtRevision(
+            parent.gitRepositoryPath,
+            parent.gitRevision,
+            manifestPath,
+            manifestText,
+            outError));
+        String sourceName =
+            parent.gitRepositoryPath + "@" + parent.gitRevision + ":" + manifestPath;
+        SLANG_RETURN_ON_FAIL(readManifestText(sourceName, manifestText, out.manifest, outError));
+        out.packageRoot = Path::combine(projectRoot, package.path);
+        out.gitRepositoryPath = parent.gitRepositoryPath;
+        out.gitRevision = parent.gitRevision;
+        out.gitRelativeRoot = gitRelativeRoot;
+        return validateLockedPackageManifest(package, out.manifest, outError);
+    }
+
+    if (isPathOnlyLockedPackage(package) || !isGitBackedLockedPackage(package))
+    {
+        SLANG_RETURN_ON_FAIL(getLockedPackageRoot(
+            projectRoot,
+            depsDirectory,
+            package,
+            localPackages,
+            out.packageRoot,
+            outError));
+        if (SLANG_FAILED(readManifest(
+                Path::combine(out.packageRoot, kManifestName),
+                out.manifest,
+                outError)))
+        {
+            outError = String("Cannot validate materialized package manifest '") + package.name +
+                       "'. Run 'slang package fetch'. " + outError;
+            return SLANG_FAIL;
+        }
+        return validateLockedPackageManifest(package, out.manifest, outError);
+    }
+
+    String cachePath =
+        Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
+    SLANG_RETURN_ON_FAIL(ensureRepository(projectRoot, package.git, cachePath, outError));
+    String manifestText;
+    SLANG_RETURN_ON_FAIL(
+        readFileAtRevision(cachePath, package.commit, kManifestName, manifestText, outError));
+    String sourceName = package.git + "@" + package.ref + ":slang-package.json";
+    SLANG_RETURN_ON_FAIL(readManifestText(sourceName, manifestText, out.manifest, outError));
+    out.packageRoot = Path::combine(projectRoot, depsDirectory, package.name);
+    out.gitRepositoryPath = cachePath;
+    out.gitRevision = package.commit;
+    return validateLockedPackageManifest(package, out.manifest, outError);
+}
+
 SlangResult validatePublishablePackage(
     const String& packageRoot,
     const Manifest& manifest,
@@ -591,10 +707,8 @@ SlangResult validateLegalResolvedProject(
     List<String>* outWarnings)
 {
     SLANG_RETURN_ON_FAIL(validateLockedWorkspaceExclusions(rootManifest, lock, outError));
-    List<Manifest> packageManifests;
-    packageManifests.setCount(lock.packages.getCount());
-    List<String> packageRoots;
-    packageRoots.setCount(lock.packages.getCount());
+    List<ResolvedPackageLoad> loadedPackages;
+    loadedPackages.setCount(lock.packages.getCount());
     List<bool> loaded;
     loaded.setCount(lock.packages.getCount());
     for (auto& value : loaded)
@@ -622,6 +736,9 @@ SlangResult validateLegalResolvedProject(
         }
     }
 
+    ResolvedPackageLoad workspaceLoad;
+    workspaceLoad.packageRoot = projectRoot;
+
     List<bool> reachable;
     reachable.setCount(lock.packages.getCount());
     for (auto& value : reachable)
@@ -643,24 +760,25 @@ SlangResult validateLegalResolvedProject(
         {
             reachable[index] = true;
             pending.add(index);
+            if (!loaded[index])
+            {
+                SLANG_RETURN_ON_FAIL(_loadResolvedPackage(
+                    projectRoot,
+                    getWorkspaceDepsDirectory(rootManifest),
+                    lock.packages[index],
+                    localPackages,
+                    workspaceLoad,
+                    dependency,
+                    loadedPackages[index],
+                    outError));
+                loaded[index] = true;
+            }
         }
     }
     for (Index pendingIndex = 0; pendingIndex < pending.getCount(); ++pendingIndex)
     {
         Index index = pending[pendingIndex];
-        if (!loaded[index])
-        {
-            SLANG_RETURN_ON_FAIL(_readMaterializedManifest(
-                projectRoot,
-                getWorkspaceDepsDirectory(rootManifest),
-                lock.packages[index],
-                localPackages,
-                packageRoots[index],
-                packageManifests[index],
-                outError));
-            loaded[index] = true;
-        }
-        const Manifest& manifest = packageManifests[index];
+        const Manifest& manifest = loadedPackages[index].manifest;
         for (const auto& dependency : manifest.dependencies)
         {
             Index dependencyIndex;
@@ -668,7 +786,7 @@ SlangResult validateLegalResolvedProject(
                 validateLockedDependency(dependency, lock, dependencyIndex, outError));
             SLANG_RETURN_ON_FAIL(validateLockedPathDependency(
                 projectRoot,
-                packageRoots[index],
+                loadedPackages[index].packageRoot,
                 manifest.name,
                 dependency,
                 lock.packages[dependencyIndex],
@@ -679,6 +797,19 @@ SlangResult validateLegalResolvedProject(
             {
                 reachable[dependencyIndex] = true;
                 pending.add(dependencyIndex);
+                if (!loaded[dependencyIndex])
+                {
+                    SLANG_RETURN_ON_FAIL(_loadResolvedPackage(
+                        projectRoot,
+                        getWorkspaceDepsDirectory(rootManifest),
+                        lock.packages[dependencyIndex],
+                        localPackages,
+                        loadedPackages[index],
+                        dependency,
+                        loadedPackages[dependencyIndex],
+                        outError));
+                    loaded[dependencyIndex] = true;
+                }
             }
         }
     }
@@ -688,13 +819,13 @@ SlangResult validateLegalResolvedProject(
     for (Index i = 0; i < lock.packages.getCount(); ++i)
     {
         if (loaded[i])
-            addSlangToolchainConstraint(packageManifests[i], toolchainConstraints);
+            addSlangToolchainConstraint(loadedPackages[i].manifest, toolchainConstraints);
         if (loaded[i] && outWarnings)
         {
             addUnadoptedWorkspaceExclusionWarnings(
                 rootManifest,
                 lock.packages[i].name,
-                packageManifests[i],
+                loadedPackages[i].manifest,
                 outWarnings);
         }
     }
@@ -710,15 +841,19 @@ SlangResult validateBuildableResolvedProject(
     List<String>* outWarnings,
     List<PrimaryModule>* outPrimaryModules,
     List<ExportedSourceFile>* outSourceFiles,
-    bool skipSourceValidation)
+    bool skipSourceValidation,
+    bool assumeLegalGraph)
 {
-    SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
-        projectRoot,
-        rootManifest,
-        lock,
-        localPackages,
-        outError,
-        outWarnings));
+    if (!assumeLegalGraph)
+    {
+        SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
+            projectRoot,
+            rootManifest,
+            lock,
+            localPackages,
+            outError,
+            outWarnings));
+    }
 
     List<ModuleLocation> modules;
     List<ExportedSourceFile> sourceFiles;

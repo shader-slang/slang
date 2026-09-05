@@ -1105,12 +1105,12 @@ you accept that later compilation may fail. It is a workaround, not the CI path.
 **It skips:** new-release license and portability checks, the first `module` / `implementing`
 declaration rules, and graph-wide import uniqueness.
 
-**It keeps:** manifest parsing, lock identity, dependency closure, materialized manifest checks,
-toolchain constraints, export-directory traversal, dirty-checkout protection, and the rest of the
-command's normal side effects. It always prints a warning.
+**It keeps:** the legal graph (identities, trusted edges, toolchain, exclusions) before any
+`deps/` change, plus dirty-checkout protection and the rest of the command's normal side effects
+other than source-layout and publish checks. It always prints a warning.
 
-**Combinations:** `update --dry-run --skip-validate` still cannot inspect remote source that
-dry-run did not materialize. `validate` intentionally has no skip flag.
+**Combinations:** `update --dry-run --skip-validate` still runs the legal graph from cache and
+still cannot inspect remote source layout. `validate` intentionally has no skip flag.
 
 ### `override add NAME PATH [AS]`
 
@@ -1169,18 +1169,17 @@ retroactively break reproducibility, while the workspace's own changed policy do
 
 ### Dry-run is not a complete rehearsal
 
-Dry-run promises no lock or checkout mutation, which means it cannot validate remote source trees.
-Its report can be correct and the real update can still fail after materialization. A future
-staging design could materialize candidates outside `deps/`, validate them, and still preserve the
-no-visible-mutation promise.
+Dry-run promises no lock or checkout mutation. It does run the legal-graph check against selected
+manifests in `.slang/cache` and local trees. It still cannot validate remote source layout, so a
+dry-run report can be correct and the real update can still fail after materialization.
 
-### Failed update is not transactional
+### Failed update is not fully transactional
 
-The new lock is written only after validation, but `build/search-paths` is cleared and
-materialization happens first. A failed update leaves the previous lock unchanged while search
-paths are empty and some `deps/` directories may already contain the candidate graph. With an old
-lock, run `slang package fetch` to restore its checkouts and search paths. A failed first update
-can leave partial checkouts and no lock. This is a correctness and recovery gap.
+A graph that is illegal is rejected before search paths are cleared or `deps/` is rewritten. A
+content-only failure happens after materialize: the previous lock remains, search paths may be
+empty, and some `deps/` directories may already contain the candidate graph. With an old lock, run
+`slang package fetch` to restore its checkouts and search paths. A failed first update can leave
+partial checkouts and no lock.
 
 ### Edit and override solve different problems
 
@@ -1340,9 +1339,10 @@ them or update this chapter and its regression tests in the same change.
 
 ### Validation contract
 
-- Fetch and update always enforce graph legality, publish-check changed Git and local selections,
-  and enforce source layout and import uniqueness across the closure. Build enforces graph legality
-  and buildability. Bare `validate` checks workspace publishability and lock portability.
+- Fetch and update always enforce the legal graph **before** materialize, then publish-check
+  changed Git and local selections and enforce source layout and import uniqueness across the
+  closure after materialize. `--skip-validate` skips only that second stage. Build enforces graph
+  legality and buildability. Bare `validate` checks workspace publishability and lock portability.
   `validate NAME` and `validate --all` check locked trees against this workspace lock.
 - `--skip-validate` exists only on fetch, update, and build; it warns and keeps lock, manifest,
   closure, toolchain, export, and dirty-checkout checks.

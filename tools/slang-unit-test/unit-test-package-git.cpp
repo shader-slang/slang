@@ -1472,3 +1472,159 @@ SLANG_UNIT_TEST(PackageToolNamedValidateAndLocalPublishableChecks)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("noise:")) >= 0);
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("grain:")) >= 0);
 }
+
+static SlangResult _initRootWithGitNoise(
+    const String& projectRoot,
+    const String& repository,
+    String& outError)
+{
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_RETURN_ON_FAIL(
+        executeInDirectory(projectRoot, SLANG_COUNT_OF(initArguments), initArguments, outError));
+    SLANG_RETURN_ON_FAIL(
+        File::writeAllText(Path::combine(projectRoot, "LICENSE"), "Root license\n"));
+
+    SLANG_RETURN_ON_FAIL(Path::createDirectoryRecursive(repository) ? SLANG_OK : SLANG_FAIL);
+    Manifest noise;
+    noise.name = "noise";
+    noise.exports.add("src");
+    noise.licenseFiles.add("LICENSE");
+    SLANG_RETURN_ON_FAIL(
+        writeManifest(Path::combine(repository, "slang-package.json"), noise, outError));
+    SLANG_RETURN_ON_FAIL(_writeFile(Path::combine(repository, "LICENSE"), "Noise license\n"));
+    SLANG_RETURN_ON_FAIL(
+        _writeFile(Path::combine(repository, "src/noise.slang"), "module noise;\n"));
+    SLANG_RETURN_ON_FAIL(_initializeRepository(repository));
+    SLANG_RETURN_ON_FAIL(_commitAndTag(repository, "v1.0.0"));
+
+    Manifest root;
+    String rootManifestPath = Path::combine(projectRoot, "slang-package.json");
+    SLANG_RETURN_ON_FAIL(readManifest(rootManifestPath, root, outError));
+    Dependency dependency;
+    dependency.name = "noise";
+    dependency.git = repository;
+    dependency.version = ">=1.0.0";
+    root.dependencies.add(dependency);
+    SLANG_RETURN_ON_FAIL(writeManifest(rootManifestPath, root, outError));
+    const char* updateArguments[] = {"slang-package", "update", "--yes"};
+    return executeInDirectory(
+        projectRoot,
+        SLANG_COUNT_OF(updateArguments),
+        updateArguments,
+        outError);
+}
+
+SLANG_UNIT_TEST(PackageToolFetchRejectsIllegalGraphBeforeMaterialize)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    String repository = Path::combine(temp.path, "upstream-noise");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initRootWithGitNoise(temp.path, repository, error)));
+
+    String searchPathsPath = Path::combine(temp.path, "build/search-paths");
+    String searchPathsBefore;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(searchPathsPath, searchPathsBefore)));
+    String checkoutSource = Path::combine(temp.path, "deps/noise/src/noise.slang");
+    String sourceBefore;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(checkoutSource, sourceBefore)));
+
+    PackageTool::LockFile lock;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lock, error)));
+    SLANG_CHECK_ABORT(lock.packages.getCount() == 1);
+    lock.packages[0].exports.clear();
+    lock.packages[0].exports.add("not-src");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeLockFile(Path::combine(temp.path, "slang-package-lock.json"), lock, error)));
+
+    const char* fetchArguments[] = {"slang-package", "fetch"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("exports")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("search-paths")) < 0);
+
+    String searchPathsAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(searchPathsPath, searchPathsAfter)));
+    SLANG_CHECK(searchPathsAfter == searchPathsBefore);
+    String sourceAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(checkoutSource, sourceAfter)));
+    SLANG_CHECK(sourceAfter == sourceBefore);
+}
+
+SLANG_UNIT_TEST(PackageToolUpdateContentFailureAdvisesFetch)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    String repository = Path::combine(temp.path, "upstream-noise");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initRootWithGitNoise(temp.path, repository, error)));
+
+    PackageTool::LockFile lockBefore;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockBefore, error)));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::writeAllText(Path::combine(repository, "src/noise.slang"), "int broken;\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1.0")));
+
+    const char* updateArguments[] = {"slang-package", "update", "--yes"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not declare")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("slang package fetch")) >= 0);
+
+    PackageTool::LockFile lockAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockAfter, error)));
+    SLANG_CHECK(lockFilesEqual(lockBefore, lockAfter));
+}
+
+SLANG_UNIT_TEST(PackageToolUpdateDryRunRunsLegalGraphWithoutWriting)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    String noiseRepository = Path::combine(temp.path, "upstream-noise");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initRootWithGitNoise(temp.path, noiseRepository, error)));
+
+    String grainRepository = Path::combine(temp.path, "upstream-grain");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(grainRepository));
+    Manifest grain;
+    grain.name = "grain";
+    grain.exports.add("src");
+    grain.licenseFiles.add("LICENSE");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(grainRepository, "slang-package.json"), grain, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(grainRepository, "LICENSE"), "Grain license\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(grainRepository, "src/grain.slang"), "module grain;\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(grainRepository)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(grainRepository, "v1.0.0")));
+
+    Manifest root;
+    String rootManifestPath = Path::combine(temp.path, "slang-package.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    Dependency grainDependency;
+    grainDependency.name = "grain";
+    grainDependency.git = grainRepository;
+    grainDependency.version = ">=1.0.0";
+    root.dependencies.add(grainDependency);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+
+    PackageTool::LockFile lockBefore;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockBefore, error)));
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "deps/grain")));
+
+    const char* dryRunArguments[] = {"slang-package", "update", "--dry-run"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(dryRunArguments), dryRunArguments, error)));
+
+    PackageTool::LockFile lockAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockAfter, error)));
+    SLANG_CHECK(lockFilesEqual(lockBefore, lockAfter));
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "deps/grain")));
+}

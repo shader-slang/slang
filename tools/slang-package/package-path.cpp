@@ -63,13 +63,28 @@ SlangResult validateLockedPathDependency(
         return SLANG_OK;
     String canonicalExpectedPath;
     String canonicalLockedPath;
-    if (SLANG_FAILED(Path::getCanonical(
-            Path::combine(declaringRoot, dependency.path),
-            canonicalExpectedPath)) ||
-        SLANG_FAILED(Path::getCanonical(
-            Path::combine(projectRoot, lockedPackage.path),
-            canonicalLockedPath)) ||
-        canonicalExpectedPath != canonicalLockedPath)
+    const bool haveCanonicalPaths = SLANG_SUCCEEDED(Path::getCanonical(
+                                        Path::combine(declaringRoot, dependency.path),
+                                        canonicalExpectedPath)) &&
+                                    SLANG_SUCCEEDED(Path::getCanonical(
+                                        Path::combine(projectRoot, lockedPackage.path),
+                                        canonicalLockedPath));
+    if (!haveCanonicalPaths)
+    {
+        // The declaring tree may not be on disk yet: fetch and update check nested path edges
+        // against the selected lock before they materialize `deps/`. Compare the intended
+        // locations without requiring `realpath`.
+        String expected = Path::simplify(Path::combine(declaringRoot, dependency.path));
+        String locked = Path::simplify(Path::combine(projectRoot, lockedPackage.path));
+        if (expected != locked)
+        {
+            outError = String("Locked path does not match dependency '") + dependency.name +
+                       "'. Run 'slang package update'.";
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
+    }
+    if (canonicalExpectedPath != canonicalLockedPath)
     {
         outError = String("Locked path does not match dependency '") + dependency.name +
                    "'. Run 'slang package update'.";

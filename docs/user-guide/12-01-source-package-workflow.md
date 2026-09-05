@@ -160,14 +160,15 @@ encoding range (`>=1.1.0`) and the
 publisher retraction of `1.0.0` agree: the shared leaf is `color-encoding@v1.1.0`, once, in the
 lock.
 
-After materializing a selection, update checks the license, exports, and module layout of each new
-or changed Git checkout and each changed local registration or path package, and checks module
-layout and import uniqueness across the complete graph. The new lock and successful resolution
-report are written only after those checks pass. Fetch applies the same checks while reproducing
-the existing lock. Unchanged dependencies are still part of closure-wide buildability, but their
-publish checks are not repeated. `--skip-validate` is an escape hatch that leaves graph,
-materialized-manifest, export-inventory, and toolchain checks in place while skipping source-layout
-and new-release publish validation.
+Before clearing search paths or writing `deps/`, update checks that the selected graph is legal:
+identities, trusted edges, toolchain, and exclusions, reading Git manifests from `.slang/cache`
+at the selected commit. After materializing that whole graph, it checks the license, exports, and
+module layout of each new or changed Git checkout and each changed local registration or path
+package, and checks module layout and import uniqueness across the complete graph. The new lock
+and successful resolution report are written only after those checks pass. Fetch applies the same
+two stages while reproducing the existing lock. Unchanged dependencies are still part of
+closure-wide buildability, but their publish checks are not repeated. `--skip-validate` skips only
+the post-materialize source-layout and publish checks.
 
 `v1.1.0` of the preview prints full-precision luma weights `(0.2126, 0.7152, 0.0722)` instead of
 the truncated `(0.2130, 0.7150, 0.0720)` from `v1.0.0`.

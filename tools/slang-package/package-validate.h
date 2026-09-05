@@ -40,11 +40,12 @@ SlangResult validatePublishablePackage(
     const Manifest& manifest,
     String& outError);
 
-/// Validate the identities and paths in a materialized dependency graph.
+/// Validate the identities and paths in a selected dependency graph.
 ///
-/// This checks dependency-to-lock correspondence, trusted reachability, materialized manifests,
-/// local registrations, path identities, and the combined toolchain constraint. It deliberately
-/// does not inspect licenses, exports, or source declarations.
+/// This checks dependency-to-lock correspondence, trusted reachability, package manifests, local
+/// registrations, path identities, and the combined toolchain constraint. Git pins without an
+/// active local path are read from `.slang/cache` at the locked commit, so `deps/` need not exist.
+/// It deliberately does not inspect licenses, exports, or source declarations.
 SlangResult validateLegalResolvedProject(
     const String& projectRoot,
     const Manifest& rootManifest,
@@ -58,8 +59,9 @@ SlangResult validateLegalResolvedProject(
 /// `fetch` and `update` use this after materialization so the proposed lock is the source of truth.
 /// Every reachable package participates in graph-wide import uniqueness and toolchain selection,
 /// including packages whose lock row did not change. `skipSourceValidation` still inventories
-/// exports and verifies the legal materialized graph and toolchain, but does not check source
-/// declarations or import uniqueness.
+/// exports needed by build, but does not check source declarations or import uniqueness.
+/// `assumeLegalGraph` skips the identity/toolchain walk when the caller already ran
+/// `validateLegalResolvedProject` on this lock.
 SlangResult validateBuildableResolvedProject(
     const String& projectRoot,
     const Manifest& rootManifest,
@@ -69,7 +71,8 @@ SlangResult validateBuildableResolvedProject(
     List<String>* outWarnings = nullptr,
     List<PrimaryModule>* outPrimaryModules = nullptr,
     List<ExportedSourceFile>* outSourceFiles = nullptr,
-    bool skipSourceValidation = false);
+    bool skipSourceValidation = false,
+    bool assumeLegalGraph = false);
 
 /// Validate the workspace package and its materialized, locked dependency closure for a build.
 ///
