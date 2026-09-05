@@ -9321,7 +9321,7 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
                         matrixType->getRowCount(),
                         matrixType->getColumnCount(),
                         m_astBuilder->getIntVal(
-                            m_astBuilder->getIntType(),
+                            matrixType->getLayout()->getType(),
                             kMatrixLayoutMode_ColumnMajor));
                 }
                 else
@@ -9331,7 +9331,7 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
                         matrixType->getRowCount(),
                         matrixType->getColumnCount(),
                         m_astBuilder->getIntVal(
-                            m_astBuilder->getIntType(),
+                            matrixType->getLayout()->getType(),
                             kMatrixLayoutMode_RowMajor));
                 }
                 expr->type = m_astBuilder->getTypeType(baseType);
