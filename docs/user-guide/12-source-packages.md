@@ -390,8 +390,7 @@ Use the package commands to change this file; its schema is tool-owned and may e
 is an exact semantic version for solver compatibility. When it is omitted, the command uses the
 version in the package's current lock row. `override enable`, `override disable`, `override remove`,
 and `override list` retain or inspect the same registration. A disabled override keeps its path and
-version but plain update selects published Git. The older `override NAME PATH [AS]` and
-`unoverride NAME` spellings remain compatibility aliases. An override does not copy or modify the
+version but plain update selects published Git. An override does not copy or modify the
 supplied directory.
 
 A registered local manifest must agree with the lock. An in-place edit keeps the published Git pin

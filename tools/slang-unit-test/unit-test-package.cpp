@@ -1940,7 +1940,7 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     SLANG_CHECK_ABORT(lockedCIndex >= 0);
     SLANG_CHECK(lock.packages[lockedCIndex].path == "vendor/c");
 
-    const char* overridePathArguments[] = {"slang-package", "override", "a", "vendor/a"};
+    const char* overridePathArguments[] = {"slang-package", "override", "add", "a", "vendor/a"};
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
         temp.path,
         SLANG_COUNT_OF(overridePathArguments),
@@ -2118,6 +2118,7 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     const char* overrideArguments[] = {
         "slang-package",
         "override",
+        "add",
         "noise",
         relativeLocalRoot.getBuffer(),
     };
@@ -2143,6 +2144,7 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     const char* helperOverrideArguments[] = {
         "slang-package",
         "override",
+        "add",
         "helper",
         relativeHelperRoot.getBuffer(),
         "2.0.0",
@@ -2238,11 +2240,11 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
         listOverrideArguments,
         error)));
 
-    const char* unoverrideNoiseArguments[] = {"slang-package", "unoverride", "noise"};
+    const char* removeNoiseArguments[] = {"slang-package", "override", "remove", "noise"};
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
         temp.path,
-        SLANG_COUNT_OF(unoverrideNoiseArguments),
-        unoverrideNoiseArguments,
+        SLANG_COUNT_OF(removeNoiseArguments),
+        removeNoiseArguments,
         error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("lock still points")) >= 0);
     const char* uneditNoiseArguments[] = {"slang-package", "unedit", "noise"};
@@ -2273,6 +2275,7 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     const char* unusedOverrideArguments[] = {
         "slang-package",
         "override",
+        "add",
         "unused",
         relativeUnusedRoot.getBuffer(),
         "1.0.0",
@@ -2289,11 +2292,11 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
         Path::combine(temp.path, "slang-package-lock.json"),
         lockAfterFailedUpdate)));
     SLANG_CHECK(lockAfterFailedUpdate == lockBeforeFailedUpdate);
-    const char* unoverrideUnusedArguments[] = {"slang-package", "unoverride", "unused"};
+    const char* removeUnusedArguments[] = {"slang-package", "override", "remove", "unused"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
         temp.path,
-        SLANG_COUNT_OF(unoverrideUnusedArguments),
-        unoverrideUnusedArguments,
+        SLANG_COUNT_OF(removeUnusedArguments),
+        removeUnusedArguments,
         error)));
 
     const char* fetchArguments[] = {"slang-package", "fetch"};

@@ -68,11 +68,7 @@ static void _printHelp(bool experimental = false)
         "  override enable|disable|remove <name> | override list\n"
         "                   Manage retained local dependency overrides.\n"
         "  edit <name>      Make a dependency checkout editable in place.\n"
-        "  unedit <name>    Return an unchanged checkout to tool ownership.\n"
-        "  override <name> <path> [as]\n"
-        "                   Use a local package as an exact semantic version.\n"
-        "  unoverride <name>\n"
-        "                   Stop using an existing local package directory.\n");
+        "  unedit <name>    Return an unchanged checkout to tool ownership.\n");
     if (experimental)
     {
         fprintf(
@@ -208,8 +204,8 @@ static bool _commandRequiresPackageRoot(int argc, const char* const* argv)
     return command == "fetch" || command == "update" || command == "validate" ||
            command == "build" || command == "run" || command == "test" || command == "docs" ||
            command == "status" || command == "tree" || command == "why" ||
-           command == "dependency" || command == "override" || command == "unoverride" ||
-           command == "edit" || command == "unedit";
+           command == "dependency" || command == "override" || command == "edit" ||
+           command == "unedit";
 }
 
 static LockedPackage* _findLockedPackage(LockFile& lock, const String& name)
@@ -2533,7 +2529,7 @@ static SlangResult _unedit(const String& projectRoot, const String& name, String
     return SLANG_OK;
 }
 
-static SlangResult _override(
+static SlangResult _overrideAdd(
     const String& projectRoot,
     const String& name,
     const String& path,
@@ -2578,7 +2574,7 @@ static SlangResult _override(
     return SLANG_OK;
 }
 
-static SlangResult _unoverride(const String& projectRoot, const String& name, String& outError)
+static SlangResult _overrideRemove(const String& projectRoot, const String& name, String& outError)
 {
     LockFile lock;
     SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
@@ -2599,7 +2595,7 @@ static SlangResult _unoverride(const String& projectRoot, const String& name, St
     if (packageIndex >= 0 && lock.packages[packageIndex].path.getLength())
     {
         outError = String("The lock still points at this local package. Run "
-                          "'slang package update' before unoverride.");
+                          "'slang package update' before 'override remove'.");
         return SLANG_FAIL;
     }
     localPackages.removeAt(localIndex);
@@ -2906,23 +2902,14 @@ SlangResult executeInDirectory(
     if (command == "override" && argc == 4 && String(argv[2]) == "disable")
         return _setOverrideEnabled(projectRoot, argv[3], false, outError);
     if (command == "override" && argc == 4 && String(argv[2]) == "remove")
-        return _unoverride(projectRoot, argv[3], outError);
+        return _overrideRemove(projectRoot, argv[3], outError);
     if (command == "override" && (argc == 5 || argc == 6) && String(argv[2]) == "add")
-        return _override(
+        return _overrideAdd(
             projectRoot,
             argv[3],
             argv[4],
             argc == 6 ? String(argv[5]) : String(),
             outError);
-    if (command == "override" && (argc == 4 || argc == 5))
-        return _override(
-            projectRoot,
-            argv[2],
-            argv[3],
-            argc == 5 ? String(argv[4]) : String(),
-            outError);
-    if (command == "unoverride" && argc == 3)
-        return _unoverride(projectRoot, argv[2], outError);
 
     outError = String("Invalid command or arguments. Run '") + argv[0] + " help'.";
     return SLANG_FAIL;
