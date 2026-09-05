@@ -308,21 +308,27 @@ Package validation has three layers:
   present and no longer contain the generated placeholder, and whose path dependencies stay
   inside that package.
 
-`slang package validate` is the sharing check. It applies the publishable-package rules to the
-workspace package, rejects active edits or overrides and a lock that requires local override state,
-and checks that the materialized lock graph is legal. It does not repeat license or source-layout
-checks for unchanged transitive dependencies.
+Bare `slang package validate` is the **app** sharing check. It applies the publishable-package
+rules to the workspace package, rejects active edits or overrides and a lock that requires local
+override state, and checks that the materialized lock graph is legal. It does not repeat license
+or source-layout checks for unchanged transitive dependencies.
+
+`slang package validate NAME` is the **library** sharing check in this workspace: the same
+publishable-package rules on that locked tree (an edit, enabled override, path lock row, or
+`deps/NAME`), with Git and path edges checked against this workspace lock rather than a nested
+lock under `NAME`. `slang package validate --all` runs that library check on every locked
+package's tree. Neither named form materializes packages or walks the legal graph again.
 
 `build` requires a legal, buildable workspace. It deliberately permits the generated license
 placeholder, edits, overrides, and local path dependencies because those do not prevent
 compilation.
 
 `fetch` and `update` always verify the legal graph. After materialization, they apply the
-publishable-package checks to each Git package whose checkout was newly created or changed, then
-check source layout and import uniqueness across the complete selected graph. The closure check
-includes unchanged packages because a new module can collide with one already selected.
-`update --dry-run` cannot inspect source from remote candidates because it does not materialize
-them.
+publishable-package checks to each Git package whose checkout was newly created or changed, and
+to each local registration or path lock row that changed, then check source layout and import
+uniqueness across the complete selected graph. The closure check includes unchanged packages
+because a new module can collide with one already selected. `update --dry-run` cannot inspect
+source from remote candidates because it does not materialize them.
 
 Pass `--skip-validate` on `fetch`, `update`, or `build` only as an escape hatch. It skips source
 declaration, import-uniqueness, and new-release publish checks, but still checks the lock against

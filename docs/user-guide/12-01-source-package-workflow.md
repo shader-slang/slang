@@ -161,12 +161,13 @@ publisher retraction of `1.0.0` agree: the shared leaf is `color-encoding@v1.1.0
 lock.
 
 After materializing a selection, update checks the license, exports, and module layout of each new
-or changed Git checkout, and checks module layout and import uniqueness across the complete graph.
-The new lock and successful resolution report are written only after those checks pass. Fetch
-applies the same checks while reproducing the existing lock. Unchanged dependencies are still part
-of closure-wide buildability, but their publish checks are not repeated. `--skip-validate` is an
-escape hatch that leaves graph, materialized-manifest, export-inventory, and toolchain checks in
-place while skipping source-layout and new-release publish validation.
+or changed Git checkout and each changed local registration or path package, and checks module
+layout and import uniqueness across the complete graph. The new lock and successful resolution
+report are written only after those checks pass. Fetch applies the same checks while reproducing
+the existing lock. Unchanged dependencies are still part of closure-wide buildability, but their
+publish checks are not repeated. `--skip-validate` is an escape hatch that leaves graph,
+materialized-manifest, export-inventory, and toolchain checks in place while skipping source-layout
+and new-release publish validation.
 
 `v1.1.0` of the preview prints full-precision luma weights `(0.2126, 0.7152, 0.0722)` instead of
 the truncated `(0.2130, 0.7150, 0.0720)` from `v1.0.0`.
@@ -263,6 +264,10 @@ prints the lock diff without writing it. The resulting lock records the
 local path plus the original Git identity, so another machine or CI fails unless it has the same
 `slang-workspace.json`. Disable the override and run `update` to restore a portable Git pin before
 you remove the registration or commit.
+
+`slang package validate NAME` checks that package's tree against this workspace lock, so
+you can certify a library after promoting an in-place override before a remote tag exists. Bare
+`validate` still rejects the workspace while any edit or override is enabled.
 
 Do not commit `slang-workspace.json`. Path dependencies in `slang-package.json` are the published
 way to vendor a tree; overrides are the laptop way to redirect one.

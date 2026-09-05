@@ -1349,3 +1349,126 @@ SLANG_UNIT_TEST(PackageToolOverridePromotesInPlaceEdit)
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockAfterDryRun, error)));
     SLANG_CHECK(lockFilesEqual(lockBefore, lockAfterDryRun));
 }
+
+// Named validate and update publish-check an overridden checkout; bare validate still rejects
+// the workspace while the override is enabled.
+SLANG_UNIT_TEST(PackageToolNamedValidateAndLocalPublishableChecks)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+
+    String noiseRepository = Path::combine(temp.path, "upstream-noise");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(noiseRepository));
+    Manifest noise;
+    noise.name = "noise";
+    noise.exports.add("src");
+    noise.licenseFiles.add("LICENSE");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(noiseRepository, "slang-package.json"), noise, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(noiseRepository, "LICENSE"), "Noise license\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(noiseRepository, "src/noise.slang"), "module noise;\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(noiseRepository)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepository, "v1.0.0")));
+
+    String grainRepository = Path::combine(temp.path, "upstream-grain");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(grainRepository));
+    Manifest grain;
+    grain.name = "grain";
+    grain.exports.add("src");
+    grain.licenseFiles.add("LICENSE");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(grainRepository, "slang-package.json"), grain, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(grainRepository, "LICENSE"), "Grain license\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(grainRepository, "src/grain.slang"), "module grain;\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(grainRepository)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(grainRepository, "v1.0.0")));
+
+    Manifest root;
+    String rootManifestPath = Path::combine(temp.path, "slang-package.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    Dependency noiseDependency;
+    noiseDependency.name = "noise";
+    noiseDependency.git = noiseRepository;
+    noiseDependency.version = ">=1.0.0";
+    root.dependencies.add(noiseDependency);
+    Dependency grainDependency;
+    grainDependency.name = "grain";
+    grainDependency.git = grainRepository;
+    grainDependency.version = ">=1.0.0";
+    root.dependencies.add(grainDependency);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+
+    const char* updateArguments[] = {"slang-package", "update", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+
+    const char* editArguments[] = {"slang-package", "edit", "noise"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(editArguments), editArguments, error)));
+    const char* promoteArguments[] = {
+        "slang-package",
+        "override",
+        "add",
+        "noise",
+        "deps/noise",
+        "1.2.0",
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(promoteArguments), promoteArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        Path::combine(temp.path, "deps/noise/LICENSE"),
+        getLicensePlaceholderText())));
+
+    const char* namedValidateArguments[] = {"slang-package", "validate", "noise"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(namedValidateArguments),
+        namedValidateArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("license placeholder")) >= 0);
+
+    const char* workspaceValidateArguments[] = {"slang-package", "validate"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(workspaceValidateArguments),
+        workspaceValidateArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("override mode")) >= 0);
+
+    PackageTool::LockFile lockBeforeUpdate;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(
+        Path::combine(temp.path, "slang-package-lock.json"),
+        lockBeforeUpdate,
+        error)));
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("license placeholder")) >= 0);
+    PackageTool::LockFile lockAfterFailedUpdate;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(
+        Path::combine(temp.path, "slang-package-lock.json"),
+        lockAfterFailedUpdate,
+        error)));
+    SLANG_CHECK(lockFilesEqual(lockBeforeUpdate, lockAfterFailedUpdate));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        Path::combine(temp.path, "deps/grain/LICENSE"),
+        getLicensePlaceholderText())));
+    const char* validateAllArguments[] = {"slang-package", "validate", "--all"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(validateAllArguments),
+        validateAllArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("noise:")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("grain:")) >= 0);
+}

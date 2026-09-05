@@ -115,8 +115,10 @@ or `slang-workspace.json`.
 ### Tool does
 
 - `init` creates the manifest, conventional directories, license placeholder, and ignore rules.
-- `validate` checks the closed manifest schema, license, export directories, module declarations,
-  and installed toolchain. A package with no dependencies does not need a lock.
+- Bare `validate` is the app sharing gate: closed manifest schema, license, export directories,
+  module declarations, installed toolchain, and a portable lock with no active edits or overrides.
+  A package with no dependencies does not need a lock. `validate NAME` and `validate --all` apply
+  the publishable-package rules to locked trees in this workspace.
 - `build` checks that the available graph is legal and buildable, emits the source bundle under
   `build/bundle/source`, collects Markdown under `build/docs/`, and regenerates
   `build/search-paths`.
@@ -329,7 +331,9 @@ import color.encoding;
 
 ### Tool does
 
-- `validate` checks that the library's files follow the package module rules before you tag it.
+- Bare `validate` in the library's own repository checks that the library's files follow the
+  package module rules before you tag it. In a consuming app, `validate NAME` checks that same
+  library against the app's lock.
 - The consumer's resolver reads `slang-package.json` from release tags and uses the tagged commit
   as the immutable source identity.
 - The consumer's root lock includes the library and all of its transitive dependencies. A lock
@@ -1146,8 +1150,8 @@ subcommand. Every other journey in this chapter is unaffected by it.
 
 `slang package help`, `-help`, and `--help` print stable package help, including source `run`.
 Binary run and host build behavior appear in `slang package --experimental help`. `init`,
-`validate`, `status`, `tree`, and `edit` accept no additional arguments; `unedit` accepts `--clean`
-and `--yes`, and `docs` accepts `--print`. `test` is
+`status`, `tree`, and `edit` accept no additional arguments; `validate` accepts an optional package
+name or `--all`; `unedit` accepts `--clean` and `--yes`, and `docs` accepts `--print`. `test` is
 present but returns a not-implemented error.
 
 ## Gaps, tensions, and intentional asymmetries
@@ -1167,8 +1171,10 @@ license can ever be valid requires an explicit license choice.
 `status` prints one line when the lock, checkouts, and graph are current, and lists only the
 dirty items otherwise. Missing pins are `incomplete`; a present graph that fails the source
 check is `not buildable`. Like `git status`, reportable drift still returns success; malformed
-required JSON is an error because no reliable report can be produced. `validate` applies the
-license, source-layout, and path-portability rules to the workspace package as a sharing gate.
+required JSON is an error because no reliable report can be produced. Bare `validate` applies the
+license, source-layout, and path-portability rules to the workspace package as the app sharing
+gate. `validate NAME` and `validate --all` apply those publishable-package rules to locked
+package trees in this workspace.
 
 ### Fetch ignores retractions but honors root excludes
 
@@ -1278,7 +1284,9 @@ them or update this chapter and its regression tests in the same change.
 
 - `init` creates the manifest, conventional directories, placeholder license, and ignore entries.
 - Default `validate` rejects the workspace license placeholder. Build allows it, while update and
-  fetch reject it only when it appears in a new or changed Git dependency checkout.
+  fetch reject it when it appears in a new or changed Git checkout or a changed local registration
+  or path package. `validate NAME` and `validate --all` apply the same publishable checks to locked
+  trees without requiring a portable workspace.
 - A dependency-free valid package can validate and build without a lock.
 
 ### Resolve and reproduce contract
@@ -1309,8 +1317,9 @@ them or update this chapter and its regression tests in the same change.
   once.
 - Nested package locks never constrain the consuming root.
 - Legal-graph and buildability checks consider the complete reachable graph, including unchanged
-  rows. Publishability is checked only for the workspace (`validate`) or a changed Git selection
-  (`fetch` and `update`).
+  rows. Publishability is checked for the workspace on bare `validate`, for one locked tree on
+  `validate NAME`, for every locked tree on `validate --all`, and for changed Git or local
+  selections on `fetch` and `update`.
 
 ### Local-development contract
 
@@ -1335,6 +1344,8 @@ them or update this chapter and its regression tests in the same change.
   published release tag.
 - A local-path lock fails on another machine without matching `slang-workspace.json`.
 - Disable an override and update to restore published selection before removing it.
+- `validate NAME` certifies a locked library tree in this workspace, including an enabled override.
+  Bare `validate` still rejects the app while any edit or override is enabled.
 - Local-registration changes regenerate `build/search-paths` when the current lock can represent
   the newly active source. Disabling a lock-adopted override requires update first.
 - Dirty, unregistered Git checkouts are not replaced without `--clean`; registered edits remain
@@ -1345,9 +1356,10 @@ them or update this chapter and its regression tests in the same change.
 
 ### Validation contract
 
-- Fetch and update always enforce graph legality, publish-check changed Git selections, and enforce
-  source layout and import uniqueness across the closure. Build enforces graph legality and
-  buildability. Validate checks workspace publishability and lock portability.
+- Fetch and update always enforce graph legality, publish-check changed Git and local selections,
+  and enforce source layout and import uniqueness across the closure. Build enforces graph legality
+  and buildability. Bare `validate` checks workspace publishability and lock portability.
+  `validate NAME` and `validate --all` check locked trees against this workspace lock.
 - `--skip-validate` exists only on fetch, update, and build; it warns and keeps lock, manifest,
   closure, toolchain, export, and dirty-checkout checks.
 - `status` diagnoses lock, registration, and checkout state without mutation or remote access. A

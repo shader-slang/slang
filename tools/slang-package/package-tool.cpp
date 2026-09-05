@@ -59,7 +59,10 @@ static void _printHelp(bool experimental = false)
         "  docs [--print]   Open build/docs/index.md with the registered application.\n"
         "                   --print writes the path instead of launching.\n"
         "  status           Report lock and graph readiness; details only when dirty.\n"
-        "  validate         Check that this package is suitable for sharing.\n"
+        "  validate [name] [--all]\n"
+        "                   Check that this package is suitable for sharing.\n"
+        "                   validate NAME checks that package's tree against this\n"
+        "                   workspace lock. --all checks every locked package's tree.\n"
         "  tree             Print the selected dependency graph.\n"
         "  why <name>       Print every graph path that requires a package.\n"
         "  dependency add <name> --git <url> --version <range>\n"
@@ -765,32 +768,94 @@ static SlangResult _writeValidatedSearchPathsAfterLocalChange(
 /// An unchanged package cannot develop a new license or source-layout defect, while the separate
 /// buildable-closure check still catches interactions such as an import collision between a
 /// changed package and an unchanged one.
-static SlangResult _validateChangedPublishablePackages(
+static bool _lockedPackageRowChanged(const LockFile* previousLock, const LockedPackage& package)
+{
+    if (!previousLock)
+        return true;
+    Index previousIndex = findLockedPackageIndex(*previousLock, package.name);
+    if (previousIndex < 0)
+        return true;
+    return !lockedPackagesEqual(previousLock->packages[previousIndex], package);
+}
+
+/// Run the shareable-package checks on one locked tree and verify its declared edges against
+/// this workspace lock, not against a nested lock under that package.
+static SlangResult _validateLockedPackagePublishable(
     const String& projectRoot,
     const Manifest& rootManifest,
     const LockFile& lock,
     const List<LocalPackage>& localPackages,
+    const LockedPackage& package,
+    String& outError)
+{
+    String packageRoot;
+    SLANG_RETURN_ON_FAIL(getLockedPackageRoot(
+        projectRoot,
+        getWorkspaceDepsDirectory(rootManifest),
+        package,
+        localPackages,
+        packageRoot,
+        outError));
+    Manifest manifest;
+    if (SLANG_FAILED(readManifest(Path::combine(packageRoot, kManifestName), manifest, outError)))
+    {
+        outError = String("Cannot validate package '") + package.name + "': " + outError;
+        return SLANG_FAIL;
+    }
+    SLANG_RETURN_ON_FAIL(validatePublishablePackage(packageRoot, manifest, outError));
+    for (const auto& dependency : manifest.dependencies)
+    {
+        Index dependencyIndex = -1;
+        SLANG_RETURN_ON_FAIL(validateLockedDependency(dependency, lock, dependencyIndex, outError));
+        SLANG_RETURN_ON_FAIL(validateLockedPathDependency(
+            projectRoot,
+            packageRoot,
+            manifest.name,
+            dependency,
+            lock.packages[dependencyIndex],
+            outError));
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _validateChangedPublishablePackages(
+    const String& projectRoot,
+    const Manifest& rootManifest,
+    const LockFile& lock,
+    const LockFile* previousLock,
+    const List<LocalPackage>& localPackages,
     const List<String>& changedPackageNames,
     String& outError)
 {
+    List<String> names;
     for (const auto& packageName : changedPackageNames)
+    {
+        if (names.indexOf(packageName) < 0)
+            names.add(packageName);
+    }
+    for (const auto& package : lock.packages)
+    {
+        if (!_lockedPackageRowChanged(previousLock, package))
+            continue;
+        if (findActiveLocalPackageIndex(localPackages, package.name) < 0 &&
+            !isPathOnlyLockedPackage(package))
+        {
+            continue;
+        }
+        if (names.indexOf(package.name) < 0)
+            names.add(package.name);
+    }
+    for (const auto& packageName : names)
     {
         Index packageIndex = findLockedPackageIndex(lock, packageName);
         SLANG_RELEASE_ASSERT(packageIndex >= 0);
-        const LockedPackage& package = lock.packages[packageIndex];
-        SLANG_ASSERT(isGitBackedLockedPackage(package));
-        String packageRoot;
-        SLANG_RETURN_ON_FAIL(getLockedPackageRoot(
+        SLANG_RETURN_ON_FAIL(_validateLockedPackagePublishable(
             projectRoot,
-            getWorkspaceDepsDirectory(rootManifest),
-            package,
+            rootManifest,
+            lock,
             localPackages,
-            packageRoot,
+            lock.packages[packageIndex],
             outError));
-        Manifest manifest;
-        SLANG_RETURN_ON_FAIL(
-            readManifest(Path::combine(packageRoot, kManifestName), manifest, outError));
-        SLANG_RETURN_ON_FAIL(validatePublishablePackage(packageRoot, manifest, outError));
     }
     return SLANG_OK;
 }
@@ -1339,6 +1404,7 @@ static SlangResult _fetch(
                 projectRoot,
                 manifest,
                 lock,
+                &lock,
                 localPackages,
                 changedPackageNames,
                 outError)))
@@ -1570,6 +1636,7 @@ static SlangResult _update(
                 projectRoot,
                 manifest,
                 lock,
+                previousLockPtr,
                 effectiveLocalPackages,
                 changedPackageNames,
                 outError)))
@@ -1647,6 +1714,82 @@ static SlangResult _validate(const String& projectRoot, String& outError)
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     fprintf(stdout, "Package is valid and suitable for sharing.\n");
+    return SLANG_OK;
+}
+
+static SlangResult _validateNamedPackage(
+    const String& projectRoot,
+    const String& name,
+    String& outError)
+{
+    Manifest rootManifest;
+    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, rootManifest, outError));
+    LockFile lock;
+    SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
+    List<LocalPackage> localPackages;
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    Index packageIndex = findLockedPackageIndex(lock, name);
+    if (packageIndex < 0)
+    {
+        outError = String("Package is not present in the lock file: ") + name;
+        return SLANG_FAIL;
+    }
+    SLANG_RETURN_ON_FAIL(_validateLockedPackagePublishable(
+        projectRoot,
+        rootManifest,
+        lock,
+        localPackages,
+        lock.packages[packageIndex],
+        outError));
+    fprintf(stdout, "Package '%s' is valid and suitable for sharing.\n", name.getBuffer());
+    return SLANG_OK;
+}
+
+static SlangResult _validateAllLockedPackages(const String& projectRoot, String& outError)
+{
+    Manifest rootManifest;
+    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, rootManifest, outError));
+    LockFile lock;
+    String lockPath = Path::combine(projectRoot, kLockName);
+    if (!File::exists(lockPath))
+    {
+        if (rootManifest.dependencies.getCount())
+        {
+            outError = "Package dependencies require slang-package-lock.json.";
+            return SLANG_FAIL;
+        }
+        fprintf(stdout, "No locked packages to validate.\n");
+        return SLANG_OK;
+    }
+    SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
+    List<LocalPackage> localPackages;
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    List<String> failures;
+    for (const auto& package : lock.packages)
+    {
+        String packageError;
+        if (SLANG_SUCCEEDED(_validateLockedPackagePublishable(
+                projectRoot,
+                rootManifest,
+                lock,
+                localPackages,
+                package,
+                packageError)))
+        {
+            continue;
+        }
+        failures.add(package.name + ": " + packageError);
+    }
+    if (failures.getCount())
+    {
+        StringBuilder message;
+        message << "Locked packages failed sharing checks:";
+        for (const auto& failure : failures)
+            message << "\n  " << failure;
+        outError = message.produceString();
+        return SLANG_FAIL;
+    }
+    fprintf(stdout, "Validated %lld locked package(s).\n", (long long)lock.packages.getCount());
     return SLANG_OK;
 }
 
@@ -3133,8 +3276,39 @@ SlangResult executeInDirectory(
             skipValidate,
             outError);
     }
-    if (command == "validate" && argc == 2)
+    if (command == "validate")
+    {
+        bool all = false;
+        String name;
+        for (int i = 2; i < argc; ++i)
+        {
+            String argument = argv[i];
+            if (argument == "--all")
+                all = true;
+            else if (argument.startsWith("-"))
+            {
+                outError = String("Unknown validate option: ") + argument;
+                return SLANG_FAIL;
+            }
+            else if (name.getLength())
+            {
+                outError = "validate accepts at most one package name.";
+                return SLANG_FAIL;
+            }
+            else
+                name = argument;
+        }
+        if (all && name.getLength())
+        {
+            outError = "validate --all cannot be combined with a package name.";
+            return SLANG_FAIL;
+        }
+        if (all)
+            return _validateAllLockedPackages(projectRoot, outError);
+        if (name.getLength())
+            return _validateNamedPackage(projectRoot, name, outError);
         return _validate(projectRoot, outError);
+    }
     if (command == "build")
     {
         bool skipValidate = false;
