@@ -26,7 +26,20 @@ DEFAULT_BOT_LOGINS = {
 }
 
 # Run statuses that mean a run still holds, or is waiting for, runner capacity.
-ACTIVE_STATUSES = {"queued", "in_progress", "waiting", "requested", "pending"}
+#
+# Deliberately excludes "waiting": in GitHub Actions that status means a job is
+# parked on an environment protection rule, not that it is consuming a runner.
+# The only environment gate in this repo is `falcor-ci` (a manual `ci-approvers`
+# approval on the Falcor bridge test), so a "waiting" run is idle build-wise --
+# it is blocked on a human, not on runner capacity. Counting it as active caused
+# a deadlock: since #12614 every run parks in "waiting" on the falcor-ci approval
+# early (the falcor-build-approval-gate job only needs [filter]), which made the
+# priority gate treat CI as permanently busy (so bot dispatches always yielded)
+# and made the retry treat CI as never quiet (so yielded runs were never rerun).
+# Runs that truly hold/await runners flip to queued/in_progress once approved and
+# are counted then. NOTE: if a second environment gate is ever added whose
+# pending state *should* count as contention, revisit this.
+ACTIVE_STATUSES = {"queued", "in_progress", "requested", "pending"}
 
 
 def normalize_bot_logins(extra_logins=None):
