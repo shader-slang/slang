@@ -400,15 +400,16 @@ Use the package commands to change this file; its schema is tool-owned and may e
 
 `slang package override add NAME PATH [AS]` uses an existing local package directory instead. `AS`
 is an exact semantic version for solver compatibility. When it is omitted, the command uses the
-version in the package's current lock row. `override enable`, `override disable`, `override remove`,
-and `override list` retain or inspect the same registration. A disabled override keeps its path and
-version but plain update selects published Git. An override does not copy or modify the
-supplied directory.
+version in the package's current lock row. If `NAME` is already edited and `PATH` is that
+workspace checkout, the command promotes the edit in place. `override enable`, `override disable`,
+`override remove`, and `override list` retain or inspect the same registration. A disabled override
+keeps its path and version but plain update selects published Git. An override does not copy or
+modify the supplied directory.
 
 A registered local manifest must agree with the lock. An in-place edit keeps the published Git pin
-in the lock, so changing its exports or dependencies requires publishing a new release tag and
-running normal `slang package update`. Use an override when local manifest changes must participate
-in resolution before publication. Enabled overrides automatically participate in plain
+in the lock, so changing its exports or dependencies requires promoting that checkout with
+`override add NAME deps/NAME AS`, or publishing a new release tag and running normal
+`slang package update`. Enabled overrides automatically participate in plain
 `slang package update`. `update --ignore-overrides` writes the published Git graph for this command
 only; the registrations stay enabled for the next plain update. An edited checkout that is absent
 from that published graph stays on disk and stays registered (a parked edit) so a later plain

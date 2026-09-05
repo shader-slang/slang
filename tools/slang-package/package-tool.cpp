@@ -70,6 +70,8 @@ static void _printHelp(bool experimental = false)
         "  override add <name> <path> [as]\n"
         "  override enable|disable|remove <name> | override list\n"
         "                   Manage retained local dependency overrides.\n"
+        "                   override add on an edited deps/<name> checkout promotes that\n"
+        "                   edit in place so the local manifest can enter the next update.\n"
         "  edit <name>      Make a dependency checkout editable in place.\n"
         "                   Accepts a checkout that already has local changes.\n"
         "                   Fetch and update fail if the selected pin would move it.\n"
@@ -2800,6 +2802,48 @@ static SlangResult _unedit(
     return SLANG_OK;
 }
 
+/// Return whether `path` is the workspace checkout for `name`, the only tree `override add` may
+/// promote from an in-place edit.
+///
+/// Consider this example: `color-encoding` is edited at `deps/color-encoding`. Promoting that
+/// edit with `override add color-encoding deps/color-encoding 1.2.0` keeps the files where they
+/// are and lets the next `update` adopt the local manifest. Pointing the override at
+/// `../color-encoding` instead would be a second tree for the same name, so the command refuses
+/// until the user `unedit`s.
+static SlangResult _isWorkspaceDependencyCheckout(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const String& name,
+    const String& path,
+    bool& outIsCheckout,
+    String& outRelativePath,
+    String& outError)
+{
+    outIsCheckout = false;
+    outRelativePath = String();
+    String inputPath = Path::isAbsolute(path) ? path : Path::combine(projectRoot, path);
+    String canonicalPath;
+    SlangPathType type;
+    if (SLANG_FAILED(Path::getPathType(inputPath, &type)) || type != SLANG_PATH_TYPE_DIRECTORY ||
+        SLANG_FAILED(Path::getCanonical(inputPath, canonicalPath)))
+    {
+        outError = String("Local package directory does not exist: ") + path;
+        return SLANG_FAIL;
+    }
+    String expected;
+    if (SLANG_FAILED(Path::getCanonical(
+            Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest), name),
+            expected)))
+    {
+        outError = String("Cannot canonicalize dependency checkout: ") + name;
+        return SLANG_FAIL;
+    }
+    outIsCheckout = canonicalPath == expected;
+    if (outIsCheckout)
+        outRelativePath = Path::getRelativePath(projectRoot, canonicalPath);
+    return SLANG_OK;
+}
+
 static SlangResult _overrideAdd(
     const String& projectRoot,
     const String& name,
@@ -2807,6 +2851,8 @@ static SlangResult _overrideAdd(
     const String& as,
     String& outError)
 {
+    Manifest manifest;
+    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
     LockFile lock;
     SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
     LockedPackage* lockedPackage = _findLockedPackage(lock, name);
@@ -2827,6 +2873,52 @@ static SlangResult _overrideAdd(
 
     List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    Index localIndex = findLocalPackageIndex(localPackages, name);
+    if (localIndex >= 0)
+    {
+        if (!isEditedLocalPackage(localPackages[localIndex]))
+        {
+            outError = String("Package already has a registered local tree: ") + name;
+            return SLANG_FAIL;
+        }
+        bool isCheckout = false;
+        String relativePath;
+        SLANG_RETURN_ON_FAIL(_isWorkspaceDependencyCheckout(
+            projectRoot,
+            manifest,
+            name,
+            path,
+            isCheckout,
+            relativePath,
+            outError));
+        if (!isCheckout)
+        {
+            outError = String("Package '") + name +
+                       "' is editable; override add can promote that checkout in place with '" +
+                       getWorkspaceDepsDirectory(manifest) + "/" + name +
+                       "', or run 'slang package unedit " + name +
+                       "' first to use a different path.";
+            return SLANG_FAIL;
+        }
+        // The working tree is already the user's. Promoting only changes how the next update
+        // treats its manifest: the files stay, including uncommitted work.
+        localPackages[localIndex].kind = LocalPackageKind::Override;
+        localPackages[localIndex].path = relativePath;
+        localPackages[localIndex].as = providedVersion;
+        localPackages[localIndex].enabled = true;
+        SLANG_RETURN_ON_FAIL(writeProjectLocalPackages(projectRoot, localPackages, outError));
+        SLANG_RETURN_ON_FAIL(
+            _writeValidatedSearchPathsAfterLocalChange(projectRoot, lock, localPackages, outError));
+        fprintf(
+            stdout,
+            "Package '%s' is now an override at '%s' as %s. Run 'slang package update' to adopt "
+            "its manifest.\n",
+            name.getBuffer(),
+            relativePath.getBuffer(),
+            providedVersion.getBuffer());
+        return SLANG_OK;
+    }
+
     SLANG_RETURN_ON_FAIL(_registerLocalPackage(
         projectRoot,
         name,

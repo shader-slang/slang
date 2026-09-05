@@ -1248,3 +1248,104 @@ SLANG_UNIT_TEST(PackageToolEditBlocksCheckoutMoves)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readProjectLocalPackages(temp.path, localPackages, error)));
     SLANG_CHECK(findLocalPackageIndex(localPackages, "noise") < 0);
 }
+
+// Promote an in-place edit to an override on the same checkout so the local manifest can enter
+// the next update without unedit restoring tool ownership first.
+SLANG_UNIT_TEST(PackageToolOverridePromotesInPlaceEdit)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+
+    String repository = Path::combine(temp.path, "upstream-noise");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(repository));
+    Manifest noise;
+    noise.name = "noise";
+    noise.exports.add("src");
+    noise.licenseFiles.add("LICENSE");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(repository, "slang-package.json"), noise, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(repository, "LICENSE"), "Noise license\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(repository, "src/noise.slang"), "module noise;\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+
+    Manifest root;
+    String rootManifestPath = Path::combine(temp.path, "slang-package.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    Dependency dependency;
+    dependency.name = "noise";
+    dependency.git = repository;
+    dependency.version = ">=1.0.0";
+    root.dependencies.add(dependency);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+
+    const char* updateArguments[] = {"slang-package", "update", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+
+    const char* editArguments[] = {"slang-package", "edit", "noise"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(editArguments), editArguments, error)));
+    const String checkoutSource = Path::combine(temp.path, "deps/noise/src/noise.slang");
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(checkoutSource, "module noise;\n// local\n")));
+
+    String sidecar = Path::combine(temp.path, "sidecar-noise");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(sidecar));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(writeManifest(Path::combine(sidecar, "slang-package.json"), noise, error)));
+    const char* otherPathArguments[] = {
+        "slang-package",
+        "override",
+        "add",
+        "noise",
+        "sidecar-noise",
+        "1.2.0",
+    };
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(otherPathArguments),
+        otherPathArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("editable")) >= 0);
+
+    const char* promoteArguments[] = {
+        "slang-package",
+        "override",
+        "add",
+        "noise",
+        "deps/noise",
+        "1.2.0",
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(promoteArguments), promoteArguments, error)));
+    String afterPromote;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(checkoutSource, afterPromote)));
+    SLANG_CHECK(afterPromote == "module noise;\n// local\n");
+    List<LocalPackage> localPackages;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readProjectLocalPackages(temp.path, localPackages, error)));
+    Index localIndex = findLocalPackageIndex(localPackages, "noise");
+    SLANG_CHECK_ABORT(localIndex >= 0);
+    SLANG_CHECK(!isEditedLocalPackage(localPackages[localIndex]));
+    SLANG_CHECK(localPackages[localIndex].as == "1.2.0");
+    SLANG_CHECK(localPackages[localIndex].enabled);
+
+    PackageTool::LockFile lockBefore;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockBefore, error)));
+    const char* dryRunArguments[] = {"slang-package", "update", "--dry-run"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(dryRunArguments), dryRunArguments, error)));
+    PackageTool::LockFile lockAfterDryRun;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockAfterDryRun, error)));
+    SLANG_CHECK(lockFilesEqual(lockBefore, lockAfterDryRun));
+}

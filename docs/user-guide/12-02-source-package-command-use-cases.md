@@ -389,13 +389,22 @@ commit work before returning the checkout to tool ownership. To discard all loca
 run `slang package unedit color-encoding --clean`; it restores the locked commit and asks for
 confirmation unless you also pass `--yes`.
 
-To trial an unpublished manifest or another repository, point the existing package name at a
-directory:
+To trial an unpublished manifest or version, including the checkout you are already
+editing, point the package at that directory with an exact `as` version. If `NAME` is
+already edited, `PATH` must be its workspace checkout (`deps/NAME` by default); that
+promotes the edit in place and leaves local files untouched:
+
+```sh
+slang package override add color-encoding deps/color-encoding 1.1.0
+slang package update --dry-run
+slang package update
+```
+
+A sibling clone is the same command with a different path, after `unedit` if that name
+was still an edit:
 
 ```sh
 slang package override add color-encoding ../color-encoding 1.1.0
-slang package update --dry-run
-slang package update
 ```
 
 Enabled overrides automatically participate in the **entire graph** solve as the only candidate
@@ -429,7 +438,8 @@ same local tree without re-entering its configuration.
   edited manifest's dependencies or exports does **not** adopt that graph. A fetch or update whose
   selected pin would move that checkout fails before any checkout is changed.
 - For an override, records the name, path, and exact effective version in
-  `slang-workspace.json`. It does not copy or modify the supplied directory.
+  `slang-workspace.json`. It does not copy or modify the supplied directory. `override add`
+  on an edited `{workspace.deps}/NAME` checkout replaces the edit registration in place.
 - Local registration changes regenerate `build/search-paths` when the current lock can represent
   the newly active source. An override's locked export paths therefore become compiler inputs
   immediately, mapped to the local directory. If its manifest declares different exports, run
@@ -442,8 +452,9 @@ same local tree without re-entering its configuration.
 
 ### Current gaps and pitfalls
 
-- An edit is not a way to trial manifest changes. Use an override, or publish a new tag and run
-  normal `update`.
+- An edit is not a way to trial manifest changes. Promote it with
+  `override add NAME deps/NAME AS`, or `unedit` and override a different path, or publish a new
+  tag and run normal `update`.
 - If an edit is registered while enabled overrides participate in the solve, its checkout HEAD must
   match a published release tag. An unpublished edit commit makes that solve fail; use an override
   when the version or manifest identity differs.
@@ -1312,7 +1323,9 @@ them or update this chapter and its regression tests in the same change.
 - Default `unedit` requires no uncommitted files or stashes but permits a different committed
   `HEAD`; `unedit --clean` restores the locked commit before removing the registration.
 - An edited manifest does not enter the solve.
-- `override` records a machine-local path and exact effective version.
+- `override` records a machine-local path and exact effective version. `override add` on an
+  edited `{workspace.deps}/NAME` checkout promotes that edit in place; a different path still
+  requires `unedit` first.
 - Enabled overrides participate in plain whole-graph update; disabled overrides retain
   configuration while published resolution is active.
 - `update --ignore-overrides` solves from Git for this command only. It does not disable

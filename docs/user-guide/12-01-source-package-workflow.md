@@ -243,10 +243,12 @@ Default `unedit` accepts a different committed `HEAD`, but refuses while the tre
 files or stashes so work cannot be forgotten accidentally. `unedit NAME --clean` discards all
 local state and restores the locked commit; pass `--yes` when confirmation cannot be interactive.
 
-`slang package override add NAME PATH [AS]` points the package at another directory you already have.
-Its effective version must satisfy every incoming dependency constraint. Omit `AS` to retain the
-version from the current lock, or provide it when the local tree represents a different version.
-An enabled override's current manifest participates in every plain update:
+`slang package override add NAME PATH [AS]` points the package at another directory you already
+have. If `NAME` is already edited and `PATH` is that checkout (`deps/NAME` by default), the
+command promotes the edit in place so the local manifest can enter the next update without
+moving files. Its effective version must satisfy every incoming dependency constraint. Omit `AS`
+to retain the version from the current lock, or provide it when the local tree represents a
+different version. An enabled override's current manifest participates in every plain update:
 
 ```sh
 slang package update
