@@ -1,6 +1,4 @@
-// A non-interface operand of an interface conjunction `&` must be rejected with E30307. Before the
-// ExistentialType work enforced the operand rule (`checkInterfaceOrConjunctionType`), a conjunction
-// with a non-interface operand was accepted silently.
+// A non-interface operand of an interface conjunction `&` must be rejected as not an interface.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive): -target hlsl -stage compute -entry computeMain
 
@@ -10,6 +8,7 @@ interface IFoo
 }
 
 typealias Bad = IFoo & int;
+// The `diag=CHECK` harness matches the diagnostic message text, which is unique to E30307.
 //CHECK: expected an interface or a conjunction of interfaces
 
 RWStructuredBuffer<float> outputBuffer;

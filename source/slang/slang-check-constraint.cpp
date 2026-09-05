@@ -4342,8 +4342,11 @@ bool SemanticsVisitor::TryUnifyTypes(
             return false;
         };
         // Match only an unmodified `ExistentialType`; do NOT look through a `ModifiedType` (as
-        // `getExistentialInterfaceType` would), so that a `no_diff dyn IFoo` operand keeps its
-        // modifier during inference rather than silently unwrapping to `IFoo`.
+        // `getExistentialInterfaceType` would). Delaying the unboxing to here means a modified
+        // operand like `no_diff dyn IFoo` first goes through the `ModifiedType` branch below, which
+        // strips the matching modifier from both sides and then re-unifies — so a solvable
+        // parameter `T` binds to the box `dyn IFoo` (not the bare interface `IFoo`), and a later
+        // `Ptr<T>` still matches `Ptr<dyn IFoo>`.
         auto boxedInterface = [](Type* t) -> Type*
         {
             if (auto existentialType = as<ExistentialType>(t))
