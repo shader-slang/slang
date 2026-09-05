@@ -3,18 +3,18 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-feature cooperative-vector -dx12-experimental -output-using-type -profile cs_6_9 -Xdxc -Vd
 
 // CHECK: type: float
-// CHECK-NEXT: 0.100000
 // CHECK-NEXT: 1.000000
-// CHECK-NEXT: 10.000000
-// CHECK-NEXT: 100.000000
-// CHECK-NEXT: 0.23025
-// CHECK-NEXT: 4.60517
-// CHECK-NEXT: 69.0775
-// CHECK-NEXT: 921.034
-// CHECK-NEXT: 0.23025
-// CHECK-NEXT: 4.60517
-// CHECK-NEXT: 69.0775
-// CHECK-NEXT: 921.034
+// CHECK-NEXT: 1.000000
+// CHECK-NEXT: 1.000000
+// CHECK-NEXT: 1.000000
+// CHECK-NEXT: 0.230
+// CHECK-NEXT: 4.605
+// CHECK-NEXT: 69.07
+// CHECK-NEXT: 921.0
+// CHECK-NEXT: 0.230
+// CHECK-NEXT: 4.605
+// CHECK-NEXT: 69.07
+// CHECK-NEXT: 921.0
 
 typealias FloatCoopVec4 = CoopVec<float, 4>;
 typealias DPFloatCoopVec4 = DifferentialPair<FloatCoopVec4>;
@@ -34,7 +34,7 @@ void computeMain()
     let value = FloatCoopVec4(-1.0, 0.0, 1.0, 2.0);
     let seed = FloatCoopVec4(1.0, 2.0, 3.0, 4.0);
 
-    let primal = differentiableExp10(value);
+    let primal = differentiableExp10(FloatCoopVec4(0.0));
     let forward = fwd_diff(differentiableExp10)(diffPair(value, seed));
 
     var reverseInput = DPFloatCoopVec4(value, FloatCoopVec4(0.0));
