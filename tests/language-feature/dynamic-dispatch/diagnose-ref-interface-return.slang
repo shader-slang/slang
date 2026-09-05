@@ -43,7 +43,7 @@ struct ContainerPropRef
         get { return stored; }
         ref { return stored; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'IFoo' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'dyn IFoo' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
     }
 }
 
@@ -56,7 +56,7 @@ struct CollectionSubRef
         get { return items[i]; }
         ref { return items[i]; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'IFoo' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'dyn IFoo' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
     }
 }
 
@@ -89,7 +89,7 @@ struct ContainerTupleRef
         get { return t; }
         ref { return t; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'Tuple<IFoo, float>' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'Tuple<dyn IFoo, float>' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
     }
 }
 
@@ -102,7 +102,7 @@ struct ContainerOptionalRef
         get { return opt; }
         ref { return opt; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'Optional<IFoo>' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'Optional<dyn IFoo>' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
     }
 }
 
@@ -121,7 +121,7 @@ struct ContainerGenericRef
         get { return b; }
         ref { return b; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'Box<IFoo>' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'Box<dyn IFoo>' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
     }
 }
 
@@ -134,7 +134,7 @@ struct ContainerArrayRef
         get { return arr; }
         ref { return arr; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'IFoo[4]' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'dyn IFoo[4]' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
     }
 }
 

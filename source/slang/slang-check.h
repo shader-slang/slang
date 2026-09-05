@@ -33,6 +33,10 @@ void collectBuiltinDeclsThatNeedRegistration(ModuleDecl* moduleDecl, List<Decl*>
 Type* unwrapArrayType(Type* type);
 Type* unwrapModifiedType(Type* type);
 
+/// Return the interface (or conjunction) wrapped by an existential-box type `dyn IFoo`,
+/// looking through `ModifiedType`; null if `type` is not an `ExistentialType`.
+Type* getExistentialInterfaceType(Type* type);
+
 OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericConstraints(
     ASTBuilder* builder,
     DeclRef<ContainerDecl> genericDecl);

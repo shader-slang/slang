@@ -899,10 +899,15 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
         SemanticsVisitor visitor(sharedSemanticsContext);
         visitor = visitor.withSink(&sink);
 
-        auto witness = visitor.isSubtype(
-            (Slang::Type*)type,
-            (Slang::Type*)interfaceType,
-            IsSubTypeOptions::None);
+        // The second argument names an interface as an interface (does the concrete type conform
+        // to it?), but name-based type lookup runs proper-type coercion and so may hand us the
+        // existential box `dyn IFoo`. Unwrap to the interface so the conformance witness is found.
+        Slang::Type* baseInterfaceType = (Slang::Type*)interfaceType;
+        if (auto wrappedInterfaceType = getExistentialInterfaceType(baseInterfaceType))
+            baseInterfaceType = wrappedInterfaceType;
+
+        auto witness =
+            visitor.isSubtype((Slang::Type*)type, baseInterfaceType, IsSubTypeOptions::None);
         if (auto subtypeWitness = as<SubtypeWitness>(witness))
         {
             result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);

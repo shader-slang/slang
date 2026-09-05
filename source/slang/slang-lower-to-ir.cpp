@@ -2331,6 +2331,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             irBuilder->emitEachInst(witnessTableType, getSimpleVal(context, elementWitness)));
     }
 
+    LoweredValInfo visitExistentialBoxConformanceWitness(ExistentialBoxConformanceWitness* witness)
+    {
+        // The claim `dyn IFoo : IBar` lowers to exactly the witness that the underlying interface
+        // refines the super-interface (`IFoo : IBar`). Since `dyn IFoo` lowers to the same IR type
+        // as `IFoo`, an existential-box parameter of a `[Differentiable]` function produces the
+        // same IR as a bare interface parameter would.
+        return lowerVal(context, witness->getInterfaceWitness());
+    }
+
     LoweredValInfo visitFirstSubtypeWitness(FirstSubtypeWitness* witness)
     {
         auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
@@ -2695,7 +2704,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitDifferentialPairType(DifferentialPairType* pairType)
     {
         IRType* primalType = lowerType(context, pairType->getPrimalType());
-        if (isDeclRefTypeOf<InterfaceDecl>(pairType->getPrimalType()))
+        if (isDeclRefTypeOf<InterfaceDecl>(pairType->getPrimalType()) ||
+            getExistentialInterfaceType(pairType->getPrimalType()))
         {
             // Existential differential pairs are handled specially later in autodiff lowering:
             // their differential type is modeled as `IDifferentiable`, and the witness operand
@@ -2939,6 +2949,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         IRInst* existentialVal =
             getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
         return getBuilder()->emitExtractExistentialType(existentialVal);
+    }
+
+    IRType* visitExistentialType(ExistentialType* type)
+    {
+        // `dyn IFoo` and the interface `IFoo` share one IR representation: the AST-level
+        // distinction only guides checking, and the existing interface IR already models an
+        // existential value.
+        return lowerType(context, type->getInterfaceType());
     }
 
     LoweredValInfo visitExtractExistentialSubtypeWitness(ExtractExistentialSubtypeWitness* witness)
@@ -5113,6 +5131,13 @@ struct ExprLoweringContext
         auto e = expr;
         while (auto castExpr = as<CastToSuperTypeExpr>(e))
         {
+            // A make-existential cast now carries the box type `dyn IFoo`; treat it the same as
+            // the bare-interface cast it replaced.
+            if (getExistentialInterfaceType(e->type))
+            {
+                e = castExpr->valueArg;
+                continue;
+            }
             if (auto declRefType = as<DeclRefType>(e->type))
             {
                 if (declRefType->getDeclRef().as<InterfaceDecl>())
@@ -6674,6 +6699,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         type = getOriginalTypeFromModifiedType(type);
 
         auto irType = lowerType(context, type);
+        // A default `dyn IFoo` value is built the same way as a default interface value: both
+        // lower to the interface IR and default-construct an empty existential.
+        if (getExistentialInterfaceType(type))
+        {
+            return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
+        }
         if (auto basicType = as<BasicExpressionType>(type); basicType)
         {
             return getSimpleDefaultVal(irType);
@@ -7342,7 +7373,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // type that binds together the concrete value and the
         // witness table that represents the subtype relationship.
         //
-        if (auto declRefType = as<DeclRefType>(expr->type))
+        // A cast whose target is `dyn IFoo` (an `ExistentialType`) is a make-existential; the
+        // box lowers to the same interface IR as the interface itself, so unwrap to the interface
+        // and reuse the concrete-to-interface / interface-to-interface paths below unchanged.
+        Type* astSuperType = expr->type;
+        if (auto existentialSuperType = as<ExistentialType>(astSuperType))
+            astSuperType = existentialSuperType->getInterfaceType();
+
+        if (auto declRefType = as<DeclRefType>(astSuperType))
         {
             auto declRef = declRefType->getDeclRef();
             if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
@@ -7350,7 +7388,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 auto concreteValue = getSimpleVal(context, value);
                 auto builder = getBuilder();
 
-                // If the source is already an existential (interface type),
+                // If the source is already an existential (interface type or `dyn IFoo` box),
                 // this is an interface-to-interface upcast.  The witness
                 // provided by the type-checker can't be lowered as a static
                 // witness table (an interface's inheritance clause lowers to
@@ -7360,7 +7398,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // Check the AST type (robust to generic instantiations whose
                 // IR form is `Specialize(Generic(...),...)` rather than a
                 // plain `IRInterfaceType`).
-                if (expr->valueArg && isInterfaceType(expr->valueArg->type))
+                if (expr->valueArg && (isInterfaceType(expr->valueArg->type) ||
+                                       getExistentialInterfaceType(expr->valueArg->type)))
                 {
                     auto extractedType = builder->emitExtractExistentialType(concreteValue);
                     auto extractedValue =

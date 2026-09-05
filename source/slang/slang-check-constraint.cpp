@@ -4323,6 +4323,48 @@ bool SemanticsVisitor::TryUnifyTypes(
     if (const auto sndErrorType = as<ErrorType>(snd); sndErrorType)
         return true;
 
+    // Generic-argument inference works against the interface, not its existential box: a
+    // parameter of type `dyn IFoo<n>` matched against an argument of type `dyn IFoo<3>` (or a
+    // concrete `X` that conforms to `IFoo<3>`) must infer `n = 3`. Unwrap the `ExistentialType`
+    // to the interface it boxes and recurse, so the interface unification / inheritance-facet
+    // paths handle the inference.
+    //
+    // Exception: when the *other* side is a bare generic type parameter still being solved (e.g.
+    // `T` matched against `dyn IFoo`), we must NOT unwrap — that parameter binds to the box
+    // `dyn IFoo`, not the interface, so that a later occurrence such as `Ptr<T>` still matches an
+    // argument of type `Ptr<dyn IFoo>`.
+    {
+        auto isSolvableTypeParam = [&](Type* t) -> bool
+        {
+            if (auto declRefType = as<DeclRefType>(t))
+                if (auto typeParam = declRefType->getDeclRef().as<GenericTypeParamDecl>())
+                    return isRelevantGeneric(constraints, typeParam.getDecl()->parentDecl);
+            return false;
+        };
+        // Match only an unmodified `ExistentialType`; do NOT look through a `ModifiedType` (as
+        // `getExistentialInterfaceType` would). Delaying the unboxing to here means a modified
+        // operand like `no_diff dyn IFoo` first goes through the `ModifiedType` branch below, which
+        // strips the matching modifier from both sides and then re-unifies — so a solvable
+        // parameter `T` binds to the box `dyn IFoo` (not the bare interface `IFoo`), and a later
+        // `Ptr<T>` still matches `Ptr<dyn IFoo>`.
+        auto boxedInterface = [](Type* t) -> Type*
+        {
+            if (auto existentialType = as<ExistentialType>(t))
+                return existentialType->getInterfaceType();
+            return nullptr;
+        };
+        auto fstInterface = boxedInterface(fst);
+        auto sndInterface = boxedInterface(snd);
+        bool unwrapFst = fstInterface && !isSolvableTypeParam(snd);
+        bool unwrapSnd = sndInterface && !isSolvableTypeParam(fst);
+        if (unwrapFst || unwrapSnd)
+        {
+            QualType fstUnwrapped = unwrapFst ? QualType(fstInterface, fst.isLeftValue) : fst;
+            QualType sndUnwrapped = unwrapSnd ? QualType(sndInterface, snd.isLeftValue) : snd;
+            return TryUnifyTypes(constraints, unificationOptions, fstUnwrapped, sndUnwrapped);
+        }
+    }
+
     // If one or the other of the types is a conjunction `X & Y`,
     // then we want to recurse on both `X` and `Y`.
     //
