@@ -493,6 +493,11 @@ bool SemanticsVisitor::doesTypeHaveTag(Type* type, TypeTag tag)
     {
         return doesTypeHaveTag(modifiedType->getBase(), tag);
     }
+    if (auto existentialInterfaceType = getExistentialInterfaceType(type))
+    {
+        // An existential box `dyn IFoo` carries the same type tags as its interface `IFoo`.
+        return doesTypeHaveTag(existentialInterfaceType, tag);
+    }
     if (auto declRefType = as<DeclRefType>(type))
     {
         if (auto aggTypeDecl = as<AggTypeDecl>(declRefType->getDeclRef()))
@@ -531,6 +536,12 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
     if (auto modifiedType = as<ModifiedType>(type))
     {
         return getTypeTags(modifiedType->getBase());
+    }
+    if (auto existentialInterfaceType = getExistentialInterfaceType(type))
+    {
+        // An existential box `dyn IFoo` carries the same type tags as its interface `IFoo` (so, for
+        // example, an interface value is still recognized as non-C-style under lang 2026).
+        return getTypeTags(existentialInterfaceType);
     }
     if (as<ParameterBlockType>(type))
     {

@@ -549,7 +549,13 @@ Val* ExistentialBoxConformanceWitness::_resolveImplOverride()
 
 void ExistentialBoxConformanceWitness::_toTextOverride(StringBuilder& out)
 {
+    // Print the box `sub : sup` as well as the wrapped witness, so a dump can tell this witness
+    // (whose `sub` is `dyn IFoo`) apart from the underlying `IFoo : IBar` witness it stores.
     out << toSlice("ExistentialBoxConformanceWitness(");
+    getSub()->toText(out);
+    out << toSlice(" : ");
+    getSup()->toText(out);
+    out << toSlice(", ");
     getInterfaceWitness()->toText(out);
     out << toSlice(")");
 }

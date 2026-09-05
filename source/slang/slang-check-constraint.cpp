@@ -4341,8 +4341,17 @@ bool SemanticsVisitor::TryUnifyTypes(
                     return isRelevantGeneric(constraints, typeParam.getDecl()->parentDecl);
             return false;
         };
-        auto fstInterface = getExistentialInterfaceType(fst);
-        auto sndInterface = getExistentialInterfaceType(snd);
+        // Match only an unmodified `ExistentialType`; do NOT look through a `ModifiedType` (as
+        // `getExistentialInterfaceType` would), so that a `no_diff dyn IFoo` operand keeps its
+        // modifier during inference rather than silently unwrapping to `IFoo`.
+        auto boxedInterface = [](Type* t) -> Type*
+        {
+            if (auto existentialType = as<ExistentialType>(t))
+                return existentialType->getInterfaceType();
+            return nullptr;
+        };
+        auto fstInterface = boxedInterface(fst);
+        auto sndInterface = boxedInterface(snd);
         bool unwrapFst = fstInterface && !isSolvableTypeParam(snd);
         bool unwrapSnd = sndInterface && !isSolvableTypeParam(fst);
         if (unwrapFst || unwrapSnd)

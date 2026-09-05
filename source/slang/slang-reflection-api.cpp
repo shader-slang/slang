@@ -540,6 +540,13 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_SPECIALIZED;
     }
+    else if (as<ExistentialType>(type))
+    {
+        // An interface named in a data-type position (e.g. a field or variable of type `IFoo`) is
+        // represented as the existential-box type `dyn IFoo`. Reflect it with the same kind a bare
+        // interface reflects with, so consumers see `KIND_INTERFACE` rather than falling through.
+        return SLANG_TYPE_KIND_INTERFACE;
+    }
     else if (const auto errorType = as<ErrorType>(type); errorType)
     {
         // This means we saw a type we didn't understand in the user's code

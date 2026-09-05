@@ -9294,11 +9294,12 @@ Expr* SemanticsExprVisitor::visitReturnValExpr(ReturnValExpr* expr)
 
 Expr* SemanticsExprVisitor::visitAndTypeExpr(AndTypeExpr* expr)
 {
-    // The operands of an interface conjunction `IFoo & IBar` name interfaces *as interfaces*.
-    // We must not run them through `CheckProperType`, which would box each into an existential
-    // (`(dyn IFoo) & (dyn IBar)`); instead check that each is an interface or conjunction thereof
-    // and keep it as the interface. The resulting `AndType` is itself boxed into a single
-    // `dyn (IFoo & IBar)` only when it is later used in a proper-type position.
+    // The operands of an interface conjunction `IFoo & IBar` name interfaces *as interfaces*, not
+    // as data types. We must not run them through `CheckProperType`, which would box each operand
+    // into its own existential (`(dyn IFoo) & (dyn IBar)`); instead we check that each is an
+    // interface (or conjunction of interfaces) and keep it unboxed, so the result here is a plain
+    // `AndType`. Any existential boxing of the conjunction as a whole happens later, where the
+    // `AndType` is used in a proper-type position — not in this function.
     expr->left = checkInterfaceOrConjunctionType(expr->left);
     expr->right = checkInterfaceOrConjunctionType(expr->right);
 

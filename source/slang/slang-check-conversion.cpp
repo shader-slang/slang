@@ -566,11 +566,11 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
         as<PtrType>(type))
         return cacheResult(true);
 
-    // Slang 2026 language fix: an interface type is not C-style.
+    // Slang 2026 language fix: an interface type is not C-style. Under lang 2026 an interface named
+    // in a data-type position is the existential box `dyn IFoo`, so recognize that form too.
     if (isSlang2026OrLater(this))
     {
-        // TODO: some/dyn types are also not C-style.
-        if (isDeclRefTypeOf<InterfaceDecl>(type))
+        if (isDeclRefTypeOf<InterfaceDecl>(type) || getExistentialInterfaceType(type))
             return cacheResult(false);
     }
 
@@ -2880,6 +2880,13 @@ bool SemanticsVisitor::_coerce(
                         {
                             auto fromVal = fromPtrType->getValueType();
                             auto toVal = toPtrType->getValueType();
+                            // A pointee that names an interface is now the existential box
+                            // `dyn IFoo`; unwrap to the interface so this advisory still recognizes
+                            // the concrete-to-interface pointer case for `Ptr<dyn IFoo>`.
+                            if (auto fromInterface = getExistentialInterfaceType(fromVal))
+                                fromVal = fromInterface;
+                            if (auto toInterface = getExistentialInterfaceType(toVal))
+                                toVal = toInterface;
                             if (!isInterfaceType(fromVal) && isInterfaceType(toVal) &&
                                 tryGetSubtypeWitness(fromVal, toVal))
                             {

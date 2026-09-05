@@ -29,6 +29,9 @@ void helper(IFoo g){g.doSomething();}
 void caller(IFoo f)
 {
     // CHECK-NOT: error 33180
+    // Existential-specialization rejection now reports E38029 (was E33180); guard the new code too
+    // so "builtin-generic-with-existential is allowed" stays protected under the migrated diagnostic.
+    // CHECK-NOT: error 38029
     let a = fooBuffer.Load(0);
     let b = byteBuffer.Load<IFoo>(0);
     let c = createDynamicObject<IFoo>(0, 0);

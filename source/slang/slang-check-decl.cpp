@@ -2161,6 +2161,11 @@ Type* getExistentialInterfaceType(Type* type)
     // an existential box. Under the `IFoo` / `dyn IFoo` split, a *value* has an `ExistentialType`,
     // never a bare interface type, so this is the check value-context code uses to recognize an
     // openable existential (member-access bases, `is`/`as` operands, differentiable slots).
+    //
+    // Split rule: value-context *recognition* may look through modifiers and so uses this helper;
+    // differentiability witness/type *formation* must NOT (a `no_diff dyn IFoo` has to stay
+    // non-differentiable), so `tryGetExistentialBoxConformanceWitness` and `tryGetDifferentialType`
+    // deliberately match a bare `ExistentialType` instead of calling this.
     if (auto existentialType = as<ExistentialType>(unwrapModifiedType(type)))
         return existentialType->getInterfaceType();
     return nullptr;

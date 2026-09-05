@@ -848,6 +848,13 @@ Type* ASTBuilder::getAndType(Type* left, Type* right)
 
 Type* ASTBuilder::getExistentialType(Type* interfaceType)
 {
+    // The operand is the interface (or interface conjunction) this is the box of, and is never
+    // itself an existential box — there is no `dyn dyn IFoo`. The full interface-or-conjunction
+    // shape is validated by the producer (`maybeFormExistentialType` via
+    // `isValidGenericConstraintType`), which lives in the checker; here we assert the invariants
+    // that are checkable at the construction boundary.
+    SLANG_ASSERT(interfaceType);
+    SLANG_ASSERT(!as<ExistentialType>(interfaceType));
     return getOrCreate<ExistentialType>(interfaceType);
 }
 
