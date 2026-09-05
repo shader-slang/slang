@@ -763,28 +763,28 @@ static SlangResult _writeValidatedSearchPathsAfterLocalChange(
     return _writeSearchPaths(projectRoot, manifest, lock, localPackages, outError);
 }
 
-/// Validate packages whose Git checkout changed during materialization as newly accepted releases.
+/// Return whether fetch/update should run the shareable-package checks on this lock row.
 ///
-/// An unchanged package cannot develop a new license or source-layout defect, while the separate
-/// buildable-closure check still catches interactions such as an import collision between a
-/// changed package and an unchanged one.
-/// Return whether fetch/update should run shareable-package checks on this lock row.
+/// Git packages that were rematerialized are handled separately through `changedPackageNames`, so
+/// this covers the local registrations instead: an edit or an enabled override. Those trees are a
+/// library the developer is preparing to share, which is what lets `update` right after a promote
+/// certify the package before any remote tag exists.
 ///
-/// Git rematerialization is handled separately via `changedPackageNames`. This covers an
-/// edit, enabled override, or path row whose identity in the lock just changed. A first lock
-/// (no previous file) still certifies active local registrations, but not every vendored path
-/// tree: those trees are how an application consumes in-repo packages, not a new library
-/// identity being published.
-static bool _shouldPublishCheckChangedLocalOrPathPackage(
+/// A vendored path row is deliberately excluded. Consider an application that keeps a package in
+/// `vendor/math` and depends on it with `path: vendor/math`. That tree is how the application
+/// consumes an in-repo package, and it is allowed to do things a published library may not, such
+/// as declaring a sibling `path: ../shared-math` dependency that a clone of the application repo
+/// alone would not reproduce. Asking whether such a tree could be published is a deliberate
+/// question, so it belongs to `validate NAME` and `validate --all` rather than to every fetch.
+static bool _shouldPublishCheckChangedLocalPackage(
     const LockFile* previousLock,
     const LockedPackage& package,
     const List<LocalPackage>& localPackages)
 {
-    const bool isActiveLocal = findActiveLocalPackageIndex(localPackages, package.name) >= 0;
-    if (!isActiveLocal && !isPathOnlyLockedPackage(package))
+    if (findActiveLocalPackageIndex(localPackages, package.name) < 0)
         return false;
     if (!previousLock)
-        return isActiveLocal;
+        return true;
     Index previousIndex = findLockedPackageIndex(*previousLock, package.name);
     if (previousIndex < 0)
         return true;
@@ -831,6 +831,12 @@ static SlangResult _validateLockedPackagePublishable(
     return SLANG_OK;
 }
 
+/// Validate packages whose Git checkout changed during materialization, plus any changed local
+/// registration, as newly accepted releases.
+///
+/// An unchanged package cannot develop a new license or source-layout defect, while the separate
+/// buildable-closure check still catches interactions such as an import collision between a
+/// changed package and an unchanged one.
 static SlangResult _validateChangedPublishablePackages(
     const String& projectRoot,
     const Manifest& rootManifest,
@@ -848,7 +854,7 @@ static SlangResult _validateChangedPublishablePackages(
     }
     for (const auto& package : lock.packages)
     {
-        if (!_shouldPublishCheckChangedLocalOrPathPackage(previousLock, package, localPackages))
+        if (!_shouldPublishCheckChangedLocalPackage(previousLock, package, localPackages))
             continue;
         if (names.indexOf(package.name) < 0)
             names.add(package.name);

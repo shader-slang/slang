@@ -324,11 +324,14 @@ placeholder, edits, overrides, and local path dependencies because those do not 
 compilation.
 
 `fetch` and `update` always verify the legal graph from selected manifests **before** they clear
-search paths or materialize `deps/`. Git pins without an active local path are read from
-`.slang/cache` at the locked commit. After materialization, they apply the publishable-package
-checks to each Git package whose checkout was newly created or changed, and to each local
-registration or path lock row that changed, then check source layout and import uniqueness across
-the complete selected graph. The closure check includes unchanged packages because a new module can
+search paths or materialize `deps/`. A Git pin without an active local path is read at its locked
+commit from whichever repository already has that revision: an existing `deps/NAME` checkout when
+it is already the locked commit, so a current workspace needs no network, otherwise `.slang/cache`.
+Either way the committed manifest is read, not the working-tree file, so a dirty checkout cannot
+change what the graph check sees. After materialization, they apply the publishable-package checks
+to each Git package whose checkout was newly created or changed, and to each changed local
+registration, then check source layout and import uniqueness across the complete selected graph.
+The closure check includes unchanged packages because a new module can
 collide with one already selected. `update --dry-run` runs that legal-graph check and still cannot
 claim source-layout success, because it does not materialize remote trees.
 

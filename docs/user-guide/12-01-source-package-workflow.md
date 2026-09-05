@@ -161,11 +161,12 @@ publisher retraction of `1.0.0` agree: the shared leaf is `color-encoding@v1.1.0
 lock.
 
 Before clearing search paths or writing `deps/`, update checks that the selected graph is legal:
-identities, trusted edges, toolchain, and exclusions, reading Git manifests from `.slang/cache`
-at the selected commit. After materializing that whole graph, it checks the license, exports, and
-module layout of each new or changed Git checkout and each changed local registration or path
-package, and checks module layout and import uniqueness across the complete graph. The new lock
-and successful resolution report are written only after those checks pass. Fetch applies the same
+identities, trusted edges, toolchain, and exclusions, reading each Git manifest at the selected
+commit from `.slang/cache`, or from `deps/NAME` when that checkout already holds the commit. After
+materializing that whole graph, it checks the license, exports, and module layout of each new or
+changed Git checkout and each changed local registration, and checks module layout and import
+uniqueness across the complete graph. The new lock and successful resolution report are written
+only after those checks pass. Fetch applies the same
 two stages while reproducing the existing lock. Unchanged dependencies are still part of
 closure-wide buildability, but their publish checks are not repeated. `--skip-validate` skips only
 the post-materialize source-layout and publish checks.

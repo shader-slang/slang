@@ -572,6 +572,25 @@ static SlangResult _readMaterializedManifest(
     return validateLockedPackageManifest(package, outManifest, outError);
 }
 
+/// Return whether a Git checkout is already sitting at exactly `commit`.
+///
+/// Stage 1 of validation runs on every fetch, update, and validate. When `deps/NAME` already holds
+/// the locked revision, its committed manifest is the one the legal graph needs, so reading it
+/// there avoids the `git fetch` that `ensureRepository` performs against the tool-owned cache. A
+/// clean workspace therefore validates without touching the network. During `update` the checkout
+/// still holds the previous commit, so this returns false and the cache answers for the newly
+/// selected revision instead.
+static bool _isCheckoutAtCommit(const String& checkoutPath, const String& commit)
+{
+    if (!commit.getLength())
+        return false;
+    String headCommit;
+    String error;
+    if (SLANG_FAILED(getRepositoryHeadCommit(checkoutPath, headCommit, error)))
+        return false;
+    return headCommit == commit;
+}
+
 struct ResolvedPackageLoad
 {
     Manifest manifest;
@@ -585,9 +604,11 @@ struct ResolvedPackageLoad
 ///
 /// Consider this example: `update` selects `noise@v1.1.0` and `noise` vendors `vendor/math` as a
 /// path dependency. Stage 1 must check those identities before it clears search paths or clones
-/// `deps/noise`. Git pins are read from `.slang/cache` at the locked commit; nested path packages
-/// of that git tree use `git show`. Edits, overrides, and ordinary path packages still use the
-/// real directory.
+/// `deps/noise`. A Git pin is therefore read at its locked commit from whichever repository
+/// already has that revision, preferring an existing `deps/NAME` checkout so a clean workspace
+/// needs no network, and falling back to `.slang/cache` when the checkout holds an older commit.
+/// Nested path packages of that Git tree are read out of the same repository with `git show`.
+/// Edits, overrides, and ordinary path packages still use the real directory.
 static SlangResult _loadResolvedPackage(
     const String& projectRoot,
     const String& depsDirectory,
@@ -673,25 +694,41 @@ static SlangResult _loadResolvedPackage(
         return validateLockedPackageManifest(package, out.manifest, outError);
     }
 
+    // Read the committed manifest out of whichever Git source already has the locked revision,
+    // rather than the file in the working tree, so local edits under `deps/` cannot change what
+    // the legal graph sees.
+    String depsRoot = Path::combine(projectRoot, depsDirectory, package.name);
     String cachePath = Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
-    String cacheError;
+    String gitError;
     String manifestText;
-    if (package.commit.getLength() &&
-        SLANG_SUCCEEDED(ensureRepository(projectRoot, package.git, cachePath, cacheError)) &&
+    String gitRepositoryPath;
+    if (_isCheckoutAtCommit(depsRoot, package.commit) &&
         SLANG_SUCCEEDED(
-            readFileAtRevision(cachePath, package.commit, kManifestName, manifestText, cacheError)))
+            readFileAtRevision(depsRoot, package.commit, kManifestName, manifestText, gitError)))
     {
-        String sourceName = package.git + "@" + package.ref + ":slang-package.json";
+        gitRepositoryPath = depsRoot;
+    }
+    else if (
+        package.commit.getLength() &&
+        SLANG_SUCCEEDED(ensureRepository(projectRoot, package.git, cachePath, gitError)) &&
+        SLANG_SUCCEEDED(
+            readFileAtRevision(cachePath, package.commit, kManifestName, manifestText, gitError)))
+    {
+        gitRepositoryPath = cachePath;
+    }
+    if (gitRepositoryPath.getLength())
+    {
+        String sourceName = package.git + "@" + package.ref + ":" + kManifestName;
         SLANG_RETURN_ON_FAIL(readManifestText(sourceName, manifestText, out.manifest, outError));
-        out.packageRoot = Path::combine(projectRoot, depsDirectory, package.name);
-        out.gitRepositoryPath = cachePath;
+        out.packageRoot = depsRoot;
+        out.gitRepositoryPath = gitRepositoryPath;
         out.gitRevision = package.commit;
         return validateLockedPackageManifest(package, out.manifest, outError);
     }
 
-    // Workspace validate and tests may have a materialized checkout without a fetchable origin
-    // (for example a lock that names `memory:b`). Read that tree when the cache cannot supply
-    // the locked revision.
+    // A lock can name an origin that cannot be cloned from here, such as the `memory:` URLs the
+    // unit tests pin, while a materialized tree is still present on disk. Read that directory
+    // when no Git source can supply the locked revision.
     if (SLANG_FAILED(getLockedPackageRoot(
             projectRoot,
             depsDirectory,
@@ -700,15 +737,15 @@ static SlangResult _loadResolvedPackage(
             out.packageRoot,
             outError)))
     {
-        if (cacheError.getLength())
-            outError = cacheError;
+        if (gitError.getLength())
+            outError = gitError;
         return SLANG_FAIL;
     }
     if (SLANG_FAILED(
             readManifest(Path::combine(out.packageRoot, kManifestName), out.manifest, outError)))
     {
-        outError = cacheError.getLength()
-                       ? cacheError
+        outError = gitError.getLength()
+                       ? gitError
                        : String("Cannot validate materialized package manifest '") + package.name +
                              "'. Run 'slang package fetch'. " + outError;
         return SLANG_FAIL;

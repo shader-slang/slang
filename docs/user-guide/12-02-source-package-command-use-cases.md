@@ -232,8 +232,8 @@ version, dependencies, and exports selected for this workspace.
   is available. Declining the prompt leaves the workspace untouched and succeeds; it is a decision,
   not a command failure.
 - A real update materializes Git source under `deps/NAME`, publish-checks new or changed Git
-  packages, checks closure-wide buildability, writes `slang-package-lock.json`, and regenerates
-  `build/search-paths`.
+  packages and changed local registrations, checks closure-wide buildability, writes
+  `slang-package-lock.json`, and regenerates `build/search-paths`.
 - `status` prints one line when the workspace is current. When something is dirty, it lists
   missing checkouts, dirty or diverged pins, active edits, enabled overrides, and source
   problems, without inspecting `build/` or contacting remotes. A missing lock or pin is
@@ -1268,8 +1268,10 @@ them or update this chapter and its regression tests in the same change.
 - `init` creates the manifest, conventional directories, placeholder license, and ignore entries.
 - Default `validate` rejects the workspace license placeholder. Build allows it, while update and
   fetch reject it when it appears in a new or changed Git checkout or a changed local registration
-  or path package. `validate NAME` and `validate --all` apply the same publishable checks to locked
-  trees without requiring a portable workspace.
+  (an edit or enabled override). A vendored path package is not publish-checked by update or fetch,
+  because consuming an in-repo tree through a path dependency is not a claim that the tree could be
+  published. `validate NAME` and `validate --all` apply the publishable checks to any locked tree,
+  including a path row, without requiring a portable workspace.
 - A dependency-free valid package can validate and build without a lock.
 
 ### Resolve and reproduce contract
