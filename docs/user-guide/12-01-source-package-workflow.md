@@ -221,8 +221,12 @@ Two local mechanisms, both recorded in gitignored `slang-workspace.json`:
 
 `slang package edit NAME` keeps the published Git pin in the lock and stops treating
 `deps/NAME` as replaceable tool-owned state. Fetch and update will not overwrite that checkout.
-Changing its exports or dependencies still requires a new published tag and a normal `update`.
-`unedit` refuses while the tree has extra commits, dirty files, or stashes.
+If a resolve would select a different commit for it, they stop with an error before changing any
+checkout. Changing its exports or dependencies still requires a new published tag and a normal
+`update` after `unedit`, or an override if the local tree should participate in resolution.
+Default `unedit` accepts a different committed `HEAD`, but refuses while the tree has uncommitted
+files or stashes so work cannot be forgotten accidentally. `unedit NAME --clean` discards all
+local state and restores the locked commit; pass `--yes` when confirmation cannot be interactive.
 
 `slang package override add NAME PATH [AS]` points the package at another directory you already have.
 Its effective version must satisfy every incoming dependency constraint. Omit `AS` to retain the

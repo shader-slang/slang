@@ -369,14 +369,19 @@ slang package edit color-encoding
 ```
 
 The checkout stays at `deps/color-encoding`; the lock keeps its published Git pin. Fetch and update
-do not replace it while the edit is registered. When the checkout is back at its locked commit
-with no changed files or stashes:
+do not replace it while the edit is registered. If the selected pin would move that checkout, the
+command fails before applying any other checkout changes. When the checkout is back at its locked
+commit with no changed files or stashes:
 
 ```sh
 slang package unedit color-encoding
 ```
 
-`unedit` refuses while work would be lost.
+Default `unedit` verifies that the working tree has no uncommitted files or stashes, then removes
+the edit registration. It accepts a committed `HEAD` that differs from the lock, which lets you
+commit work before returning the checkout to tool ownership. To discard all local state instead,
+run `slang package unedit color-encoding --clean`; it restores the locked commit and asks for
+confirmation unless you also pass `--yes`.
 
 To trial an unpublished manifest or another repository, point the existing package name at a
 directory:
@@ -415,7 +420,8 @@ same local tree without re-entering its configuration.
 
 - For an edit, writes a registration to gitignored `slang-workspace.json`, protects the checkout
   from replacement, and keeps the published manifest and Git identity in the solve. Changing the
-  edited manifest's dependencies or exports does **not** adopt that graph.
+  edited manifest's dependencies or exports does **not** adopt that graph. A fetch or update whose
+  selected pin would move that checkout fails before any checkout is changed.
 - For an override, records the name, path, and exact effective version in
   `slang-workspace.json`. It does not copy or modify the supplied directory.
 - Local registration changes regenerate `build/search-paths` when the current lock can represent
@@ -1123,8 +1129,8 @@ subcommand. Every other journey in this chapter is unaffected by it.
 
 `slang package help`, `-help`, and `--help` print stable package help, including source `run`.
 Binary run and host build behavior appear in `slang package --experimental help`. `init`,
-`validate`, `status`, `tree`, `edit`, `unedit`, and `docs` otherwise accept only their documented
-arguments. `test` is
+`validate`, `status`, `tree`, and `edit` accept no additional arguments; `unedit` accepts `--clean`
+and `--yes`, and `docs` accepts `--print`. `test` is
 present but returns a not-implemented error.
 
 ## Gaps, tensions, and intentional asymmetries
@@ -1291,7 +1297,11 @@ them or update this chapter and its regression tests in the same change.
 
 ### Local-development contract
 
-- `edit` keeps the published Git identity and prevents replacement of `deps/NAME`.
+- `edit` keeps the published Git identity and prevents replacement of `deps/NAME`. If fetch or
+  update would need to move that checkout to a newly selected pin, the command fails before
+  applying any checkout changes.
+- Default `unedit` requires no uncommitted files or stashes but permits a different committed
+  `HEAD`; `unedit --clean` restores the locked commit before removing the registration.
 - An edited manifest does not enter the solve.
 - `override` records a machine-local path and exact effective version.
 - Enabled overrides participate in plain whole-graph update; disabled overrides retain

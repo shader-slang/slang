@@ -417,9 +417,14 @@ static SlangResult _materializeRevision(
 
     if (destinationExisted && currentCommit.getLength())
     {
-        bool isSafe = false;
-        SLANG_RETURN_ON_FAIL(
-            isWorkingTreeSafeToRemove(destination, currentCommit, isSafe, outError));
+        GitWorkingTreeStatus status;
+        SLANG_RETURN_ON_FAIL(getWorkingTreeStatus(destination, currentCommit, status, outError));
+        const bool hasUncommittedState = status.changedFileCount != 0 || status.stashCount != 0;
+        if (!hasUncommittedState && status.headCommit == targetCommit)
+            return SLANG_OK;
+
+        const bool isSafe = !hasUncommittedState && status.commitsAhead == 0 &&
+                            status.commitsBehind == 0 && status.headCommit == currentCommit;
         if (!isSafe)
         {
             if (!allowClean)
@@ -444,8 +449,6 @@ static SlangResult _materializeRevision(
                 ioDidMaterialize,
                 outError);
         }
-        if (currentCommit == targetCommit)
-            return SLANG_OK;
     }
     else if (destinationExisted)
     {

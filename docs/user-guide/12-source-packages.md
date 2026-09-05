@@ -362,9 +362,13 @@ source remains visible under `deps/`; generated files go under `build/`.
 `slang package edit NAME` marks the existing `{workspace.deps}/NAME` checkout (by default
 `deps/NAME`) as editable without moving it. The Git pin remains in the lock; gitignored
 `slang-workspace.json` records that the package tool no longer owns the working tree. Fetch and
-update do not modify an edited checkout. Use `slang package unedit NAME` to return an unchanged
-checkout to package-tool ownership. `unedit` refuses while the checkout has changed files, commits
-not selected by the lock, or stashes.
+update do not modify an edited checkout. If the selected Git pin for that package would change,
+they fail before applying any checkout changes so other dependencies are not moved either. Use
+`slang package unedit NAME` after committing local changes to return a clean checkout to
+package-tool ownership. The checkout may be at a different commit from the lock; `unedit` refuses
+only while it has uncommitted files or stashes. `unedit NAME --clean` instead discards all local
+state and restores the locked commit. Like other destructive clean operations, it asks for
+confirmation unless `--yes` is passed.
 
 For example, the generated local-state file may contain:
 

@@ -5,6 +5,7 @@
 #include "package-git.h"
 #include "package-json.h"
 #include "package-local.h"
+#include "package-lock.h"
 #include "package-tool.h"
 #include "package-validate.h"
 #include "unit-test/slang-unit-test.h"
@@ -199,14 +200,31 @@ SLANG_UNIT_TEST(PackageGitSkipsAlreadyMaterializedRevision)
         error)));
     SLANG_CHECK(didMaterialize);
 
-    // Once the checkout is clean at the target commit, materialization needs only its local state.
-    // Removing the remote makes this test fail if the implementation tries to fetch again.
+    String sourcePath = Path::combine(repository, "content.txt");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(sourcePath, "version 2")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1.0")));
+    String nextCommit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(repository, nextCommit, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(materializeLockedRevision(
+        temp.path,
+        repository,
+        commit,
+        nextCommit,
+        checkout,
+        false,
+        didMaterialize,
+        error)));
+    SLANG_CHECK(didMaterialize);
+
+    // Once the checkout is clean at the target commit, materialization needs only its local state,
+    // even when the previous lock still names an older commit. Removing the remote makes this test
+    // fail if the implementation tries to fetch again.
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(Path::removeNonEmpty(repository)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(materializeLockedRevision(
         temp.path,
         repository,
         commit,
-        commit,
+        nextCommit,
         checkout,
         false,
         didMaterialize,
@@ -558,14 +576,16 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
     const char* uneditArguments[] = {"slang-package", "unedit", "noise"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(uneditArguments), uneditArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("local changes")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("uncommitted files")) >= 0);
 
-    List<String> restoreArguments;
-    restoreArguments.add("-C");
-    restoreArguments.add(checkout);
-    restoreArguments.add("restore");
-    restoreArguments.add(".");
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(restoreArguments)));
+    List<String> commitArguments;
+    commitArguments.add("-C");
+    commitArguments.add(checkout);
+    _addTestIdentity(commitArguments);
+    commitArguments.add("commit");
+    commitArguments.add("-am");
+    commitArguments.add("local edit");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(commitArguments)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(uneditArguments), uneditArguments, error)));
     SLANG_CHECK(File::exists(checkoutSource));
@@ -970,4 +990,126 @@ SLANG_UNIT_TEST(PackageToolIgnoreOverridesParksEditedDependency)
         Path::combine(temp.path, "slang-workspace.json"),
         workspaceAfterRestore)));
     SLANG_CHECK(workspaceAfterRestore == workspaceAfterFirst);
+}
+
+SLANG_UNIT_TEST(PackageToolEditBlocksCheckoutMoves)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+
+    auto makeGitPackage = [&](const String& name, const String& source) -> String
+    {
+        String repository = Path::combine(temp.path, String("upstream-") + name);
+        SLANG_CHECK_ABORT(Path::createDirectoryRecursive(repository));
+        Manifest package;
+        package.name = name;
+        package.exports.add("src");
+        package.licenseFiles.add("LICENSE");
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            writeManifest(Path::combine(repository, "slang-package.json"), package, error)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(_writeFile(Path::combine(repository, "LICENSE"), name + " license\n")));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            _writeFile(Path::combine(repository, String("src/") + name + ".slang"), source)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+        return repository;
+    };
+
+    String noiseRepo = makeGitPackage("noise", "module noise;\n");
+    String helperRepo = makeGitPackage("helper", "module helper;\n");
+
+    Manifest root;
+    String rootManifestPath = Path::combine(temp.path, "slang-package.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    Dependency noiseDep;
+    noiseDep.name = "noise";
+    noiseDep.git = noiseRepo;
+    noiseDep.version = ">=1.0.0";
+    root.dependencies.add(noiseDep);
+    Dependency helperDep;
+    helperDep.name = "helper";
+    helperDep.git = helperRepo;
+    helperDep.version = ">=1.0.0";
+    root.dependencies.add(helperDep);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+
+    const char* updateArguments[] = {"slang-package", "update", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+
+    const char* editArguments[] = {"slang-package", "edit", "noise"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(editArguments), editArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        Path::combine(temp.path, "deps/noise/src/noise.slang"),
+        "module noise;\n// edited\n")));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        Path::combine(noiseRepo, "src/noise.slang"),
+        "module noise;\n// v1.1\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepo, "v1.1.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        Path::combine(helperRepo, "src/helper.slang"),
+        "module helper;\n// v1.1\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(helperRepo, "v1.1.0")));
+
+    PackageTool::LockFile lockBefore;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockBefore, error)));
+    String helperBefore;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::readAllText(Path::combine(temp.path, "deps/helper/src/helper.slang"), helperBefore)));
+
+    const char* dryRunArguments[] = {"slang-package", "update", "--dry-run"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(dryRunArguments), dryRunArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("is edited")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("would have to move")) >= 0);
+
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("is edited")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("unedit noise --clean")) >= 0);
+
+    PackageTool::LockFile lockAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockAfter, error)));
+    SLANG_CHECK(lockFilesEqual(lockBefore, lockAfter));
+    String helperAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::readAllText(Path::combine(temp.path, "deps/helper/src/helper.slang"), helperAfter)));
+    SLANG_CHECK(helperAfter == helperBefore);
+    String noiseAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::readAllText(Path::combine(temp.path, "deps/noise/src/noise.slang"), noiseAfter)));
+    SLANG_CHECK(noiseAfter == "module noise;\n// edited\n");
+
+    const char* unconfirmedCleanUneditArguments[] = {"slang-package", "unedit", "noise", "--clean"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(unconfirmedCleanUneditArguments),
+        unconfirmedCleanUneditArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--yes")) >= 0);
+
+    const char* cleanUneditArguments[] = {"slang-package", "unedit", "noise", "--clean", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(cleanUneditArguments),
+        cleanUneditArguments,
+        error)));
+    String restoredNoise;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::readAllText(Path::combine(temp.path, "deps/noise/src/noise.slang"), restoredNoise)));
+    SLANG_CHECK(restoredNoise == "module noise;\n");
+    List<LocalPackage> localPackages;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readProjectLocalPackages(temp.path, localPackages, error)));
+    SLANG_CHECK(findLocalPackageIndex(localPackages, "noise") < 0);
 }

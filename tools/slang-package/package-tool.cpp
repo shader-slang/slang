@@ -52,7 +52,6 @@ static void _printHelp(bool experimental = false)
         "                   Build the distributable source bundle and docs.\n"
         "  run [name] [args...]\n"
         "                   Interpret a configured executable from the source bundle.\n"
-        "  test             Reserved. Package testing is not implemented yet.\n"
         "  docs [--print]   Open build/docs/index.md with the registered application.\n"
         "                   --print writes the path instead of launching.\n"
         "  status           Report lock and graph readiness; details only when dirty.\n"
@@ -68,7 +67,10 @@ static void _printHelp(bool experimental = false)
         "  override enable|disable|remove <name> | override list\n"
         "                   Manage retained local dependency overrides.\n"
         "  edit <name>      Make a dependency checkout editable in place.\n"
-        "  unedit <name>    Return an unchanged checkout to tool ownership.\n");
+        "                   Fetch and update fail if the selected pin would move it.\n"
+        "  unedit <name> [--clean] [--yes]\n"
+        "                   Return a clean checkout to tool ownership.\n"
+        "                   --clean discards local state and restores the locked commit.\n");
     if (experimental)
     {
         fprintf(
@@ -999,6 +1001,79 @@ static void _warnSkippedSourceValidation()
         "(--skip-validate).\n");
 }
 
+/// Fail when the selected Git pin for an in-place edit is not the commit already in that
+/// working tree, and matching it would require changing the checkout.
+///
+/// Consider this example: `noise` is edited at `deps/noise` on `v1.0.0`, then a new `v1.1.0`
+/// tag is published and `update` would select it. Materialize skips edited trees, so applying
+/// that lock would rewrite the pin while leaving the checkout behind. Fetch and update refuse
+/// that graph before they clear search paths or touch any other checkout. A parked edit that is
+/// not in the selected lock is left in place; the selected pin did not move that tree.
+static SlangResult _refuseIfEditedCheckoutsWouldMove(
+    const String& projectRoot,
+    const List<LocalPackage>& localPackages,
+    const LockFile* previousLock,
+    const LockFile& lock,
+    String& outError)
+{
+    for (const auto& localPackage : localPackages)
+    {
+        if (!isEditedLocalPackage(localPackage))
+            continue;
+        Index nextIndex = findLockedPackageIndex(lock, localPackage.name);
+        if (nextIndex < 0)
+            continue;
+        const LockedPackage& next = lock.packages[nextIndex];
+        if (!isGitBackedLockedPackage(next))
+            continue;
+
+        const LockedPackage* previous = nullptr;
+        if (previousLock)
+        {
+            Index previousIndex = findLockedPackageIndex(*previousLock, localPackage.name);
+            if (previousIndex >= 0)
+                previous = &previousLock->packages[previousIndex];
+        }
+        if (previous && previous->git == next.git && previous->commit == next.commit)
+            continue;
+
+        String localRoot;
+        SLANG_RETURN_ON_FAIL(getLocalPackageRoot(projectRoot, localPackage, localRoot, outError));
+        String origin;
+        String headCommit;
+        if (SLANG_SUCCEEDED(getRepositoryOrigin(localRoot, origin, outError)) &&
+            origin == next.git &&
+            SLANG_SUCCEEDED(getRepositoryHeadCommit(localRoot, headCommit, outError)) &&
+            headCommit == next.commit)
+        {
+            outError = String();
+            continue;
+        }
+        outError = String();
+
+        outError = String("Cannot apply this command while package '") + next.name +
+                   "' is edited: its checkout would have to move to match " + next.ref + " (" +
+                   next.commit + ").";
+        if (previous && previous->commit.getLength())
+        {
+            outError = outError + " The lock currently selects " + previous->ref + " (" +
+                       previous->commit + ").";
+        }
+        String advice =
+            String("Fetch and update do not change an edited checkout, and they stop before "
+                   "applying any other checkout changes. Commit or discard local file changes, "
+                   "then run 'slang package unedit ") +
+            next.name +
+            "'. To discard all local state and restore the locked commit instead, run 'slang "
+            "package unedit " +
+            next.name +
+            " --clean'. Use an override if the local tree should participate in resolution.";
+        appendErrorAdvice(outError, advice);
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 static SlangResult _update(
     const String& projectRoot,
     bool ignoreOverrides,
@@ -1046,6 +1121,8 @@ static SlangResult _fetch(
     SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
     SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
+    SLANG_RETURN_ON_FAIL(
+        _refuseIfEditedCheckoutsWouldMove(projectRoot, localPackages, &lock, lock, outError));
     List<String> warnings;
     SLANG_RETURN_ON_FAIL(
         _validateLocalPackages(projectRoot, lock, localPackages, outError, &warnings));
@@ -1234,6 +1311,12 @@ static SlangResult _update(
         SLANG_RETURN_ON_FAIL(
             resolveDependencies(projectRoot, manifest, lock, outError, &warnings, &report));
     }
+    SLANG_RETURN_ON_FAIL(_refuseIfEditedCheckoutsWouldMove(
+        projectRoot,
+        effectiveLocalPackages,
+        previousLockPtr,
+        lock,
+        outError));
     SLANG_RETURN_ON_FAIL(
         _validateLocalPackages(projectRoot, lock, effectiveLocalPackages, outError, &warnings));
     String reportText =
@@ -2462,7 +2545,12 @@ static SlangResult _edit(const String& projectRoot, const String& name, String& 
     return SLANG_OK;
 }
 
-static SlangResult _unedit(const String& projectRoot, const String& name, String& outError)
+static SlangResult _unedit(
+    const String& projectRoot,
+    const String& name,
+    bool allowClean,
+    bool assumeYes,
+    String& outError)
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
@@ -2506,16 +2594,47 @@ static SlangResult _unedit(const String& projectRoot, const String& name, String
         outError = String("Package is not editable: ") + name;
         return SLANG_FAIL;
     }
-    bool isSafeToRemove = false;
-    SLANG_RETURN_ON_FAIL(
-        isWorkingTreeSafeToRemove(destination, package->commit, isSafeToRemove, outError));
-    if (!isSafeToRemove)
+    String headCommit;
+    SLANG_RETURN_ON_FAIL(getRepositoryHeadCommit(destination, headCommit, outError));
+    GitWorkingTreeStatus status;
+    SLANG_RETURN_ON_FAIL(getWorkingTreeStatus(destination, headCommit, status, outError));
+    const bool hasLocalState = status.changedFileCount != 0 || status.stashCount != 0;
+    if (hasLocalState && !allowClean)
     {
-        outError =
-            String("Editable checkout has local changes, commits, or stashes; refusing to return "
-                   "it to package-tool ownership: ") +
-            destination;
+        outError = String("Editable checkout has uncommitted files or stashes; refusing to return "
+                          "it to package-tool ownership: ") +
+                   destination;
+        String advice = String("Commit or discard the changes and run 'slang package unedit ") +
+                        name + "' again, or run 'slang package unedit " + name +
+                        " --clean' to discard all local state and restore the locked commit.";
+        appendErrorAdvice(outError, advice);
         return SLANG_FAIL;
+    }
+    if (allowClean)
+    {
+        const bool needsRestore = hasLocalState || status.headCommit != package->commit;
+        if (needsRestore)
+        {
+            bool approved = false;
+            SLANG_RETURN_ON_FAIL(_confirmApply(
+                assumeYes,
+                "Discard this editable checkout state and restore the locked commit?",
+                approved,
+                outError));
+            if (!approved)
+                return SLANG_OK;
+
+            bool didMaterialize = false;
+            SLANG_RETURN_ON_FAIL(materializeLockedRevision(
+                projectRoot,
+                package->git,
+                package->commit,
+                package->commit,
+                destination,
+                true,
+                didMaterialize,
+                outError));
+        }
     }
     localPackages.removeAt(localIndex);
     SLANG_RETURN_ON_FAIL(writeProjectLocalPackages(projectRoot, localPackages, outError));
@@ -2893,8 +3012,35 @@ SlangResult executeInDirectory(
     }
     if (command == "edit" && argc == 3)
         return _edit(projectRoot, argv[2], outError);
-    if (command == "unedit" && argc == 3)
-        return _unedit(projectRoot, argv[2], outError);
+    if (command == "unedit")
+    {
+        if (argc < 3)
+        {
+            outError = "unedit requires a package name.";
+            return SLANG_FAIL;
+        }
+        bool allowClean = false;
+        bool assumeYes = false;
+        for (int i = 3; i < argc; ++i)
+        {
+            String flag = argv[i];
+            if (flag == "--clean")
+                allowClean = true;
+            else if (flag == "--yes")
+                assumeYes = true;
+            else
+            {
+                outError = String("Unknown unedit option: ") + flag;
+                return SLANG_FAIL;
+            }
+        }
+        if (assumeYes && !allowClean)
+        {
+            outError = "unedit --yes requires --clean.";
+            return SLANG_FAIL;
+        }
+        return _unedit(projectRoot, argv[2], allowClean, assumeYes, outError);
+    }
     if (command == "override" && argc == 3 && String(argv[2]) == "list")
         return _listOverrides(projectRoot, outError);
     if (command == "override" && argc == 4 && String(argv[2]) == "enable")
