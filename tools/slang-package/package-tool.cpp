@@ -55,7 +55,7 @@ static void _printHelp(bool experimental = false)
         "  test             Reserved. Package testing is not implemented yet.\n"
         "  docs [--print]   Open build/docs/index.md with the registered application.\n"
         "                   --print writes the path instead of launching.\n"
-        "  status           Report whether the workspace is current; details only when dirty.\n"
+        "  status           Report lock and graph readiness; details only when dirty.\n"
         "  validate         Check that this package is suitable for sharing.\n"
         "  tree             Print the selected dependency graph.\n"
         "  why <name>       Print every graph path that requires a package.\n"
@@ -1410,11 +1410,43 @@ static SlangResult _validate(const String& projectRoot, String& outError)
     return SLANG_OK;
 }
 
-/// Report whether the workspace is current, with extra lines only when something is dirty.
+/// Join nonzero Git checkout facts, omitting zero ahead/behind/stash counts.
+///
+/// Consider this example: a lock pins `color` at commit A, and `deps/color` has one untracked
+/// file but is still at A. Status should say `color: 1 changed`, not four zero counters. If HEAD
+/// is not A and `rev-list` reports no ahead/behind (for example a detached other commit), the
+/// remaining fact is `not at locked commit`.
+static String _describeDirtyCheckout(
+    const GitWorkingTreeStatus& gitStatus,
+    const String& expectedCommit)
+{
+    List<String> facts;
+    if (gitStatus.changedFileCount)
+        facts.add(String(gitStatus.changedFileCount) + " changed");
+    if (gitStatus.commitsAhead)
+        facts.add(String(gitStatus.commitsAhead) + " ahead");
+    if (gitStatus.commitsBehind)
+        facts.add(String(gitStatus.commitsBehind) + " behind");
+    if (gitStatus.stashCount)
+    {
+        facts.add(
+            String(gitStatus.stashCount) + (gitStatus.stashCount == 1 ? " stash" : " stashes"));
+    }
+    if (gitStatus.headCommit != expectedCommit && !gitStatus.commitsAhead &&
+        !gitStatus.commitsBehind)
+        facts.add("not at locked commit");
+    StringBuilder detail;
+    for (Index i = 0; i < facts.getCount(); ++i)
+        detail << (i ? ", " : "") << facts[i];
+    return detail.produceString();
+}
+
+/// Report lock, checkout, and graph readiness, with extra lines only when something is dirty.
 ///
 /// Like `git status`, reportable drift is data rather than command failure. This function fails
 /// only when the root manifest, an existing lock, or workspace-local JSON cannot be read and
-/// parsed well enough to produce a report.
+/// parsed well enough to produce a report. The header uses `incomplete` when the lock or Git pins
+/// are missing, and `not buildable` only after those trees are present and the source check fails.
 SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outReport, String& outError)
 {
     outReport = String();
@@ -1431,38 +1463,51 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
         SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
 
     StringBuilder observations;
-    Index observationCount = 0;
-    auto addObservation = [&](const String& observation)
+    List<String> observationFacts;
+    auto addFact = [&](const String& fact,
+                       const String& useCommand = String(),
+                       const String& useTail = String())
     {
-        ++observationCount;
-        observations << "  - " << observation << "\n";
+        observationFacts.add(fact);
+        observations << "  " << fact << "\n";
+        if (useCommand.getLength() == 0)
+            return;
+        observations << "    use '" << useCommand << "'";
+        if (useTail.getLength())
+            observations << useTail;
+        observations << "\n";
     };
 
     String issue;
     bool lockMatchesManifest = false;
+    bool reportedLockDrift = false;
     if (!hasLock)
     {
         if (manifest.dependencies.getCount())
         {
-            addObservation(
-                "Workspace has dependencies but no slang-package-lock.json. Run 'slang package "
-                "fetch' to select the initial graph.");
+            addFact("no slang-package-lock.json", "slang package fetch");
+            reportedLockDrift = true;
         }
         if (localPackages.getCount())
         {
-            addObservation(
-                "Workspace has local package registrations but no dependency lock to attach them "
-                "to.");
+            addFact("slang-workspace.json has no lock");
+            reportedLockDrift = true;
         }
     }
     else
     {
         lockMatchesManifest = SLANG_SUCCEEDED(_validateLockAgainstManifest(manifest, lock, issue));
         if (!lockMatchesManifest)
-            addObservation(issue);
+        {
+            addFact(issue);
+            reportedLockDrift = true;
+        }
         issue = String();
         if (SLANG_FAILED(_validateLocalPackages(projectRoot, lock, localPackages, issue)))
-            addObservation(issue);
+        {
+            addFact(issue);
+            reportedLockDrift = true;
+        }
     }
 
     // Find the tool-owned checkouts that are absent before inspecting anything inside them.
@@ -1486,13 +1531,10 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
     if (unmaterializedNames.getCount())
     {
         StringBuilder detail;
-        detail << unmaterializedNames.getCount()
-               << " locked package(s) are not materialized under '"
-               << getWorkspaceDepsDirectory(manifest) << "/': ";
+        detail << "missing under '" << getWorkspaceDepsDirectory(manifest) << "/': ";
         for (Index i = 0; i < unmaterializedNames.getCount(); ++i)
             detail << (i ? ", " : "") << unmaterializedNames[i];
-        detail << ". Run 'slang package fetch' to materialize them.";
-        addObservation(detail);
+        addFact(detail.produceString(), "slang package fetch");
     }
 
     // Inspect each checkout that is present, even when a sibling is absent. A present checkout can
@@ -1509,17 +1551,12 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
         issue = String();
         if (SLANG_FAILED(getRepositoryOrigin(packageRoot, origin, issue)))
         {
-            addObservation(
-                String("Package checkout '") + package.name +
-                "' is not a Git repository with an 'origin' remote. Run 'slang package fetch "
-                "--clean' to replace it.");
+            addFact(package.name + ": not a git checkout", "slang package fetch --clean");
             continue;
         }
         if (origin != package.git)
         {
-            addObservation(
-                String("Package checkout '") + package.name +
-                "' has a different Git origin. Run 'slang package fetch --clean' to restore it.");
+            addFact(package.name + ": different origin", "slang package fetch --clean");
             continue;
         }
 
@@ -1527,20 +1564,16 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
         issue = String();
         if (SLANG_FAILED(getWorkingTreeStatus(packageRoot, package.commit, gitStatus, issue)))
         {
-            addObservation(issue);
+            addFact(package.name + ": " + issue.trim());
             continue;
         }
         if (gitStatus.changedFileCount || gitStatus.commitsAhead || gitStatus.commitsBehind ||
             gitStatus.stashCount || gitStatus.headCommit != package.commit)
         {
-            StringBuilder detail;
-            detail << "Package checkout '" << package.name << "' is not clean ("
-                   << gitStatus.changedFileCount << " changed/untracked file(s), "
-                   << gitStatus.commitsAhead << " commit(s) ahead, " << gitStatus.commitsBehind
-                   << " commit(s) behind, " << gitStatus.stashCount
-                   << " stash(es)). Run 'slang package edit " << package.name
-                   << "' to keep the work, or 'slang package fetch --clean' to discard it.";
-            addObservation(detail);
+            addFact(
+                package.name + ": " + _describeDirtyCheckout(gitStatus, package.commit),
+                String("slang package edit ") + package.name,
+                " to keep, or 'slang package fetch --clean' to reset");
         }
     }
 
@@ -1548,35 +1581,54 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
     {
         if (isEditedLocalPackage(package))
         {
-            addObservation(
-                String("Package '") + package.name +
-                "' is in edit mode; the workspace is not portable.");
+            addFact(package.name + ": edited");
         }
         else if (package.enabled)
         {
-            addObservation(
-                String("Package '") + package.name +
-                "' has an enabled override; the workspace is not portable.");
+            addFact(package.name + ": override at " + package.path);
         }
     }
 
     List<String> buildWarnings;
     issue = String();
-    bool canCheckBuildability =
-        unmaterializedNames.getCount() == 0 && (hasLock || !manifest.dependencies.getCount());
-    bool isBuildable =
+    const bool needsLock = manifest.dependencies.getCount() != 0 || localPackages.getCount() != 0;
+    const bool canCheckBuildability =
+        unmaterializedNames.getCount() == 0 && (hasLock || !needsLock);
+    const bool isBuildable =
         canCheckBuildability &&
         SLANG_SUCCEEDED(validateBuildableProject(projectRoot, issue, &buildWarnings));
     if (canCheckBuildability && !isBuildable)
-        addObservation(issue);
+    {
+        bool alreadyReported = false;
+        for (const auto& fact : observationFacts)
+        {
+            if (issue.getUnownedSlice().indexOf(fact.getUnownedSlice()) >= 0 ||
+                fact.getUnownedSlice().indexOf(issue.getUnownedSlice()) >= 0)
+            {
+                alreadyReported = true;
+                break;
+            }
+        }
+        if (!alreadyReported &&
+            !(reportedLockDrift &&
+              (issue.getUnownedSlice().indexOf(UnownedStringSlice("lock")) >= 0 ||
+               issue.getUnownedSlice().indexOf(UnownedStringSlice("Lock")) >= 0)))
+            addFact(issue);
+    }
     for (const auto& warning : buildWarnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+
+    const char* readiness = "not buildable";
+    if (isBuildable)
+        readiness = "buildable";
+    else if (!canCheckBuildability)
+        readiness = "incomplete";
 
     StringBuilder report;
     report << "Package '" << manifest.name << "': ";
     if (!hasLock)
     {
-        if (manifest.dependencies.getCount() == 0)
+        if (!needsLock)
             report << "no lock required";
         else
             report << "lock absent";
@@ -1588,20 +1640,11 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
     }
     else
     {
-        report << "lock does not match, " << lock.packages.getCount()
-               << (lock.packages.getCount() == 1 ? " package" : " packages");
+        report << "lock stale";
     }
-    report << ", " << (isBuildable ? "buildable" : "not buildable") << ".\n";
+    report << ", " << readiness << ".\n";
 
-    String gitRoot;
-    String gitError;
-    if (SLANG_SUCCEEDED(getGitWorkingTreeRoot(projectRoot, gitRoot, gitError)) &&
-        gitRoot != projectRoot)
-    {
-        report << "Package root is inside the Git work tree " << gitRoot << ".\n";
-    }
-
-    if (observationCount)
+    if (observationFacts.getCount())
         report << observations;
     outReport = report.produceString();
     return SLANG_OK;

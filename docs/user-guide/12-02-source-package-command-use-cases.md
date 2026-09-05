@@ -233,9 +233,10 @@ version, dependencies, and exports selected for this workspace.
   packages, checks closure-wide buildability, writes `slang-package-lock.json`, and regenerates
   `build/search-paths`.
 - `status` prints one line when the workspace is current. When something is dirty, it lists
-  missing materialization, wrong origins, changed/untracked counts, commit divergence, stashes,
-  active edits, enabled overrides, and buildability, without inspecting `build/` or contacting
-  remotes. Reportable drift does not make status fail.
+  missing checkouts, dirty or diverged pins, active edits, enabled overrides, and source
+  problems, without inspecting `build/` or contacting remotes. A missing lock or pin is
+  `incomplete`; a present graph that fails the source check is `not buildable`. Reportable
+  drift does not make status fail.
 - `fetch` subsequently reproduces that lock without consulting newer tags, publisher retractions,
   or version selection:
 
@@ -1140,8 +1141,9 @@ license can ever be valid requires an explicit license choice.
 
 ### Status reports state; validate gates sharing
 
-`status` prints one line when the lock, checkouts, and buildability are current, and lists only the
-dirty items otherwise. Like `git status`, reportable drift still returns success; malformed
+`status` prints one line when the lock, checkouts, and graph are current, and lists only the
+dirty items otherwise. Missing pins are `incomplete`; a present graph that fails the source
+check is `not buildable`. Like `git status`, reportable drift still returns success; malformed
 required JSON is an error because no reliable report can be produced. `validate` applies the
 license, source-layout, and path-portability rules to the workspace package as a sharing gate.
 
@@ -1314,7 +1316,8 @@ them or update this chapter and its regression tests in the same change.
 - `--skip-validate` exists only on fetch, update, and build; it warns and keeps lock, manifest,
   closure, toolchain, export, and dirty-checkout checks.
 - `status` diagnoses lock, registration, and checkout state without mutation or remote access. A
-  current workspace is one header line; observations appear only when something is dirty. It never
+  current workspace is one header line; observations appear only when something is dirty. Missing
+  pins are `incomplete`; a present graph that fails the source check is `not buildable`. It never
   inspects `build/` and is not the package-quality gate. Reportable drift returns success;
   unreadable or malformed required JSON returns failure.
 

@@ -356,9 +356,9 @@ SLANG_UNIT_TEST(PackageToolStatusReportsUnmaterializedCheckouts)
     String statusReport;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
     SLANG_CHECK(
-        statusReport.getUnownedSlice().indexOf(
-            UnownedStringSlice("are not materialized under 'deps/'")) >= 0);
+        statusReport.getUnownedSlice().indexOf(UnownedStringSlice("missing under 'deps/':")) >= 0);
     SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("noise")) >= 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("incomplete.")) >= 0);
     // The absent checkout is reported once: neither the dependency-manifest read nor Git's own
     // missing-directory text should restate it, and the present sibling must not be implicated.
     SLANG_CHECK(
@@ -381,11 +381,11 @@ SLANG_UNIT_TEST(PackageToolStatusReportsUnmaterializedCheckouts)
         executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
     SLANG_CHECK(
-        statusReport.getUnownedSlice().indexOf(
-            UnownedStringSlice("are not materialized under 'deps/'")) >= 0);
+        statusReport.getUnownedSlice().indexOf(UnownedStringSlice("missing under 'deps/':")) >= 0);
     SLANG_CHECK(
-        statusReport.getUnownedSlice().indexOf(
-            UnownedStringSlice("Package checkout 'color' is not clean")) >= 0);
+        statusReport.getUnownedSlice().indexOf(UnownedStringSlice("color: 1 changed")) >= 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("incomplete.")) >= 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("Git work tree")) < 0);
 }
 
 SLANG_UNIT_TEST(PackageToolPublishChecksOnlyChangedGitPackages)
@@ -514,7 +514,7 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
         executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
     String statusReport;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
-    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("edit mode")) >= 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("noise: edited")) >= 0);
     SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("unreachable")) >= 0);
     root.dependencies.add(dependency);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));

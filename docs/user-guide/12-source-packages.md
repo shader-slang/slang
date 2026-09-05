@@ -326,9 +326,9 @@ flag.
 
 `slang package status` prints one header line when the workspace is current, for example
 `Package 'video-preview': lock current, 3 packages, buildable.` Extra lines appear only when
-something is dirty: a missing or inconsistent lock, unmaterialized or dirty tool-owned checkouts,
-active edits, enabled overrides, or a graph that is not buildable. Disabled overrides are silent.
-If the package root sits inside a larger Git work tree, status names that enclosing root. Like
+something is dirty. The header says `incomplete` when the lock or Git pins are missing, and
+`not buildable` only after those trees are present and the source check fails. Dirty checkouts,
+edits, and enabled overrides are listed by name; disabled overrides are silent. Like
 `git status`, reportable drift does not make the command fail. Status returns nonzero only when
 required root manifest, existing lock, or workspace JSON cannot be read and parsed well enough to
 produce a report. It does not inspect `build/`, modify package state, or contact remotes.

@@ -1405,6 +1405,7 @@ SLANG_UNIT_TEST(PackageToolUpdateRequiresConfirmation)
         statusReport.getUnownedSlice().indexOf(UnownedStringSlice("no lock required")) >= 0);
     SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("buildable.")) >= 0);
     SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("  - ")) < 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("    use '")) < 0);
 
     List<LocalPackage> localPackages;
     LocalPackage localPackage;
@@ -1417,8 +1418,12 @@ SLANG_UNIT_TEST(PackageToolUpdateRequiresConfirmation)
         executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
     SLANG_CHECK(
-        statusReport.getUnownedSlice().indexOf(UnownedStringSlice("local package registrations")) >=
-        0);
+        statusReport.getUnownedSlice().indexOf(
+            UnownedStringSlice("slang-workspace.json has no lock")) >= 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("noise: override")) >= 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("lock absent")) >= 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("incomplete.")) >= 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("no lock required")) < 0);
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "slang-workspace.json"))));
 
@@ -2400,8 +2405,10 @@ SLANG_UNIT_TEST(PackageToolFailureTranscripts)
     String statusReport;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
     SLANG_CHECK(
-        statusReport.getUnownedSlice().indexOf(
-            UnownedStringSlice("Workspace has dependencies but no slang-package-lock.json")) >= 0);
+        statusReport.getUnownedSlice().indexOf(UnownedStringSlice("no slang-package-lock.json")) >=
+        0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("lock absent")) >= 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("incomplete.")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageToolUpdateDryRun)

@@ -112,12 +112,12 @@ slang package status
 
 After a successful fetch, status should be one line: the package name, that the lock is current,
 and that the workspace is buildable. Extra lines appear only for drift such as a missing lock,
-unmaterialized or dirty checkouts, edits, or enabled overrides. Status does not inspect `build/`,
+missing or dirty checkouts, edits, or enabled overrides. Status does not inspect `build/`,
 fetch, update, or contact remotes. When it finds drift, it lists the problems and names the
 corrective command without returning a failure merely because the workspace is dirty or incomplete.
 
-If you run status before fetch, the header says the lock is absent or the graph is not buildable,
-and the following lines name the missing lock or materialization. Status returns nonzero only when
+If you run status before fetch, the header says the lock is absent and the graph is incomplete,
+and the following lines name the missing lock or checkouts. Status returns nonzero only when
 required JSON cannot be read and parsed.
 
 ## Preview a new solve, then apply it
