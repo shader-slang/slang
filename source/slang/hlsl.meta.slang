@@ -32601,6 +32601,8 @@ CoopVec<T, N> exp2<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 [require(cooperative_vector)]
 CoopVec<T, N> exp10<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
+    // No cooperative-vector backend provides a dedicated exp10 intrinsic, so map the scalar
+    // operation across the lanes.
     CoopVec<T, N> ret;
     for(int i = 0; i < N; ++i)
         ret[i] = exp10(x[i]);
