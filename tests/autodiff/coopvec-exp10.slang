@@ -11,10 +11,10 @@
 // CHECK-NEXT: 4.605
 // CHECK-NEXT: 69.07
 // CHECK-NEXT: 921.0
-// CHECK-NEXT: 0.230
-// CHECK-NEXT: 4.605
-// CHECK-NEXT: 69.07
-// CHECK-NEXT: 921.0
+// CHECK-NEXT: 0.921
+// CHECK-NEXT: 6.907
+// CHECK-NEXT: 46.05
+// CHECK-NEXT: 230.2
 
 typealias FloatCoopVec4 = CoopVec<float, 4>;
 typealias DPFloatCoopVec4 = DifferentialPair<FloatCoopVec4>;
@@ -32,13 +32,14 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain()
 {
     let value = FloatCoopVec4(-1.0, 0.0, 1.0, 2.0);
-    let seed = FloatCoopVec4(1.0, 2.0, 3.0, 4.0);
+    let forwardSeed = FloatCoopVec4(1.0, 2.0, 3.0, 4.0);
+    let reverseSeed = FloatCoopVec4(4.0, 3.0, 2.0, 1.0);
 
     let primal = differentiableExp10(FloatCoopVec4(0.0));
-    let forward = fwd_diff(differentiableExp10)(diffPair(value, seed));
+    let forward = fwd_diff(differentiableExp10)(diffPair(value, forwardSeed));
 
     var reverseInput = DPFloatCoopVec4(value, FloatCoopVec4(0.0));
-    bwd_diff(differentiableExp10)(reverseInput, seed);
+    bwd_diff(differentiableExp10)(reverseInput, reverseSeed);
 
     primal.store(outputBuffer, 0);
     forward.d.store(outputBuffer, 16);
