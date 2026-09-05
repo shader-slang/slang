@@ -992,6 +992,141 @@ SLANG_UNIT_TEST(PackageToolIgnoreOverridesParksEditedDependency)
     SLANG_CHECK(workspaceAfterRestore == workspaceAfterFirst);
 }
 
+// A dependency checkout that holds local work is refused before the graph is resolved, and `edit`
+// can adopt that checkout without losing the work.
+//
+// Consider this example: `deps/noise` was materialized from the lock, a file in it is edited
+// without running `slang package edit noise`, and a new `noise` release is then published. Update
+// must stop while it still has nothing to undo: the lock it would rewrite, the sibling `helper`
+// checkout it would replace, and the local change in `deps/noise` are all left exactly as they
+// were. `edit noise` then succeeds on that dirty tree, which is the action both `status` and the
+// refusal recommend for keeping the work.
+SLANG_UNIT_TEST(PackageToolUpdateRefusesDirtyUnregisteredCheckout)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+
+    auto makeGitPackage = [&](const String& name, const String& source) -> String
+    {
+        String repository = Path::combine(temp.path, String("upstream-") + name);
+        SLANG_CHECK_ABORT(Path::createDirectoryRecursive(repository));
+        Manifest package;
+        package.name = name;
+        package.exports.add("src");
+        package.licenseFiles.add("LICENSE");
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            writeManifest(Path::combine(repository, "slang-package.json"), package, error)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(_writeFile(Path::combine(repository, "LICENSE"), name + " license\n")));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            _writeFile(Path::combine(repository, String("src/") + name + ".slang"), source)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+        return repository;
+    };
+
+    String noiseRepo = makeGitPackage("noise", "module noise;\n");
+    String helperRepo = makeGitPackage("helper", "module helper;\n");
+
+    Manifest root;
+    String rootManifestPath = Path::combine(temp.path, "slang-package.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    Dependency noiseDep;
+    noiseDep.name = "noise";
+    noiseDep.git = noiseRepo;
+    noiseDep.version = ">=1.0.0";
+    root.dependencies.add(noiseDep);
+    Dependency helperDep;
+    helperDep.name = "helper";
+    helperDep.git = helperRepo;
+    helperDep.version = ">=1.0.0";
+    root.dependencies.add(helperDep);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+
+    const char* updateArguments[] = {"slang-package", "update", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+
+    const String noiseCheckoutSource = Path::combine(temp.path, "deps/noise/src/noise.slang");
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(noiseCheckoutSource, "module noise;\n// local\n")));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        Path::combine(noiseRepo, "src/noise.slang"),
+        "module noise;\n// v1.1\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepo, "v1.1.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        Path::combine(helperRepo, "src/helper.slang"),
+        "module helper;\n// v1.1\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(helperRepo, "v1.1.0")));
+
+    PackageTool::LockFile lockBefore;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockBefore, error)));
+
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("without --clean")) >= 0);
+    // The refusal names the same drift facts `status` reports, which is what distinguishes the
+    // preflight from the identical rule inside materialization: only the preflight can describe
+    // the checkout before a solve has happened.
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("noise: 1 changed")) >= 0);
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("slang package edit noise")) >= 0);
+
+    const char* fetchArguments[] = {"slang-package", "fetch"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("noise: 1 changed")) >= 0);
+
+    // Nothing was resolved, written, or replaced: the lock still selects v1.0.0, the sibling
+    // checkout that the refused update would have upgraded is untouched, and the local change
+    // survives.
+    PackageTool::LockFile lockAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockAfter, error)));
+    SLANG_CHECK(lockFilesEqual(lockBefore, lockAfter));
+    String helperAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::readAllText(Path::combine(temp.path, "deps/helper/src/helper.slang"), helperAfter)));
+    SLANG_CHECK(helperAfter == "module helper;\n");
+    String noiseAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(noiseCheckoutSource, noiseAfter)));
+    SLANG_CHECK(noiseAfter == "module noise;\n// local\n");
+
+    // A dry run installs nothing, so a dirty checkout does not stop it from reporting the plan.
+    const char* dryRunArguments[] = {"slang-package", "update", "--dry-run"};
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(dryRunArguments), dryRunArguments, error)));
+
+    // Adopting the dirty checkout is the recommended way to keep the work, so it must succeed.
+    const char* editArguments[] = {"slang-package", "edit", "noise"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(editArguments), editArguments, error)));
+    String editedNoise;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(noiseCheckoutSource, editedNoise)));
+    SLANG_CHECK(editedNoise == "module noise;\n// local\n");
+    String statusReport;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("noise: edited")) >= 0);
+
+    const char* cleanUneditArguments[] = {"slang-package", "unedit", "noise", "--clean", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(cleanUneditArguments),
+        cleanUneditArguments,
+        error)));
+    String restoredNoise;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(noiseCheckoutSource, restoredNoise)));
+    SLANG_CHECK(restoredNoise == "module noise;\n");
+}
+
 SLANG_UNIT_TEST(PackageToolEditBlocksCheckoutMoves)
 {
     TemporaryDirectory temp;

@@ -106,13 +106,26 @@ String formatResolveFailure(const ResolveFailure& failure);
 /// Default output is a rationale for each selected package, then a count. `--minimal` keeps
 /// one-liners for every selected package, including unchanged ones, and the count. The installed
 /// Slang toolchain is not listed unless resolution fails its constraint.
+///
+/// `planned` selects the tense of every verb. A report that describes a solve which has not been
+/// materialized yet -- a dry run, or the plan `update` prints before asking for confirmation --
+/// must pass `true` so it reads `would upgrade` and `Would update`, because a reader cannot tell
+/// a proposal from a result once the tense says the work is done.
 String formatResolveReport(
     const Manifest& rootManifest,
     const LockFile* previous,
     const LockFile& next,
     const ResolveReport& report,
-    bool dryRun,
+    bool planned,
     bool minimal);
+
+/// Format only the applied count line, for `slang package update` to print once the lock and the
+/// checkouts it names have actually been written.
+String formatResolveSummary(
+    const Manifest& rootManifest,
+    const LockFile* previous,
+    const LockFile& next,
+    const ResolveReport& report);
 
 } // namespace PackageTool
 } // namespace Slang

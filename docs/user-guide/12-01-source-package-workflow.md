@@ -100,6 +100,15 @@ rewrites the lock.
 Use fetch for ordinary development and for CI. Pass `--clean` only when you intend to replace a
 dirty or unowned checkout.
 
+Fetch and update never discard local work as a side effect. Both inspect the checkouts the current
+lock owns before doing anything else, and stop with an error naming each one that holds local
+state: uncommitted files, stashes, a different `HEAD`, a different origin, or a directory that is
+no longer a Git checkout. Update stops there before it even resolves the graph, so it reports no
+plan and rewrites no lock. Registered edits and overrides are exempt because those trees are
+yours and are never replaced. The three ways forward are to commit or discard the changes, run
+`slang package edit NAME` to keep working in that checkout, or re-run with `--clean` to discard
+the local state and restore the locked commit.
+
 If dependencies exist but the lock is missing, fetch performs the initial solve, prints the
 selection report, and asks before writing the first lock. Pass `--yes` in a non-interactive
 checkout. Once a lock exists, fetch reproduces it and never reselects versions.
@@ -142,8 +151,11 @@ git -C deps/color-convert describe --tags --exact-match
 git -C deps/color-encoding describe --tags --exact-match
 ```
 
-Update prints the report again and asks whether to apply that exact in-memory selection. Use
-`slang package update --yes` for automation. All three should now print `v1.1.0`. Convert's tighter
+Update prints the report again and asks whether to apply that exact in-memory selection. The
+report is a plan, so it is written in the future tense (`would upgrade`, `Would update 3
+packages`); the past-tense summary is printed only after the lock and the checkouts it names have
+actually been written. Use `slang package update --yes` for automation. All three should now
+print `v1.1.0`. Convert's tighter
 encoding range (`>=1.1.0`) and the
 publisher retraction of `1.0.0` agree: the shared leaf is `color-encoding@v1.1.0`, once, in the
 lock.
@@ -222,8 +234,11 @@ Two local mechanisms, both recorded in gitignored `slang-workspace.json`:
 `slang package edit NAME` keeps the published Git pin in the lock and stops treating
 `deps/NAME` as replaceable tool-owned state. Fetch and update will not overwrite that checkout.
 If a resolve would select a different commit for it, they stop with an error before changing any
-checkout. Changing its exports or dependencies still requires a new published tag and a normal
-`update` after `unedit`, or an override if the local tree should participate in resolution.
+checkout. The checkout may already contain local changes when you run `edit`: adopting work you
+have already started is the point of the command, and it is what `status` recommends when it
+reports a dirty checkout. Changing its exports or dependencies still requires a new published tag
+and a normal `update` after `unedit`, or an override if the local tree should participate in
+resolution.
 Default `unedit` accepts a different committed `HEAD`, but refuses while the tree has uncommitted
 files or stashes so work cannot be forgotten accidentally. `unedit NAME --clean` discards all
 local state and restores the locked commit; pass `--yes` when confirmation cannot be interactive.

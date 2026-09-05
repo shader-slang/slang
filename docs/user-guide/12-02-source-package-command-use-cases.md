@@ -370,8 +370,14 @@ slang package edit color-encoding
 
 The checkout stays at `deps/color-encoding`; the lock keeps its published Git pin. Fetch and update
 do not replace it while the edit is registered. If the selected pin would move that checkout, the
-command fails before applying any other checkout changes. When the checkout is back at its locked
-commit with no changed files or stashes:
+command fails before applying any other checkout changes.
+
+`edit` also accepts a checkout that already has local changes. That is the recommended recovery
+when you modified `deps/color-encoding` first and only then discovered that fetch and update
+refuse to run: registering the edit adopts the work as-is rather than making you choose between
+losing it and hand-copying it elsewhere.
+
+When you are ready to hand the checkout back:
 
 ```sh
 slang package unedit color-encoding
@@ -1300,6 +1306,9 @@ them or update this chapter and its regression tests in the same change.
 - `edit` keeps the published Git identity and prevents replacement of `deps/NAME`. If fetch or
   update would need to move that checkout to a newly selected pin, the command fails before
   applying any checkout changes.
+- `edit` accepts a checkout that already holds local changes, and requires only that the directory
+  is still the Git repository the lock names. Refusing a dirty tree would withhold the one command
+  that preserves the work in exactly the state that needs it.
 - Default `unedit` requires no uncommitted files or stashes but permits a different committed
   `HEAD`; `unedit --clean` restores the locked commit before removing the registration.
 - An edited manifest does not enter the solve.
@@ -1316,7 +1325,10 @@ them or update this chapter and its regression tests in the same change.
 - Local-registration changes regenerate `build/search-paths` when the current lock can represent
   the newly active source. Disabling a lock-adopted override requires update first.
 - Dirty, unregistered Git checkouts are not replaced without `--clean`; registered edits remain
-  protected.
+  protected. Fetch and update check every checkout the current lock owns before they do anything
+  else, so update stops before resolving rather than after reporting a plan it cannot apply. The
+  refusal names each checkout and its drift using the same facts `status` prints, and offers the
+  same three ways forward: commit or discard, `edit` the checkout, or re-run with `--clean`.
 
 ### Validation contract
 

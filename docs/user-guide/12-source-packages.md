@@ -264,6 +264,12 @@ Dependency checkout paths are stable. A pin stays at `deps/NAME` while it is too
 and returned to tool ownership. Fetch and update refuse to replace an unregistered checkout with
 changed files, extra commits, or stashes. Pass `--clean` explicitly to permit replacement.
 
+That refusal happens first, before any other work: both commands inspect every checkout the
+current lock owns up front, and update stops before resolving rather than after printing a plan it
+cannot apply. The error names each checkout and its drift in the same terms `status` uses, and the
+ways forward are to commit or discard the changes, run `slang package edit NAME` to keep working in
+that checkout, or re-run with `--clean`.
+
 Run `slang package update` deliberately when manifest constraints or upstream releases change.
 `slang package update --dry-run` prints the selected graph (what moved, what stayed, and why)
 without writing the lock or replacing checkouts. `--ignore-overrides` solves from Git even when
@@ -363,7 +369,9 @@ source remains visible under `deps/`; generated files go under `build/`.
 `deps/NAME`) as editable without moving it. The Git pin remains in the lock; gitignored
 `slang-workspace.json` records that the package tool no longer owns the working tree. Fetch and
 update do not modify an edited checkout. If the selected Git pin for that package would change,
-they fail before applying any checkout changes so other dependencies are not moved either. Use
+they fail before applying any checkout changes so other dependencies are not moved either. The
+checkout may already have local changes when `edit` runs; it only has to still be the Git
+repository the lock names. Use
 `slang package unedit NAME` after committing local changes to return a clean checkout to
 package-tool ownership. The checkout may be at a different commit from the lock; `unedit` refuses
 only while it has uncommitted files or stashes. `unedit NAME --clean` instead discards all local

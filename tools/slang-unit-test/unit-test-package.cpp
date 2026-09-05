@@ -3453,6 +3453,13 @@ SLANG_UNIT_TEST(PackageResolveReportFormat)
             UnownedStringSlice("Would update 2 packages: 1 upgraded, 1 added; 0 unchanged.")) >= 0);
     SLANG_CHECK(detailedDryRun.getUnownedSlice().indexOf(UnownedStringSlice("would update")) < 0);
 
+    // The summary printed once the lock and checkouts have been written is the only place that may
+    // claim the work happened, and it carries no per-package rationale of its own.
+    String summary = formatResolveSummary(root, &previous, next, report);
+    SLANG_CHECK(
+        summary.getUnownedSlice() ==
+        UnownedStringSlice("Updated 2 packages: 1 upgraded, 1 added; 0 unchanged.\n"));
+
     String minimal = formatResolveReport(root, &previous, next, report, false, true);
     SLANG_CHECK(
         minimal.getUnownedSlice().indexOf(UnownedStringSlice("Resolving dependencies...")) < 0);

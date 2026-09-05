@@ -39,6 +39,8 @@ static void _printHelp(bool experimental = false)
         "  init             Create a package manifest and standard directories.\n"
         "  fetch [--clean] [--yes] [--skip-validate]\n"
         "                   Materialize dependencies from the lock file.\n"
+        "                   Stops before changing anything when a checkout holds local\n"
+        "                   state; --clean discards that state instead.\n"
         "  update [--ignore-overrides] [--clean] [--dry-run] [--minimal] [--yes]\n"
         "         [--skip-validate]\n"
         "                   Re-resolve dependencies and update the lock file.\n"
@@ -48,6 +50,8 @@ static void _printHelp(bool experimental = false)
         "                   --yes applies without an interactive confirmation.\n"
         "                   --skip-validate skips source-layout and publish checks.\n"
         "                   Graph, manifest, checkout, and toolchain checks still run.\n"
+        "                   Stops before resolving when a checkout holds local state;\n"
+        "                   --clean discards that state instead.\n"
         "  build [--skip-validate]\n"
         "                   Build the distributable source bundle and docs.\n"
         "  run [name] [args...]\n"
@@ -67,6 +71,7 @@ static void _printHelp(bool experimental = false)
         "  override enable|disable|remove <name> | override list\n"
         "                   Manage retained local dependency overrides.\n"
         "  edit <name>      Make a dependency checkout editable in place.\n"
+        "                   Accepts a checkout that already has local changes.\n"
         "                   Fetch and update fail if the selected pin would move it.\n"
         "  unedit <name> [--clean] [--yes]\n"
         "                   Return a clean checkout to tool ownership.\n"
@@ -1001,6 +1006,134 @@ static void _warnSkippedSourceValidation()
         "(--skip-validate).\n");
 }
 
+/// Join nonzero Git checkout facts, omitting zero ahead/behind/stash counts.
+///
+/// Consider this example: a lock pins `color` at commit A, and `deps/color` has one untracked
+/// file but is still at A. Status should say `color: 1 changed`, not four zero counters. If HEAD
+/// is not A and `rev-list` reports no ahead/behind (for example a detached other commit), the
+/// remaining fact is `not at locked commit`.
+///
+/// An empty result therefore means the checkout is clean and sitting on the locked commit, which
+/// is exactly the condition under which materialization is allowed to replace it. Both `status`
+/// and the fetch/update preflight describe drift through this function so that the facts a user
+/// reads from `status` are the same facts that stop a command.
+static String _describeDirtyCheckout(
+    const GitWorkingTreeStatus& gitStatus,
+    const String& expectedCommit)
+{
+    List<String> facts;
+    if (gitStatus.changedFileCount)
+        facts.add(String(gitStatus.changedFileCount) + " changed");
+    if (gitStatus.commitsAhead)
+        facts.add(String(gitStatus.commitsAhead) + " ahead");
+    if (gitStatus.commitsBehind)
+        facts.add(String(gitStatus.commitsBehind) + " behind");
+    if (gitStatus.stashCount)
+    {
+        facts.add(
+            String(gitStatus.stashCount) + (gitStatus.stashCount == 1 ? " stash" : " stashes"));
+    }
+    if (gitStatus.headCommit != expectedCommit && !gitStatus.commitsAhead &&
+        !gitStatus.commitsBehind)
+        facts.add("not at locked commit");
+    StringBuilder detail;
+    for (Index i = 0; i < facts.getCount(); ++i)
+        detail << (i ? ", " : "") << facts[i];
+    return detail.produceString();
+}
+
+/// Fail when a checkout the lock owns holds local work that this command would have to discard.
+///
+/// Consider this example: `deps/color-encoding` was materialized from the lock, and then a file
+/// in it is edited without running `slang package edit color-encoding`. Materialization already
+/// refuses to overwrite that tree without `--clean`, but it only reaches that decision after the
+/// graph has been resolved, the plan has been printed, the user has confirmed it, and
+/// `build/search-paths` has been cleared. The user is then told the command failed after reading
+/// a report that described the new graph as if it had been installed.
+///
+/// Never discarding local work without `--clean` is the overriding rule here, so the trees the
+/// current lock owns are inspected before anything else happens: no solve, no report, no prompt,
+/// no cleared search paths. Registered edits and overrides are skipped because those trees belong
+/// to the user and materialization does not touch them; whether an edit's *pin* may move is a
+/// separate question, answered by `_refuseIfEditedCheckoutsWouldMove` once a lock is in hand.
+static SlangResult _refuseIfOwnedCheckoutsAreDirty(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const LockFile& lock,
+    const List<LocalPackage>& localPackages,
+    String& outError)
+{
+    String depsRoot = Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest));
+    List<String> dirtyNames;
+    List<String> dirtyFacts;
+    for (const auto& package : lock.packages)
+    {
+        if (findActiveLocalPackageIndex(localPackages, package.name) >= 0 ||
+            !isGitBackedLockedPackage(package) || package.path.getLength())
+        {
+            continue;
+        }
+
+        String destination = Path::combine(depsRoot, package.name);
+        SlangPathType pathType;
+        // An absent checkout is the normal case for fetch and update, and holds nothing to keep.
+        if (SLANG_FAILED(Path::getPathType(destination, &pathType)) ||
+            pathType != SLANG_PATH_TYPE_DIRECTORY)
+        {
+            continue;
+        }
+
+        auto addDirty = [&](const String& description)
+        {
+            dirtyNames.add(package.name);
+            dirtyFacts.add(package.name + ": " + description);
+        };
+
+        // A path that is not the repository the lock names is reported rather than inspected: Git
+        // cannot describe its drift against a commit it does not contain, and materialization
+        // would still have to delete the whole directory to install the locked package there.
+        String origin;
+        String issue;
+        if (SLANG_FAILED(getRepositoryOrigin(destination, origin, issue)))
+        {
+            addDirty("not a git checkout");
+            continue;
+        }
+        if (origin != package.git)
+        {
+            addDirty("different origin");
+            continue;
+        }
+
+        GitWorkingTreeStatus gitStatus;
+        SLANG_RETURN_ON_FAIL(
+            getWorkingTreeStatus(destination, package.commit, gitStatus, outError));
+        String description = _describeDirtyCheckout(gitStatus, package.commit);
+        if (!description.getLength())
+            continue;
+        addDirty(description);
+    }
+    if (!dirtyNames.getCount())
+        return SLANG_OK;
+
+    StringBuilder message;
+    message << "Refusing to replace a dependency checkout under '"
+            << getWorkspaceDepsDirectory(manifest) << "/' that has local state without --clean:";
+    for (const auto& fact : dirtyFacts)
+        message << "\n  " << fact;
+    outError = message.produceString();
+    String editTarget = dirtyNames.getCount() == 1 ? dirtyNames[0] : String("<name>");
+    appendErrorAdvice(
+        outError,
+        String("Fetch and update replace the checkouts the lock owns, so they stop before "
+               "touching any tree when one of them holds local state. Commit or discard the "
+               "changes, run 'slang package edit ") +
+            editTarget +
+            "' to keep working in that checkout, or re-run with '--clean' to discard local "
+            "checkout state and restore the locked commit.");
+    return SLANG_FAIL;
+}
+
 /// Fail when the selected Git pin for an in-place edit is not the commit already in that
 /// working tree, and matching it would require changing the checkout.
 ///
@@ -1123,6 +1256,11 @@ static SlangResult _fetch(
     SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
     SLANG_RETURN_ON_FAIL(
         _refuseIfEditedCheckoutsWouldMove(projectRoot, localPackages, &lock, lock, outError));
+    if (!allowClean)
+    {
+        SLANG_RETURN_ON_FAIL(
+            _refuseIfOwnedCheckoutsAreDirty(projectRoot, manifest, lock, localPackages, outError));
+    }
     List<String> warnings;
     SLANG_RETURN_ON_FAIL(
         _validateLocalPackages(projectRoot, lock, localPackages, outError, &warnings));
@@ -1273,6 +1411,19 @@ static SlangResult _update(
         SLANG_RETURN_ON_FAIL(readLockFile(lockPath, previousLock, outError));
         previousLockPtr = &previousLock;
     }
+    // Inspect the checkouts the existing lock owns before resolving. A dirty tool-owned tree means
+    // this update cannot be applied at all, and the user should learn that instead of reading a
+    // plan for a graph that will never be installed. A dry run installs nothing, so it is free to
+    // report the plan regardless of what the checkouts look like.
+    if (previousLockPtr && !dryRun && !allowClean)
+    {
+        SLANG_RETURN_ON_FAIL(_refuseIfOwnedCheckoutsAreDirty(
+            projectRoot,
+            manifest,
+            previousLock,
+            effectiveLocalPackages,
+            outError));
+    }
     if (useLocalResolver)
     {
         for (auto& localPackage : effectiveLocalPackages)
@@ -1319,8 +1470,11 @@ static SlangResult _update(
         outError));
     SLANG_RETURN_ON_FAIL(
         _validateLocalPackages(projectRoot, lock, effectiveLocalPackages, outError, &warnings));
+    // The report is printed before anything is materialized, so it always describes a plan. Only
+    // the summary printed after the lock and the checkouts have been written may claim the work
+    // happened.
     String reportText =
-        formatResolveReport(manifest, previousLockPtr, lock, report, dryRun, minimal);
+        formatResolveReport(manifest, previousLockPtr, lock, report, /* planned */ true, minimal);
     if (ignoredEnabledOverrides)
     {
         fprintf(
@@ -1427,6 +1581,11 @@ static SlangResult _update(
         _writeSearchPaths(projectRoot, manifest, lock, effectiveLocalPackages, outError));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+    if (lockChanges)
+    {
+        String summary = formatResolveSummary(manifest, previousLockPtr, lock, report);
+        fprintf(stdout, "%s", summary.getBuffer());
+    }
     if (useLocalResolver)
     {
         fprintf(
@@ -1487,37 +1646,6 @@ static SlangResult _validate(const String& projectRoot, String& outError)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     fprintf(stdout, "Package is valid and suitable for sharing.\n");
     return SLANG_OK;
-}
-
-/// Join nonzero Git checkout facts, omitting zero ahead/behind/stash counts.
-///
-/// Consider this example: a lock pins `color` at commit A, and `deps/color` has one untracked
-/// file but is still at A. Status should say `color: 1 changed`, not four zero counters. If HEAD
-/// is not A and `rev-list` reports no ahead/behind (for example a detached other commit), the
-/// remaining fact is `not at locked commit`.
-static String _describeDirtyCheckout(
-    const GitWorkingTreeStatus& gitStatus,
-    const String& expectedCommit)
-{
-    List<String> facts;
-    if (gitStatus.changedFileCount)
-        facts.add(String(gitStatus.changedFileCount) + " changed");
-    if (gitStatus.commitsAhead)
-        facts.add(String(gitStatus.commitsAhead) + " ahead");
-    if (gitStatus.commitsBehind)
-        facts.add(String(gitStatus.commitsBehind) + " behind");
-    if (gitStatus.stashCount)
-    {
-        facts.add(
-            String(gitStatus.stashCount) + (gitStatus.stashCount == 1 ? " stash" : " stashes"));
-    }
-    if (gitStatus.headCommit != expectedCommit && !gitStatus.commitsAhead &&
-        !gitStatus.commitsBehind)
-        facts.add("not at locked commit");
-    StringBuilder detail;
-    for (Index i = 0; i < facts.getCount(); ++i)
-        detail << (i ? ", " : "") << facts[i];
-    return detail.produceString();
 }
 
 /// Report lock, checkout, and graph readiness, with extra lines only when something is dirty.
@@ -2521,13 +2649,37 @@ static SlangResult _edit(const String& projectRoot, const String& name, String& 
                    destination;
         return SLANG_FAIL;
     }
-    bool isSafe = false;
-    SLANG_RETURN_ON_FAIL(isWorkingTreeSafeToRemove(destination, package->commit, isSafe, outError));
-    if (!isSafe)
+    // Local file changes are not an obstacle here, they are the reason to run this command: the
+    // user has work in `deps/NAME` and wants the tool to stop managing that tree. Fetch and update
+    // refuse to replace a dirty checkout, so requiring a pristine tree would leave the one
+    // command that preserves the work unavailable in exactly the state that needs it.
+    //
+    // What must still hold is that the tree is the repository the lock names. An edited checkout
+    // keeps its published Git identity in the solve, `unedit` decides whether the tree is
+    // committed, and `unedit --clean` restores the locked commit into it; none of that is
+    // meaningful for a directory that is not that repository.
+    if (isGitBackedLockedPackage(*package))
     {
-        outError = String("Dependency checkout already has changed files, commits, or stashes: ") +
-                   destination;
-        return SLANG_FAIL;
+        String origin;
+        if (SLANG_FAILED(getRepositoryOrigin(destination, origin, outError)))
+        {
+            outError = String("Dependency checkout is not a Git repository: ") + destination;
+            appendErrorAdvice(
+                outError,
+                "Run 'slang package fetch --clean' to restore it from the lock, then edit it.");
+            return SLANG_FAIL;
+        }
+        if (origin != package->git)
+        {
+            outError =
+                String("Dependency checkout is not the repository the lock names: ") + destination;
+            appendErrorAdvice(
+                outError,
+                String("The lock selects ") + package->git +
+                    ". Run 'slang package fetch --clean' to restore that repository, or use an "
+                    "override if this directory should participate in resolution.");
+            return SLANG_FAIL;
+        }
     }
     List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));

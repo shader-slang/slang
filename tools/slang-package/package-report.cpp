@@ -122,20 +122,20 @@ static Index _changeKindOrder(ResolveChangeKind kind)
     }
 }
 
-static const char* _changeVerb(ResolveChangeKind kind, bool dryRun)
+static const char* _changeVerb(ResolveChangeKind kind, bool planned)
 {
     switch (kind)
     {
     case ResolveChangeKind::Added:
-        return dryRun ? "would add" : "added";
+        return planned ? "would add" : "added";
     case ResolveChangeKind::Removed:
-        return dryRun ? "would remove" : "removed";
+        return planned ? "would remove" : "removed";
     case ResolveChangeKind::Upgraded:
-        return dryRun ? "would upgrade" : "upgraded";
+        return planned ? "would upgrade" : "upgraded";
     case ResolveChangeKind::Downgraded:
-        return dryRun ? "would downgrade" : "downgraded";
+        return planned ? "would downgrade" : "downgraded";
     case ResolveChangeKind::Replaced:
-        return dryRun ? "would replace" : "replaced";
+        return planned ? "would replace" : "replaced";
     case ResolveChangeKind::Unchanged:
         return "unchanged";
     }
@@ -422,7 +422,7 @@ static void _collectChanges(
         });
 }
 
-static String _countLine(const List<ResolveChange>& changes, bool dryRun)
+static String _countLine(const List<ResolveChange>& changes, bool planned)
 {
     Index added = 0;
     Index removed = 0;
@@ -461,19 +461,19 @@ static String _countLine(const List<ResolveChange>& changes, bool dryRun)
         }
     }
 
-    // The summary is a standalone sentence, so it is capitalized for both the dry-run and the
+    // The summary is a standalone sentence, so it is capitalized for both the planned and the
     // applied spelling. Per-package lines are list entries and stay lowercase for every verb, so
     // capitalization tracks the role of the line rather than which verb the line happens to use.
     StringBuilder builder;
     if (moved == 0)
     {
         builder << "No package versions changed.\n";
-        builder << (dryRun ? "Would update " : "Updated ");
+        builder << (planned ? "Would update " : "Updated ");
         builder << "0 packages; " << unchanged << " unchanged.\n";
         return builder.produceString();
     }
 
-    builder << (dryRun ? "Would update " : "Updated ") << moved
+    builder << (planned ? "Would update " : "Updated ") << moved
             << (moved == 1 ? " package: " : " packages: ");
     bool first = true;
     auto appendPart = [&](Index count, const char* label)
@@ -499,7 +499,7 @@ String formatResolveReport(
     const LockFile* previous,
     const LockFile& next,
     const ResolveReport& report,
-    bool dryRun,
+    bool planned,
     bool minimal)
 {
     List<ResolveChange> changes;
@@ -512,7 +512,7 @@ String formatResolveReport(
     auto appendHeadline = [&](const ResolveChange& change, bool goStyle)
     {
         builder << (minimal || goStyle ? "" : "  ");
-        builder << _changeVerb(change.kind, dryRun) << " " << change.name << " "
+        builder << _changeVerb(change.kind, planned) << " " << change.name << " "
                 << (goStyle ? _goHeadlineRest(change) : _headlineRest(change)) << "\n";
     };
 
@@ -532,8 +532,19 @@ String formatResolveReport(
         }
     }
 
-    builder << _countLine(changes, dryRun);
+    builder << _countLine(changes, planned);
     return builder.produceString();
+}
+
+String formatResolveSummary(
+    const Manifest& rootManifest,
+    const LockFile* previous,
+    const LockFile& next,
+    const ResolveReport& report)
+{
+    List<ResolveChange> changes;
+    _collectChanges(rootManifest, previous, next, report, changes);
+    return _countLine(changes, false);
 }
 
 } // namespace PackageTool
