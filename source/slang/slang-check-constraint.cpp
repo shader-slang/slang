@@ -4326,8 +4326,8 @@ bool SemanticsVisitor::TryUnifyTypes(
     // Generic-argument inference works against the interface, not its existential box: a
     // parameter of type `dyn IFoo<n>` matched against an argument of type `dyn IFoo<3>` (or a
     // concrete `X` that conforms to `IFoo<3>`) must infer `n = 3`. Unwrap the `ExistentialType`
-    // to the interface it boxes and recurse, so the existing interface unification /
-    // inheritance-facet paths run exactly as they did before the box existed.
+    // to the interface it boxes and recurse, so the interface unification / inheritance-facet
+    // paths handle the inference.
     //
     // Exception: when the *other* side is a bare generic type parameter still being solved (e.g.
     // `T` matched against `dyn IFoo`), we must NOT unwrap — that parameter binds to the box
