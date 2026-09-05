@@ -3176,6 +3176,13 @@ public:
 
     SubtypeWitness* isTypeDifferentiable(Type* type);
 
+    /// If `type` is an existential-box type `dyn IFoo` whose interface `IFoo` refines `superType`,
+    /// manufacture and return an `ExistentialBoxConformanceWitness` witnessing `type : superType`
+    /// (storing the underlying `IFoo : superType` witness); otherwise null. This is the only site
+    /// that manufactures such a witness — the box is not otherwise treated as conforming to
+    /// `superType`. It is used only by the differentiability queries. See #12430 / PR #12555.
+    SubtypeWitness* tryGetExistentialBoxConformanceWitness(Type* type, Type* superType);
+
     bool doesTypeHaveTag(Type* type, TypeTag tag);
 
     TypeTag getTypeTags(Type* type);

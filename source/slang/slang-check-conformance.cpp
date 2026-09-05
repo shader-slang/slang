@@ -438,6 +438,20 @@ Type* SemanticsVisitor::maybeFormExistentialType(Type* type)
     return type;
 }
 
+SubtypeWitness* SemanticsVisitor::tryGetExistentialBoxConformanceWitness(
+    Type* type,
+    Type* superType)
+{
+    auto interfaceType = getExistentialInterfaceType(type);
+    if (!interfaceType)
+        return nullptr;
+    auto interfaceWitness =
+        as<SubtypeWitness>(tryGetInterfaceConformanceWitness(interfaceType, superType));
+    if (!interfaceWitness)
+        return nullptr;
+    return m_astBuilder->getExistentialBoxConformanceWitness(type, superType, interfaceWitness);
+}
+
 SubtypeWitness* SemanticsVisitor::isTypeDifferentiable(Type* type)
 {
     if (auto valueWitness =
@@ -449,6 +463,15 @@ SubtypeWitness* SemanticsVisitor::isTypeDifferentiable(Type* type)
             m_astBuilder->getDifferentiableRefInterfaceType(),
             IsSubTypeOptions::None))
         return ptrWitness;
+
+    // An existential-box type `dyn IFoo` does not itself conform to the differentiable interface,
+    // but we treat it as differentiable when its interface `IFoo` refines the differentiable value
+    // interface — mirroring how a bare interface parameter of a `[Differentiable]` function is
+    // handled, so the lowered IR is unchanged. The manufactured witness is distinct from the
+    // interface's refinement witness (its `sub` is the box type). See #12430.
+    if (auto boxWitness =
+            tryGetExistentialBoxConformanceWitness(type, m_astBuilder->getDiffInterfaceType()))
+        return boxWitness;
 
     return nullptr;
 }

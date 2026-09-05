@@ -1434,6 +1434,14 @@ SubtypeWitness* ASTBuilder::getEachSubtypeWitness(
     return getOrCreate<EachSubtypeWitness>(subType, superType, patternWitness);
 }
 
+SubtypeWitness* ASTBuilder::getExistentialBoxConformanceWitness(
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* interfaceWitness)
+{
+    return getOrCreate<ExistentialBoxConformanceWitness>(subType, superType, interfaceWitness);
+}
+
 SubtypeWitness* ASTBuilder::getFirstSubtypeWitness(
     Type* subType,
     Type* superType,

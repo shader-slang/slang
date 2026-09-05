@@ -864,10 +864,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
         if (auto wrappedInterfaceType = getExistentialInterfaceType(baseInterfaceType))
             baseInterfaceType = wrappedInterfaceType;
 
-        auto witness = visitor.isSubtype(
-            (Slang::Type*)type,
-            baseInterfaceType,
-            IsSubTypeOptions::None);
+        auto witness =
+            visitor.isSubtype((Slang::Type*)type, baseInterfaceType, IsSubTypeOptions::None);
         if (auto subtypeWitness = as<SubtypeWitness>(witness))
         {
             result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);

@@ -1704,6 +1704,12 @@ Type* SemanticsVisitor::tryGetDifferentialValueType(ASTBuilder* builder, Type* t
 
 Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
 {
+    // The differential of an existential box `dyn IFoo` is the differential of its interface
+    // `IFoo` — namely the differentiable interface itself — matching how a bare interface parameter
+    // of a `[Differentiable]` function is handled.
+    if (auto interfaceType = getExistentialInterfaceType(type))
+        return tryGetDifferentialType(builder, interfaceType);
+
     if (auto ptrType = as<PtrTypeBase>(type))
     {
         if (as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
@@ -2125,7 +2131,7 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
     }
 
     bool hasDiffValueConformance = false;
-    if (isDeclRefTypeOf<InterfaceDecl>(type))
+    if (isDeclRefTypeOf<InterfaceDecl>(type) || as<ExistentialType>(type))
     {
         // Existential types. There's not a proper way to represent
         // the differential of an existential type (yet).
@@ -2134,9 +2140,16 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
         //
         // The backend will treat it as if its a tuple of existentials.
         //
-        if (auto witness = tryGetInterfaceConformanceWitness(
-                type,
-                getASTBuilder()->getDifferentiableInterfaceType()))
+        // For an existential-box type `dyn IFoo` we manufacture a distinct
+        // `ExistentialBoxConformanceWitness` (whose `sub` is the box type) rather than reusing the
+        // interface's refinement witness; the registered pair type keys on `dyn IFoo`, which lowers
+        // to the same IR as the bare interface case. See #12430.
+        auto diffInterfaceType = getASTBuilder()->getDifferentiableInterfaceType();
+        SubtypeWitness* witness =
+            as<ExistentialType>(type)
+                ? tryGetExistentialBoxConformanceWitness(type, diffInterfaceType)
+                : as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, diffInterfaceType));
+        if (witness)
         {
             this->getParentDifferentiableAttribute()->addAssocVal(
                 type,
@@ -2148,9 +2161,10 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
                 getCurrentASTBuilder()->getDifferentiableInterfaceType());
             // Leave the rest unregistered for now. The backend will take care of it.
         }
-        else if (tryGetInterfaceConformanceWitness(
-                     type,
-                     getASTBuilder()->getDifferentiableRefInterfaceType()))
+        else if (
+            !as<ExistentialType>(type) && tryGetInterfaceConformanceWitness(
+                                              type,
+                                              getASTBuilder()->getDifferentiableRefInterfaceType()))
         {
             // Unsupported at the moment.
             SLANG_UNEXPECTED("existential differentiable pointer types not supported");
@@ -7675,9 +7689,10 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
 {
     expr->typeExpr = CheckProperType(expr->typeExpr);
     // The right-hand side of `is` is a type-test *target*, a position where an interface names
-    // itself (like a generic constraint) rather than denoting the existential box. `CheckProperType`
-    // will have boxed a bare interface into `dyn IFoo`; unwrap it so the downstream subtype and
-    // optional-constraint checks run against the interface, as they did before the box existed.
+    // itself (like a generic constraint) rather than denoting the existential box.
+    // `CheckProperType` will have boxed a bare interface into `dyn IFoo`; unwrap it so the
+    // downstream subtype and optional-constraint checks run against the interface, as they did
+    // before the box existed.
     if (auto rhsInterfaceType = getExistentialInterfaceType(expr->typeExpr.type))
         expr->typeExpr.type = rhsInterfaceType;
     auto originalVal = CheckTerm(expr->value);
@@ -7691,7 +7706,7 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // The value of an `is` test now has existential type `dyn IFoo`; recover the interface it
     // boxes so the runtime-check witness below is derived against the interface, not the box.
     auto boxedInterfaceType = getExistentialInterfaceType(unwrappedValueType);
-    auto valueInterfaceType = boxedInterfaceType         ? boxedInterfaceType
+    auto valueInterfaceType = boxedInterfaceType                    ? boxedInterfaceType
                               : isInterfaceType(unwrappedValueType) ? unwrappedValueType
                                                                     : valueType;
 
@@ -7776,7 +7791,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     // The cast source now has existential type `dyn IFoo`; recover the boxed interface so the
     // runtime-cast witness below is derived against the interface, not the box.
     auto boxedInterfaceType = getExistentialInterfaceType(unwrappedValueType);
-    auto valueInterfaceType = boxedInterfaceType         ? boxedInterfaceType
+    auto valueInterfaceType = boxedInterfaceType                    ? boxedInterfaceType
                               : isInterfaceType(unwrappedValueType) ? unwrappedValueType
                                                                     : valueType;
 

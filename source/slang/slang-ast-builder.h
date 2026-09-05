@@ -807,6 +807,11 @@ public:
         Type* superType,
         SubtypeWitness* patternWitness);
 
+    SubtypeWitness* getExistentialBoxConformanceWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* interfaceWitness);
+
     SubtypeWitness* getFirstSubtypeWitness(
         Type* subType,
         Type* superType,

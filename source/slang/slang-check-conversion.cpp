@@ -2315,7 +2315,8 @@ bool SemanticsVisitor::_coerce(
                 // must be expanded into a transitive chain first (as the interface-to-interface
                 // cast at the general subtype path below does).
                 if (fromExistential)
-                    witness = normalizeSubtypeWitnessForInterfaceUpcast(sourceInterfaceType, witness);
+                    witness =
+                        normalizeSubtypeWitnessForInterfaceUpcast(sourceInterfaceType, witness);
                 if (outToExpr)
                 {
                     *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);

@@ -2324,6 +2324,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             irBuilder->emitEachInst(witnessTableType, getSimpleVal(context, elementWitness)));
     }
 
+    LoweredValInfo visitExistentialBoxConformanceWitness(ExistentialBoxConformanceWitness* witness)
+    {
+        // The claim `dyn IFoo : IBar` lowers to exactly the witness that the underlying interface
+        // refines the super-interface (`IFoo : IBar`). Since `dyn IFoo` lowers to the same IR type
+        // as `IFoo`, an existential-box parameter of a `[Differentiable]` function produces the
+        // same IR as a bare interface parameter would.
+        return lowerVal(context, witness->getInterfaceWitness());
+    }
+
     LoweredValInfo visitFirstSubtypeWitness(FirstSubtypeWitness* witness)
     {
         auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());

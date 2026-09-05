@@ -506,6 +506,54 @@ void EachSubtypeWitness::_toTextOverride(StringBuilder& out)
     out << toSlice(")");
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!! ExistentialBoxConformanceWitness !!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Val* ExistentialBoxConformanceWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto newSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto newSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
+    auto newInterfaceWitness =
+        as<SubtypeWitness>(getInterfaceWitness()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return getCurrentASTBuilder()->getExistentialBoxConformanceWitness(
+        newSub,
+        newSup,
+        newInterfaceWitness);
+}
+
+Val* ExistentialBoxConformanceWitness::_resolveImplOverride()
+{
+    int diff = 0;
+    auto newInterfaceWitness = as<SubtypeWitness>(getInterfaceWitness()->resolve());
+    if (newInterfaceWitness != getInterfaceWitness())
+        diff++;
+    auto newSub = as<Type>(getSub()->resolve());
+    if (newSub != getSub())
+        diff++;
+    auto newSup = as<Type>(getSup()->resolve());
+    if (newSup != getSup())
+        diff++;
+    if (!diff)
+        return this;
+    return getCurrentASTBuilder()->getExistentialBoxConformanceWitness(
+        newSub,
+        newSup,
+        newInterfaceWitness);
+}
+
+void ExistentialBoxConformanceWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("ExistentialBoxConformanceWitness(");
+    getInterfaceWitness()->toText(out);
+    out << toSlice(")");
+}
+
 namespace
 {
 template<typename TWitness>
