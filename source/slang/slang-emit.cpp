@@ -645,11 +645,10 @@ void calcRequiredLoweringPassSet(
         result.lateRequireCapability = true;
         break;
     case kIROp_MatrixType:
-        // An `Unknown` layout needs the pass. So does `Unknown` passed as a generic argument,
-        // which this scan cannot recognize, so a generic (non-literal) layout requests it too.
-        if (auto matrixType = as<IRMatrixType>(inst))
         {
-            auto layout = as<IRIntLit>(matrixType->getLayout());
+            // An `Unknown` layout needs the pass. So does `Unknown` passed as a generic argument,
+            // which this scan cannot recognize, so a generic (non-literal) layout requests it too.
+            auto layout = as<IRIntLit>(cast<IRMatrixType>(inst)->getLayout());
             if (!layout || layout->getValue() == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
                 result.unresolvedMatrixLayout = true;
         }

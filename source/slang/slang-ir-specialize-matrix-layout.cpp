@@ -52,6 +52,8 @@ struct UnresolvedMatrixLayoutCollector
     // Needs `matrixLayoutModeType`, so call after `visitMatrixTypes`.
     void visitSpecializeInsts(IRInst* parent)
     {
+        SLANG_ASSERT(matrixLayoutModeType);
+
         for (auto child : parent->getChildren())
         {
             if (auto specializeInst = as<IRSpecialize>(child))
