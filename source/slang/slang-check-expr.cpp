@@ -1706,9 +1706,11 @@ Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
 {
     // The differential of an existential box `dyn IFoo` is the differential of its interface
     // `IFoo` — namely the differentiable interface itself — matching how a bare interface parameter
-    // of a `[Differentiable]` function is handled.
-    if (auto interfaceType = getExistentialInterfaceType(type))
-        return tryGetDifferentialType(builder, interfaceType);
+    // of a `[Differentiable]` function is handled. Match only an unmodified `ExistentialType`: a
+    // `no_diff dyn IFoo` (a `ModifiedType`) must retain no differential, so we must not look
+    // through the modifier here.
+    if (auto existentialType = as<ExistentialType>(type))
+        return tryGetDifferentialType(builder, existentialType->getInterfaceType());
 
     if (auto ptrType = as<PtrTypeBase>(type))
     {

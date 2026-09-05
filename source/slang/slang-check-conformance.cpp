@@ -167,6 +167,10 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
         if (!witness)
             witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableRefInterfaceType());
 
+        // Do not synthesize an existential-box witness here: `DiffTypeInfoWitness` needs a
+        // runtime-usable conformance witness for the parameter, whereas the box witness only
+        // encodes static interface refinement, which dynamic-dispatch backward-diff lowering cannot
+        // consume as a witness table.
         return witness;
     };
 
@@ -442,9 +446,13 @@ SubtypeWitness* SemanticsVisitor::tryGetExistentialBoxConformanceWitness(
     Type* type,
     Type* superType)
 {
-    auto interfaceType = getExistentialInterfaceType(type);
-    if (!interfaceType)
+    // Match only an unmodified existential-box type. In particular we must NOT look through a
+    // `ModifiedType` here (as `getExistentialInterfaceType` would): a `no_diff dyn IFoo` parameter
+    // must stay non-differentiable, or an explicit `no_diff` would be silently defeated.
+    auto existentialType = as<ExistentialType>(type);
+    if (!existentialType)
         return nullptr;
+    auto interfaceType = existentialType->getInterfaceType();
     auto interfaceWitness =
         as<SubtypeWitness>(tryGetInterfaceConformanceWitness(interfaceType, superType));
     if (!interfaceWitness)
@@ -465,10 +473,9 @@ SubtypeWitness* SemanticsVisitor::isTypeDifferentiable(Type* type)
         return ptrWitness;
 
     // An existential-box type `dyn IFoo` does not itself conform to the differentiable interface,
-    // but we treat it as differentiable when its interface `IFoo` refines the differentiable value
-    // interface — mirroring how a bare interface parameter of a `[Differentiable]` function is
-    // handled, so the lowered IR is unchanged. The manufactured witness is distinct from the
-    // interface's refinement witness (its `sub` is the box type). See #12430.
+    // but we report it as differentiable when its interface `IFoo` refines the differentiable value
+    // interface, so that box-typed values participate in differentiation. The manufactured witness
+    // is distinct from the interface's refinement witness (its `sub` is the box type). See #12430.
     if (auto boxWitness =
             tryGetExistentialBoxConformanceWitness(type, m_astBuilder->getDiffInterfaceType()))
         return boxWitness;

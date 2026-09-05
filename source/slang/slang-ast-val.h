@@ -1096,9 +1096,9 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
 /// confused with an actual conformance of the interface `IFoo` itself.
 ///
 /// This is currently manufactured only when the front-end checks whether an existential-box type is
-/// differentiable (see `SemanticsVisitor::isTypeDifferentiable`), so that a `[Differentiable]`
-/// function can treat a `dyn IFoo` parameter exactly as it treats a bare interface parameter and
-/// the lowered IR is unchanged. It lowers to the same IR as its underlying witness.
+/// differentiable (see `SemanticsVisitor::isTypeDifferentiable`), so that the box's
+/// differentiable-type classification and registration match those of its interface. It lowers to
+/// the same IR as its stored underlying witness.
 FIDDLE()
 class ExistentialBoxConformanceWitness : public SubtypeWitness
 {
