@@ -849,6 +849,17 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
     if (typeOut.type)
         type = typeOut.type;
 
+    // Resolving a type *by name* (reflection `findTypeByName`, `-conformance`)
+    // names an interface *as an interface*, not as its existential value type.
+    // `tryCoerceToProperType` boxes a bare interface into `dyn IFoo` (correct for
+    // in-language data-type positions), so undo that top-level boxing for the
+    // named result: `findTypeByName("IFoo")` must return the named interface, not
+    // an unnamed box, and `isSubType(concrete, IFoo)` must hold. Only the outer
+    // result is normalized; nested data-type positions (e.g. the element of
+    // `Optional<dyn IFoo>`) stay boxed.
+    if (auto interfaceType = getExistentialInterfaceType(type))
+        type = interfaceType;
+
     if (type)
     {
         m_types[typeStr] = type;

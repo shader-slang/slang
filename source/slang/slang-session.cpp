@@ -857,9 +857,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
         SemanticsVisitor visitor(getSemanticsForReflection());
         visitor = visitor.withSink(&sink);
 
-        // The second argument names an interface as an interface (does the concrete type conform
-        // to it?), but name-based type lookup runs proper-type coercion and so may hand us the
-        // existential box `dyn IFoo`. Unwrap to the interface so the conformance witness is found.
+        // `interfaceType` names an interface, but a caller may pass one obtained
+        // from a value/field/parameter position, where an interface reflects as
+        // its existential box `dyn IFoo` (still `Kind::Interface`). Normalize a
+        // top-level box to the interface so `isSubtype(concrete, IFoo)` finds the
+        // conformance witness. (The `getTypeFromString` name-resolution path is
+        // already normalized; this guards the boxes that reach this public API
+        // through other reflection paths.)
         Slang::Type* baseInterfaceType = (Slang::Type*)interfaceType;
         if (auto wrappedInterfaceType = getExistentialInterfaceType(baseInterfaceType))
             baseInterfaceType = wrappedInterfaceType;
