@@ -840,9 +840,14 @@ Result readSerializedModuleSerializationVersion(RIFF::Chunk const* chunk, UInt64
 
     Fossilized<IRModuleInfo>* fossilizedModuleInfo = cast<Fossilized<IRModuleInfo>>(rootValPtr);
 
-    // Only one version supported so far, if we had multiple versions to
-    // support this is where we might branch
-    if (fossilizedModuleInfo->serializationVersion != IRModuleInfo::kSupportedSerializationVersion)
+    // IR-decode-time backstop for the version check, sharing the one accepted
+    // version via `getSupportedModuleSerializationVersion()`. The primary
+    // enforcement is the early gate in `Linkage::loadSerializedModuleContents` /
+    // `Session::_readBuiltinModule`, which rejects an incompatible module before
+    // its AST is decoded (AST node tags are positional); this check covers any
+    // IR-only read path. If we ever support a back-compat window this becomes a
+    // list of accepted versions.
+    if (fossilizedModuleInfo->serializationVersion != getSupportedModuleSerializationVersion())
         return SLANG_FAIL;
 
     IRModuleInfo info;
