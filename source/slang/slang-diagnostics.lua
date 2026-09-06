@@ -435,6 +435,12 @@ err(
 
 err("riff-hash-mismatch", 91, "riff hash mismatch - incompatible riff")
 
+err(
+    "incompatible-serialized-module-version",
+    88,
+    "the serialized module '~path' was built with an incompatible serialization format version (~foundVersion); this compiler reads serialized modules of version ~expectedVersion, so the module must be recompiled from source"
+)
+
 err("unable-to-create-directory", 92, "unable to create directory '~path'")
 
 err("unable-to-extract-repro-to-directory", 93, "unable to extract repro to directory '~path'")

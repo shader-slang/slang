@@ -40,7 +40,15 @@ struct IRModuleInfo
     // IRModuleInst or IRConstants.
     // If we want to support back compat we'll need to change this to a list of
     // accepted values, and branch on that later down.
-    const static UInt64 kSupportedSerializationVersion = 1;
+    //
+    // This value stamps the whole serialized-module container, so it must also
+    // be bumped whenever the *AST* serialization changes in a
+    // backward-incompatible way: AST nodes are serialized by their positional
+    // `ASTNodeType` tag with no stable-name indirection (unlike IR opcodes), so
+    // inserting a node type mid-hierarchy shifts every later tag and would make a
+    // module written by an older compiler decode incorrectly instead of being
+    // rejected.
+    const static UInt64 kSupportedSerializationVersion = 2;
     FIDDLE() UInt64 serializationVersion = kSupportedSerializationVersion;
     // Include the specific compiler version in serialized output, in case we
     // ever need to do any version specific workarounds.
@@ -782,6 +790,30 @@ Result readSerializedModuleInfo(
     version = fossilizedModule->m_version;
     compilerVersion = fossilizedModuleInfo->fullVersion.get();
     name = fossilizedModuleInfo->module->m_name.get();
+    return SLANG_OK;
+}
+
+UInt64 getSupportedModuleSerializationVersion()
+{
+    return IRModuleInfo::kSupportedSerializationVersion;
+}
+
+Result readSerializedModuleSerializationVersion(RIFF::Chunk const* chunk, UInt64& outVersion)
+{
+    auto dataChunk = as<RIFF::DataChunk>(chunk);
+    if (!dataChunk)
+        return SLANG_FAIL;
+
+    Fossil::AnyValPtr rootValPtr =
+        Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
+    if (!rootValPtr)
+        return SLANG_FAIL;
+
+    // `serializationVersion` is the first field of `IRModuleInfo` and has been
+    // present since the first fossil version, so reading it is safe for any
+    // module the compiler has ever written.
+    Fossilized<IRModuleInfo>* fossilizedModuleInfo = cast<Fossilized<IRModuleInfo>>(rootValPtr);
+    outVersion = fossilizedModuleInfo->serializationVersion;
     return SLANG_OK;
 }
 

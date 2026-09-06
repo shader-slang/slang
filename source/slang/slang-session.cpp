@@ -2184,6 +2184,29 @@ SlangResult Linkage::loadSerializedModuleContents(
     if (!irChunk)
         return SLANG_FAIL;
 
+    // Reject a module written by an incompatible compiler version before we
+    // decode its AST. AST nodes are serialized by their positional `ASTNodeType`
+    // tag, so a module written before a node type was inserted mid-hierarchy
+    // would silently mis-decode (or crash) if we read it. The container's
+    // serialization version lives in the IR chunk and is present in every module
+    // ever written, so we can check it here without touching the AST.
+    {
+        UInt64 foundVersion = 0;
+        const UInt64 expectedVersion = getSupportedModuleSerializationVersion();
+        if (SLANG_FAILED(readSerializedModuleSerializationVersion(irChunk, foundVersion)) ||
+            foundVersion != expectedVersion)
+        {
+            if (sink)
+            {
+                sink->diagnose(Diagnostics::IncompatibleSerializedModuleVersion{
+                    .path = moduleFilePathInfo.foundPath,
+                    .foundVersion = String(foundVersion),
+                    .expectedVersion = String(expectedVersion)});
+            }
+            return SLANG_FAIL;
+        }
+    }
+
     auto astBuilder = getASTBuilder();
     auto session = getSessionImpl();
 

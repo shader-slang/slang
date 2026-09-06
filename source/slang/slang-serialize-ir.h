@@ -35,6 +35,23 @@ void writeSerializedModuleIR(
     UInt& version,
     String& name);
 
+// Returns the serialized-module container format version that this build of the
+// compiler writes and is able to read back (see `kSupportedSerializationVersion`
+// in slang-serialize-ir.cpp).
+UInt64 getSupportedModuleSerializationVersion();
+
+// Reads just the serialization format version stamped in a serialized IR module
+// chunk, without decoding the module. This lets a caller reject a module written
+// by an incompatible compiler version *before* decoding its AST, whose
+// `ASTNodeType` tags are positional and would otherwise mis-decode across
+// versions. It reads only the leading version field, assuming the well-formed
+// IR-module fossil layout the compiler writes; it does not otherwise validate
+// the payload (a corrupt fossil root is handled by the fossil reader itself).
+// Returns SLANG_FAIL if `chunk` is not a fossil data chunk.
+[[nodiscard]] Result readSerializedModuleSerializationVersion(
+    RIFF::Chunk const* chunk,
+    UInt64& outVersion);
+
 // Enable a mild optimization by putting instructions with payloads at the end
 // of the stream to make deserialization slightly faster
 const bool kReorderInstructionsForSerialization = true;
