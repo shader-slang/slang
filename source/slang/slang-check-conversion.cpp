@@ -1636,7 +1636,7 @@ static bool isSigned(Type* t)
 // unsigned source stores its value directly (so UINT64_MAX, which is -1 when
 // viewed as signed, is the full 2^64-1 magnitude), while a signed source uses
 // the magnitude of its two's-complement value.
-static bool isIntExactlyRepresentableInFloat(
+static bool isIntExactlyRepresentableWithMantissaBits(
     IntegerLiteralValue value,
     bool isSourceUnsigned,
     int mantissaBits)
@@ -2812,8 +2812,9 @@ bool SemanticsVisitor::_coerce(
                 if (auto moduleDecl = module->getModuleDecl())
                     isCoreModule = moduleDecl->hasModifier<FromCoreModuleModifier>();
 
-            // Cache the constant-fold result so both the overflow check and
-            // the UnrecommendedImplicitConversion check can reuse it.
+            // Cache the constant-fold result so the overflow check, the
+            // UnrecommendedImplicitConversion check, and the lossy
+            // integer->float/double check below can all reuse it.
             ConstantIntVal* cachedFoldedVal = nullptr;
             bool hasFolded = false;
             auto getFoldedIntVal = [&]() -> ConstantIntVal*
@@ -2949,6 +2950,10 @@ bool SemanticsVisitor::_coerce(
             // pervasive in real shader code, so it is diagnosed only under the
             // opt-in -Wpedantic group, and only when the source type is wide
             // enough that precision could actually be lost.
+            //
+            // These are always this low-cost builtin conversion when reified
+            // here, so the block needs no conversion-cost guard of its own: it
+            // never coincides with the high-cost type-mismatch path above.
             int mantissaBits = 0;
             bool toDouble = false;
             if (auto basicToType = as<BasicExpressionType>(toType))
@@ -2966,11 +2971,15 @@ bool SemanticsVisitor::_coerce(
                     break;
                 }
             }
-            if (!isCoreModule && sink && mantissaBits != 0)
+            // Restrict to builtin integer sources so isSigned() below is
+            // well-defined: a folded constant of a non-basic type (e.g. an enum
+            // member) must not reach the magnitude check, where a negative value
+            // would otherwise be misread as a ~2^64 unsigned magnitude.
+            if (!isCoreModule && sink && mantissaBits != 0 && isScalarIntegerType(fromType.type))
             {
                 if (auto val = getFoldedIntVal())
                 {
-                    if (!isIntExactlyRepresentableInFloat(
+                    if (!isIntExactlyRepresentableWithMantissaBits(
                             val->getValue(),
                             !isSigned(fromType.type),
                             mantissaBits))
@@ -2987,9 +2996,13 @@ bool SemanticsVisitor::_coerce(
                                 .expr = fromExpr});
                     }
                 }
-                else if (
-                    isScalarIntegerType(fromType.type) &&
-                    getMaximumTypeBitSize(fromType.type) > mantissaBits)
+                // A non-constant source cannot be proven lossy at compile time,
+                // so warn only when its storage width exceeds the mantissa. That
+                // width comparison is a conservative bound, exact here only
+                // because integer widths are coarse (8/16/32/64): none lands in
+                // the (25..31)/(54..63) gap where the width could exceed the
+                // mantissa while every representable value still fits.
+                else if (getMaximumTypeBitSize(fromType.type) > mantissaBits)
                 {
                     if (toDouble)
                         sink->diagnose(

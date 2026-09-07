@@ -10,15 +10,17 @@
 // source type is wide enough to actually lose precision.
 //
 // Each warning emits two rows -- the summary and the detailed span message --
-// so the assertions below appear in matching pairs (and twice where two source
-// lines produce the same warning). The check is exhaustive, so the absence of
-// an assertion for the representable / power-of-two / explicit-cast /
+// so the assertions below appear in matching pairs, and repeat where several
+// source lines produce the same warning. The check is exhaustive, so the
+// absence of an assertion for the representable / power-of-two / explicit-cast /
 // int32->double cases also asserts that they produce no diagnostic. See #12929.
 
 // Default: only the provably-lossy constant conversions warn.
 //DIAGNOSTIC_TEST:SIMPLE(diag=DEFAULT):
 //DEFAULT: integer-to-float conversion loses precision
 //DEFAULT: integer-to-float conversion loses precision
+//DEFAULT: integer-to-float conversion loses precision
+//DEFAULT: 'int' to 'float' loses precision
 //DEFAULT: 'int' to 'float' loses precision
 //DEFAULT: 'int' to 'float' loses precision
 //DEFAULT: integer-to-double conversion loses precision
@@ -30,6 +32,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=PEDANTIC): -Wpedantic
 //PEDANTIC: integer-to-float conversion loses precision
 //PEDANTIC: integer-to-float conversion loses precision
+//PEDANTIC: integer-to-float conversion loses precision
+//PEDANTIC: 'int' to 'float' loses precision
 //PEDANTIC: 'int' to 'float' loses precision
 //PEDANTIC: 'int' to 'float' loses precision
 //PEDANTIC: integer-to-float conversion may lose precision
@@ -49,6 +53,10 @@ void testConversions(int i, int64_t l)
     // Constant *expression* that folds to a non-representable value (2^24 + 1):
     // exercises the constant-fold path, not just literals -> warns by default.
     float ce = 16777216 + 1;
+
+    // Negative constant not representable in float's mantissa -> warns by default,
+    // exercising the value < 0 (two's-complement magnitude) branch of the helper.
+    float n = -123456789;
 
     // Representable constant -> never warns.
     float b = 123;
@@ -72,6 +80,9 @@ void testConversions(int i, int64_t l)
     // reads as -1, so representability must use the unsigned magnitude. Not
     // representable in double -> warns by default (guards the signedness path).
     double u = 0xFFFFFFFFFFFFFFFF;
+
+    // 2^53 exactly: representable in double -> never warns (double analogue of `bound`).
+    double dbound = 9007199254740992;
 
     // 32-bit int -> double is always exact -> never warns, even under -Wpedantic.
     double g = i;
