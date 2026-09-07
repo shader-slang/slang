@@ -1625,17 +1625,18 @@ static bool isSigned(Type* t)
     }
 }
 
-// Return true if the integer `value` is exactly representable in a binary
-// floating-point type with `mantissaBits` bits of precision, counting the
-// implicit leading 1 (`float` has 24, `double` has 53). An integer is exact
-// iff the significant bits of its magnitude -- i.e. the value with its trailing
-// zeros removed -- fit in the mantissa. For example 123 and 2^28 are exact in
-// `float`, but 123456789 needs 27 significant bits and is rounded to 123456792.
+// Return true if `value` is exactly representable in a binary floating-point
+// type with `mantissaBits` bits of precision, counting the implicit leading 1
+// (`float` has 24, `double` has 53). An integer is exact iff the significant
+// bits of its magnitude -- i.e. the value with its trailing zeros removed -- fit
+// in the mantissa. For example 123 and 2^28 are exact in `float`, but 123456789
+// needs 27 significant bits and is rounded to 123456792.
 //
-// `isSourceUnsigned` selects how the 64-bit `value` bit pattern is read: an
-// unsigned source stores its value directly (so UINT64_MAX, which is -1 when
-// viewed as signed, is the full 2^64-1 magnitude), while a signed source uses
-// the magnitude of its two's-complement value.
+// `isSourceUnsigned` selects how the 64-bit `value` bit pattern is read into a
+// magnitude: an unsigned source stores its value directly (so UINT64_MAX, which
+// is -1 when viewed as signed, is the full 2^64-1 magnitude), while a signed
+// source uses the magnitude of its two's-complement value (so -1 is magnitude 1,
+// which is representable -- not a spurious 2^64-1).
 static bool isIntExactlyRepresentableWithMantissaBits(
     IntegerLiteralValue value,
     bool isSourceUnsigned,
@@ -2943,17 +2944,23 @@ bool SemanticsVisitor::_coerce(
             // int64 -> double are costed below the general warning threshold
             // because float/double are the preferred integer->real targets for
             // overload ranking, so the UnrecommendedImplicitConversion branch
-            // above never covers them. A constant source is diagnosed only when
-            // its exact value is not representable in the target's mantissa
-            // (default-on, mirroring the constant-overflow warning). A
-            // non-constant source cannot be proven lossy at compile time and is
-            // pervasive in real shader code, so it is diagnosed only under the
-            // opt-in -Wpedantic group, and only when the source type is wide
-            // enough that precision could actually be lost.
+            // above never covers them. These are always this low-cost builtin
+            // conversion when reified here, so the block needs no conversion-cost
+            // guard of its own; it never coincides with the type-mismatch path.
             //
-            // These are always this low-cost builtin conversion when reified
-            // here, so the block needs no conversion-cost guard of its own: it
-            // never coincides with the high-cost type-mismatch path above.
+            // Two tiers, matching what can be proven at compile time:
+            //   * An integer *literal* source has an exact, known value, so it is
+            //     diagnosed by default when that value is not representable in the
+            //     target mantissa (mirroring the constant-overflow warning).
+            //   * A non-constant source cannot be proven lossy and is pervasive in
+            //     shader code, so it is diagnosed only under the opt-in -Wpedantic
+            //     group, and only when its type is wide enough to lose precision.
+            //
+            // Folded constant *expressions* are intentionally left undiagnosed:
+            // constant folding evaluates in 64 bits without wrapping at each typed
+            // operation (e.g. `uint(0xffffffff) + 2` folds to 0x100000001, not the
+            // 1u it is at runtime), so the folded value cannot be trusted for a
+            // representability check without a dedicated typed-folding path.
             int mantissaBits = 0;
             bool toDouble = false;
             if (auto basicToType = as<BasicExpressionType>(toType))
@@ -2971,35 +2978,20 @@ bool SemanticsVisitor::_coerce(
                     break;
                 }
             }
-            // Restrict to builtin integer sources so isSigned() below is
-            // well-defined: a folded constant of a non-basic type (e.g. an enum
-            // member) must not reach the magnitude check, where a negative value
-            // would otherwise be misread as a ~2^64 unsigned magnitude.
+            // Restrict to builtin integer sources so the literal payload is a
+            // magnitude and getMaximumTypeBitSize returns a real width.
             if (!isCoreModule && sink && mantissaBits != 0 && isScalarIntegerType(fromType.type))
             {
-                if (auto val = getFoldedIntVal())
+                if (as<IntegerLiteralExpr>(fromExpr))
                 {
-                    // Constant folding evaluates in 64 bits without wrapping to
-                    // the source type's width (the overflow check above relies on
-                    // that un-wrapped value), but the value actually converted to
-                    // float is the source-typed, wrapped value -- e.g.
-                    // `uint(0xffffffff) + 2` is 1u at runtime, not 0x100000001.
-                    // Normalize to the source width so representability matches
-                    // what is emitted.
-                    bool isSourceUnsigned = !isSigned(fromType.type);
-                    IntegerLiteralValue v = val->getValue();
-                    if (int width = getMaximumTypeBitSize(fromType.type); width > 0 && width < 64)
-                    {
-                        uint64_t mask = (uint64_t(1) << width) - 1;
-                        uint64_t bits = (uint64_t)v & mask;
-                        if (!isSourceUnsigned && (bits & (uint64_t(1) << (width - 1))) != 0)
-                            bits |= ~mask; // sign-extend a negative signed value
-                        v = (IntegerLiteralValue)bits;
-                    }
-                    if (!isIntExactlyRepresentableWithMantissaBits(
-                            v,
-                            isSourceUnsigned,
-                            mantissaBits))
+                    // A literal's value is exactly what is converted (no
+                    // arithmetic, so no wrapping); its signedness selects how the
+                    // payload is read into a magnitude (see the helper's contract).
+                    if (auto val = getFoldedIntVal();
+                        val && !isIntExactlyRepresentableWithMantissaBits(
+                                   val->getValue(),
+                                   !isSigned(fromType.type),
+                                   mantissaBits))
                     {
                         if (toDouble)
                             sink->diagnose(Diagnostics::LossyImplicitIntegerToDoubleConversion{
@@ -3013,13 +3005,13 @@ bool SemanticsVisitor::_coerce(
                                 .expr = fromExpr});
                     }
                 }
-                // A non-constant source cannot be proven lossy at compile time,
-                // so warn only when its storage width exceeds the mantissa. That
-                // width comparison is a conservative bound, exact here only
-                // because integer widths are coarse (8/16/32/64): none lands in
-                // the (25..31)/(54..63) gap where the width could exceed the
-                // mantissa while every representable value still fits.
-                else if (getMaximumTypeBitSize(fromType.type) > mantissaBits)
+                // A non-constant source (constant folding fails) that is wide
+                // enough to lose precision. The width comparison is a conservative
+                // bound, exact here only because integer widths are coarse
+                // (8/16/32/64): none lands in the (25..31)/(54..63) gap where the
+                // width could exceed the mantissa while every representable value
+                // still fits.
+                else if (!getFoldedIntVal() && getMaximumTypeBitSize(fromType.type) > mantissaBits)
                 {
                     if (toDouble)
                         sink->diagnose(
