@@ -19,6 +19,14 @@ SamplerState inputSampler;
 [[vk::binding(2)]]
 RWStructuredBuffer<float4> results;
 
+// A helper taking opaque resources by value, kept as a real function so its parameters exercise
+// the parameter gate in insertDebugValueStore (which runs before general inlining).
+[noinline]
+float4 sampleThroughParams(Texture2D<float4> texParam, SamplerState sampParam, float2 uv)
+{
+    return texParam.SampleLevel(sampParam, uv, 0.0);
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void debugResourceAliases(uint3 threadId : SV_DispatchThreadID)
@@ -33,27 +41,43 @@ void debugResourceAliases(uint3 threadId : SV_DispatchThreadID)
 
     float2 uv = (float2(threadId.xy) + 0.5) / 64.0;
     float4 sampledValue = textureAlias.SampleLevel(samplerAlias, uv, 0.0) +
-                          textureLet.SampleLevel(samplerLet, uv, 0.0);
+                          textureLet.SampleLevel(samplerLet, uv, 0.0) +
+                          sampleThroughParams(inputTexture, inputSampler, uv);
     results[threadId.x] =
         sampledValue + float4(float(scalarMarker) * 0.001, 0.0, 0.0, 0.0);
 }
 
-// The mutable-var texture alias gets a named DebugLocalVariable and a DebugValue bound to it.
+// Group 1 — the OpString names (emitted early, in the debug-string section).
 // CHECK-DAG: %[[TEXNAME:[0-9]+]] = OpString "textureAlias"
+// CHECK-DAG: %[[SMPNAME:[0-9]+]] = OpString "samplerAlias"
+// CHECK-DAG: %[[TEXLETNAME:[0-9]+]] = OpString "textureLet"
+// CHECK-DAG: %[[SMPLETNAME:[0-9]+]] = OpString "samplerLet"
+// CHECK-DAG: %[[TEXPNAME:[0-9]+]] = OpString "texParam"
+// CHECK-DAG: %[[SMPPNAME:[0-9]+]] = OpString "sampParam"
+
+// No opaque-handle alias may get a backing Function OpVariable — that would be illegal SPIR-V.
+// A backing var carries an `OpName %id "_dbgvar_<name>"` (scalars get one, e.g. _dbgvar_scalarMarker),
+// so its absence for the handles locks the core invariant. These CHECK-NOTs sit between the OpString
+// group above and the DebugLocalVariable/DebugValue group below, so their region spans the OpName
+// section where any such backing-var name would appear. (The -g2 source blob escapes quotes as \",
+// so it cannot match the bare-quote OpName literal here.)
+// CHECK-NOT: OpName {{%[A-Za-z0-9_]+}} "_dbgvar_textureAlias"
+// CHECK-NOT: OpName {{%[A-Za-z0-9_]+}} "_dbgvar_samplerAlias"
+// CHECK-NOT: OpName {{%[A-Za-z0-9_]+}} "_dbgvar_textureLet"
+// CHECK-NOT: OpName {{%[A-Za-z0-9_]+}} "_dbgvar_samplerLet"
+// CHECK-NOT: OpName {{%[A-Za-z0-9_]+}} "_dbgvar_texParam"
+// CHECK-NOT: OpName {{%[A-Za-z0-9_]+}} "_dbgvar_sampParam"
+
+// Group 2 — each alias gets a DebugLocalVariable bound to its OpString name, plus a DebugValue.
 // CHECK-DAG: %[[TEXVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[TEXNAME]]
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[TEXVAR]]
-
-// The mutable-var sampler alias gets a named DebugLocalVariable and a DebugValue bound to it.
-// CHECK-DAG: %[[SMPNAME:[0-9]+]] = OpString "samplerAlias"
 // CHECK-DAG: %[[SMPVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[SMPNAME]]
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[SMPVAR]]
-
-// The immutable let texture alias likewise gets a DebugLocalVariable + DebugValue.
-// CHECK-DAG: %[[TEXLETNAME:[0-9]+]] = OpString "textureLet"
 // CHECK-DAG: %[[TEXLETVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[TEXLETNAME]]
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[TEXLETVAR]]
-
-// The immutable let sampler alias likewise gets a DebugLocalVariable + DebugValue.
-// CHECK-DAG: %[[SMPLETNAME:[0-9]+]] = OpString "samplerLet"
 // CHECK-DAG: %[[SMPLETVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[SMPLETNAME]]
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[SMPLETVAR]]
+// CHECK-DAG: %[[TEXPVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[TEXPNAME]]
+// CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[TEXPVAR]]
+// CHECK-DAG: %[[SMPPVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[SMPPNAME]]
+// CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[SMPPVAR]]
