@@ -78,6 +78,14 @@ void testConversions(int i, int64_t l)
     // un-wrapped folded value 0x100000001).
     float w = uint(0xffffffff) + 2;
 
+    // Parser-folded unary operators on a literal fold into the literal node with
+    // an un-truncated 64-bit payload, but the converted value is the payload
+    // reduced to the source width. `-0xffffffff` (a uint) is 1u, `~0xffffffff` is
+    // 0u -- both representable, so neither warns (guards the width-reduction path).
+    float um = -0xffffffff;
+    float un = ~0xffffffff;
+    double ud = -0xffffffff;
+
     // Non-constant int -> float: only under -Wpedantic.
     float e = i;
 

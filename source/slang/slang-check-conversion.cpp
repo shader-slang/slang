@@ -1625,27 +1625,43 @@ static bool isSigned(Type* t)
     }
 }
 
-// Return true if `value` is exactly representable in a binary floating-point
-// type with `mantissaBits` bits of precision, counting the implicit leading 1
-// (`float` has 24, `double` has 53). An integer is exact iff the significant
-// bits of its magnitude -- i.e. the value with its trailing zeros removed -- fit
-// in the mantissa. For example 123 and 2^28 are exact in `float`, but 123456789
-// needs 27 significant bits and is rounded to 123456792.
+// Return true if the integer `value` is exactly representable in a binary
+// floating-point type with `mantissaBits` bits of precision, counting the
+// implicit leading 1 (`float` has 24, `double` has 53). An integer is exact iff
+// the significant bits of its magnitude -- i.e. the value with its trailing
+// zeros removed -- fit in the mantissa. For example 123 and 2^28 are exact in
+// `float`, but 123456789 needs 27 significant bits and is rounded to 123456792.
 //
-// `isSourceUnsigned` selects how the 64-bit `value` bit pattern is read into a
-// magnitude: an unsigned source stores its value directly (so UINT64_MAX, which
-// is -1 when viewed as signed, is the full 2^64-1 magnitude), while a signed
-// source uses the magnitude of its two's-complement value (so -1 is magnitude 1,
-// which is representable -- not a spurious 2^64-1).
+// `value` is the raw 64-bit payload of an integer literal of a source type that
+// is `sourceBitWidth` bits wide and unsigned iff `isSourceUnsigned`. The payload
+// is first reduced to that width, because the parser folds a unary `-`/`+`/`~` on
+// a literal into the literal node without truncating to the source type until IR
+// lowering: e.g. `-0xffffffff` (a `uint`) folds to the 64-bit value -4294967295,
+// but the value actually converted is `(uint)(-4294967295) == 1u`. Reducing to 32
+// unsigned bits recovers 1, which is representable. This is sound for a literal
+// because negation and bitwise-not both commute with truncation mod 2^width, so a
+// chain of unary ops reduced once at the end equals wrapping at each step. The
+// magnitude is then taken by signedness: an unsigned source uses the reduced value
+// directly (so UINT64_MAX is the full 2^64-1), a signed source uses its
+// two's-complement magnitude (so -1 is magnitude 1, not a spurious 2^64-1).
 static bool isIntExactlyRepresentableWithMantissaBits(
     IntegerLiteralValue value,
     bool isSourceUnsigned,
+    int sourceBitWidth,
     int mantissaBits)
 {
+    uint64_t bits = (uint64_t)value;
+    if (sourceBitWidth < 64)
+    {
+        uint64_t mask = (UINT64_C(1) << sourceBitWidth) - 1;
+        bits &= mask;
+        if (!isSourceUnsigned && (bits & (UINT64_C(1) << (sourceBitWidth - 1))))
+            bits |= ~mask;
+    }
     uint64_t magnitude;
     if (isSourceUnsigned)
     {
-        magnitude = (uint64_t)value;
+        magnitude = bits;
     }
     else
     {
@@ -1654,7 +1670,7 @@ static bool isIntExactlyRepresentableWithMantissaBits(
 #pragma warning(push)
 #pragma warning(disable : 4146)
 #endif
-        magnitude = value >= 0 ? (uint64_t)value : -(uint64_t)value;
+        magnitude = (int64_t)bits >= 0 ? bits : -bits;
 #if SLANG_VC
 #pragma warning(pop)
 #endif
@@ -2984,13 +3000,16 @@ bool SemanticsVisitor::_coerce(
             {
                 if (as<IntegerLiteralExpr>(fromExpr))
                 {
-                    // A literal's value is exactly what is converted (no
-                    // arithmetic, so no wrapping); its signedness selects how the
-                    // payload is read into a magnitude (see the helper's contract).
+                    // A literal (including a parser-folded unary `-`/`+`/`~` on a
+                    // literal) carries a single value with no binary arithmetic,
+                    // so reducing its payload to the source width recovers exactly
+                    // what is converted -- see the helper's contract, which takes
+                    // the source width and signedness to do that reduction.
                     if (auto val = getFoldedIntVal();
                         val && !isIntExactlyRepresentableWithMantissaBits(
                                    val->getValue(),
                                    !isSigned(fromType.type),
+                                   getMaximumTypeBitSize(fromType.type),
                                    mantissaBits))
                     {
                         if (toDouble)
