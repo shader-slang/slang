@@ -10636,7 +10636,6 @@ static NodeBase* parseIntrinsicTypeModifier(Parser* parser, void* /*userData*/)
 static NodeBase* parseImplicitConversionModifier(Parser* parser, void* /*userData*/)
 {
     ImplicitConversionModifier* modifier = parser->astBuilder->create<ImplicitConversionModifier>();
-    BuiltinConversionKind builtinKind = kBuiltinConversion_Unknown;
     ConversionCost cost = kConversionCost_Default;
     if (AdvanceIf(parser, TokenType::LParent))
     {
@@ -10653,15 +10652,9 @@ static NodeBase* parseImplicitConversionModifier(Parser* parser, void* /*userDat
             cost = ConversionCost(
                 stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
         }
-        if (AdvanceIf(parser, TokenType::Comma))
-        {
-            builtinKind = BuiltinConversionKind(
-                stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
-        }
         parser->ReadToken(TokenType::RParent);
     }
     modifier->cost = cost;
-    modifier->builtinConversionKind = builtinKind;
     return modifier;
 }
 

@@ -1210,18 +1210,13 @@ ${
             kBaseTypes[tt],
             kBaseTypes[ss]);
 
-        BuiltinConversionKind builtinConversionKind = kBuiltinConversion_Unknown;
-        if (kBaseTypes[tt].tag == BaseType::Double &&
-            kBaseTypes[ss].tag == BaseType::Float)
-            builtinConversionKind = kBuiltinConversion_FloatToDouble;
-
         const char* attrib = "";
         if ((kBaseTypes[tt].flags & kBaseTypes[ss].flags & FLOAT_MASK) != 0)
             attrib = "[Differentiable]";
 $}
     $(attrib)
     __intrinsic_op($(intrinsicOpCode))
-    __implicit_conversion($(conversionCost), $(builtinConversionKind))
+    __implicit_conversion($(conversionCost))
     __init($(kBaseTypes[ss].name) value);
 
 ${
