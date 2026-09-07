@@ -673,17 +673,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     auto& arena = astBuilder->getArena();
     SemanticsVisitor visitor(this);
 
-    // An `enum`'s `__EnumType` conformance is synthesized late -- in
-    // `SemanticsDeclBasesVisitor::visitEnumDecl`, once the enum reaches `ReadyForLookup` --
-    // rather than being written in source. If the enum's bases are linearized before that
-    // point (e.g. `checkModule` drives an `extension` mentioning the enum to `ReadyForLookup`
-    // first), the synthesized base is still missing and a spurious non-conforming result gets
-    // cached. Adding that base later neither bumps the enum's extension epoch nor calls
-    // `invalidateInheritanceInfo`, so the cached entry is never revalidated and the stale
-    // answer survives -- later `T : __EnumType` queries then fail with E38029. Force the enum
-    // to `ReadyForLookup` first so its synthesized base is present before its bases are read.
-    // (`visitEnumDecl` never queries the enum's own inheritance info, so this cannot recurse
-    // into the in-progress computation.)
+    // An enum's `__EnumType` conformance is not written in source; it is synthesized in
+    // `SemanticsDeclBasesVisitor::visitEnumDecl` when the enum reaches `ReadyForLookup`. Its
+    // base list is therefore incomplete until then, so force that state before linearizing to
+    // avoid caching a spurious non-conforming result. (`visitEnumDecl` never queries the enum's
+    // own inheritance info, so this cannot recurse into the in-progress computation.)
     if (auto enumDeclRef = declRef.as<EnumDecl>())
         visitor.ensureDecl(enumDeclRef.getDecl(), DeclCheckState::ReadyForLookup);
 

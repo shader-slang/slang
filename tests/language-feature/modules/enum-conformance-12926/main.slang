@@ -1,15 +1,9 @@
 // Regression for https://github.com/shader-slang/slang/issues/12926.
 //
-// An `enum`'s conformance to the built-in `__EnumType` interface is synthesized
-// late, when the enum is driven to `ReadyForLookup`. When a module is assembled
-// from `__include` fragments, `checkModule` drives every `extension` to
-// `ReadyForLookup` in a dedicated pass that runs before the enum's own
-// declaration is checked. Resolving the `extension EnumBox<Hints>` target below
-// therefore checks `Hints : __EnumType` before that conformance exists, which
-// used to cache a non-conforming result that survived (the inheritance cache is
-// only invalidated by extension-epoch bumps). The later `is_set(hints, ...)`
-// call then read the stale negative and failed with E38029, even though `Hints`
-// genuinely conforms.
+// A `module` assembled from `__include` fragments where an `extension` mentioning
+// the enum is checked before the enum's own declaration; the enum's synthesized
+// `__EnumType` conformance must still be found by the later `is_set<T : __EnumType>`
+// call. (Failed with E38029 before the fix.)
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
