@@ -263,7 +263,7 @@ SLANG_UNIT_TEST(lazyAutodiffModuleMergeDoesNotDuplicateEntries)
     Linkage* linkage = static_cast<Linkage*>(reusedSession.get());
 
     DiagnosticSink sink(linkage->getSourceManager(), nullptr);
-    SharedSemanticsContext context(linkage, nullptr, &sink);
+    SharedSemanticsContext context(linkage, linkage->m_optionSet.getLanguageVersion(), &sink);
 
     // Building the views now picks the supplement up through `Session::coreModules`.
     const Index associationsBeforeMerge = context.getAssociatedDeclsForDecl(primalDecl).getCount();
