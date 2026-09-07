@@ -1,9 +1,8 @@
-// Coverage for the captured-`this` closure-field rename (issue #12923): a captured
-// `this` is given a synthesized `$this` field name on every `this`-capture path, not
-// only the interface default-method path. This exercises the plain-struct method path
-// (whose field name changed from the receiver type's name to `$this`), a default method
-// capturing `this` alongside a local (both the local-keeps-name and this->`$this` naming
-// branches), and nested lambdas that each reference `this`.
+// Additional coverage for capturing `this` in a lambda (issue #12923): the captured
+// receiver is reachable through the synthesized closure on every `this`-capture path.
+// A plain struct method captures `this`; an interface default method captures `this`
+// together with a local variable in one lambda; and a `this` captured only by an inner
+// nested lambda still propagates out through the enclosing lambda.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
