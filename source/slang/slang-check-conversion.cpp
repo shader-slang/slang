@@ -2998,7 +2998,13 @@ bool SemanticsVisitor::_coerce(
             // magnitude and getMaximumTypeBitSize returns a real width.
             if (!isCoreModule && sink && mantissaBits != 0 && isScalarIntegerType(fromType.type))
             {
-                if (as<IntegerLiteralExpr>(fromExpr))
+                // Look through parentheses: `(123456789)` is the same literal
+                // conversion as `123456789` and must be diagnosed identically.
+                Expr* literalExpr = fromExpr;
+                while (auto parenExpr = as<ParenExpr>(literalExpr))
+                    literalExpr = parenExpr->base;
+
+                if (as<IntegerLiteralExpr>(literalExpr))
                 {
                     // A literal (including a parser-folded unary `-`/`+`/`~` on a
                     // literal) carries a single value with no binary arithmetic,

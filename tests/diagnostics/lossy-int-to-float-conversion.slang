@@ -22,6 +22,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DEFAULT):
 //DEFAULT: integer-to-float conversion loses precision
 //DEFAULT: integer-to-float conversion loses precision
+//DEFAULT: integer-to-float conversion loses precision
+//DEFAULT: 'int' to 'float' loses precision
 //DEFAULT: 'int' to 'float' loses precision
 //DEFAULT: 'int' to 'float' loses precision
 //DEFAULT: integer-to-double conversion loses precision
@@ -33,6 +35,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=PEDANTIC): -Wpedantic
 //PEDANTIC: integer-to-float conversion loses precision
 //PEDANTIC: integer-to-float conversion loses precision
+//PEDANTIC: integer-to-float conversion loses precision
+//PEDANTIC: 'int' to 'float' loses precision
 //PEDANTIC: 'int' to 'float' loses precision
 //PEDANTIC: 'int' to 'float' loses precision
 //PEDANTIC: integer-to-float conversion may lose precision
@@ -69,6 +73,10 @@ void testConversions(int i, int64_t l)
     // Explicit cast -> never warns (not an implicit conversion).
     float d = (float)123456789;
 
+    // Parenthesized literal -> warns by default (parentheses are looked through,
+    // so this is the same conversion as the bare literal `a`).
+    float pa = (123456789);
+
     // Constant *expression* (folds, but is not a literal) -> not diagnosed by
     // default, even though 2^24 + 1 is lossy: the folded value is not trusted.
     float ce = 16777216 + 1;
@@ -99,6 +107,10 @@ void testConversions(int i, int64_t l)
 
     // 2^53 exactly: representable in double -> never warns (double analogue of `bound`).
     double dbound = 9007199254740992;
+
+    // 2^63 as an unsigned 64-bit literal: a power of two, so exactly representable
+    // -> never warns (locks the representable end of the unsigned 64-bit path).
+    double ub = 0x8000000000000000;
 
     // 32-bit int -> double is always exact -> never warns, even under -Wpedantic.
     double g = i;
