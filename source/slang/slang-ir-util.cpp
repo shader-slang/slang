@@ -896,6 +896,11 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         break;
     case kIROp_TensorAddressingTensorViewType:
         {
+            // Operands are [dimension, hasDimension, permutation...]; the two leading operands are
+            // rendered by name, so the remaining `getOperandCount() - 2` are the permutation.
+            // Unused trailing permutation slots hold the sentinel 255 (the emitter reads only
+            // `dimension` of them); they are included here so the rendered name still reflects the
+            // full operand list.
             auto tensorView = as<IRTensorAddressingTensorViewType>(type);
             sb << "TensorView<";
             getTypeNameHint(sb, tensorView->getDimension());
