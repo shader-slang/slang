@@ -65,7 +65,7 @@
 //PEDANTIC: warning E30136
 //PEDANTIC: 'int64_t' to 'double' may lose precision
 
-void testConversions(int i, int64_t l)
+void testConversions(int i, int64_t l, intptr_t p)
 {
     // Literal not representable in float's significand -> warns by default.
     float a = 123456789;
@@ -136,6 +136,12 @@ void testConversions(int i, int64_t l)
 
     // Non-constant int -> float: only under -Wpedantic.
     float e = i;
+
+    // intptr_t is pointer-width (target-dependent), so getMaximumTypeBitSize
+    // reports its 64-bit maximum rather than the real width -> never diagnosed,
+    // even under -Wpedantic. Locks the pointer-width exclusion (a value lossy at
+    // 64 bits may be exact at a 32-bit-pointer target, so loss is unprovable here).
+    float ptrf = p;
 
     // Literal not representable in double's significand (2^53 + 1) -> warns by default.
     double f = 9007199254740993;

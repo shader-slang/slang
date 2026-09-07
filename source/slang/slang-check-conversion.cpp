@@ -2994,12 +2994,23 @@ bool SemanticsVisitor::_coerce(
                     break;
                 }
             }
+            // IntPtr/UIntPtr are pointer-width (target-dependent), so
+            // getMaximumTypeBitSize reports their 64-bit maximum, not the actual
+            // width. Exclude them: a pointer-typed literal that is lossy at 64 bits
+            // may be exact at a 32-bit-pointer target, so loss cannot be proven
+            // here, and the width heuristic below would be wrong. (This is exactly
+            // the false-positive class this diagnostic exists to avoid.)
+            auto fromBasicType = as<BasicExpressionType>(fromType.type);
+            bool fromIsPointerWidth =
+                fromBasicType && (fromBasicType->getBaseType() == BaseType::IntPtr ||
+                                  fromBasicType->getBaseType() == BaseType::UIntPtr);
             // Restrict to scalar builtin integer sources. (bool also satisfies
             // isScalarIntegerType, but getMaximumTypeBitSize has no bool case and
             // returns 0, so a bool source reaches neither branch below -- 0 is not
             // > mantissaBits, and a bool is not an IntegerLiteralExpr -- and is
             // harmlessly skipped.)
-            if (!isCoreModule && sink && mantissaBits != 0 && isScalarIntegerType(fromType.type))
+            if (!isCoreModule && sink && mantissaBits != 0 && isScalarIntegerType(fromType.type) &&
+                !fromIsPointerWidth)
             {
                 // Look through parentheses: `(123456789)` is the same literal
                 // conversion as `123456789` and must be diagnosed identically.
