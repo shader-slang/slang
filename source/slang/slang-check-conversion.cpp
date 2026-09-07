@@ -3003,8 +3003,6 @@ bool SemanticsVisitor::_coerce(
             {
                 // Look through parentheses: `(123456789)` is the same literal
                 // conversion as `123456789` and must be diagnosed identically.
-                // peeledExpr is fromExpr with parens removed; it is only known to
-                // be a literal after the as<IntegerLiteralExpr> check below.
                 Expr* peeledExpr = fromExpr;
                 while (auto parenExpr = as<ParenExpr>(peeledExpr))
                     peeledExpr = parenExpr->base;
