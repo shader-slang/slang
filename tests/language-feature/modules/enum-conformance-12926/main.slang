@@ -1,9 +1,8 @@
 // Regression for https://github.com/shader-slang/slang/issues/12926.
 //
-// A `module` assembled from `__include` fragments where an `extension` mentioning
-// the enum is checked before the enum's own declaration; the enum's synthesized
-// `__EnumType` conformance must still be found by the later `is_set<T : __EnumType>`
-// call. (Failed with E38029 before the fix.)
+// The extension-first checking pass evaluates `Hints : __EnumType` (via the extension in
+// ext.slang) before `Hints`'s own declaration is traversed; the enum's synthesized `__EnumType`
+// conformance must still be found by the later `is_set<T : __EnumType>` call.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
@@ -12,8 +11,6 @@ module test_enum_conformance_12926;
 __include enums;
 __include ext;
 
-// A generic helper constrained on the built-in `__EnumType` interface -- the same
-// shape as the `is_set` utility in the bug report.
 public bool is_set<T : __EnumType>(T value, T flag)
 {
     return (__slang_noop_cast<T.__Tag>(value) & __slang_noop_cast<T.__Tag>(flag)) ==

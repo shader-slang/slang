@@ -7,9 +7,9 @@ struct EnumBox<T : __EnumType>
     T value;
 }
 
-// The extension target instantiates a `__EnumType`-constrained generic with `Hints`, forcing
-// `Hints : __EnumType` to be evaluated in the extension-first pass -- before `Hints` itself is
-// checked. This is the ordering that exercises the fix.
+// The extension target instantiates a `__EnumType`-constrained generic with `Hints`, so the
+// extension-first pass evaluates `Hints : __EnumType` -- a lookup that must complete `Hints`'s
+// own conformance before it can answer.
 extension EnumBox<Hints>
 {
     uint dummy() { return 0u; }
