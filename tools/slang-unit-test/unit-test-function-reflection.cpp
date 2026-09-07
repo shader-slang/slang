@@ -18,6 +18,89 @@ static String getTypeFullName(slang::TypeReflection* type)
     return String((const char*)blob->getBufferPointer());
 }
 
+static const char* kLanguageVersionOverloadSource = R"(
+    module reflectionVersion;
+
+    public struct BroadResult {}
+    public struct ShapedResult {}
+
+    public BroadResult choose<T : IFloat>(T value)
+    {
+        return BroadResult();
+    }
+
+    __generic<T : __BuiltinFloatingPointType, let N : int>
+    public ShapedResult choose(vector<T, N> value)
+    {
+        return ShapedResult();
+    }
+
+    public BroadResult rankedChoose<T : IFloat>(T value)
+    {
+        return BroadResult();
+    }
+
+    __generic<T : __BuiltinFloatingPointType, let N : int>
+    [OverloadRank(1)]
+    public ShapedResult rankedChoose(vector<T, N> value)
+    {
+        return ShapedResult();
+    }
+)";
+
+// Resolves the return type selected for `functionName(float3)` in `layout`.
+static String resolveFunctionReturnType(slang::ProgramLayout* layout, const char* functionName)
+{
+    SLANG_CHECK_ABORT(layout != nullptr);
+    auto function = layout->findFunctionByName(functionName);
+    SLANG_CHECK_ABORT(function != nullptr);
+    auto float3Type = layout->findTypeByName("float3");
+    SLANG_CHECK_ABORT(float3Type != nullptr);
+
+    slang::TypeReflection* argTypes[] = {float3Type};
+    auto resolved = function->specializeWithArgTypes(1, argTypes);
+    return resolved ? getTypeFullName(resolved->getReturnType()) : String();
+}
+
+// Resolves `functionName(float3)` through reflection in a fresh session configured for
+// `languageVersion`. A fresh session isolates the version policy under test from module and
+// reflection caches created by the other case.
+static String resolveFunctionReturnTypeForLanguageVersion(
+    SlangLanguageVersion languageVersion,
+    const char* functionName)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry languageVersionEntry = {};
+    languageVersionEntry.name = slang::CompilerOptionName::LanguageVersion;
+    languageVersionEntry.value.kind = slang::CompilerOptionValueKind::Int;
+    languageVersionEntry.value.intValue0 = languageVersion;
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &languageVersionEntry;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromSourceString(
+        "reflectionVersion",
+        "reflection-version.slang",
+        kLanguageVersionOverloadSource,
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    return resolveFunctionReturnType(module->getLayout(), functionName);
+}
+
 // Test that the reflection API provides correct info about entry point and ordinary functions.
 
 SLANG_UNIT_TEST(functionReflection)
@@ -216,6 +299,58 @@ SLANG_UNIT_TEST(functionReflection)
     SLANG_CHECK_ABORT(fooType != nullptr);
     auto ctor = module->getLayout()->findFunctionByNameInType(fooType, "$init");
     SLANG_CHECK(ctor != nullptr);
+}
+
+// Reflection overload resolution has no primary source module, but it still needs an effective
+// Slang language version. Verify that it uses the session option: Slang 2026 applies the deprecated
+// final fallback, while Slang 202c leaves the otherwise-tied candidates ambiguous.
+SLANG_UNIT_TEST(reflectionOverloadUsesSessionLanguageVersion)
+{
+    SLANG_CHECK(
+        resolveFunctionReturnTypeForLanguageVersion(SLANG_LANGUAGE_VERSION_2026, "choose") ==
+        "BroadResult");
+    // The public reflection specialization API reports failure as null and does not expose its
+    // diagnostic sink. First prove that 202c reflection can resolve this same pair of candidate
+    // shapes when the ordinary OverloadRank rule distinguishes them. The diagnostics test proves
+    // that the otherwise-identical `choose` overload set fails specifically because it is
+    // ambiguous, while the final assertion verifies that reflection applies that policy.
+    SLANG_CHECK(
+        resolveFunctionReturnTypeForLanguageVersion(SLANG_LANGUAGE_VERSION_202C, "rankedChoose") ==
+        "ShapedResult");
+    SLANG_CHECK(
+        resolveFunctionReturnTypeForLanguageVersion(SLANG_LANGUAGE_VERSION_202C, "choose")
+            .getLength() == 0);
+}
+
+// Legacy compile requests can process command-line options after reflection has initialized its
+// ad hoc semantic context. Verify that changing `-std` replaces that context instead of retaining
+// overload rules from its originally cached language version.
+SLANG_UNIT_TEST(reflectionRefreshesChangedLanguageVersion)
+{
+    auto session = spCreateSession();
+    auto request = spCreateCompileRequest(session);
+
+    spAddCodeGenTarget(request, SLANG_HLSL);
+    int translationUnitIndex =
+        spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "reflectionVersion");
+    spAddTranslationUnitSourceString(
+        request,
+        translationUnitIndex,
+        "reflection-version.slang",
+        kLanguageVersionOverloadSource);
+    SLANG_CHECK_ABORT(spCompile(request) == SLANG_OK);
+
+    auto layout = slang::ShaderReflection::get(request);
+    SLANG_CHECK(resolveFunctionReturnType(layout, "choose") == "BroadResult");
+
+    const char* slang202cArgs[] = {"-std", "202c"};
+    SLANG_CHECK_ABORT(
+        spProcessCommandLineArguments(request, slang202cArgs, SLANG_COUNT_OF(slang202cArgs)) ==
+        SLANG_OK);
+    SLANG_CHECK(resolveFunctionReturnType(layout, "choose").getLength() == 0);
+
+    spDestroyCompileRequest(request);
+    spDestroySession(session);
 }
 
 // Regression test for shader-slang/slang#11277. `ModifiedType` wrappers

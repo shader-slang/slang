@@ -25,6 +25,11 @@ jobs:
     # Only when the bridge completed successfully (it always should; this guards
     # against a cancelled/failed relay run).
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Repo-scoped writes (assignees, review requests, comments) use
+    # github-actions[bot]; org-team reads and ProjectsV2 writes still use the PAT.
+    permissions:
+      issues: write
+      pull-requests: write
     uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
     secrets:
       SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}
