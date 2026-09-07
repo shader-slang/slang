@@ -852,6 +852,64 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         getTypeNameHint(sb, as<IRDescriptorHandleType>(type)->getResourceType());
         sb << ">";
         break;
+    case kIROp_RayQueryType:
+        // The sole operand is the ray-flags value; include it so `RayQuery<flags>` instantiations
+        // that differ only in flags get distinct names.
+        sb << "RayQuery<";
+        getTypeNameHint(sb, type->getOperand(0));
+        sb << ">";
+        break;
+    case kIROp_CoopVectorType:
+        sb << "CoopVec<";
+        getTypeNameHint(sb, as<IRCoopVectorType>(type)->getElementType());
+        sb << ",";
+        getTypeNameHint(sb, as<IRCoopVectorType>(type)->getElementCount());
+        sb << ">";
+        break;
+    case kIROp_CoopMatrixType:
+        {
+            // Include every operand (scope and use as well as element/shape): each is part of the
+            // cooperative-matrix type identity, so omitting any would collide distinct types.
+            auto coopMat = as<IRCoopMatrixType>(type);
+            sb << "CoopMat<";
+            getTypeNameHint(sb, coopMat->getElementType());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getScope());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getRowCount());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getColumnCount());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getMatrixUse());
+            sb << ">";
+        }
+        break;
+    case kIROp_TensorAddressingTensorLayoutType:
+        {
+            auto tensorLayout = as<IRTensorAddressingTensorLayoutType>(type);
+            sb << "TensorLayout<";
+            getTypeNameHint(sb, tensorLayout->getDimension());
+            sb << ",";
+            getTypeNameHint(sb, tensorLayout->getClampMode());
+            sb << ">";
+        }
+        break;
+    case kIROp_TensorAddressingTensorViewType:
+        {
+            auto tensorView = as<IRTensorAddressingTensorViewType>(type);
+            sb << "TensorView<";
+            getTypeNameHint(sb, tensorView->getDimension());
+            sb << ",";
+            getTypeNameHint(sb, tensorView->getHasDimension());
+            UInt permutationCount = tensorView->getOperandCount() - 2;
+            for (UInt i = 0; i < permutationCount; i++)
+            {
+                sb << ",";
+                getTypeNameHint(sb, tensorView->getPermutation((int)i));
+            }
+            sb << ">";
+        }
+        break;
     case kIROp_Specialize:
         {
             auto specialize = as<IRSpecialize>(type);
