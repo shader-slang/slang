@@ -12046,8 +12046,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // For debug builds, still create debug information for let variables
                 // even though we're not creating an actual variable
                 // Requires Standard level or higher for variable debug info
+                // Immutable `let` aliases lower to the initializer's SSA value with no backing
+                // IRVar, so this is the only site that can attach debug info to them. Opaque leaf
+                // handles (Texture2D, SamplerState, ...) are not isDebuggableType, but still get a
+                // DebugLocalVariable bound to the handle SSA value via DebugValue (no backing
+                // OpVariable) — admit them here via the leaf-only isResourceType predicate.
+                auto letDebugType = initVal.val->getDataType();
                 if (context->debugInfoLevel >= DebugInfoLevel::Standard && decl->loc.isValid() &&
-                    context->shared->debugValueContext.isDebuggableType(initVal.val->getDataType()))
+                    (context->shared->debugValueContext.isDebuggableType(letDebugType) ||
+                     isResourceType(letDebugType)))
                 {
                     // Create a debug variable for this let declaration
                     auto builder = context->irBuilder;
