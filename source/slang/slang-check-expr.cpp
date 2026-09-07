@@ -5442,7 +5442,22 @@ struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
         if (!mapSrcDeclToCapturedDecl->tryGetValue(srcDecl, capturedVarDecl))
         {
             capturedVarDecl = astBuilder->create<VarDecl>();
-            capturedVarDecl->nameAndLoc = srcDecl->nameAndLoc;
+            // A captured local variable keeps its own name. A captured `this` instead
+            // has a *type* as its source decl (a struct, or an interface's `This`
+            // generic parameter), so its closure field gets a synthesized name rather
+            // than the type's name. The interface `This` parameter is literally named
+            // "This", and a closure field named "This" is hijacked by the reserved-name
+            // member lookup when the synthesized `$init` re-checks `this.<field> = ...`,
+            // breaking constructor synthesis (issue #12923).
+            if (as<VarDeclBase>(srcDecl))
+            {
+                capturedVarDecl->nameAndLoc = srcDecl->nameAndLoc;
+            }
+            else
+            {
+                capturedVarDecl->nameAndLoc.name = astBuilder->getNamePool()->getName("$this");
+                capturedVarDecl->nameAndLoc.loc = exprIn->loc;
+            }
             SLANG_ASSERT(exprIn->type.type);
             capturedVarDecl->type.type = exprIn->type.type;
             mapSrcDeclToCapturedDecl->add(srcDecl, capturedVarDecl);
@@ -9133,6 +9148,13 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
         {
             expr->type.type =
                 DeclRefType::create(m_astBuilder, DeclRef<Decl>(defaultImplDecl->thisTypeDecl));
+            // A `this` referenced from a lambda body must be registered as a closure
+            // capture, mirroring the AggTypeDeclBase branch above; otherwise the
+            // synthesized closure struct has no field for it (issue #12923).
+            if (m_parentLambdaExpr)
+            {
+                return maybeRegisterLambdaCapture(expr);
+            }
             return expr;
         }
 #if 0
