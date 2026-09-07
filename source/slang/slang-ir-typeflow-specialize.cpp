@@ -3697,13 +3697,13 @@ struct TypeFlowSpecializationContext
         IRInst* context,
         IRExtractExistentialWitnessTable* inst)
     {
-        // An ExtractExistentialWitnessTable inst is assumed to by dynamic, so we
-        // extract the set of witness tables from the input existential and
-        // state that the info of the result is a tag-type of that set.
+        // An ExtractExistentialWitnessTable inst is assumed to be dynamic, so we extract the
+        // witness-table set from the input existential's info and state that the result's info is
+        // an element-of-set of it.
         //
-        // Note that since ExtractExistentialWitnessTable can only be used on
-        // an existential, the input info must be a TaggedUnionType of
-        // concrete table and type sets (or none/unbounded)
+        // The input info is normally a TaggedUnionType (or none/unbounded), but a concrete value
+        // entering an interface merge point yields an UntaggedUnionType (handled below); COM
+        // interfaces are handled separately.
         //
 
         auto operand = inst->getOperand(0);
@@ -3743,18 +3743,24 @@ struct TypeFlowSpecializationContext
             return makeElementOfSetType(tableSet);
         }
 
+        // An UntaggedUnionType carries only a payload TypeSet and no witness-table set, so there is
+        // no witness-table set to recover -- regardless of whether the payload is a singleton.
+        // Leave it unrefined (none()); the existential's witness table, when needed, is resolved
+        // from the concrete type recovered by analyzeExtractExistentialType, not from this info.
+        if (as<IRUntaggedUnionType>(operandInfo))
+            return none();
+
         SLANG_UNEXPECTED("Unhandled info type in analyzeExtractExistentialWitnessTable");
     }
 
     IRInst* analyzeExtractExistentialType(IRInst* context, IRExtractExistentialType* inst)
     {
-        // An ExtractExistentialType inst is assumed to be dynamic, so we
-        // extract the set of witness tables from the input existential and
-        // state that the info of the result is a tag-type of that set.
+        // An ExtractExistentialType inst is assumed to be dynamic, so we extract the type set from
+        // the input existential's info and state that the result's info is an element-of-set of it.
         //
-        // Note: Since ExtractExistentialType can only be used on
-        // an existential, the input info must be a TaggedUnionType of
-        // concrete table and type sets (or none/unbounded)
+        // The input info is normally a TaggedUnionType (or none/unbounded), but a concrete value
+        // entering an interface merge point yields an UntaggedUnionType (handled below); COM
+        // interfaces are handled separately.
         //
 
         auto operand = inst->getOperand(0);
@@ -3777,6 +3783,21 @@ struct TypeFlowSpecializationContext
 
         if (auto taggedUnion = as<IRTaggedUnionType>(operandInfo))
             return makeElementOfSetType(taggedUnion->getTypeSet());
+
+        // An UntaggedUnionType operand info (payload TypeSet, no witness-table tag) arises when a
+        // concrete value enters an interface merge point: makeInfoForConcreteType() builds a
+        // singleton one; unionPropagationInfo() can union several into a multi-element one. Refine
+        // a singleton to its element-of-set (same result kind as the tagged-union case, resolved to
+        // the concrete type by specializeExtractExistentialType). Leave a multi-element one
+        // unrefined: its element-of-set would reach that consumer's multi-element path, which emits
+        // GetTypeTagFromTaggedUnion and so requires a runtime tag that an untagged union does not
+        // carry.
+        if (auto untaggedUnion = as<IRUntaggedUnionType>(operandInfo))
+        {
+            if (untaggedUnion->getSet()->isSingleton())
+                return makeElementOfSetType(untaggedUnion->getSet());
+            return none();
+        }
 
         SLANG_UNEXPECTED("Unhandled info type in analyzeExtractExistentialType");
     }
