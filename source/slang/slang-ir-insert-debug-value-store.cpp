@@ -189,7 +189,13 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
                 {
                     auto varType = tryGetPointedToType(&builder, varInst->getDataType());
                     builder.setInsertBefore(varInst);
-                    if (!isDebuggableType(varType))
+                    // Opaque leaf handles (Texture2D, SamplerState, ...) are not "debuggable" in
+                    // the recursive isDebuggableType sense, but a named local alias of one still
+                    // deserves a DebugLocalVariable bound to its loaded SSA handle via DebugValue
+                    // (the SPIR-V emit path emits no backing Function OpVariable for handles).
+                    // isResourceType is leaf-only (it does not recurse into struct fields), so a
+                    // struct that merely contains a handle stays excluded, as it is today.
+                    if (!isDebuggableType(varType) && !isResourceType(varType))
                         continue;
                     auto debugVar = builder.emitDebugVar(
                         varType,
