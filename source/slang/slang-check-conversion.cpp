@@ -2905,6 +2905,11 @@ bool SemanticsVisitor::_coerce(
                 }
             }
 
+            // Warn about implicit float->double widening passed as an argument. A conversion whose
+            // cost reaches kConversionCost_Explicit was already rejected as a TypeMismatch above,
+            // so it is not an implicit conversion and warning here would contradict that rejection
+            // -- hence the cost < Explicit gate. Float literals are exempt because widening a
+            // literal is a compile-time constant, not a runtime cost.
             if (site == CoercionSite::Argument && sink && cost < kConversionCost_Explicit)
             {
                 if (!as<FloatingPointLiteralExpr>(fromExpr) &&
