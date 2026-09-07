@@ -7224,8 +7224,21 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         addModifier(synthesized, forwardDiffAttr);
     }
 
-    // The visibility of synthesized decl should be the min of the parent decl and the requirement.
-    if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
+    // Also assign the min-visibility (`Min(parent, requirement)`) for the builtin default-init
+    // constructor requirement. Its visibility is implicit -- the interface member has no
+    // `VisibilityModifier` for the general guard below to detect -- so otherwise its witness
+    // stays module-default (Internal) and is unreachable when another module default-constructs
+    // a `public` type (#12917). Only for a direct conformance: there `context->parentDecl` is the
+    // constructed type, so the cap is safe; for an extension it is the `ExtensionDecl`, whose
+    // visibility can exceed the extended type's and would over-expose the witness (E30604). The
+    // leading `context &&` guards this new predicate's own `context->parentDecl` access.
+    const bool isDirectDefaultInitCtorRequirement =
+        context && as<ConstructorDecl>(requiredMemberDeclRef.getDecl()) &&
+        requiredMemberDeclRef.getParent() ==
+            getASTBuilder()->getDefaultInitializableTypeInterfaceDecl() &&
+        !as<ExtensionDecl>(context->parentDecl);
+    if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>() ||
+        isDirectDefaultInitCtorRequirement)
     {
         auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
         auto thisVisibility = getDeclVisibility(context->parentDecl);
