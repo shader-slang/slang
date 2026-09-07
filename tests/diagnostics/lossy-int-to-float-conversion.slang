@@ -31,12 +31,14 @@
 //DEFAULT: integer-to-float conversion loses precision
 //DEFAULT: integer-to-float conversion loses precision
 //DEFAULT: integer-to-float conversion loses precision
+//DEFAULT: integer-to-float conversion loses precision
 //DEFAULT: 'int' to 'float' loses precision
 //DEFAULT: 'int' to 'float' loses precision
 //DEFAULT: 'int' to 'float' loses precision
 //DEFAULT: 'int' to 'float' loses precision
 //DEFAULT: 'uint' to 'float' loses precision
 //DEFAULT: 'int64_t' to 'float' loses precision
+//DEFAULT: 'intptr_t' to 'float' loses precision
 //DEFAULT: warning E30135
 //DEFAULT: integer-to-double conversion loses precision
 //DEFAULT: 'int64_t' to 'double' loses precision
@@ -50,14 +52,20 @@
 //PEDANTIC: integer-to-float conversion loses precision
 //PEDANTIC: integer-to-float conversion loses precision
 //PEDANTIC: integer-to-float conversion loses precision
+//PEDANTIC: integer-to-float conversion loses precision
 //PEDANTIC: 'int' to 'float' loses precision
 //PEDANTIC: 'int' to 'float' loses precision
 //PEDANTIC: 'int' to 'float' loses precision
 //PEDANTIC: 'int' to 'float' loses precision
 //PEDANTIC: 'uint' to 'float' loses precision
 //PEDANTIC: 'int64_t' to 'float' loses precision
+//PEDANTIC: 'intptr_t' to 'float' loses precision
 //PEDANTIC: warning E30134
+//PEDANTIC: integer-to-float conversion may lose precision
+//PEDANTIC: integer-to-float conversion may lose precision
 //PEDANTIC: 'int' to 'float' may lose precision
+//PEDANTIC: 'intptr_t' to 'float' may lose precision
+//PEDANTIC: 'uintptr_t' to 'float' may lose precision
 //PEDANTIC: warning E30135
 //PEDANTIC: integer-to-double conversion loses precision
 //PEDANTIC: 'int64_t' to 'double' loses precision
@@ -65,7 +73,7 @@
 //PEDANTIC: warning E30136
 //PEDANTIC: 'int64_t' to 'double' may lose precision
 
-void testConversions(int i, int64_t l, intptr_t p)
+void testConversions(int i, int64_t l, intptr_t p, uintptr_t uq)
 {
     // Literal not representable in float's significand -> warns by default.
     float a = 123456789;
@@ -137,11 +145,26 @@ void testConversions(int i, int64_t l, intptr_t p)
     // Non-constant int -> float: only under -Wpedantic.
     float e = i;
 
-    // intptr_t is pointer-width (target-dependent), so getMaximumTypeBitSize
-    // reports its 64-bit maximum rather than the real width -> never diagnosed,
-    // even under -Wpedantic. Locks the pointer-width exclusion (a value lossy at
-    // 64 bits may be exact at a 32-bit-pointer target, so loss is unprovable here).
+    // Pointer-width sources (intptr_t/uintptr_t) have a target-dependent width of
+    // 32 or 64 bits, so the emit block judges precision conservatively:
+    //
+    // Non-constant pointer -> float loses precision even at the 32-bit minimum
+    // (32 > 24), so it warns under -Wpedantic.
     float ptrf = p;
+    float uptrf = uq;
+
+    // Non-constant pointer -> double is exact at 32 bits (32 <= 53), so its loss is
+    // width-dependent and is NOT diagnosed, even under -Wpedantic.
+    double ptrd = p;
+
+    // Pointer-width literal lossy at BOTH candidate widths (2^24 + 1 fits unchanged
+    // in each) -> provably lossy, warns by default.
+    float litLossy = 0x1000001z;
+
+    // Pointer-width literal exact at 32 bits (2^32 + 1 truncates to 1) but lossy at
+    // 64 -> width-dependent, so NOT diagnosed (would be a false positive on a
+    // 32-bit-pointer target).
+    float litAmbig = 0x100000001z;
 
     // Literal not representable in double's significand (2^53 + 1) -> warns by default.
     double f = 9007199254740993;
