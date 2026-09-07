@@ -263,19 +263,27 @@ The following implicit type conversions are allowed:
 - `enum` type to its tag type
 - an initializer list to a type with an initializer that accepts the arguments in the list
 
-The following implicit type conversions are allowed but not recommended. Each of them triggers a warning
-diagnostic.
+The following implicit type conversions are allowed but not recommended. A cell marked "after GitHub issue
+#NNNNN" describes the intended behavior tracked by that issue.
 
-- `bool` to a floating-point type
-- integer type to a `bool`
-- integer type to a narrower integer type, except integer literals whose values fit in the narrower type
-- integer type to same width integer type with different signedness, except integer literals whose values fit
-  in the target type
-- integer type to a floating-point type and vice versa
-- floating-point type to a narrower floating-point type
-- floating-point type to a double type (possible performance issue)
-- vector to vector and matrix to matrix where the target element type is narrower or has different signedness
-- integer vector to a floating-point vector and vice versa
+| Conversion                                                          | Compiler diagnostic                                                                                                      |
+|---------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| `bool` to a floating-point type                                     | warning                                                                                                                  |
+| integer type to a `bool`                                            | warning                                                                                                                  |
+| integer type to a narrower integer type                             | warning, unless the source is constant                                                                                   |
+| integer type to a same-width integer type with different signedness | opt-in warning (after GitHub issue [#12928](https://github.com/shader-slang/slang/issues/12928))                         |
+| integer type to `half`                                              | warning, unless the source is constant                                                                                   |
+| integer type to `float` or `double`                                 | warning, unless the source is constant (after GitHub issue [#12929](https://github.com/shader-slang/slang/issues/12929)) |
+| floating-point type to a `bool`                                     | warning                                                                                                                  |
+| floating-point type to an integer type                              | warning                                                                                                                  |
+| floating-point type to a narrower floating-point type               | warning                                                                                                                  |
+| `float` to `double` (potential unintended performance issue)        | warning, function-call arguments only, literals exempted                                                                 |
+| vector to vector, matrix to matrix                                  | same as the element type conversion                                                                                      |
+| `float` to `double`, vector or matrix                               | same as the scalar case above (after GitHub issue [#12930](https://github.com/shader-slang/slang/issues/12930))          |
+
+Where the table says "unless the source is constant" and "literals exempted", the conversion is not diagnosed
+when the source is a constant expression whose value fits in the target type. When the value does not fit, the
+compiler reports a warning about lost precision.
 
 > 📝 **Remark:** Some common contexts for implicit type conversions:
 >
