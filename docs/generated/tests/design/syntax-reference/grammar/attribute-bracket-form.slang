@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:03:32+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#attributes-and-decorations
-//META: doc_section_digest=4060d5c47c1516c06a54f1ded73028e3fc2a792c74817f782fe37321c52bdcef
-//META: purpose=`Attribute` parses as `'[' AttributeName ('(' ArgList? ')')? ']'` and attaches to the following decl.
+//META: doc_section_digest=15532574d330d6144dfcff6e6eb0a667f59639395aa4b4eccbd806a31f935008
+//META: purpose=`Attribute` parses as `'[' AttributeBody ']'` where `AttributeBody` is `AttributeName '(' ArgList ')'`, and attaches to the following decl.
 //META: intent=functional
 //META: pipeline_stage=parse
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.

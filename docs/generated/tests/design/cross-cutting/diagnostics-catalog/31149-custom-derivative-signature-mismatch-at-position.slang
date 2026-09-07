@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=14450a3ae36a6844280667c4d2c77ef314d909cb138c9900d6c2aa9d88f35a3b
+//META: doc_section_digest=09409799a68de63cd40d16048cdf7f065f638c190612eefcac8d930f840838e4
 //META: purpose=Fires diagnostic E31149 (custom-derivative-signature-mismatch-at-position) -- custom derivative parameter type mismatch
 //META: intent=negative
 //META: pipeline_stage=check
@@ -19,4 +19,4 @@ void derivFunc(inout DifferentialPair<int> p, float dOut) {}
 float orig(float x) { return x; }
 
 
-// CHECK: E31149
+//CHECK: E31149

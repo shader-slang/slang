@@ -144,6 +144,19 @@ can take. The user-facing API is the template `DeclRef<T>`, declared
 in [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
 and described in [base.md](base.md#support-types).
 
+The four shapes record *how* a declaration was reached; they are not
+four things a program can spell. `DirectDeclRef` and `MemberDeclRef`
+differ only in whether the path to the declaration had to be written
+out: a `DirectDeclRef` holds a bare `Decl` operand and so has nothing
+to substitute, and a `MemberDeclRef` whose path is known to be static
+folds back into one — `MemberDeclRef(DirectDeclRef(A), B)` becomes
+`DirectDeclRef(B)`, per the comment at
+[slang-ast-val.h](../../../../source/slang/slang-ast-val.h) lines
+32-35. `GenericAppDeclRef` and `LookupDeclRef` are the two shapes that
+add information beyond the path — an argument list and a
+`SubtypeWitness` — and so are the two that can make decl-refs to the
+same `Decl` denote different things.
+
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `DirectDeclRef` | `DeclRefBase` | `decl: Decl` (`getDecl()`) | (none) | A bare decl-ref to a `Decl` with no substitutions. |
@@ -165,7 +178,7 @@ operands that follow that slot.
 | --- | --- | --- | --- | --- |
 | `ConstantIntVal` | `IntVal` | `value: IntegerLiteralValue` (`getValue()`) | (none) | A literal compile-time integer. |
 | `DeclRefIntVal` | `IntVal` | `declRef: DeclRef<VarDeclBase>` (to a value generic param) | (none) | An unsubstituted generic value parameter. |
-| `TypeCastIntVal` | `IntVal` | `base: Val` (`getBase()`) | (none) | An integer cast to a different integer type (the target type is the node's own `type` operand). |
+| `TypeCastIntVal` | `IntVal` | `base: Val` (`getBase()`) | (none) | An integer cast to a different integer type (the target type is the node's own `type` operand), spelled as a conversion in a compile-time position — e.g. the array bound `int[int(N)]` over a `let N : uint` parameter. |
 | `BuiltinOperationIntVal` | `IntVal` | `op: BuiltinOperationKind` (operand 1), arg `IntVal` operands (from slot 2) | (none) | A still-symbolic builtin operator (e.g. `N / 2`); folds to a `ConstantIntVal` once its operands are concrete. |
 | `SizeOfIntVal` | `SizeOfLikeIntVal` | `valArg: Type` (`getValArg()`) | (none) | Compile-time `sizeof` of a type. |
 | `AlignOfIntVal` | `SizeOfLikeIntVal` | `valArg: Type` (`getValArg()`) | (none) | Compile-time `alignof` of a type. |
@@ -181,7 +194,7 @@ operands that follow that slot.
 | `ShapeReduceIntValPack` | `ShapeTransformIntValPack` | `valuePack: Val`, `axis: IntVal` | (none) | Drop one axis from an `IntVal` pack. |
 | `ExpandIntValPack` | `IntVal` | `patternVal: Val` plus captured-pack operands | (none) | An unexpanded value pattern over captured value packs (the value analogue of `ExpandType`). |
 | `EachIntVal` | `IntVal` | `basePack: Val` | (none) | Indexes into a value pack during substitution using the substitution's `packExpansionIndex`. |
-| `WitnessLookupIntVal` | `IntVal` | `witness: SubtypeWitness`, `key: Decl` (`getKey()`) | (none) | An integer value resolved through a witness-table lookup. |
+| `WitnessLookupIntVal` | `IntVal` | `witness: SubtypeWitness`, `key: Decl` (`getKey()`) | (none) | An integer value resolved through a witness-table lookup; spelled `T.Name` for a `static const int` interface requirement read through a type parameter's conformance, as `Shape.dimensions` is in `_Texture`. |
 | `PolynomialIntVal` | `IntVal` | `constantTerm: IntegerLiteralValue` plus `PolynomialIntValTerm` operands | (none) | A polynomial in unsubstituted generic value parameters. |
 | `ErrorIntVal` | `IntVal` | (type operand only) | (none) | Error placeholder; lets checking continue when an integer value cannot be computed. |
 
@@ -255,6 +268,26 @@ live in [modifiers.md](modifiers.md)). These values are stored by
 `ModifiedTypeExpr` is what produces them, by converting that
 expression's syntax-level `Modifiers` into `Val`s before building the
 `ModifiedType`.
+
+Because the value ends up on the *type*, it stays there for the rest
+of the compile, and every later decision made about that type sees
+it. [core.meta.slang](../../../../source/slang/core.meta.slang)
+declares `unorm` and `snorm` (lines 44-60 and 62-78) as marking a
+buffer or texture element type as backed by normalized data, states
+that the modifier does not change the semantics of a `float` or
+vector that carries it, and notes that some platforms require the
+qualifier while others operate correctly without it — so how much of
+a `ResourceFormatModifierVal` survives into generated code is a
+per-target decision. The modified element type is not interchangeable
+with the unmodified one in those decisions: the core module's WGSL
+texture check `__wgsl_check_texture_type` in
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) (lines
+1130-1134) requires the texel type to be `float`, `int`, `uint` or a
+vector of one of them, and a `unorm`-modified element type fails that
+`static_assert` where the bare spelling passes. Which spelling each
+target actually emits is decided in the emitters, which are not in
+this page's `watched_paths`; see
+[../pipeline/06-emit.md](../pipeline/06-emit.md).
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
@@ -437,7 +470,12 @@ also means *all* operands must themselves be canonical — the
 pointers are identical or when their `resolve()` results are, and each
 `Val` memoizes its resolved form in the private `m_resolvedVal` /
 `m_resolvedValEpoch` pair declared in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h). Any
+[slang-ast-base.h](../../../../source/slang/slang-ast-base.h). The
+surface consequence is that two differently-spelled compile-time
+values compare equal exactly when they hash-cons to one node: inside
+a generic over `let N : int`, `int[2*N+3]` and `int[3+2*N]` are the
+same type and values of each are mutually assignable, which they
+would not be if either spelling built a second node. Any
 cache keyed on `Val*` identity — inside or outside the AST — is only
 correct because one logical value has exactly one canonical
 representation, which is why classes such as `BuiltinOperationIntVal`

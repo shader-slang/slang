@@ -26,6 +26,8 @@
 //TEST:SIMPLE(filecheck=CUDACTRLCHECK):-target cuda -entry computeCtrlMain -stage compute
 //TEST:SIMPLE(filecheck=GLSLMEMCHECK):-target glsl -entry computeMemMain -stage compute
 //TEST:SIMPLE(filecheck=GLSLCTRLCHECK):-target glsl -entry computeCtrlMain -stage compute
+//TEST:SIMPLE(filecheck=HLSLMEMCHECK):-target hlsl -entry computeMemMain -stage compute
+//TEST:SIMPLE(filecheck=HLSLCTRLCHECK):-target hlsl -entry computeCtrlMain -stage compute
 
 RWStructuredBuffer<uint> buf;
 
@@ -72,6 +74,14 @@ void computeCtrlMain(uint3 tid : SV_DispatchThreadID)
 // GLSLMEMCHECK: memoryBarrier
 // GLSL groupsync: emits controlBarrier (execution + memory).
 // GLSLCTRLCHECK: controlBarrier
+
+// HLSL keeps the two spellings distinct, which is the same memory-only vs.
+// execution+memory distinction the SPIRV pair encodes: the non-sync entry point
+// emits `AllMemoryBarrier()` and never the WithGroupSync spelling, while the
+// group-sync entry point emits `AllMemoryBarrierWithGroupSync()`.
+// HLSLMEMCHECK: AllMemoryBarrier()
+// HLSLMEMCHECK-NOT: AllMemoryBarrierWithGroupSync
+// HLSLCTRLCHECK: AllMemoryBarrierWithGroupSync()
 
 // Targets not covered by emission directives:
 //   cpp    - AllMemoryBarrier/AllMemoryBarrierWithGroupSync not available on cpp target (E36107 capability gate).

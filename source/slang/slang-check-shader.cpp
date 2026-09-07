@@ -158,6 +158,46 @@ static SemanticDecl* lookUpSemanticDecl(
     return as<SemanticDecl>(lookupResult.item.declRef.getDecl());
 }
 
+// True when `stageProjectedCaps` (an accessor requirement already projected onto `stage`) is
+// equivalent to the bare stage and so adds nothing to enforce. Tested by implication in *both*
+// directions: one-way `{stage} implies req` also holds when `req` is strictly stronger than the
+// stage (e.g. adds a target restriction), so requiring `req implies {stage}` too keeps genuinely
+// stage-only requirements out while letting stronger ones through.
+static bool isStageOnlyRequirement(const CapabilitySet& stageProjectedCaps, Stage stage)
+{
+    if (stageProjectedCaps.isEmpty() || stageProjectedCaps.isInvalid())
+        return true;
+    CapabilityAtom stageAtom = getAtomFromStage(stage);
+    if (stageAtom == CapabilityAtom::Invalid)
+        return false;
+    CapabilitySet stageCaps((CapabilityName)stageAtom);
+    return stageCaps.implies(stageProjectedCaps) && stageProjectedCaps.implies(stageCaps);
+}
+
+// Fold a matched semantic accessor's `[require]` into the entry point's `*outCaps`, so the profile
+// check enforces a capability the semantic carries but general inference misses (it does not look
+// through a semantic to its accessor). Project the requirement onto the entry point's stage first
+// and join only what is strictly stronger than that stage context: a multi-stage requirement's
+// off-stage alternatives must not leak in (a fragment use of a getter declared for
+// `[require(fragment)] [require(geometry)]` must not pull in `geometry`), and a requirement equal
+// to the stage is already implied by the profile. Example: `SV_Barycentrics`, whose getter is
+// `[require(fragment, fragmentshaderbarycentric)]`, contributes `fragmentshaderbarycentric`.
+static void collectSemanticAccessorRequirement(Decl* member, Stage stage, CapabilitySet* outCaps)
+{
+    SLANG_ASSERT(outCaps);
+    auto requireAttr = member->findModifier<RequireCapabilityAttribute>();
+    if (!requireAttr || !requireAttr->capabilitySet)
+        return;
+    CapabilityAtom stageAtom = getAtomFromStage(stage);
+    if (stageAtom == CapabilityAtom::Invalid)
+        return;
+    CapabilitySet stageProjectedCaps{requireAttr->capabilitySet};
+    stageProjectedCaps.join(CapabilitySet((CapabilityName)stageAtom));
+    if (isStageOnlyRequirement(stageProjectedCaps, stage))
+        return;
+    outCaps->nonDestructiveJoin(stageProjectedCaps);
+}
+
 // Validate that type being used for a system value semantic is compatible with the semantic.
 static void validateSystemValueSemanticForType(
     SemanticsVisitor* visitor,
@@ -167,7 +207,8 @@ static void validateSystemValueSemanticForType(
     HLSLSimpleSemantic* semantic,
     Stage stage,
     SemanticDirection direction,
-    Scope* scope)
+    Scope* scope,
+    CapabilitySet* outInferredCaps)
 {
     if (!semantic || !type)
         return;
@@ -270,6 +311,7 @@ static void validateSystemValueSemanticForType(
         if (isSemanticTypeCompatible(accessorType, type))
         {
             foundMatchingAccessor = true;
+            collectSemanticAccessorRequirement(member, stage, outInferredCaps);
             break;
         }
 
@@ -286,6 +328,7 @@ static void validateSystemValueSemanticForType(
                             typeArrayType->getElementType()))
                     {
                         foundMatchingAccessor = true;
+                        collectSemanticAccessorRequirement(member, stage, outInferredCaps);
                         break;
                     }
                 }
@@ -392,8 +435,12 @@ static void validateNoPerPrimitiveSemanticsInType(
 }
 
 
-// Validate system value semantics on a declaration recursively.
-// and validates any SV_ semantic against the SemanticDecl definitions in core module.
+// Validate `decl`'s SV_ semantics against the SemanticDecl definitions in the core module,
+// recursing through struct fields. Also folds each matched accessor's capability requirement into
+// `outInferredCaps` (non-destructive join), so the entry point enforces a requirement the semantic
+// carries but the general capability inference misses — e.g. `fragmentshaderbarycentric` for
+// `SV_Barycentrics`. `outInferredCaps` is the entry point's accumulating requirement set and is
+// always non-null.
 static void validateSystemValueSemantic(
     SemanticsVisitor* visitor,
     DiagnosticSink* sink,
@@ -401,6 +448,7 @@ static void validateSystemValueSemantic(
     Stage stage,
     SemanticDirection direction,
     Scope* scope,
+    CapabilitySet* outInferredCaps,
     UInt recursionDepth = 0)
 {
     if (!decl)
@@ -489,6 +537,7 @@ static void validateSystemValueSemantic(
                     stage,
                     direction,
                     scope,
+                    outInferredCaps,
                     recursionDepth + 1);
             }
         }
@@ -507,7 +556,8 @@ static void validateSystemValueSemantic(
         semantic,
         stage,
         direction,
-        scope);
+        scope,
+        outInferredCaps);
 }
 
 // Return true if `semanticName` is one of the fragment depth-output system values
@@ -1735,8 +1785,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         // Use the existing getTypeTags functionality to check for resource types
         // Create a temporary SemanticsVisitor to access getTypeTags
-        SharedSemanticsContext shared(linkage, module, sink);
-        SemanticsVisitor visitor(&shared);
+        auto shared = SharedSemanticsContext::createForOptionalModule(
+            linkage,
+            module,
+            linkage->m_optionSet.getLanguageVersion(),
+            sink);
+        SemanticsVisitor visitor(shared);
 
         auto typeTags = visitor.getTypeTags(returnType);
         bool hasResourceOrUnsizedTypes = (((int)typeTags & (int)TypeTag::Opaque) != 0) ||
@@ -1910,10 +1964,26 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
-    // Validate system value semantics against SemanticDecl definitions in core module
+    // The entry point's effective requirements, seeded from the decl's inferred set and augmented
+    // at this boundary with two contributions the per-decl capability walk does not record: the
+    // SV_ semantic-accessor requirements (walk just below) and the signature's generic-struct
+    // requirements (`signatureStructUses` loop further below). Both are gathered into this local
+    // set — matching the existing generic-struct handling — because the accessor match is resolved
+    // here using the entry-point stage, and the decl's own `inferredCapabilityRequirements` was
+    // already frozen in the earlier CapabilityChecked phase.
+    CapabilitySet entryPointInferredCaps{entryPointFuncDecl->inferredCapabilityRequirements};
+
+    // Validate system value semantics, and collect the capabilities their accessors require:
+    // general capability inference does not look through a semantic to the `[require]` on the
+    // accessor it resolves to, so a need like `fragmentshaderbarycentric` on `SV_Barycentrics`
+    // must be gathered here.
     {
-        SharedSemanticsContext shared(linkage, module, sink);
-        SemanticsVisitor visitor(&shared);
+        auto shared = SharedSemanticsContext::createForOptionalModule(
+            linkage,
+            module,
+            linkage->m_optionSet.getLanguageVersion(),
+            sink);
+        SemanticsVisitor visitor(shared);
 
         // Use the session's coreLanguageScope which contains the SemanticDecl definitions
         // The module's own scope may not include the core module (e.g., when loading from
@@ -1931,14 +2001,16 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Input,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                     validateSystemValueSemantic(
                         &visitor,
                         sink,
                         param,
                         stage,
                         SemanticDirection::Output,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                 }
                 else if (param->hasModifier<OutModifier>())
                 {
@@ -1948,7 +2020,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Output,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                 }
                 else
                 {
@@ -1958,7 +2031,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Input,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                 }
             }
 
@@ -1969,7 +2043,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 entryPointFuncDecl,
                 stage,
                 SemanticDirection::Output,
-                scope);
+                scope,
+                &entryPointInferredCaps);
         }
     }
 
@@ -2376,7 +2451,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // for both spellings. `signatureStructUses` keeps each contributing struct and
     // its use location so we can point the diagnostic at the exact use site (the
     // non-generic case is reported by `diagnoseMissingCapabilityProvenance`).
-    CapabilitySet entryPointInferredCaps{entryPointFuncDecl->inferredCapabilityRequirements};
     List<GenericStructTypeUse> signatureStructUses;
     {
         auto astBuilder = linkage->getASTBuilder();
@@ -2417,6 +2491,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // collector), so this join is unconditional.
     for (auto& use : signatureStructUses)
         entryPointInferredCaps.nonDestructiveJoin(use.structDecl->inferredCapabilityRequirements);
+
+    // The entry point's stage-specific requirements belong to the `EntryPoint`, not the
+    // stage-agnostic `FuncDecl`; store the finalized set there as the source of truth for
+    // downstream entry-point consumers.
+    entryPoint->setInferredCapabilityRequirements(
+        entryPointInferredCaps.freeze(linkage->getASTBuilder()));
 
     for (auto target : linkage->targets)
     {
@@ -3402,7 +3482,10 @@ static void _extractSpecializationArgs(
 {
     auto linkage = componentType->getLinkage();
 
-    SharedSemanticsContext semanticsContext(linkage, nullptr, sink);
+    SharedSemanticsContext semanticsContext(
+        linkage,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
     SemanticsVisitor semanticsVisitor(&semanticsContext);
 
     auto argCount = argExprs.getCount();
@@ -3447,20 +3530,28 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     // primary module's own extensions come along -- this is the same
     // point-of-view an in-body generic call has.
     //
-    // When the entry point has no owning module (`getModule()` is null) we pass
-    // `nullptr` and fall back to the prior module-less behavior.
+    // When the entry point has no owning module (`getModule()` is null), retain the prior
+    // module-less behavior and use the linkage's effective language version.
     auto entryPointModule = getModule();
-    SharedSemanticsContext sharedSemanticsContext(getLinkage(), entryPointModule, sink);
+    RefPtr<SharedSemanticsContext> sharedSemanticsContext;
     if (entryPointModule)
     {
+        sharedSemanticsContext = new SharedSemanticsContext(getLinkage(), entryPointModule, sink);
         for (auto module : getModuleDependencies())
         {
             auto moduleDecl = module->getModuleDecl();
-            if (sharedSemanticsContext.importedModulesSet.add(moduleDecl))
-                sharedSemanticsContext.importedModulesList.add(moduleDecl);
+            if (sharedSemanticsContext->importedModulesSet.add(moduleDecl))
+                sharedSemanticsContext->importedModulesList.add(moduleDecl);
         }
     }
-    SemanticsVisitor visitor(&sharedSemanticsContext);
+    else
+    {
+        sharedSemanticsContext = new SharedSemanticsContext(
+            getLinkage(),
+            getLinkage()->m_optionSet.getLanguageVersion(),
+            sink);
+    }
+    SemanticsVisitor visitor(sharedSemanticsContext);
 
     // The last N arguments will be for the implicit existential arguments
     // of the entry point (if it has any).
@@ -3721,7 +3812,10 @@ void parseSpecializationArgStrings(
     auto linkage = endToEndReq->getLinkage();
     auto sink = endToEndReq->getSink();
 
-    SharedSemanticsContext sharedSemanticsContext(linkage, nullptr, sink);
+    SharedSemanticsContext sharedSemanticsContext(
+        linkage,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
     SemanticsVisitor semantics(&sharedSemanticsContext);
 
     // We will be looping over the generic argument strings
@@ -3757,7 +3851,7 @@ Type* Linkage::specializeType(
     // TODO: We should cache and re-use specialized types
     // when the exact same arguments are provided again later.
 
-    SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
+    SharedSemanticsContext sharedSemanticsContext(this, m_optionSet.getLanguageVersion(), sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
     SpecializationParams specializationParams;
@@ -3800,7 +3894,6 @@ Type* Linkage::specializeType(
 
 /// Shared implementation logic for the `_createSpecializedProgram*` entry points.
 static RefPtr<ComponentType> _createSpecializedProgramImpl(
-    Linkage* linkage,
     ComponentType* unspecializedProgram,
     List<Expr*> const& specializationArgExprs,
     DiagnosticSink* sink)
@@ -3827,8 +3920,6 @@ static RefPtr<ComponentType> _createSpecializedProgramImpl(
     // We have an appropriate number of arguments for the global specialization parameters,
     // and now we need to check that the arguments conform to the declared constraints.
     //
-    SharedSemanticsContext visitor(linkage, nullptr, sink);
-
     List<SpecializationArg> specializationArgs;
     _extractSpecializationArgs(
         unspecializedProgram,
@@ -3899,7 +3990,6 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
     // global or entry-point generic parameters.
     //
     auto unspecializedProgram = endToEndReq->getUnspecializedGlobalComponentType();
-    auto linkage = endToEndReq->getLinkage();
     auto sink = endToEndReq->getSink();
 
     // First, let's parse the specialization argument strings that were
@@ -3920,11 +4010,8 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
     // applying the global generic arguments (if any) to the
     // unspecialized program.
     //
-    auto specializedProgram = _createSpecializedProgramImpl(
-        linkage,
-        unspecializedProgram,
-        globalSpecializationArgs,
-        sink);
+    auto specializedProgram =
+        _createSpecializedProgramImpl(unspecializedProgram, globalSpecializationArgs, sink);
 
     // If anything went wrong with the global generic
     // arguments, then bail out now.

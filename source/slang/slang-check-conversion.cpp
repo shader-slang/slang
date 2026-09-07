@@ -2634,6 +2634,16 @@ bool SemanticsVisitor::_coerce(
         AddTypeOverloadCandidates(toType, overloadContext);
     }
 
+    // `canCoerce` performs a speculative cost probe by passing a null `outToExpr`; materialized
+    // conversions pass storage for the result. Apply the legacy compatibility fallback in both
+    // cases, but supply the sink only for a materialized conversion. A null sink explicitly
+    // requests a non-diagnostic operation, so there is nowhere to report the deprecation.
+    bool usedLegacyGenericParameterCountFallback =
+        tryResolveOverloadUsingLegacyGenericParameterCountFallback(
+            overloadContext,
+            overloadContext.loc,
+            outToExpr ? sink : nullptr);
+
     // After all of the overload candidates have been added
     // to the context and processed, we need to see whether
     // there was one best overload or not.
@@ -2936,8 +2946,11 @@ bool SemanticsVisitor::_coerce(
 
             // TODO: Register associated differentiable methods & types here as well.
         }
-        if (!cachedMethod)
+        if (!cachedMethod && !usedLegacyGenericParameterCountFallback)
         {
+            // Never cache a conversion selected by the legacy compatibility fallback. A cost probe
+            // must not hide a later source-level warning, and every materialized source occurrence
+            // must resolve and report its own use of the deprecated rule.
             // We can only cache the method if it is a public, otherwise we may not be able to
             // use this method depending on where we are performing the coercion.
             if (overloadContext.bestCandidate->item.declRef &&

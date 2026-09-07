@@ -74,7 +74,11 @@ ModuleHeader    ::= 'module' (IDENT | STRING_LIT)? ';'       -- parseModuleDecla
                                               --   token, never dotted; omitted = current module)
                   | 'implementing' ModuleName ';'            -- parseImplementingDecl
                                               --   (via parseFileReferenceDeclBase)
-ModuleName      ::= IDENT ('.' IDENT)* | STRING_LIT          -- dotted identifier or string literal
+ModuleName      ::= IDENT ('.' IDENT)* | STRING_LIT          -- dotted identifier or string literal;
+                                                              --   only the 'implementing' alternative
+                                                              --   (and ImportPath) reaches the dotted
+                                                              --   form, since a declared module name
+                                                              --   is a single token
 
 TopDecl         ::= ImportDecl                                -- parseDecls -> ParseDecl
                   | ModuleHeader                              -- placement is semantic
@@ -320,6 +324,21 @@ AccessorName    ::= 'get' | 'set' | 'ref'        -- parseAccessorDecl; any other
                                                   -- accessor name is diagnosed (Unexpected)
 ```
 
+A `__func_extension` names the higher-order form it is defining and
+then gives that form's signature. Its parameters go through
+`parseModernParamList`, so either parameter spelling is accepted, and
+the body is an ordinary `FuncBody`:
+
+```
+float cube(float x) { return x * x * x; }
+
+__func_extension fwd_diff(cube)(DifferentialPair<float> x)
+    -> DifferentialPair<float>
+{
+    return diffPair(cube(x.p), 3.0 * x.p * x.p * x.d);
+}
+```
+
 ### Variable / binding declarations
 
 ```
@@ -380,19 +399,43 @@ AttributeSyntaxDecl ::= 'attribute_syntax' '[' IDENT AttributeParams? ']' ':' ID
                                                               --   alias form for attributes
 AttributeParams     ::= '(' AttributeParam (',' AttributeParam)* ')'
 AttributeParam      ::= IDENT (':' Type)? ('=' ArgExpr)?      -- parseAttributeParamDecl
-RequireCapabilityDecl ::= '__require_capability' CapabilityName (('+' | ',') CapabilityName)* ';'
+RequireCapabilityDecl ::= '__require_capability' CapabilityName ';'
                                                               -- parseRequireCapabilityDecl; there are
-                                                              --   no parentheses, and each name must be
+                                                              --   no parentheses, exactly one atom
+                                                              --   (see note), and the name must be
                                                               --   a known capability atom
                                                               --   (findCapabilityName), otherwise
                                                               --   UnknownCapability is reported
 CapabilityName        ::= IDENT
 ```
 
+The `':'` clause of both `SyntaxDecl` and `AttributeSyntaxDecl` is
+resolved by `astBuilder->findSyntaxClass`, so the names it can take
+are the compiler's own AST node classes, not types declared in the
+program being compiled. The core module is where the two forms are
+used, and it supplies a readable example of each — the first installs
+a modifier keyword, the second an attribute together with its
+parameters
+([core.meta.slang](../../../../source/slang/core.meta.slang)):
+
+```
+syntax constexpr : ConstExprModifier;
+attribute_syntax [vk_binding(binding: int, set: int = 0)] : GLSLBindingAttribute;
+```
+
+The single-atom restriction is not a deliberate design: after reading
+a name, `parseRequireCapabilityDecl` tries to continue the list with
+`AdvanceIf(parser, "+")` / `AdvanceIf(parser, ",")`, and that overload
+matches only an `Identifier` token whose text is the given string —
+never the `+` or `,` operator tokens the lexer actually produces. The
+loop therefore always stops after the first atom, and
+`__require_capability a + b;` fails at the following mandatory `';'`.
+
 The statement-level spelling is different: `__requireCapability` inside
 a function body *does* take parentheses and only allows commas —
 `'__requireCapability' '(' CapabilityName (',' CapabilityName)* ')' ';'`
-(`Parser::ParseRequireCapabilityStatement`).
+(`Parser::ParseRequireCapabilityStatement`). It is the only spelling
+that can name several atoms at once.
 
 ## Statements
 
@@ -437,9 +480,10 @@ ContinueStmt    ::= 'continue' ';'                             -- ParseContinueS
 ReturnStmt      ::= 'return' Expr? ';'                          -- ParseReturnStatement
 DiscardStmt     ::= 'discard' ';'                               -- ParseStatement (inline)
 DeferStmt       ::= 'defer' Stmt                                -- ParseDeferStatement
-ThrowStmt       ::= 'throw' Expr                                -- ParseThrowStatement
-                                                              -- (does not consume ';'; a trailing
-                                                              --   ';' is parsed as a separate EmptyStmt)
+ThrowStmt       ::= 'throw' Expr ';'                            -- ParseThrowStatement
+                                                              -- (the ';' is mandatory:
+                                                              --   ParseThrowStatement ends with
+                                                              --   ReadToken(TokenType::Semicolon))
 LabelStmt       ::= IDENT ':' Stmt                              -- parseLabelStatement; chosen when an
                                                               --   identifier is followed by ':'
                                                               --   (the label BreakStmt refers to)
@@ -587,6 +631,20 @@ AssignOp        ::= '=' | '+=' | '-=' | '*=' | '/=' | '%='
                   | '<<=' | '>>=' | '&=' | '|=' | '^='
 ```
 
+The value a `LambdaExpr` produces is consumed through the `IFunc`
+interface declared in
+[core.meta.slang](../../../../source/slang/core.meta.slang), whose
+requirement is `TR operator()(expand each TP p)`. The runnable
+shape of the production is therefore a lambda passed to (or stored in)
+an `IFunc`-constrained binding, which is what supplies the call
+syntax:
+
+```
+float apply(IFunc<float, float> f, float x) { return f(x); }
+
+// apply((float v) => v * 2.0, 3.0) is 6.0
+```
+
 ### Literal forms vs. token kinds
 
 `INT_LIT`, `FLOAT_LIT`, `STRING_LIT`, and `CHAR_LIT` are distinct
@@ -647,8 +705,11 @@ as `A<(x > y)>` needs the parentheses.
 
 ```
 ModifierList    ::= (Modifier | Attribute)+
-Modifier        ::= ModifierKeyword ModifierTail?
-ModifierKeyword ::= 'in' | 'out' | 'inout' | 'const' | 'static' | 'inline'
+Modifier        ::= BareModifierKeyword                       -- takes no further tokens
+                  | TailModifierKeyword ModifierTail?         -- tail required for most, optional
+                                                              --   for four; see note
+BareModifierKeyword
+                ::= 'in' | 'out' | 'inout' | 'const' | 'static' | 'inline'
                   | 'public' | 'private' | 'internal' | 'extern' | 'export'
                   | 'uniform' | 'groupshared' | 'precise'
                   | 'nointerpolation' | 'noperspective' | 'linear' | 'sample' | 'centroid'
@@ -658,22 +719,40 @@ ModifierKeyword ::= 'in' | 'out' | 'inout' | 'const' | 'static' | 'inline'
                   | 'override' | 'dynamic_uniform' | 'param' | 'require'
                   | 'dyn' | 'highp' | 'lowp' | 'mediump'
                   | 'volatile' | 'coherent' | 'restrict' | 'readonly' | 'writeonly'
-                  | 'shared' | 'layout' | 'hitAttributeEXT'
+                  | 'shared' | 'hitAttributeEXT'
                   | '__ref' | '__constref' | '__builtin' | '__global' | '__exported'
                   | '__prefix' | '__postfix'
-                  | '__intrinsic_op' | '__target_intrinsic'
-                  | '__specialized_for_target' | '__attributeTarget'
+TailModifierKeyword
+                ::= 'layout' | '__attributeTarget'            -- tail required
                   | '__glsl_extension' | '__glsl_version' | '__spirv_version'
                   | '__wgsl_extension' | '__cuda_sm_version'
                   | '__builtin_type' | '__builtin_requirement'
                   | '__magic_type' | '__magic_enum' | '__intrinsic_type'
-                  | '__implicit_conversion'
+                  | '__intrinsic_op' | '__target_intrinsic'   -- tail optional
+                  | '__specialized_for_target' | '__implicit_conversion'
 
-ModifierTail    ::= '(' ArgList? ')'                          -- per-modifier; see keywords-and-builtins.md
+ModifierTail    ::= '(' ModifierArgs ')'                      -- per-modifier token shape, not a
+                                                              --   general ArgList; see note
 ```
 
-The complete keyword inventory is in
-[keywords-and-builtins.md](keywords-and-builtins.md).
+The split follows `g_parseSyntaxEntries[]`: a modifier registered
+there with a syntax class alone is parsed by `parseSimpleSyntax` and
+takes no further tokens, while a tail is read by the modifier's own
+parse callback. Having a callback does not imply a tail, though:
+`shared`, `volatile`, `coherent`, `restrict`, `readonly`,
+`writeonly`, and `hitAttributeEXT` have one only to choose between
+HLSL and GLSL modifier nodes or to report a deprecation, and read
+nothing after the keyword, so they are listed as bare keywords above.
+
+A `ModifierTail` is not an `ArgList`. Each modifier reads a fixed
+token shape of its own: an identifier
+(`__glsl_extension(GL_EXT_texture_shadow_lod)`), an integer literal
+(`__builtin_type(...)`), a version literal (`__spirv_version(1.3)`),
+a target name with an optional definition
+(`__target_intrinsic(hlsl, RayDesc)`), a magic-type name with an
+optional tag (`__magic_type(DifferentiableType)`), or the
+GLSL qualifier list of `layout(...)`. The complete keyword inventory
+is in [keywords-and-builtins.md](keywords-and-builtins.md).
 
 ## Attributes and decorations
 
@@ -747,11 +826,27 @@ to state several constraints, repeat the keyword. A leading
 `optional` modifier (parsed as `OptionalConstraintModifier`) is
 accepted on every term except `__hasDiffTypeInfo`. The
 `countof(Pack) == IntExpr` form is *oriented*: the reversed spelling
-`N == countof(Pack)` is recognized only to emit a targeted
-diagnostic. `nonempty(Pack)` and `countof(Pack) == IntExpr` are
-pack-shape constraints on a variadic `each` parameter;
-`__hasDiffTypeInfo(Type)` is a compiler-internal differentiability
-constraint.
+`N == countof(Pack)` is recognized only to emit
+`VariadicPackCountConstraintRequiresCountofOnLeft`, which asks for the
+constraint to be rewritten with `countof` on the left, and the rest of
+that `where` clause is then skipped. `nonempty(Pack)` and
+`countof(Pack) == IntExpr` are pack-shape constraints on a variadic
+`each` parameter; `__hasDiffTypeInfo(Type)` is a compiler-internal
+differentiability constraint.
+
+An `optional` conformance constraint is one the argument type does not
+have to satisfy, so anything the constraint provides has to be guarded
+by an `is` test before it is used:
+
+```
+interface IThing { void thing(); }
+
+void f<T>(T t) where optional T : IThing
+{
+    if (T is IThing)
+        t.thing();
+}
+```
 
 Where-clauses appear after the parameter list (or after the result
 clause for function-style declarations) and are syntactically optional

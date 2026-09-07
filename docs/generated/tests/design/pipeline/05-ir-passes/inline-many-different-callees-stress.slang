@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#inlining-and-call-graph
-//META: doc_section_digest=d53bcc40d9eaa7a3ac784fc9773eb4780b72aa50e5c0ba67ff2ca45acd271030
+//META: doc_section_digest=0c02024bf756789f5e2a8e8518524bff844c5a9c7658e631aab916c9a49f2d22
 //META: purpose=Stress: eight different `[ForceInline]` callees (each called once) all inline into a single entry point — no callee name appears in the HLSL emit.
 //META: intent=stress
 //META: pipeline_stage=ir-pass

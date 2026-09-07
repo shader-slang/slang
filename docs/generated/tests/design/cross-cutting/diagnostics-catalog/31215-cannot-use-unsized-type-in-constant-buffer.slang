@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=bfe3e1b6f6d44fbabde610fbc210a633063a505de3d1bde448fef98cb526fd73
+//META: doc_section_digest=36a8dad99ac4edf423dbc20e1230c8b8923b08e25dfb7fa7a4bbbde8c24ca2b2
 //META: purpose=Fires diagnostic E31215 (cannot-use-unsized-type-in-constant-buffer) -- unsized type in constant buffer
 //META: intent=negative
 //META: pipeline_stage=check
@@ -21,4 +21,4 @@ ConstantBuffer<S> cb;
 void main() {}
 
 
-// CHECK: E31215
+//CHECK: E31215

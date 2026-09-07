@@ -11,7 +11,9 @@ bool test()
 {
     CHECK(getAccess<Texture2D>() == DescriptorAccess.Read);
     CHECK(getAccess<SamplerState>() == DescriptorAccess.Unknown);
-    CHECK(getAccess<RasterizerOrderedStructuredBuffer<int>>() == DescriptorAccess.RasterizerOrdered);
+    CHECK(
+        getAccess<RasterizerOrderedStructuredBuffer<int>>() == DescriptorAccess.RasterizerOrdered);
+    CHECK(getAccess<RasterizerOrderedByteAddressBuffer>() == DescriptorAccess.RasterizerOrdered);
     CHECK(getAccess<RWStructuredBuffer<int>>() == DescriptorAccess.ReadWrite);
     CHECK(getAccess<AppendStructuredBuffer<int>>() == DescriptorAccess.ReadWrite);
     CHECK(getAccess<ConsumeStructuredBuffer<int>>() == DescriptorAccess.ReadWrite);

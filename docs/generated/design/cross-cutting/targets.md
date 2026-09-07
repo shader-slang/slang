@@ -168,7 +168,12 @@ KHR name — as `SPV_EXT_shader_invocation_reorder` is
 (`_spirv_1_4 + SPV_KHR_ray_tracing + SPV_KHR_physical_storage_buffer`)
 — does not push the effective version up. That matters because a
 raised floor is user-visible; see the `-capability` discussion under
-[Profiles](#profiles).
+[Profiles](#profiles). The raise shows up in the emitted module:
+because `SPV_KHR_cooperative_matrix` derives from `_spirv_1_6 +
+SPV_EXT_physical_storage_buffer + SPV_KHR_vulkan_memory_model`,
+`-target spirv-asm -capability SPV_KHR_cooperative_matrix` emits
+`; Version: 1.6` and `OpCapability VulkanMemoryModel` for a kernel
+that uses neither.
 
 ### Runtime representation
 
@@ -191,6 +196,17 @@ described above. Operations:
   `isSpirvVersionAtom`, `isSpirvExtensionAtom`, and `hasTargetAtom`.
   `getAtomSetOfTargets` and `getAtomSetOfStages` return the
   populated key-atom set for each of the two keyholes.
+
+Whether a shortfall in that join is fatal is a command-line choice:
+`maybeDiagnoseWarningOrError` in
+[slang-compiler.h](../../../../source/slang/slang-compiler.h) selects
+a `Capability`-category diagnostic's error form under
+`-restrictive-capability-check` and its warning form otherwise, and
+`maybeDiagnose` drops the diagnostic entirely under
+`-ignore-capabilities`. For a missing atom those two forms are
+"entry point uses capabilities not in specified profile" and
+"profile implicitly upgraded", the second widening the profile to
+include the missing atoms and continuing.
 
 The high-level design is described in
 [../../../design/capabilities.md](../../../design/capabilities.md); this
@@ -224,12 +240,21 @@ regenerated markdown together.
 Aliases tagged `[Compound]` in those comments are the names the
 front-end uses to gate a user-visible builtin or operation against
 the active target/stage. For example `abort` expands to
-`GL_EXT_shader_abort` (GLSL `abortEXT` / SPIR-V `OpAbortKHR`), and
+`GL_EXT_shader_abort` (GLSL `abortEXT` / SPIR-V `OpAbortKHR`) and
+gates the variadic
+`void abort<each T>(NativeString format, expand each T args)`
+builtin, whose whole user surface is a call such as
+`abort("bad value: %u", v);`.
 `rayquery_sphere_nv` / `rayquery_lss_nv` each disjoin the per-target
 support for the NV sphere / linear-swept-spheres ray-query accessors
 (GLSL `_GL_NV_linear_swept_spheres`, HLSL/NVAPI `_sm_6_3`, or SPIR-V
-`spvRayQueryKHR` combined with the matching geometry capability). The
-restriction of `subgroup_workgroup_index` (the `WaveGetWaveIndex` /
+`spvRayQueryKHR` combined with the matching geometry capability), and
+gate ten `RayQuery` methods — the `Candidate` / `Committed` pairs of
+`SphereObjectPositionAndRadiusNV`, `IsNonOpaqueSphereNV` /
+`IsSphereNV`, `LssObjectPositionsAndRadiiNV`, `LssHitParameterNV`
+and `IsNonOpaqueLssNV` / `IsLssNV` — each of which also carries
+`[__requiresNVAPI]` for its HLSL arm.
+The restriction of `subgroup_workgroup_index` (the `WaveGetWaveIndex` /
 `WaveGetNumWaves` queries) to compute-class stages on GLSL / SPIR-V is
 likewise encoded as a compound alias, so misuse is rejected by the
 capability system rather than producing invalid output.
@@ -278,12 +303,26 @@ already implied by the target set, so a cross-family request such as
 direct path, and the via-GLSL path keeps `glsl` rather than `spirv`
 as its target keyhole.
 
+"Supplies none" is narrower than it reads. The capability alias a
+profile version maps onto carries a SPIR-V disjunct of its own —
+`sm_6_0` reaches `spirv_1_3` through `sm_6_0_version`, and `GLSL_450`
+lists `spirv_1_3` directly — so an explicit `-profile` normally does
+supply a SPIR-V version atom even when it belongs to another family.
+The `spirv_1_5` fallback therefore applies to a compile with no
+`-profile` at all, whose emitted header reads `; Version: 1.5`;
+`-profile sm_6_0` and `-profile glsl_450` both emit `; Version: 1.3`.
+
 The stage side of a profile and the stage keyhole of the capability
 system are separate vocabularies that have to agree. `Stage::Node`
 and the capability alias `node` are the paired spellings for
 work-graph entry points; the alias is `_node + _sm_6_8`, so naming
 the stage in capability terms also asserts the Shader Model floor
-the stage needs.
+the stage needs. That floor arrives through the profile's own set —
+`Profile::getCapabilityName` adds `CapabilityName::node` for
+`Stage::Node` — so it raises what a node entry point *promises*
+rather than being something the `-profile` version is checked
+against: a `[shader("node")]` entry point at `-profile lib_6_6` is
+not diagnosed for a missing `sm_6_8`.
 
 ### Profiles versus explicit `-capability`
 
@@ -310,6 +349,41 @@ reports `conflicting-explicit-capability-and-profile`, defined in
 When the profile pins no version of that family, the function
 returns false and nothing is diagnosed.
 
+Reaching the diagnostic needs the profile and the target to be in
+the same family. `SPV_KHR_cooperative_matrix` inherits `_spirv_1_6`,
+so a compile of any kernel under
+`-target spirv -profile spirv_1_3 -capability SPV_KHR_cooperative_matrix`
+stops with
+
+```
+error[E00046]: a requested '-capability' requires a higher target version than the explicitly requested profile 'spirv_1_3'; specify a higher '-profile' or remove the conflicting '-capability'
+```
+
+while the same line at `-profile spirv_1_6`, or with no `-profile`
+at all, compiles and emits a 1.6 module.
+
+The counter-example is that line with a cross-family profile:
+`-profile glsl_450` or `-profile sm_6_0` also compiles and emits
+1.6, silently. What suppresses the check is not the function's early
+return — both profiles do supply a SPIR-V version atom, and on their
+own both emit `; Version: 1.3` — but a gate ahead of it. The call
+site picks a version family only when `profile.getFamily()` agrees
+with the target format (`ProfileFamily::SPIRV` with `isSPIRV`, `DX`
+with `isD3DTarget`, `GLSL` with the GLSL text target, `METAL` with
+`isMetalTarget`), and otherwise never calls the folding function at
+all. Without that gate the version atoms a cross-family profile
+carries would read as a pin, and adding `-capability spirv_1_4` to
+`-profile glsl_450` would be rejected as a conflict the user never
+expressed.
+
+The two options do not have separate diagnostic name spaces. An
+unrecognised `-capability` atom is rejected by `findCapabilityName`
+but reported as `unknown profile '<name>'` — the same diagnostic an
+unrecognised `-profile` gets from `Profile::lookUp` — because the
+`-capability` handler in
+[slang-options.cpp](../../../../source/slang/slang-options.cpp)
+reuses it rather than raising one of its own.
+
 ## How target choice affects IR
 
 The IR itself is mostly target-agnostic. Two places where the target
@@ -320,7 +394,25 @@ shows through:
    `slang-ir-specialize-stage-switch.cpp` (see
    [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md))
    resolve `[target]` / `[stage]` conditional code paths against the
-   active `TargetRequest`.
+   active `TargetRequest`. The user-level syntax they resolve is
+   `__target_switch`, used throughout
+   [core.meta.slang](../../../../source/slang/core.meta.slang); its
+   case labels are capability atom names, arms fall through, and
+   `default:` covers every target with no arm of its own:
+
+   ```slang
+   __target_switch
+   {
+   case hlsl:  return 1;
+   case glsl:
+   case spirv: return 2;
+   default:    return 99;
+   }
+   ```
+
+   With no matching arm and no `default:`, the function has no body
+   for the active target, and what is rejected is the entry point
+   that reaches it rather than the switch.
 2. **Target-specific lowering passes** named by target acronym:
    - HLSL: [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp)
    - GLSL: [slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp), [slang-ir-glsl-liveness.cpp](../../../../source/slang/slang-ir-glsl-liveness.cpp)

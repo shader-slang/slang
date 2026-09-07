@@ -152,6 +152,25 @@ line 380. Second, every `IRDebugSource` produced here is recorded in
 `context->shared->mapSourceFileToDebugSourceInst`, which later
 per-decl lowering consults rather than re-emitting.
 
+A3 and A9 attach their decorations to the module instruction itself
+rather than to a global symbol, so neither appears in a `-dump-ir`
+listing: `dumpIRModule` in
+[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 8400)
+walks `module->getGlobalInsts()`, and `IRInst::getFirstChild` (line
+8872) starts after the last decoration. The two gates are reached
+from source in different ways. A3 fires for a module declaration
+carrying the `[ExperimentalModule]` attribute, declared by
+`attribute_syntax` at line 128 of
+[core.meta.slang](../../../../source/slang/core.meta.slang) and used
+by the shipped experimental modules (for example
+[workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang)
+line 9). A9 fires when the `NV_SHADER_EXTN_SLOT` and
+`NV_SHADER_EXTN_REGISTER_SPACE` preprocessor macros are defined, in
+the source or on the command line; the front end reads their values
+and attaches the `NVAPISlotModifier` to the `ModuleDecl` at lines
+283-338 of
+[slang-compile-request.h](../../../../source/slang/slang-compile-request.h).
+
 The `#if 0` block at line 15509 (a `dumpIR(module, ..., "GENERATED", ...)`
 call) is intentionally disabled in production builds; flip it for
 debugging the pre-mandatory IR shape.
@@ -282,11 +301,11 @@ flowchart TD
 |---|---|---|---|---|
 | D1 | `checkForRecursiveTypes(module, sink)` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation` | Disallows recursive type definitions. |
 | D2 | early return on error (lines 15665-15666) | [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) | `sink->getErrorCount() != 0` | If D1 (or any earlier diagnostic) raised an error, Phase D exits before propagation and the later passes. |
-| D3 | `propagateConstExpr(module, sink)` | [slang-ir-constexpr.cpp](../../../../source/slang/slang-ir-constexpr.cpp) | `shouldRunNonEssentialValidation` | Propagates `constexpr`-ness through the dataflow and call graph. |
+| D3 | `propagateConstExpr(module, sink)` | [slang-ir-constexpr.cpp](../../../../source/slang/slang-ir-constexpr.cpp) | `shouldRunNonEssentialValidation` | Propagates `constexpr`-ness through the dataflow and call graph. A transform as well as a check: every value it proves constant is retyped to the rate-qualified form `@ConstExpr T` by `markConstExpr` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 10050). It diagnoses only where a `constexpr` demand cannot be met. |
 | D4 | `checkForUsingUninitializedValues(module, sink)` | [slang-ir-use-uninitialized-values.cpp](../../../../source/slang/slang-ir-use-uninitialized-values.cpp) | `shouldRunNonEssentialValidation` | Dataflow check that requires SSA + SCCP from Phase C. |
 | D5 | `checkForMissingReturns(module, sink, CodeGenTarget::None, true)` | [slang-ir-missing-return.cpp](../../../../source/slang/slang-ir-missing-return.cpp) | `shouldRunNonEssentialValidation` | Note `target=None`: pre-link this is target-agnostic; later passes may re-run target-aware variants. |
 | D6 | `checkAutoDiffUsages(module, sink)` | [slang-ir-check-differentiability.cpp](../../../../source/slang/slang-ir-check-differentiability.cpp) | `shouldRunNonEssentialValidation` | Validates bodies of `[Differentiable]` functions. |
-| D7 | `checkForOperatorShiftOverflow(module, sink)` | [slang-ir-operator-shift-overflow.cpp](../../../../source/slang/slang-ir-operator-shift-overflow.cpp) | `shouldRunNonEssentialValidation` | Flags shift counts that exceed the operand width. |
+| D7 | `checkForOperatorShiftOverflow(module, sink)` | [slang-ir-operator-shift-overflow.cpp](../../../../source/slang/slang-ir-operator-shift-overflow.cpp) | `shouldRunNonEssentialValidation` | Flags shift counts that exceed the operand width, on the `kIROp_Lsh` insts that survive Phase C; see the note below. |
 | D8 | `addDecorationsForGenericsSpecializedWithExistentials(module, sink)` | [slang-ir-check-specialize-generic-with-existential.cpp](../../../../source/slang/slang-ir-check-specialize-generic-with-existential.cpp) | `shouldRunNonEssentialValidation` and `languageVersion >= 2025` | Slang 2025+ disallows specializing a generic with an existential type; this pass adds the diagnostic-bearing decoration. |
 | D9 | `checkForMeshOutputReads(module, sink)` | [slang-ir-mesh-output-reads.cpp](../../../../source/slang/slang-ir-mesh-output-reads.cpp) | `shouldRunNonEssentialValidation` | Reading from mesh-shader outputs is not allowed. |
 | D10 | `stripFrontEndOnlyInstructions(module, stripOptions)` (line 15730) | [slang-ir-strip.cpp](../../../../source/slang/slang-ir-strip.cpp) (line 50) | always | `stripOptions.shouldStripNameHints = shouldObfuscateCode()` (line 15720); `stripSourceLocs = false` (line 15729 — the obfuscation pass below produces new locs). |
@@ -295,6 +314,31 @@ flowchart TD
 | D13 | `obfuscateModuleLocs(module, sourceManager)` | [slang-ir-obfuscate-loc.cpp](../../../../source/slang/slang-ir-obfuscate-loc.cpp) | `stripOptions.shouldStripNameHints && shouldHaveSourceMap()` | Generates obfuscated source locations and the matching source map. |
 | D14 | `validateIRModuleIfEnabled(compileRequest, module)` (line 15761) | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) (line 435) | always | Structural sanity check after stripping. |
 | D15 | `module->buildMangledNameToGlobalInstMap()` (line 15777) | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 5161) | always | Builds the lookup index `linkIR` later needs. |
+
+The diagnostics the validators in this block emit, with a minimal
+input that triggers each:
+
+| # | Diagnostic | Minimal trigger |
+|---|---|---|
+| D1 | `E41001` *type contains cyclic reference* | `struct Bad { Bad next; }` |
+| D3 | `E40012` *expected a compile-time constant*, `E40013` *argument is not a compile-time constant* | a value that is not constant reaching a parameter whose type is `constexpr` |
+| D4 | `W41016` *use of uninitialized variable* | `int x; buf[0] = x;` |
+| D5 | `W41010` *non-void function does not return in all cases* | `int f(int x) { if (x > 0) return 1; }` |
+| D6 | `E41022` *derivative cannot be propagated through non-differentiable call* | a `[Differentiable]` function calling one that has no derivative |
+| D7 | `W41030` *left shift overflow*, `W41034` *left shift on narrow integer type* | `a << 40` where `a` is a `uniform int` |
+| D9 | `E54005` *cannot read values from mesh shader outputs* | reading `verts[0].pos` back after writing it |
+
+D7 sees only the shifts that survive Phase C, which is why the
+trigger above shifts a `uniform` rather than a literal.
+`checkForOperatorShiftOverflow` walks `kIROp_Lsh` instructions and
+compares a literal right operand against the width of the left
+operand's element type; an all-literal shift such as `1 << 40` has
+already been folded to a constant by C2 (`evalLsh` at line 776 of
+[slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp)), so
+no `Lsh` is left for the validator to flag. `W41034` covers the
+complementary case: a *non*-literal shift amount whose type is wider
+than a narrow (under 32-bit) left operand, where Slang — unlike C —
+does not promote before shifting.
 
 Note that the `if (compileRequest->optionSet.shouldDumpIR())` block
 between D14 and D15 (lines 15765-15775, tagged `"LOWER-TO-IR"`) is an
@@ -311,11 +355,24 @@ optional dump, not a pipeline step; it does not mutate the module.
 | Obfuscation | `linkage->m_optionSet.shouldObfuscateCode()` | The `shouldStripNameHints` flag in D10 and (with `shouldHaveSourceMap()`) D13. |
 | Source map | `linkage->m_optionSet.shouldHaveSourceMap()` | D13 (only when `shouldStripNameHints` is also true). |
 | Loop inversion | `linkage->m_optionSet.getBoolOption(CompilerOptionName::LoopInversion)` | C6. |
-| Trace coverage | `linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage)` | Sets `context->traceCoverage`; does **not** directly gate a pass in this pipeline, but propagates into per-decl lowering inside A6/A7. |
-| Trace function coverage | `linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceFunctionCoverage)` | Sets `context->traceFunctionCoverage`; like `TraceCoverage`, it influences per-decl lowering (function-entry counters) rather than gating a pass here. |
-| Trace branch coverage | `linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage)` | Sets `context->traceBranchCoverage`; influences per-decl lowering (per-branch-arm counters) rather than gating a pass here. |
+| Trace coverage (`-trace-coverage`) | `linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage)` | Sets `context->traceCoverage`; does **not** directly gate a pass in this pipeline, but propagates into per-decl lowering inside A6/A7. |
+| Trace function coverage (`-trace-function-coverage`) | `linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceFunctionCoverage)` | Sets `context->traceFunctionCoverage`; like `TraceCoverage`, it influences per-decl lowering (function-entry counters) rather than gating a pass here. |
+| Trace branch coverage (`-trace-branch-coverage`) | `linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage)` | Sets `context->traceBranchCoverage`; influences per-decl lowering (per-branch-arm counters) rather than gating a pass here. |
 | Debug info | `linkage->m_optionSet.getDebugInfoLevel()` | A4 (any level above `None`), A5 (`Standard` or higher), B6 (`Standard` or higher). The level is cached once on `context->debugInfoLevel` at line 15416 and every gate below reads that field. |
 | Include source in debug info | `linkage->m_optionSet.shouldIncludeSourceInDebugInfo()`, i.e. `getBoolOption(CompilerOptionName::DebugInfoIncludeSource)` | Not a pass gate: it widens A4 so that `IRDebugSource` carries the source *text* even at `Minimal` debug-info level. It does **not** enable A4 on its own — `debugInfoLevel != None` is still required. |
+
+The three trace-coverage fields are read out of the option set at
+lines 15443-15447 and consumed during the Phase A decl walk, which
+emits `kIROp_IncrementCoverageCounter` before every executable
+statement (line 9999), `kIROp_IncrementFunctionCoverageCounter` at
+the head of each lowered function body (line 14321), and
+`kIROp_IncrementBranchCoverageCounter` on each `if` arm,
+loop-condition arm, and `switch` arm (line 8146). Because they come
+from lowering rather than from a pass, all three are already present
+in the pre-link IR; the pass that turns them into stores through the
+synthesized `__slang_coverage` buffer (`instrumentCoverage`, line
+1216 of [slang-emit.cpp](../../../../source/slang/slang-emit.cpp))
+runs post-link.
 
 ### Context predicates
 
@@ -330,6 +387,20 @@ optional dump, not a pipeline step; it does not mutate the module.
 | Predicate | Effect |
 |---|---|
 | `moduleDecl->languageVersion >= SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2025` | Gates D8 (`addDecorationsForGenericsSpecializedWithExistentials`). |
+
+D8 does not diagnose. It only attaches
+`IRDisallowSpecializationWithExistentialsDecoration` to the offending
+`specialize` instruction (line 69 of
+[slang-ir-check-specialize-generic-with-existential.cpp](../../../../source/slang/slang-ir-check-specialize-generic-with-existential.cpp));
+the error a user sees, `E33180` *cannot specialize generic with
+existential type*, is raised post-link by the typeflow specialization
+pass (`emitExistentialSpecializationDiagnostic`, line 8293 of
+[slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp),
+covered by [05-ir-passes.md](05-ir-passes.md)). That pass also
+recognizes the shape by scanning function bodies when the decoration
+is absent (`isInvalidExistentialSpecialization`, line 228), so
+turning off non-essential validation — and with it D8 — does not make
+the error go away.
 
 ## Loops in the pipeline
 
@@ -479,6 +550,25 @@ every subsequent target and entry point, so it must remain complete
 and self-consistent. Pruning is only sound in `linkIR`, whose output
 is a throw-away per-target copy where deferred witness-table entries
 can be cloned on demand by mangled name.
+
+Neither policy changes emitted code, so that is the wrong place to
+look for the difference. The comment on
+`canPruneAutodiffLinkArtifacts` (lines 69-84) states the cost it is
+avoiding: in a program that never differentiates, the artifacts are
+dragged through specialization, `simplifyIR`, and DCE before DCE
+finally removes them — the compile-time regression tracked as issue
+#11781. What differs is therefore an intermediate module shape, and it
+has names to look for: module-scope `IRAnnotation` insts, and the
+mangled-name-keyed derivative entries of a differentiable-interface
+witness table. No dump isolates them, though. `linkIR` is called
+directly at line 1004 of
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) rather than
+through the `SLANG_PASS` wrapper that gives every post-link pass an
+`### AFTER <pass>:` block under `-dump-ir`
+([slang-pass-wrapper.cpp](../../../../source/slang/slang-pass-wrapper.cpp)
+lines 80-83), so the earliest post-link listing already has a pass of
+further transformation applied to it, while the `### LOWER-TO-IR:`
+block is the prelinked module.
 
 Note that `prelinkIR` still computes
 `sharedContext.useAutodiff = doesModuleUseAutodiff(irModule)` at

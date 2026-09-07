@@ -1,0 +1,55 @@
+schema_version: 1
+id: hull-patch-constant-user-output-location-collides
+bundle: coverage/legalize
+suspected_kind: wrong-codegen
+title: "Hull patch-constant user output reuses control-point output location"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: spirv
+evidence:
+  command: "SLANG_RUN_SPIRV_VALIDATION=1 build/RelWithDebInfo/bin/slangc /tmp/cand/hull4.slang -target spirv -entry main -stage hull -o /tmp/cand/h4.spv"
+  source_slang: docs/generated/tests/coverage/legalize/hull-patch-constant-func-spirv.slang
+  observed_summary: |
+    When a hull shader's patch-constant function returns a user-semantic (non
+    SV_TessFactor) field alongside the control-point outputs, both are assigned
+    Location 0 and the module fails SPIR-V validation:
+
+      struct HscOut { float edges[3] : SV_TessFactor;
+                      float inner    : SV_InsideTessFactor;
+                      float3 center  : CENTER; };
+      HscOut constants(InputPatch<VOut,3> ip, OutputPatch<HsOut,3> op) { ... }
+      [outputcontrolpoints(3)][patchconstantfunc("constants")]
+      HsOut main(InputPatch<VOut,3> ip, uint cpid : SV_OutputControlPointID) { ... }
+
+      error: line 4: [VUID-StandaloneSpirv-OpEntryPoint-08722] Entry-point has
+      conflicting output location assignment at location 0, component 0
+        OpEntryPoint TessellationControl %main "main" %gl_TessLevelOuter
+        %gl_TessLevelInner %entryPointParam_constants_center %entryPointParam_main_pos
+        %ip_pos %gl_InvocationID
+
+    `createPatchConstantFuncResultTypeLayout` (slang-ir-glsl-legalize.cpp:1179) hands
+    out VaryingOutput slots from `context->usedBindingIndex`, but that bitmap does not
+    yet account for the entry point's own control-point output, which is laid out
+    separately and also lands on location 0. The text-GLSL arm has an independent
+    problem on the same input: the patch-constant output is emitted as a plain
+    `out vec3 entryPointParam_constants_center_0;`, and glslang rejects it with
+    "'out' : type must be an array" because a tessellation-control per-vertex output
+    must be an array (a patch-constant output should be `patch out`).
+  exit_code: 0
+  stderr_tail: "error: line 4: [VUID-StandaloneSpirv-OpEntryPoint-08722] Entry-point has conflicting output location assignment at location 0, component 0"
+expected:
+  claim: |
+    A user-semantic field returned by the patch-constant function should get a location
+    that does not collide with the entry point's control-point outputs, and on the GLSL
+    arm should be declared `patch out` (a per-patch, non-arrayed output) rather than a
+    plain per-vertex `out`.
+  citation_kind: sibling-test
+  citation: tests/spirv/hull-shader.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/05-ir-passes.md#entry-point-and-parameter-handling
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — dropping the single `float3 center : CENTER` field from the patch-constant result makes the same shader validate cleanly."
+    - "The sibling test tests/spirv/hull-shader.slang has a user-semantic patch-constant output (`uint instanceId`) and pins it at Location 2, but that shader's hull entry point takes no InputPatch and its control-point outputs happen to be laid out first, so the collision is not exercised there."

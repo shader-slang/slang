@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
         {
             "name": "arg",
@@ -242,10 +243,258 @@ standard output = {
             }
         }
     ],
+    "globalScope": {
+        "kind": "none",
+        "parameters": [
+            {
+                "name": "arg",
+                "binding": {"kind": "generic", "index": 0},
+                "type": {
+                    "kind": "parameterBlock",
+                    "elementType": {
+                        "kind": "struct",
+                        "name": "S",
+                        "fields": [
+                            {
+                                "name": "p",
+                                "type": {
+                                    "kind": "GenericTypeParameter",
+                                    "name": "TParam2",
+                                    "sizes": [
+                                        {"kind": "generic", "value": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "generic", "index": 0}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "generic", "value": 1}
+                        ]
+                    },
+                    "containerVarLayout": {
+
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "struct",
+                            "name": "S",
+                            "fields": [
+                                {
+                                    "name": "p",
+                                    "type": {
+                                        "kind": "GenericTypeParameter",
+                                        "name": "TParam2",
+                                        "sizes": [
+                                            {"kind": "generic", "value": 1}
+                                        ]
+                                    },
+                                    "binding": {"kind": "generic", "index": 0}
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "generic", "value": 1}
+                            ]
+                        },
+                        "binding": {"kind": "generic", "index": 0}
+                    },
+                    "sizes": [
+                        {"kind": "generic", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "arg1",
+                "binding": {"kind": "generic", "index": 0},
+                "type": {
+                    "kind": "parameterBlock",
+                    "elementType": {
+                        "kind": "GenericTypeParameter",
+                        "name": "TParam",
+                        "sizes": [
+                            {"kind": "generic", "value": 1}
+                        ]
+                    },
+                    "containerVarLayout": {
+
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "GenericTypeParameter",
+                            "name": "TParam",
+                            "sizes": [
+                                {"kind": "generic", "value": 1}
+                            ]
+                        },
+                        "binding": {"kind": "generic", "index": 0}
+                    },
+                    "sizes": [
+                        {"kind": "generic", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "t",
+                "binding": {"kind": "shaderResource", "index": 0},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "resultType": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "s",
+                "binding": {"kind": "samplerState", "index": 0},
+                "type": {
+                    "kind": "samplerState",
+                    "sizes": [
+                        {"kind": "samplerState", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "CB",
+                "binding": {"kind": "constantBuffer", "index": 0},
+                "type": {
+                    "kind": "constantBuffer",
+                    "elementType": {
+                        "kind": "struct",
+                        "fields": [
+                            {
+                                "name": "u",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 16, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
+                            },
+                            {
+                                "name": "v",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 16, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
+                            },
+                            {
+                                "name": "w",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 16, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 32, "size": 16, "elementStride": 4}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 48, "alignment": 16}
+                        ]
+                    },
+                    "containerVarLayout": {
+                        "binding": {"kind": "constantBuffer", "index": 0}
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "struct",
+                            "fields": [
+                                {
+                                    "name": "u",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 16, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
+                                },
+                                {
+                                    "name": "v",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 16, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
+                                },
+                                {
+                                    "name": "w",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 16, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 32, "size": 16, "elementStride": 4}
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "uniform", "value": 48, "alignment": 16}
+                            ]
+                        },
+                        "binding": {"kind": "uniform", "offset": 0, "size": 48, "elementStride": 0}
+                    },
+                    "sizes": [
+                        {"kind": "constantBuffer", "value": 1}
+                    ]
+                }
+            }
+        ]
+    },
     "entryPoints": [
         {
             "name": "main",
             "stage": "fragment",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+
+                ]
+            },
             "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},

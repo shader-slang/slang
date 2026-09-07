@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#scope-walking-order-during-lookup
-//META: doc_section_digest=3d87095dd18e90d93ff4e17cadb91ec9dacff31277081232f0c892a1279af690
+//META: doc_section_digest=a1cef77c9d314e6b0613e85e980bbd3bf945a9dae9a4942fa2c7e720befca8ee
 //META: purpose=Visiting `currentScope` first means an inner declaration with the same name as an outer one shadows it inside the inner block.
 //META: intent=functional
 //META: pipeline_stage=check

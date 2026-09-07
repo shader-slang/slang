@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=9c3b0473d92dc983eefa739ead53bf2055c86632613dc8c21720d0a5fe754a1b
 //META: purpose=Fires diagnostic E52002 (pass-through-compiler-not-found) - pass-through compiler not found
 //META: intent=negative
 //META: pipeline_stage=emit
@@ -19,4 +19,4 @@
 [numthreads(1,1,1)]
 void main() {}
 
-// CHECK: E52002
+//CHECK: E52002

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:30:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=0d38710803487481ded085ca5cee10f82c37a05e5dea2cdbfe425963306c60a7
 //META: purpose=Fires diagnostic 40011 (overload-candidate) - candidate note after overload error
 //META: intent=negative
 //META: pipeline_stage=check
@@ -23,4 +23,4 @@ void main()
     f(1);
 }
 
-// CHECK: 40011
+//CHECK: 40011

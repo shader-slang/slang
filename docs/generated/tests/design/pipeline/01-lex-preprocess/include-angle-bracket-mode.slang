@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:27:31Z
-//META: source_commit=6b490bc8cb3cf11b356ddf70168c5609efa46341
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/01-lex-preprocess.md#include-resolution
-//META: doc_section_digest=84fa78a16b12acc1c4a16a6900c45945fcf27cbb6ff16cb5e1d86c53e4450f09
+//META: doc_section_digest=15676a5139bfbfb4b33e12ca3d5ef744f531fa5b0c577d5608dc32037e46822a
 //META: purpose=An angle-form `#include` builds its path by concatenating the raw tokens between `<` and `>` and resolves it in system-include mode.
 //META: intent=functional
 //META: pipeline_stage=preprocess
