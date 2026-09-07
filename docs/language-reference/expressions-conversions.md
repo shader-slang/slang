@@ -7,14 +7,14 @@ Slang supports the following kinds of type conversions:
 
 - _Explicit type conversion_ occurs with a _cast expression_ or an _initializer expression_ (see
   below). Explicit type conversion is used to convert a value to a specific type.
-- _Implicit type conversion_ occurs when a value of a certain type is passed to a context that requires another
+- _Implicit type conversion_ occurs when a value of a certain type is used in a context that requires another
   type. Implicit type conversion is sometimes referred to as _type coercion_.
 - A _bit cast_ reinterprets the underlying bit pattern of a value of one type as a value of another type.
 
 
 ## Cast Expression
 
-**Syntax**
+**Grammar:**
 
 Cast expression:
 > **`'('`** *`type-expr`* **`')'`** *`base-expr`*
@@ -22,18 +22,20 @@ Cast expression:
 Initializer expression:
 > *`type-expr`* **`'('`** *`base-expr`* **`')'`**
 
-A _cast expression_ converts a value (*`base-expr`*) to the desired type (*`type-expr`*). For example, `(uint32_t)5`.
+A _cast expression_ converts a value (*`base-expr`*) to the desired type (*`type-expr`*). For example,
+`(uint32_t)5`.
 
-An _initializer expression_ creates a new value of the desired type (*`type-expr`*) from (*`base-expr`*). For example,
-`float(5)`.
+An _initializer expression_ creates a new value of the desired type (*`type-expr`*) from (*`base-expr`*). For
+example, `float(5)`. See [initializer expressions](expressions-initializer.md) for details.
 
 For fundamental types, cast expressions and single-argument initializer expressions have the same
 semantics. For user-defined types, a cast expression invokes the single-argument initializer of the target
 type.
 
-The conversion rules between fundamental types are as follows:
+The table below presents the conversion rules between the fundamental types. In the description column, `src`
+is the source value, `S` is its type, and `T` is the target type.
 
-| Source type (S)     | Target type (T)     | Description                                                           |
+| Source type         | Target type         | Description                                                           |
 |---------------------|---------------------|-----------------------------------------------------------------------|
 | bool                | integer type        | Same as `(src ? T(1) : T(0))`                                         |
 | bool                | floating-point type | Same as `(src ? T(1.0) : T(0.0))`                                     |
@@ -56,15 +58,14 @@ The conversion rules between fundamental types are as follows:
 2. Change the signedness of the value if necessary to match the signedness of the target type.
    - This step does not change the bit representation of the value.
 
-Note that when the source value can be represented with the target type, the value does not change in
-conversion.
+Note that when the source value is representable in the target type, the value does not change in conversion.
 
-If the integer-to-float or float-to-integer conversion is not representable by the target type after rounding,
-the behavior is [undefined](basics-behavior.md).
+If the result of an integer-to-float, float-to-integer, or float-to-float conversion is not representable in
+the target type after rounding, the behavior is [undefined](basics-behavior.md).
 
-> 📝 **Remark:** As a compatibility feature for legacy code, Slang &le;2026 has special semantics for a cast
-> from literal 0 to a user-defined [structure](types-struct.md) type. This is equivalent to initializing the
-> structure with a default initializer.
+> 📝 **Remark:** As a compatibility feature for legacy code, Slang 2026 and earlier has special semantics for a
+> cast from literal 0 to a user-defined [structure](types-struct.md) type. This is equivalent to initializing
+> the structure with a default initializer.
 >
 > The special semantics are removed in Slang 202c. In Slang 202c, a cast from literal 0 is a regular
 > conversion, and it invokes the single-argument initializer of the target type.
@@ -72,11 +73,11 @@ the behavior is [undefined](basics-behavior.md).
 > ```hlsl
 > MyStruct s = (MyStruct)0;
 >
-> // In Slang 2026 and previous versions, the above is the same as
-> MyStruct s = MyStruct();
+> // In Slang 2026 and earlier, the above is the same as
+> MyStruct sLegacy = MyStruct();
 >
 > // From Slang 202c onward, the cast from literal 0 is equivalent to
-> MyStruct s = MyStruct(0);
+> MyStruct sNext = MyStruct(0);
 > ```
 >
 > See also GitHub issue [#12045](https://github.com/shader-slang/slang/issues/12045).
@@ -115,8 +116,9 @@ void main(uint3 tid : SV_DispatchThreadID)
 ## Cast to Void
 
 A cast to [`void`](types-fundamental.md) is a no-op cast producing a `void` value. The primary use of
-a `void` cast is to mark the value as consumed, suppressing related warnings. See also
-[attribute \[NoDiscard\]](../../../core-module-reference/attributes/nodiscard-02.html).
+a `void` cast is to mark the value as consumed, suppressing the related diagnostics. See also the
+[\[NoDiscard\]](../../../core-module-reference/attributes/nodiscard-02.html) attribute, which makes discarding
+a function result an error unless the result is explicitly cast to `void`.
 
 ### Examples
 
@@ -126,7 +128,7 @@ RWStructuredBuffer<uint> output;
 enum StatusCode
 {
     Success = 0,
-    Overflow = 1
+    Overflow = 1,
 }
 
 [NoDiscard] StatusCode incrementValue(inout uint val)
@@ -147,14 +149,14 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 ```
 
-## Conversions Between Scalar, Vector, and Matrix Types
+## Conversions Between Scalar, Vector, and Matrix Types {#scalar-vector-matrix}
 
 A scalar can be cast to a vector or matrix type. In this conversion, the scalar value is used to
 populate every element of the vector or matrix.
 
 A vector can be constructed from elements and smaller vectors. The elements are concatenated to form the new
-vector. If the target vector type has more elements than supplied (but at least 2 were supplied), the newly
-constructed vector will be tail-padded by 0. However, see the warning below.
+vector. If the target vector type has more components than were supplied (and at least two were supplied), the
+newly constructed vector will be tail-padded by 0. However, see the warning below.
 
 A matrix can be constructed from vectors in the following ways:
 
@@ -170,17 +172,18 @@ A matrix can be constructed from vectors in the following ways:
 For details, see [vector initialization functions](../../../core-module-reference/types/vector/init.html) and
 [matrix initialization functions](../../../core-module-reference/types/matrix/init.html).
 
-> ⚠️ **Warning:** In Slang 2025 and previous, the construction of a 4-dimensional vector from a 2-dimensional
-> vector and an element is inconsistent with the tail-padding by 0 semantics. Instead, the element is
-> implicitly converted to a 2-dimensional vector. This constructor has been removed from Slang 2026. See
+> ⚠️ **Warning:** In Slang 2025 and earlier, a 4-dimensional vector could be constructed from three arguments,
+> `(vector<T, 2>, T)` or `(T, vector<T, 2>)`. This is inconsistent with the tail-padding by 0 semantics:
+> instead of being padded, the lone element is implicitly converted to a 2-dimensional vector, so
+> `float4(float2(7, 8), 9)` yields `{ 7, 8, 9, 9 }`. These constructors have been removed in Slang 2026. See
 > GitHub issue [#12093](https://github.com/shader-slang/slang/issues/12093) for details.
 
 > ⚠️ **Warning:** Constructing a vector using an initializer list with a single element is equivalent to
-> initializing with a scalar. That is:
+> initializing with a scalar. That is, the element is broadcast to every component:
 >
 > ```hlsl
-> int4 v0 = 1;        // { 1, 1, 1, 1 } - duplicate
-> int4 v1 = { 1 };    // { 1, 1, 1, 1 } - duplicate
+> int4 v0 = 1;        // { 1, 1, 1, 1 } - broadcast
+> int4 v1 = { 1 };    // { 1, 1, 1, 1 } - broadcast
 > int4 v2 = { 1, 1 }; // { 1, 1, 0, 0 } - tail-pad with 0
 > ```
 
@@ -241,13 +244,13 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 ## Implicit Type Conversion
 
-Implicit type conversion occurs when the type of a value does not match the required type, there is an
-explicit conversion available, and implicit conversion is allowed.
+Implicit type conversion occurs when the type of a value does not match the required type, a conversion to the
+required type exists, and that conversion is allowed to be applied implicitly.
 
 The following implicit type conversions are allowed:
 
 - `bool` to an integer type
-- integer type to a wider integer type, same signedness (aka. integer promotion)
+- integer type to a wider integer type, same signedness (integer promotion)
 - `half` to `float`
 - scalar `T` to `vector<T, N>` (where `N` is any legal value)
 - scalar `T` to `matrix<T, R, C>` (where `R` and `C` are any legal values)
@@ -256,12 +259,12 @@ The following implicit type conversions are allowed:
 - a type to an interface it conforms to
 - `none` or a value of `T` to `Optional<T>`
 - `nullptr` to any pointer type
-- sized array to unsized array of same element type
+- sized array to unsized array of the same element type
 - `enum` type to its tag type
 - an initializer list to a type with an initializer that accepts the arguments in the list
 
-The following implicit type conversions are allowed but not recommended. These implicit type conversions
-trigger a diagnostic warning.
+The following implicit type conversions are allowed but not recommended. Each of them triggers a warning
+diagnostic.
 
 - `bool` to a floating-point type
 - integer type to a `bool`
@@ -269,7 +272,7 @@ trigger a diagnostic warning.
 - integer type to same width integer type with different signedness, except integer literals whose values fit
   in the target type
 - integer type to a floating-point type and vice versa
-- floating-point type to a narrower float type
+- floating-point type to a narrower floating-point type
 - floating-point type to a double type (possible performance issue)
 - vector to vector and matrix to matrix where the target element type is narrower or has different signedness
 - integer vector to a floating-point vector and vice versa
@@ -277,14 +280,17 @@ trigger a diagnostic warning.
 > 📝 **Remark:** Some common contexts for implicit type conversions:
 >
 > - Assigning a value of one type to a variable of another type
-> - [Function](expressions-operators.md) call where the argument type does not match the parameter type
-> - [Operator](expressions-operators.md) call where the argument type does not match the parameter type
-> - [Generic argument application](generics.md) where the argument type does not match the generic parameter type
+> - [Function call](expressions-operators.md#call-expression) where the argument type does not match the
+>   parameter type
+> - [Operator](expressions-operators.md#built-in-operators) call where the argument type does not match the
+>   parameter type
+> - [Generic argument application](generics.md) where the argument type does not match the generic parameter
+>   type
 
-> ⚠️ **Warning:** In Slang 2025 and earlier, `vector<T, 4>` allowed initialization from
-> `(vector<T, 2>, T)` and `(T, vector<T, 2>)` arguments due to the `T` &rarr; `vector<T, 2>` implicit
-> conversion. This has been removed in Slang 2026.
-> See GitHub issue [#12093](https://github.com/shader-slang/slang/issues/12093) for details.
+> ⚠️ **Warning:** The `T` &rarr; `vector<T, 2>` implicit conversion is why, in Slang 2025 and earlier,
+> `vector<T, 4>` accepted the three-argument initializers `(vector<T, 2>, T)` and `(T, vector<T, 2>)`. Those
+> initializers have been removed in Slang 2026; see the warning under
+> [Conversions Between Scalar, Vector, and Matrix Types](#scalar-vector-matrix).
 
 ### Examples
 
@@ -319,7 +325,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 ```
 
-**Value and `none` to Optional:**
+**Value and `none` to Optional**
 
 ```hlsl
 StructuredBuffer<int64_t> input;
@@ -347,14 +353,14 @@ Optional<int> boundsCheckForInt32(int64_t val64)
     // check whether the value survived the cast
     if (val32 == val64)
     {
-        // survived, cast the value implicitly as
-        // Optional<int> holding the value
+        // survived, the value is implicitly converted to
+        // an Optional<int> holding the value
         return val32;
     }
     else
     {
-        // didn't survive, cast 'none' implicitly as
-        // Optional<int> holding nothing
+        // didn't survive, 'none' is implicitly converted to
+        // an Optional<int> holding nothing
         return none;
     }
 }
@@ -398,7 +404,7 @@ void main()
 }
 ```
 
-**Implicit initializer list conversions:**
+**Implicit initializer list conversions**
 
 ```hlsl
 RWStructuredBuffer<int> output;
@@ -412,12 +418,13 @@ int2 someFunc(int3 v)
     return { v.x + v.y + v.z, 1001 };
 }
 
+[numthreads(1,1,1)]
 void main()
 {
     int2 a = { 1, 2 };
     int b = 3;
 
-    // Assign new values to 'a', overriding the previous value.
+    // Assign new values to 'a', overwriting the previous value.
     // Initializer list { int, int } is converted to int2 when
     // invoking the assignment operator function.
     a = { 9, 5 };
@@ -434,15 +441,15 @@ void main()
 ## Bit Cast and Reinterpret Cast
 
 A bit cast reinterprets an existing bit pattern as another type of the same size. A bit cast is invoked using
-the [bit\_cast](../../../core-module-reference/global-decls/bit_cast.html) function. It is generally
-[implementation-defined behavior](basics-behavior.md) how values are encoded as underlying bit
-patterns. However, an application can reasonably expect the following:
+the [bit\_cast](../../../core-module-reference/global-decls/bit_cast.html) function. How values are encoded as
+underlying bit patterns is generally [implementation-defined](basics-behavior.md). However, an application can
+reasonably expect the following:
 
 - Signed integers are two's complement.
-- Floating-point types `half`, `float`, and `double` use the IEEE 754 encoding. Other floating-point types use
-  their respective encodings.
+- The [floating-point types](types-fundamental.md#floating) `half`, `float`, and `double` use the IEEE 754
+  encoding.
 
-The standard library also offers the following concrete HLSL-compatibility conversion and bit-cast functions:
+The core module also offers the following concrete HLSL-compatibility conversion and bit-cast functions:
 
 - [asdouble](../../../core-module-reference/global-decls/asdouble.html)
 - [asfloat](../../../core-module-reference/global-decls/asfloat.html)
@@ -457,7 +464,7 @@ A reinterpret cast is more general, and it allows reinterpreting a bit pattern o
 target type. A reinterpret cast is invoked using the
 [reinterpret](../../../core-module-reference/global-decls/reinterpret.html) function, and it uses the same
 union type emulation as [interface-conforming variants](types-interface.md). That is, the source value is
-packed into an AnyValue struct, which is then unpacked as the target type.
+packed into an `AnyValue` struct, which is then unpacked as the target type.
 
 
 ### Examples

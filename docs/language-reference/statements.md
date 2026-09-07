@@ -217,7 +217,8 @@ return someValue;
 
 The value returned must be able to coerce to the result type of the lexically enclosing function.
 
-> 📝 **Remark:** It is allowed to return an explicit `void` value from a function with a `void` result type. For example:
+> 📝 **Remark:** It is allowed to return an explicit `void` value from a function with a `void` result type.
+> For example:
 >
 > ```hlsl
 > void returnVoid() { }
@@ -227,7 +228,6 @@ The value returned must be able to coerce to the result type of the lexically en
 >     return returnVoid();
 > }
 > ```
-
 
 ### Discard Statement
 

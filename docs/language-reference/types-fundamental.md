@@ -15,7 +15,8 @@ A function with return type `void` does not return a value.
 
 Variables, arrays elements, or structure data members may not have type `void`.
 
-> 📝 **Remark 1:** It is allowed to return an explicit `void` value from a function with a `void` result type. For example:
+> 📝 **Remark 1:** It is allowed to return an explicit `void` value from a function with a `void` result type.
+> For example:
 >
 > ```hlsl
 > void returnVoid() { }
@@ -32,9 +33,9 @@ Variables, arrays elements, or structure data members may not have type `void`.
 > RWStructuredBuffer<uint> data;
 >
 > // returns false on overflow
-> [NoDiscard] bool checkedIncrement(inout int val)
+> [NoDiscard] bool checkedIncrement(inout uint val)
 > {
->     int orig = val;
+>     uint orig = val;
 >     ++val;
 >     return orig < val;
 > }
