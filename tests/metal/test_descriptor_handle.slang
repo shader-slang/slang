@@ -14,7 +14,8 @@ RWStructuredBuffer<uint> outputBuffer;
 void computeMain(uint3 dtid : SV_DispatchThreadID)
 {
     uint idx = dtid.x;
-    // Load values from the buffer to verify correct access
-    // METAL: {{.*}}outputBuffer{{.*}}=
+    // The read goes straight through the wrapper's typed-buffer field (`inner_N.read(...)`) with no
+    // descriptor-handle lookup in between.
+    // METAL: outputBuffer{{.*}}inner_{{[0-9]+}}){{.*}}.read(
     outputBuffer[idx] = param[0];
 }

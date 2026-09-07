@@ -1,8 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -g2 -emit-spirv-directly -capability cooperative_vector -capability cooperative_matrix
 
-// The linalg cooperative/tensor-addressing types are opaque and only reach the debug-info emitter as
-// function parameters (an opaque type is not a debuggable local or field). Each name must carry the
-// operands that form the type's identity so distinct instantiations don't collide on the literal
+// The linalg cooperative/tensor-addressing types are opaque builtins. This test instantiates each as
+// [noinline] function parameters — a simple fixture that forces distinct instantiations to be
+// retained and emitted into debug info. Each name must carry the operands that form the type's
+// identity so distinct instantiations don't collide on the literal
 // "unnamed" that a missing getTypeNameHint case would produce. Each type below is instantiated as a
 // pair differing in a preserved operand — cooperative-vector element count, cooperative-matrix use,
 // tensor-layout clamp mode, and (for TensorView, whose permutation is sized by the dimension)

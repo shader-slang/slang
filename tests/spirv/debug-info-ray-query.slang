@@ -1,9 +1,10 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -g2 -emit-spirv-directly
 
-// RayQuery is opaque and only reaches the debug-info emitter as a function parameter (an opaque type
-// is not a debuggable local or field). Its ray-flags operand must appear in the name, so the two
-// instantiations below — which differ only in flags — are distinguished instead of both rendering
-// the literal "unnamed" that a missing getTypeNameHint case would produce.
+// RayQuery is an opaque builtin. This test uses two [noinline] function parameters as a simple
+// fixture that forces each distinct instantiation to be retained and emitted into debug info.
+// Its ray-flags operand must appear in the name, so the two instantiations below — which differ only
+// in flags — are distinguished instead of both rendering the literal "unnamed" that a missing
+// getTypeNameHint case would produce.
 
 RWStructuredBuffer<float> outBuf;
 
