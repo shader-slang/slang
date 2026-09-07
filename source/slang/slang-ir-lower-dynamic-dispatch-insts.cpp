@@ -168,6 +168,18 @@ IRFunc* emitWitnessTableWrapper(
         if (auto name = _getWitnessTableWrapperFuncName(module, func))
             builder->addNameHintDecoration(wrapperFunc, name);
 
+    // This wrapper only marshals arguments between the interface's `AnyValue`-based
+    // signature and the concrete implementation's signature -- it is compiler-synthesized
+    // glue, not a call the downstream target compiler has any reason to keep as a distinct
+    // function. Every other synthesized marshalling helper in the compiler (e.g. the
+    // pack/unpack storage helpers in slang-ir-lower-buffer-element-type.cpp) is force-inlined
+    // the same way for the same reason. Without this, whether the wrapper (and, transitively,
+    // the switch-based dispatch function built around it in `createDispatchFunc`) survives to
+    // the final target output is left entirely to the downstream compiler's own heuristic
+    // inliner, which can decline once the wrapped method body is non-trivial (observed on the
+    // CUDA/NVRTC backend specifically).
+    builder->addForceInlineDecoration(wrapperFunc);
+
     builder->setInsertInto(wrapperFunc);
     auto block = builder->emitBlock();
     builder->setInsertInto(block);
@@ -264,6 +276,14 @@ IRFunc* createDispatchFunc(
     auto func = builder.createFunc();
     builder.setInsertInto(func);
     func->setFullType(dispatchFuncType);
+
+    // Same reasoning as `emitWitnessTableWrapper`'s force-inline decoration above: this
+    // function only exists because `mapping` is a closed, statically-enumerable set of
+    // concrete-type implementations (that's the only case this pass runs for), so the
+    // `switch` built below is itself the already-resolved dispatch. Leaving it as a separate,
+    // non-force-inlined function defeats that resolution by handing the decision back to a
+    // downstream heuristic inliner.
+    builder.addForceInlineDecoration(func);
 
     auto entryBlock = builder.emitBlock();
     builder.setInsertInto(entryBlock);

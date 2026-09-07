@@ -42,8 +42,10 @@ void takeRef(inout IFoo f, RWStructuredBuffer<float> buf)
     buf[1] = f.getValue();
 }
 
-// HLSL: s_dispatch_IFoo{{.*}}getValue
 // HLSL: void computeMain
+// HLSL: switch
+// HLSL: ImplA_getValue
+// HLSL: ImplB_getValue
 // GLSL: void main()
 // MTL: void computeMain
 [numthreads(1, 1, 1)]
