@@ -847,14 +847,19 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     case kIROp_TextureFootprintType:
         sb << "TextureFootprint";
         break;
+    // The following opaque builtin types carry no name-hint/linkage decoration, and their operands
+    // form the type's identity. Each case renders the surface name plus those operands, so
+    // consumers (chiefly SPIR-V debug info) get a real name instead of the empty hint that would
+    // collapse distinct instantiations into the literal "unnamed".
     case kIROp_DescriptorHandleType:
         sb << "DescriptorHandle<";
         getTypeNameHint(sb, as<IRDescriptorHandleType>(type)->getResourceType());
         sb << ">";
         break;
     case kIROp_RayQueryType:
-        // The sole operand is the ray-flags value; include it so `RayQuery<flags>` instantiations
-        // that differ only in flags get distinct names.
+        // The first operand is the ray-flags value (RayQueryType has min_operands == 1, so
+        // getOperand(0) is in bounds); include it so `RayQuery<flags>` instantiations that differ
+        // only in flags get distinct names.
         sb << "RayQuery<";
         getTypeNameHint(sb, type->getOperand(0));
         sb << ">";
@@ -897,10 +902,11 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     case kIROp_TensorAddressingTensorViewType:
         {
             // Operands are [dimension, hasDimension, permutation...]; the two leading operands are
-            // rendered by name, so the remaining `getOperandCount() - 2` are the permutation.
-            // Unused trailing permutation slots hold the sentinel 255 (the emitter reads only
-            // `dimension` of them); they are included here so the rendered name still reflects the
-            // full operand list.
+            // rendered by name, so the remaining `getOperandCount() - 2` are the permutation. Only
+            // the first `dimension`-many permutation entries are meaningful; trailing slots are the
+            // sentinel 255 (padding that the OpTypeTensorViewNV writer in the SPIR-V emitter
+            // ignores). This function deliberately renders every slot so the name stays a faithful,
+            // collision-free function of the full operand list.
             auto tensorView = as<IRTensorAddressingTensorViewType>(type);
             sb << "TensorView<";
             getTypeNameHint(sb, tensorView->getDimension());

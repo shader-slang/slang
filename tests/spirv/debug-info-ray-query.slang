@@ -5,7 +5,6 @@
 // instantiations below — which differ only in flags — are distinguished instead of both rendering
 // the literal "unnamed" that a missing getTypeNameHint case would produce.
 
-RaytracingAccelerationStructure accel;
 RWStructuredBuffer<float> outBuf;
 
 [noinline]

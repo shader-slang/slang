@@ -76,6 +76,9 @@ void main(uint3 tid: SV_DispatchThreadID)
                     useTensorView3(tv3, 1.0);
 }
 
+// Enum operands render as their integer values (for uniqueness, not readability): CoopMat scope
+// 3 = MemoryScope.Subgroup and use 0/2 = MatrixA/MatrixAccumulator; TensorLayout clamp 0/1 =
+// CoopMatClampMode.Undefined/Constant.
 // CHECK-DAG: %[[DEBUG_INFO_NONE:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugInfoNone
 
 // The element-count operand is preserved, so the two CoopVec instantiations get distinct names.

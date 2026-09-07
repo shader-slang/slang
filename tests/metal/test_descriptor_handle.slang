@@ -4,7 +4,10 @@ struct MyStruct
 {
     uint value;
 }
-// METAL-NOT: DescriptorHandle
+// The DescriptorHandle<Buffer<uint>> parameter must lower to a direct Metal resource binding: a
+// texture_buffer field inside the ParameterBlock wrapper struct, accessed with no descriptor-handle
+// indirection.
+// METAL: texture_buffer<uint, access::read>
 ParameterBlock<DescriptorHandle<Buffer<uint>>> param;
 RWStructuredBuffer<uint> outputBuffer;
 [numthreads(4, 1, 1)]
