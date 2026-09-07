@@ -2731,6 +2731,11 @@ public:
     /// Is `type` a scalar integer type.
     bool isScalarIntegerType(Type* type);
 
+    /// Return true when the integer constant `expr` provably folds to the value the
+    /// width-aware runtime computes. Used by the lossy int->float/double check to
+    /// trust a folded constant expression only when the fold matches that value.
+    bool isConstantFoldRuntimeEquivalent(Expr* expr);
+
     // This function is used to get the best integer type that matches the given type.
     // If `type` is already an integer type, return it as is.
     // If `type` is a enum type, return the tag type if it exists.

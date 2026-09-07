@@ -1688,6 +1688,32 @@ static bool isIntExactlyRepresentableWithMantissaBits(
     return significantBits <= mantissaBits;
 }
 
+// Return true if the 64-bit folded value `v` is the canonical representative of
+// an integer type that is `bitWidth` bits wide and signed iff `isSignedType` --
+// i.e. storing `v` into that type and reading it back is lossless. A signed
+// N-bit type accepts [-2^(N-1), 2^(N-1)-1]; an unsigned N-bit type accepts
+// [0, 2^N-1]; any 64-bit type accepts every int64. A value outside that range
+// carries bits the runtime operation of that width would have discarded, so its
+// payload cannot be trusted. The unsigned range is strict on purpose: a folded
+// -1 is a valid 32-bit unsigned pattern but a 64-bit all-ones payload, so
+// accepting it would let a widening cast like `uint64_t(0u - 1u)` carry those
+// upper bits into a spurious lossy warning.
+static bool isFoldedValueCanonicalForType(IntegerLiteralValue v, int bitWidth, bool isSignedType)
+{
+    if (bitWidth <= 0)
+        return false;
+    if (bitWidth >= 64)
+        return true;
+    if (isSignedType)
+    {
+        int64_t minValue = -(INT64_C(1) << (bitWidth - 1));
+        int64_t maxValue = (INT64_C(1) << (bitWidth - 1)) - 1;
+        return v >= minValue && v <= maxValue;
+    }
+    uint64_t maxValue = (UINT64_C(1) << bitWidth) - 1;
+    return v >= 0 && (uint64_t)v <= maxValue;
+}
+
 int getMaximumTypeBitSize(Type* t)
 {
     auto basicType = as<BasicExpressionType>(t);
@@ -1714,6 +1740,145 @@ int getMaximumTypeBitSize(Type* t)
     default:
         return 0;
     }
+}
+
+// Return true when the integer constant `expr` provably folds to the same value
+// the width-aware runtime computes, so the lossy int->float/double check can trust
+// a folded constant *expression*, not just a bare literal. The frontend folder
+// evaluates in raw 64 bits and narrows to a declared width only at a cast, so its
+// value can differ from the runtime when a narrower-than-64-bit operation would
+// have discarded bits; the Div/Mod/Rsh and shift-count guards below cover the
+// operators that diverge for other reasons. See #12933 for the full argument.
+//
+// Conservative structural walk over the folder's node set: a leaf literal must fit
+// its own type; a cast/arithmetic/bitwise/shift node must fold, each integer
+// operand must itself prove, and the node's folded value must be canonical for its
+// own type (which catches a narrower operation that overflowed). Any other shape
+// (non-constant, enum/const ref, index/sizeof, bool literal, non-integer operand)
+// returns false, leaving the conversion silent.
+bool SemanticsVisitor::isConstantFoldRuntimeEquivalent(Expr* expr)
+{
+    while (auto parenExpr = as<ParenExpr>(expr))
+        expr = parenExpr->base;
+
+    // Pointer-sized integers have a target-dependent width, but the folder
+    // evaluates in 64 bits and getMaximumTypeBitSize reports 64 for them. On a
+    // 32-bit-pointer target the fold would not wrap where the runtime does (e.g.
+    // `uintptr_t(0x100000001)` is 1 there), so its value cannot be trusted --
+    // reject pointer-sized nodes conservatively.
+    if (auto basicType = as<BasicExpressionType>(expr->type.type))
+    {
+        auto baseType = basicType->getBaseType();
+        if (baseType == BaseType::IntPtr || baseType == BaseType::UIntPtr)
+            return false;
+    }
+
+    if (auto intLit = as<IntegerLiteralExpr>(expr))
+        return isFoldedValueCanonicalForType(
+            intLit->value,
+            getMaximumTypeBitSize(intLit->type.type),
+            isSigned(intLit->type.type));
+
+    // A few operators fold to a value the runtime never computes; the canonical
+    // range check cannot catch that (the wrong value is still in range), so reject
+    // them here. The fast path produces a `BuiltinOperatorExpr` carrying its `op`,
+    // but an operator whose operands keep different types stays a resolved
+    // `InvokeExpr` -- notably a shift, whose count is not coerced to the shifted
+    // type (`uint64_t x >> 1` keeps `1` as `int`). Detect the operator kind in
+    // both forms so a divergent operator cannot slip through the recursion below.
+    BuiltinOperationKind opKind = BuiltinOperationKind::Unknown;
+    if (auto builtinOp = as<BuiltinOperatorExpr>(expr))
+    {
+        opKind = builtinOp->op;
+    }
+    else if (auto invoke = as<InvokeExpr>(expr))
+    {
+        // A `TypeCastExpr` is an `InvokeExpr` subclass but a conversion, not an
+        // operator; its callee is not an operator symbol and maps to `Unknown`, so
+        // it (like a safe operator such as `Add`) falls through to the recursion.
+        if (!as<TypeCastExpr>(expr))
+            if (auto callee = as<DeclRefExpr>(invoke->functionExpr))
+                opKind = getBuiltinOperationKindFromString(
+                    getText(callee->declRef.getName()).getUnownedSlice(),
+                    invoke->arguments.getCount() == 1 ? OperatorArity::Unary
+                                                      : OperatorArity::Binary);
+    }
+    // Div/Mod/Rsh fold on raw signed 64-bit payloads. For a signed type, or an
+    // unsigned type narrower than 64 bits (whose values are non-negative as int64),
+    // that matches the runtime. On an unsigned 64-bit type a set high bit can make
+    // the signed fold diverge from the unsigned runtime op, so reject unless every
+    // operand folds non-negative.
+    if (opKind == BuiltinOperationKind::Div || opKind == BuiltinOperationKind::Mod ||
+        opKind == BuiltinOperationKind::Rsh)
+    {
+        auto argsExpr = as<ExprWithArgsBase>(expr);
+        if (!argsExpr)
+            return false;
+        const int width = getMaximumTypeBitSize(expr->type.type);
+        if (!isSigned(expr->type.type) && width >= 64)
+        {
+            for (auto arg : argsExpr->arguments)
+            {
+                auto operandVal = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
+                    arg,
+                    ConstantFoldingKind::CompileTime,
+                    nullptr));
+                if (!operandVal || operandVal->getValue() < 0)
+                    return false;
+            }
+        }
+    }
+    // A shift (left or right) needs a constant count in [0, width): the folder
+    // masks the count modulo 64, but the width-aware IR (`slang-ir-sccp`'s
+    // evalLsh/evalRsh) yields 0 -- or -1 for a negative signed right shift -- once
+    // the count reaches the width, so the two can diverge at or above the width;
+    // conservatively accept only a count in [0, width).
+    if (opKind == BuiltinOperationKind::Lsh || opKind == BuiltinOperationKind::Rsh)
+    {
+        auto argsExpr = as<ExprWithArgsBase>(expr);
+        if (!argsExpr || argsExpr->arguments.getCount() < 2)
+            return false;
+        const int width = getMaximumTypeBitSize(expr->type.type);
+        auto shiftCount = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
+            argsExpr->arguments[1],
+            ConstantFoldingKind::CompileTime,
+            nullptr));
+        if (!shiftCount || shiftCount->getValue() < 0 || shiftCount->getValue() >= width)
+            return false;
+    }
+
+    // A proven-integer operand must itself fold to its runtime value; a
+    // non-integer operand (e.g. a float literal under a cast) cannot be reasoned
+    // about here.
+    auto operandProves = [&](Expr* operand) -> bool
+    { return isScalarIntegerType(operand->type.type) && isConstantFoldRuntimeEquivalent(operand); };
+
+    // A cast or arithmetic/bitwise/shift operator: recurse into its integer
+    // operands. `ExprWithArgsBase` covers `InvokeExpr`, `TypeCastExpr` (and its
+    // implicit-cast subclasses), and `BuiltinOperatorExpr`; `BuiltinCastExpr`
+    // holds its operand in `->base` instead.
+    if (auto builtinCast = as<BuiltinCastExpr>(expr))
+    {
+        if (!operandProves(builtinCast->base))
+            return false;
+    }
+    else if (auto argsExpr = as<ExprWithArgsBase>(expr))
+    {
+        for (auto arg : argsExpr->arguments)
+            if (!operandProves(arg))
+                return false;
+    }
+    else
+    {
+        return false;
+    }
+
+    auto folded = as<ConstantIntVal>(
+        tryFoldIntegerConstantExpression(expr, ConstantFoldingKind::CompileTime, nullptr));
+    return folded && isFoldedValueCanonicalForType(
+                         folded->getValue(),
+                         getMaximumTypeBitSize(expr->type.type),
+                         isSigned(expr->type.type));
 }
 
 ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
@@ -2967,12 +3132,10 @@ bool SemanticsVisitor::_coerce(
             // skipped -- element-wise/broadcast conversions (e.g.
             // `float3 v = 123456789;`) are not diagnosed here.
             //
-            // The default-on path checks a bare literal value, never a folded
-            // binary constant expression: constant folding evaluates in 64 bits
-            // without wrapping at each typed operation -- e.g. `uint(0xffffffff) + 2`
-            // folds to 0x100000001, not the 1u it is at runtime -- so a folded
-            // expression's value cannot be trusted here (a sound check is left to
-            // #12933).
+            // The default-on path diagnoses a bare literal value and, via
+            // isConstantFoldRuntimeEquivalent, a folded constant expression whose
+            // fold provably equals the runtime value. A non-constant source is
+            // diagnosed only under -Wpedantic.
             int mantissaBits = 0;
             bool toDouble = false;
             if (auto basicToType = as<BasicExpressionType>(toType))
@@ -3066,6 +3229,32 @@ bool SemanticsVisitor::_coerce(
                         }
                     }
                 }
+                else if (auto val = getFoldedIntVal())
+                {
+                    // A folded constant *expression* that is not a bare literal
+                    // (e.g. `16777216 + 1`). isConstantFoldRuntimeEquivalent proves
+                    // the fold equals the runtime value (and rejects target-dependent
+                    // pointer widths); when it holds, the same representability check
+                    // the literal branch uses applies at the source width.
+                    if (isConstantFoldRuntimeEquivalent(fromExpr) &&
+                        !isIntExactlyRepresentableWithMantissaBits(
+                            val->getValue(),
+                            !isSigned(fromType.type),
+                            getMaximumTypeBitSize(fromType.type),
+                            mantissaBits))
+                    {
+                        if (toDouble)
+                            sink->diagnose(Diagnostics::LossyImplicitIntegerToDoubleConversion{
+                                .fromType = fromType.type,
+                                .toType = toType,
+                                .expr = fromExpr});
+                        else
+                            sink->diagnose(Diagnostics::LossyImplicitIntegerToFloatConversion{
+                                .fromType = fromType.type,
+                                .toType = toType,
+                                .expr = fromExpr});
+                    }
+                }
                 // A non-constant source (constant folding fails) that is wide
                 // enough to lose precision. The width comparison is a conservative
                 // bound, exact here only because integer widths are coarse
@@ -3076,7 +3265,6 @@ bool SemanticsVisitor::_coerce(
                 // pointer -> float warns, pointer -> double -- exact at 32 bits --
                 // does not).
                 else if (
-                    !getFoldedIntVal() &&
                     (fromIsPointerWidth ? 32 : getMaximumTypeBitSize(fromType.type)) > mantissaBits)
                 {
                     if (toDouble)
