@@ -1,8 +1,10 @@
 // Regression for https://github.com/shader-slang/slang/issues/12926.
 //
-// The extension-first checking pass evaluates `Hints : __EnumType` (via the extension in
-// ext.slang) before `Hints`'s own declaration is traversed; the enum's synthesized `__EnumType`
-// conformance must still be found by the later `is_set<T : __EnumType>` call.
+// The declarations are split across `__include` fragments to mirror #12926's cross-fragment
+// module; the trigger is checkModule's extension-first pass, which is independent of `__include`
+// order. That pass evaluates `Hints : __EnumType` (via the extension in ext.slang) before
+// `Hints`'s own declaration is traversed; the enum's synthesized `__EnumType` conformance must
+// still be found by the later `is_set<T : __EnumType>` call.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
