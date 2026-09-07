@@ -1,0 +1,70 @@
+name: Nightly Falcor 2 Perf Test
+
+# Runs the Falcor 2 perf bridge (ci-falcor2-perf-bridge-smoke.yml) against
+# origin/master on a schedule, without requiring a manual workflow_dispatch
+# each time. Modeled directly on nightly-falcor-test.yml (see that file's own
+# comment for the full reasoning on why a schedule-triggered workflow can
+# safely omit the PR-controlled-code approval gate: it always resolves this
+# workflow file from the default branch and never runs PR-branch code).
+#
+# NOT YET VALIDATED END-TO-END: this is the first landing of a real (not
+# smoke-only) Falcor2 nightly perf pipeline -- see the Falcor2-side branch
+# perf/falcor2-nightly (gitlab-master.nvidia.com/nvresearch-gfx/Tools/falcor2)
+# for the scene-measurement and BenchView-submission work this triggers.
+# Confirm with a manual workflow_dispatch run, and confirm the Falcor2-side
+# pipeline it triggers actually reaches the new run-scene-bench /
+# write-benchview-submission / submit-benchview-results steps (not just the
+# original sealed-build smoke check), before trusting the schedule below.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run nightly at 6:00 AM UTC, after nightly-falcor-test.yml (5:00 AM) so
+    # the two don't compete for the same falcor-bridge runner pool.
+    - cron: "0 6 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # No filter/should-run gating here (unlike ci.yml's PR-scoped jobs): every
+  # scheduled run always triggers the bridge, regardless of which files last
+  # changed -- matching nightly-falcor-test.yml.
+  falcor2-perf-nightly:
+    permissions:
+      actions: read
+      contents: read
+    uses: ./.github/workflows/ci-falcor2-perf-bridge-smoke.yml
+
+  # Post the nightly's result to Slack. Scheduled runs only, so manual
+  # workflow_dispatch verification runs stay quiet.
+  notify:
+    needs: [falcor2-perf-nightly]
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Success notification
+        if: needs.falcor2-perf-nightly.result == 'success'
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          payload: |
+            {
+              "Falcor2-Perf-Nightly": ":green-check-mark: Falcor2 perf nightly: clean (${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_FALCOR_NIGHTLY }}
+
+      - name: Failure notification
+        if: needs.falcor2-perf-nightly.result != 'success'
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          payload: |
+            {
+              "Falcor2-Perf-Nightly": ":alert: Falcor2 perf nightly: ${{ needs.falcor2-perf-nightly.result }}\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_FALCOR_NIGHTLY }}

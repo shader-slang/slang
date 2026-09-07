@@ -1,11 +1,21 @@
 name: CI Falcor 2 Perf Bridge Smoke
 
-# Manual bridge smoke. Keep this workflow narrow: call the runner-local
-# entrypoint with a fixed target selector and let the configured bridge own the
-# implementation.
+# Bridge smoke, manual or called from a scheduled wrapper. Keep this workflow
+# narrow: call the runner-local entrypoint with a fixed target selector and
+# let the configured bridge own the implementation.
+#
+# workflow_call added for nightly-falcor2-perf-test.yml (see that file). The
+# SLANG_CI_BRIDGE_TARGET value and its mapping to the Falcor2-side GitLab
+# pipeline trigger are owned by /opt/slang-ci/run-external-ci, which is not in
+# this repo -- this workflow's own behavior is unchanged by adding
+# workflow_call (same target, same steps), but whether the runner-side bridge
+# itself treats a workflow_call-triggered run identically to a manual
+# workflow_dispatch one has not been verified end-to-end. Confirm with a
+# manual workflow_dispatch run before relying on the nightly schedule.
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   actions: read

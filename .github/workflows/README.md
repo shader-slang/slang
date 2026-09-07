@@ -164,6 +164,7 @@ No trigger of their own; see the first diagram for who calls them. The
 | `ci-slang-coverage-test.yml`                                   | Instrumented build plus coverage report. |
 | `ci-falcor-test.yml`                                           | Compile Falcor's shaders.                |
 | `ci-falcor-perf-test.yml`                                      | Falcor compiler perf test.               |
+| `ci-falcor2-perf-bridge-smoke.yml`                              | Falcor 2 perf bridge (also `workflow_dispatch`-able directly). |
 | `ci-slang-regression-test.yml`                                 | Compile-regression suite.                |
 | `ci-mdl-benchmark-test.yml`                                    | MDL benchmark run.                       |
 | `ci-materialx-regression-test.yml`                             | MaterialX integration test.              |
@@ -189,6 +190,7 @@ not compete for the same runners.
 | `nightly-slang-sascha-test.yml`    | nightly    | Compiles the Sascha Willems Vulkan sample shaders.           |
 | `nightly-slang-vkglcts-test.yml`   | nightly    | Runs the Vulkan CTS with Slang as the shader compiler.       |
 | `nightly-mdl-perf-test.yml`        | nightly    | Compile-performance suite for the MDL workloads.             |
+| `nightly-falcor2-perf-test.yml`    | nightly    | Falcor 2 scene perf, via the Falcor 2 perf bridge.            |
 | `ci-analytics.yml`                 | daily      | Collects CI run statistics and publishes them.               |
 | `pr-sweep-nightly.yml`             | nightly    | Board-sync backstop over every open PR.                      |
 | `cmake-options.yml`                | weekly     | Builds the matrix of non-default CMake option combinations.  |
@@ -243,7 +245,6 @@ PR against your branch, so a failed check can be fixed without a local checkout.
 
 | Workflow                           | Purpose                                                     |
 | ---------------------------------- | ----------------------------------------------------------- |
-| `ci-falcor2-perf-bridge-smoke.yml` | Manual smoke test for the Falcor 2 perf bridge prototype.   |
 | `ci-retry.yml`                     | Waits for a run to finish, then reruns its failed jobs.     |
 | `perf-compile-release-sweep.yml`   | Backfills compile-performance history across past releases. |
 | `check-spirv-tools.yml`            | Placeholder for a SPIRV-Tools tip-of-tree check.            |
