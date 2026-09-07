@@ -30,7 +30,7 @@ built-in requirement keys lowering attaches for the recognized
 `IDifferentiable` family.
 
 The observation form is
-`-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute`,
+`-target spirv-asm -dump-ir -o - -entry main -stage compute`,
 with every CHECK anchored at a user-named symbol (`func %main`,
 `func %f`, a captured `let` value, or the `### LOWER-TO-IR:` /
 `###` section boundaries) so the very large autodiff preamble cannot

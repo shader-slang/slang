@@ -17,7 +17,7 @@
 // under the struct parent, which shows each surface name reaches its own
 // opcode rather than collapsing to a shared floating-point type.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o -
 
 struct Storage
 {

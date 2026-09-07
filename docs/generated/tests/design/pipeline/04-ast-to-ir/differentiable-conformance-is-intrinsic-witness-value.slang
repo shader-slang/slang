@@ -17,7 +17,7 @@
 // shape: a `let` binding typed `witness_table_t(...)` whose right-hand side is
 // an intrinsic applied to the derivative function, not a `witness_table` block.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;

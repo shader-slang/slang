@@ -14,7 +14,7 @@
 // are narrow integer types — the resulting `add` carries `Int16`
 // in its operand types.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int16_t a;
 uniform int16_t b;

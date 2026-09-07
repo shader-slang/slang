@@ -19,7 +19,7 @@
 // point, since a single `EnumCast` is what a reader of the table would
 // otherwise expect.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 enum Color : int { Red = 0, Green = 1 }
 enum Other : int { Zero = 0, One = 1 }

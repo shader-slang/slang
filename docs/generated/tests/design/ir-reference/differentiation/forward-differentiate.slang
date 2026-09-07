@@ -18,7 +18,7 @@
 // the call inside `func %main` to target exactly that value, which is what
 // makes the request the callee rather than `%f` itself.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float a;
 uniform float d;

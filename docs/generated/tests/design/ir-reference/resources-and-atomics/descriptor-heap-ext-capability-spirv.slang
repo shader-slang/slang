@@ -24,7 +24,7 @@
 // extension request and the two heap variable names, which differ from the
 // non-capability spelling by more than a prefix.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main -capability spvDescriptorHeapEXT
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main -capability spvDescriptorHeapEXT
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage compute -entry main -capability spvDescriptorHeapEXT
 
 uniform DescriptorHandle<SamplerState> samp;

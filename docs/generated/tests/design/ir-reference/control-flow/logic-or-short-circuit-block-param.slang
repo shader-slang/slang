@@ -15,7 +15,7 @@
 // the right operand. The CHECK binds the ifElse afterBlock operand and pins
 // both branch argument shapes plus the receiving `param`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform int b;

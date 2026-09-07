@@ -15,7 +15,7 @@
 // and therefore matched with a wildcard; the flags operand is pinned because
 // it is a stable literal.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g -separate-debug-info
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g -separate-debug-info
 
 uniform RWStructuredBuffer<int> buf;
 

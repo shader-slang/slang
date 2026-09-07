@@ -12,7 +12,7 @@
 // Array of Int16 elements surfaces Array(Int16, N : Int) in the IR
 // dump. An `int16_t[5]` global_param surfaces `Array(Int16, 5 : Int)`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int16_t v[5];
 uniform RWStructuredBuffer<int> buf;

@@ -15,7 +15,7 @@
 // the CHECK-DAGs require one placeholder key per element, each naming the
 // tuple type and the element index it stands for.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 uniform Tuple<int, float> tup;

@@ -15,7 +15,7 @@
 // case alongside an ordinary finite size elsewhere in the same module, so a
 // regression that collapsed the two forms would fail.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 
 Texture2D gTex[] : register(t0);
 SamplerState gSamp;

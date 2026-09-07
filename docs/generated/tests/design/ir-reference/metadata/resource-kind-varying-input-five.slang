@@ -15,7 +15,7 @@
 // named `uv` field key of the parameter struct to its offset and to the size
 // on its type layout, requiring 5 in operand 0 of both.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage fragment
 
 struct FsInput
 {

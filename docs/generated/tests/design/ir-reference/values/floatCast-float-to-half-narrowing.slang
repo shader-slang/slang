@@ -14,7 +14,7 @@
 // 32-bit `float` to 16-bit `half`. The widening case (float to
 // double) lives in the smoke test.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform RWStructuredBuffer<half> hbuf;

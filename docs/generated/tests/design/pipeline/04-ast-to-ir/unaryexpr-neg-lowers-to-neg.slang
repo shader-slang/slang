@@ -14,7 +14,7 @@
 // canonical unary arithmetic case, producing a one-operand
 // `neg` pure-value inst sibling of `add`/`sub`/`mul`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

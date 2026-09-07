@@ -13,7 +13,7 @@
 // IRMul as an example in the "Pure value insts (IRAdd, IRMul, IREq,
 // ...)" sentence. Verifies the multiply opcode name.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform int b;

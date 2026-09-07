@@ -129,6 +129,7 @@ is deleted right after — so check the workflow's own run list, not the PR.
 | `ci-slangpy-trigger-test.yml`     | yes    | yes         | Runs SlangPy's CI against this change.                                                                |
 | `check-actionlint.yml`            | yes    | no          | Lints the workflow YAML in this directory.                                                            |
 | `check-submodules.yml`            | yes    | no          | Verifies `external/**` submodule pins are reachable.                                                  |
+| `check-cmake-binary-dir.yml`      | yes    | no          | Rejects `CMAKE_BINARY_DIR` in first-party CMake (use `slang_BINARY_DIR`).                             |
 | `check-doc-gaps.yml`              | yes    | no          | Hard-gates the generated-doc structural lint; reports the doc-gap queue as advisory. Also runs daily. |
 | `check-pr-label.yml`              | yes    | no          | Requires exactly one `pr:` classification label.                                                      |
 | `check-toc.yml`                   | yes    | no          | Checks the user-guide TOC; `/regenerate-toc` auto-fixes.                                              |
@@ -168,6 +169,7 @@ No trigger of their own; see the first diagram for who calls them. The
 | `ci-materialx-regression-test.yml`                             | MaterialX integration test.              |
 | `cmake-options-build.yml`, `cmake-options-build-container.yml` | Build one CMake-option combination.      |
 | `pr-board-sync.yml`                                            | The PR-board reconciliation engine.      |
+| `issue-board-onboard.yml`                                      | Onboard a new issue onto Slang-All.      |
 
 ## 3. Scheduled
 
@@ -200,9 +202,10 @@ The `pr-*` files — the first four rows — are thin callers around
 `pr-board-sync.yml`; each exists because a different event is the only one
 carrying a particular signal, or the only one carrying secrets for a fork PR.
 See the second diagram, and read [`pr-board-sync.md`](pr-board-sync.md) before
-changing any of them. The remaining rows are standalone bots that call nothing
-and are grouped here only because they react to issue, comment, and review
-events rather than to a PR's code.
+changing any of them. `issue-onboard.yml` is the same thin-caller pattern around
+`issue-board-onboard.yml` for newly opened issues. The remaining rows are
+standalone bots that call nothing and are grouped here because they react to
+issue, comment, and review events rather than to a PR's code.
 
 | Workflow                                                | Purpose                                                      |
 | ------------------------------------------------------- | ------------------------------------------------------------ |
@@ -211,6 +214,7 @@ events rather than to a PR's code.
 | `pr-commit-status.yml`                                  | Board sync when an external commit status settles.           |
 | `pr-review-fork-bridge.yml`, `pr-review-fork-apply.yml` | Two-stage relay for fork-PR reviews.                         |
 | `issue-add-labels.yml`                                  | Labels new issues by the author's team membership.           |
+| `issue-onboard.yml` / `issue-board-onboard.yml`         | Adds a new issue to Slang-All; sets Source; Internal authors are assigned and moved to In Triage / current Sprint. |
 | `claude.yml`                                            | The `@claude` assistant on issues and PRs.                   |
 | `claude-ci-analysis.yml`                                | On demand: analyzes a CI failure and pushes a fix to the PR. |
 
@@ -237,11 +241,12 @@ PR against your branch, so a failed check can be fixed without a local checkout.
 
 ## 7. Manual only
 
-| Workflow                         | Purpose                                                     |
-| -------------------------------- | ----------------------------------------------------------- |
-| `ci-retry.yml`                   | Waits for a run to finish, then reruns its failed jobs.     |
-| `perf-compile-release-sweep.yml` | Backfills compile-performance history across past releases. |
-| `check-spirv-tools.yml`          | Placeholder for a SPIRV-Tools tip-of-tree check.            |
+| Workflow                           | Purpose                                                     |
+| ---------------------------------- | ----------------------------------------------------------- |
+| `ci-falcor2-perf-bridge-smoke.yml` | Manual smoke test for the Falcor 2 perf bridge prototype.   |
+| `ci-retry.yml`                     | Waits for a run to finish, then reruns its failed jobs.     |
+| `perf-compile-release-sweep.yml`   | Backfills compile-performance history across past releases. |
+| `check-spirv-tools.yml`            | Placeholder for a SPIRV-Tools tip-of-tree check.            |
 
 ## 8. Composite actions
 

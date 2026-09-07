@@ -13,7 +13,7 @@
 // usual surface for that is a `uniform` declaration, which lowers to
 // `global_param` in the IR dump.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int myUniformInt;
 uniform RWStructuredBuffer<int> buf;

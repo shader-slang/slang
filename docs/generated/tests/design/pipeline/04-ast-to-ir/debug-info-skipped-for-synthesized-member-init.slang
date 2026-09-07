@@ -17,7 +17,7 @@
 // the synthesized `Plain.$init` body, up to its terminator, to contain neither a
 // `DebugLine` nor a debug-location decoration.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -g2 -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -g2 -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

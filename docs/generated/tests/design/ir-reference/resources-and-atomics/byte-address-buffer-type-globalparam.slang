@@ -14,7 +14,7 @@
 // in parentheses. Both the read-only and the writable spelling are
 // declared so the CHECKs can pin each bare type name separately.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform ByteAddressBuffer babuf;
 uniform RWByteAddressBuffer rwbabuf;

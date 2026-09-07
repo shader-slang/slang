@@ -13,7 +13,7 @@
 // methods produce three `interface_req_entry` rows referenced from
 // the `interface(%1, %2, %3)` declaration.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IThree {
     int a(int x);

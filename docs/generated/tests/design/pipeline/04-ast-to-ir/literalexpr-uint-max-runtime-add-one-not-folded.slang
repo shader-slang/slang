@@ -14,7 +14,7 @@
 // IRBuilder cannot constant-fold `a + 1u` and emits an `add`
 // instruction whose RHS is the literal `1 : UInt`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint a;
 uniform RWStructuredBuffer<uint> buf;
