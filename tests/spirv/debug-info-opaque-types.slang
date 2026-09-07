@@ -43,6 +43,9 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
 // CHECK-DAG: %[[EMPTY_NAME:[0-9]+]] = OpString "Empty"
 // CHECK-DAG: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugTypeComposite %[[EMPTY_NAME]] %uint_1 %{{[a-zA-Z0-9_]+}} %{{[a-zA-Z0-9_]+}} %{{[a-zA-Z0-9_]+}} %{{[a-zA-Z0-9_]+}} %[[EMPTY_NAME]] %uint_0 %uint_131072{{$}}
 
+// Each DescriptorHandle<T> wrapper must get its own name/linkage OpString: the two descriptor
+// kinds would otherwise have identical unnamed DebugTypeComposite metadata, indistinguishable
+// in a debugger.
 // CHECK-DAG: %[[TEX_HANDLE_NAME:[0-9]+]] = OpString "DescriptorHandle<Texture2D>"
 // CHECK-DAG: %[[TEX_HANDLE_LINKAGE:[0-9]+]] = OpString "@DescriptorHandle<Texture2D>"
 // CHECK-DAG: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugTypeComposite %[[TEX_HANDLE_NAME]] %uint_0 %{{[0-9]+}} %uint_0 %uint_0 %{{[0-9]+}} %[[TEX_HANDLE_LINKAGE]] %[[DEBUG_INFO_NONE]] %uint_131072{{$}}
