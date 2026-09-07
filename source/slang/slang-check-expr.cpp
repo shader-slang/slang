@@ -5455,6 +5455,10 @@ struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
             }
             else
             {
+                // The only non-VarDeclBase capture is a `this`: visitVarExpr passes a VarDeclBase,
+                // and visitThisExpr passes the this-type decl for a ThisExpr. Assert that contract
+                // so a future caller passing another Decl kind is caught rather than mis-named.
+                SLANG_ASSERT(as<ThisExpr>(exprIn));
                 capturedVarDecl->nameAndLoc.name = astBuilder->getNamePool()->getName("$this");
                 capturedVarDecl->nameAndLoc.loc = exprIn->loc;
             }
