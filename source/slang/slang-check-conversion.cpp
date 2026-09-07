@@ -2956,11 +2956,16 @@ bool SemanticsVisitor::_coerce(
             }
 
             // Warn on implicit integer -> float/double conversions that may lose
-            // precision. int32 -> float and int64 -> double are costed below the
-            // general warning threshold (float/double are the preferred
-            // integer->real overload targets), so the UnrecommendedImplicitConversion
-            // branch above never reaches them; this independent block needs no cost
-            // guard of its own.
+            // precision. Integer -> float/double conversions (any width) are
+            // costed below the general warning threshold (float/double are the
+            // preferred integer->real overload targets), so the
+            // UnrecommendedImplicitConversion branch above never reaches them;
+            // this independent block needs no cost guard of its own.
+            //
+            // Scope: scalar targets only. A vector/matrix target is not a
+            // BasicExpressionType, so mantissaBits stays 0 and the block is
+            // skipped -- element-wise/broadcast conversions (e.g.
+            // `float3 v = 123456789;`) are not diagnosed here.
             //
             // The default-on path checks a bare literal value, never a folded
             // binary constant expression: constant folding evaluates in 64 bits
@@ -2981,27 +2986,38 @@ bool SemanticsVisitor::_coerce(
                     mantissaBits = 53;
                     toDouble = true;
                     break;
+                // half is intentionally excluded: int -> half is NOT costed below
+                // the threshold, so it already warns via
+                // UnrecommendedImplicitConversion (E30081); covering it here would
+                // double-warn.
                 default:
                     break;
                 }
             }
-            // Restrict to builtin integer sources so the literal payload is a
-            // magnitude and getMaximumTypeBitSize returns a real width.
+            // Restrict to scalar builtin integer sources. (bool also satisfies
+            // isScalarIntegerType, but getMaximumTypeBitSize has no bool case and
+            // returns 0, so a bool source reaches neither branch below -- 0 is not
+            // > mantissaBits, and a bool is not an IntegerLiteralExpr -- and is
+            // harmlessly skipped.)
             if (!isCoreModule && sink && mantissaBits != 0 && isScalarIntegerType(fromType.type))
             {
                 // Look through parentheses: `(123456789)` is the same literal
                 // conversion as `123456789` and must be diagnosed identically.
-                Expr* literalExpr = fromExpr;
-                while (auto parenExpr = as<ParenExpr>(literalExpr))
-                    literalExpr = parenExpr->base;
+                // peeledExpr is fromExpr with parens removed; it is only known to
+                // be a literal after the as<IntegerLiteralExpr> check below.
+                Expr* peeledExpr = fromExpr;
+                while (auto parenExpr = as<ParenExpr>(peeledExpr))
+                    peeledExpr = parenExpr->base;
 
-                if (as<IntegerLiteralExpr>(literalExpr))
+                if (as<IntegerLiteralExpr>(peeledExpr))
                 {
                     // A literal (including a parser-folded unary `-`/`+`/`~` on a
                     // literal) carries a single value with no binary arithmetic,
                     // so reducing its payload to the source width recovers exactly
                     // what is converted -- see the helper's contract, which takes
-                    // the source width and signedness to do that reduction.
+                    // the source width and signedness to do that reduction. The
+                    // `val` guard skips the rare case of a literal that fails to
+                    // fold (only reachable on an earlier-error path).
                     if (auto val = getFoldedIntVal();
                         val && !isIntExactlyRepresentableWithMantissaBits(
                                    val->getValue(),

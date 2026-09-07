@@ -1771,14 +1771,14 @@ warning(
     "lossy-implicit-integer-to-float-conversion",
     30133,
     "implicit integer-to-float conversion loses precision",
-    span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' loses precision: the value is not exactly representable in float's 24-bit mantissa; use an explicit cast if this is intended" }
+    span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' loses precision: the value is not exactly representable with float's 24 bits of significand precision; use explicit cast if intended" }
 )
 
 warning(
     "potentially-lossy-implicit-integer-to-float-conversion",
     30134,
     "implicit integer-to-float conversion may lose precision",
-    span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' may lose precision: values that do not fit in float's 24-bit mantissa are rounded; use an explicit cast if this is intended" },
+    span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' may lose precision: values that do not fit in float's 24 bits of significand precision are rounded; use explicit cast if intended" },
     pedantic
 )
 
@@ -1786,14 +1786,14 @@ warning(
     "lossy-implicit-integer-to-double-conversion",
     30135,
     "implicit integer-to-double conversion loses precision",
-    span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' loses precision: the value is not exactly representable in double's 53-bit mantissa; use an explicit cast if this is intended" }
+    span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' loses precision: the value is not exactly representable with double's 53 bits of significand precision; use explicit cast if intended" }
 )
 
 warning(
     "potentially-lossy-implicit-integer-to-double-conversion",
     30136,
     "implicit integer-to-double conversion may lose precision",
-    span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' may lose precision: values that do not fit in double's 53-bit mantissa are rounded; use an explicit cast if this is intended" },
+    span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' may lose precision: values that do not fit in double's 53 bits of significand precision are rounded; use explicit cast if intended" },
     pedantic
 )
 

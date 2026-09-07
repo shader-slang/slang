@@ -2,55 +2,72 @@
 // may lose precision are diagnosed.
 //
 // An integer *literal* source has an exact known value, so it is diagnosed by
-// default when that value is not representable in the target's mantissa (E30133
-// for float's 24 bits, E30135 for double's 53 bits); representable, power-of-two,
-// and boundary literals are not. A non-constant source cannot be proven lossy at
-// compile time and is pervasive in shader code, so it is diagnosed only under
-// -Wpedantic (E30134 for float, E30136 for double), and only when the source
-// type is wide enough to actually lose precision. Folded constant *expressions*
-// are intentionally not diagnosed: constant folding does not wrap at each typed
-// operation, so a wrapping expression's folded value would false-positive.
+// default when that value is not representable in the target's significand
+// (E30133 for float's 24 bits, E30135 for double's 53 bits); representable,
+// power-of-two, and boundary literals are not. A non-constant source cannot be
+// proven lossy at compile time and is pervasive in shader code, so it is
+// diagnosed only under -Wpedantic (E30134 for float, E30136 for double), and
+// only when the source type is wide enough to actually lose precision. Folded
+// constant *expressions* are intentionally not diagnosed (constant folding does
+// not wrap at each typed operation, so a wrapping expression's folded value
+// would false-positive); nor are vector/matrix targets (scalar targets only).
 //
-// Each warning emits two rows -- the summary and the detailed span message -- so
-// the assertions below appear in matching pairs, and repeat where several source
-// lines produce the same warning. The check is exhaustive, so the absence of an
-// assertion for the representable / power-of-two / explicit-cast / int32->double
-// / constant-expression cases also asserts that they produce no diagnostic.
+// The matcher is exhaustive over the scalar conversions below: every emitted
+// diagnostic must have a matching annotation, so a source line with no
+// annotation also asserts it produces no diagnostic. Each warning emits two rows
+// -- a summary and a detailed span message -- matched by substring against the
+// emitted diagnostics independent of source order, so the annotations are
+// grouped (all summaries, then all spans) and repeat once per source line that
+// produces the same text. At least one `warning E<code>` annotation per new
+// diagnostic pins the severity+code, asserting these are warnings and not errors
+// -- the central design choice: a lossy literal must not fail compilation.
 // See #12929.
 
 // Default: only the provably-lossy literal conversions warn.
 //DIAGNOSTIC_TEST:SIMPLE(diag=DEFAULT):
+//DEFAULT: warning E30133
+//DEFAULT: integer-to-float conversion loses precision
+//DEFAULT: integer-to-float conversion loses precision
 //DEFAULT: integer-to-float conversion loses precision
 //DEFAULT: integer-to-float conversion loses precision
 //DEFAULT: integer-to-float conversion loses precision
 //DEFAULT: 'int' to 'float' loses precision
 //DEFAULT: 'int' to 'float' loses precision
 //DEFAULT: 'int' to 'float' loses precision
-//DEFAULT: integer-to-double conversion loses precision
+//DEFAULT: 'int' to 'float' loses precision
+//DEFAULT: 'uint' to 'float' loses precision
+//DEFAULT: 'int64_t' to 'float' loses precision
+//DEFAULT: warning E30135
 //DEFAULT: integer-to-double conversion loses precision
 //DEFAULT: 'int64_t' to 'double' loses precision
 //DEFAULT: 'uint64_t' to 'double' loses precision
 
 // -Wpedantic additionally flags non-constant integer sources wide enough to lose precision.
 //DIAGNOSTIC_TEST:SIMPLE(diag=PEDANTIC): -Wpedantic
+//PEDANTIC: warning E30133
+//PEDANTIC: integer-to-float conversion loses precision
+//PEDANTIC: integer-to-float conversion loses precision
 //PEDANTIC: integer-to-float conversion loses precision
 //PEDANTIC: integer-to-float conversion loses precision
 //PEDANTIC: integer-to-float conversion loses precision
 //PEDANTIC: 'int' to 'float' loses precision
 //PEDANTIC: 'int' to 'float' loses precision
 //PEDANTIC: 'int' to 'float' loses precision
-//PEDANTIC: integer-to-float conversion may lose precision
+//PEDANTIC: 'int' to 'float' loses precision
+//PEDANTIC: 'uint' to 'float' loses precision
+//PEDANTIC: 'int64_t' to 'float' loses precision
+//PEDANTIC: warning E30134
 //PEDANTIC: 'int' to 'float' may lose precision
-//PEDANTIC: integer-to-double conversion loses precision
+//PEDANTIC: warning E30135
 //PEDANTIC: integer-to-double conversion loses precision
 //PEDANTIC: 'int64_t' to 'double' loses precision
 //PEDANTIC: 'uint64_t' to 'double' loses precision
-//PEDANTIC: integer-to-double conversion may lose precision
+//PEDANTIC: warning E30136
 //PEDANTIC: 'int64_t' to 'double' may lose precision
 
 void testConversions(int i, int64_t l)
 {
-    // Literal not representable in float's 24-bit mantissa -> warns by default.
+    // Literal not representable in float's significand -> warns by default.
     float a = 123456789;
 
     // Negative literal, not representable -> warns by default. Its magnitude
@@ -69,6 +86,24 @@ void testConversions(int i, int64_t l)
 
     // 2^24 exactly: the largest run of representable integers ends here -> never warns.
     float bound = 16777216;
+
+    // 2^24 + 1: the smallest integer above that run that is NOT representable
+    // (25 significant bits, odd) -> warns. Pins the float 24->25-bit boundary
+    // with an odd value; the power-of-two boundaries above strip to a single
+    // significant bit and never exercise the `significantBits <= 24` compare.
+    float boundPlus = 16777217;
+
+    // 2^24 - 1: all 24 bits set, still representable -> never warns.
+    float boundExact = 16777215;
+
+    // uint source (not int): 2^24 + 1 is not representable -> warns. Exercises
+    // the 'uint' to 'float' span and the unsigned 32-bit magnitude path.
+    float u32 = 16777217u;
+
+    // int64_t source -> float: 2^53 + 1 needs 54 significant bits, not
+    // representable in float's 24 -> warns. Exercises the 'int64_t' to 'float'
+    // span (float target with a 64-bit source).
+    float i64f = 9007199254740993;
 
     // Explicit cast -> never warns (not an implicit conversion).
     float d = (float)123456789;
@@ -94,10 +129,15 @@ void testConversions(int i, int64_t l)
     float un = ~0xffffffff;
     double ud = -0xffffffff;
 
+    // Vector target: not a BasicExpressionType, so the check is skipped (scalar
+    // targets only). A lossy scalar-literal broadcast is silently NOT diagnosed
+    // -> never warns. Locks the documented scalar-only scope (see #12929).
+    float3 vbroadcast = 123456789;
+
     // Non-constant int -> float: only under -Wpedantic.
     float e = i;
 
-    // Literal not representable in double's 53-bit mantissa (2^53 + 1) -> warns by default.
+    // Literal not representable in double's significand (2^53 + 1) -> warns by default.
     double f = 9007199254740993;
 
     // Unsigned 64-bit literal with the high bit set: its signed payload reads as
