@@ -289,7 +289,8 @@ trigger a diagnostic warning.
 ### Examples
 
 **Scalar to vector, scalar to matrix**
-```slang
+
+```hlsl
 RWStructuredBuffer<float> output;
 
 [numthreads(1,1,1)]
@@ -319,7 +320,8 @@ void main(uint3 tid : SV_DispatchThreadID)
 ```
 
 **Value and `none` to Optional:**
-```slang
+
+```hlsl
 StructuredBuffer<int64_t> input;
 RWStructuredBuffer<int> output;
 
@@ -368,7 +370,8 @@ void main()
 ```
 
 **Enum to tag type**
-```slang
+
+```hlsl
 RWStructuredBuffer<uint> output;
 
 enum TestEnum : uint
@@ -396,7 +399,8 @@ void main()
 ```
 
 **Implicit initializer list conversions:**
-```slang
+
+```hlsl
 RWStructuredBuffer<int> output;
 
 int2 someFunc(int3 v)
@@ -458,7 +462,7 @@ packed into an AnyValue struct, which is then unpacked as the target type.
 
 ### Examples
 
-```slang
+```hlsl
 RWStructuredBuffer<uint> output;
 
 [numthreads(1,1,1)]

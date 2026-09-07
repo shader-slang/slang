@@ -15,6 +15,38 @@ A function with return type `void` does not return a value.
 
 Variables, arrays elements, or structure data members may not have type `void`.
 
+> 📝 **Remark 1:** It is allowed to return an explicit `void` value from a function with a `void` result type. For example:
+>
+> ```hlsl
+> void returnVoid() { }
+>
+> void testFunc()
+> {
+>     return returnVoid(); // No value is returned
+> }
+> ```
+
+> 📝 **Remark 2:** A `void` [cast](expressions-conversions.md) can be used to explicitly discard a value:
+>
+> ```hlsl
+> RWStructuredBuffer<uint> data;
+>
+> // returns false on overflow
+> [NoDiscard] bool checkedIncrement(inout int val)
+> {
+>     int orig = val;
+>     ++val;
+>     return orig < val;
+> }
+>
+> [numthreads(1,1,1)]
+> void main(uint3 tid : SV_DispatchThreadID)
+> {
+>     // discard overflow status
+>     (void)checkedIncrement(data[tid.x]);
+> }
+> ```
+
 
 ## Scalar Types {#scalar}
 
