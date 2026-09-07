@@ -248,29 +248,38 @@ TypeLayout* TargetRequest::getTypeLayout(
 {
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
-    // When non-null, `programLayout` must belong to `this` `TargetRequest`. This is a
-    // precondition on the layout context below, not just a cache-correctness concern: a
-    // mismatched `programLayout` would build the layout against a foreign program's
-    // `extern`/global-generic resolution, and the per-program cache selected via
-    // `programLayout->getTargetProgram()` would additionally cache that wrong result
-    // against, and later return it for, a different target's program.
+    // When non-null, `programLayout` must belong to `this` `TargetRequest` and
+    // have the owning `TargetProgram` that constructed it. This is a
+    // precondition on the layout context below, not just a cache-correctness
+    // concern: a mismatched `programLayout` would build the layout against a
+    // foreign program's `extern`/global-generic resolution, and the per-program
+    // cache selected via `programLayout->getTargetProgram()` would additionally
+    // cache that wrong result against, and later return it for, a different
+    // target's program.
     //
     // This holds by construction for the sole *program-supplying* caller:
     // `spReflection_GetTypeLayout` calls `context->getTargetReq()->getTypeLayout(type,
     // rules, context)`, so `programLayout` (== `context`) and `this` always come from
-    // the same `ProgramLayout`. (The other caller, `Linkage::getTypeLayout`, passes no
-    // `programLayout` at all, so it trivially satisfies the assert via the `!programLayout`
-    // short-circuit rather than by supplying a matching one.) A debug-only `SLANG_ASSERT`
-    // is therefore enough to catch a future caller that breaks this by-construction
-    // guarantee, rather than a release-mode guard against untrusted input.
-    SLANG_ASSERT(!programLayout || programLayout->getTargetReq() == this);
+    // the same `ProgramLayout`. Each `ProgramLayout` is created by
+    // `generateParameterBindings(TargetProgram*)`, which records that non-null owner
+    // before any layout work begins. (The other caller, `Linkage::getTypeLayout`,
+    // passes no `programLayout` at all.) A debug-only `SLANG_ASSERT` is therefore
+    // enough to catch a future caller that breaks this by-construction guarantee,
+    // rather than a release-mode guard against untrusted input.
+    SLANG_ASSERT(
+        !programLayout ||
+        (programLayout->getTargetProgram() && programLayout->getTargetReq() == this));
 
-    // When a `ProgramLayout` is supplied, the layout context can resolve
-    // `extern` declarations against their link-time definitions (via
-    // `buildExternTypeMap`) and establish the global ordering of generic type
-    // parameters that might be referenced from field types. The reflection
-    // entry point `spReflection_GetTypeLayout` always has the `ProgramLayout`
-    // in hand, so it threads it through here; that way a query such as
+    // The contract for `GenericParamTypeLayout::paramIndex` is program-scoped:
+    // when a `ProgramLayout` is supplied, the layout embeds the generic
+    // parameter's index in that program's global ordering. That matches the
+    // public reflection API, whose callers query the index directly from the
+    // `TypeLayoutReflection`. The older index-free TODO was never implemented;
+    // the program-supplying entry point already has the necessary `ProgramLayout`,
+    // so threading it here keeps this function as the source of truth.
+    //
+    // The layout context can also resolve `extern` declarations against their
+    // link-time definitions (via `buildExternTypeMap`). That way a query such as
     // `getTypeLayout` for a struct with an `extern` member resolves the member
     // to its concrete linked type rather than laying out the bare, unresolved
     // `extern` declaration (which would report zero fields and size 0).
