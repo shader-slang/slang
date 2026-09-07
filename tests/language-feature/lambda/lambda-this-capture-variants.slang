@@ -1,8 +1,9 @@
 // Additional coverage for capturing `this` in a lambda (issue #12923): the captured
 // receiver is reachable through the synthesized closure on every `this`-capture path.
-// A plain struct method captures `this`; an interface default method captures `this`
-// together with a local variable in one lambda; and a `this` captured only by an inner
-// nested lambda still propagates out through the enclosing lambda.
+// A plain struct method captures `this`; an extension method captures `this`; an
+// interface default method captures `this` together with a local variable in one lambda;
+// and a `this` captured only by an inner nested lambda still propagates out through the
+// enclosing lambda.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
@@ -14,6 +15,15 @@ struct S
 {
     int x;
     int doubled() { let g = () => this.x * 2; return g(); }
+}
+
+struct E
+{
+    int y;
+}
+extension E
+{
+    int tripled() { let g = () => this.y * 3; return g(); }
 }
 
 interface IFoo
@@ -48,12 +58,16 @@ void computeMain()
 {
     S s;
     s.x = 21;
+    E e;
+    e.y = 5;
     Impl impl = {};
 
     outputBuffer[0] = s.doubled();
     // CHECK: 42
-    outputBuffer[1] = withLocal(impl);
+    outputBuffer[1] = e.tripled();
+    // CHECK: 15
+    outputBuffer[2] = withLocal(impl);
     // CHECK: 121
-    outputBuffer[2] = nested(impl);
+    outputBuffer[3] = nested(impl);
     // CHECK: 22
 }
