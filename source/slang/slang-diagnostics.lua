@@ -1766,8 +1766,7 @@ warning(
 
 -- int -> float / int64_t -> double are costed below the general warning
 -- threshold, so unrecommended-implicit-conversion (E30081) never covers them;
--- these four surface the precision loss. The literal forms are default-on; the
--- non-constant forms are opt-in (`pedantic`, off by default).
+-- these four surface the precision loss.
 warning(
     "lossy-implicit-integer-to-float-conversion",
     30133,

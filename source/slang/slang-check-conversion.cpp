@@ -2955,20 +2955,19 @@ bool SemanticsVisitor::_coerce(
                 }
             }
 
-            // Warn on implicit integer -> float/double conversions that lose
+            // Warn on implicit integer -> float/double conversions that may lose
             // precision. int32 -> float and int64 -> double are costed below the
             // general warning threshold (float/double are the preferred
             // integer->real overload targets), so the UnrecommendedImplicitConversion
             // branch above never reaches them; this independent block needs no cost
             // guard of its own.
             //
-            // Only an integer *literal* source is diagnosed by default: its value
-            // is exact. A folded *binary* constant expression is not, because
-            // constant folding evaluates in 64 bits without wrapping at each typed
-            // operation -- e.g. `uint(0xffffffff) + 2` folds to 0x100000001, not the
-            // 1u it is at runtime -- so its folded value cannot be trusted here (a
-            // sound check is left to #12933). A non-constant source is diagnosed
-            // only under -Wpedantic, and only when wide enough to lose precision.
+            // The default-on path checks a bare literal value, never a folded
+            // binary constant expression: constant folding evaluates in 64 bits
+            // without wrapping at each typed operation -- e.g. `uint(0xffffffff) + 2`
+            // folds to 0x100000001, not the 1u it is at runtime -- so a folded
+            // expression's value cannot be trusted here (a sound check is left to
+            // #12933).
             int mantissaBits = 0;
             bool toDouble = false;
             if (auto basicToType = as<BasicExpressionType>(toType))
