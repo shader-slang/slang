@@ -84,6 +84,11 @@ void testConversions(int i, int64_t l)
     // 2^53 exactly: representable in double -> never warns (double analogue of `bound`).
     double dbound = 9007199254740992;
 
+    // Constant expression that wraps in its 32-bit source type (0xffffffff + 2
+    // == 1u) -> the converted value is exact, so no warning. Guards normalizing
+    // the folded value to the source width before the representability check.
+    float w = uint(0xffffffff) + 2;
+
     // 32-bit int -> double is always exact -> never warns, even under -Wpedantic.
     double g = i;
 

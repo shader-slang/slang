@@ -2979,9 +2979,26 @@ bool SemanticsVisitor::_coerce(
             {
                 if (auto val = getFoldedIntVal())
                 {
+                    // Constant folding evaluates in 64 bits without wrapping to
+                    // the source type's width (the overflow check above relies on
+                    // that un-wrapped value), but the value actually converted to
+                    // float is the source-typed, wrapped value -- e.g.
+                    // `uint(0xffffffff) + 2` is 1u at runtime, not 0x100000001.
+                    // Normalize to the source width so representability matches
+                    // what is emitted.
+                    bool isSourceUnsigned = !isSigned(fromType.type);
+                    IntegerLiteralValue v = val->getValue();
+                    if (int width = getMaximumTypeBitSize(fromType.type); width > 0 && width < 64)
+                    {
+                        uint64_t mask = (uint64_t(1) << width) - 1;
+                        uint64_t bits = (uint64_t)v & mask;
+                        if (!isSourceUnsigned && (bits & (uint64_t(1) << (width - 1))) != 0)
+                            bits |= ~mask; // sign-extend a negative signed value
+                        v = (IntegerLiteralValue)bits;
+                    }
                     if (!isIntExactlyRepresentableWithMantissaBits(
-                            val->getValue(),
-                            !isSigned(fromType.type),
+                            v,
+                            isSourceUnsigned,
                             mantissaBits))
                     {
                         if (toDouble)
