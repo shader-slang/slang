@@ -2955,28 +2955,20 @@ bool SemanticsVisitor::_coerce(
                 }
             }
 
-            // Warn on implicit integer -> float/double conversions that may lose
-            // precision. Unlike int -> half (cost 500), int32 -> float and
-            // int64 -> double are costed below the general warning threshold
-            // because float/double are the preferred integer->real targets for
-            // overload ranking, so the UnrecommendedImplicitConversion branch
-            // above never covers them. These are always this low-cost builtin
-            // conversion when reified here, so the block needs no conversion-cost
-            // guard of its own; it never coincides with the type-mismatch path.
+            // Warn on implicit integer -> float/double conversions that lose
+            // precision. int32 -> float and int64 -> double are costed below the
+            // general warning threshold (float/double are the preferred
+            // integer->real overload targets), so the UnrecommendedImplicitConversion
+            // branch above never reaches them; this independent block needs no cost
+            // guard of its own.
             //
-            // Two tiers, matching what can be proven at compile time:
-            //   * An integer *literal* source has an exact, known value, so it is
-            //     diagnosed by default when that value is not representable in the
-            //     target mantissa (mirroring the constant-overflow warning).
-            //   * A non-constant source cannot be proven lossy and is pervasive in
-            //     shader code, so it is diagnosed only under the opt-in -Wpedantic
-            //     group, and only when its type is wide enough to lose precision.
-            //
-            // Folded constant *expressions* are intentionally left undiagnosed:
+            // Only an integer *literal* source is diagnosed by default: its value
+            // is exact. A folded *binary* constant expression is not, because
             // constant folding evaluates in 64 bits without wrapping at each typed
-            // operation (e.g. `uint(0xffffffff) + 2` folds to 0x100000001, not the
-            // 1u it is at runtime), so the folded value cannot be trusted for a
-            // representability check without a dedicated typed-folding path.
+            // operation -- e.g. `uint(0xffffffff) + 2` folds to 0x100000001, not the
+            // 1u it is at runtime -- so its folded value cannot be trusted here (a
+            // sound check is left to #12933). A non-constant source is diagnosed
+            // only under -Wpedantic, and only when wide enough to lose precision.
             int mantissaBits = 0;
             bool toDouble = false;
             if (auto basicToType = as<BasicExpressionType>(toType))

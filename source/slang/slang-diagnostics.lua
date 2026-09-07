@@ -1764,14 +1764,10 @@ warning(
     span { loc = "expr:Expr", message = "implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended." }
 )
 
--- int -> float / int64_t -> double conversions are costed below the general
--- warning threshold (they are the preferred integer->real default), so
--- unrecommended-implicit-conversion (E30081) never covers them. These four
--- warnings surface the precision loss. The constant forms are default-on
--- because a constant that silently changes value is unambiguous (like the
--- constant-overflow warning); the non-constant forms are opt-in (`pedantic`,
--- off by default) because variable int->float is pervasive and unprovable at
--- compile time -- a default-on warning would flood existing shaders.
+-- int -> float / int64_t -> double are costed below the general warning
+-- threshold, so unrecommended-implicit-conversion (E30081) never covers them;
+-- these four surface the precision loss. The literal forms are default-on; the
+-- non-constant forms are opt-in (`pedantic`, off by default).
 warning(
     "lossy-implicit-integer-to-float-conversion",
     30133,
