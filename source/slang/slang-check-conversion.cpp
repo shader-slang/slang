@@ -1625,6 +1625,52 @@ static bool isSigned(Type* t)
     }
 }
 
+// Return true if the integer `value` is exactly representable in a binary
+// floating-point type with `mantissaBits` bits of precision, counting the
+// implicit leading 1 (`float` has 24, `double` has 53). An integer is exact
+// iff the significant bits of its magnitude -- i.e. the value with its trailing
+// zeros removed -- fit in the mantissa. For example 123 and 2^28 are exact in
+// `float`, but 123456789 needs 27 significant bits and is rounded to 123456792.
+//
+// `isSourceUnsigned` selects how the 64-bit `value` bit pattern is read: an
+// unsigned source stores its value directly (so UINT64_MAX, which is -1 when
+// viewed as signed, is the full 2^64-1 magnitude), while a signed source uses
+// the magnitude of its two's-complement value.
+static bool isIntExactlyRepresentableInFloat(
+    IntegerLiteralValue value,
+    bool isSourceUnsigned,
+    int mantissaBits)
+{
+    uint64_t magnitude;
+    if (isSourceUnsigned)
+    {
+        magnitude = (uint64_t)value;
+    }
+    else
+    {
+#if SLANG_VC
+// Disable MSVC warning: "unary minus operator applied to unsigned type, result still unsigned"
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
+        magnitude = value >= 0 ? (uint64_t)value : -(uint64_t)value;
+#if SLANG_VC
+#pragma warning(pop)
+#endif
+    }
+    if (magnitude == 0)
+        return true;
+    while ((magnitude & 1) == 0)
+        magnitude >>= 1;
+    int significantBits = 0;
+    while (magnitude)
+    {
+        significantBits++;
+        magnitude >>= 1;
+    }
+    return significantBits <= mantissaBits;
+}
+
 int getMaximumTypeBitSize(Type* t)
 {
     auto basicType = as<BasicExpressionType>(t);
@@ -2888,6 +2934,75 @@ bool SemanticsVisitor::_coerce(
                 {
                     if (!as<FloatingPointLiteralExpr>(fromExpr))
                         sink->diagnose(Diagnostics::ImplicitConversionToDouble{.expr = fromExpr});
+                }
+            }
+
+            // Warn on implicit integer -> float/double conversions that may lose
+            // precision. Unlike int -> half (cost 500), int32 -> float and
+            // int64 -> double are costed below the general warning threshold
+            // because float/double are the preferred integer->real targets for
+            // overload ranking, so the UnrecommendedImplicitConversion branch
+            // above never covers them. A constant source is diagnosed only when
+            // its exact value is not representable in the target's mantissa
+            // (default-on, mirroring the constant-overflow warning). A
+            // non-constant source cannot be proven lossy at compile time and is
+            // pervasive in real shader code, so it is diagnosed only under the
+            // opt-in -Wpedantic group, and only when the source type is wide
+            // enough that precision could actually be lost.
+            int mantissaBits = 0;
+            bool toDouble = false;
+            if (auto basicToType = as<BasicExpressionType>(toType))
+            {
+                switch (basicToType->getBaseType())
+                {
+                case BaseType::Float:
+                    mantissaBits = 24;
+                    break;
+                case BaseType::Double:
+                    mantissaBits = 53;
+                    toDouble = true;
+                    break;
+                default:
+                    break;
+                }
+            }
+            if (!isCoreModule && sink && mantissaBits != 0)
+            {
+                if (auto val = getFoldedIntVal())
+                {
+                    if (!isIntExactlyRepresentableInFloat(
+                            val->getValue(),
+                            !isSigned(fromType.type),
+                            mantissaBits))
+                    {
+                        if (toDouble)
+                            sink->diagnose(Diagnostics::LossyImplicitIntegerToDoubleConversion{
+                                .fromType = fromType.type,
+                                .toType = toType,
+                                .expr = fromExpr});
+                        else
+                            sink->diagnose(Diagnostics::LossyImplicitIntegerToFloatConversion{
+                                .fromType = fromType.type,
+                                .toType = toType,
+                                .expr = fromExpr});
+                    }
+                }
+                else if (
+                    isScalarIntegerType(fromType.type) &&
+                    getMaximumTypeBitSize(fromType.type) > mantissaBits)
+                {
+                    if (toDouble)
+                        sink->diagnose(
+                            Diagnostics::PotentiallyLossyImplicitIntegerToDoubleConversion{
+                                .fromType = fromType.type,
+                                .toType = toType,
+                                .expr = fromExpr});
+                    else
+                        sink->diagnose(
+                            Diagnostics::PotentiallyLossyImplicitIntegerToFloatConversion{
+                                .fromType = fromType.type,
+                                .toType = toType,
+                                .expr = fromExpr});
                 }
             }
         }

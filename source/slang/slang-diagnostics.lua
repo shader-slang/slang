@@ -1764,6 +1764,44 @@ warning(
     span { loc = "expr:Expr", message = "implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended." }
 )
 
+-- int -> float / int64_t -> double conversions are costed below the general
+-- warning threshold (they are the preferred integer->real default), so
+-- unrecommended-implicit-conversion (E30081) never covers them. These four
+-- warnings surface the precision loss. The constant forms are default-on
+-- because a constant that silently changes value is unambiguous (like the
+-- constant-overflow warning); the non-constant forms are opt-in (`pedantic`,
+-- off by default) because variable int->float is pervasive and unprovable at
+-- compile time -- a default-on warning would flood existing shaders.
+warning(
+    "lossy-implicit-integer-to-float-conversion",
+    30133,
+    "implicit integer-to-float conversion loses precision",
+    span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' loses precision: the value is not exactly representable in float's 24-bit mantissa; use an explicit cast if this is intended" }
+)
+
+warning(
+    "potentially-lossy-implicit-integer-to-float-conversion",
+    30134,
+    "implicit integer-to-float conversion may lose precision",
+    span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' may lose precision: values that do not fit in float's 24-bit mantissa are rounded; use an explicit cast if this is intended" },
+    pedantic
+)
+
+warning(
+    "lossy-implicit-integer-to-double-conversion",
+    30135,
+    "implicit integer-to-double conversion loses precision",
+    span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' loses precision: the value is not exactly representable in double's 53-bit mantissa; use an explicit cast if this is intended" }
+)
+
+warning(
+    "potentially-lossy-implicit-integer-to-double-conversion",
+    30136,
+    "implicit integer-to-double conversion may lose precision",
+    span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' may lose precision: values that do not fit in double's 53-bit mantissa are rounded; use an explicit cast if this is intended" },
+    pedantic
+)
+
 warning(
     "deprecated-struct-cast-from-zero",
     30087,
