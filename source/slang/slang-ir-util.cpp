@@ -847,6 +847,11 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     case kIROp_TextureFootprintType:
         sb << "TextureFootprint";
         break;
+    case kIROp_DescriptorHandleType:
+        sb << "DescriptorHandle<";
+        getTypeNameHint(sb, as<IRDescriptorHandleType>(type)->getResourceType());
+        sb << ">";
+        break;
     case kIROp_Specialize:
         {
             auto specialize = as<IRSpecialize>(type);
