@@ -40,6 +40,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ARTIFACT_NAME="slang-build-windows-x86_64-cl-release"
+          CANDIDATE_LIMIT=5
           STALE_AFTER_DAYS=3
 
           # Look the artifact up by name instead of walking `gh run list`.
@@ -61,17 +62,80 @@ jobs:
           # master or the merge queue, which is the trust boundary the previous
           # `--event merge_group` query had implicitly.
           echo "Looking for the newest unexpired '$ARTIFACT_NAME' built from master..."
-          CANDIDATES=$(gh api \
-            "repos/${{ github.repository }}/actions/artifacts?name=${ARTIFACT_NAME}&per_page=100" \
-            --jq '[.artifacts[]
-                   | select(.expired == false)
-                   | select(.workflow_run.head_repository_id
-                            == .workflow_run.repository_id)
-                   | select(.workflow_run.head_branch == "master"
-                            or (.workflow_run.head_branch
-                                | startswith("gh-readonly-queue/master/")))]
-                  | sort_by(.created_at) | reverse | .[0:5][]
-                  | "\(.workflow_run.id)\t\(.created_at)\t\(.workflow_run.head_sha)"')
+          CANDIDATES=""
+          CANDIDATE_COUNT=0
+          PAGE=1
+
+          # The repository artifact endpoint cannot filter by branch. Walk its
+          # newest-first pages until we have enough usable candidates or reach
+          # expired artifacts; filtering only the first page can hide a still-
+          # retained master build behind a busy day's worth of PR artifacts.
+          while [ "$CANDIDATE_COUNT" -lt "$CANDIDATE_LIMIT" ]; do
+            ARTIFACT_PAGE=$(gh api \
+              "repos/${{ github.repository }}/actions/artifacts?name=${ARTIFACT_NAME}&per_page=100&page=${PAGE}")
+            PAGE_COUNT=$(jq '.artifacts | length' <<< "$ARTIFACT_PAGE")
+            if [ "$PAGE_COUNT" -eq 0 ]; then
+              break
+            fi
+
+            PAGE_CANDIDATES=$(jq -r \
+              '[.artifacts[]
+                | select(.expired == false)
+                | select(.workflow_run.head_repository_id
+                         == .workflow_run.repository_id)
+                | select(.workflow_run.head_branch == "master"
+                         or (.workflow_run.head_branch
+                             | startswith("gh-readonly-queue/master/")))]
+               | sort_by(.created_at) | reverse | .[]
+               | "\(.workflow_run.id)\t\(.created_at)\t\(.workflow_run.head_sha)\t\(.workflow_run.head_branch)"' \
+              <<< "$ARTIFACT_PAGE")
+
+            while IFS=$'\t' read -r RUN_ID CREATED COMMIT HEAD_BRANCH; do
+              if [ -z "$RUN_ID" ]; then
+                continue
+              fi
+
+              # A merge-queue build uploads its artifact before the rest of CI
+              # finishes. Accept it only if the overall merge_group run passed;
+              # otherwise we could test code that was rejected and never reached
+              # master. A direct master artifact is already built from master and
+              # remains useful even if an unrelated job in its workflow failed.
+              if [ "$HEAD_BRANCH" != "master" ]; then
+                if ! RUN_STATE=$(gh api \
+                  "repos/${{ github.repository }}/actions/runs/${RUN_ID}" \
+                  --jq '[.event, .status, .conclusion] | @tsv'); then
+                  echo "  Could not verify merge-queue run $RUN_ID, skipping it."
+                  continue
+                fi
+                IFS=$'\t' read -r RUN_EVENT RUN_STATUS RUN_CONCLUSION <<< "$RUN_STATE"
+                if [ "$RUN_EVENT" != "merge_group" ] || \
+                   [ "$RUN_STATUS" != "completed" ] || \
+                   [ "$RUN_CONCLUSION" != "success" ]; then
+                  echo "  Skipping merge-queue run $RUN_ID ($RUN_STATUS/$RUN_CONCLUSION)."
+                  continue
+                fi
+              fi
+
+              CANDIDATES+="${RUN_ID}"$'\t'"${CREATED}"$'\t'"${COMMIT}"$'\n'
+              CANDIDATE_COUNT=$((CANDIDATE_COUNT + 1))
+              if [ "$CANDIDATE_COUNT" -ge "$CANDIDATE_LIMIT" ]; then
+                break
+              fi
+            done <<< "$PAGE_CANDIDATES"
+
+            # Artifacts with this name all use the repository's five-day
+            # retention. Since the endpoint is newest-first, once a page reaches
+            # an expired artifact, later pages cannot contain a usable candidate.
+            if jq -e 'any(.artifacts[]; .expired == true)' \
+                >/dev/null <<< "$ARTIFACT_PAGE"; then
+              break
+            fi
+            PAGE=$((PAGE + 1))
+          done
+
+          # Remove the trailing newline so the read loop below does not get an
+          # extra empty record.
+          CANDIDATES=${CANDIDATES%$'\n'}
 
           if [ -z "$CANDIDATES" ]; then
             echo "::error::No unexpired '$ARTIFACT_NAME' artifact built from master."
