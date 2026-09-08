@@ -35,49 +35,68 @@ jobs:
         run: |
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
 
-      - name: Download Slang build from latest successful merge queue
+      - name: Download latest Slang build for master
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Finding latest successful merge queue CI run with artifacts..."
           ARTIFACT_NAME="slang-build-windows-x86_64-cl-release"
+          STALE_AFTER_DAYS=3
 
-          # Some CI runs skip builds (e.g. docs-only changes) and have no
-          # artifacts. Search through recent successful runs to find one that
-          # actually produced the artifact we need.
-          RUN_LIST=$(gh run list --repo ${{ github.repository }} \
-            --workflow ci.yml --status success --event merge_group --limit 10 \
-            --json databaseId,headSha,createdAt)
+          # Look the artifact up by name instead of walking `gh run list`.
+          # The run-list endpoint filtered by status+event has twice returned a
+          # stale page: the nightlies on 2026-09-06 and 2026-09-08 were both
+          # handed the same ten 11-day-old runs whose artifacts had long since
+          # expired, even though a usable build from two days earlier was
+          # sitting right there. Querying artifacts by name avoids that index,
+          # and it widens the pool from ci.yml merge-queue runs alone to every
+          # master build -- including sccache-populate, which rebuilds master
+          # every 30 minutes.
+          echo "Looking for the newest unexpired '$ARTIFACT_NAME' built from master..."
+          CANDIDATES=$(gh api \
+            "repos/${{ github.repository }}/actions/artifacts?name=${ARTIFACT_NAME}&per_page=100" \
+            --jq '[.artifacts[]
+                   | select(.expired == false)
+                   | select(.workflow_run.head_branch == "master"
+                            or (.workflow_run.head_branch
+                                | startswith("gh-readonly-queue/master/")))]
+                  | sort_by(.created_at) | reverse | .[0:5][]
+                  | "\(.workflow_run.id)\t\(.created_at)\t\(.workflow_run.head_sha)"')
 
+          if [ -z "$CANDIDATES" ]; then
+            echo "::error::No unexpired '$ARTIFACT_NAME' artifact built from master."
+            echo "Artifacts are retained for 5 days, so this means master has not"
+            echo "produced a Windows release build in that window."
+            exit 1
+          fi
+
+          # More than one candidate only to ride out a transient download
+          # failure; the first entry is the one we actually want.
           FOUND=false
-          COUNT=$(echo "$RUN_LIST" | jq length)
-          for i in $(seq 0 $((COUNT - 1))); do
-            RUN_ID=$(echo "$RUN_LIST" | jq -r ".[$i].databaseId")
-            COMMIT=$(echo "$RUN_LIST" | jq -r ".[$i].headSha")
-            CREATED=$(echo "$RUN_LIST" | jq -r ".[$i].createdAt")
-
-            echo "Trying CI run $RUN_ID (commit: ${COMMIT:0:12}, created: $CREATED)..."
-            ERR_FILE=$(mktemp)
+          while IFS=$'\t' read -r RUN_ID CREATED COMMIT; do
+            echo "Trying run $RUN_ID (commit: ${COMMIT:0:12}, created: $CREATED)..."
+            rm -rf slang-build
             if gh run download "$RUN_ID" --repo ${{ github.repository }} \
-                --name "$ARTIFACT_NAME" --dir slang-build/ 2>"$ERR_FILE"; then
-              echo "Downloaded artifact from CI run $RUN_ID"
-              rm -f "$ERR_FILE"
+                --name "$ARTIFACT_NAME" --dir slang-build/; then
+              echo "Downloaded '$ARTIFACT_NAME' from run $RUN_ID"
+              SELECTED_CREATED="$CREATED"
               FOUND=true
               break
-            elif grep -qi "artifact" "$ERR_FILE"; then
-              echo "  No artifact '$ARTIFACT_NAME' in this run, trying next..."
-              rm -f "$ERR_FILE"
-            else
-              echo "  Artifact download failed for run $RUN_ID:"
-              cat "$ERR_FILE"
-              rm -f "$ERR_FILE"
-              exit 1
             fi
-          done
+            echo "  Download failed, trying the next candidate..."
+          done <<< "$CANDIDATES"
 
           if [ "$FOUND" != "true" ]; then
-            echo "No successful CI run with artifact '$ARTIFACT_NAME' found in last 10 runs"
+            echo "::error::Every candidate download of '$ARTIFACT_NAME' failed."
             exit 1
+          fi
+
+          # Testing an old build is better than not testing at all, so this only
+          # warns. It exists so a quiet master shows up as such in the log rather
+          # than masquerading as a run against current sources.
+          AGE_DAYS=$(( ( $(date -u +%s) - $(date -u -d "$SELECTED_CREATED" +%s) ) / 86400 ))
+          echo "Build is ${AGE_DAYS} day(s) old."
+          if [ "$AGE_DAYS" -ge "$STALE_AFTER_DAYS" ]; then
+            echo "::warning::Testing a ${AGE_DAYS}-day-old master build from $SELECTED_CREATED."
           fi
 
           slangcPath=$(find slang-build -name "slangc.exe" -type f | head -1)
