@@ -703,10 +703,25 @@ static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
                 continue;
             }
 
-            // Work out the
+            // Work out the view. origLoc starts as the raw loc originally on the IR inst; it is
+            // updated in-place below if that loc turns out to be a per-invocation
+            // macro-expansion-range loc, so that every subsequent use in this block (offset and
+            // humane-loc comparisons) is consistent with what SerialSourceLocWriter::addSourceLoc
+            // actually wrote out (see slang-serialize-source-loc.cpp).
+            SourceLoc origLoc = origInst->sourceLoc;
             SourceView* origSourceView =
-                options.sourceManagerToUseWhenSerializingSourceLocs->findSourceView(
-                    origInst->sourceLoc);
+                options.sourceManagerToUseWhenSerializingSourceLocs->findSourceView(origLoc);
+            if (!origSourceView)
+            {
+                // origLoc may be a per-invocation macro-expansion-range loc produced by
+                // MacroInvocation::_remapBodyLoc (slang-preprocessor.cpp), which has no direct
+                // SourceView. addSourceLoc unmaps such locs to their definition-file position
+                // before serializing rather than dropping them, so this check must perform the
+                // same unmap on origLoc to compare like with like against readInst->sourceLoc.
+                origSourceView =
+                    options.sourceManagerToUseWhenSerializingSourceLocs
+                        ->findSourceViewThroughExpansion(origLoc);
+            }
             SourceView* readSourceView = workSourceManager.findSourceView(readInst->sourceLoc);
 
             // if both are null we are done
@@ -717,8 +732,7 @@ static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
             SLANG_ASSERT(origSourceView && readSourceView);
 
             // The offset should be the same
-            Index origOffset =
-                origInst->sourceLoc.getRaw() - origSourceView->getRange().begin.getRaw();
+            Index origOffset = origLoc.getRaw() - origSourceView->getRange().begin.getRaw();
             Index readOffset =
                 readInst->sourceLoc.getRaw() - readSourceView->getRange().begin.getRaw();
 
@@ -729,8 +743,7 @@ static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
             }
 
             {
-                auto origInfo =
-                    origSourceView->getHumaneLoc(origInst->sourceLoc, SourceLocType::Actual);
+                auto origInfo = origSourceView->getHumaneLoc(origLoc, SourceLocType::Actual);
                 auto readInfo =
                     readSourceView->getHumaneLoc(readInst->sourceLoc, SourceLocType::Actual);
 
@@ -747,8 +760,7 @@ static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
 
             if (false)
             {
-                auto origInfo =
-                    origSourceView->getHumaneLoc(origInst->sourceLoc, SourceLocType::Nominal);
+                auto origInfo = origSourceView->getHumaneLoc(origLoc, SourceLocType::Nominal);
                 auto readInfo =
                     readSourceView->getHumaneLoc(readInst->sourceLoc, SourceLocType::Nominal);
 

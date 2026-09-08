@@ -23,6 +23,7 @@
 //
 
 DIAGNOSTIC(-1, Note, seeTokenPasteLocation, "see token pasted location")
+DIAGNOSTIC(-1, Note, seeExpandedFromMacro, "expanded from macro '$0'")
 
 DIAGNOSTIC(
     100000,

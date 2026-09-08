@@ -21,6 +21,9 @@ struct DiagnosticNote
     String message;
     DiagnosticSpan span;
     List<DiagnosticSpan> secondarySpans;
+    /// The originating diagnostic definition, for use by renderers that need the diagnostic id.
+    /// Points into static storage; may be null for synthetic notes.
+    const DiagnosticInfo* diagnosticInfo = nullptr;
 };
 
 //
