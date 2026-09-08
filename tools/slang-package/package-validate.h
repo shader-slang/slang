@@ -42,17 +42,31 @@ SlangResult validatePublishablePackage(
 
 /// Validate the identities and paths in a selected dependency graph.
 ///
-/// This checks dependency-to-lock correspondence, trusted reachability, package manifests, local
-/// registrations, path identities, and the combined toolchain constraint. Git pins without an
-/// active local path are read from `.slang/cache` at the locked commit, so `deps/` need not exist.
-/// It deliberately does not inspect licenses, exports, or source declarations.
+/// Walk declared edges from the root manifest, using an override's working-tree manifest when that
+/// package is pinned locally, and otherwise the manifest of the locked version (Git at `commit`,
+/// or the path directory). Every live edge must still select the same lock row; every lock row
+/// must be reachable. This is the local "does the current graph still match the lock" check and
+/// does not look for newer Git tags.
+/// `allowRemoteGit` lets Git pins populate `.slang/cache` when the locked revision is not already
+/// local. Status passes false so "needs update" stays a local check.
 SlangResult validateLegalResolvedProject(
     const String& projectRoot,
     const Manifest& rootManifest,
     const LockFile& lock,
     const List<LocalPackage>& localPackages,
     String& outError,
-    List<String>* outWarnings = nullptr);
+    List<String>* outWarnings = nullptr,
+    bool allowRemoteGit = true);
+
+/// Load the manifest used as the source of declared dependencies and exports for one lock row.
+SlangResult loadLockedPackageGraphManifest(
+    const String& projectRoot,
+    const Manifest& rootManifest,
+    const LockedPackage& package,
+    const List<LocalPackage>& localPackages,
+    Manifest& outManifest,
+    String& outError,
+    bool allowRemoteGit = true);
 
 /// Validate that a proposed materialized graph has the source shape needed by a build.
 ///

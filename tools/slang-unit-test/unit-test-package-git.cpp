@@ -1328,7 +1328,12 @@ SLANG_UNIT_TEST(PackageToolEditAdoptsLocalTree)
     SLANG_CHECK(lockAfter.packages[noiseIndex].git == noiseRepo);
     SLANG_CHECK(lockAfter.packages[noiseIndex].path == "deps/noise");
     SLANG_CHECK(lockAfter.packages[noiseIndex].version == "1.0.0");
-    SLANG_CHECK(lockAfter.packages[noiseIndex].exports.getCount() == 2);
+    String searchPaths;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::readAllText(Path::combine(temp.path, "build/search-paths"), searchPaths)));
+    SLANG_CHECK(
+        searchPaths.getUnownedSlice().indexOf(
+            Path::combine(temp.path, "deps/noise/extra").getUnownedSlice()) >= 0);
     SLANG_CHECK(lockAfter.packages[helperIndex].ref == "v1.1.0");
     String helperAfter;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -1826,7 +1831,11 @@ SLANG_UNIT_TEST(PackageToolUneditAdoptRejectsManifestDrift)
     String localManifestPath = Path::combine(checkout, "slang-pkg-manifest.json");
     Manifest localManifest;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(localManifestPath, localManifest, error)));
-    localManifest.exports.add("extra");
+    Dependency extra;
+    extra.name = "missing-dep";
+    extra.git = repository;
+    extra.version = "1.0.0";
+    localManifest.dependencies.add(extra);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(localManifestPath, localManifest, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(checkout, "change package graph")));
 
@@ -1834,7 +1843,8 @@ SLANG_UNIT_TEST(PackageToolUneditAdoptRejectsManifestDrift)
         {"slang-package", "unedit", "noise", "--adopt", "--as", "1.0.1", "--yes"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(adoptArguments), adoptArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("exports do not match")) >= 0);
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("does not contain dependency")) >= 0);
     List<LocalPackage> localPackages;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readProjectLocalPackages(temp.path, localPackages, error)));
     SLANG_CHECK(findLocalPackageIndex(localPackages, "noise") >= 0);
@@ -2034,15 +2044,16 @@ SLANG_UNIT_TEST(PackageToolFetchRejectsIllegalGraphBeforeMaterialize)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readLockFile(Path::combine(temp.path, "slang-pkg-lock.json"), lock, error)));
     SLANG_CHECK_ABORT(lock.packages.getCount() == 1);
-    lock.packages[0].exports.clear();
-    lock.packages[0].exports.add("not-src");
+    lock.packages[0].version = "0.0.1";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         writeLockFile(Path::combine(temp.path, "slang-pkg-lock.json"), lock, error)));
 
     const char* fetchArguments[] = {"slang-package", "fetch"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("exports")) >= 0);
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("Locked version no longer satisfies")) >=
+        0);
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("search-paths")) < 0);
 
     String searchPathsAfter;

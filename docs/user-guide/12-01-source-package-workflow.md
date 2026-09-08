@@ -68,8 +68,10 @@ less slang-pkg-lock.json
   dependencies, optional `tools.slang-toolchain` for a minimum installed compiler (and thus its
   builtins and standard library), optional `build.host` executables, optional publisher `retractions`,
   and optional root-only `workspace` settings (`deps`, `build`, `excludes`).
-- `slang-pkg-lock.json` is the exact graph this workspace selected. `fetch` reproduces it
-  without solving again.
+- `slang-pkg-lock.json` is the exact selection this workspace resolved: identity only (`version`,
+  Git `ref`/`commit`, overlay `path`). `fetch` reproduces those pins without solving again.
+  Declared exports and dependencies are reloaded from overlay working trees or from each locked
+  version's manifest.
 - `slang-pkg-workspace.json` is gitignored machine-local override state. `edit NAME` creates an
   override at `deps/NAME`; other overrides may point elsewhere. The file should not be in the
   clone. If it is missing, that is correct for CI and for a clean checkout.

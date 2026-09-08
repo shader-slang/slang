@@ -166,6 +166,9 @@ inline String getWorkspaceBuildDirectory(const Manifest& manifest)
 /// - Local override: `git` and `path` are both set. The Git identity is retained, but the tree at
 ///   `path` is used instead; `version` is the version it provides and `slang-pkg-workspace.json`
 ///   must register the same path.
+///
+/// Declared `exports` and `dependencies` are not stored. Fetch and status reload them from the
+/// overlay working tree, or from the pinned version's manifest.
 struct LockedPackage
 {
     String name;
@@ -174,7 +177,7 @@ struct LockedPackage
     String version;
     String commit;
     String path;
-    List<String> exports;
+    /// Filled during resolve only; not read from or written to the lock file.
     List<Dependency> dependencies;
 };
 

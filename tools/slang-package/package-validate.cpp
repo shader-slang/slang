@@ -615,7 +615,8 @@ static SlangResult _loadResolvedPackage(
     const ResolvedPackageLoad& parent,
     const Dependency& incoming,
     ResolvedPackageLoad& out,
-    String& outError)
+    String& outError,
+    bool allowRemoteGit)
 {
     out = ResolvedPackageLoad();
     Index localIndex = findActiveLocalPackageIndex(localPackages, package.name);
@@ -710,7 +711,7 @@ static SlangResult _loadResolvedPackage(
         gitRepositoryPath = depsRoot;
     }
     else if (
-        package.commit.getLength() &&
+        allowRemoteGit && package.commit.getLength() &&
         SLANG_SUCCEEDED(ensureRepository(projectRoot, package.git, cachePath, gitError)) &&
         SLANG_SUCCEEDED(readFileAtRevision(
             cachePath,
@@ -760,6 +761,32 @@ static SlangResult _loadResolvedPackage(
     return validateLockedPackageManifest(package, out.manifest, outError);
 }
 
+SlangResult loadLockedPackageGraphManifest(
+    const String& projectRoot,
+    const Manifest& rootManifest,
+    const LockedPackage& package,
+    const List<LocalPackage>& localPackages,
+    Manifest& outManifest,
+    String& outError,
+    bool allowRemoteGit)
+{
+    ResolvedPackageLoad parent;
+    Dependency incoming;
+    ResolvedPackageLoad loaded;
+    SLANG_RETURN_ON_FAIL(_loadResolvedPackage(
+        projectRoot,
+        getWorkspaceDepsDirectory(rootManifest),
+        package,
+        localPackages,
+        parent,
+        incoming,
+        loaded,
+        outError,
+        allowRemoteGit));
+    outManifest = loaded.manifest;
+    return SLANG_OK;
+}
+
 SlangResult validatePublishablePackage(
     const String& packageRoot,
     const Manifest& manifest,
@@ -777,7 +804,8 @@ SlangResult validateLegalResolvedProject(
     const LockFile& lock,
     const List<LocalPackage>& localPackages,
     String& outError,
-    List<String>* outWarnings)
+    List<String>* outWarnings,
+    bool allowRemoteGit)
 {
     SLANG_RETURN_ON_FAIL(validateLockedWorkspaceExclusions(rootManifest, lock, outError));
     List<ResolvedPackageLoad> loadedPackages;
@@ -842,7 +870,8 @@ SlangResult validateLegalResolvedProject(
                     workspaceLoad,
                     dependency,
                     loadedPackages[index],
-                    outError));
+                    outError,
+                    allowRemoteGit));
                 loaded[index] = true;
             }
         }
@@ -879,7 +908,8 @@ SlangResult validateLegalResolvedProject(
                         loadedPackages[index],
                         dependency,
                         loadedPackages[dependencyIndex],
-                        outError));
+                        outError,
+                        allowRemoteGit));
                     loaded[dependencyIndex] = true;
                 }
             }

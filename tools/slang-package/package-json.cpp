@@ -1085,8 +1085,7 @@ static SlangResult _readLockedPackage(
     for (auto field : container->getObject(pair.value))
     {
         String key = container->getStringFromKey(field.key);
-        if (key != "git" && key != "path" && key != "ref" && key != "version" && key != "commit" &&
-            key != "exports" && key != "dependencies")
+        if (key != "git" && key != "path" && key != "ref" && key != "version" && key != "commit")
         {
             outError = String("Unknown field in locked package '") + outPackage.name + "': " + key;
             return SLANG_FAIL;
@@ -1152,17 +1151,6 @@ static SlangResult _readLockedPackage(
             return SLANG_FAIL;
         }
     }
-    SLANG_RETURN_ON_FAIL(
-        _readRelativePathArray(container, pair.value, "exports", outPackage.exports, outError));
-    if (!_find(container, pair.value, "dependencies").isValid())
-    {
-        outError = String("Locked package is missing dependency requirements: ") + outPackage.name +
-                   ". Run 'slang package update'.";
-        return SLANG_FAIL;
-    }
-    SLANG_RETURN_ON_FAIL(
-        _readDependencies(container, pair.value, outPackage.dependencies, outError));
-
     return SLANG_OK;
 }
 
@@ -1242,13 +1230,6 @@ SlangResult writeLockFile(const String& path, const LockFile& lock, String& outE
         }
         _writeKey(writer, "version");
         writer.addStringValue(package.version.getUnownedSlice(), SourceLoc());
-        _writeKey(writer, "exports");
-        _writeStringArray(writer, package.exports);
-        _writeKey(writer, "dependencies");
-        writer.startObject(SourceLoc());
-        for (const auto& dependency : package.dependencies)
-            _writeDependency(writer, dependency);
-        writer.endObject(SourceLoc());
         writer.endObject(SourceLoc());
     }
     writer.endObject(SourceLoc());

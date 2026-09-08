@@ -240,7 +240,15 @@ static SlangResult _writeSearchPaths(
             localPackages,
             packageRoot,
             outError));
-        for (const auto& exportPath : package.exports)
+        Manifest packageManifest;
+        SLANG_RETURN_ON_FAIL(loadLockedPackageGraphManifest(
+            projectRoot,
+            manifest,
+            package,
+            localPackages,
+            packageManifest,
+            outError));
+        for (const auto& exportPath : packageManifest.exports)
             searchPaths << Path::combine(packageRoot, exportPath) << "\n";
     }
 
@@ -494,58 +502,26 @@ static SlangResult _readProjectLock(const String& projectRoot, LockFile& outLock
     return readLockFile(Path::combine(projectRoot, kLockFileName), outLock, outError);
 }
 
-/// Verify that the lock is exactly the reachable graph required by its stored package manifests.
+/// Check that the current dependency graph, including overrides, still selects this lock.
 ///
-/// Each lock entry stores the dependency requirements from the manifest that produced it. This
-/// lets fetch validate both Git and local package graphs without rediscovering metadata.
+/// Declared edges come from overlay working trees and from each locked version's manifest. This
+/// does not search for newer Git tags.
 static SlangResult _validateLockAgainstManifest(
+    const String& projectRoot,
     const Manifest& manifest,
     const LockFile& lock,
-    String& outError)
+    const List<LocalPackage>& localPackages,
+    String& outError,
+    bool allowRemoteGit = true)
 {
-    SLANG_RETURN_ON_FAIL(validateLockedWorkspaceExclusions(manifest, lock, outError));
-    List<bool> reachablePackages;
-    reachablePackages.setCount(lock.packages.getCount());
-    for (auto& reachable : reachablePackages)
-        reachable = false;
-    List<Index> pendingPackages;
-    for (const auto& dependency : manifest.dependencies)
-    {
-        Index packageIndex;
-        SLANG_RETURN_ON_FAIL(validateLockedDependency(dependency, lock, packageIndex, outError));
-        if (!reachablePackages[packageIndex])
-        {
-            reachablePackages[packageIndex] = true;
-            pendingPackages.add(packageIndex);
-        }
-    }
-
-    for (Index pendingIndex = 0; pendingIndex < pendingPackages.getCount(); ++pendingIndex)
-    {
-        const LockedPackage& package = lock.packages[pendingPackages[pendingIndex]];
-        for (const auto& dependency : package.dependencies)
-        {
-            Index dependencyIndex;
-            SLANG_RETURN_ON_FAIL(
-                validateLockedDependency(dependency, lock, dependencyIndex, outError));
-            if (!reachablePackages[dependencyIndex])
-            {
-                reachablePackages[dependencyIndex] = true;
-                pendingPackages.add(dependencyIndex);
-            }
-        }
-    }
-
-    for (Index i = 0; i < reachablePackages.getCount(); ++i)
-    {
-        if (!reachablePackages[i])
-        {
-            outError = String("Lock file contains unreachable package '") + lock.packages[i].name +
-                       "'. Run 'slang package update'.";
-            return SLANG_FAIL;
-        }
-    }
-    return SLANG_OK;
+    return validateLegalResolvedProject(
+        projectRoot,
+        manifest,
+        lock,
+        localPackages,
+        outError,
+        nullptr,
+        allowRemoteGit);
 }
 
 /// Verify that every registered local tree matches its locked slot and every path lock is
@@ -624,9 +600,9 @@ static SlangResult _validateLocalPackages(
 /// Validate enough of the locked graph to regenerate search paths after a local registration
 /// changes.
 ///
-/// The lock remains the dependency source of truth for an active local package until the next
-/// update adopts that package's manifest, so this deliberately validates the local root and uses
-/// the locked dependency edges instead of requiring the two manifests to match.
+/// An overlay may declare dependencies the lock does not yet contain. Those edges wait for
+/// `update`. Existing lock rows must still be reachable, and overlay edges that already have a lock
+/// row must still select that pin.
 static SlangResult _validateGraphAfterLocalRegistrationChange(
     const String& projectRoot,
     const Manifest& rootManifest,
@@ -688,12 +664,13 @@ static SlangResult _validateGraphAfterLocalRegistrationChange(
             SLANG_RETURN_ON_FAIL(validateLockedPackageManifest(package, manifest, outError));
         addSlangToolchainConstraint(manifest, toolchainConstraints);
         addUnadoptedWorkspaceExclusionWarnings(rootManifest, package.name, manifest, outWarnings);
-        const List<Dependency>& dependencies =
-            localIndex >= 0 ? package.dependencies : manifest.dependencies;
-        for (const auto& dependency : dependencies)
+        for (const auto& dependency : manifest.dependencies)
         {
             Index dependencyIndex = findLockedPackageIndex(lock, dependency.name);
-            SLANG_RELEASE_ASSERT(dependencyIndex >= 0);
+            if (dependencyIndex < 0)
+                continue;
+            SLANG_RETURN_ON_FAIL(
+                validateLockedDependency(dependency, lock, dependencyIndex, outError));
             SLANG_RETURN_ON_FAIL(validateLockedPathDependency(
                 projectRoot,
                 packageRoot,
@@ -1238,7 +1215,6 @@ static SlangResult _fetch(
     List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-    SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
     if (!allowClean)
     {
         SLANG_RETURN_ON_FAIL(
@@ -1608,7 +1584,6 @@ static SlangResult _validate(const String& projectRoot, String& outError)
         outError = "Package dependencies require slang-pkg-lock.json before publishing.";
         return SLANG_FAIL;
     }
-    SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
     for (const auto& package : lock.packages)
     {
         if (!isLocalOverrideLockedPackage(package))
@@ -1763,7 +1738,8 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
     }
     else
     {
-        lockMatchesManifest = SLANG_SUCCEEDED(_validateLockAgainstManifest(manifest, lock, issue));
+        lockMatchesManifest = SLANG_SUCCEEDED(
+            _validateLockAgainstManifest(projectRoot, manifest, lock, localPackages, issue, false));
         if (!lockMatchesManifest)
         {
             addFact(issue);
@@ -1950,6 +1926,7 @@ static void _getSortedDependencies(
 
 static void _printDependencyTree(
     const LockFile& lock,
+    const List<Manifest>& graphManifests,
     const Dependency& dependency,
     const String& prefix,
     List<String>& ioExpanded)
@@ -1979,25 +1956,59 @@ static void _printDependencyTree(
     ioExpanded.add(package.name);
 
     List<const Dependency*> children;
-    _getSortedDependencies(package.dependencies, children);
+    _getSortedDependencies(graphManifests[packageIndex].dependencies, children);
     for (const auto child : children)
-        _printDependencyTree(lock, *child, prefix + "  ", ioExpanded);
+        _printDependencyTree(lock, graphManifests, *child, prefix + "  ", ioExpanded);
+}
+
+static SlangResult _loadLockGraphManifests(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const LockFile& lock,
+    const List<LocalPackage>& localPackages,
+    List<Manifest>& outManifests,
+    String& outError)
+{
+    outManifests.clear();
+    outManifests.setCount(lock.packages.getCount());
+    for (Index i = 0; i < lock.packages.getCount(); ++i)
+    {
+        SLANG_RETURN_ON_FAIL(loadLockedPackageGraphManifest(
+            projectRoot,
+            manifest,
+            lock.packages[i],
+            localPackages,
+            outManifests[i],
+            outError));
+    }
+    return SLANG_OK;
 }
 
 static SlangResult _tree(const String& projectRoot, String& outError)
 {
     Manifest manifest;
     LockFile lock;
+    List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
     SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
-    SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    SLANG_RETURN_ON_FAIL(
+        _validateLockAgainstManifest(projectRoot, manifest, lock, localPackages, outError));
+    List<Manifest> graphManifests;
+    SLANG_RETURN_ON_FAIL(_loadLockGraphManifests(
+        projectRoot,
+        manifest,
+        lock,
+        localPackages,
+        graphManifests,
+        outError));
 
     fprintf(stdout, "%s\n", manifest.name.getBuffer());
     List<const Dependency*> dependencies;
     _getSortedDependencies(manifest.dependencies, dependencies);
     List<String> expanded;
     for (const auto dependency : dependencies)
-        _printDependencyTree(lock, *dependency, "  ", expanded);
+        _printDependencyTree(lock, graphManifests, *dependency, "  ", expanded);
     if (!dependencies.getCount())
         fprintf(stdout, "  (no dependencies)\n");
     fprintf(stdout, "(*) dependency subtree already shown\n");
@@ -2006,6 +2017,7 @@ static SlangResult _tree(const String& projectRoot, String& outError)
 
 static void _printWhyPaths(
     const LockFile& lock,
+    const List<Manifest>& graphManifests,
     const List<Dependency>& dependencies,
     const String& targetName,
     const String& path,
@@ -2029,7 +2041,14 @@ static void _printWhyPaths(
             continue;
         }
         ioStack.add(package.name);
-        _printWhyPaths(lock, package.dependencies, targetName, nextPath, ioStack, ioPathCount);
+        _printWhyPaths(
+            lock,
+            graphManifests,
+            graphManifests[packageIndex].dependencies,
+            targetName,
+            nextPath,
+            ioStack,
+            ioPathCount);
         ioStack.removeLast();
     }
 }
@@ -2038,19 +2057,37 @@ static SlangResult _why(const String& projectRoot, const String& name, String& o
 {
     Manifest manifest;
     LockFile lock;
+    List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
     SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
-    SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    SLANG_RETURN_ON_FAIL(
+        _validateLockAgainstManifest(projectRoot, manifest, lock, localPackages, outError));
     if (findLockedPackageIndex(lock, name) < 0)
     {
         outError = String("Package is not present in the lock: ") + name;
         return SLANG_FAIL;
     }
+    List<Manifest> graphManifests;
+    SLANG_RETURN_ON_FAIL(_loadLockGraphManifests(
+        projectRoot,
+        manifest,
+        lock,
+        localPackages,
+        graphManifests,
+        outError));
 
     fprintf(stdout, "Dependency paths to '%s':\n", name.getBuffer());
     List<String> stack;
     Index pathCount = 0;
-    _printWhyPaths(lock, manifest.dependencies, name, manifest.name, stack, pathCount);
+    _printWhyPaths(
+        lock,
+        graphManifests,
+        manifest.dependencies,
+        name,
+        manifest.name,
+        stack,
+        pathCount);
     if (!pathCount)
     {
         outError = String("No dependency path from the workspace reaches package: ") + name;
@@ -2092,7 +2129,15 @@ static SlangResult _collectCompilationSearchPaths(
             localPackages,
             packageRoot,
             outError));
-        for (const auto& exportPath : package.exports)
+        Manifest packageManifest;
+        SLANG_RETURN_ON_FAIL(loadLockedPackageGraphManifest(
+            projectRoot,
+            manifest,
+            package,
+            localPackages,
+            packageManifest,
+            outError));
+        for (const auto& exportPath : packageManifest.exports)
             outSearchPaths.add(Path::combine(packageRoot, exportPath));
     }
     return SLANG_OK;
@@ -2914,7 +2959,6 @@ static SlangResult _adoptInPlaceOverride(
     package.commit = headCommit;
 
     localPackages.removeAt(localIndex);
-    SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
     List<String> warnings;
     SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
         projectRoot,

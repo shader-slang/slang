@@ -125,52 +125,6 @@ SlangResult validateLockedPackageManifest(
         outError = String("Locked package manifest has a different name: ") + package.name;
         return SLANG_FAIL;
     }
-
-    // Exports are an unordered set of source roots, so reordering the manifest array must not
-    // invalidate a lock that already records the same roots. Manifest and lock reading both reject
-    // duplicate entries, so equal counts plus containment mean the two sets are equal.
-    if (manifest.exports.getCount() != package.exports.getCount())
-    {
-        outError = String("Locked package manifest exports do not match its lock: ") + package.name;
-        return SLANG_FAIL;
-    }
-    for (const auto& exportPath : manifest.exports)
-    {
-        if (!package.exports.contains(exportPath))
-        {
-            outError =
-                String("Locked package manifest exports do not match its lock: ") + package.name;
-            return SLANG_FAIL;
-        }
-    }
-
-    if (manifest.dependencies.getCount() != package.dependencies.getCount())
-    {
-        outError = String("Package manifest dependencies do not match its lock: ") + package.name;
-        return SLANG_FAIL;
-    }
-    for (const auto& dependency : manifest.dependencies)
-    {
-        bool found = false;
-        for (const auto& lockedDependency : package.dependencies)
-        {
-            if (dependency.name == lockedDependency.name &&
-                dependency.git == lockedDependency.git &&
-                dependency.path == lockedDependency.path &&
-                dependency.version == lockedDependency.version &&
-                dependency.ref == lockedDependency.ref && dependency.as == lockedDependency.as)
-            {
-                found = true;
-                break;
-            }
-        }
-        if (!found)
-        {
-            outError =
-                String("Package manifest dependencies do not match its lock: ") + package.name;
-            return SLANG_FAIL;
-        }
-    }
     return SLANG_OK;
 }
 
@@ -220,47 +174,10 @@ SlangResult requireAllLockPackagesTrusted(
     return SLANG_OK;
 }
 
-static bool _dependenciesEqual(const List<Dependency>& left, const List<Dependency>& right)
-{
-    if (left.getCount() != right.getCount())
-        return false;
-    for (const auto& dependency : left)
-    {
-        bool found = false;
-        for (const auto& other : right)
-        {
-            if (dependency.name == other.name && dependency.git == other.git &&
-                dependency.path == other.path && dependency.version == other.version &&
-                dependency.ref == other.ref && dependency.as == other.as)
-            {
-                found = true;
-                break;
-            }
-        }
-        if (!found)
-            return false;
-    }
-    return true;
-}
-
-static bool _stringSetsEqual(const List<String>& left, const List<String>& right)
-{
-    if (left.getCount() != right.getCount())
-        return false;
-    for (const auto& value : left)
-    {
-        if (!right.contains(value))
-            return false;
-    }
-    return true;
-}
-
 bool lockedPackagesEqual(const LockedPackage& left, const LockedPackage& right)
 {
     return left.name == right.name && left.git == right.git && left.ref == right.ref &&
-           left.version == right.version && left.commit == right.commit &&
-           left.path == right.path && _stringSetsEqual(left.exports, right.exports) &&
-           _dependenciesEqual(left.dependencies, right.dependencies);
+           left.version == right.version && left.commit == right.commit && left.path == right.path;
 }
 
 bool lockFilesEqual(const LockFile& left, const LockFile& right)

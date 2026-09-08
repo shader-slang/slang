@@ -382,8 +382,8 @@ slang package edit color-encoding
 
 The checkout stays at `deps/color-encoding`. `edit` registers an enabled override there, using the
 version from the current lock. Fetch and update do not replace that user-owned tree. The next
-`update` reads its working-tree manifest and writes a Git+path lock row, so changed exports and
-dependencies participate in the full solve.
+`update` reads its working-tree manifest and writes a Git+path lock row. Changed exports and
+dependencies participate in the full solve; they are not copied into the lock.
 
 `edit` also accepts a checkout that already has local changes. That is the recommended recovery
 when you modified `deps/color-encoding` first and only then discovered that fetch and update

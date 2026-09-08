@@ -485,6 +485,14 @@ SLANG_UNIT_TEST(PackageLockRejectsUnknownFields)
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         path,
+        "{\"version\":1,\"packages\":{\"noise\":{\"git\":\"https://example.com/noise.git\","
+        "\"ref\":\"v1.0.0\",\"commit\":\"0000000000000000000000000000000000000000\","
+        "\"version\":\"1.0.0\",\"exports\":[\"src\"]}}}")));
+    SLANG_CHECK(SLANG_FAILED(readLockFile(path, lock, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        path,
         "{\"version\":1,\"packages\":{},\"tools\":{\"slang-toolchain\":{\"version\":"
         "\"2026.8.1\"}}}")));
     SLANG_CHECK(SLANG_FAILED(readLockFile(path, lock, error)));
@@ -1692,7 +1700,9 @@ SLANG_UNIT_TEST(PackageToolDependencyCommandsAndInitialFetch)
         executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
     String statusReport;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
-    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("unreachable")) >= 0);
+    SLANG_CHECK(
+        statusReport.getUnownedSlice().indexOf(
+            UnownedStringSlice("not selected by a trusted path dependency")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageToolFetchRejectsPathLockForGitDependency)
@@ -1720,7 +1730,6 @@ SLANG_UNIT_TEST(PackageToolFetchRejectsPathLockForGitDependency)
     locked.name = "noise";
     locked.path = "../untrusted-noise";
     locked.version = "1.0.0";
-    locked.exports.add("src");
     PackageTool::LockFile lock;
     lock.packages.add(locked);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -1779,7 +1788,6 @@ SLANG_UNIT_TEST(PackageToolFetchRejectsWorkspaceExclusion)
     locked.ref = "v1.0.0";
     locked.version = "1.0.0";
     locked.commit = "0000000000000000000000000000000000000000";
-    locked.exports.add("src");
     PackageTool::LockFile lock;
     lock.packages.add(locked);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -1832,7 +1840,6 @@ SLANG_UNIT_TEST(PackageToolRejectsPathIntoSlangState)
     locked.name = "evil";
     locked.path = ".slang/evil";
     locked.version = "1.0.0";
-    locked.exports.add("src");
     PackageTool::LockFile lock;
     lock.packages.add(locked);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -2134,7 +2141,6 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     locked.ref = "v1.0.0";
     locked.version = "1.0.0";
     locked.commit = "0000000000000000000000000000000000000000";
-    locked.exports.add("src");
     PackageTool::LockFile lock;
     lock.packages.add(locked);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -2254,9 +2260,8 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     }
     SLANG_CHECK(lock.packages[0].name == "helper");
     SLANG_CHECK(lock.packages[1].name == "noise");
-    SLANG_CHECK(lock.packages[1].dependencies.getCount() == 2);
-    SLANG_CHECK(lock.packages[1].dependencies[0].name == "helper");
-    SLANG_CHECK(lock.packages[1].dependencies[1].name == "noise");
+    SLANG_CHECK(findLockedPackageIndex(lock, "helper") >= 0);
+    SLANG_CHECK(findLockedPackageIndex(lock, "noise") >= 0);
     const char* buildArguments[] = {"slang-package", "build"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
@@ -2379,13 +2384,14 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     registeredPackages[noiseRegistration].path = relativeLocalRoot;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeLocalPackages(registryPath, registeredPackages, error)));
 
-    local.dependencies[0].version = ">=2.0.0 <3.0.0";
+    local.dependencies[0].version = ">=3.0.0";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         writeManifest(Path::combine(localRoot, "slang-pkg-manifest.json"), local, error)));
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
     SLANG_CHECK(
-        error.getUnownedSlice().indexOf(UnownedStringSlice("dependencies do not match")) >= 0);
+        error.getUnownedSlice().indexOf(UnownedStringSlice("Locked version no longer satisfies")) >=
+        0);
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
         temp.path,
         SLANG_COUNT_OF(validateArguments),
@@ -2877,7 +2883,6 @@ SLANG_UNIT_TEST(PackageValidateIgnoresTransitiveAliasThatBuildRejects)
     locked.ref = "v1.0.0";
     locked.version = "1.0.0";
     locked.commit = "0000000000000000000000000000000000000000";
-    locked.exports.add("src");
     PackageTool::LockFile lock;
     lock.packages.add(locked);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(

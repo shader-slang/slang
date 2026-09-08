@@ -7,6 +7,7 @@
 #include "package-local.h"
 #include "package-lock.h"
 #include "package-path.h"
+#include "package-validate.h"
 
 #include <stdio.h>
 
@@ -293,7 +294,18 @@ SlangResult buildDocumentation(const String& projectRoot, String& outError)
                 outError));
             packageNames.add(package.name);
             packageRoots.add(packageRoot);
-            _setPackageDependencies(dependenciesByPackage, package.name, package.dependencies);
+            Manifest packageManifest;
+            SLANG_RETURN_ON_FAIL(loadLockedPackageGraphManifest(
+                projectRoot,
+                manifest,
+                package,
+                localPackages,
+                packageManifest,
+                outError));
+            _setPackageDependencies(
+                dependenciesByPackage,
+                package.name,
+                packageManifest.dependencies);
         }
     }
 

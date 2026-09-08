@@ -809,7 +809,6 @@ private:
         package.locked.name = package.name;
         package.locked.path = pathManifest.lockRoot;
         package.locked.version = dependency.as;
-        package.locked.exports = pathManifest.manifest.exports;
         package.locked.dependencies = pathManifest.manifest.dependencies;
         VersionConstraint asConstraint;
         String asError;
@@ -1138,7 +1137,6 @@ private:
                 selected.locked.commit = candidate.commit;
             }
             selected.resolvedManifest = manifest;
-            selected.locked.exports = manifest.manifest.exports;
             selected.locked.dependencies = manifest.manifest.dependencies;
 
             bool dependencyConflict = false;

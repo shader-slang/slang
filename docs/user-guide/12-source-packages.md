@@ -262,10 +262,12 @@ fetches missing locked trees itself and never rewrites that lock. A first clone 
 start with `build`, which runs fetch and then update `--yes`. Use an explicit `fetch` to
 materialize without building, to pass `--clean`, or to confirm a first lock interactively.
 
-Every lock row has an exact `version`. A Git row also records the selected `ref` and `commit`; a
-range-selected release uses its `vMAJOR.MINOR.PATCH` tag as the ref. A path row records its
-effective `as` version as `version`. A local-override row records its original Git location, local
-path, and effective version.
+Every lock row records selection identity only: an exact `version`, plus `git`/`ref`/`commit` for a
+Git pin or `path` for a path or overlay row. Declared `exports` and `dependencies` are not copied
+into the lock. Commands reload them from an active overlay's working-tree manifest, or from the
+manifest of the locked version (Git at `commit`, or the path directory). `status` uses that live
+graph, including overlays, to check whether the current lock still satisfies every pin that cannot
+change. It does not look for newer Git tags; that is `update`.
 
 Dependency checkout paths are stable. A pin stays at `deps/NAME` while it is tool-owned, locally
 overridden in place, and returned to tool ownership. Fetch and update refuse to replace an

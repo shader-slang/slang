@@ -25,7 +25,7 @@ SlangResult validateLockedWorkspaceExclusions(
     const LockFile& lock,
     String& outError);
 
-/// Verify that a package manifest matches the identity and exports recorded in the lock.
+/// Verify that a loaded package manifest names the same package as the lock row.
 SlangResult validateLockedPackageManifest(
     const LockedPackage& package,
     const Manifest& manifest,
@@ -47,7 +47,7 @@ SlangResult requireAllLockPackagesTrusted(
     const List<bool>& trusted,
     String& outError);
 
-/// True when two lock rows record the same identity, exports, and declared dependencies.
+/// True when two lock rows record the same selected identity.
 bool lockedPackagesEqual(const LockedPackage& left, const LockedPackage& right);
 
 /// True when two locks select the same set of packages with identical rows.
