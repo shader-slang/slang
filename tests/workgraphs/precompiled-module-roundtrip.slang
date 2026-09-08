@@ -1,4 +1,4 @@
-//TEST:SIMPLE: -o tests/workgraphs/precompiled-module-roundtrip.slang-module -experimental-feature
+//TEST:SIMPLE: -o tests/workgraphs/precompiled-module-roundtrip.slang-module -experimental-feature -warnings-disable module-format-not-frozen
 //TEST:SIMPLE(filecheck=CHK): -target hlsl -stage node -entry dispatchMain -profile lib_6_8 -experimental-feature tests/workgraphs/precompiled-module-roundtrip.slang-module
 import experimental.workgraph;
 

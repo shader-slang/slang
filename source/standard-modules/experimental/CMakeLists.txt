@@ -48,11 +48,14 @@ endif()
 set(SLANG_COMPILER_CORE_MODULE_ARGS -load-core-module ${core_module_archive_without_timestamp})
 set(SLANG_COMPILER_EXTRA_DEPS generate_core_module)
 
+# -warnings-disable 88 silences module-format-not-frozen: this is the compiler's own bundled module
+# built here, not a user-distributed artifact, so the not-frozen warning is just noise. The numeric
+# id lets an older cross-compile slang-bootstrap ignore it rather than error on an unknown name.
 add_custom_command(
     OUTPUT ${workgraph_module_file}
     COMMAND
         ${SLANG_COMPILER} ${SLANG_COMPILER_CORE_MODULE_ARGS} -I ${CMAKE_CURRENT_SOURCE_DIR}
-        workgraph.slang -o ${SLANG_WORKGRAPH_MODULE_FILE_NAME}
+        workgraph.slang -o ${SLANG_WORKGRAPH_MODULE_FILE_NAME} -warnings-disable 88
     DEPENDS
         ${workgraph_copied_files}
         ${SLANG_COMPILER_DEPENDENCY}

@@ -1013,6 +1013,12 @@ SlangResult EndToEndCompileRequest::maybeCreateContainer()
             return res;
         }
 
+        // Emit only for command-line compiles. maybeCreateContainer() is also reached by the
+        // programmatic compile API, and a new sink diagnostic there could regress an API client
+        // that treats warnings as errors or asserts on diagnostic counts.
+        if (m_isCommandLineCompile)
+            getSink()->diagnose(Diagnostics::ModuleFormatNotFrozen{});
+
         // Need to turn into a blob
         List<uint8_t> blobData;
         stream.swapContents(blobData);
