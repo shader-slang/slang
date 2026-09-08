@@ -13,12 +13,27 @@ public interface IDifferentiableNumericShapedType : INumericShapedType, IDiffere
 }
 
 /// Supports a differentiable dot product between values with the same logical shape.
+///
+/// Conforming types provide first-order forward- and backward-mode rules that the generic `dot`
+/// overload uses during automatic differentiation.
 public interface IDifferentiableDotProduct : IDotProduct, IDifferentiableNumericShapedType
 {
-    /// Returns the dot product of this value and `other` and propagates derivatives through both
-    /// operands.
-    [Differentiable]
-    Scalar dotProductWith(This other);
+    __constraint Scalar : IDifferentiable;
+
+    // Slang cannot currently associate custom derivative declarations with an interface
+    // requirement. Keep the JVP and VJP as explicit requirements, and associate them with the
+    // user-facing free-function wrapper instead.
+
+    /// Evaluates the dot product and its forward derivative for `left` and `right`.
+    static DifferentialPair<Scalar> forwardDifferentiateDotProduct(
+        DifferentialPair<This> left,
+        DifferentialPair<This> right);
+
+    /// Propagates `outputDifferential` backward through the dot product to `left` and `right`.
+    static void backwardDifferentiateDotProduct(
+        inout DifferentialPair<This> left,
+        inout DifferentialPair<This> right,
+        Scalar.Differential outputDifferential);
 }
 
 /// Supports differentiable signed arithmetic with division.

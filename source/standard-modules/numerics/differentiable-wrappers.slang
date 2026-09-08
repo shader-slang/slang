@@ -22,11 +22,29 @@ implementing differentiable;
 // of the base contracts.
 
 [__readNone]
-[Differentiable]
 [ForceInline]
+[ForwardDerivative(__numericsForwardDifferentiateDot)]
+[BackwardDerivative(__numericsBackwardDifferentiateDot)]
 public T.Scalar dot<T : IDifferentiableDotProduct>(T left, T right)
 {
     return left.dotProductWith(right);
+}
+
+[__readNone]
+[ForceInline]
+public DifferentialPair<T.Scalar> __numericsForwardDifferentiateDot<
+    T : IDifferentiableDotProduct>(DifferentialPair<T> left, DifferentialPair<T> right)
+{
+    return T.forwardDifferentiateDotProduct(left, right);
+}
+
+[ForceInline]
+public void __numericsBackwardDifferentiateDot<T : IDifferentiableDotProduct>(
+    inout DifferentialPair<T> left,
+    inout DifferentialPair<T> right,
+    T.Scalar.Differential outputDifferential)
+{
+    T.backwardDifferentiateDotProduct(left, right, outputDifferential);
 }
 
 [__readNone]

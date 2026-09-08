@@ -109,8 +109,27 @@ interface __IScalarDifferentiableFloatingPointDotProduct
         }                                                                        \
         SLANG_NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS                         \
         SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS                     \
-        [Differentiable] [ForceInline]                                           \
-        Scalar dotProductWith(This other) { return this.mul(other); }            \
+        [ForceInline]                                                            \
+        static DifferentialPair<TYPE> forwardDifferentiateDotProduct(            \
+            DifferentialPair<TYPE> left, DifferentialPair<TYPE> right)           \
+        {                                                                        \
+            return diffPair(                                                     \
+                left.p.mul(right.p),                                             \
+                left.d.mul(right.p).add(left.p.mul(right.d)));                   \
+        }                                                                        \
+        [ForceInline]                                                            \
+        static void backwardDifferentiateDotProduct(                             \
+            inout DifferentialPair<TYPE> left,                                   \
+            inout DifferentialPair<TYPE> right,                                  \
+            TYPE.Differential outputDifferential)                               \
+        {                                                                        \
+            let leftPrimal = left.p;                                             \
+            let rightPrimal = right.p;                                           \
+            left = diffPair(                                                     \
+                leftPrimal, rightPrimal.mul(outputDifferential));                \
+            right = diffPair(                                                    \
+                rightPrimal, leftPrimal.mul(outputDifferential));                \
+        }                                                                        \
     }                                                                            \
                                                                                  \
     public extension TYPE : IDifferentiableExponentialFunctions                 \
@@ -173,11 +192,21 @@ public extension<
     SLANG_NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS
     SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS
 
-    [Differentiable]
     [ForceInline]
-    Scalar dotProductWith(This other)
+    static DifferentialPair<T> forwardDifferentiateDotProduct(
+        DifferentialPair<This> left,
+        DifferentialPair<This> right)
     {
-        return __differentiableNumericsDot(this, other);
+        return fwd_diff(__differentiableNumericsDot<T, N>)(left, right);
+    }
+
+    [ForceInline]
+    static void backwardDifferentiateDotProduct(
+        inout DifferentialPair<This> left,
+        inout DifferentialPair<This> right,
+        T.Differential outputDifferential)
+    {
+        bwd_diff(__differentiableNumericsDot<T, N>)(left, right, outputDifferential);
     }
 }
 

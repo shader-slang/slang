@@ -1,8 +1,9 @@
 /**
 Differentiable refinements of the experimental numeric interfaces.
 
-@remarks Importing this annex re-exports `slang.numerics`. Its interfaces re-declare only the
-operations for which differentiability is part of the contract.
+@remarks Importing this annex re-exports `slang.numerics`. Its interfaces add differentiable
+requirements or explicit derivative rules only for operations where differentiability is part of
+the contract.
 */
 [ExperimentalModule]
 module differentiable;
