@@ -17,6 +17,15 @@ allowed-tools:
 
 ## Step 1: Trigger Release CI
 
+Fetch `upstream/master` and inspect the user-skills gitlink before starting the preflight:
+
+```bash
+git fetch upstream master
+git ls-tree upstream/master external/slang-user-skills
+```
+
+Confirm that the full commit SHA is the reviewed `slang-user-skills` revision intended for this Slang release.
+
 Manually trigger the Release workflow on the `master` branch from:
 <https://github.com/shader-slang/slang/actions/workflows/release.yml>
 
@@ -33,6 +42,8 @@ gh run list --workflow=release.yml --limit 1 --json status,conclusion,databaseId
 ```
 
 Wait until the run completes successfully before proceeding.
+The release configuration requires the exact `external/slang-user-skills` commit recorded by `master`, and every binary-package job verifies the bundled files and provenance before upload.
+Confirm that the `Verify bundled user skills` steps passed; a missing, modified, or mismatched skills checkout is a release blocker.
 
 ## Step 2: Determine the Version
 
@@ -110,10 +121,12 @@ vYYYY.N
 ## Interactive Workflow
 
 1. Check prerequisites: verify `gh` is installed and has `read:project` scope (`gh auth status`)
-2. Trigger the Release CI on master (`gh workflow run release.yml --ref master`)
-3. Monitor the CI run until it passes (~30 minutes)
-4. Query the project board to determine the current sprint and compute the version number
-5. Run `docs/scripts/release-note.sh` to generate release notes
-6. Create the annotated tag on `upstream/master` with the release notes
-7. Push the tag to `upstream` to trigger release packaging
-8. Verify the release CI was triggered for the new tag
+2. Inspect the `external/slang-user-skills` gitlink on `upstream/master` and confirm it is the intended revision
+3. Trigger the Release CI on master (`gh workflow run release.yml --ref master`)
+4. Monitor the CI run until it passes (~30 minutes), including every `Verify bundled user skills` step
+5. Confirm the verification logs report the intended skills commit for `share/slang/agent-skills/PROVENANCE.json`
+6. Query the project board to determine the current sprint and compute the version number
+7. Run `docs/scripts/release-note.sh` to generate release notes
+8. Create the annotated tag on `upstream/master` with the release notes
+9. Push the tag to `upstream` to trigger release packaging
+10. Verify the release CI was triggered for the new tag

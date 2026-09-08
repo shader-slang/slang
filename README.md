@@ -67,6 +67,8 @@ The Slang project provides a variety of different [documentation](docs/), but mo
 
 For developers writing Slang code, the [Slang Core Module Reference](https://shader-slang.com/stdlib-reference/) provides detailed documentation on Slang's built-in types and functions.
 
+Agent Skills-compatible assistants can use the [Slang user skills](https://github.com/shader-slang/slang-user-skills); Slang release packages include a tested snapshot under `share/slang/agent-skills` for optional, explicit installation.
+
 We also provide a few [examples](examples/) of how to integrate Slang into a rendering application.
 
 These examples use a graphics layer that we include with Slang called "GFX" which is an abstraction library of various graphics APIs (D3D11, D2D12, OpenGL, Vulkan, CUDA, and the CPU) to support cross-platform applications using GPU graphics and compute capabilities.
