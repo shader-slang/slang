@@ -103,6 +103,41 @@ static SlangResult _commitAndTag(const String& repository, const String& tag)
     return _runGitChecked(arguments);
 }
 
+static SlangResult _commitAll(const String& repository, const String& message)
+{
+    List<String> arguments;
+    arguments.add("-C");
+    arguments.add(repository);
+    arguments.add("add");
+    arguments.add(".");
+    SLANG_RETURN_ON_FAIL(_runGitChecked(arguments));
+
+    arguments.clear();
+    arguments.add("-C");
+    arguments.add(repository);
+    _addTestIdentity(arguments);
+    arguments.add("commit");
+    arguments.add("-q");
+    arguments.add("-m");
+    arguments.add(message);
+    return _runGitChecked(arguments);
+}
+
+static SlangResult _forceAnnotatedTag(const String& repository, const String& tag)
+{
+    List<String> arguments;
+    arguments.add("-C");
+    arguments.add(repository);
+    _addTestIdentity(arguments);
+    arguments.add("tag");
+    arguments.add("-a");
+    arguments.add("-f");
+    arguments.add("-m");
+    arguments.add(tag);
+    arguments.add(tag);
+    return _runGitChecked(arguments);
+}
+
 static SlangResult _writeFile(const String& path, const String& contents)
 {
     if (!Path::createDirectoryRecursive(Path::getParentDirectory(path)))
@@ -1512,6 +1547,42 @@ static SlangResult _initRootWithGitNoise(
         SLANG_COUNT_OF(updateArguments),
         updateArguments,
         outError);
+}
+
+SLANG_UNIT_TEST(PackageToolFetchInstallsLockedCommitAfterMovedTag)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    String repository = Path::combine(temp.path, "upstream-noise");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initRootWithGitNoise(temp.path, repository, error)));
+
+    PackageTool::LockFile lockBefore;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockBefore, error)));
+    SLANG_CHECK_ABORT(lockBefore.packages.getCount() == 1);
+    const String lockedCommit = lockBefore.packages[0].commit;
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(repository, "src/noise.slang"), "module noise;\n// retagged\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(repository, "move v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(repository, "v1.0.0")));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(Path::removeNonEmpty(Path::combine(temp.path, "deps/noise"))));
+
+    const char* fetchArguments[] = {"slang-package", "fetch"};
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
+
+    PackageTool::LockFile lockAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockAfter, error)));
+    SLANG_CHECK(lockFilesEqual(lockBefore, lockAfter));
+
+    String headCommit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        getRepositoryHeadCommit(Path::combine(temp.path, "deps/noise"), headCommit, error)));
+    SLANG_CHECK(headCommit == lockedCommit);
 }
 
 SLANG_UNIT_TEST(PackageToolFetchRejectsIllegalGraphBeforeMaterialize)

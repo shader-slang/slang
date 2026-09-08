@@ -239,8 +239,8 @@ version, dependencies, and exports selected for this workspace.
   problems, without inspecting `build/` or contacting remotes. A missing lock or pin is
   `incomplete`; a present graph that fails the source check is `not buildable`. Reportable
   drift does not make status fail.
-- `fetch` subsequently reproduces that lock without consulting newer tags, publisher retractions,
-  or version selection:
+- `fetch` subsequently reproduces that lock. It checks out each recorded `commit` and does not
+  consult newer tags, a tag that has since moved, publisher retractions, or version selection:
 
   ```sh
   slang package fetch
@@ -1163,7 +1163,9 @@ package trees in this workspace.
 ### Fetch ignores retractions but honors root excludes
 
 A publisher retraction is new advice about a release that an existing lock may continue to
-reproduce. A root `workspace.excludes` entry is current committed intent for this workspace, so a
+reproduce. A release tag that later points at a different commit is the same kind of advice:
+fetch still installs the SHA the lock recorded, and the next `update` is what can select the new
+identity. A root `workspace.excludes` entry is current committed intent for this workspace, so a
 lock selecting that version is stale. The asymmetry is intentional: publisher advice does not
 retroactively break reproducibility, while the workspace's own changed policy does.
 
@@ -1391,7 +1393,8 @@ Start with these unit tests when changing a journey:
 
 - Bootstrap and license: `PackageToolInit`, `PackageValidateStructureAndLicense`.
 - Fetch and initial lock: `PackageToolFetchRequiresLock`,
-  `PackageToolDependencyCommandsAndInitialFetch`.
+  `PackageToolDependencyCommandsAndInitialFetch`,
+  `PackageToolFetchInstallsLockedCommitAfterMovedTag`.
 - Update preview, confirmation, and report: `PackageToolUpdateDryRun`,
   `PackageToolUpdateRequiresConfirmation`, `PackageToolUpdateSkipsConfirmationWhenLockIsUnchanged`,
   `PackageGitSkipsAlreadyMaterializedRevision`, `PackageResolveReportFormat`.

@@ -248,8 +248,11 @@ lockfile is the definitive dependency graph and records both Git and path packag
 `slang-workspace.json` currently uses schema version 2. Nested packages' lockfiles are not used for
 that solve. When a lock exists, `slang package fetch` checks that it still satisfies every recorded
 manifest and ensures every direct and transitive Git dependency is at its locked commit under
-`workspace.deps` (`deps/` by default). A clean checkout already at that commit is left untouched;
-missing or out-of-date checkouts are materialized as needed. Path dependencies remain at their
+`workspace.deps` (`deps/` by default). Fetch installs that `commit`; it does not ask whether the
+recorded release tag still points at it. A publisher who later moves `v1.2.0` does not break
+fetch of a lock that already named a SHA. The next `update` is what sees the new tag identity and
+may select it. A clean checkout already at the locked commit is left untouched; missing or
+out-of-date checkouts are materialized as needed. Path dependencies remain at their
 locked relative locations. When dependencies exist
 but a fresh checkout has no lock, fetch performs the initial solve, shows the same selection report
 as update, confirms it, and writes the first lock. Later fetches reproduce that lock without

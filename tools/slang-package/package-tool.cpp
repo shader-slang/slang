@@ -332,21 +332,6 @@ static SlangResult _materialize(
             return SLANG_FAIL;
         }
 
-        SemanticVersion releaseVersion;
-        if (SLANG_SUCCEEDED(parseReleaseTag(package.ref, releaseVersion)))
-        {
-            TagCandidate candidate;
-            SLANG_RETURN_ON_FAIL(resolveReference(package.git, package.ref, candidate, outError));
-            if (candidate.commit != package.commit)
-            {
-                outError =
-                    String(
-                        "Locked release tag no longer identifies the locked commit for package '") +
-                    package.name + "'.";
-                return SLANG_FAIL;
-            }
-        }
-
         String currentCommit;
         if (previousLock)
         {
