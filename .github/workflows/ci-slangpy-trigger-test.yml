@@ -39,7 +39,11 @@ env:
   #
   # Setting this applies to every Slang PR, so keep the window short: land the SlangPy
   # PR right after the Slang one, then set this back to "".
-  SLANGPY_CHERRY_PICK_PR: ""
+  #
+  # Currently cherry-picking: shader-slang/slangpy#1135, needed by #12840, which
+  # retypes the layout parameter of `matrix` from `int` to the `MatrixLayoutMode`
+  # enum. REVERT THIS TO "" AS SOON AS slangpy#1135 HAS MERGED.
+  SLANGPY_CHERRY_PICK_PR: "1135"
 
 jobs:
   filter:
