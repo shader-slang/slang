@@ -1337,11 +1337,13 @@ static SlangResult _fetch(
     return SLANG_OK;
 }
 
-static bool _hasEnabledOverride(const List<LocalPackage>& localPackages)
+static bool _hasEnabledOutOfTreeOverride(
+    const Manifest& manifest,
+    const List<LocalPackage>& localPackages)
 {
     for (const auto& localPackage : localPackages)
     {
-        if (localPackage.enabled)
+        if (localPackage.enabled && !isInPlaceLocalPackage(manifest, localPackage))
             return true;
     }
     return false;
@@ -1382,7 +1384,8 @@ static SlangResult _update(
 
     List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-    const bool ignoredEnabledOverrides = ignoreOverrides && _hasEnabledOverride(localPackages);
+    const bool ignoredEnabledOverrides =
+        ignoreOverrides && _hasEnabledOutOfTreeOverride(manifest, localPackages);
     List<LocalPackage> effectiveLocalPackages;
     _localPackagesForUpdate(manifest, localPackages, ignoreOverrides, effectiveLocalPackages);
     bool useLocalResolver = false;

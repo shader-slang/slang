@@ -941,6 +941,29 @@ SLANG_UNIT_TEST(PackageToolBuildRejectsCleanAndYes)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--yes")) >= 0);
 }
 
+SLANG_UNIT_TEST(PackageToolUneditRejectsConflictingOptions)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    const char* initArguments[] = {"slang-package", "init"};
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+
+    const char* cleanAdoptArguments[] = {"slang-package", "unedit", "noise", "--clean", "--adopt"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(cleanAdoptArguments),
+        cleanAdoptArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("cannot be combined")) >= 0);
+
+    const char* asArguments[] = {"slang-package", "unedit", "noise", "--as", "1.0.0"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(asArguments), asArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("requires --adopt")) >= 0);
+}
+
 SLANG_UNIT_TEST(PackageToolBundleFlags)
 {
     TemporaryDirectory temp;

@@ -1606,6 +1606,29 @@ static SlangResult _initRootWithGitNoise(
         outError);
 }
 
+SLANG_UNIT_TEST(PackageToolReadsLegacyEditsAsOverrides)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    String repository = Path::combine(temp.path, "upstream-noise");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initRootWithGitNoise(temp.path, repository, error)));
+    String workspacePath = Path::combine(temp.path, "slang-workspace.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::writeAllText(workspacePath, "{\"schema_version\":2,\"edits\":{\"noise\":{}}}\n")));
+
+    List<LocalPackage> localPackages;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readProjectLocalPackages(temp.path, localPackages, error)));
+    SLANG_CHECK_ABORT(localPackages.getCount() == 1);
+    SLANG_CHECK(localPackages[0].path == "deps/noise");
+    SLANG_CHECK(localPackages[0].as == "1.0.0");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeProjectLocalPackages(temp.path, localPackages, error)));
+    String workspaceText;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(workspacePath, workspaceText)));
+    SLANG_CHECK(workspaceText.getUnownedSlice().indexOf(UnownedStringSlice("\"edits\"")) < 0);
+    SLANG_CHECK(workspaceText.getUnownedSlice().indexOf(UnownedStringSlice("\"path\"")) >= 0);
+}
+
 SLANG_UNIT_TEST(PackageToolUneditAdoptsCommitPin)
 {
     TemporaryDirectory temp;

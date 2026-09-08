@@ -34,9 +34,11 @@ view:
 - `slang-package-lock.json` is the exact graph selected for the workspace in which you ran
   `update`. The tool writes it; reviewing and committing a root application's lock is recommended
   for reproducibility but not enforced. A dependency's nested lock is not used when your workspace
-  resolves that dependency.
-- `slang-workspace.json` is machine-local state for `edit` and `override`. The tool writes it and
-  `init` adds it to `.gitignore`. Do not commit it.
+  resolves that dependency. Portability is derived: a Git+path row requires local workspace state,
+  while Git-only rows can be fetched elsewhere once their commits are reachable from the remote.
+- `slang-workspace.json` is machine-local override state. The tool writes it and `init` adds it to
+  `.gitignore`. `edit NAME` is shorthand for an override at `{workspace.deps}/NAME`. Do not commit
+  this file.
 
 The **workspace** is the package from which you run the command. It owns the one lock for that
 solve. This is not a multi-member workspace in the Cargo or npm sense: Slang currently has no
@@ -116,7 +118,7 @@ or `slang-workspace.json`.
 
 - `init` creates the manifest, conventional directories, license placeholder, and ignore rules.
 - Bare `validate` is the app sharing gate: closed manifest schema, license, export directories,
-  module declarations, installed toolchain, and a portable lock with no active edits or overrides.
+  module declarations, installed toolchain, and a portable lock with no active overrides.
   A package with no dependencies does not need a lock. `validate NAME` and `validate --all` apply
   the publishable-package rules to locked trees in this workspace.
 - `build` checks that the available graph is legal and buildable, emits the source bundle under
@@ -238,7 +240,7 @@ version, dependencies, and exports selected for this workspace.
   packages and changed local registrations, checks closure-wide buildability, writes
   `slang-package-lock.json`, and regenerates `build/search-paths`.
 - `status` prints one line when the workspace is current. When something is dirty, it lists
-  missing checkouts, dirty or diverged pins, active edits, enabled overrides, and source
+  missing checkouts, dirty or diverged pins, enabled overrides, and source
   problems, without inspecting `build/` or contacting remotes. A missing lock or pin is
   `incomplete`; a present graph that fails the source check is `not buildable`. Reportable
   drift does not make status fail.
@@ -360,13 +362,13 @@ import color.encoding;
 
 ## Journey 4: work on a consumed package locally
 
-There are two workflows because “edit these source files” and “try a different package graph” are
-different operations.
+Edits and overrides use one mechanism. `edit` is the convenient in-place form; `override add`
+also supports a different local directory.
 
 ### Goal
 
-Choose between patching source at the published identity and trialing an unpublished manifest or
-version.
+Patch a dependency in place, trial an unpublished local graph, then either discard the overlay or
+adopt a committed fix as manifest intent.
 
 ### Human does
 
@@ -378,9 +380,10 @@ slang package edit color-encoding
 # edit deps/color-encoding/src/...
 ```
 
-The checkout stays at `deps/color-encoding`; the lock keeps its published Git pin. Fetch and update
-do not replace it while the edit is registered. If the selected pin would move that checkout, the
-command fails before applying any other checkout changes.
+The checkout stays at `deps/color-encoding`. `edit` registers an enabled override there, using the
+version from the current lock. Fetch and update do not replace that user-owned tree. The next
+`update` reads its working-tree manifest and writes a Git+path lock row, so changed exports and
+dependencies participate in the full solve.
 
 `edit` also accepts a checkout that already has local changes. That is the recommended recovery
 when you modified `deps/color-encoding` first and only then discovered that fetch and update
@@ -393,16 +396,24 @@ When you are ready to hand the checkout back:
 slang package unedit color-encoding
 ```
 
-Default `unedit` verifies that the working tree has no uncommitted files or stashes, then removes
-the edit registration. It accepts a committed `HEAD` that differs from the lock, which lets you
-commit work before returning the checkout to tool ownership. To discard all local state instead,
-run `slang package unedit color-encoding --clean`; it restores the locked commit and asks for
-confirmation unless you also pass `--yes`.
+Default `unedit` removes the registration only when the lock is already a Git pin, the tree is
+clean, and `HEAD` is that exact commit. To discard local state, use `--clean`; it restores the
+locked commit and asks for confirmation unless you also pass `--yes`. If update has already
+written a local-path row, disable the override and update the published graph before unediting.
 
-To trial an unpublished manifest or version, including the checkout you are already
-editing, point the package at that directory with an exact `as` version. If `NAME` is
-already edited, `PATH` must be its workspace checkout (`deps/NAME` by default); that
-promotes the edit in place and leaves local files untouched:
+To keep a committed fix, make the pin authoritative in the manifest:
+
+```sh
+git -C deps/color-encoding commit -am "Fix conversion"
+slang package unedit color-encoding --adopt --as 1.1.1
+```
+
+`--adopt` writes the current `HEAD` as the direct Git dependency's `ref`, writes its exact solver
+identity as `as`, converts the lock row back to a Git pin, and removes the overlay. It infers `as`
+when exactly one `vMAJOR.MINOR.PATCH` tag points at `HEAD`; otherwise `--as VERSION` is required.
+The commit or tag must be reachable from the configured remote before another machine can fetch it.
+
+To assign another effective version to the in-place tree, re-add that same override with `as`:
 
 ```sh
 slang package override add color-encoding deps/color-encoding 1.1.0
@@ -410,16 +421,15 @@ slang package update --dry-run
 slang package update
 ```
 
-A sibling clone is the same command with a different path, after `unedit` if that name
-was still an edit:
+A sibling clone is the same mechanism with a different path. Remove the in-place registration
+first because one package name cannot have two local trees:
 
 ```sh
 slang package override add color-encoding ../color-encoding 1.1.0
 ```
 
 Enabled overrides automatically participate in the **entire graph** solve as the only candidate
-for their package names; packages without enabled overrides still come from Git. Registered edits
-remain published Git candidates, so their changed manifests do not enter the solve.
+for their package names; packages without enabled overrides still come from Git.
 
 If the local `color-encoding` manifest adds `color-math`, the full-graph local solve adds
 `color-math` and its transitive requirements to the root lock. Every incoming constraint must
@@ -443,13 +453,11 @@ same local tree without re-entering its configuration.
 
 ### Tool does
 
-- For an edit, writes a registration to gitignored `slang-workspace.json`, protects the checkout
-  from replacement, and keeps the published manifest and Git identity in the solve. Changing the
-  edited manifest's dependencies or exports does **not** adopt that graph. A fetch or update whose
-  selected pin would move that checkout fails before any checkout is changed.
-- For an override, records the name, path, and exact effective version in
-  `slang-workspace.json`. It does not copy or modify the supplied directory. `override add`
-  on an edited `{workspace.deps}/NAME` checkout replaces the edit registration in place.
+- Records every local substitution under `overrides` in `slang-workspace.json`. `edit NAME`
+  creates the special case whose path is `{workspace.deps}/NAME`; there is no second edit
+  representation.
+- Does not copy or modify the supplied directory. Re-adding the in-place path updates that same
+  registration's effective version.
 - Local registration changes regenerate `build/search-paths` when the current lock can represent
   the newly active source. An override's locked export paths therefore become compiler inputs
   immediately, mapped to the local directory. If its manifest declares different exports, run
@@ -462,12 +470,10 @@ same local tree without re-entering its configuration.
 
 ### Current gaps and pitfalls
 
-- An edit is not a way to trial manifest changes. Promote it with
-  `override add NAME deps/NAME AS`, or `unedit` and override a different path, or publish a new
-  tag and run normal `update`.
-- If an edit is registered while enabled overrides participate in the solve, its checkout HEAD must
-  match a published release tag. An unpublished edit commit makes that solve fail; use an override
-  when the version or manifest identity differs.
+- `unedit --adopt` applies only to a direct Git dependency because that is the manifest edge it can
+  pin. A transitive fix must be exposed as direct intent or published upstream.
+- An untagged adopted commit requires explicit `--as`; Git object identity does not determine a
+  semantic version.
 - Overrides are path-only; there is no user-global Git-to-Git remapping policy.
 - `slang-workspace.json` must not be committed. A team-wide source relationship belongs in
   `slang-package.json` as a path or Git dependency.
@@ -740,7 +746,7 @@ override. Fetch would clone that git onto `deps/color-math`, a second copy of th
 already editing.
 
 `deps/color-math` is gitignored. Use it only as a laptop override (`override add color-math
-deps/color-math 1.0.0`, including promoting an in-place edit). A sidecar there is not in the
+deps/color-math 1.0.0`, the same representation created by `edit`). A sidecar there is not in the
 application repository until that inner git has a remote.
 
 `slang package validate color-math` and root `build` use this workspace's lock pins. They do not
@@ -1079,12 +1085,11 @@ Non-overridden and disabled packages still resolve from Git. The resulting lock 
 paths and requires the same `slang-workspace.json`.
 
 **Use `--ignore-overrides` when:** this command should write the published Git graph without
-disabling registrations. Edits stay active and those checkouts are not replaced, even if the
-published graph no longer contains that package. The next plain `update` adopts enabled overrides
-again and reattaches parked edits.
+disabling registrations. In-place overrides created by `edit` stay active because they own their
+`deps/NAME` checkouts; out-of-tree overrides are ignored for this solve. An in-place override that
+drops out of the published graph remains parked, and the next plain update can reattach it.
 
-**They do not mean:** “update only this package,” “use every nearby repository,” or “adopt the
-changed manifest from an in-place edit.” Edits retain published Git candidates.
+**They do not mean:** “update only this package” or “use every nearby repository.”
 
 Use `override enable` and `override disable` for persistent per-package switches.
 
@@ -1096,8 +1101,8 @@ extra commits, or stashes that you intentionally want to discard.
 **It changes:** dirty-checkout protection for replacement. It is destructive authorization, not
 dependency selection.
 
-**It does not change:** an explicitly registered edit or override into a tool-owned checkout.
-Local package registrations remain protected by their own workflow.
+**It does not change:** an enabled local override. Local package registrations remain protected by
+their own workflow.
 
 **Combination:** `update --dry-run --clean` is rejected. Fetch may combine `--clean` with
 `--skip-validate`. When fetch would actually discard local checkout state, it lists every affected
@@ -1136,6 +1141,18 @@ row whose version the local tree represents. Supply it for a newly introduced na
 local tree represents another version. The value must satisfy every incoming constraint when you
 run `update`.
 
+### `unedit NAME --clean` and `unedit NAME --adopt [--as VERSION]`
+
+Use plain `unedit` only when the checkout is clean at the Git commit in the lock. `--clean`
+authorizes restoring that commit and discarding local files, commits, and stashes. Both reject a
+Git+path lock row; disable the override and update first when the local graph was already solved.
+
+Use `--adopt` to keep a committed fix. It changes a direct Git dependency in
+`slang-package.json` to `ref` plus `as`, writes `HEAD` as the lock commit, and removes the local
+override. A unique semantic-version tag at `HEAD` supplies both `ref` and `as`; an untagged commit
+uses its full object ID as `ref` and requires `--as VERSION`. The local manifest must still agree
+with the lock. Both destructive clean and adopt require confirmation; pass `--yes` for automation.
+
 ### `--experimental`
 
 **Use it when:** you need `.slang-module` binaries or host executables. Journey 8 covers both
@@ -1153,8 +1170,8 @@ subcommand. Every other journey in this chapter is unaffected by it.
 Binary run and host build behavior appear in `slang package --experimental help`. `init`,
 `status`, `tree`, and `edit` accept no additional arguments; `validate` accepts an optional package
 name or `--all`; `build` accepts only `--skip-validate` (not `--clean` or `--yes`); `unedit`
-accepts `--clean` and `--yes`, and `docs` accepts `--print`. `test` is present but returns a
-not-implemented error.
+accepts `--clean`, or `--adopt` with optional `--as`, plus `--yes`; and `docs` accepts `--print`.
+`test` is present but returns a not-implemented error.
 
 ## Gaps, tensions, and intentional asymmetries
 
@@ -1333,32 +1350,30 @@ them or update this chapter and its regression tests in the same change.
 
 ### Local-development contract
 
-- `edit` keeps the published Git identity and prevents replacement of `deps/NAME`. If fetch or
-  update would need to move that checkout to a newly selected pin, the command fails before
-  applying any checkout changes.
+- `edit` creates an enabled override at `{workspace.deps}/NAME`, using the locked version, and
+  prevents replacement of that checkout.
 - `edit` accepts a checkout that already holds local changes, and requires only that the directory
   is still the Git repository the lock names. Refusing a dirty tree would withhold the one command
   that preserves the work in exactly the state that needs it.
-- Default `unedit` requires no uncommitted files or stashes but permits a different committed
-  `HEAD`; `unedit --clean` restores the locked commit before removing the registration.
-- An edited manifest does not enter the solve.
-- `override` records a machine-local path and exact effective version. `override add` on an
-  edited `{workspace.deps}/NAME` checkout promotes that edit in place; a different path still
-  requires `unedit` first.
+- Default `unedit` requires a Git-only lock row, no uncommitted files or stashes, and `HEAD` equal
+  to the locked commit; `unedit --clean` restores that commit before removing the registration.
+- `unedit --adopt` pins a direct Git dependency and the lock to committed `HEAD`, requiring
+  explicit `--as` unless one semantic-version tag identifies it.
+- An in-place override's working-tree manifest enters the solve.
+- `override` records a machine-local path and exact effective version. Re-adding
+  `{workspace.deps}/NAME` updates the same registration; a different path requires `unedit` first.
 - Enabled overrides participate in plain whole-graph update; disabled overrides retain
   configuration while published resolution is active.
-- `update --ignore-overrides` solves from Git for this command only. It does not disable
-  registrations or replace edited checkouts. An edited package that drops out of the published
-  graph stays registered and on disk (a parked edit) so a later plain update can restore it.
-- A registered edit used during a solve that includes enabled overrides must have HEAD at a
-  published release tag.
+- `update --ignore-overrides` ignores out-of-tree overrides for this command only. In-place
+  overrides remain active so it cannot replace a checkout registered through `edit`. An in-place
+  package that drops out of the graph stays registered and on disk so a later update can restore it.
 - A local-path lock fails on another machine without matching `slang-workspace.json`.
 - Disable an override and update to restore published selection before removing it.
 - `validate NAME` certifies a locked library tree in this workspace, including an enabled override.
   Bare `validate` still rejects the app while any edit or override is enabled.
 - Local-registration changes regenerate `build/search-paths` when the current lock can represent
   the newly active source. Disabling a lock-adopted override requires update first.
-- Dirty, unregistered Git checkouts are not replaced without `--clean`; registered edits remain
+- Dirty, unregistered Git checkouts are not replaced without `--clean`; enabled overrides remain
   protected. Fetch and update check every checkout the current lock owns before they do anything
   else, so update stops before resolving rather than after reporting a plan it cannot apply. The
   refusal names each checkout and its drift using the same facts `status` prints, and offers the
@@ -1428,6 +1443,9 @@ Start with these unit tests when changing a journey:
   `PackageToolUpdateRejectsBundleCaseConflict`, `PackageValidateRejectsFlattenedModuleAlias`.
 - Local overrides and enable state: `PackageToolLocalOverrideUpdatesDefinitiveLock`,
   `PackageToolUpdateIgnoresOverrides`, `PackageToolIgnoreOverridesParksEditedDependency`,
+  `PackageToolEditAdoptsLocalTree`, `PackageToolEditIsInPlaceOverride`,
+  `PackageToolUneditAdoptsCommitPin`, `PackageToolUneditAdoptsVersionTag`,
+  `PackageToolUneditRejectsConflictingOptions`, `PackageToolReadsLegacyEditsAsOverrides`,
   `PackageLocalRegistryJSON`.
 - Path dependencies: `PackageToolPathDependencies`,
   `PackageToolFetchRejectsPathLockForGitDependency`, `PackageToolRejectsPathIntoSlangState`,

@@ -189,7 +189,8 @@ Each dependency entry has one of four shapes:
 
 - `git` plus `version` selects the highest compatible `vMAJOR.MINOR.PATCH` release tag.
 - `path` plus `as` uses one relative tree as the exact semantic version named by `as`.
-- `git`, `ref`, and `as` pins an opaque branch or tag and uses `as` as its exact solver version.
+- `git`, `ref`, and `as` pins an opaque branch, tag, or full commit ID and uses `as` as its exact
+  solver version.
 - `git`, `version`, `ref`, and `as` adds a compatibility assertion: `as` must satisfy `version`, or
   manifest validation fails.
 
@@ -198,8 +199,8 @@ Each dependency entry has one of four shapes:
 or a single exact version. For example, `>=1.2.0 !=1.3.0` skips 1.3.0, and
 `>=1.0.0 <1.3.0 || >=1.3.1 <2.0.0` accepts either interval. Dependents still unify one version per
 package name: every incoming constraint must match that version. Both `version` and `as` omit the
-release tag's `v` prefix. `ref` is normally a branch or tag; the lock, rather than the
-manifest, records the exact commit.
+release tag's `v` prefix. `ref` is normally a branch or tag, but may be a full commit ID; the lock
+always records the exact commit.
 
 A dependency `path` must be relative to the manifest that declares it and must be paired with an
 exact `as` version. The target directory must contain its own `slang-package.json`, and its package
@@ -266,8 +267,9 @@ range-selected release uses its `vMAJOR.MINOR.PATCH` tag as the ref. A path row 
 effective `as` version as `version`. A local-override row records its original Git location, local
 path, and effective version.
 
-Dependency checkout paths are stable. A pin stays at `deps/NAME` while it is tool-owned, edited,
-and returned to tool ownership. Fetch and update refuse to replace an unregistered checkout with
+Dependency checkout paths are stable. A pin stays at `deps/NAME` while it is tool-owned, locally
+overridden in place, and returned to tool ownership. Fetch and update refuse to replace an
+unregistered checkout with
 changed files, extra commits, or stashes. Pass `--clean` explicitly to permit replacement.
 
 That refusal happens first, before any other work: both commands inspect every checkout the
@@ -278,8 +280,8 @@ that checkout, or re-run with `--clean`.
 
 Run `slang package update` deliberately when manifest constraints or upstream releases change.
 `slang package update --dry-run` prints the selected graph (what moved, what stayed, and why)
-without writing the lock or replacing checkouts. `--ignore-overrides` solves from Git even when
-overrides are enabled; it does not change `slang-workspace.json` or replace edited checkouts.
+without writing the lock or replacing checkouts. `--ignore-overrides` ignores out-of-tree
+overrides for that solve; it does not change `slang-workspace.json` or replace in-place overrides.
 `--minimal` keeps one-line package changes and the summary count. The installed Slang
 toolchain is omitted unless its constraint fails. Resolver Git clones
 under `.slang/cache/` may still be populated so the tool can inspect available tags. A real update
@@ -308,25 +310,25 @@ Package validation has three layers:
   selections, materialized manifests, and toolchain constraints. Commands never skip this layer.
 - A **buildable workspace** additionally requires every export in the materialized closure to
   exist, every source file to use the required `module` or `implementing` declaration, and every
-  primary import path to be unique across the graph. Local edits, overrides, and escaping path
+  primary import path to be unique across the graph. Local overrides and escaping path
   dependencies remain valid build inputs.
 - A **publishable package** is one package whose source tree is buildable, whose license files are
   present and no longer contain the generated placeholder, and whose path dependencies stay
   inside that package.
 
 Bare `slang package validate` is the **app** sharing check. It applies the publishable-package
-rules to the workspace package, rejects active edits or overrides and a lock that requires local
+rules to the workspace package, rejects active overrides and a lock that requires local
 override state, and checks that the materialized lock graph is legal. It does not repeat license
 or source-layout checks for unchanged transitive dependencies.
 
 `slang package validate NAME` is the **library** sharing check in this workspace: the same
-publishable-package rules on that locked tree (an edit, enabled override, path lock row, or
+publishable-package rules on that locked tree (an enabled override, path lock row, or
 `deps/NAME`), with Git and path edges checked against this workspace lock rather than a nested
 lock under `NAME`. `slang package validate --all` runs that library check on every locked
 package's tree. Neither named form materializes packages or walks the legal graph again.
 
 `build` requires a legal, buildable workspace. It deliberately permits the generated license
-placeholder, edits, overrides, and local path dependencies because those do not prevent
+placeholder, overrides, and local path dependencies because those do not prevent
 compilation. If a tool-owned Git checkout is missing, or if there is no lock and the manifest
 has dependencies, build runs `fetch` first (without `--clean`). A missing lock makes fetch run
 `update --yes` so a first clone can build without a prompt. An existing lock is never rewritten.
@@ -385,27 +387,29 @@ version can be parsed. It adds `.slang/`, `deps/`, `build/`, and `slang-workspac
 source remains visible under `deps/`; generated files go under `build/`.
 
 `slang package edit NAME` marks the existing `{workspace.deps}/NAME` checkout (by default
-`deps/NAME`) as editable without moving it. The Git pin remains in the lock; gitignored
-`slang-workspace.json` records that the package tool no longer owns the working tree. Fetch and
-update do not modify an edited checkout. If the selected Git pin for that package would change,
-they fail before applying any checkout changes so other dependencies are not moved either. The
-checkout may already have local changes when `edit` runs; it only has to still be the Git
-repository the lock names. Use
-`slang package unedit NAME` after committing local changes to return a clean checkout to
-package-tool ownership. The checkout may be at a different commit from the lock; `unedit` refuses
-only while it has uncommitted files or stashes. `unedit NAME --clean` instead discards all local
-state and restores the locked commit. Like other destructive clean operations, it asks for
-confirmation unless `--yes` is passed.
+`deps/NAME`) as editable without moving it. Under the covers this is an enabled override at that
+path, using the current locked version. Gitignored `slang-workspace.json` records that the package
+tool no longer owns the tree. Fetch and update do not replace it, and update reads its working-tree
+manifest and writes a Git+path lock row. The checkout may already have local changes when `edit`
+runs; it only has to still be the Git repository the lock names.
+
+Plain `unedit NAME` requires a Git-only lock row and a clean checkout at that locked commit.
+`unedit NAME --clean` discards local state and restores the locked commit. Use
+`unedit NAME --adopt [--as VERSION]` instead to pin a committed `HEAD` in the direct dependency's
+manifest and lock. A unique `vMAJOR.MINOR.PATCH` tag at `HEAD` supplies the version automatically;
+an untagged commit requires `--as`. Clean and adopt ask for confirmation unless `--yes` is passed.
 
 For example, the generated local-state file may contain:
 
 ```json
 {
   "schema_version": 2,
-  "edits": {
-    "noise": {}
-  },
   "overrides": {
+    "noise": {
+      "path": "deps/noise",
+      "as": "1.4.0",
+      "enabled": true
+    },
     "shared": {
       "path": "../shared",
       "as": "2.3.0",
@@ -420,19 +424,19 @@ Use the package commands to change this file; its schema is tool-owned and may e
 `slang package override add NAME PATH [AS]` uses an existing local package directory instead. `AS`
 is an exact semantic version for solver compatibility. When it is omitted, the command uses the
 version in the package's current lock row. If `NAME` is already edited and `PATH` is that
-workspace checkout, the command promotes the edit in place. `override enable`, `override disable`,
-`override remove`, and `override list` retain or inspect the same registration. A disabled override
+workspace checkout, the command updates the same in-place registration. `override enable`,
+`override disable`, `override remove`, and `override list` retain or inspect the same registration.
+A disabled override
 keeps its path and version but plain update selects published Git. An override does not copy or
 modify the supplied directory.
 
-A registered local manifest must agree with the lock. An in-place edit keeps the published Git pin
-in the lock, so changing its exports or dependencies requires promoting that checkout with
-`override add NAME deps/NAME AS`, or publishing a new release tag and running normal
-`slang package update`. Enabled overrides automatically participate in plain
+A registered local manifest must agree with the lock. Enabled overrides, including the in-place
+form created by `edit`, automatically participate in plain
 `slang package update`. `update --ignore-overrides` writes the published Git graph for this command
-only; the registrations stay enabled for the next plain update. An edited checkout that is absent
-from that published graph stays on disk and stays registered (a parked edit) so a later plain
-update can restore it without losing the work. An override records both its original
+only for out-of-tree overrides; in-place overrides remain active so the command cannot replace
+their user-owned checkouts. An in-place checkout that is absent from that graph stays on disk and
+registered so a later plain update can restore it without losing work. An override records its
+original
 Git location and its effective path and requires the matching registration in
 `slang-workspace.json`; it therefore fails explicitly on another machine or in CI. The override's
 effective version must satisfy every incoming constraint, and all of its transitive dependencies

@@ -70,8 +70,9 @@ less slang-package-lock.json
   and optional root-only `workspace` settings (`deps`, `build`, `excludes`).
 - `slang-package-lock.json` is the exact graph this workspace selected. `fetch` reproduces it
   without solving again.
-- `slang-workspace.json` is gitignored machine-local state for `edit` and `override`. It should
-  not be in the clone. If it is missing, that is correct for CI and for a clean checkout.
+- `slang-workspace.json` is gitignored machine-local override state. `edit NAME` creates an
+  override at `deps/NAME`; other overrides may point elsewhere. The file should not be in the
+  clone. If it is missing, that is correct for CI and for a clean checkout.
 
 `build` is a sibling of `workspace` in the manifest. `workspace.build` names the output directory;
 `build.host` configures native executables. A dependency may declare `build.host`; only the package
@@ -106,8 +107,8 @@ Fetch and update never discard local work as a side effect. Both inspect the che
 lock owns before doing anything else, and stop with an error naming each one that holds local
 state: uncommitted files, stashes, a different `HEAD`, a different origin, or a directory that is
 no longer a Git checkout. Update stops there before it even resolves the graph, so it reports no
-plan and rewrites no lock. Registered edits and overrides are exempt because those trees are
-yours and are never replaced. The three ways forward are to commit or discard the changes, run
+plan and rewrites no lock. Enabled overrides are exempt because those trees are yours and are
+never replaced. The three ways forward are to commit or discard the changes, run
 `slang package edit NAME` to keep working in that checkout, or re-run with `--clean` to discard
 the local state and restore the locked commit.
 
@@ -234,26 +235,26 @@ documentation should change. `slang package test` is reserved and not implemente
 
 ## Develop against a local tree
 
-Two local mechanisms, both recorded in gitignored `slang-workspace.json`:
+Both commands use overrides recorded in gitignored `slang-workspace.json`.
 
-`slang package edit NAME` keeps the published Git pin in the lock and stops treating
-`deps/NAME` as replaceable tool-owned state. Fetch and update will not overwrite that checkout.
-If a resolve would select a different commit for it, they stop with an error before changing any
-checkout. The checkout may already contain local changes when you run `edit`: adopting work you
-have already started is the point of the command, and it is what `status` recommends when it
-reports a dirty checkout. Changing its exports or dependencies still requires a new published tag
-and a normal `update` after `unedit`, or an override if the local tree should participate in
-resolution.
-Default `unedit` accepts a different committed `HEAD`, but refuses while the tree has uncommitted
-files or stashes so work cannot be forgotten accidentally. `unedit NAME --clean` discards all
-local state and restores the locked commit; pass `--yes` when confirmation cannot be interactive.
+`slang package edit NAME` registers `deps/NAME` as an enabled in-place override at the version in
+the current lock. The checkout may already contain local changes: preserving work you have already
+started is the point of the command. Fetch and update will not overwrite it. A plain update reads
+its working-tree manifest, so changed exports and dependencies enter the solve and the resulting
+lock records both the Git identity and local path.
 
-`slang package override add NAME PATH [AS]` points the package at another directory you already
-have. If `NAME` is already edited and `PATH` is that checkout (`deps/NAME` by default), the
-command promotes the edit in place so the local manifest can enter the next update without
-moving files. Its effective version must satisfy every incoming dependency constraint. Omit `AS`
-to retain the version from the current lock, or provide it when the local tree represents a
-different version. An enabled override's current manifest participates in every plain update:
+Plain `unedit` succeeds only when the lock is a Git pin and the checkout is clean at that exact
+commit. `unedit NAME --clean` discards local state and restores that commit; pass `--yes` when
+confirmation cannot be interactive. To keep a committed fix, use
+`unedit NAME --adopt [--as VERSION]`: this pins the direct dependency in the manifest and writes a
+Git-only lock at `HEAD`. A unique `vMAJOR.MINOR.PATCH` tag at `HEAD` supplies the version;
+otherwise `--as` is required.
+
+`slang package override add NAME PATH [AS]` points the package at a directory you already have.
+`PATH=deps/NAME` updates the same in-place registration created by `edit`; another path creates an
+out-of-tree override. Its effective version must satisfy every incoming dependency constraint.
+Omit `AS` to retain the version from the current lock, or provide it when the local tree represents
+a different version. An enabled override's current manifest participates in every plain update:
 
 ```sh
 slang package update
@@ -262,16 +263,16 @@ slang package update
 Use `override disable NAME` to retain its path and version while selecting the published graph,
 then `override enable NAME` to switch back. `override list` shows both states.
 `update --ignore-overrides` solves from Git for this command only, without disabling the
-registrations. Edits stay in place and those checkouts are not replaced, including edited packages
-that drop out of the published graph (parked edits). A later plain update restores them. A dry run
+registrations. In-place overrides stay active so those checkouts are not replaced, including
+packages that drop out of the published graph. A later plain update restores them. A dry run
 prints the lock diff without writing it. The resulting lock records the
 local path plus the original Git identity, so another machine or CI fails unless it has the same
 `slang-workspace.json`. Disable the override and run `update` to restore a portable Git pin before
 you remove the registration or commit.
 
 `slang package validate NAME` checks that package's tree against this workspace lock, so
-you can certify a library after promoting an in-place override before a remote tag exists. Bare
-`validate` still rejects the workspace while any edit or override is enabled.
+you can certify a library using an in-place override before a remote tag exists. Bare `validate`
+still rejects the workspace while any override is enabled.
 
 Do not commit `slang-workspace.json`. Path dependencies in `slang-package.json` are in-package
 vendoring, not extract. Overrides are the laptop way to redirect one identity at a local tree.
