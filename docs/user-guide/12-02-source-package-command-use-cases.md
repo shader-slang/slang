@@ -1444,7 +1444,10 @@ Start with these unit tests when changing a journey:
 - Local overrides and enable state: `PackageToolLocalOverrideUpdatesDefinitiveLock`,
   `PackageToolUpdateIgnoresOverrides`, `PackageToolIgnoreOverridesParksEditedDependency`,
   `PackageToolEditAdoptsLocalTree`, `PackageToolEditIsInPlaceOverride`,
-  `PackageToolUneditAdoptsCommitPin`, `PackageToolUneditAdoptsVersionTag`,
+  `PackageToolIgnoreOverridesKeepsInPlaceOverride`,
+  `PackageToolDisabledInPlaceOverrideProtectsDirtyTree`,
+  `PackageToolUneditAdoptsCommitPin`, `PackageToolUneditAdoptRejectsManifestDrift`,
+  `PackageToolUneditAdoptsVersionTag`,
   `PackageToolUneditRejectsConflictingOptions`, `PackageToolReadsLegacyEditsAsOverrides`,
   `PackageLocalRegistryJSON`.
 - Path dependencies: `PackageToolPathDependencies`,

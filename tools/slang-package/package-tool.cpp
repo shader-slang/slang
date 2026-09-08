@@ -1848,8 +1848,15 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
 
     for (const auto& package : localPackages)
     {
-        if (package.enabled && isInPlaceLocalPackage(manifest, package))
-            addFact(package.name + ": edited");
+        if (isInPlaceLocalPackage(manifest, package))
+        {
+            if (package.enabled)
+                addFact(package.name + ": edited");
+            else
+                addFact(
+                    package.name + ": in-place override disabled",
+                    String("slang package override enable ") + package.name);
+        }
         else if (package.enabled)
             addFact(package.name + ": override at " + package.path);
     }

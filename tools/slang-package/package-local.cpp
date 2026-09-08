@@ -3,6 +3,7 @@
 #include "package-local.h"
 
 #include "core/slang-io.h"
+#include "package-git.h"
 #include "package-json.h"
 #include "package-lock.h"
 
@@ -64,6 +65,20 @@ SlangResult readProjectLocalPackages(
             Index lockedIndex = findLockedPackageIndex(lock, package.name);
             if (lockedIndex >= 0)
                 package.as = lock.packages[lockedIndex].version;
+            else
+            {
+                String packageRoot = Path::combine(projectRoot, package.path);
+                String tag;
+                SemanticVersion version;
+                bool foundTag = false;
+                String tagError;
+                if (SLANG_SUCCEEDED(
+                        findVersionTagAtHead(packageRoot, tag, version, foundTag, tagError)) &&
+                    foundTag)
+                {
+                    package.as = formatExactVersion(version);
+                }
+            }
         }
     }
     return SLANG_OK;
