@@ -13,7 +13,7 @@
 // Paired with `lower-optional-half3.slang`, this isolates the
 // `Optional<T>` lowering from the half/vector axes.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int x;
 uniform int sel;

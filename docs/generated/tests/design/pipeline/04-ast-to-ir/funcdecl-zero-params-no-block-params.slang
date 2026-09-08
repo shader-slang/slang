@@ -15,7 +15,7 @@
 // rows. The doc's row "FuncDecl -> IRFunc containing one or more
 // IRBlocks" still holds.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

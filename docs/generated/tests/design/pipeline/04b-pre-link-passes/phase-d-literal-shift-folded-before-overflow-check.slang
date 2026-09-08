@@ -17,7 +17,7 @@
 // a stored constant zero and no shift instruction remains anywhere in the
 // dump, and no overflow warning was reported.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 

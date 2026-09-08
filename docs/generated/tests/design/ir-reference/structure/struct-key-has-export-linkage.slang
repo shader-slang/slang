@@ -15,7 +15,7 @@
 // decoration to sit directly above the `let %name : _ = key` line it belongs
 // to, and the mangled name to end in the field's own name.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 uniform int seed;

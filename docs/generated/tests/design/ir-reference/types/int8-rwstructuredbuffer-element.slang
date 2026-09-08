@@ -13,7 +13,7 @@
 // its element-type operand. A `RWStructuredBuffer<int8_t>` shows
 // `RWStructuredBuffer(Int8, ...)` as the global_param's IR type.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int8_t> buf;
 

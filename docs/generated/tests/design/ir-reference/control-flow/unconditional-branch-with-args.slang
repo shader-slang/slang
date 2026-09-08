@@ -13,7 +13,7 @@
 // post-switch merge block carries the per-arm value as an argument
 // operand; the merge block receives it as a block-level param.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int sel;
 uniform RWStructuredBuffer<int> buf;

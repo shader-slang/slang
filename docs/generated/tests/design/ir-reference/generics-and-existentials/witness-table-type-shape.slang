@@ -12,7 +12,7 @@
 // satisfies rides on the result `witness_table_t(...)` type while the
 // conforming concrete type is the inst's own operand, so the CHECK pins one
 // line carrying interface-in-type and concrete-type-as-operand together.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

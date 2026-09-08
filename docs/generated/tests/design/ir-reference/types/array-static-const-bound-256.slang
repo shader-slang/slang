@@ -14,7 +14,7 @@
 // extent is folded to the integer literal `256 : Int` on the `Array`
 // opcode.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 static const int N = 256;
 struct Big { float data[N]; }

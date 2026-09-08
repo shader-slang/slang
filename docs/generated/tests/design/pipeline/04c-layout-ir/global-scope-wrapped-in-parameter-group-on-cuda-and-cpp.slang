@@ -15,9 +15,9 @@
 // C++, where global uniforms are gathered into a generated parameter block.
 // The SPV prefix pins the unwrapped shape, CUDA/CPP the wrapped one.
 
-//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=CUDA):-target cuda -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=CPP):-target cpp -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 
@@ -27,14 +27,14 @@ void main(uint3 tid : SV_DispatchThreadID)
     buf[0] = int(tid.x);
 }
 
-// SPV-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// SPV-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // SPV: {{^}}varLayout(
 // SPV-NEXT: structTypeLayout(
 
-// CUDA-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// CUDA-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // CUDA: {{^}}varLayout(
 // CUDA-NEXT: parameterGroupTypeLayout(
 
-// CPP-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// CPP-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // CPP: {{^}}varLayout(
 // CPP-NEXT: parameterGroupTypeLayout(

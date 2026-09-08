@@ -562,6 +562,30 @@ static void applyMacroSubstitution(String filePath, TestDetails& details)
     }
 }
 
+// Normalizes and validates the output-path arguments of a parsed test directive, reporting any
+// rejection (an absolute `-o` / `-separate-debug-info-output` path) as a run error against
+// `filePath` so the test fails rather than silently running with an unportable path.
+static SlangResult _normalizeTestOutputPaths(
+    const String& filePath,
+    List<String>& args,
+    TestContext* context)
+{
+    String error;
+    const SlangResult res = normalizeTestOutputPathsForTestFile(filePath, args, error);
+    if (SLANG_FAILED(res))
+    {
+        // Every path that reaches directive parsing installs a reporter first, so a missing one is
+        // a programming error rather than a case to handle.
+        SLANG_ASSERT(context && context->getTestReporter());
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "Invalid test directive in file '%s': %s",
+            filePath.getBuffer(),
+            error.getBuffer());
+    }
+    return res;
+}
+
 // Try to read command-line options from the test file itself
 static SlangResult _gatherTestsForFile(
     TestCategorySet* categorySet,
@@ -742,7 +766,8 @@ static SlangResult _gatherTestsForFile(
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
-            normalizeTestOutputPathsForTestFile(filePath, testDetails.options.args);
+            SLANG_RETURN_ON_FAIL(
+                _normalizeTestOutputPaths(filePath, testDetails.options.args, context));
 
             outTestList->tests.add(testDetails);
         }
@@ -773,7 +798,8 @@ static SlangResult _gatherTestsForFile(
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
-            normalizeTestOutputPathsForTestFile(filePath, testDetails.options.args);
+            SLANG_RETURN_ON_FAIL(
+                _normalizeTestOutputPaths(filePath, testDetails.options.args, context));
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;
@@ -2671,6 +2697,15 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
+// Inspect the raw result kind: deserializing into a zero-field struct via getMessage() accepts `{}`
+// but rejects JSON `null`, so it cannot detect a null result.
+static bool receivedNullResult(JSONRPCConnection* connection)
+{
+    JSONResultResponse resultResponse;
+    return SLANG_SUCCEEDED(connection->getRPC(&resultResponse)) &&
+           resultResponse.result.getKind() == JSONValue::Kind::Null;
+}
+
 TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 {
     // We don't support running language server tests in parallel yet.
@@ -2792,9 +2827,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             if (SLANG_FAILED(waitForNonDiagnosticResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            LanguageServerProtocol::NullResponse nullResponse;
             List<LanguageServerProtocol::CompletionItem> completionItems;
-            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            if (receivedNullResult(connection))
             {
                 actualOutputSB << "null\n";
             }
@@ -2831,9 +2865,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             if (SLANG_FAILED(waitForNonDiagnosticResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            LanguageServerProtocol::NullResponse nullResponse;
             LanguageServerProtocol::SignatureHelp sigInfo;
-            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            if (receivedNullResult(connection))
             {
                 actualOutputSB << "null\n";
             }
@@ -2878,9 +2911,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             if (SLANG_FAILED(waitForNonDiagnosticResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            LanguageServerProtocol::NullResponse nullResponse;
             LanguageServerProtocol::Hover hover;
-            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            if (receivedNullResult(connection))
             {
                 actualOutputSB << "null\n";
             }
@@ -2890,6 +2922,43 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                                << hover.range.start.character << " - " << hover.range.end.line
                                << "," << hover.range.end.character;
                 actualOutputSB << "\ncontent:\n" << hover.contents.value << "\n";
+            }
+        }
+        else if (line.startsWith("RESOLVE"))
+        {
+            // Drive completionItem/resolve for an item that carries a textEdit but no `data`
+            // (the file/import completion shape). LSP requires resolve to answer with the item,
+            // never null, so the server must echo it back with its textEdit preserved.
+            LanguageServerProtocol::TextEditCompletionItem item;
+            item.label = "resolveItem";
+            item.textEdit.newText = "resolveItem";
+            item.textEdit.range.start.line = 5;
+            item.textEdit.range.start.character = 0;
+            item.textEdit.range.end.line = 5;
+            item.textEdit.range.end.character = 3;
+            if (SLANG_FAILED(connection->sendCall(
+                    UnownedStringSlice("completionItem/resolve"),
+                    &item,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\n";
+            LanguageServerProtocol::TextEditCompletionItem resolved;
+            if (receivedNullResult(connection))
+            {
+                actualOutputSB << "null\n";
+            }
+            else if (SLANG_SUCCEEDED(connection->getMessage(&resolved)))
+            {
+                actualOutputSB << "label: " << resolved.label << "\n";
+                actualOutputSB << "textEdit: " << resolved.textEdit.newText << "\n";
+                actualOutputSB << "range: " << resolved.textEdit.range.start.line << ","
+                               << resolved.textEdit.range.start.character << " - "
+                               << resolved.textEdit.range.end.line << ","
+                               << resolved.textEdit.range.end.character << "\n";
             }
         }
         else if (line.startsWith("DIAGNOSTICS"))

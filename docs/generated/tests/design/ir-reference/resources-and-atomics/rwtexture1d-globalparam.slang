@@ -12,7 +12,7 @@
 // `RWTexture1D<T>` flips the RW-access slot in the `TextureType(...)`
 // operand list while keeping shape at 1D.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWTexture1D<float4> rwtex;
 uniform RWStructuredBuffer<int> outbuf;

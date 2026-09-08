@@ -37,7 +37,7 @@ descriptor-heap handle types (`UntypedResourceHandle`,
 `UntypedSamplerHandle`).
 
 The primary observation mechanism is `-target <text-target> -dump-ir
--o /dev/null` followed by a FileCheck against the IR dump. Patterns are
+-o -` followed by a FileCheck against the IR dump. Patterns are
 anchored at user-named functions, user structs, and user
 `global_param`s — the IR-dump preamble is large and any unanchored
 pattern risks a false positive. For type lowerings that are

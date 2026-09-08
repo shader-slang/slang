@@ -13,6 +13,7 @@
 
 #include "core/slang-char-util.h"
 #include "core/slang-math.h"
+#include "core/slang-short-dictionary.h"
 #include "core/slang-string-util.h"
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
@@ -1110,7 +1111,7 @@ Expr* SemanticsVisitor::createLookupResultExpr(
 
 static DeclVisibility _getTypeVisibility(
     Type* type,
-    Dictionary<Type*, DeclVisibility>& typeVisibilityCache)
+    ShortDictionary<Type*, DeclVisibility>& typeVisibilityCache)
 {
     if (auto cachedVisibility = typeVisibilityCache.tryGetValue(type))
         return *cachedVisibility;
@@ -1137,7 +1138,10 @@ static DeclVisibility _getTypeVisibility(
 
 DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
 {
-    Dictionary<Type*, DeclVisibility> typeVisibilityCache;
+    // ShortDictionary rather than Dictionary: most types checked here have little or no shared
+    // structure, so the cache typically ends up with only a handful of entries. See the
+    // ShortDictionary doc comment and #12139.
+    ShortDictionary<Type*, DeclVisibility> typeVisibilityCache;
     return _getTypeVisibility(type, typeVisibilityCache);
 }
 

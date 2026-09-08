@@ -13,7 +13,7 @@
 // `conversion-explicit-cast-...` covers float<->int; this one
 // pins the half-to-float `floatCast` opcode.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform half h;
 uniform RWStructuredBuffer<float> buf;

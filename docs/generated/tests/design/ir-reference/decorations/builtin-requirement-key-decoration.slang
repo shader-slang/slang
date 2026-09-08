@@ -17,7 +17,7 @@
 // line to be a `builtinRequirementKey` built from the same ordinal, which
 // is what ties the tag to the key rather than to an arbitrary inst.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<float> buf;
 

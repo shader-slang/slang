@@ -13,7 +13,7 @@
 // in the IR. `float2` is the smallest multi-element vector; its IR
 // type is `Vec(Float, 2 : Int)`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float2 v;
 uniform RWStructuredBuffer<float> buf;

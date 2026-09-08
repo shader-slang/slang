@@ -13,7 +13,7 @@
 // operand. A `RWStructuredBuffer<uint64_t>` exposes the 64-bit
 // unsigned scalar as the element-type operand.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<uint64_t> buf;
 

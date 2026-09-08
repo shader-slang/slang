@@ -18,7 +18,7 @@
 // that table across as the last specialization argument alongside the value
 // `2 : Int` and the deduced `TypePack(Int, Int)`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 

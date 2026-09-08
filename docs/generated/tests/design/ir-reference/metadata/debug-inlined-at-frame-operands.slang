@@ -17,7 +17,7 @@
 // shown to be absent for this single-level inline, and the captured source id
 // is required to be the module's source record.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after performForceInlining -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after performForceInlining -o - -entry main -stage compute -g1
 
 uniform RWStructuredBuffer<int> buf;
 

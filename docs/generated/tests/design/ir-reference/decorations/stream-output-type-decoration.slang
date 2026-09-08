@@ -24,7 +24,7 @@
 // was rejected as bogus. A test for the decoration itself still needs
 // writing, and needs a compiler run to pin the printed form.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage geometry
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage geometry
 
 uniform RWStructuredBuffer<float4> buf;
 

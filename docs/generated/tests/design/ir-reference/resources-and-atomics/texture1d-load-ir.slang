@@ -13,7 +13,7 @@
 // underlying `imageLoad` opcode is inlined later in the pipeline
 // (see existing bundle's "Doc gaps observed").
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform Texture1D<float4> tex;
 uniform RWStructuredBuffer<float4> outbuf;

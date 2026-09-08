@@ -13,7 +13,7 @@
 // inputs and Bool result. Comparing two `int64_t` globals produces a
 // `cmpLT` with the wider operand type preserved at the IR level.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int64_t a;
 uniform int64_t b;

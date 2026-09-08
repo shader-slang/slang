@@ -17,7 +17,7 @@
 // the destination pointer and the source vector. A reader (or a test)
 // that assumed one index per element would see only two.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float f;
 uniform float2 v;

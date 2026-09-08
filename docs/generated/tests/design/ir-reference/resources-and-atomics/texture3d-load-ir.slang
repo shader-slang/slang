@@ -11,7 +11,7 @@
 
 // 3D variant of the `Load` `call specialize(...)` shape.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform Texture3D<float4> tex;
 uniform RWStructuredBuffer<float4> outbuf;

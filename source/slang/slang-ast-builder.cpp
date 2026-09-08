@@ -423,7 +423,10 @@ Val* ASTBuilder::_getOrCreateValDirectly(ValNodeDesc&& desc)
     // update our cache.
     //
     auto node = as<Val>(desc.type.createInstance(this));
-    SLANG_ASSERT(node);
+    // `desc.type` must be an instantiable `Val` class; an abstract class (no `createFunc`) yields
+    // null here. Release-assert so an out-of-contract type fails loudly rather than dereferencing
+    // null below or caching a null node.
+    SLANG_RELEASE_ASSERT(node);
     for (auto& operand : desc.operands)
         node->m_operands.add(operand);
 

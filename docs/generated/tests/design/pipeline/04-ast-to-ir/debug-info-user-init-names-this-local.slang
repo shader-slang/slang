@@ -17,7 +17,7 @@
 // debug-location decoration, which is what lets a debugger stopped inside the
 // initializer inspect the members being written.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -g2 -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -g2 -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;
