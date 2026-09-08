@@ -606,6 +606,12 @@ the bindless resource idiom. When targeting HLSL, GLSL, and SPIR-V, where descri
 to access the global descriptor heap or resource array in order to obtain the actual resource handle. On targets where resource handles
 are not opaque handles, `DescriptorHandle<T>` maps to `T` and will have the same size and alignment defined by the target.
 
+For an ordinary resource handle this `uint2` is not a single 64-bit value split into low and high halves: `.x` is the index into the resource or sampler heap/array,
+and `.y` is an unused component that the default heap-derived construction leaves zero, forming the handle as `uint2(index, 0)`. Some cases covered below use `.y`,
+or both components, differently: in the split representation of a combined texture-sampler, `.x` indexes the resource heap/array for the texture and `.y` indexes the
+sampler heap/array for the sampler, whereas on some targets a `DescriptorHandle<RaytracingAccelerationStructure>` is instead reinterpreted as a GPU address. The
+target-specific sections that follow describe which representation each target uses.
+
 `DescriptorHandle<T>` is declared as:
 ```slang
 struct DescriptorHandle<T> where T:IOpaqueDescriptor {}
