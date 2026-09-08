@@ -92,6 +92,12 @@ jobs:
           git submodule sync -- external/optix-dev
           git submodule update --init --depth=1 external/optix-dev
 
+      - name: Checkout Slang user skills
+        if: inputs.os == 'linux' && inputs.platform == 'x86_64' && inputs.config == 'release' && inputs.cpu-only
+        run: |
+          git submodule sync -- external/slang-user-skills
+          git submodule update --init --depth=1 external/slang-user-skills
+
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
         with:
@@ -101,6 +107,12 @@ jobs:
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
           cpu-only: ${{ inputs.cpu-only }}
+
+      - name: Validate Slang user-skill examples
+        if: inputs.os == 'linux' && inputs.platform == 'x86_64' && inputs.config == 'release' && inputs.cpu-only
+        run: >-
+          python3 external/slang-user-skills/scripts/validate-examples.py
+          --slangc "$bin_dir/slangc"
 
       # slang-test's CUDA pass-through compiles through NVRTC, so the
       # offline (non-NVRTC) branch of the prelude is never compiled by the
