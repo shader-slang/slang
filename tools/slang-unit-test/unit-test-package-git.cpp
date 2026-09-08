@@ -669,7 +669,9 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
     const char* uneditArguments[] = {"slang-package", "unedit", "noise"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(uneditArguments), uneditArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("lock still points")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("in-place override")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--adopt")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("override disable noise")) >= 0);
 
     List<String> commitArguments;
     commitArguments.add("-C");
@@ -1195,6 +1197,12 @@ SLANG_UNIT_TEST(PackageToolUpdateRefusesDirtyUnregisteredCheckout)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
     SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("noise: edited")) >= 0);
 
+    const char* uneditArguments[] = {"slang-package", "unedit", "noise"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(uneditArguments), uneditArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Commit the files")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--adopt")) >= 0);
+
     List<String> commitArguments;
     commitArguments.add("-C");
     commitArguments.add(Path::combine(temp.path, "deps/noise"));
@@ -1203,10 +1211,10 @@ SLANG_UNIT_TEST(PackageToolUpdateRefusesDirtyUnregisteredCheckout)
     commitArguments.add("-am");
     commitArguments.add("local edit");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(commitArguments)));
-    const char* uneditArguments[] = {"slang-package", "unedit", "noise"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(uneditArguments), uneditArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("HEAD differs")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--adopt")) >= 0);
 
     const char* cleanUneditArguments[] = {"slang-package", "unedit", "noise", "--clean", "--yes"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(

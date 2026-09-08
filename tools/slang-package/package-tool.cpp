@@ -598,10 +598,10 @@ static SlangResult _validateLocalPackages(
                        "'slang package update'.";
             return SLANG_FAIL;
         }
-        Manifest manifest;
+        Manifest localManifest;
         SLANG_RETURN_ON_FAIL(
-            readLocalPackageManifest(projectRoot, localPackage, manifest, outError));
-        if (SLANG_FAILED(validateLockedPackageManifest(*package, manifest, outError)))
+            readLocalPackageManifest(projectRoot, localPackage, localManifest, outError));
+        if (SLANG_FAILED(validateLockedPackageManifest(*package, localManifest, outError)))
         {
             appendErrorAdvice(
                 outError,
@@ -2985,8 +2985,13 @@ static SlangResult _unedit(
     }
     if (package->path.getLength())
     {
-        outError = String("The lock still points at this editable package. Run "
-                          "'slang package update' before unedit.");
+        outError = String("The lock still records an in-place override for package: ") + name;
+        appendErrorAdvice(
+            outError,
+            String("To keep the committed checkout, run 'slang package unedit ") + name +
+                " --adopt' (and pass '--as VERSION' when HEAD is untagged). To return to the "
+                "published graph, run 'slang package override disable " +
+                name + "', then 'slang package update' and 'slang package unedit " + name + "'.");
         return SLANG_FAIL;
     }
     String destination;
@@ -3020,9 +3025,17 @@ static SlangResult _unedit(
                 ? String("Editable checkout has uncommitted files or stashes: ") + destination
                 : String("Editable checkout HEAD differs from the locked commit: ") + destination;
         String advice =
-            String("Return the checkout to the locked commit and run 'slang package unedit ") +
-            name + "' again, or run 'slang package unedit " + name +
-            " --clean' to discard all local state and restore the locked commit.";
+            hasLocalState
+                ? String("Commit the files you want to keep and apply any stashes, then run "
+                         "'slang package unedit ") +
+                      name +
+                      " --adopt' (and pass '--as VERSION' when HEAD is untagged). To discard all "
+                      "local state instead, run 'slang package unedit " +
+                      name + " --clean'."
+                : String("To keep these commits, run 'slang package unedit ") + name +
+                      " --adopt' (and pass '--as VERSION' when HEAD is untagged). To discard them "
+                      "and restore the locked commit, run 'slang package unedit " +
+                      name + " --clean'.";
         appendErrorAdvice(outError, advice);
         return SLANG_FAIL;
     }
