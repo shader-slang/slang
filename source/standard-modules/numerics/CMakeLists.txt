@@ -30,7 +30,6 @@ set(numerics_base_sources
 set(numerics_differentiable_sources
     differentiable.slang
     differentiable-interfaces.slang
-    differentiable-exp10.slang
     differentiable-conformances.slang
     differentiable-wrappers.slang
 )

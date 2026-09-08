@@ -41,7 +41,7 @@ implementing differentiable;
     SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         exponentialWithBase2, __differentiableNumericsExp2)                          \
     SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
-        exponentialWithBase10, __differentiableNumericsRegisteredExp10)         \
+        exponentialWithBase10, __differentiableNumericsExp10)                        \
     SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         logarithm, __differentiableNumericsLog)                                       \
     SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
@@ -258,7 +258,7 @@ public extension<
     SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
         exponentialWithBase2, __differentiableNumericsExp2)                          \
     SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
-        exponentialWithBase10, __differentiableNumericsRegisteredExp10)         \
+        exponentialWithBase10, __differentiableNumericsExp10)                        \
     SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
         logarithm, __differentiableNumericsLog)                                       \
     SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
@@ -440,7 +440,7 @@ public extension<
     SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         exponentialWithBase2, __differentiableNumericsExp2)                    \
     SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
-        exponentialWithBase10, __differentiableNumericsRegisteredExp10)        \
+        exponentialWithBase10, __differentiableNumericsExp10)                  \
     SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         logarithm, __differentiableNumericsLog)                                \
     SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \

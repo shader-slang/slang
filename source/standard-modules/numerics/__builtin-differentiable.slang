@@ -73,6 +73,7 @@ SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsCos, cos)
 SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsCosh, cosh)
 SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsExp, exp)
 SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsExp2, exp2)
+SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsExp10, exp10)
 SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsFractionalPart, frac)
 SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsLog, log)
 SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsLog10, log10)
@@ -86,25 +87,6 @@ SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsTan, tan)
 SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(__differentiableNumericsTanh, tanh)
 
 #undef SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER
-
-// Core `exp10` does not currently provide the complete derivative registrations needed by an
-// adapter marked `[Differentiable]`. The differentiable annex therefore attaches forward and
-// backward derivatives to an annex-local forwarding function in `differentiable-exp10.slang`.
-[__readNone]
-[__unsafeForceInlineEarly]
-public T __differentiableNumericsExp10<T : __BuiltinFloatingPointType>(T value)
-{
-    return ::exp10(value);
-}
-
-[__readNone]
-[__unsafeForceInlineEarly]
-public vector<T, N> __differentiableNumericsExp10<
-    T : __BuiltinFloatingPointType,
-    let N : int>(vector<T, N> value)
-{
-    return ::exp10(value);
-}
 
 #define SLANG_NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(NAME, BUILTIN)                   \
     [__readNone] [Differentiable] [__unsafeForceInlineEarly]                    \

@@ -11,6 +11,5 @@ __exported import slang.numerics;
 import slang.numerics.__builtin_differentiable;
 
 __include "differentiable-interfaces.slang";
-__include "differentiable-exp10.slang";
 __include "differentiable-conformances.slang";
 __include "differentiable-wrappers.slang";
