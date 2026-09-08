@@ -166,10 +166,3 @@ docs/generated/tests/design/target-pipelines/metal/append-buffer-params-carry-bu
 # triage.)
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2
-
-# https://github.com/shader-slang/slang/issues/12443 — `Size(N)` enum
-# construction is rejected inside a generic function's array bound with
-# E33070 "expected a function, got 'typeof(Size)'", while the same spelling
-# compiles in an ordinary expression. Recorded in
-# _meta/findings/enum-cast-in-generic-array-bound-rejected.yaml.
-docs/generated/tests/design/ast-reference/values/builtinoperationintval-enum-operands-fold.slang
