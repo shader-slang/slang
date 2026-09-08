@@ -148,6 +148,22 @@ SlangResult resolveReference(
     TagCandidate& outCandidate,
     String& outError)
 {
+    bool isCommit = ref.getLength() == 40;
+    for (Index i = 0; isCommit && i < ref.getLength(); ++i)
+    {
+        char c = ref[i];
+        isCommit = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+    }
+    if (isCommit)
+    {
+        // A commit pin need not be an advertised branch or tag tip. The later manifest load
+        // verifies that the object is reachable from the configured repository.
+        outCandidate = TagCandidate();
+        outCandidate.ref = ref;
+        outCandidate.commit = ref;
+        return SLANG_OK;
+    }
+
     List<String> arguments;
     arguments.add("ls-remote");
     arguments.add("--");
@@ -300,6 +316,40 @@ SlangResult getRepositoryHeadCommit(
     ExecuteResult result;
     SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
     outCommit = result.standardOutput.trim();
+    return SLANG_OK;
+}
+
+SlangResult findVersionTagAtHead(
+    const String& repositoryPath,
+    String& outTag,
+    SemanticVersion& outVersion,
+    bool& outFound,
+    String& outError)
+{
+    List<String> arguments;
+    arguments.add("tag");
+    arguments.add("--points-at");
+    arguments.add("HEAD");
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+
+    outFound = false;
+    outTag = String();
+    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+    {
+        String tag = line.trim();
+        SemanticVersion version;
+        if (!tag.getLength() || SLANG_FAILED(parseReleaseTag(tag, version)))
+            continue;
+        if (outFound)
+        {
+            outError = "HEAD has multiple semantic-version tags; pass --as explicitly.";
+            return SLANG_FAIL;
+        }
+        outFound = true;
+        outTag = tag;
+        outVersion = version;
+    }
     return SLANG_OK;
 }
 

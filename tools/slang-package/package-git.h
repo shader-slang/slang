@@ -41,6 +41,14 @@ SlangResult getRepositoryHeadCommit(
     String& outCommit,
     String& outError);
 
+/// Find the one semantic-version tag that points at `HEAD`, or report that none exists.
+SlangResult findVersionTagAtHead(
+    const String& repositoryPath,
+    String& outTag,
+    SemanticVersion& outVersion,
+    bool& outFound,
+    String& outError);
+
 /// Return the working-tree root of the Git repository that contains `workingDirectory`.
 ///
 /// This is `git -C workingDirectory rev-parse --show-toplevel`. A nested checkout, such as a
