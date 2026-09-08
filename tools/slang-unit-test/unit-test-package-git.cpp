@@ -1195,6 +1195,19 @@ SLANG_UNIT_TEST(PackageToolUpdateRefusesDirtyUnregisteredCheckout)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
     SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("noise: edited")) >= 0);
 
+    List<String> commitArguments;
+    commitArguments.add("-C");
+    commitArguments.add(Path::combine(temp.path, "deps/noise"));
+    _addTestIdentity(commitArguments);
+    commitArguments.add("commit");
+    commitArguments.add("-am");
+    commitArguments.add("local edit");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(commitArguments)));
+    const char* uneditArguments[] = {"slang-package", "unedit", "noise"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(uneditArguments), uneditArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("HEAD differs")) >= 0);
+
     const char* cleanUneditArguments[] = {"slang-package", "unedit", "noise", "--clean", "--yes"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
         temp.path,

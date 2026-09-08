@@ -2860,20 +2860,23 @@ static SlangResult _unedit(
     GitWorkingTreeStatus status;
     SLANG_RETURN_ON_FAIL(getWorkingTreeStatus(destination, headCommit, status, outError));
     const bool hasLocalState = status.changedFileCount != 0 || status.stashCount != 0;
-    if (hasLocalState && !allowClean)
+    const bool headMoved = status.headCommit != package->commit;
+    if ((hasLocalState || headMoved) && !allowClean)
     {
-        outError = String("Editable checkout has uncommitted files or stashes; refusing to return "
-                          "it to package-tool ownership: ") +
-                   destination;
-        String advice = String("Commit or discard the changes and run 'slang package unedit ") +
-                        name + "' again, or run 'slang package unedit " + name +
-                        " --clean' to discard all local state and restore the locked commit.";
+        outError =
+            hasLocalState
+                ? String("Editable checkout has uncommitted files or stashes: ") + destination
+                : String("Editable checkout HEAD differs from the locked commit: ") + destination;
+        String advice =
+            String("Return the checkout to the locked commit and run 'slang package unedit ") +
+            name + "' again, or run 'slang package unedit " + name +
+            " --clean' to discard all local state and restore the locked commit.";
         appendErrorAdvice(outError, advice);
         return SLANG_FAIL;
     }
     if (allowClean)
     {
-        const bool needsRestore = hasLocalState || status.headCommit != package->commit;
+        const bool needsRestore = hasLocalState || headMoved;
         if (needsRestore)
         {
             bool approved = false;
