@@ -608,7 +608,7 @@ struct ResolvedPackageLoad
 /// already has that revision, preferring an existing `deps/NAME` checkout so a clean workspace
 /// needs no network, and falling back to `.slang/cache` when the checkout holds an older commit.
 /// Nested path packages of that Git tree are read out of the same repository with `git show`.
-/// Edits, overrides, and ordinary path packages still use the real directory.
+/// Overrides and ordinary path packages still use the real directory.
 static SlangResult _loadResolvedPackage(
     const String& projectRoot,
     const String& depsDirectory,
@@ -786,15 +786,14 @@ SlangResult validateLegalResolvedProject(
         Index packageIndex = findLockedPackageIndex(lock, localPackage.name);
         if (packageIndex < 0)
         {
-            if (isParkedEdit(localPackage, lock))
+            if (isInPlaceLocalPackage(rootManifest, localPackage))
                 continue;
             outError =
                 String("Registered local package is not present in the lock: ") + localPackage.name;
             return SLANG_FAIL;
         }
         const LockedPackage& package = lock.packages[packageIndex];
-        if (!isEditedLocalPackage(localPackage) && localPackage.as.getLength() &&
-            package.version != localPackage.as)
+        if (localPackage.as.getLength() && package.version != localPackage.as)
         {
             outError = String("Locked version for local override '") + package.name +
                        "' does not match slang-workspace.json. Run 'slang package update'.";

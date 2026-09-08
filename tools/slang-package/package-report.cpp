@@ -299,11 +299,6 @@ static void _appendSelectionReason(StringBuilder& builder, const ResolveChange& 
             _appendConstraintLines(builder, explanation->constraints, "      ");
         }
         break;
-    case ResolveSelectionKind::Edit:
-        builder << "    "
-                << (unchanged ? "remains an in-place edit at " : "selected by in-place edit at ")
-                << explanation->path << "\n";
-        break;
     case ResolveSelectionKind::HighestRelease:
         if (explanation->constraints.getCount())
         {

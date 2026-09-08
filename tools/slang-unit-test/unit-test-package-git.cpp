@@ -643,19 +643,6 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
     root.dependencies.add(dependency);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
 
-    const char* disableEditArguments[] = {
-        "slang-package",
-        "override",
-        "disable",
-        "noise",
-    };
-    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
-        temp.path,
-        SLANG_COUNT_OF(disableEditArguments),
-        disableEditArguments,
-        error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no local override")) >= 0);
-
     const char* localUpdateArguments[] = {"slang-package", "update", "--yes"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
         temp.path,
@@ -667,8 +654,8 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), editedLock, error)));
     SLANG_CHECK_ABORT(editedLock.packages.getCount() == 1);
     SLANG_CHECK(editedLock.packages[0].git == repository);
-    SLANG_CHECK(editedLock.packages[0].ref == "v1.0.0");
-    SLANG_CHECK(editedLock.packages[0].path.getLength() == 0);
+    SLANG_CHECK(editedLock.packages[0].ref.getLength() == 0);
+    SLANG_CHECK(editedLock.packages[0].path == "third-party/noise");
 
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::writeAllText(checkoutSource, "module noise;\n// edited\n")));
@@ -682,7 +669,7 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
     const char* uneditArguments[] = {"slang-package", "unedit", "noise"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(uneditArguments), uneditArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("uncommitted files")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("lock still points")) >= 0);
 
     List<String> commitArguments;
     commitArguments.add("-C");
@@ -692,37 +679,23 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
     commitArguments.add("-am");
     commitArguments.add("local edit");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(commitArguments)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(uneditArguments), uneditArguments, error)));
-    SLANG_CHECK(File::exists(checkoutSource));
-
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(File::writeAllText(checkoutSource, "module noise;\n// unregistered\n")));
-    SLANG_CHECK(SLANG_FAILED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("without --clean")) >= 0);
-
-    const char* unconfirmedCleanFetchArguments[] = {"slang-package", "fetch", "--clean"};
-    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
-        temp.path,
-        SLANG_COUNT_OF(unconfirmedCleanFetchArguments),
-        unconfirmedCleanFetchArguments,
-        error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--yes")) >= 0);
-    const char* cleanFetchArguments[] = {"slang-package", "fetch", "--clean", "--yes"};
+    const char* disableEditArguments[] = {"slang-package", "override", "disable", "noise"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
         temp.path,
-        SLANG_COUNT_OF(cleanFetchArguments),
-        cleanFetchArguments,
+        SLANG_COUNT_OF(disableEditArguments),
+        disableEditArguments,
         error)));
+    const char* cleanUpdateArguments[] = {"slang-package", "update", "--clean", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(cleanUpdateArguments),
+        cleanUpdateArguments,
+        error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(uneditArguments), uneditArguments, error)));
     String restoredSource;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(checkoutSource, restoredSource)));
     SLANG_CHECK(restoredSource == "module noise;\n");
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
-        temp.path,
-        SLANG_COUNT_OF(unconfirmedCleanFetchArguments),
-        unconfirmedCleanFetchArguments,
-        error)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         Path::combine(repository, "src/noise.slang"),
@@ -927,7 +900,7 @@ SLANG_UNIT_TEST(PackageToolUpdateIgnoresOverrides)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readProjectLocalPackages(temp.path, registered, error)));
     Index noiseIndex = findLocalPackageIndex(registered, "noise");
     SLANG_CHECK_ABORT(noiseIndex >= 0);
-    SLANG_CHECK(!isEditedLocalPackage(registered[noiseIndex]));
+    SLANG_CHECK(!isInPlaceLocalPackage(root, registered[noiseIndex]));
     SLANG_CHECK(registered[noiseIndex].enabled);
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -1078,7 +1051,7 @@ SLANG_UNIT_TEST(PackageToolIgnoreOverridesParksEditedDependency)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readProjectLocalPackages(temp.path, registered, error)));
     Index helperIndex = findLocalPackageIndex(registered, "helper");
     SLANG_CHECK_ABORT(helperIndex >= 0);
-    SLANG_CHECK(isEditedLocalPackage(registered[helperIndex]));
+    SLANG_CHECK(isInPlaceLocalPackage(root, registered[helperIndex]));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
@@ -1233,7 +1206,7 @@ SLANG_UNIT_TEST(PackageToolUpdateRefusesDirtyUnregisteredCheckout)
     SLANG_CHECK(restoredNoise == "module noise;\n");
 }
 
-SLANG_UNIT_TEST(PackageToolEditBlocksCheckoutMoves)
+SLANG_UNIT_TEST(PackageToolEditAdoptsLocalTree)
 {
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
@@ -1291,6 +1264,15 @@ SLANG_UNIT_TEST(PackageToolEditBlocksCheckoutMoves)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         Path::combine(temp.path, "deps/noise/src/noise.slang"),
         "module noise;\n// edited\n")));
+    Manifest editedNoiseManifest;
+    String editedNoiseManifestPath = Path::combine(temp.path, "deps/noise/slang-package.json");
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(readManifest(editedNoiseManifestPath, editedNoiseManifest, error)));
+    editedNoiseManifest.exports.add("extra");
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(writeManifest(editedNoiseManifestPath, editedNoiseManifest, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(temp.path, "deps/noise/extra/extra.slang"), "module extra;\n")));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         Path::combine(noiseRepo, "src/noise.slang"),
@@ -1309,55 +1291,38 @@ SLANG_UNIT_TEST(PackageToolEditBlocksCheckoutMoves)
         File::readAllText(Path::combine(temp.path, "deps/helper/src/helper.slang"), helperBefore)));
 
     const char* dryRunArguments[] = {"slang-package", "update", "--dry-run"};
-    SLANG_CHECK(SLANG_FAILED(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(dryRunArguments), dryRunArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("is edited")) >= 0);
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("would have to move")) >= 0);
 
-    SLANG_CHECK(SLANG_FAILED(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("is edited")) >= 0);
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("unedit noise --clean")) >= 0);
 
     PackageTool::LockFile lockAfter;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockAfter, error)));
-    SLANG_CHECK(lockFilesEqual(lockBefore, lockAfter));
+    Index noiseIndex = findLockedPackageIndex(lockAfter, "noise");
+    Index helperIndex = findLockedPackageIndex(lockAfter, "helper");
+    SLANG_CHECK_ABORT(noiseIndex >= 0);
+    SLANG_CHECK_ABORT(helperIndex >= 0);
+    SLANG_CHECK(lockAfter.packages[noiseIndex].path == "deps/noise");
+    SLANG_CHECK(lockAfter.packages[noiseIndex].exports.getCount() == 2);
+    SLANG_CHECK(lockAfter.packages[helperIndex].ref == "v1.1.0");
     String helperAfter;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         File::readAllText(Path::combine(temp.path, "deps/helper/src/helper.slang"), helperAfter)));
-    SLANG_CHECK(helperAfter == helperBefore);
+    SLANG_CHECK(helperAfter == "module helper;\n// v1.1\n");
     String noiseAfter;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         File::readAllText(Path::combine(temp.path, "deps/noise/src/noise.slang"), noiseAfter)));
     SLANG_CHECK(noiseAfter == "module noise;\n// edited\n");
 
-    const char* unconfirmedCleanUneditArguments[] = {"slang-package", "unedit", "noise", "--clean"};
-    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
-        temp.path,
-        SLANG_COUNT_OF(unconfirmedCleanUneditArguments),
-        unconfirmedCleanUneditArguments,
-        error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--yes")) >= 0);
-
-    const char* cleanUneditArguments[] = {"slang-package", "unedit", "noise", "--clean", "--yes"};
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
-        temp.path,
-        SLANG_COUNT_OF(cleanUneditArguments),
-        cleanUneditArguments,
-        error)));
-    String restoredNoise;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::readAllText(Path::combine(temp.path, "deps/noise/src/noise.slang"), restoredNoise)));
-    SLANG_CHECK(restoredNoise == "module noise;\n");
     List<LocalPackage> localPackages;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readProjectLocalPackages(temp.path, localPackages, error)));
-    SLANG_CHECK(findLocalPackageIndex(localPackages, "noise") < 0);
+    SLANG_CHECK(findLocalPackageIndex(localPackages, "noise") >= 0);
 }
 
-// Promote an in-place edit to an override on the same checkout so the local manifest can enter
-// the next update without unedit restoring tool ownership first.
-SLANG_UNIT_TEST(PackageToolOverridePromotesInPlaceEdit)
+// `edit` and `override add NAME deps/NAME` update the same in-place override registration.
+SLANG_UNIT_TEST(PackageToolEditIsInPlaceOverride)
 {
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
@@ -1421,7 +1386,7 @@ SLANG_UNIT_TEST(PackageToolOverridePromotesInPlaceEdit)
         SLANG_COUNT_OF(otherPathArguments),
         otherPathArguments,
         error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("editable")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("registered local tree")) >= 0);
 
     const char* promoteArguments[] = {
         "slang-package",
@@ -1440,7 +1405,7 @@ SLANG_UNIT_TEST(PackageToolOverridePromotesInPlaceEdit)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readProjectLocalPackages(temp.path, localPackages, error)));
     Index localIndex = findLocalPackageIndex(localPackages, "noise");
     SLANG_CHECK_ABORT(localIndex >= 0);
-    SLANG_CHECK(!isEditedLocalPackage(localPackages[localIndex]));
+    SLANG_CHECK(isInPlaceLocalPackage(root, localPackages[localIndex]));
     SLANG_CHECK(localPackages[localIndex].as == "1.2.0");
     SLANG_CHECK(localPackages[localIndex].enabled);
 
@@ -1549,7 +1514,7 @@ SLANG_UNIT_TEST(PackageToolNamedValidateAndLocalPublishableChecks)
         SLANG_COUNT_OF(workspaceValidateArguments),
         workspaceValidateArguments,
         error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("override mode")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("edit mode")) >= 0);
 
     PackageTool::LockFile lockBeforeUpdate;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(

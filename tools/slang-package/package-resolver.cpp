@@ -154,30 +154,6 @@ public:
             return gitSource.listReleaseTags(packageName, git, outCandidates, outError);
 
         const LocalPackage& localPackage = (*localPackages)[localIndex];
-        if (isEditedLocalPackage(localPackage))
-        {
-            String localRoot;
-            SLANG_RETURN_ON_FAIL(
-                getLocalPackageRoot(projectRoot, localPackage, localRoot, outError));
-            String headCommit;
-            SLANG_RETURN_ON_FAIL(getRepositoryHeadCommit(localRoot, headCommit, outError));
-            List<TagCandidate> releaseCandidates;
-            SLANG_RETURN_ON_FAIL(
-                gitSource.listReleaseTags(packageName, git, releaseCandidates, outError));
-            for (const auto& release : releaseCandidates)
-            {
-                if (release.commit != headCommit)
-                    continue;
-                TagCandidate candidate = release;
-                candidate.path = localPackage.path;
-                candidate.isEdit = true;
-                outCandidates.clear();
-                outCandidates.add(candidate);
-                return SLANG_OK;
-            }
-            outError = String("Edited package HEAD is not a published release tag: ") + packageName;
-            return SLANG_FAIL;
-        }
         TagCandidate candidate;
         candidate.path = localPackage.path;
         SLANG_RETURN_ON_FAIL(parseExactVersion(localPackage.as, candidate.version, outError));
@@ -198,25 +174,6 @@ public:
             return gitSource.resolveReference(packageName, git, ref, outCandidate, outError);
 
         const LocalPackage& localPackage = (*localPackages)[localIndex];
-        if (isEditedLocalPackage(localPackage))
-        {
-            SLANG_RETURN_ON_FAIL(
-                gitSource.resolveReference(packageName, git, ref, outCandidate, outError));
-            String localRoot;
-            SLANG_RETURN_ON_FAIL(
-                getLocalPackageRoot(projectRoot, localPackage, localRoot, outError));
-            String headCommit;
-            SLANG_RETURN_ON_FAIL(getRepositoryHeadCommit(localRoot, headCommit, outError));
-            if (headCommit != outCandidate.commit)
-            {
-                outError =
-                    String("Edited package HEAD does not match pinned Git ref: ") + packageName;
-                return SLANG_FAIL;
-            }
-            outCandidate.path = localPackage.path;
-            outCandidate.isEdit = true;
-            return SLANG_OK;
-        }
         SemanticVersion version;
         SLANG_RETURN_ON_FAIL(parseExactVersion(localPackage.as, version, outError));
         outCandidate = TagCandidate();
@@ -233,8 +190,6 @@ public:
         ResolvedManifest& outManifest,
         String& outError) override
     {
-        if (candidate.isEdit)
-            return gitSource.loadManifest(packageName, git, candidate, outManifest, outError);
         if (!candidate.path.getLength())
             return gitSource.loadManifest(packageName, git, candidate, outManifest, outError);
 
@@ -452,8 +407,8 @@ private:
     }
 
     /// Read publisher retractions from the highest release, independently of the workspace's
-    /// version constraint. Local edit and override candidates are explicit developer choices and
-    /// do not participate in remote retraction discovery.
+    /// version constraint. Local override candidates are explicit developer choices and do not
+    /// participate in remote retraction discovery.
     SlangResult loadPublisherRetractions(
         const ResolutionPackage& package,
         const List<TagCandidate>& candidates,
@@ -1163,8 +1118,6 @@ private:
             selected.selected = true;
             if (getPinnedIdentity(selected, pinnedRef, pinnedAs, pinnedVersion))
                 selected.selectionKind = ResolveSelectionKind::PinnedRef;
-            else if (candidate.path.getLength() && candidate.isEdit)
-                selected.selectionKind = ResolveSelectionKind::Edit;
             else if (candidate.path.getLength())
                 selected.selectionKind = ResolveSelectionKind::Override;
             else
@@ -1172,7 +1125,7 @@ private:
             selected.locked.name = selected.name;
             selected.locked.git = selected.git;
             selected.locked.version = formatExactVersion(candidate.version);
-            if (candidate.path.getLength() && !candidate.isEdit)
+            if (candidate.path.getLength())
             {
                 addWarning(
                     String("Local path for package '") + selected.name +

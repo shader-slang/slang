@@ -1314,7 +1314,6 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
                            "': " + json.container->getStringFromKey(field.key);
                 return SLANG_FAIL;
             }
-            package.kind = LocalPackageKind::Edit;
             outPackages.add(package);
         }
     }
@@ -1372,7 +1371,8 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
                 duplicate = duplicate || existing.name == package.name;
             if (duplicate)
             {
-                outError = String("Package cannot be both edited and overridden: ") + package.name;
+                outError = String("Package cannot have both legacy edit and override entries: ") +
+                           package.name;
                 return SLANG_FAIL;
             }
             outPackages.add(package);
@@ -1397,24 +1397,10 @@ SlangResult writeLocalPackages(
     writer.startObject(SourceLoc());
     _writeKey(writer, "schema_version");
     writer.addIntegerValue(kWorkspaceSchemaVersion, SourceLoc());
-    _writeKey(writer, "edits");
-    writer.startObject(SourceLoc());
-    for (const auto& package : packages)
-    {
-        if (!isEditedLocalPackage(package))
-            continue;
-        SLANG_RELEASE_ASSERT(isValidPackageName(package.name));
-        writer.addUnquotedKey(package.name.getUnownedSlice(), SourceLoc());
-        writer.startObject(SourceLoc());
-        writer.endObject(SourceLoc());
-    }
-    writer.endObject(SourceLoc());
     _writeKey(writer, "overrides");
     writer.startObject(SourceLoc());
     for (const auto& package : packages)
     {
-        if (isEditedLocalPackage(package))
-            continue;
         SLANG_RELEASE_ASSERT(isValidPackageName(package.name));
         writer.addUnquotedKey(package.name.getUnownedSlice(), SourceLoc());
         writer.startObject(SourceLoc());

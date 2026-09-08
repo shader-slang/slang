@@ -64,8 +64,6 @@ static void _printHelp(bool experimental = false)
         "  override add <name> <path> [as]\n"
         "  override enable|disable|remove <name> | override list\n"
         "                   Manage retained local dependency overrides.\n"
-        "                   override add on an edited deps/<name> checkout promotes that\n"
-        "                   edit in place so the local manifest can enter the next update.\n"
         "  edit <name>      Make a dependency checkout editable in place.\n"
         "                   Accepts a checkout that already has local changes.\n"
         "                   Fetch and update fail if the selected pin would move it.\n"
@@ -302,7 +300,7 @@ static SlangResult _materialize(
             fprintf(
                 stdout,
                 "Using local %s '%s' at %s.\n",
-                isEditedLocalPackage(localPackages[localIndex]) ? "edit" : "override",
+                isInPlaceLocalPackage(manifest, localPackages[localIndex]) ? "edit" : "override",
                 package.name.getBuffer(),
                 localPackages[localIndex].path.getBuffer());
             continue;
@@ -557,6 +555,7 @@ static SlangResult _validateLockAgainstManifest(
 /// registered.
 static SlangResult _validateLocalPackages(
     const String& projectRoot,
+    const Manifest& manifest,
     const LockFile& lock,
     const List<LocalPackage>& localPackages,
     String& outError,
@@ -569,13 +568,13 @@ static SlangResult _validateLocalPackages(
         Index packageIndex = findLockedPackageIndex(lock, localPackage.name);
         if (packageIndex < 0)
         {
-            if (isEditedLocalPackage(localPackage))
+            if (isInPlaceLocalPackage(manifest, localPackage))
             {
                 if (outWarnings)
                 {
                     outWarnings->add(
-                        String("Edited package '") + localPackage.name +
-                        "' is not in this graph; leaving its checkout and edit registration in "
+                        String("In-place override '") + localPackage.name +
+                        "' is not in this graph; leaving its checkout and registration in "
                         "place.");
                 }
                 continue;
@@ -592,8 +591,7 @@ static SlangResult _validateLocalPackages(
                        "'slang package update'.";
             return SLANG_FAIL;
         }
-        if (!isEditedLocalPackage(localPackage) && localPackage.as.getLength() &&
-            package->version != localPackage.as)
+        if (localPackage.as.getLength() && package->version != localPackage.as)
         {
             outError = String("Locked version for local override '") + package->name +
                        "' does not match slang-workspace.json. Run "
@@ -607,12 +605,8 @@ static SlangResult _validateLocalPackages(
         {
             appendErrorAdvice(
                 outError,
-                isEditedLocalPackage(localPackage)
-                    ? "An edit retains its published Git pin; publish a new release tag and "
-                      "run 'slang package update', or use an override for local manifest "
-                      "changes."
-                    : "Align the local manifest with the selected upstream graph, or run "
-                      "'slang package update' to record local manifest changes.");
+                "Align the local manifest with the selected upstream graph, or run "
+                "'slang package update' to record local manifest changes.");
             return SLANG_FAIL;
         }
     }
@@ -742,7 +736,7 @@ static SlangResult _writeValidatedSearchPathsAfterLocalChange(
 /// Return whether fetch/update should run the shareable-package checks on this lock row.
 ///
 /// Git packages that were rematerialized are handled separately through `changedPackageNames`, so
-/// this covers the local registrations instead: an edit or an enabled override. Those trees are a
+/// this covers enabled local overrides instead. Those trees are a
 /// library the developer is preparing to share, which is what lets `update` right after a promote
 /// certify the package before any remote tag exists.
 ///
@@ -1119,9 +1113,8 @@ static String _describeDirtyCheckout(
 ///
 /// Never discarding local work without `--clean` is the overriding rule here, so the trees the
 /// current lock owns are inspected before anything else happens: no solve, no report, no prompt,
-/// no cleared search paths. Registered edits and overrides are skipped because those trees belong
-/// to the user and materialization does not touch them; whether an edit's *pin* may move is a
-/// separate question, answered by `_refuseIfEditedCheckoutsWouldMove` once a lock is in hand.
+/// no cleared search paths. Enabled overrides are skipped because those trees belong to the user
+/// and materialization does not touch them.
 static SlangResult _refuseIfOwnedCheckoutsAreDirty(
     const String& projectRoot,
     const Manifest& manifest,
@@ -1200,79 +1193,6 @@ static SlangResult _refuseIfOwnedCheckoutsAreDirty(
     return SLANG_FAIL;
 }
 
-/// Fail when the selected Git pin for an in-place edit is not the commit already in that
-/// working tree, and matching it would require changing the checkout.
-///
-/// Consider this example: `noise` is edited at `deps/noise` on `v1.0.0`, then a new `v1.1.0`
-/// tag is published and `update` would select it. Materialize skips edited trees, so applying
-/// that lock would rewrite the pin while leaving the checkout behind. Fetch and update refuse
-/// that graph before they clear search paths or touch any other checkout. A parked edit that is
-/// not in the selected lock is left in place; the selected pin did not move that tree.
-static SlangResult _refuseIfEditedCheckoutsWouldMove(
-    const String& projectRoot,
-    const List<LocalPackage>& localPackages,
-    const LockFile* previousLock,
-    const LockFile& lock,
-    String& outError)
-{
-    for (const auto& localPackage : localPackages)
-    {
-        if (!isEditedLocalPackage(localPackage))
-            continue;
-        Index nextIndex = findLockedPackageIndex(lock, localPackage.name);
-        if (nextIndex < 0)
-            continue;
-        const LockedPackage& next = lock.packages[nextIndex];
-        if (!isGitBackedLockedPackage(next))
-            continue;
-
-        const LockedPackage* previous = nullptr;
-        if (previousLock)
-        {
-            Index previousIndex = findLockedPackageIndex(*previousLock, localPackage.name);
-            if (previousIndex >= 0)
-                previous = &previousLock->packages[previousIndex];
-        }
-        if (previous && previous->git == next.git && previous->commit == next.commit)
-            continue;
-
-        String localRoot;
-        SLANG_RETURN_ON_FAIL(getLocalPackageRoot(projectRoot, localPackage, localRoot, outError));
-        String origin;
-        String headCommit;
-        if (SLANG_SUCCEEDED(getRepositoryOrigin(localRoot, origin, outError)) &&
-            origin == next.git &&
-            SLANG_SUCCEEDED(getRepositoryHeadCommit(localRoot, headCommit, outError)) &&
-            headCommit == next.commit)
-        {
-            outError = String();
-            continue;
-        }
-        outError = String();
-
-        outError = String("Cannot apply this command while package '") + next.name +
-                   "' is edited: its checkout would have to move to match " + next.ref + " (" +
-                   next.commit + ").";
-        if (previous && previous->commit.getLength())
-        {
-            outError = outError + " The lock currently selects " + previous->ref + " (" +
-                       previous->commit + ").";
-        }
-        String advice =
-            String("Fetch and update do not change an edited checkout, and they stop before "
-                   "applying any other checkout changes. Commit or discard local file changes, "
-                   "then run 'slang package unedit ") +
-            next.name +
-            "'. To discard all local state and restore the locked commit instead, run 'slang "
-            "package unedit " +
-            next.name +
-            " --clean'. Use an override if the local tree should participate in resolution.";
-        appendErrorAdvice(outError, advice);
-        return SLANG_FAIL;
-    }
-    return SLANG_OK;
-}
-
 static SlangResult _update(
     const String& projectRoot,
     bool ignoreOverrides,
@@ -1321,8 +1241,6 @@ static SlangResult _fetch(
     SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
     SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
-    SLANG_RETURN_ON_FAIL(
-        _refuseIfEditedCheckoutsWouldMove(projectRoot, localPackages, &lock, lock, outError));
     if (!allowClean)
     {
         SLANG_RETURN_ON_FAIL(
@@ -1330,7 +1248,7 @@ static SlangResult _fetch(
     }
     List<String> warnings;
     SLANG_RETURN_ON_FAIL(
-        _validateLocalPackages(projectRoot, lock, localPackages, outError, &warnings));
+        _validateLocalPackages(projectRoot, manifest, lock, localPackages, outError, &warnings));
     SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
         projectRoot,
         manifest,
@@ -1423,16 +1341,18 @@ static bool _hasEnabledOverride(const List<LocalPackage>& localPackages)
 {
     for (const auto& localPackage : localPackages)
     {
-        if (!isEditedLocalPackage(localPackage) && localPackage.enabled)
+        if (localPackage.enabled)
             return true;
     }
     return false;
 }
 
-/// Copy workspace registrations for one `update`, optionally treating every override as disabled.
+/// Copy workspace registrations for one `update`, optionally disabling out-of-tree overrides.
 ///
-/// Edits stay active: they own checkouts and must not be reverted by ignoring path overrides.
+/// An in-place override continues to own `deps/NAME` under `--ignore-overrides`; treating it as
+/// inactive could let materialization replace the checkout the user entered through `edit`.
 static void _localPackagesForUpdate(
+    const Manifest& manifest,
     const List<LocalPackage>& localPackages,
     bool ignoreOverrides,
     List<LocalPackage>& outEffective)
@@ -1441,7 +1361,7 @@ static void _localPackagesForUpdate(
     for (const auto& localPackage : localPackages)
     {
         LocalPackage copy = localPackage;
-        if (ignoreOverrides && !isEditedLocalPackage(copy))
+        if (ignoreOverrides && !isInPlaceLocalPackage(manifest, copy))
             copy.enabled = false;
         outEffective.add(copy);
     }
@@ -1464,11 +1384,10 @@ static SlangResult _update(
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
     const bool ignoredEnabledOverrides = ignoreOverrides && _hasEnabledOverride(localPackages);
     List<LocalPackage> effectiveLocalPackages;
-    _localPackagesForUpdate(localPackages, ignoreOverrides, effectiveLocalPackages);
+    _localPackagesForUpdate(manifest, localPackages, ignoreOverrides, effectiveLocalPackages);
     bool useLocalResolver = false;
     for (const auto& localPackage : effectiveLocalPackages)
-        useLocalResolver =
-            useLocalResolver || (!isEditedLocalPackage(localPackage) && localPackage.enabled);
+        useLocalResolver = useLocalResolver || localPackage.enabled;
 
     LockFile previousLock;
     LockFile* previousLockPtr = nullptr;
@@ -1495,8 +1414,7 @@ static SlangResult _update(
     {
         for (auto& localPackage : effectiveLocalPackages)
         {
-            if (!isActiveLocalPackage(localPackage) || isEditedLocalPackage(localPackage) ||
-                localPackage.as.getLength())
+            if (!isActiveLocalPackage(localPackage) || localPackage.as.getLength())
                 continue;
             Index lockedIndex =
                 previousLockPtr ? findLockedPackageIndex(*previousLockPtr, localPackage.name) : -1;
@@ -1529,14 +1447,13 @@ static SlangResult _update(
         SLANG_RETURN_ON_FAIL(
             resolveDependencies(projectRoot, manifest, lock, outError, &warnings, &report));
     }
-    SLANG_RETURN_ON_FAIL(_refuseIfEditedCheckoutsWouldMove(
+    SLANG_RETURN_ON_FAIL(_validateLocalPackages(
         projectRoot,
-        effectiveLocalPackages,
-        previousLockPtr,
+        manifest,
         lock,
-        outError));
-    SLANG_RETURN_ON_FAIL(
-        _validateLocalPackages(projectRoot, lock, effectiveLocalPackages, outError, &warnings));
+        effectiveLocalPackages,
+        outError,
+        &warnings));
     SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
         projectRoot,
         manifest,
@@ -1672,9 +1589,10 @@ static SlangResult _validate(const String& projectRoot, String& outError)
     {
         if (!isActiveLocalPackage(localPackage))
             continue;
-        outError = String("Package cannot be published while local package '") + localPackage.name +
-                   "' is in " +
-                   (isEditedLocalPackage(localPackage) ? "edit mode." : "override mode.");
+        outError =
+            String("Package cannot be published while local package '") + localPackage.name +
+            "' is in " +
+            (isInPlaceLocalPackage(manifest, localPackage) ? "edit mode." : "override mode.");
         return SLANG_FAIL;
     }
 
@@ -1851,7 +1769,7 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
             reportedLockDrift = true;
         }
         issue = String();
-        if (SLANG_FAILED(_validateLocalPackages(projectRoot, lock, localPackages, issue)))
+        if (SLANG_FAILED(_validateLocalPackages(projectRoot, manifest, lock, localPackages, issue)))
         {
             addFact(issue);
             reportedLockDrift = true;
@@ -1927,14 +1845,10 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
 
     for (const auto& package : localPackages)
     {
-        if (isEditedLocalPackage(package))
-        {
+        if (package.enabled && isInPlaceLocalPackage(manifest, package))
             addFact(package.name + ": edited");
-        }
         else if (package.enabled)
-        {
             addFact(package.name + ": override at " + package.path);
-        }
     }
 
     List<String> buildWarnings;
@@ -2384,7 +2298,7 @@ static SlangResult _deployExecutableRuntime(
 
 /// Return whether a tool-owned Git checkout directory is absent.
 ///
-/// Path-only rows and active edits or overrides are skipped: those trees are not fetch's to
+/// Path-only rows and active overrides are skipped: those trees are not fetch's to
 /// create. A missing `deps/NAME` for a Git pin is the case where build can invoke fetch without
 /// writing the lock. A directory that is present but not at the locked commit is left to fetch
 /// or fetch --clean; build does not try to replace it.
@@ -2781,7 +2695,6 @@ static SlangResult _registerLocalPackage(
     const String& name,
     const String& path,
     const String& as,
-    LocalPackageKind kind,
     List<LocalPackage>& ioPackages,
     String& outError)
 {
@@ -2811,7 +2724,6 @@ static SlangResult _registerLocalPackage(
     package.name = name;
     package.path = relativePath;
     package.as = as;
-    package.kind = kind;
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(readLocalPackageManifest(projectRoot, package, manifest, outError));
     ioPackages.add(package);
@@ -2853,10 +2765,9 @@ static SlangResult _edit(const String& projectRoot, const String& name, String& 
     // refuse to replace a dirty checkout, so requiring a pristine tree would leave the one
     // command that preserves the work unavailable in exactly the state that needs it.
     //
-    // What must still hold is that the tree is the repository the lock names. An edited checkout
-    // keeps its published Git identity in the solve, `unedit` decides whether the tree is
-    // committed, and `unedit --clean` restores the locked commit into it; none of that is
-    // meaningful for a directory that is not that repository.
+    // What must still hold is that the tree is the repository the lock names. `edit` turns that
+    // existing checkout into an in-place override; it is not a way to substitute an unrelated
+    // repository under the workspace-owned dependency path.
     if (isGitBackedLockedPackage(*package))
     {
         String origin;
@@ -2886,8 +2797,7 @@ static SlangResult _edit(const String& projectRoot, const String& name, String& 
         projectRoot,
         name,
         destination,
-        String(),
-        LocalPackageKind::Edit,
+        package->version,
         localPackages,
         outError));
     SLANG_RETURN_ON_FAIL(
@@ -2916,7 +2826,7 @@ static SlangResult _unedit(
     List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
     Index localIndex = findLocalPackageIndex(localPackages, name);
-    if (localIndex < 0 || !isEditedLocalPackage(localPackages[localIndex]))
+    if (localIndex < 0 || !isInPlaceLocalPackage(manifest, localPackages[localIndex]))
     {
         outError = String("Package is not editable: ") + name;
         return SLANG_FAIL;
@@ -2999,14 +2909,10 @@ static SlangResult _unedit(
     return SLANG_OK;
 }
 
-/// Return whether `path` is the workspace checkout for `name`, the only tree `override add` may
-/// promote from an in-place edit.
+/// Return whether `path` is the workspace checkout for `name`.
 ///
-/// Consider this example: `color-encoding` is edited at `deps/color-encoding`. Promoting that
-/// edit with `override add color-encoding deps/color-encoding 1.2.0` keeps the files where they
-/// are and lets the next `update` adopt the local manifest. Pointing the override at
-/// `../color-encoding` instead would be a second tree for the same name, so the command refuses
-/// until the user `unedit`s.
+/// `edit color-encoding` and `override add color-encoding deps/color-encoding` name the same local
+/// registration, so callers use this role check instead of storing a second edit representation.
 static SlangResult _isWorkspaceDependencyCheckout(
     const String& projectRoot,
     const Manifest& manifest,
@@ -3073,11 +2979,6 @@ static SlangResult _overrideAdd(
     Index localIndex = findLocalPackageIndex(localPackages, name);
     if (localIndex >= 0)
     {
-        if (!isEditedLocalPackage(localPackages[localIndex]))
-        {
-            outError = String("Package already has a registered local tree: ") + name;
-            return SLANG_FAIL;
-        }
         bool isCheckout = false;
         String relativePath;
         SLANG_RETURN_ON_FAIL(_isWorkspaceDependencyCheckout(
@@ -3088,18 +2989,13 @@ static SlangResult _overrideAdd(
             isCheckout,
             relativePath,
             outError));
-        if (!isCheckout)
+        if (!isInPlaceLocalPackage(manifest, localPackages[localIndex]) || !isCheckout)
         {
-            outError = String("Package '") + name +
-                       "' is editable; override add can promote that checkout in place with '" +
-                       getWorkspaceDepsDirectory(manifest) + "/" + name +
-                       "', or run 'slang package unedit " + name +
-                       "' first to use a different path.";
+            outError = String("Package already has a registered local tree: ") + name;
             return SLANG_FAIL;
         }
-        // The working tree is already the user's. Promoting only changes how the next update
-        // treats its manifest: the files stay, including uncommitted work.
-        localPackages[localIndex].kind = LocalPackageKind::Override;
+        // `edit` already registered this exact in-place override. Re-adding it may supply a new
+        // effective version, but it does not create another local-package representation.
         localPackages[localIndex].path = relativePath;
         localPackages[localIndex].as = providedVersion;
         localPackages[localIndex].enabled = true;
@@ -3116,14 +3012,8 @@ static SlangResult _overrideAdd(
         return SLANG_OK;
     }
 
-    SLANG_RETURN_ON_FAIL(_registerLocalPackage(
-        projectRoot,
-        name,
-        path,
-        providedVersion,
-        LocalPackageKind::Override,
-        localPackages,
-        outError));
+    SLANG_RETURN_ON_FAIL(
+        _registerLocalPackage(projectRoot, name, path, providedVersion, localPackages, outError));
     SLANG_RETURN_ON_FAIL(
         _writeValidatedSearchPathsAfterLocalChange(projectRoot, lock, localPackages, outError));
     fprintf(
@@ -3136,6 +3026,8 @@ static SlangResult _overrideAdd(
 
 static SlangResult _overrideRemove(const String& projectRoot, const String& name, String& outError)
 {
+    Manifest manifest;
+    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
     LockFile lock;
     SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
     Index packageIndex = findLockedPackageIndex(lock, name);
@@ -3147,7 +3039,7 @@ static SlangResult _overrideRemove(const String& projectRoot, const String& name
         outError = String("Package has no registered local tree: ") + name;
         return SLANG_FAIL;
     }
-    if (isEditedLocalPackage(localPackages[localIndex]))
+    if (isInPlaceLocalPackage(manifest, localPackages[localIndex]))
     {
         outError = String("Package is editable; use 'slang package unedit ") + name + "'.";
         return SLANG_FAIL;
@@ -3177,7 +3069,7 @@ static SlangResult _setOverrideEnabled(
     List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
     Index localIndex = findLocalPackageIndex(localPackages, name);
-    if (localIndex < 0 || isEditedLocalPackage(localPackages[localIndex]))
+    if (localIndex < 0)
     {
         outError = String("Package has no local override: ") + name;
         return SLANG_FAIL;
@@ -3219,8 +3111,6 @@ static SlangResult _listOverrides(const String& projectRoot, String& outError)
     Index count = 0;
     for (const auto& package : localPackages)
     {
-        if (isEditedLocalPackage(package))
-            continue;
         if (count++ == 0)
             fprintf(stdout, "Overrides:\n");
         fprintf(

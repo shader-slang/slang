@@ -4,6 +4,7 @@
 
 #include "core/slang-io.h"
 #include "package-json.h"
+#include "package-lock.h"
 
 namespace Slang
 {
@@ -29,6 +30,11 @@ Index findActiveLocalPackageIndex(const List<LocalPackage>& packages, const Stri
     return index >= 0 && isActiveLocalPackage(packages[index]) ? index : -1;
 }
 
+bool isInPlaceLocalPackage(const Manifest& manifest, const LocalPackage& package)
+{
+    return package.path == Path::combine(getWorkspaceDepsDirectory(manifest), package.name);
+}
+
 SlangResult readProjectLocalPackages(
     const String& projectRoot,
     List<LocalPackage>& outPackages,
@@ -44,11 +50,21 @@ SlangResult readProjectLocalPackages(
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(
         readManifest(Path::combine(projectRoot, kManifestName), manifest, outError));
-    String depsDirectory = getWorkspaceDepsDirectory(manifest);
+    LockFile lock;
+    String lockPath = Path::combine(projectRoot, "slang-package-lock.json");
+    if (File::exists(lockPath))
+        SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
     for (auto& package : outPackages)
     {
-        if (isEditedLocalPackage(package))
-            package.path = Path::combine(depsDirectory, package.name);
+        // Schema 1 and 2 stored in-place overrides under `edits` without fields. Normalize that
+        // legacy spelling at the project boundary so every consumer sees one override shape.
+        if (!package.path.getLength())
+        {
+            package.path = Path::combine(getWorkspaceDepsDirectory(manifest), package.name);
+            Index lockedIndex = findLockedPackageIndex(lock, package.name);
+            if (lockedIndex >= 0)
+                package.as = lock.packages[lockedIndex].version;
+        }
     }
     return SLANG_OK;
 }

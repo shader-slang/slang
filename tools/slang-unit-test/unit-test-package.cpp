@@ -509,7 +509,8 @@ SLANG_UNIT_TEST(PackageLocalRegistryJSON)
     packages.add(package);
     package.name = "helper";
     package.path = "deps/helper";
-    package.kind = LocalPackageKind::Edit;
+    package.as = "1.0.0";
+    package.enabled = true;
     packages.add(package);
 
     String error;
@@ -518,16 +519,22 @@ SLANG_UNIT_TEST(PackageLocalRegistryJSON)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLocalPackages(path, roundTrip, error)));
     SLANG_CHECK(roundTrip.getCount() == 2);
     SLANG_CHECK(roundTrip[0].name == "helper");
-    SLANG_CHECK(roundTrip[0].path.getLength() == 0);
-    SLANG_CHECK(isEditedLocalPackage(roundTrip[0]));
+    SLANG_CHECK(roundTrip[0].path == "deps/helper");
+    SLANG_CHECK(roundTrip[0].as == "1.0.0");
     SLANG_CHECK(roundTrip[1].name == "noise");
     SLANG_CHECK(roundTrip[1].path == "../noise");
-    SLANG_CHECK(!isEditedLocalPackage(roundTrip[1]));
     SLANG_CHECK(!roundTrip[1].enabled);
 
     String workspaceText;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(path, workspaceText)));
     SLANG_CHECK(workspaceText.getUnownedSlice().indexOf(UnownedStringSlice("\"enabled\"")) >= 0);
+    SLANG_CHECK(workspaceText.getUnownedSlice().indexOf(UnownedStringSlice("\"edits\"")) < 0);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::writeAllText(path, "{\"schema_version\":2,\"edits\":{\"helper\":{}}}")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLocalPackages(path, roundTrip, error)));
+    SLANG_CHECK(roundTrip.getCount() == 1);
+    SLANG_CHECK(roundTrip[0].name == "helper");
+    SLANG_CHECK(!roundTrip[0].path.getLength());
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         path,
         "{\"schema_version\":1,\"overrides\":{\"noise\":{\"path\":\"../noise\","

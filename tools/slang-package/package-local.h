@@ -13,13 +13,16 @@ namespace PackageTool
 Index findLocalPackageIndex(const List<LocalPackage>& packages, const String& name);
 Index findActiveLocalPackageIndex(const List<LocalPackage>& packages, const String& name);
 
-/// Read `slang-workspace.json`, treating an absent file as no edits or overrides.
+/// Return whether an override uses the checkout path owned by this workspace.
+bool isInPlaceLocalPackage(const Manifest& manifest, const LocalPackage& package);
+
+/// Read `slang-workspace.json`, treating an absent file as no overrides.
 SlangResult readProjectLocalPackages(
     const String& projectRoot,
     List<LocalPackage>& outPackages,
     String& outError);
 
-/// Write edit and override state to `slang-workspace.json`.
+/// Write local override state to `slang-workspace.json`.
 SlangResult writeProjectLocalPackages(
     const String& projectRoot,
     const List<LocalPackage>& packages,

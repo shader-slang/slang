@@ -159,8 +159,7 @@ inline String getWorkspaceBuildDirectory(const Manifest& manifest)
 /// One package in `slang-package-lock.json`. Exactly one of these shapes is legal:
 ///
 /// - Git pin: `git`, `ref`, `version`, and `commit` are set; `path` is empty. Fetch materializes
-///   `workspace.deps/<name>` at that commit. An in-place edit keeps this lock shape; the
-///   gitignored `slang-workspace.json` changes ownership of the checkout.
+///   `workspace.deps/<name>` at that commit.
 /// - Path-only: `path` and `version` are set; `git` is empty. The package is used in place and is
 ///   trusted only when a manifest `path` edge selected it.
 /// - Local override: `git` and `path` are both set. The Git identity is retained, but the tree at
@@ -206,20 +205,13 @@ struct LockFile
     List<LockedPackage> packages;
 };
 
-enum class LocalPackageKind
-{
-    Override,
-    Edit,
-};
-
 struct LocalPackage
 {
     String name;
     String path;
-    /// Optional exact version for an override. When absent, `update` uses the version from the lock
-    /// row being replaced.
+    /// Optional exact version. Legacy `edits` entries omit it; the project reader recovers it from
+    /// the lock when possible.
     String as;
-    LocalPackageKind kind = LocalPackageKind::Override;
     /// Disabled overrides retain their configuration but do not participate in resolution.
     bool enabled = true;
 };
@@ -234,14 +226,9 @@ struct GitWorkingTreeStatus
     String headCommit;
 };
 
-inline bool isEditedLocalPackage(const LocalPackage& package)
-{
-    return package.kind == LocalPackageKind::Edit;
-}
-
 inline bool isActiveLocalPackage(const LocalPackage& package)
 {
-    return isEditedLocalPackage(package) || package.enabled;
+    return package.enabled;
 }
 
 enum class VersionComparison
@@ -282,7 +269,6 @@ struct TagCandidate
     String ref;
     String commit;
     String path;
-    bool isEdit = false;
     SemanticVersion version;
 };
 
