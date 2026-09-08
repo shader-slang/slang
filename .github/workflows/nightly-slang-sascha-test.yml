@@ -51,11 +51,22 @@ jobs:
           # and it widens the pool from ci.yml merge-queue runs alone to every
           # master build -- including sccache-populate, which rebuilds master
           # every 30 minutes.
+          #
+          # The head-repository check is what keeps that widening safe. A fork's
+          # default branch is also called master, and `pull_request` CI uploads
+          # its build into this repository's artifact store, so a branch-name
+          # match alone would let a fork PR hand us the slangc.exe we then run
+          # with GH_TOKEN in the environment. Requiring the run's head
+          # repository to be this repository restricts us to code that reached
+          # master or the merge queue, which is the trust boundary the previous
+          # `--event merge_group` query had implicitly.
           echo "Looking for the newest unexpired '$ARTIFACT_NAME' built from master..."
           CANDIDATES=$(gh api \
             "repos/${{ github.repository }}/actions/artifacts?name=${ARTIFACT_NAME}&per_page=100" \
             --jq '[.artifacts[]
                    | select(.expired == false)
+                   | select(.workflow_run.head_repository_id
+                            == .workflow_run.repository_id)
                    | select(.workflow_run.head_branch == "master"
                             or (.workflow_run.head_branch
                                 | startswith("gh-readonly-queue/master/")))]
