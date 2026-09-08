@@ -912,6 +912,28 @@ SLANG_UNIT_TEST(PackageToolBuild)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("undefined identifier")) >= 0);
 }
 
+SLANG_UNIT_TEST(PackageToolBuildRejectsCleanAndYes)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    const char* initArguments[] = {"slang-package", "init"};
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+
+    const char* cleanArguments[] = {"slang-package", "build", "--clean"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(cleanArguments), cleanArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown build option")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--clean")) >= 0);
+
+    const char* yesArguments[] = {"slang-package", "build", "--yes"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(yesArguments), yesArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown build option")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--yes")) >= 0);
+}
+
 SLANG_UNIT_TEST(PackageToolBundleFlags)
 {
     TemporaryDirectory temp;

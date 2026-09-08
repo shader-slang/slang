@@ -256,7 +256,10 @@ out-of-date checkouts are materialized as needed. Path dependencies remain at th
 locked relative locations. When dependencies exist
 but a fresh checkout has no lock, fetch performs the initial solve, shows the same selection report
 as update, confirms it, and writes the first lock. Later fetches reproduce that lock without
-reselecting versions, so fetch remains the appropriate command for normal builds and CI.
+reselecting versions. CI that already has a committed lock should `fetch` or `build`; `build`
+fetches missing locked trees itself and never rewrites that lock. A first clone with no lock can
+start with `build`, which runs fetch and then update `--yes`. Use an explicit `fetch` to
+materialize without building, to pass `--clean`, or to confirm a first lock interactively.
 
 Every lock row has an exact `version`. A Git row also records the selected `ref` and `commit`; a
 range-selected release uses its `vMAJOR.MINOR.PATCH` tag as the ref. A path row records its
@@ -282,8 +285,8 @@ toolchain is omitted unless its constraint fails. Resolver Git clones
 under `.slang/cache/` may still be populated so the tool can inspect available tags. A real update
 prints that report and asks before applying the exact graph it just resolved, unless that graph
 already matches the committed lock. Declining leaves the workspace unchanged and still succeeds.
-Pass `--yes` for a non-interactive invocation. Normal CI and developer builds use
-`slang package fetch`; an inconsistent existing lock is an error.
+Pass `--yes` for a non-interactive invocation. Reproducing a committed lock uses
+`slang package fetch` or `slang package build`; an inconsistent existing lock is an error.
 
 The tool invokes the `git` executable from the system path. Existing Git credential and SSH
 configuration therefore applies without separate package-tool authentication. Git locations
@@ -324,7 +327,11 @@ package's tree. Neither named form materializes packages or walks the legal grap
 
 `build` requires a legal, buildable workspace. It deliberately permits the generated license
 placeholder, edits, overrides, and local path dependencies because those do not prevent
-compilation.
+compilation. If a tool-owned Git checkout is missing, or if there is no lock and the manifest
+has dependencies, build runs `fetch` first (without `--clean`). A missing lock makes fetch run
+`update --yes` so a first clone can build without a prompt. An existing lock is never rewritten.
+Each of those hand-offs prints why the inner command is running. A dirty checkout that would
+require `--clean` still fails; run `slang package fetch --clean` yourself.
 
 `fetch` and `update` always verify the legal graph from selected manifests **before** they clear
 search paths or materialize `deps/`. A Git pin without an active local path is read at its locked

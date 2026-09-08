@@ -39,8 +39,10 @@ static void _printHelp(bool experimental = false)
         "  init             Create a package manifest and standard directories.\n"
         "  fetch [--clean] [--yes] [--skip-validate]\n"
         "                   Materialize dependencies from the lock file.\n"
-        "                   Stops before changing anything when a checkout holds local\n"
-        "                   state; --clean discards that state instead.\n"
+        "                   Does not rewrite an existing lock. If the lock is missing and\n"
+        "                   the manifest has dependencies, runs update (prompt unless\n"
+        "                   --yes). Stops before changing anything when a checkout holds\n"
+        "                   local state; --clean discards that state instead.\n"
         "  update [--ignore-overrides] [--clean] [--dry-run] [--minimal] [--yes]\n"
         "         [--skip-validate]\n"
         "                   Re-resolve dependencies and update the lock file.\n"
@@ -54,6 +56,10 @@ static void _printHelp(bool experimental = false)
         "                   --clean discards that state instead.\n"
         "  build [--skip-validate]\n"
         "                   Build the distributable source bundle and docs.\n"
+        "                   Runs fetch if a locked Git checkout is missing, or if there is\n"
+        "                   no lock and the manifest has dependencies (fetch then update\n"
+        "                   --yes). Does not rewrite an existing lock. Does not accept\n"
+        "                   --clean or --yes.\n"
         "  run [name] [args...]\n"
         "                   Interpret a configured executable from the source bundle.\n"
         "  docs [--print]   Open build/docs/index.md with the registered application.\n"
@@ -1072,6 +1078,15 @@ static void _warnSkippedSourceValidation()
         "(--skip-validate).\n");
 }
 
+/// Tell the user that this command is invoking another, and why.
+///
+/// Build may run fetch, and fetch with no lock may run update. Those hand-offs are easy to miss
+/// in a wall of resolver output, so each one prints a one-line notice first.
+static void _announceSubcommand(const char* because, const char* command)
+{
+    fprintf(stdout, "slang-package: %s; running '%s'.\n", because, command);
+}
+
 /// Join nonzero Git checkout facts, omitting zero ahead/behind/stash counts.
 ///
 /// Consider this example: a lock pins `color` at commit A, and `deps/color` has one untracked
@@ -1290,7 +1305,6 @@ static SlangResult _fetch(
     bool skipValidate,
     String& outError)
 {
-    SLANG_UNUSED(assumeYes);
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
 
@@ -1303,7 +1317,9 @@ static SlangResult _fetch(
                        "to resolve. Run 'slang package update' to create an empty lock.";
             return SLANG_FAIL;
         }
-        fprintf(stdout, "No lock file exists; resolving the initial dependency graph.\n");
+        _announceSubcommand(
+            "slang-package-lock.json is missing",
+            assumeYes ? "slang package update --yes" : "slang package update");
         return _update(
             projectRoot,
             false,
@@ -2381,8 +2397,44 @@ static SlangResult _deployExecutableRuntime(
     return SLANG_FAIL;
 }
 
+/// Return whether a tool-owned Git checkout directory is absent.
+///
+/// Path-only rows and active edits or overrides are skipped: those trees are not fetch's to
+/// create. A missing `deps/NAME` for a Git pin is the case where build can invoke fetch without
+/// writing the lock. A directory that is present but not at the locked commit is left to fetch
+/// or fetch --clean; build does not try to replace it.
+static bool _lockedGitCheckoutIsMissing(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const LockFile& lock,
+    const List<LocalPackage>& localPackages)
+{
+    String depsRoot = Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest));
+    for (const auto& package : lock.packages)
+    {
+        if (findActiveLocalPackageIndex(localPackages, package.name) >= 0 ||
+            !isGitBackedLockedPackage(package) || package.path.getLength())
+        {
+            continue;
+        }
+        String destination = Path::combine(depsRoot, package.name);
+        SlangPathType pathType;
+        if (SLANG_FAILED(Path::getPathType(destination, &pathType)) ||
+            pathType != SLANG_PATH_TYPE_DIRECTORY)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 /// Copy exported source under `build/bundle/source`. With the experimental opt-in, also compile
 /// enabled `.slang-module` output and host executables into explicitly marked directories.
+///
+/// If a locked Git checkout is missing, this runs fetch first (without `--clean`). If there is no
+/// lock and the manifest has dependencies, it also runs fetch, which runs update with `--yes` so
+/// a first clone can `slang package build` without a prompt. An existing lock is never rewritten.
+/// Each of those hand-offs prints why it is running the inner command.
 static SlangResult _build(
     const String& projectRoot,
     bool experimental,
@@ -2391,6 +2443,28 @@ static SlangResult _build(
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
+
+    String lockPath = Path::combine(projectRoot, kLockName);
+    bool ranFetch = false;
+    if (File::exists(lockPath))
+    {
+        LockFile lock;
+        List<LocalPackage> localPackages;
+        SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
+        SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+        if (_lockedGitCheckoutIsMissing(projectRoot, manifest, lock, localPackages))
+        {
+            _announceSubcommand("a locked Git checkout is missing", "slang package fetch");
+            SLANG_RETURN_ON_FAIL(_fetch(projectRoot, false, false, skipValidate, outError));
+            ranFetch = true;
+        }
+    }
+    else if (manifest.dependencies.getCount())
+    {
+        _announceSubcommand("slang-package-lock.json is missing", "slang package fetch");
+        SLANG_RETURN_ON_FAIL(_fetch(projectRoot, false, true, skipValidate, outError));
+        ranFetch = true;
+    }
 
     List<PrimaryModule> primaryModules;
     List<ExportedSourceFile> sourceFiles;
@@ -2404,7 +2478,7 @@ static SlangResult _build(
         skipValidate));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
-    if (skipValidate)
+    if (skipValidate && !ranFetch)
         _warnSkippedSourceValidation();
 
     const bool buildModules = experimental && manifest.workspace.bundle.modules;

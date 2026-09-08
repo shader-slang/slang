@@ -97,8 +97,10 @@ All three `describe` commands should print `v1.0.0`, even though `v1.1.0` alread
 though the later encoding release retracts `1.0.0`. Fetch never consults retractions and never
 rewrites the lock.
 
-Use fetch for ordinary development and for CI. Pass `--clean` only when you intend to replace a
-dirty or unowned checkout.
+Use fetch to materialize a committed lock without building. `build` also fetches missing locked
+trees and, when there is no lock, runs fetch then update `--yes` so a first clone can bundle
+without a prompt. Pass `--clean` only on fetch or update when you intend to replace a dirty or
+unowned checkout; build does not accept `--clean`.
 
 Fetch and update never discard local work as a side effect. Both inspect the checkouts the current
 lock owns before doing anything else, and stop with an error naming each one that holds local
@@ -330,6 +332,11 @@ slang package fetch
 slang package status
 slang package --experimental build
 ```
+
+`fetch` is optional when CI only needs a bundle: `build` fetches any missing locked trees itself.
+A first clone with no lock also works: `build` runs fetch, which runs update `--yes` and writes
+the first lock. An existing lock is never rewritten. Keep an explicit `fetch` when you want
+materialization without building, or when you need `--clean`.
 
 Drop `--experimental` when CI only needs the stable source bundle and documentation. Keep it only
 when CI deliberately tests unstable module or host outputs.

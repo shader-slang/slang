@@ -121,7 +121,10 @@ or `slang-workspace.json`.
   the publishable-package rules to locked trees in this workspace.
 - `build` checks that the available graph is legal and buildable, emits the source bundle under
   `build/bundle/source`, collects Markdown under `build/docs/`, and regenerates
-  `build/search-paths`.
+  `build/search-paths`. If a locked Git checkout is missing, it runs fetch first. If there is no
+  lock and the manifest has dependencies, fetch runs update `--yes` so the first clone can build
+  without a prompt. An existing lock is never rewritten. Build does not accept `--clean` or
+  `--yes`.
 
 ### Current gaps and pitfalls
 
@@ -247,14 +250,17 @@ version, dependencies, and exports selected for this workspace.
   slang package build
   ```
 
-  This is the normal clean-clone and CI path. CI should not run `update`.
+  This is the normal clean-clone and CI path. With a committed lock, `build` fetches any missing
+  locked trees first and does not rewrite that lock. With no lock, `build` runs fetch, which runs
+  update `--yes` to write the first lock. `fetch` remains the command for prefetch, `--clean`, and
+  CI that wants materialization without building. CI that already has a committed lock should not
+  run `update`.
 
-From this point forward, the clean-clone flow has a lock and starts with fetch:
+From this point forward, a clone can start with build:
 
 ```sh
 git clone <image-viewer-url>
 cd image-viewer
-slang package fetch
 slang package build
 ```
 
@@ -1095,7 +1101,16 @@ Local package registrations remain protected by their own workflow.
 
 **Combination:** `update --dry-run --clean` is rejected. Fetch may combine `--clean` with
 `--skip-validate`. When fetch would actually discard local checkout state, it lists every affected
-package and asks once. Pass `--yes` only when that destruction was pre-approved.
+package and asks once. Pass `--yes` only when that destruction was pre-approved. Build does not
+accept `--clean`.
+
+### `fetch --yes`
+
+**Use it when:** fetch has no lock and would run update, or `--clean` would discard checkout
+state, and there is no interactive terminal.
+
+**It does not change:** an existing lock. Build does not take `--yes`; a missing lock makes the
+nested update run as `update --yes` so a first clone can `slang package build` without a prompt.
 
 ### `fetch --skip-validate`, `update --skip-validate`, and `build --skip-validate`
 
@@ -1110,7 +1125,9 @@ declaration rules, and graph-wide import uniqueness.
 other than source-layout and publish checks. It always prints a warning.
 
 **Combinations:** `update --dry-run --skip-validate` still runs the legal graph from cache and
-still cannot inspect remote source layout. `validate` intentionally has no skip flag.
+still cannot inspect remote source layout. `build --skip-validate` passes the flag through to
+fetch when build has to materialize missing locked trees. `validate` intentionally has no skip
+flag.
 
 ### `override add NAME PATH [AS]`
 
@@ -1135,8 +1152,9 @@ subcommand. Every other journey in this chapter is unaffected by it.
 `slang package help`, `-help`, and `--help` print stable package help, including source `run`.
 Binary run and host build behavior appear in `slang package --experimental help`. `init`,
 `status`, `tree`, and `edit` accept no additional arguments; `validate` accepts an optional package
-name or `--all`; `unedit` accepts `--clean` and `--yes`, and `docs` accepts `--print`. `test` is
-present but returns a not-implemented error.
+name or `--all`; `build` accepts only `--skip-validate` (not `--clean` or `--yes`); `unedit`
+accepts `--clean` and `--yes`, and `docs` accepts `--print`. `test` is present but returns a
+not-implemented error.
 
 ## Gaps, tensions, and intentional asymmetries
 
@@ -1278,13 +1296,18 @@ them or update this chapter and its regression tests in the same change.
 
 ### Resolve and reproduce contract
 
-- `update` is the only normal command that reselects versions and writes a graph lock.
+- `update` is the command that reselects versions and writes a graph lock. Fetch with an
+  existing lock does not reselect. Fetch with dependencies and no lock delegates to update
+  (prompt, or `--yes`). Build never rewrites an existing lock; with no lock it delegates to
+  fetch, which delegates to update `--yes`.
 - `update --dry-run` writes neither lock nor dependency checkouts.
 - A real update reports one selected in-memory graph, confirms it when it differs from the
   committed lock, and applies that exact graph. A declined confirmation applies nothing and is not
   an error.
 - Fetch with an existing lock selects nothing and does not rewrite that lock. Fetch with
-  dependencies and no lock performs the confirmed initial solve and writes the first lock.
+  dependencies and no lock announces that it is running update, then performs the confirmed
+  initial solve and writes the first lock. Build with no lock announces fetch, then that
+  nested fetch announces update `--yes`.
 - A real update writes the lock only after the candidate graph validates.
 - Every reachable dependency has one exact lock row; Git rows include ref and commit.
 - Path packages remain in place; Git packages materialize under the configured deps directory.
@@ -1345,8 +1368,11 @@ them or update this chapter and its regression tests in the same change.
 
 - Fetch and update always enforce the legal graph **before** materialize, then publish-check
   changed Git and local selections and enforce source layout and import uniqueness across the
-  closure after materialize. `--skip-validate` skips only that second stage. Build enforces graph
-  legality and buildability. Bare `validate` checks workspace publishability and lock portability.
+  closure after materialize. `--skip-validate` skips only that second stage. Build never rewrites
+  an existing lock. If a tool-owned Git checkout is missing, build invokes fetch (without
+  `--clean`). If the lock itself is missing and the manifest has dependencies, that fetch runs
+  update `--yes` so a first clone can build without a prompt. Each hand-off prints why the inner
+  command is running. Bare `validate` checks workspace publishability and lock portability.
   `validate NAME` and `validate --all` check locked trees against this workspace lock.
 - `--skip-validate` exists only on fetch, update, and build; it warns and keeps lock, manifest,
   closure, toolchain, export, and dirty-checkout checks.
@@ -1418,7 +1444,10 @@ Start with these unit tests when changing a journey:
 - Toolchain selection: `PackageToolSlangToolchain`, `PackageResolverSlangToolchain`.
 - Dependency editing and graph inspection: `PackageToolDependencyCommandsAndInitialFetch`.
 - Stable source build and experimental binary artifacts: `PackageToolBuild`, `PackageToolRun`,
-  `PackageToolExecutableRequiresWorkspaceSource`.
+  `PackageToolExecutableRequiresWorkspaceSource`,
+  `PackageToolBuildFetchesMissingLockedCheckouts`,
+  `PackageToolBuildCreatesFirstLockViaFetch`,
+  `PackageToolBuildRejectsCleanAndYes`.
 
 The upstream-add and upstream-split journeys do not yet have end-to-end command tests named after
 them. Add those anchors when the next resolver or command-lifecycle change touches those cases.

@@ -2,6 +2,7 @@
 
 #include "core/slang-io.h"
 #include "core/slang-process-util.h"
+#include "core/slang-string-util.h"
 #include "package-git.h"
 #include "package-json.h"
 #include "package-local.h"
@@ -9,6 +10,22 @@
 #include "package-tool.h"
 #include "package-validate.h"
 #include "unit-test/slang-unit-test.h"
+
+#include <stdio.h>
+
+#if defined(_WIN32)
+#include <io.h>
+#define SLANG_PACKAGE_DUP _dup
+#define SLANG_PACKAGE_DUP2 _dup2
+#define SLANG_PACKAGE_FILENO _fileno
+#define SLANG_PACKAGE_CLOSE _close
+#else
+#include <unistd.h>
+#define SLANG_PACKAGE_DUP dup
+#define SLANG_PACKAGE_DUP2 dup2
+#define SLANG_PACKAGE_FILENO fileno
+#define SLANG_PACKAGE_CLOSE close
+#endif
 
 using namespace Slang;
 using namespace Slang::PackageTool;
@@ -34,6 +51,60 @@ static SlangResult _makeTemporaryDirectory(TemporaryDirectory& outDirectory)
     SLANG_RETURN_ON_FAIL(File::remove(outDirectory.path));
     return Path::createDirectoryRecursive(outDirectory.path) ? SLANG_OK : SLANG_FAIL;
 }
+
+/// Capture stdout for the duration of an in-process package-tool invocation.
+///
+/// Announcements from fetch and build go to stdout, while `executeInDirectory` only returns
+/// `outError`. Tests that need to see "running 'slang package fetch'" use this around the call.
+struct StdoutCapture
+{
+    String path;
+    int savedFd = -1;
+    FILE* file = nullptr;
+
+    ~StdoutCapture() { restore(); }
+
+    SlangResult start()
+    {
+        SLANG_RETURN_ON_FAIL(
+            File::generateTemporary(UnownedStringSlice("slang-package-stdout"), path));
+        SLANG_RETURN_ON_FAIL(File::remove(path));
+        file = fopen(path.getBuffer(), "w+");
+        if (!file)
+            return SLANG_FAIL;
+        fflush(stdout);
+        savedFd = SLANG_PACKAGE_DUP(SLANG_PACKAGE_FILENO(stdout));
+        if (savedFd < 0)
+            return SLANG_FAIL;
+        if (SLANG_PACKAGE_DUP2(SLANG_PACKAGE_FILENO(file), SLANG_PACKAGE_FILENO(stdout)) < 0)
+            return SLANG_FAIL;
+        return SLANG_OK;
+    }
+
+    SlangResult finish(String& outText)
+    {
+        fflush(stdout);
+        SLANG_RETURN_ON_FAIL(restore());
+        return File::readAllText(path, outText);
+    }
+
+    SlangResult restore()
+    {
+        if (savedFd >= 0)
+        {
+            fflush(stdout);
+            SLANG_PACKAGE_DUP2(savedFd, SLANG_PACKAGE_FILENO(stdout));
+            SLANG_PACKAGE_CLOSE(savedFd);
+            savedFd = -1;
+        }
+        if (file)
+        {
+            fclose(file);
+            file = nullptr;
+        }
+        return SLANG_OK;
+    }
+};
 
 static SlangResult _runGit(const List<String>& arguments, ExecuteResult& outResult)
 {
@@ -1508,7 +1579,7 @@ SLANG_UNIT_TEST(PackageToolNamedValidateAndLocalPublishableChecks)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("grain:")) >= 0);
 }
 
-static SlangResult _initRootWithGitNoise(
+static SlangResult _prepareRootWithUnsolvedGitNoise(
     const String& projectRoot,
     const String& repository,
     String& outError)
@@ -1540,7 +1611,15 @@ static SlangResult _initRootWithGitNoise(
     dependency.git = repository;
     dependency.version = ">=1.0.0";
     root.dependencies.add(dependency);
-    SLANG_RETURN_ON_FAIL(writeManifest(rootManifestPath, root, outError));
+    return writeManifest(rootManifestPath, root, outError);
+}
+
+static SlangResult _initRootWithGitNoise(
+    const String& projectRoot,
+    const String& repository,
+    String& outError)
+{
+    SLANG_RETURN_ON_FAIL(_prepareRootWithUnsolvedGitNoise(projectRoot, repository, outError));
     const char* updateArguments[] = {"slang-package", "update", "--yes"};
     return executeInDirectory(
         projectRoot,
@@ -1583,6 +1662,86 @@ SLANG_UNIT_TEST(PackageToolFetchInstallsLockedCommitAfterMovedTag)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         getRepositoryHeadCommit(Path::combine(temp.path, "deps/noise"), headCommit, error)));
     SLANG_CHECK(headCommit == lockedCommit);
+}
+
+SLANG_UNIT_TEST(PackageToolBuildFetchesMissingLockedCheckouts)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    String repository = Path::combine(temp.path, "upstream-noise");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initRootWithGitNoise(temp.path, repository, error)));
+
+    PackageTool::LockFile lockBefore;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockBefore, error)));
+    SLANG_CHECK_ABORT(lockBefore.packages.getCount() == 1);
+    const String lockedCommit = lockBefore.packages[0].commit;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(Path::removeNonEmpty(Path::combine(temp.path, "deps/noise"))));
+
+    StdoutCapture stdoutCapture;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(stdoutCapture.start()));
+    const char* buildArguments[] = {"slang-package", "build"};
+    SlangResult buildResult =
+        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error);
+    String stdoutText;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(stdoutCapture.finish(stdoutText)));
+    SLANG_CHECK(SLANG_SUCCEEDED(buildResult));
+    SLANG_CHECK(
+        stdoutText.getUnownedSlice().indexOf(UnownedStringSlice(
+            "slang-package: a locked Git checkout is missing; running 'slang package fetch'.")) >=
+        0);
+    SLANG_CHECK(
+        stdoutText.getUnownedSlice().indexOf(UnownedStringSlice("running 'slang package update")) <
+        0);
+
+    PackageTool::LockFile lockAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockAfter, error)));
+    SLANG_CHECK(lockFilesEqual(lockBefore, lockAfter));
+
+    String headCommit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        getRepositoryHeadCommit(Path::combine(temp.path, "deps/noise"), headCommit, error)));
+    SLANG_CHECK(headCommit == lockedCommit);
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/bundle/source/noise.slang")));
+}
+
+SLANG_UNIT_TEST(PackageToolBuildCreatesFirstLockViaFetch)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    String repository = Path::combine(temp.path, "upstream-noise");
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_prepareRootWithUnsolvedGitNoise(temp.path, repository, error)));
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "slang-package-lock.json")));
+
+    StdoutCapture stdoutCapture;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(stdoutCapture.start()));
+    const char* buildArguments[] = {"slang-package", "build"};
+    SlangResult buildResult =
+        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error);
+    String stdoutText;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(stdoutCapture.finish(stdoutText)));
+    SLANG_CHECK(SLANG_SUCCEEDED(buildResult));
+    SLANG_CHECK(
+        stdoutText.getUnownedSlice().indexOf(UnownedStringSlice(
+            "slang-package: slang-package-lock.json is missing; running 'slang package fetch'.")) >=
+        0);
+    SLANG_CHECK(
+        stdoutText.getUnownedSlice().indexOf(UnownedStringSlice(
+            "slang-package: slang-package-lock.json is missing; running 'slang package "
+            "update --yes'.")) >= 0);
+
+    PackageTool::LockFile lock;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lock, error)));
+    SLANG_CHECK(lock.packages.getCount() == 1);
+    SLANG_CHECK(lock.packages[0].name == "noise");
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "deps/noise/src/noise.slang")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/bundle/source/noise.slang")));
 }
 
 SLANG_UNIT_TEST(PackageToolFetchRejectsIllegalGraphBeforeMaterialize)
