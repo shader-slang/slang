@@ -207,6 +207,42 @@ T addToDouble<T : IFractional>(T left, double right)
 
 These conversions make familiar cases like `T(1)`, `T(0.5)`, etc. available for use in generic numeric code, but they are not only usable with literals.
 
+## Constraining Built-In Scalar Representations
+
+The extensible numeric interfaces admit user-defined numeric types.
+In contrast, Slang's built-in `vector`, `matrix`, and cooperative-vector types require compiler-supported scalar element representations.
+A generic algorithm that explicitly forms one of those built-in shaped types must therefore constrain its element type both to the required numeric capabilities and to an appropriate built-in scalar family.
+
+For example, this function requires a built-in floating-point element representation because its signature explicitly uses `vector<T, N>`:
+
+```slang
+vector<T, N> sineVector<T, let N : int>(vector<T, N> value)
+    where T : IBuiltinScalarFloatingPointType & ITrigonometricFunctions
+{
+    return sin(value);
+}
+```
+
+`IBuiltinScalarFloatingPointType` combines the compiler-supported floating-point representation constraint with `IScalarFloatingPoint`.
+The explicit `ITrigonometricFunctions` constraint states the additional mathematical operation used by the function.
+
+The module provides corresponding built-in restrictions for its scalar capability families:
+
+- `IBuiltinScalarShapedType`
+- `IBuiltinScalarAdditive`
+- `IBuiltinScalarNumeric`
+- `IBuiltinScalarSignedNumeric`
+- `IBuiltinScalarIntegerType`
+- `IBuiltinScalarUnsignedIntegerType`
+- `IBuiltinScalarSignedIntegerType`
+- `IBuiltinScalarFractional`
+- `IBuiltinScalarFloatingPointType`
+- `IBuiltinScalarElementaryFunctions`
+- `IBuiltinScalarReal`
+
+Use the extensible `IScalar...` interfaces when an algorithm should admit user-defined scalar representations.
+Use the corresponding `IBuiltinScalar...` definition when the algorithm also depends on a compiler-supported built-in representation.
+
 ## Choosing the Right Numeric Interface
 
 Different numeric types support different operations, and sometimes the same symbol will denote semantically distinct operations between types (e.g., the infix `/` operator acts quite differently between the built-in integer and floating-point types).
@@ -228,6 +264,19 @@ The typical arithmetic operations are divided as follows:
 - `IFloatingPoint` refines `IFractional`, and provides operations tied to a floating-point representation, including rounding, floating-point remainder, splitting, sign copying, and classification.
 
 The separation between `IFractional` and `IFloatingPoint` allows developers to introduce custom fixed-point, ratio, dual-number, and interval types without forcing them to provide the illusion of an IEEE-like representation.
+
+The independent `IDotProduct` capability provides a dot product between values with the same logical shape.
+For scalar values the operation is ordinary multiplication, while for vectors it returns the sum of the component-wise products:
+
+```slang
+T.Scalar sumOfProducts<T : IDotProduct>(T left, T right)
+{
+    return dot(left, right);
+}
+```
+
+Built-in numeric scalars and ordinary vectors conform to `IDotProduct`.
+The interface does not define a dot-product interpretation for matrices.
 
 The above interfaces all support both scalar and shaped types.
 When a generic algorithm only works with scalar types, then one of the scalar-specific refinements should be used:
@@ -400,6 +449,7 @@ The `slang.numerics.differentiable` module re-exports all of the definitions fro
 The differentiable numerics module provides various `IDifferentiable...` counterparts to interfaces from the base numerics module:
 
 - `IDifferentiableNumericShapedType`
+- `IDifferentiableDotProduct`
 - `IDifferentiableFractional`
 - `IDifferentiableFloatingPoint`
 - `IDifferentiableRealOrderingFunctions`
@@ -432,6 +482,7 @@ Known limitations include:
 
 - Matrices of built-in integer types do not currently conform to the numeric interfaces.
 - Cooperative vectors of built-in floating-point types satisfy `IReal`, but do not currently conform to `IFloatingPoint`.
+- Dot-product conformances currently cover built-in numeric scalars and ordinary vectors, but not matrices or cooperative vectors.
 - Cooperative matrices do not currently conform to the numeric interfaces.
 
 Because the numerics modules are experimental, the set of supported conformances is expected to change as the design and implementation of the module evolves.

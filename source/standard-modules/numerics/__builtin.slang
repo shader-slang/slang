@@ -117,6 +117,24 @@ SLANG_NUMERICS_VECTOR_COMPARISON_ADAPTER(__numericsBuiltinLessEqual, <=)
 #undef SLANG_NUMERICS_VECTOR_COMPARISON_ADAPTER
 #undef SLANG_NUMERICS_SCALAR_COMPARISON_ADAPTER
 
+[__readNone]
+[__unsafeForceInlineEarly]
+public T __numericsBuiltinDot<T : __BuiltinFloatingPointType, let N : int>(
+    vector<T, N> left,
+    vector<T, N> right)
+{
+    return ::dot(left, right);
+}
+
+[__readNone]
+[__unsafeForceInlineEarly]
+public T __numericsBuiltinDot<T : __BuiltinIntegerType, let N : int>(
+    vector<T, N> left,
+    vector<T, N> right)
+{
+    return ::dot(left, right);
+}
+
 #define SLANG_NUMERICS_INTEGER_VECTOR_BINARY_ADAPTER(NAME, OP)                        \
     [__readNone] [__unsafeForceInlineEarly]                                     \
     public vector<T, N> NAME<T : __BuiltinIntegerType, let N : int>(            \

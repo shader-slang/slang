@@ -25,14 +25,14 @@ T oneValue<T : INumeric>()
     return T.one();
 }
 
-T fromBuiltinInteger<T : INumeric, TSource : __BuiltinIntegerType>(TSource value)
+T fromBuiltinInteger<T : INumeric, TSource : IBuiltinScalarIntegerType>(TSource value)
 {
     return T(value);
 }
 
 T fromBuiltinFloatingPoint<
     T : IFractional,
-    TSource : __BuiltinFloatingPointType>(TSource value)
+    TSource : IBuiltinScalarFloatingPointType>(TSource value)
 {
     return T(value);
 }
@@ -228,6 +228,29 @@ T realStep<T : IReal>(T edge, T value)
     return step(edge, value);
 }
 
+T.Scalar dotValues<T : IDotProduct>(T left, T right)
+{
+    return dot(left, right);
+}
+
+vector<T, N> sineVector<T, let N : int>(vector<T, N> value)
+    where T : IBuiltinScalarFloatingPointType & ITrigonometricFunctions
+{
+    return sin(value);
+}
+
+void requireBuiltinScalarShapedType<T : IBuiltinScalarShapedType>() {}
+void requireBuiltinScalarAdditive<T : IBuiltinScalarAdditive>() {}
+void requireBuiltinScalarNumeric<T : IBuiltinScalarNumeric>() {}
+void requireBuiltinScalarSignedNumeric<T : IBuiltinScalarSignedNumeric>() {}
+void requireBuiltinScalarIntegerType<T : IBuiltinScalarIntegerType>() {}
+void requireBuiltinScalarUnsignedIntegerType<T : IBuiltinScalarUnsignedIntegerType>() {}
+void requireBuiltinScalarSignedIntegerType<T : IBuiltinScalarSignedIntegerType>() {}
+void requireBuiltinScalarFractional<T : IBuiltinScalarFractional>() {}
+void requireBuiltinScalarFloatingPointType<T : IBuiltinScalarFloatingPointType>() {}
+void requireBuiltinScalarElementaryFunctions<T : IBuiltinScalarElementaryFunctions>() {}
+void requireBuiltinScalarReal<T : IBuiltinScalarReal>() {}
+
 T legacyArithmeticIdentity<T : IArithmetic>(T value)
 {
     return value;
@@ -257,6 +280,18 @@ vector<T, 2> legacyBuiltinIntegerVector<T : __BuiltinIntegerType>(vector<T, 2> v
 [numthreads(1, 1, 1)]
 void main()
 {
+    requireBuiltinScalarShapedType<float>();
+    requireBuiltinScalarAdditive<int>();
+    requireBuiltinScalarNumeric<uint>();
+    requireBuiltinScalarSignedNumeric<float>();
+    requireBuiltinScalarIntegerType<int>();
+    requireBuiltinScalarUnsignedIntegerType<uint>();
+    requireBuiltinScalarSignedIntegerType<int>();
+    requireBuiltinScalarFractional<float>();
+    requireBuiltinScalarFloatingPointType<float>();
+    requireBuiltinScalarElementaryFunctions<float>();
+    requireBuiltinScalarReal<float>();
+
     int integerScalar = addValues(1, 2);
     int3 integerVector = multiplyValues(int3(1, 2, 3), int3(4, 5, 6));
     int3 signedIntegerVector = negateValue(integerVector);
@@ -309,6 +344,10 @@ void main()
     vector<bool, 3> vectorFinite = floatingPointIsFinite(float3(1.5));
     matrix<bool, 2, 2> matrixInfinite = floatingPointIsInfinite(float2x2(1.0 / 0.0));
     float2x2 matrixElementary = elementaryCurve(float2x2(0.5));
+    float scalarDotProduct = dotValues(2.0, 3.0);
+    float vectorDotProduct = dotValues(float3(1.0, 2.0, 3.0), float3(4.0, 5.0, 6.0));
+    int integerVectorDotProduct = dotValues(int3(1, 2, 3), int3(4, 5, 6));
+    float3 publicBuiltinSine = sineVector(float3(0.5));
 
     float scalarMinimum = realMinimum(1.0, 2.0);
     float3 vectorMaximum = realMaximum(float3(1.0), float3(2.0));
@@ -390,7 +429,8 @@ void main()
         rowMajorSplitFractional[0][0] + rowMajorElementary[0][0] + scalarClamped +
         vectorSaturated.x + rowMajorClamped[0][0] + vectorInterpolated.x + vectorSmoothed.x +
         rowMajorSmoothed[0][0] + scalarStep + vectorStep.x + rowMajorStep[0][0] +
-        legacyFloatVector.x + legacyFloatMatrix[0][0] + float(legacyIntegerVector.x);
+        legacyFloatVector.x + legacyFloatMatrix[0][0] + float(legacyIntegerVector.x) +
+        scalarDotProduct + vectorDotProduct + float(integerVectorDotProduct) + publicBuiltinSine.x;
 }
 
 [shader("compute")]

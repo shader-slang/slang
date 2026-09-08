@@ -12,6 +12,15 @@ public interface IDifferentiableNumericShapedType : INumericShapedType, IDiffere
     static This fromScalar(Scalar value);
 }
 
+/// Supports a differentiable dot product between values with the same logical shape.
+public interface IDifferentiableDotProduct : IDotProduct, IDifferentiableNumericShapedType
+{
+    /// Returns the dot product of this value and `other` and propagates derivatives through both
+    /// operands.
+    [Differentiable]
+    Scalar dotProductWith(This other);
+}
+
 /// Supports differentiable signed arithmetic with division.
 ///
 /// This interface refines the representation-independent `IFractional` contract without making
@@ -23,7 +32,7 @@ public interface IDifferentiableFractional : IFractional, IDifferentiableNumeric
 
     /// Constructs a value from any builtin floating-point representation.
     [Differentiable]
-    __init<TSource : __BuiltinFloatingPointType>(TSource value);
+    __init<TSource : IBuiltinScalarFloatingPointType>(TSource value);
 
     [Differentiable]
     This plus(This other);

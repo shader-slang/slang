@@ -11,9 +11,14 @@ public extension bool : IBooleanMask
     [__unsafeForceInlineEarly] bool all() { return this; }
 }
 
+// The nominal joins below let each conformance publish one unambiguous set of Scalar, Mask, and
+// fromScalar witnesses for interface branches that share INumericShapedType. Equivalent
+// conjunction aliases currently fail during conformance checking; see #12874.
+interface __IScalarNumericDotProduct : IDotProduct, IScalarNumeric {}
+
 #define SLANG_NUMERICS_SCALAR_CONFORMANCE(TYPE)                                       \
     public extension TYPE                                                       \
-        : IComponentwiseOrdered, IPartiallyOrdered, IScalarNumeric              \
+        : IComponentwiseOrdered, IPartiallyOrdered, __IScalarNumericDotProduct  \
     {                                                                            \
         typealias Scalar = TYPE;                                                 \
         typealias Mask = bool;                                                   \
@@ -50,6 +55,8 @@ public extension bool : IBooleanMask
         This minus(This other) { return this - other; }                          \
         [__unsafeForceInlineEarly]                                               \
         This multipliedBy(This other) { return this * other; }                   \
+        [__unsafeForceInlineEarly]                                               \
+        Scalar dotProductWith(This other) { return this * other; }               \
     }
 
 SLANG_NUMERICS_SCALAR_CONFORMANCE(int8_t)
@@ -293,8 +300,10 @@ public extension<let R : int, let C : int, let L : int>
     }
 }
 
+interface __IIntegerVectorDotProduct : IDotProduct, IIntegerType {}
+
 public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
-    vector<T, N> : IIntegerType
+    vector<T, N> : __IIntegerVectorDotProduct
 {
     typealias Scalar = T;
     typealias Mask = vector<bool, N>;
@@ -323,6 +332,8 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     This minus(This other) { return this.sub(other); }
     [__unsafeForceInlineEarly]
     This multipliedBy(This other) { return this.mul(other); }
+    [__unsafeForceInlineEarly]
+    Scalar dotProductWith(This other) { return __numericsBuiltinDot(this, other); }
     [__unsafeForceInlineEarly]
     This quotientWhenDividedBy(This divisor)
     {
@@ -386,8 +397,10 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
     }
 }
 
+interface __IFractionalVectorDotProduct : IDotProduct, IFractional {}
+
 public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int>
-    vector<T, N> : IFractional
+    vector<T, N> : __IFractionalVectorDotProduct
 {
     [__unsafeForceInlineEarly]
     __init<TSource : __BuiltinIntegerType>(TSource value)
@@ -407,6 +420,8 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
     This minus(This other) { return this.sub(other); }
     [__unsafeForceInlineEarly]
     This multipliedBy(This other) { return this.mul(other); }
+    [__unsafeForceInlineEarly]
+    Scalar dotProductWith(This other) { return __numericsBuiltinDot(this, other); }
     [__unsafeForceInlineEarly]
     This dividedBy(This other) { return this.div(other); }
     [__unsafeForceInlineEarly]

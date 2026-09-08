@@ -50,7 +50,7 @@ T.Mask integerLessThan<T : IIntegerType>(T left, T right)
     return left < right;
 }
 
-T constructFromBuiltinInteger<T : INumeric, TSource : __BuiltinIntegerType>(TSource value)
+T constructFromBuiltinInteger<T : INumeric, TSource : IBuiltinScalarIntegerType>(TSource value)
 {
     return T(value);
 }

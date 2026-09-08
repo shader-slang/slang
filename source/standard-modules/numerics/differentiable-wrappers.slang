@@ -11,13 +11,23 @@ implementing differentiable;
 // This file exposes conventional operators and free functions for the differentiable interface
 // requirements. Importing `slang.numerics.differentiable` makes these overloads available, and
 // declarations in this module are found before the corresponding declarations brought in by its
-// exported import of `slang.numerics`. The free functions intentionally use the base module's -10
-// fallback rank, while the operators use its -4 fallback rank. Those negative ranks keep concrete
-// and legacy core overloads preferred; raising only selected differentiable wrappers would make the
-// overload policy depend on incidental operation-by-operation exceptions. The bodies dispatch to
-// differentiable requirements so that builtin and user-defined conformances can use spellings such
-// as `sin(value)` instead of `value.sin()` without making differentiability part of the base
-// contracts.
+// exported import of `slang.numerics`. Most free functions intentionally use the base module's -10
+// fallback rank, while the operators use its -4 fallback rank. The dot-product overload needs no
+// explicit rank because its refined constraint makes it more specific than the base wrapper, while
+// concrete core overloads remain more specific than either wrapper. The negative ranks elsewhere
+// keep concrete and legacy core overloads preferred; raising only selected differentiable wrappers
+// would make the overload policy depend on incidental operation-by-operation exceptions. The
+// bodies dispatch to differentiable requirements so that builtin and user-defined conformances can
+// use spellings such as `sin(value)` instead of `value.sin()` without making differentiability part
+// of the base contracts.
+
+[__readNone]
+[Differentiable]
+[ForceInline]
+public T.Scalar dot<T : IDifferentiableDotProduct>(T left, T right)
+{
+    return left.dotProductWith(right);
+}
 
 [__readNone]
 [Differentiable]

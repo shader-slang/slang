@@ -1,5 +1,49 @@
 implementing numerics;
 
+// These aliases combine an extensible scalar capability with the sealed builtin representation
+// domain needed by builtin vector, matrix, cooperative-vector, and intrinsic declarations. The
+// public spelling deliberately describes the complete useful constraint; clients should not need
+// to name the implementation-level `__Builtin...` interfaces directly.
+
+/// Restricts `IScalarShapedType` to builtin arithmetic scalar representations.
+public typealias IBuiltinScalarShapedType = __BuiltinArithmeticType & IScalarShapedType;
+
+/// Restricts `IScalarAdditive` to builtin arithmetic scalar representations.
+public typealias IBuiltinScalarAdditive = __BuiltinArithmeticType & IScalarAdditive;
+
+/// Restricts `IScalarNumeric` to builtin arithmetic scalar representations.
+public typealias IBuiltinScalarNumeric = __BuiltinArithmeticType & IScalarNumeric;
+
+/// Restricts `IScalarSignedNumeric` to builtin signed arithmetic scalar representations.
+public typealias IBuiltinScalarSignedNumeric =
+    __BuiltinSignedArithmeticType & IScalarSignedNumeric;
+
+/// Restricts `IScalarIntegerType` to builtin integer scalar representations.
+public typealias IBuiltinScalarIntegerType = __BuiltinIntegerType & IScalarIntegerType;
+
+/// Restricts `IScalarUnsignedIntegerType` to builtin unsigned integer scalar representations.
+public typealias IBuiltinScalarUnsignedIntegerType =
+    __BuiltinIntegerType & IScalarUnsignedIntegerType;
+
+/// Restricts `IScalarSignedIntegerType` to builtin signed integer scalar representations.
+public typealias IBuiltinScalarSignedIntegerType =
+    __BuiltinIntegerType & IScalarSignedIntegerType;
+
+/// Restricts `IScalarFractional` to builtin floating-point scalar representations.
+public typealias IBuiltinScalarFractional =
+    __BuiltinFloatingPointType & IScalarFractional;
+
+/// Restricts `IScalarFloatingPoint` to builtin floating-point scalar representations.
+public typealias IBuiltinScalarFloatingPointType =
+    __BuiltinFloatingPointType & IScalarFloatingPoint;
+
+/// Restricts `IScalarElementaryFunctions` to builtin floating-point scalar representations.
+public typealias IBuiltinScalarElementaryFunctions =
+    __BuiltinFloatingPointType & IScalarElementaryFunctions;
+
+/// Restricts `IScalarReal` to builtin floating-point scalar representations.
+public typealias IBuiltinScalarReal = __BuiltinFloatingPointType & IScalarReal;
+
 /// Represents a scalar or shaped Boolean value that supports component-wise logical operations and
 /// horizontal reductions.
 public interface IBooleanMask
@@ -40,6 +84,16 @@ public interface IScalarShapedType : INumericShapedType
 {
     __constraint Scalar == This;
     __constraint Mask == bool;
+}
+
+/// Supports a dot product between values with the same logical shape.
+///
+/// A scalar conformance returns the ordinary product. A vector conformance returns the sum of
+/// component-wise products. This interface does not define matrix semantics.
+public interface IDotProduct : INumericShapedType
+{
+    /// Returns the dot product of this value and `other`.
+    Scalar dotProductWith(This other);
 }
 
 /// Supports component-wise equality.
@@ -91,13 +145,13 @@ public interface ITotallyOrdered : IPartiallyOrdered
 /// Supports explicit construction from every builtin integer type.
 public interface IConstructibleFromBuiltinInteger
 {
-    __init<TSource : __BuiltinIntegerType>(TSource value);
+    __init<TSource : IBuiltinScalarIntegerType>(TSource value);
 }
 
 /// Supports explicit construction from every builtin floating-point type.
 public interface IConstructibleFromBuiltinFloatingPoint
 {
-    __init<TSource : __BuiltinFloatingPointType>(TSource value);
+    __init<TSource : IBuiltinScalarFloatingPointType>(TSource value);
 }
 
 /// Supports addition and subtraction for logical scalars and shaped values.

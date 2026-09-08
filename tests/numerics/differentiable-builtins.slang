@@ -44,7 +44,7 @@ T genericDifferentiableSin<T : IDifferentiableTrigonometricFunctions>(T value)
 [Differentiable]
 T constructFromBuiltinFloatingPoint<
     T : IDifferentiableFractional,
-    TSource : __BuiltinFloatingPointType>(TSource value)
+    TSource : IBuiltinScalarFloatingPointType>(TSource value)
 {
     return T(value);
 }

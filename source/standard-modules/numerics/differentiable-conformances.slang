@@ -90,8 +90,14 @@ implementing differentiable;
     SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
         maximum, __differentiableNumericsMaximum)
 
+// These nominal joins share the inherited associated-type witnesses between the differentiable
+// and dot-product branches. See the corresponding base conformances and #12874.
+interface __IScalarDifferentiableFloatingPointDotProduct
+    : IDifferentiableDotProduct, IScalarDifferentiableFloatingPoint
+{}
+
 #define SLANG_NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES(TYPE)                       \
-    public extension TYPE : IScalarDifferentiableFloatingPoint                  \
+    public extension TYPE : __IScalarDifferentiableFloatingPointDotProduct       \
     {                                                                            \
         [Differentiable] [ForceInline]                                           \
         static This fromScalar(Scalar value) { return value; }                   \
@@ -103,6 +109,8 @@ implementing differentiable;
         }                                                                        \
         SLANG_NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS                         \
         SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS                     \
+        [Differentiable] [ForceInline]                                           \
+        Scalar dotProductWith(This other) { return this.mul(other); }            \
     }                                                                            \
                                                                                  \
     public extension TYPE : IDifferentiableExponentialFunctions                 \
@@ -141,10 +149,14 @@ SLANG_NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES(double)
 
 #undef SLANG_NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES
 
+interface __IDifferentiableFloatingPointVectorDotProduct
+    : IDifferentiableDotProduct, IDifferentiableFloatingPoint
+{}
+
 public extension<
     T : __BuiltinFloatingPointType & IScalarDifferentiableFloatingPoint,
     let N : int>
-    vector<T, N> : IDifferentiableFloatingPoint
+    vector<T, N> : __IDifferentiableFloatingPointVectorDotProduct
 {
     [Differentiable] [ForceInline]
     static This fromScalar(Scalar value)
@@ -160,6 +172,13 @@ public extension<
 
     SLANG_NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS
     SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS
+
+    [Differentiable]
+    [ForceInline]
+    Scalar dotProductWith(This other)
+    {
+        return __differentiableNumericsDot(this, other);
+    }
 }
 
 public extension<

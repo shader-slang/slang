@@ -19,7 +19,7 @@ bool allLessThan<T : IComponentwiseOrdered>(T left, T right)
 
 T constructFromBuiltinFloatingPoint<
     T : IFractional,
-    TSource : __BuiltinFloatingPointType>(TSource value)
+    TSource : IBuiltinScalarFloatingPointType>(TSource value)
 {
     return T(value);
 }

@@ -19,10 +19,16 @@
 // HLSL-NOT: __numericInterface
 // HLSL-NOT: IElementaryFunctions
 // HLSL-NOT: IReal
+// HLSL: dot(
+// HLSL-NOT: __numericsBuiltinDot
+// HLSL-NOT: IDotProduct
 
 // SPIRV-NOT: __numericInterface
 // SPIRV-NOT: IElementaryFunctions
 // SPIRV-NOT: IReal
+// SPIRV: OpDot
+// SPIRV-NOT: __numericsBuiltinDot
+// SPIRV-NOT: IDotProduct
 // SPIRV: OpExtInst {{.*}} Sin
 // SPIRV-NOT: __numericInterface
 // SPIRV-NOT: IElementaryFunctions
@@ -59,6 +65,11 @@ T reciprocal<T : IFractional>(T value)
     return rcp(value);
 }
 
+T.Scalar dotProduct<T : IDotProduct>(T left, T right)
+{
+    return dot(left, right);
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -67,6 +78,7 @@ void computeMain()
     float2x2 matrixReciprocal = reciprocal(float2x2(2.0));
     int4 integerResult = integerCurve(integerInput[0], integerInput[1]);
     bool ordered = orderedMask(floatingInput[0], floatingInput[1]).all();
+    float dotted = dotProduct(floatingInput[0], floatingInput[1]);
     outputBuffer[0] =
-        floatingResult + float4(integerResult) + float(ordered) + matrixReciprocal[0][0];
+        floatingResult + float4(integerResult) + float(ordered) + matrixReciprocal[0][0] + dotted;
 }

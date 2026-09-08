@@ -115,6 +115,16 @@ SLANG_NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsRemainder, 
 [__readNone]
 [Differentiable]
 [__unsafeForceInlineEarly]
+public T __differentiableNumericsDot<T : __BuiltinFloatingPointType, let N : int>(
+    vector<T, N> left,
+    vector<T, N> right)
+{
+    return ::dot(left, right);
+}
+
+[__readNone]
+[Differentiable]
+[__unsafeForceInlineEarly]
 public void __differentiableNumericsSinCos<T : __BuiltinFloatingPointType>(
     T value,
     out T sineResult,

@@ -22,7 +22,7 @@ struct WrappedInt : IScalarSignedIntegerType
     typealias Mask = bool;
     typealias ShiftAmount = int;
 
-    __init<TSource : __BuiltinIntegerType>(TSource value)
+    __init<TSource : IBuiltinScalarIntegerType>(TSource value)
     {
         this.value = __intCast<int>(value);
     }
@@ -132,7 +132,7 @@ struct SignedIntegerPair<T : IScalarSignedIntegerType> : ISignedIntegerType
     typealias Mask = vector<bool, 2>;
     typealias ShiftAmount = vector<int, 2>;
 
-    __init<TSource : __BuiltinIntegerType>(TSource value)
+    __init<TSource : IBuiltinScalarIntegerType>(TSource value)
     {
         let scalar = T(value);
         x = scalar;
@@ -282,7 +282,7 @@ T integerShiftCurve<T : IIntegerType>(T value, T.ShiftAmount left, T.ShiftAmount
     return value >> right;
 }
 
-T constructFromBuiltinInteger<T : INumeric, TSource : __BuiltinIntegerType>(TSource value)
+T constructFromBuiltinInteger<T : INumeric, TSource : IBuiltinScalarIntegerType>(TSource value)
 {
     return T(value);
 }

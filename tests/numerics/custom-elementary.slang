@@ -21,12 +21,12 @@ struct CustomReal
     typealias Scalar = CustomReal;
     typealias Mask = bool;
 
-    __init<TSource : __BuiltinIntegerType>(TSource value)
+    __init<TSource : IBuiltinScalarIntegerType>(TSource value)
     {
         this.value = __realCast<float>(value);
     }
 
-    __init<TSource : __BuiltinFloatingPointType>(TSource value)
+    __init<TSource : IBuiltinScalarFloatingPointType>(TSource value)
     {
         this.value = __realCast<float>(value);
     }
@@ -261,8 +261,8 @@ T realCurve<T : IReal>(T value, T other)
 
 T constructFromBuiltinTypes<
     T : IFractional,
-    TInteger : __BuiltinIntegerType,
-    TFloatingPoint : __BuiltinFloatingPointType>(
+    TInteger : IBuiltinScalarIntegerType,
+    TFloatingPoint : IBuiltinScalarFloatingPointType>(
     TInteger integerValue,
     TFloatingPoint floatingValue)
 {
