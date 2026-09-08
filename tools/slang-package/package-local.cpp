@@ -3,17 +3,12 @@
 #include "package-local.h"
 
 #include "core/slang-io.h"
-#include "package-git.h"
 #include "package-json.h"
-#include "package-lock.h"
 
 namespace Slang
 {
 namespace PackageTool
 {
-
-static const char* const kManifestName = "slang-package.json";
-static const char* const kWorkspaceName = "slang-workspace.json";
 
 Index findLocalPackageIndex(const List<LocalPackage>& packages, const String& name)
 {
@@ -41,47 +36,13 @@ SlangResult readProjectLocalPackages(
     List<LocalPackage>& outPackages,
     String& outError)
 {
-    String path = Path::combine(projectRoot, kWorkspaceName);
+    String path = Path::combine(projectRoot, kWorkspaceFileName);
     if (!File::exists(path))
     {
         outPackages.clear();
         return SLANG_OK;
     }
-    SLANG_RETURN_ON_FAIL(readLocalPackages(path, outPackages, outError));
-    Manifest manifest;
-    SLANG_RETURN_ON_FAIL(
-        readManifest(Path::combine(projectRoot, kManifestName), manifest, outError));
-    LockFile lock;
-    String lockPath = Path::combine(projectRoot, "slang-package-lock.json");
-    if (File::exists(lockPath))
-        SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
-    for (auto& package : outPackages)
-    {
-        // Schema 1 and 2 stored in-place overrides under `edits` without fields. Normalize that
-        // legacy spelling at the project boundary so every consumer sees one override shape.
-        if (!package.path.getLength())
-        {
-            package.path = Path::combine(getWorkspaceDepsDirectory(manifest), package.name);
-            Index lockedIndex = findLockedPackageIndex(lock, package.name);
-            if (lockedIndex >= 0)
-                package.as = lock.packages[lockedIndex].version;
-            else
-            {
-                String packageRoot = Path::combine(projectRoot, package.path);
-                String tag;
-                SemanticVersion version;
-                bool foundTag = false;
-                String tagError;
-                if (SLANG_SUCCEEDED(
-                        findVersionTagAtHead(packageRoot, tag, version, foundTag, tagError)) &&
-                    foundTag)
-                {
-                    package.as = formatExactVersion(version);
-                }
-            }
-        }
-    }
-    return SLANG_OK;
+    return readLocalPackages(path, outPackages, outError);
 }
 
 SlangResult writeProjectLocalPackages(
@@ -89,7 +50,7 @@ SlangResult writeProjectLocalPackages(
     const List<LocalPackage>& packages,
     String& outError)
 {
-    return writeLocalPackages(Path::combine(projectRoot, kWorkspaceName), packages, outError);
+    return writeLocalPackages(Path::combine(projectRoot, kWorkspaceFileName), packages, outError);
 }
 
 SlangResult getLocalPackageRoot(
@@ -117,7 +78,8 @@ SlangResult readLocalPackageManifest(
 {
     String root;
     SLANG_RETURN_ON_FAIL(getLocalPackageRoot(projectRoot, package, root, outError));
-    SLANG_RETURN_ON_FAIL(readManifest(Path::combine(root, kManifestName), outManifest, outError));
+    SLANG_RETURN_ON_FAIL(
+        readManifest(Path::combine(root, kManifestFileName), outManifest, outError));
     if (outManifest.name != package.name)
     {
         outError = String("Registered local package '") + package.name + "' has manifest name '" +

@@ -12,10 +12,11 @@ namespace Slang
 namespace PackageTool
 {
 
-/// Schema version accepted by `slang-package.json` and `slang-package-lock.json`.
-inline constexpr Int kSchemaVersion = 1;
-/// Schema version written by the machine-local `slang-workspace.json`.
-inline constexpr Int kWorkspaceSchemaVersion = 2;
+/// File-format identifier written as `"version": 1` in package JSON files.
+inline constexpr Int kFormatVersion = 1;
+inline constexpr char const* kManifestFileName = "slang-pkg-manifest.json";
+inline constexpr char const* kLockFileName = "slang-pkg-lock.json";
+inline constexpr char const* kWorkspaceFileName = "slang-pkg-workspace.json";
 
 struct Dependency
 {
@@ -65,8 +66,8 @@ struct BundleSettings
     bool source = true;
 };
 
-/// Root-only workspace layout from `slang-package.json`. Dependency manifests may contain these
-/// fields, but only the manifest that starts resolution controls materialization and output.
+/// Root-only workspace layout from `slang-pkg-manifest.json`. Dependency manifests may contain
+/// these fields, but only the manifest that starts resolution controls materialization and output.
 struct WorkspaceSettings
 {
     String depsDirectory;
@@ -75,8 +76,8 @@ struct WorkspaceSettings
     List<Exclusion> exclusions;
 };
 
-/// Native host output from `build.host` in `slang-package.json`. Dependency manifests may declare
-/// this field, but only the workspace that starts a build produces executables.
+/// Native host output from `build.host` in `slang-pkg-manifest.json`. Dependency manifests may
+/// declare this field, but only the workspace that starts a build produces executables.
 ///
 /// Each entry in `executables` is both the output filename (without a platform suffix) and the
 /// stem of a workspace primary: `video-preview` requires an exported `video-preview.slang`.
@@ -88,7 +89,7 @@ struct HostSettings
     String defaultExecutable;
 };
 
-/// Root-only compilation settings from the top-level `build` object in `slang-package.json`.
+/// Root-only compilation settings from the top-level `build` object in `slang-pkg-manifest.json`.
 ///
 /// This is not `workspace.build`, which names the output directory (`build/` by default). `build`
 /// is how the package is compiled. Schema 1 only understands `host`; later keys (additional
@@ -156,15 +157,15 @@ inline String getWorkspaceBuildDirectory(const Manifest& manifest)
                                                          : "build";
 }
 
-/// One package in `slang-package-lock.json`. Exactly one of these shapes is legal:
+/// One package in `slang-pkg-lock.json`. Exactly one of these shapes is legal:
 ///
 /// - Git pin: `git`, `ref`, `version`, and `commit` are set; `path` is empty. Fetch materializes
 ///   `workspace.deps/<name>` at that commit.
 /// - Path-only: `path` and `version` are set; `git` is empty. The package is used in place and is
 ///   trusted only when a manifest `path` edge selected it.
 /// - Local override: `git` and `path` are both set. The Git identity is retained, but the tree at
-///   `path` is used instead; `version` is the version it provides and `slang-workspace.json` must
-///   register the same path.
+///   `path` is used instead; `version` is the version it provides and `slang-pkg-workspace.json`
+///   must register the same path.
 struct LockedPackage
 {
     String name;
@@ -209,8 +210,8 @@ struct LocalPackage
 {
     String name;
     String path;
-    /// Optional exact version. Legacy `edits` entries omit it; the project reader recovers it from
-    /// the lock when possible.
+    /// Optional exact version identity for the solver. Omit only when the lock already records it
+    /// and a later command will fill it in before resolve.
     String as;
     /// Disabled overrides retain their configuration but do not participate in resolution.
     bool enabled = true;
@@ -356,8 +357,8 @@ void addUnadoptedWorkspaceExclusionWarnings(
 /// Append `advice` as a following line of `ioError`.
 ///
 /// Path-bearing errors are written without a trailing period so the path stays copyable, for
-/// example `Cannot read JSON file: /tmp/pkg/slang-package.json`. Gluing the next sentence on the
-/// same line with a space makes `Run` look like part of the filename. A newline keeps the path
+/// example `Cannot read JSON file: /tmp/pkg/slang-pkg-manifest.json`. Gluing the next sentence on
+/// the same line with a space makes `Run` look like part of the filename. A newline keeps the path
 /// intact and still lets `slang-package: error:` introduce the whole report.
 inline void appendErrorAdvice(String& ioError, const char* advice)
 {

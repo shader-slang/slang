@@ -26,9 +26,6 @@ namespace Slang
 namespace PackageTool
 {
 
-static const char* const kManifestName = "slang-package.json";
-static const char* const kLockName = "slang-package-lock.json";
-
 static void _printHelp(bool experimental = false)
 {
     fprintf(
@@ -60,7 +57,7 @@ static void _printHelp(bool experimental = false)
         "  dependency add <name> --git <url> --ref <ref> --as <version>\n"
         "  dependency add <name> --path <path> --as <version>\n"
         "  dependency remove <name> | dependency list\n"
-        "                   Manage direct dependencies in slang-package.json.\n"
+        "                   Manage direct dependencies in slang-pkg-manifest.json.\n"
         "  override add <name> <path> [as]\n"
         "  override enable|disable|remove <name> | override list\n"
         "                   Manage retained local dependency overrides.\n"
@@ -87,7 +84,7 @@ static void _printHelp(bool experimental = false)
         "Global options:\n"
         "  --experimental   Enable experimental commands and build features.\n"
         "\n"
-        "Commands load slang-package.json, slang-package-lock.json, and slang-workspace.json\n"
+        "Commands load slang-pkg-manifest.json, slang-pkg-lock.json, and slang-pkg-workspace.json\n"
         "from the nearest ancestor directory that contains the manifest. Nested packages, such\n"
         "as dependencies under deps/, keep their own root when they have a manifest.\n"
         "`init` still creates a package in the current directory.\n");
@@ -155,7 +152,7 @@ SlangResult discoverPackageRoot(const String& startDirectory, String& outRoot, S
     String directory = current;
     for (;;)
     {
-        if (File::exists(Path::combine(directory, kManifestName)))
+        if (File::exists(Path::combine(directory, kManifestFileName)))
         {
             outRoot = directory;
             return SLANG_OK;
@@ -166,7 +163,7 @@ SlangResult discoverPackageRoot(const String& startDirectory, String& outRoot, S
         directory = parent;
     }
 
-    outError = String("Cannot find slang-package.json from ") + current +
+    outError = String("Cannot find slang-pkg-manifest.json from ") + current +
                ". Run this command from a package directory or a subdirectory of a package.";
     return SLANG_FAIL;
 }
@@ -317,7 +314,7 @@ static SlangResult _materialize(
         if (isLocalOverrideLockedPackage(package))
         {
             outError = String("Locked local override '") + package.name +
-                       "' is not registered in slang-workspace.json.";
+                       "' is not registered in slang-pkg-workspace.json.";
             return SLANG_FAIL;
         }
 
@@ -489,12 +486,12 @@ static SlangResult _readProjectManifest(
     Manifest& outManifest,
     String& outError)
 {
-    return readManifest(Path::combine(projectRoot, kManifestName), outManifest, outError);
+    return readManifest(Path::combine(projectRoot, kManifestFileName), outManifest, outError);
 }
 
 static SlangResult _readProjectLock(const String& projectRoot, LockFile& outLock, String& outError)
 {
-    return readLockFile(Path::combine(projectRoot, kLockName), outLock, outError);
+    return readLockFile(Path::combine(projectRoot, kLockFileName), outLock, outError);
 }
 
 /// Verify that the lock is exactly the reachable graph required by its stored package manifests.
@@ -587,14 +584,14 @@ static SlangResult _validateLocalPackages(
         if (package->path.getLength() && package->path != localPackage.path)
         {
             outError = String("Locked path for package '") + package->name +
-                       "' does not match slang-workspace.json. Run "
+                       "' does not match slang-pkg-workspace.json. Run "
                        "'slang package update'.";
             return SLANG_FAIL;
         }
         if (localPackage.as.getLength() && package->version != localPackage.as)
         {
             outError = String("Locked version for local override '") + package->name +
-                       "' does not match slang-workspace.json. Run "
+                       "' does not match slang-pkg-workspace.json. Run "
                        "'slang package update'.";
             return SLANG_FAIL;
         }
@@ -616,7 +613,7 @@ static SlangResult _validateLocalPackages(
             findActiveLocalPackageIndex(localPackages, package.name) < 0)
         {
             outError = String("Locked local package '") + package.name +
-                       "' is not registered in slang-workspace.json. Run "
+                       "' is not registered in slang-pkg-workspace.json. Run "
                        "'slang package update' to restore a published pin.";
             return SLANG_FAIL;
         }
@@ -681,7 +678,7 @@ static SlangResult _validateGraphAfterLocalRegistrationChange(
 
         Manifest manifest;
         if (SLANG_FAILED(
-                readManifest(Path::combine(packageRoot, kManifestName), manifest, outError)))
+                readManifest(Path::combine(packageRoot, kManifestFileName), manifest, outError)))
         {
             outError = String("Cannot read the dependency manifest of locked package '") +
                        package.name + "'. " + outError;
@@ -780,7 +777,8 @@ static SlangResult _validateLockedPackagePublishable(
         packageRoot,
         outError));
     Manifest manifest;
-    if (SLANG_FAILED(readManifest(Path::combine(packageRoot, kManifestName), manifest, outError)))
+    if (SLANG_FAILED(
+            readManifest(Path::combine(packageRoot, kManifestFileName), manifest, outError)))
     {
         outError = String("Cannot validate package '") + package.name + "': " + outError;
         return SLANG_FAIL;
@@ -846,10 +844,10 @@ static SlangResult _validateChangedPublishablePackages(
 
 static SlangResult _init(const String& projectRoot, String& outError)
 {
-    String manifestPath = Path::combine(projectRoot, kManifestName);
+    String manifestPath = Path::combine(projectRoot, kManifestFileName);
     if (File::exists(manifestPath))
     {
-        outError = "slang-package.json already exists.";
+        outError = "slang-pkg-manifest.json already exists.";
         return SLANG_FAIL;
     }
 
@@ -904,7 +902,7 @@ static SlangResult _init(const String& projectRoot, String& outError)
         ".slang/",
         "deps/",
         "build/",
-        "slang-workspace.json",
+        "slang-pkg-workspace.json",
     };
     StringBuilder updatedIgnore;
     updatedIgnore << gitIgnore;
@@ -946,7 +944,7 @@ static SlangResult _writeValidatedProjectManifest(
     const Manifest& manifest,
     String& outError)
 {
-    String temporaryPath = Path::combine(projectRoot, ".slang-package.json.validate.tmp");
+    String temporaryPath = Path::combine(projectRoot, ".slang-pkg-manifest.json.validate.tmp");
     if (SLANG_FAILED(writeManifest(temporaryPath, manifest, outError)))
         return SLANG_FAIL;
     Manifest validatedManifest;
@@ -954,7 +952,7 @@ static SlangResult _writeValidatedProjectManifest(
     File::remove(temporaryPath);
     if (SLANG_FAILED(result))
         return result;
-    return writeManifest(Path::combine(projectRoot, kManifestName), manifest, outError);
+    return writeManifest(Path::combine(projectRoot, kManifestFileName), manifest, outError);
 }
 
 static SlangResult _dependencyAdd(
@@ -975,7 +973,7 @@ static SlangResult _dependencyAdd(
     SLANG_RETURN_ON_FAIL(_writeValidatedProjectManifest(projectRoot, manifest, outError));
     fprintf(
         stdout,
-        "%s dependency '%s' in slang-package.json. Run 'slang package status', then "
+        "%s dependency '%s' in slang-pkg-manifest.json. Run 'slang package status', then "
         "'slang package update'.\n",
         replacing ? "Updated" : "Added",
         dependency.name.getBuffer());
@@ -999,7 +997,7 @@ static SlangResult _dependencyRemove(
     SLANG_RETURN_ON_FAIL(_writeValidatedProjectManifest(projectRoot, manifest, outError));
     fprintf(
         stdout,
-        "Removed dependency '%s' from slang-package.json. Run 'slang package status', then "
+        "Removed dependency '%s' from slang-pkg-manifest.json. Run 'slang package status', then "
         "'slang package update'.\n",
         name.getBuffer());
     return SLANG_OK;
@@ -1213,17 +1211,17 @@ static SlangResult _fetch(
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
 
-    String lockPath = Path::combine(projectRoot, kLockName);
+    String lockPath = Path::combine(projectRoot, kLockFileName);
     if (!File::exists(lockPath))
     {
         if (!manifest.dependencies.getCount())
         {
-            outError = "fetch requires slang-package-lock.json when there is no dependency graph "
+            outError = "fetch requires slang-pkg-lock.json when there is no dependency graph "
                        "to resolve. Run 'slang package update' to create an empty lock.";
             return SLANG_FAIL;
         }
         _announceSubcommand(
-            "slang-package-lock.json is missing",
+            "slang-pkg-lock.json is missing",
             assumeYes ? "slang package update --yes" : "slang package update");
         return _update(
             projectRoot,
@@ -1394,7 +1392,7 @@ static SlangResult _update(
 
     LockFile previousLock;
     LockFile* previousLockPtr = nullptr;
-    String lockPath = Path::combine(projectRoot, kLockName);
+    String lockPath = Path::combine(projectRoot, kLockFileName);
     if (File::exists(lockPath))
     {
         SLANG_RETURN_ON_FAIL(readLockFile(lockPath, previousLock, outError));
@@ -1474,7 +1472,7 @@ static SlangResult _update(
         fprintf(
             stderr,
             "slang-package: warning: ignoring enabled overrides for this update; they remain in "
-            "slang-workspace.json.\n");
+            "slang-pkg-workspace.json.\n");
     }
     if (dryRun)
     {
@@ -1575,7 +1573,7 @@ static SlangResult _update(
     {
         fprintf(
             stdout,
-            "The workspace contains local package state and requires slang-workspace.json.\n");
+            "The workspace contains local package state and requires slang-pkg-workspace.json.\n");
     }
     return SLANG_OK;
 }
@@ -1599,7 +1597,7 @@ static SlangResult _validate(const String& projectRoot, String& outError)
         return SLANG_FAIL;
     }
 
-    String lockPath = Path::combine(projectRoot, kLockName);
+    String lockPath = Path::combine(projectRoot, kLockFileName);
     LockFile lock;
     if (File::exists(lockPath))
     {
@@ -1607,7 +1605,7 @@ static SlangResult _validate(const String& projectRoot, String& outError)
     }
     else if (manifest.dependencies.getCount())
     {
-        outError = "Package dependencies require slang-package-lock.json before publishing.";
+        outError = "Package dependencies require slang-pkg-lock.json before publishing.";
         return SLANG_FAIL;
     }
     SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
@@ -1667,12 +1665,12 @@ static SlangResult _validateAllLockedPackages(const String& projectRoot, String&
     Manifest rootManifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, rootManifest, outError));
     LockFile lock;
-    String lockPath = Path::combine(projectRoot, kLockName);
+    String lockPath = Path::combine(projectRoot, kLockFileName);
     if (!File::exists(lockPath))
     {
         if (rootManifest.dependencies.getCount())
         {
-            outError = "Package dependencies require slang-package-lock.json.";
+            outError = "Package dependencies require slang-pkg-lock.json.";
             return SLANG_FAIL;
         }
         fprintf(stdout, "No locked packages to validate.\n");
@@ -1725,7 +1723,7 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
     List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
 
-    String lockPath = Path::combine(projectRoot, kLockName);
+    String lockPath = Path::combine(projectRoot, kLockFileName);
     LockFile lock;
     bool hasLock = File::exists(lockPath);
     if (hasLock)
@@ -1754,12 +1752,12 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
     {
         if (manifest.dependencies.getCount())
         {
-            addFact("no slang-package-lock.json", "slang package fetch");
+            addFact("no slang-pkg-lock.json", "slang package fetch");
             reportedLockDrift = true;
         }
         if (localPackages.getCount())
         {
-            addFact("slang-workspace.json has no lock");
+            addFact("slang-pkg-workspace.json has no lock");
             reportedLockDrift = true;
         }
     }
@@ -1780,8 +1778,8 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
     }
 
     // Find the tool-owned checkouts that are absent before inspecting anything inside them.
-    // Reading a dependency's own `slang-package.json` and asking Git about its checkout both fail
-    // for an absent directory, and those failures would only restate the absence -- one as a
+    // Reading a dependency's own `slang-pkg-manifest.json` and asking Git about its checkout both
+    // fail for an absent directory, and those failures would only restate the absence -- one as a
     // missing JSON file, the other as Git refusing to run in a directory that does not exist.
     List<String> unmaterializedNames;
     for (const auto& package : lock.packages)
@@ -2076,7 +2074,7 @@ static SlangResult _collectCompilationSearchPaths(
     for (const auto& exportPath : manifest.exports)
         outSearchPaths.add(Path::combine(projectRoot, exportPath));
 
-    String lockPath = Path::combine(projectRoot, kLockName);
+    String lockPath = Path::combine(projectRoot, kLockFileName);
     if (!File::exists(lockPath))
         return SLANG_OK;
 
@@ -2353,7 +2351,7 @@ static SlangResult _build(
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
 
-    String lockPath = Path::combine(projectRoot, kLockName);
+    String lockPath = Path::combine(projectRoot, kLockFileName);
     bool ranFetch = false;
     if (File::exists(lockPath))
     {
@@ -2370,7 +2368,7 @@ static SlangResult _build(
     }
     else if (manifest.dependencies.getCount())
     {
-        _announceSubcommand("slang-package-lock.json is missing", "slang package fetch");
+        _announceSubcommand("slang-pkg-lock.json is missing", "slang package fetch");
         SLANG_RETURN_ON_FAIL(_fetch(projectRoot, false, true, skipValidate, outError));
         ranFetch = true;
     }
@@ -2544,7 +2542,7 @@ static SlangResult _runSource(
     {
         outError =
             "The workspace does not configure a host executable. Add 'build.host.executables' to "
-            "slang-package.json and run 'slang package build'.";
+            "slang-pkg-manifest.json and run 'slang package build'.";
         return SLANG_FAIL;
     }
     if (!manifest.workspace.bundle.source)
@@ -2600,7 +2598,7 @@ static SlangResult _runBinary(
     {
         outError =
             "The workspace does not configure a host executable. Add 'build.host.executables' to "
-            "slang-package.json and run 'slang package --experimental build'.";
+            "slang-pkg-manifest.json and run 'slang package --experimental build'.";
         return SLANG_FAIL;
     }
 
@@ -2943,7 +2941,7 @@ static SlangResult _adoptInPlaceOverride(
         return SLANG_OK;
 
     SLANG_RETURN_ON_FAIL(_writeValidatedProjectManifest(projectRoot, manifest, outError));
-    SLANG_RETURN_ON_FAIL(writeLockFile(Path::combine(projectRoot, kLockName), lock, outError));
+    SLANG_RETURN_ON_FAIL(writeLockFile(Path::combine(projectRoot, kLockFileName), lock, outError));
     SLANG_RETURN_ON_FAIL(writeProjectLocalPackages(projectRoot, localPackages, outError));
     SLANG_RETURN_ON_FAIL(
         _writeValidatedSearchPathsAfterLocalChange(projectRoot, lock, localPackages, outError));

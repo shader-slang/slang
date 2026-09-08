@@ -16,13 +16,13 @@ Index findActiveLocalPackageIndex(const List<LocalPackage>& packages, const Stri
 /// Return whether an override uses the checkout path owned by this workspace.
 bool isInPlaceLocalPackage(const Manifest& manifest, const LocalPackage& package);
 
-/// Read `slang-workspace.json`, treating an absent file as no overrides.
+/// Read `slang-pkg-workspace.json`, treating an absent file as no overrides.
 SlangResult readProjectLocalPackages(
     const String& projectRoot,
     List<LocalPackage>& outPackages,
     String& outError);
 
-/// Write local override state to `slang-workspace.json`.
+/// Write local override state to `slang-pkg-workspace.json`.
 SlangResult writeProjectLocalPackages(
     const String& projectRoot,
     const List<LocalPackage>& packages,

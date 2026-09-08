@@ -15,8 +15,6 @@ namespace Slang
 namespace PackageTool
 {
 
-static const char* const kManifestName = "slang-package.json";
-static const char* const kLockName = "slang-package-lock.json";
 static const Index kMaxDocumentationFileCount = 16384;
 static const Index kMaxDocumentationDirectoryCount = 4096;
 
@@ -267,7 +265,7 @@ SlangResult buildDocumentation(const String& projectRoot, String& outError)
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(
-        readManifest(Path::combine(projectRoot, kManifestName), manifest, outError));
+        readManifest(Path::combine(projectRoot, kManifestFileName), manifest, outError));
     List<String> packageNames;
     List<String> packageRoots;
     packageNames.add(manifest.name);
@@ -276,7 +274,7 @@ SlangResult buildDocumentation(const String& projectRoot, String& outError)
     Dictionary<String, List<String>> dependenciesByPackage;
     _setPackageDependencies(dependenciesByPackage, manifest.name, manifest.dependencies);
 
-    String lockPath = Path::combine(projectRoot, kLockName);
+    String lockPath = Path::combine(projectRoot, kLockFileName);
     if (File::exists(lockPath))
     {
         LockFile lock;

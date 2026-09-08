@@ -29,14 +29,14 @@ Module file naming is in [Writing Module Files, Import, and Include](module-file
 Before starting, distinguish the files that describe the same graph from different points of
 view:
 
-- `slang-package.json` is intent written by a package author. It declares the package's exported
+- `slang-pkg-manifest.json` is intent written by a package author. It declares the package's exported
   source, dependencies, licenses, and toolchain requirements. You edit and commit it.
-- `slang-package-lock.json` is the exact graph selected for the workspace in which you ran
+- `slang-pkg-lock.json` is the exact graph selected for the workspace in which you ran
   `update`. The tool writes it; reviewing and committing a root application's lock is recommended
   for reproducibility but not enforced. A dependency's nested lock is not used when your workspace
   resolves that dependency. Portability is derived: a Git+path row requires local workspace state,
   while Git-only rows can be fetched elsewhere once their commits are reachable from the remote.
-- `slang-workspace.json` is machine-local override state. The tool writes it and `init` adds it to
+- `slang-pkg-workspace.json` is machine-local override state. The tool writes it and `init` adds it to
   `.gitignore`. `edit NAME` is shorthand for an override at `{workspace.deps}/NAME`. Do not commit
   this file.
 
@@ -69,7 +69,7 @@ slang package init
 image-viewer/
 ├── .gitignore
 ├── LICENSE
-├── slang-package.json
+├── slang-pkg-manifest.json
 ├── src/
 ├── tests/
 ├── docs/
@@ -112,7 +112,7 @@ git commit
 ```
 
 Commit source, the manifest, licenses, tests, and docs. Do not commit `.slang/`, `deps/`, `build/`,
-or `slang-workspace.json`.
+or `slang-pkg-workspace.json`.
 
 ### Tool does
 
@@ -175,7 +175,7 @@ slang package dependency add color-encoding \
   --version ">=1.0.0 <2.0.0"
 ```
 
-This atomically changes only `slang-package.json`; it does not resolve or materialize anything.
+This atomically changes only `slang-pkg-manifest.json`; it does not resolve or materialize anything.
 The resulting manifest edge is:
 
 ```json
@@ -220,8 +220,8 @@ slang package build
 Review and commit both files:
 
 ```sh
-git diff -- slang-package.json slang-package-lock.json
-git add slang-package.json slang-package-lock.json
+git diff -- slang-pkg-manifest.json slang-pkg-lock.json
+git add slang-pkg-manifest.json slang-pkg-lock.json
 git commit
 ```
 
@@ -238,7 +238,7 @@ version, dependencies, and exports selected for this workspace.
   not a command failure.
 - A real update materializes Git source under `deps/NAME`, publish-checks new or changed Git
   packages and changed local registrations, checks closure-wide buildability, writes
-  `slang-package-lock.json`, and regenerates `build/search-paths`.
+  `slang-pkg-lock.json`, and regenerates `build/search-paths`.
 - `status` prints one line when the workspace is current. When something is dirty, it lists
   missing checkouts, dirty or diverged pins, enabled overrides, and source
   problems, without inspecting `build/` or contacting remotes. A missing lock or pin is
@@ -342,7 +342,7 @@ import color.encoding;
 - Bare `validate` in the library's own repository checks that the library's files follow the
   package module rules before you tag it. In a consuming app, `validate NAME` checks that same
   library against the app's lock.
-- The consumer's resolver reads `slang-package.json` from release tags and uses the tagged commit
+- The consumer's resolver reads `slang-pkg-manifest.json` from release tags and uses the tagged commit
   as the immutable source identity.
 - The consumer's root lock includes the library and all of its transitive dependencies. A lock
   committed inside `color-encoding` is useful when developing that repository itself, but it does
@@ -453,7 +453,7 @@ same local tree without re-entering its configuration.
 
 ### Tool does
 
-- Records every local substitution under `overrides` in `slang-workspace.json`. `edit NAME`
+- Records every local substitution under `overrides` in `slang-pkg-workspace.json`. `edit NAME`
   creates the special case whose path is `{workspace.deps}/NAME`; there is no second edit
   representation.
 - Does not copy or modify the supplied directory. Re-adding the in-place path updates that same
@@ -475,8 +475,8 @@ same local tree without re-entering its configuration.
 - An untagged adopted commit requires explicit `--as`; Git object identity does not determine a
   semantic version.
 - Overrides are path-only; there is no user-global Git-to-Git remapping policy.
-- `slang-workspace.json` must not be committed. A team-wide source relationship belongs in
-  `slang-package.json` as a path or Git dependency.
+- `slang-pkg-workspace.json` must not be committed. A team-wide source relationship belongs in
+  `slang-pkg-manifest.json` as a path or Git dependency.
 - A manifest path dependency cannot be overridden by the current command.
 
 ## Journey 5: a consumed package adds a dependency
@@ -530,12 +530,12 @@ new `color-encoding` manifest requires it. After review:
 
 ```sh
 slang package update
-git diff -- slang-package-lock.json
-git add slang-package-lock.json
+git diff -- slang-pkg-lock.json
+git add slang-pkg-lock.json
 git commit
 ```
 
-The consumer's own `slang-package.json` is unchanged. The new package is transitive, but the root
+The consumer's own `slang-pkg-manifest.json` is unchanged. The new package is transitive, but the root
 lock gains an exact row for it.
 
 ### Tool does
@@ -607,7 +607,7 @@ unchanged:
 ```sh
 slang package update --dry-run
 slang package update
-git add slang-package-lock.json
+git add slang-pkg-lock.json
 git commit
 ```
 
@@ -720,7 +720,7 @@ Replace its license placeholder, move the source, and initialize git in that sid
 ```text
 color-math/
 ├── LICENSE
-├── slang-package.json
+├── slang-pkg-manifest.json
 └── src/
     └── color/
         ├── math.slang
@@ -770,7 +770,7 @@ cd packages/color-math
 slang package init
 ```
 
-In the root `image-viewer/slang-package.json`, add:
+In the root `image-viewer/slang-pkg-manifest.json`, add:
 
 ```json
 "color-math": {
@@ -780,7 +780,7 @@ In the root `image-viewer/slang-package.json`, add:
 ```
 
 Then `update` from the root. The path package stays under `packages/color-math`; it is not copied
-to `deps/`. Clone of the application repository reproduces it without `slang-workspace.json`.
+to `deps/`. Clone of the application repository reproduces it without `slang-pkg-workspace.json`.
 
 #### Publish first, then consume
 
@@ -854,7 +854,7 @@ export __extern_cpp int main()
 }
 ```
 
-Declare the executable in the `build.host` section of `slang-package.json`:
+Declare the executable in the `build.host` section of `slang-pkg-manifest.json`:
 
 ```json
 "build": {
@@ -960,7 +960,7 @@ Go starts a module with
 the modules are always developed together, because a local overlay can make tests differ from
 what downstream users build.
 
-That is the reason to keep Slang's current `slang-workspace.json` gitignored. It is closer to a
+That is the reason to keep Slang's current `slang-pkg-workspace.json` gitignored. It is closer to a
 Go local workspace or replacement overlay than to a committed Cargo workspace. If Slang adds
 committed package members, they should be a different concept and file.
 
@@ -1005,7 +1005,7 @@ without performing another update.
 
 ### Peer pitfalls to retain in Slang's design
 
-- **Do not leak a local overlay into the published graph.** `slang-workspace.json` should stay
+- **Do not leak a local overlay into the published graph.** `slang-pkg-workspace.json` should stay
   local; committed path or Git edges belong in the manifest.
 - **Do not confuse a package's own lock with what consumers select.** The solve root owns the
   definitive graph, as with root locks in Cargo and npm.
@@ -1038,7 +1038,7 @@ default and what remains invariant.
 or a local-override solve.
 
 **It changes:** the resolver still reads candidate manifests and prints the same detailed or
-minimal selection report, but it does not write `slang-package-lock.json`, replace dependency
+minimal selection report, but it does not write `slang-pkg-lock.json`, replace dependency
 checkouts, or regenerate materialized state. Resolver caches under `.slang/cache/` may still be
 populated.
 
@@ -1082,7 +1082,7 @@ workspace.
 **Use enabled overrides when:** unpublished local trees should participate in every plain update.
 The resolver uses each enabled override as the only candidate for that package name.
 Non-overridden and disabled packages still resolve from Git. The resulting lock records local
-paths and requires the same `slang-workspace.json`.
+paths and requires the same `slang-pkg-workspace.json`.
 
 **Use `--ignore-overrides` when:** this command should write the published Git graph without
 disabling registrations. In-place overrides created by `edit` stay active because they own their
@@ -1148,7 +1148,7 @@ authorizes restoring that commit and discarding local files, commits, and stashe
 Git+path lock row; disable the override and update first when the local graph was already solved.
 
 Use `--adopt` to keep a committed fix. It changes a direct Git dependency in
-`slang-package.json` to `ref` plus `as`, writes `HEAD` as the lock commit, and removes the local
+`slang-pkg-manifest.json` to `ref` plus `as`, writes `HEAD` as the lock commit, and removes the local
 override. A unique semantic-version tag at `HEAD` supplies both `ref` and `as`; an untagged commit
 uses its full object ID as `ref` and requires `--as VERSION`. The local manifest must still agree
 with the lock. Both destructive clean and adopt require confirmation; pass `--yes` for automation.
@@ -1281,7 +1281,7 @@ belongs in the package tool.
 
 ### Multi-package development
 
-1. Define a committed member model, distinct from gitignored `slang-workspace.json`, for packages
+1. Define a committed member model, distinct from gitignored `slang-pkg-workspace.json`, for packages
    that are always developed and checked in together.
 2. Add a command that initializes and attaches a child package while preserving import paths.
 3. Make local trial state visibly different from a portable lock, or provide an explicit command
@@ -1367,7 +1367,7 @@ them or update this chapter and its regression tests in the same change.
 - `update --ignore-overrides` ignores out-of-tree overrides for this command only. In-place
   overrides remain active so it cannot replace a checkout registered through `edit`. An in-place
   package that drops out of the graph stays registered and on disk so a later update can restore it.
-- A local-path lock fails on another machine without matching `slang-workspace.json`.
+- A local-path lock fails on another machine without matching `slang-pkg-workspace.json`.
 - Disable an override and update to restore published selection before removing it.
 - `validate NAME` certifies a locked library tree in this workspace, including an enabled override.
   Bare `validate` still rejects the app while any edit or override is enabled.

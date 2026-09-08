@@ -56,7 +56,7 @@ SlangResult writeModuleProvenance(
     JSONWriter writer(JSONWriter::IndentationStyle::Allman);
     writer.startObject(SourceLoc());
     writer.addUnquotedKey(UnownedStringSlice("schema_version"), SourceLoc());
-    writer.addIntegerValue(kSchemaVersion, SourceLoc());
+    writer.addIntegerValue(1, SourceLoc());
     writer.addUnquotedKey(UnownedStringSlice("kind"), SourceLoc());
     writer.addStringValue(UnownedStringSlice("slang-modules"), SourceLoc());
     writer.addUnquotedKey(UnownedStringSlice("experimental"), SourceLoc());

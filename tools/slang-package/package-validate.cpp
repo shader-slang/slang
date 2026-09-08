@@ -16,8 +16,6 @@ namespace Slang
 namespace PackageTool
 {
 
-static const char* const kManifestName = "slang-package.json";
-static const char* const kLockName = "slang-package-lock.json";
 static const char* const kLicensePlaceholder =
     "Replace this file with the package license before publishing.\n";
 static const Index kMaxSourceFileCount = 16384;
@@ -546,7 +544,7 @@ static SlangResult _readMaterializedManifest(
         if (package.path.getLength() && package.path != localPackages[localIndex].path)
         {
             outError = String("Locked path for package '") + package.name +
-                       "' does not match slang-workspace.json.";
+                       "' does not match slang-pkg-workspace.json.";
             return SLANG_FAIL;
         }
         SLANG_RETURN_ON_FAIL(
@@ -563,7 +561,7 @@ static SlangResult _readMaterializedManifest(
             outError));
     }
     if (SLANG_FAILED(
-            readManifest(Path::combine(outPackageRoot, kManifestName), outManifest, outError)))
+            readManifest(Path::combine(outPackageRoot, kManifestFileName), outManifest, outError)))
     {
         outError = String("Cannot validate materialized package manifest '") + package.name +
                    "'. Run 'slang package fetch'. " + outError;
@@ -626,13 +624,13 @@ static SlangResult _loadResolvedPackage(
         if (package.path.getLength() && package.path != localPackages[localIndex].path)
         {
             outError = String("Locked path for package '") + package.name +
-                       "' does not match slang-workspace.json.";
+                       "' does not match slang-pkg-workspace.json.";
             return SLANG_FAIL;
         }
         SLANG_RETURN_ON_FAIL(
             getLocalPackageRoot(projectRoot, localPackages[localIndex], out.packageRoot, outError));
         if (SLANG_FAILED(readManifest(
-                Path::combine(out.packageRoot, kManifestName),
+                Path::combine(out.packageRoot, kManifestFileName),
                 out.manifest,
                 outError)))
         {
@@ -654,8 +652,8 @@ static SlangResult _loadResolvedPackage(
             return SLANG_FAIL;
         }
         String manifestPath = gitRelativeRoot.getLength()
-                                  ? Path::combine(gitRelativeRoot, kManifestName)
-                                  : kManifestName;
+                                  ? Path::combine(gitRelativeRoot, kManifestFileName)
+                                  : kManifestFileName;
         String manifestText;
         SLANG_RETURN_ON_FAIL(readFileAtRevision(
             parent.gitRepositoryPath,
@@ -683,7 +681,7 @@ static SlangResult _loadResolvedPackage(
             out.packageRoot,
             outError));
         if (SLANG_FAILED(readManifest(
-                Path::combine(out.packageRoot, kManifestName),
+                Path::combine(out.packageRoot, kManifestFileName),
                 out.manifest,
                 outError)))
         {
@@ -702,23 +700,30 @@ static SlangResult _loadResolvedPackage(
     String gitError;
     String manifestText;
     String gitRepositoryPath;
-    if (_isCheckoutAtCommit(depsRoot, package.commit) &&
-        SLANG_SUCCEEDED(
-            readFileAtRevision(depsRoot, package.commit, kManifestName, manifestText, gitError)))
+    if (_isCheckoutAtCommit(depsRoot, package.commit) && SLANG_SUCCEEDED(readFileAtRevision(
+                                                             depsRoot,
+                                                             package.commit,
+                                                             kManifestFileName,
+                                                             manifestText,
+                                                             gitError)))
     {
         gitRepositoryPath = depsRoot;
     }
     else if (
         package.commit.getLength() &&
         SLANG_SUCCEEDED(ensureRepository(projectRoot, package.git, cachePath, gitError)) &&
-        SLANG_SUCCEEDED(
-            readFileAtRevision(cachePath, package.commit, kManifestName, manifestText, gitError)))
+        SLANG_SUCCEEDED(readFileAtRevision(
+            cachePath,
+            package.commit,
+            kManifestFileName,
+            manifestText,
+            gitError)))
     {
         gitRepositoryPath = cachePath;
     }
     if (gitRepositoryPath.getLength())
     {
-        String sourceName = package.git + "@" + package.ref + ":" + kManifestName;
+        String sourceName = package.git + "@" + package.ref + ":" + kManifestFileName;
         SLANG_RETURN_ON_FAIL(readManifestText(sourceName, manifestText, out.manifest, outError));
         out.packageRoot = depsRoot;
         out.gitRepositoryPath = gitRepositoryPath;
@@ -741,8 +746,10 @@ static SlangResult _loadResolvedPackage(
             outError = gitError;
         return SLANG_FAIL;
     }
-    if (SLANG_FAILED(
-            readManifest(Path::combine(out.packageRoot, kManifestName), out.manifest, outError)))
+    if (SLANG_FAILED(readManifest(
+            Path::combine(out.packageRoot, kManifestFileName),
+            out.manifest,
+            outError)))
     {
         outError = gitError.getLength()
                        ? gitError
@@ -796,7 +803,7 @@ SlangResult validateLegalResolvedProject(
         if (localPackage.as.getLength() && package.version != localPackage.as)
         {
             outError = String("Locked version for local override '") + package.name +
-                       "' does not match slang-workspace.json. Run 'slang package update'.";
+                       "' does not match slang-pkg-workspace.json. Run 'slang package update'.";
             return SLANG_FAIL;
         }
     }
@@ -968,11 +975,11 @@ SlangResult validateBuildableProject(
 {
     Manifest rootManifest;
     SLANG_RETURN_ON_FAIL(
-        readManifest(Path::combine(projectRoot, kManifestName), rootManifest, outError));
+        readManifest(Path::combine(projectRoot, kManifestFileName), rootManifest, outError));
 
     List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-    String lockPath = Path::combine(projectRoot, kLockName);
+    String lockPath = Path::combine(projectRoot, kLockFileName);
     LockFile lock;
     if (File::exists(lockPath))
     {
@@ -981,8 +988,8 @@ SlangResult validateBuildableProject(
     else if (rootManifest.dependencies.getCount() || localPackages.getCount())
     {
         outError = localPackages.getCount()
-                       ? "Registered local packages require slang-package-lock.json."
-                       : "Package dependencies require slang-package-lock.json.";
+                       ? "Registered local packages require slang-pkg-lock.json."
+                       : "Package dependencies require slang-pkg-lock.json.";
         return SLANG_FAIL;
     }
 

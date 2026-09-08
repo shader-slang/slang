@@ -7,6 +7,7 @@
 #include "compiler-core/slang-json-value.h"
 #include "compiler-core/slang-source-loc.h"
 #include "core/slang-io.h"
+#include "core/slang-string.h"
 
 namespace Slang
 {
@@ -150,22 +151,22 @@ static SlangResult _readOptionalString(
     return SLANG_OK;
 }
 
-static SlangResult _requireSchemaVersion(
+static SlangResult _requireFormatVersion(
     JSONContainer* container,
     const JSONValue& root,
     const char* fileName,
     String& outError)
 {
-    JSONValue value = _find(container, root, "schema_version");
+    JSONValue value = _find(container, root, "version");
     if (!value.isValid())
     {
-        outError = String("Field 'schema_version' is required in ") + fileName + ".";
+        outError = String("Field 'version' is required in ") + fileName + ".";
         return SLANG_FAIL;
     }
     if (value.getKind() != JSONValue::Kind::Integer ||
-        container->asInteger(value) != kSchemaVersion)
+        container->asInteger(value) != kFormatVersion)
     {
-        outError = String("Field 'schema_version' in ") + fileName + " must be the integer 1.";
+        outError = String("Field 'version' in ") + fileName + " must be the integer 1.";
         return SLANG_FAIL;
     }
     return SLANG_OK;
@@ -835,16 +836,16 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
             outError = "Field 'host' must be nested under 'build' as 'build.host'.";
             return SLANG_FAIL;
         }
-        if (key != "schema_version" && key != "name" && key != "exports" &&
-            key != "license_files" && key != "dependencies" && key != "retractions" &&
-            key != "workspace" && key != "build" && key != "tools")
+        if (key != "version" && key != "name" && key != "exports" && key != "license_files" &&
+            key != "dependencies" && key != "retractions" && key != "workspace" && key != "build" &&
+            key != "tools")
         {
-            outError = String("Unknown field in slang-package.json: ") + key;
+            outError = String("Unknown field in ") + kManifestFileName + ": " + key;
             return SLANG_FAIL;
         }
     }
     SLANG_RETURN_ON_FAIL(
-        _requireSchemaVersion(json.container, json.root, "slang-package.json", outError));
+        _requireFormatVersion(json.container, json.root, kManifestFileName, outError));
     SLANG_RETURN_ON_FAIL(
         _readRequiredString(json.container, json.root, "name", outManifest.name, outError));
     if (!isValidPackageName(outManifest.name))
@@ -907,6 +908,12 @@ static void _writeKey(JSONWriter& writer, const char* key)
     writer.addUnquotedKey(UnownedStringSlice(key), SourceLoc());
 }
 
+static void _writeFormatVersion(JSONWriter& writer)
+{
+    _writeKey(writer, "version");
+    writer.addIntegerValue(kFormatVersion, SourceLoc());
+}
+
 static void _writeDependency(JSONWriter& writer, const Dependency& dependency)
 {
     SLANG_RELEASE_ASSERT(isValidPackageName(dependency.name));
@@ -962,8 +969,7 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
 {
     JSONWriter writer(JSONWriter::IndentationStyle::Allman);
     writer.startObject(SourceLoc());
-    _writeKey(writer, "schema_version");
-    writer.addIntegerValue(kSchemaVersion, SourceLoc());
+    _writeFormatVersion(writer);
     _writeKey(writer, "name");
     writer.addStringValue(manifest.name.getUnownedSlice(), SourceLoc());
     _writeKey(writer, "exports");
@@ -1174,14 +1180,13 @@ SlangResult readLockFile(const String& path, LockFile& outLock, String& outError
     for (auto pair : json.container->getObject(json.root))
     {
         String key = json.container->getStringFromKey(pair.key);
-        if (key != "schema_version" && key != "packages")
+        if (key != "version" && key != "packages")
         {
-            outError = String("Unknown field in slang-package-lock.json: ") + key;
+            outError = String("Unknown field in ") + kLockFileName + ": " + key;
             return SLANG_FAIL;
         }
     }
-    SLANG_RETURN_ON_FAIL(
-        _requireSchemaVersion(json.container, json.root, "slang-package-lock.json", outError));
+    SLANG_RETURN_ON_FAIL(_requireFormatVersion(json.container, json.root, kLockFileName, outError));
 
     JSONValue packages = _find(json.container, json.root, "packages");
     if (packages.getKind() != JSONValue::Kind::Object)
@@ -1210,8 +1215,7 @@ SlangResult writeLockFile(const String& path, const LockFile& lock, String& outE
 {
     JSONWriter writer(JSONWriter::IndentationStyle::Allman);
     writer.startObject(SourceLoc());
-    _writeKey(writer, "schema_version");
-    writer.addIntegerValue(kSchemaVersion, SourceLoc());
+    _writeFormatVersion(writer);
     _writeKey(writer, "packages");
     writer.startObject(SourceLoc());
     for (const auto& package : lock.packages)
@@ -1270,118 +1274,61 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
     for (auto pair : json.container->getObject(json.root))
     {
         String key = json.container->getStringFromKey(pair.key);
-        if (key != "schema_version" && key != "edits" && key != "overrides")
+        if (key != "version" && key != "overrides")
         {
-            outError = String("Unknown field in slang-workspace.json: ") + key;
+            outError = String("Unknown field in ") + kWorkspaceFileName + ": " + key;
             return SLANG_FAIL;
         }
     }
-    JSONValue schemaVersionValue = _find(json.container, json.root, "schema_version");
-    if (schemaVersionValue.getKind() != JSONValue::Kind::Integer)
-    {
-        outError = "Field 'schema_version' in slang-workspace.json must be an integer.";
-        return SLANG_FAIL;
-    }
-    Int workspaceSchemaVersion = Int(json.container->asInteger(schemaVersionValue));
-    if (workspaceSchemaVersion != 1 && workspaceSchemaVersion != kWorkspaceSchemaVersion)
-    {
-        outError = String("Unsupported slang-workspace.json schema version: ") +
-                   String(workspaceSchemaVersion);
-        return SLANG_FAIL;
-    }
+    SLANG_RETURN_ON_FAIL(
+        _requireFormatVersion(json.container, json.root, kWorkspaceFileName, outError));
     outPackages.clear();
-    JSONValue edits = _find(json.container, json.root, "edits");
-    if (edits.isValid() && edits.getKind() != JSONValue::Kind::Object)
-    {
-        outError = "Field 'edits' must be an object.";
-        return SLANG_FAIL;
-    }
-    if (edits.isValid())
-    {
-        for (auto pair : json.container->getObject(edits))
-        {
-            LocalPackage package;
-            package.name = json.container->getStringFromKey(pair.key);
-            if (!isValidPackageName(package.name) ||
-                pair.value.getKind() != JSONValue::Kind::Object)
-            {
-                outError = String("Invalid edited package entry: ") + package.name;
-                return SLANG_FAIL;
-            }
-            for (auto field : json.container->getObject(pair.value))
-            {
-                outError = String("Unknown field in edited package '") + package.name +
-                           "': " + json.container->getStringFromKey(field.key);
-                return SLANG_FAIL;
-            }
-            outPackages.add(package);
-        }
-    }
-
     JSONValue overrides = _find(json.container, json.root, "overrides");
-    if (overrides.isValid() && overrides.getKind() != JSONValue::Kind::Object)
+    if (overrides.getKind() != JSONValue::Kind::Object)
     {
         outError = "Field 'overrides' must be an object.";
         return SLANG_FAIL;
     }
-    if (overrides.isValid())
+    for (auto pair : json.container->getObject(overrides))
     {
-        for (auto pair : json.container->getObject(overrides))
+        LocalPackage package;
+        package.name = json.container->getStringFromKey(pair.key);
+        if (!isValidPackageName(package.name) || pair.value.getKind() != JSONValue::Kind::Object)
         {
-            LocalPackage package;
-            package.name = json.container->getStringFromKey(pair.key);
-            if (!isValidPackageName(package.name) ||
-                pair.value.getKind() != JSONValue::Kind::Object)
-            {
-                outError = String("Invalid override entry: ") + package.name;
-                return SLANG_FAIL;
-            }
-            for (auto field : json.container->getObject(pair.value))
-            {
-                String key = json.container->getStringFromKey(field.key);
-                if (key != "path" && key != "as" && key != "enabled")
-                {
-                    outError = String("Unknown field in override '") + package.name + "'.";
-                    return SLANG_FAIL;
-                }
-            }
-            SLANG_RETURN_ON_FAIL(
-                _readRequiredString(json.container, pair.value, "path", package.path, outError));
-            SLANG_RETURN_ON_FAIL(
-                _readOptionalString(json.container, pair.value, "as", package.as, outError));
-            SLANG_RETURN_ON_FAIL(_readOptionalBool(
-                json.container,
-                pair.value,
-                "enabled",
-                true,
-                package.enabled,
-                outError));
-            if (package.as.getLength())
-            {
-                SemanticVersion ignoredVersion;
-                SLANG_RETURN_ON_FAIL(parseExactVersion(package.as, ignoredVersion, outError));
-            }
-            if (!_isSafeLocalPath(package.path))
-            {
-                outError = String("Override path must be relative: ") + package.name;
-                return SLANG_FAIL;
-            }
-            bool duplicate = false;
-            for (const auto& existing : outPackages)
-                duplicate = duplicate || existing.name == package.name;
-            if (duplicate)
-            {
-                outError = String("Package cannot have both legacy edit and override entries: ") +
-                           package.name;
-                return SLANG_FAIL;
-            }
-            outPackages.add(package);
+            outError = String("Invalid override entry: ") + package.name;
+            return SLANG_FAIL;
         }
-    }
-    if (!edits.isValid() && !overrides.isValid())
-    {
-        outError = "Workspace file must contain 'edits' or 'overrides'.";
-        return SLANG_FAIL;
+        for (auto field : json.container->getObject(pair.value))
+        {
+            String key = json.container->getStringFromKey(field.key);
+            if (key != "path" && key != "as" && key != "enabled")
+            {
+                outError = String("Unknown field in override '") + package.name + "'.";
+                return SLANG_FAIL;
+            }
+        }
+        SLANG_RETURN_ON_FAIL(
+            _readRequiredString(json.container, pair.value, "path", package.path, outError));
+        SLANG_RETURN_ON_FAIL(
+            _readOptionalString(json.container, pair.value, "as", package.as, outError));
+        SLANG_RETURN_ON_FAIL(_readOptionalBool(
+            json.container,
+            pair.value,
+            "enabled",
+            true,
+            package.enabled,
+            outError));
+        if (package.as.getLength())
+        {
+            SemanticVersion ignoredVersion;
+            SLANG_RETURN_ON_FAIL(parseExactVersion(package.as, ignoredVersion, outError));
+        }
+        if (!_isSafeLocalPath(package.path))
+        {
+            outError = String("Override path must be relative: ") + package.name;
+            return SLANG_FAIL;
+        }
+        outPackages.add(package);
     }
     outPackages.sort([](const LocalPackage& left, const LocalPackage& right)
                      { return left.name < right.name; });
@@ -1395,8 +1342,7 @@ SlangResult writeLocalPackages(
 {
     JSONWriter writer(JSONWriter::IndentationStyle::Allman);
     writer.startObject(SourceLoc());
-    _writeKey(writer, "schema_version");
-    writer.addIntegerValue(kWorkspaceSchemaVersion, SourceLoc());
+    _writeFormatVersion(writer);
     _writeKey(writer, "overrides");
     writer.startObject(SourceLoc());
     for (const auto& package : packages)

@@ -160,7 +160,7 @@ Prefer `__include` over preprocessor `#include` for module fragments. `#include`
 
 ## Rules for module and package authors
 
-1. One primary per module. Place it at the import path you want consumers to write, under an export listed in `slang-package.json`.
+1. One primary per module. Place it at the import path you want consumers to write, under an export listed in `slang-pkg-manifest.json`.
 2. Declare `module` / `implementing` with the primary's file stem (`noise`), not the namespace prefix (`acme`).
 3. Put implementation files under `primaryName/` next to the primary, and `__include` them with that prefix from the including file.
 4. Do not treat companion files as importable modules. Do not add companion directories as extra `-I` entries.

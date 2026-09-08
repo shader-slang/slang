@@ -188,7 +188,7 @@ SlangResult getLockedPackageRoot(
     if (isLocalOverrideLockedPackage(package))
     {
         outError = String("Locked local override '") + package.name +
-                   "' is not registered in slang-workspace.json.";
+                   "' is not registered in slang-pkg-workspace.json.";
         return SLANG_FAIL;
     }
     if (isPathOnlyLockedPackage(package))
