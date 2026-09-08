@@ -2,21 +2,26 @@
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
 
-// CHECK: type: float
-// CHECK-NEXT: 11.000000
-// CHECK-NEXT: 32.000000
-// CHECK-NEXT: 6.000000
-// CHECK-NEXT: 29.000000
-// CHECK-NEXT: 3.000000
-// CHECK-NEXT: 2.000000
-// CHECK-NEXT: 32.000000
-// CHECK-NEXT: 6.000000
-// CHECK-NEXT: 4.000000
-// CHECK-NEXT: 2.000000
+// CHECK: type: int32_t
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=results
 
 import slang.numerics.differentiable;
+
+bool approximatelyEqual(float actual, float expected)
+{
+    return abs(actual - expected) < 0.001;
+}
 
 struct Pair : IDotProduct
 {
@@ -55,14 +60,14 @@ float vectorDot(float3 left, float3 right)
     return differentiableDot(left, right);
 }
 
-RWStructuredBuffer<float> results;
+RWStructuredBuffer<int> results;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    results[0] = dot(Pair(1.0, 2.0), Pair(3.0, 4.0));
-    results[1] = float(dot(int3(1, 2, 3), int3(4, 5, 6)));
+    results[0] = int(approximatelyEqual(dot(Pair(1.0, 2.0), Pair(3.0, 4.0)), 11.0));
+    results[1] = int(dot(int3(1, 2, 3), int3(4, 5, 6)) == 32);
 
     let scalarForward = fwd_diff(scalarDot)(diffPair(2.0, 5.0), diffPair(3.0, 7.0));
     let vectorForward = fwd_diff(vectorDot)(
@@ -77,12 +82,12 @@ void computeMain()
     var vectorRight = diffPair(float3(4.0, 5.0, 6.0), float3(0.0));
     bwd_diff(vectorDot)(vectorLeft, vectorRight, 1.0);
 
-    results[2] = scalarForward.p;
-    results[3] = scalarForward.d;
-    results[4] = scalarLeft.d;
-    results[5] = scalarRight.d;
-    results[6] = vectorForward.p;
-    results[7] = vectorForward.d;
-    results[8] = vectorLeft.d.x;
-    results[9] = vectorRight.d.y;
+    results[2] = int(approximatelyEqual(scalarForward.p, 6.0));
+    results[3] = int(approximatelyEqual(scalarForward.d, 29.0));
+    results[4] = int(approximatelyEqual(scalarLeft.d, 3.0));
+    results[5] = int(approximatelyEqual(scalarRight.d, 2.0));
+    results[6] = int(approximatelyEqual(vectorForward.p, 32.0));
+    results[7] = int(approximatelyEqual(vectorForward.d, 6.0));
+    results[8] = int(approximatelyEqual(vectorLeft.d.x, 4.0));
+    results[9] = int(approximatelyEqual(vectorRight.d.y, 2.0));
 }

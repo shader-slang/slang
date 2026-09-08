@@ -11,6 +11,12 @@
 // HLSL-NOT: __numericInterface
 // HLSL-NOT: IElementaryFunctions
 // HLSL-NOT: IReal
+// HLSL: dot(
+// HLSL-NOT: __numericsBuiltinDot
+// HLSL-NOT: IDotProduct
+// HLSL-NOT: __numericInterface
+// HLSL-NOT: IElementaryFunctions
+// HLSL-NOT: IReal
 // HLSL: sin(
 // HLSL-NOT: __numericInterface
 // HLSL-NOT: IElementaryFunctions
@@ -19,9 +25,6 @@
 // HLSL-NOT: __numericInterface
 // HLSL-NOT: IElementaryFunctions
 // HLSL-NOT: IReal
-// HLSL: dot(
-// HLSL-NOT: __numericsBuiltinDot
-// HLSL-NOT: IDotProduct
 
 // SPIRV-NOT: __numericInterface
 // SPIRV-NOT: IElementaryFunctions
