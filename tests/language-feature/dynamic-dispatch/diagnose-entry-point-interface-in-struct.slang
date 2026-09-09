@@ -44,8 +44,12 @@ void takeRef(inout IFoo f, RWStructuredBuffer<float> buf)
 
 // HLSL: void computeMain
 // HLSL: switch
-// HLSL: ImplA_getValue
-// HLSL: ImplB_getValue
+// The two calls below are matched order-independently (not sequentially):
+// the switch-case order between ImplA and ImplB is not guaranteed across
+// compilers/platforms (confirmed -- MSVC and GCC emit them in opposite
+// orders).
+// HLSL-DAG: ImplA_getValue
+// HLSL-DAG: ImplB_getValue
 // GLSL: void main()
 // MTL: void computeMain
 [numthreads(1, 1, 1)]

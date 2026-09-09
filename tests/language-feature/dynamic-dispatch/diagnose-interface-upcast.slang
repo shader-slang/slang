@@ -36,11 +36,14 @@ RWStructuredBuffer<float> outputBuffer;
 // indicate the upcast was folded away to one concrete type. The dispatch itself
 // is force-inlined into `scenario1` (see slang-ir-lower-dynamic-dispatch-insts.cpp),
 // so what's checked is the surviving `switch` with calls into both concrete
-// implementations, not a separately named dispatch function.
+// implementations, not a separately named dispatch function. The two calls
+// below are matched order-independently (not sequentially): the switch-case
+// order between ImplA and ImplB is not guaranteed across compilers/platforms
+// (confirmed -- MSVC and GCC emit them in opposite orders).
 // CHK1: void scenario1
 // CHK1: switch
-// CHK1: ImplB_getValue
-// CHK1: ImplA_getValue
+// CHK1-DAG: ImplB_getValue
+// CHK1-DAG: ImplA_getValue
 [numthreads(1, 1, 1)]
 void scenario1()
 {
