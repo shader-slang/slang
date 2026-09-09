@@ -2,11 +2,13 @@
 
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "core/slang-builtin-module-cache.h"
+#include "core/slang-io.h"
 #include "core/slang-performance-profiler.h"
 #include "core/slang-platform.h"
 #include "core/slang-rtti-info.h"
 #include "core/slang-shared-library.h"
 #include "core/slang-signal.h"
+#include "core/slang-string-util.h"
 #include "slang-capability.h"
 #include "slang-compiler.h"
 #include "slang-internal.h"
@@ -1078,6 +1080,138 @@ SLANG_API void spSetDiagnosticFlags(slang::ICompileRequest* request, SlangDiagno
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Blob Creation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+namespace
+{
+
+class SearchPathListAllocation : public Slang::ComBaseObject, public ISlangUnknown
+{
+public:
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    SlangResult load(const char* path, ISlangFileSystem* fileSystem, Slang::String& outError)
+    {
+        Slang::ScopedAllocation osContents;
+        Slang::ComPtr<ISlangBlob> fileSystemContents;
+        const void* contents = nullptr;
+        size_t contentsSize = 0;
+        SlangResult readResult;
+        if (fileSystem)
+        {
+            readResult = fileSystem->loadFile(path, fileSystemContents.writeRef());
+            if (SLANG_SUCCEEDED(readResult))
+            {
+                contents = fileSystemContents->getBufferPointer();
+                contentsSize = fileSystemContents->getBufferSize();
+            }
+        }
+        else
+        {
+            readResult = Slang::File::readAllBytes(path, osContents);
+            if (SLANG_SUCCEEDED(readResult))
+            {
+                contents = osContents.getData();
+                contentsSize = osContents.getSizeInBytes();
+            }
+        }
+        if (SLANG_FAILED(readResult))
+        {
+            outError = Slang::String("Cannot read search path list: ") + path;
+            return SLANG_FAIL;
+        }
+
+        SlangInt lineNumber = 0;
+        for (auto line : Slang::LineParser(
+                 Slang::UnownedStringSlice(static_cast<const char*>(contents), contentsSize)))
+        {
+            ++lineNumber;
+            if (!line.getLength())
+                continue;
+
+            for (const char* cursor = line.begin(); cursor != line.end(); ++cursor)
+            {
+                if (*cursor == 0)
+                {
+                    Slang::StringBuilder builder;
+                    builder << "Search path list contains a null byte on line " << lineNumber
+                            << ".";
+                    outError = builder.produceString();
+                    return SLANG_FAIL;
+                }
+            }
+            m_searchPaths.add(Slang::String(line));
+        }
+
+        for (const auto& searchPath : m_searchPaths)
+            m_searchPathPointers.add(searchPath.getBuffer());
+        return SLANG_OK;
+    }
+
+    char const* const* getSearchPaths() { return m_searchPathPointers.getBuffer(); }
+    SlangInt getSearchPathCount() { return m_searchPathPointers.getCount(); }
+
+private:
+    void* getInterface(const SlangUUID& uuid)
+    {
+        if (uuid == ISlangUnknown::getTypeGuid())
+            return static_cast<ISlangUnknown*>(this);
+        return nullptr;
+    }
+
+    Slang::List<Slang::String> m_searchPaths;
+    Slang::List<const char*> m_searchPathPointers;
+};
+
+static SlangResult _setSearchPathListDiagnostic(
+    SlangResult result,
+    const Slang::String& message,
+    ISlangBlob** outDiagnostics)
+{
+    if (outDiagnostics)
+        *outDiagnostics = Slang::StringBlob::create(message).detach();
+    return result;
+}
+
+} // namespace
+
+SLANG_EXTERN_C SLANG_API SlangResult slang_readSearchPathsFile(
+    const char* path,
+    ISlangFileSystem* fileSystem,
+    const char* const** outSearchPaths,
+    SlangInt* outSearchPathCount,
+    ISlangUnknown** outAllocation,
+    ISlangBlob** outDiagnostics)
+{
+    if (outDiagnostics)
+        *outDiagnostics = nullptr;
+    if (outSearchPaths)
+        *outSearchPaths = nullptr;
+    if (outSearchPathCount)
+        *outSearchPathCount = 0;
+    if (outAllocation)
+        *outAllocation = nullptr;
+    if (!outSearchPaths || !outSearchPathCount || !outAllocation)
+        return _setSearchPathListDiagnostic(
+            SLANG_E_INVALID_ARG,
+            "slang_readSearchPathsFile requires output pointers.",
+            outDiagnostics);
+    if (!path || !path[0])
+        return _setSearchPathListDiagnostic(
+            SLANG_E_INVALID_ARG,
+            "slang_readSearchPathsFile requires a file path.",
+            outDiagnostics);
+
+    Slang::ComPtr<SearchPathListAllocation> allocation(new SearchPathListAllocation);
+    Slang::String error;
+    SlangResult result = allocation->load(path, fileSystem, error);
+    if (SLANG_FAILED(result))
+        return _setSearchPathListDiagnostic(result, error, outDiagnostics);
+
+    *outSearchPaths = allocation->getSearchPaths();
+    *outSearchPathCount = allocation->getSearchPathCount();
+    *outAllocation = allocation.detach();
+    return SLANG_OK;
+}
 
 SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t size)
 {
