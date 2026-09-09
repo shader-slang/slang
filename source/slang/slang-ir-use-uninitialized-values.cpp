@@ -653,6 +653,32 @@ static WaveElectionContext collectWaveElectionContext(IRGlobalValueWithCode* fun
     return context;
 }
 
+// Is `to` reachable from `from` at all, ignoring `blocksWithStore` entirely? Used by
+// `isEveryPathFromBlockedByStore` to distinguish "every path to `to` passes a store" from "`to`
+// is never reached in the first place" -- the guard's true-branch diverging via an early
+// `return`/`break`/`discard` is the latter, not the former, and must not be treated as a
+// guarantee.
+static bool isBlockReachableFrom(IRBlock* from, IRBlock* to)
+{
+    HashSet<IRBlock*> visited;
+    List<IRBlock*> worklist;
+    visited.add(from);
+    worklist.add(from);
+    while (worklist.getCount())
+    {
+        auto block = worklist.getLast();
+        worklist.removeLast();
+        if (block == to)
+            return true;
+        for (auto succ : block->getSuccessors())
+        {
+            if (visited.add(succ))
+                worklist.add(succ);
+        }
+    }
+    return false;
+}
+
 // Does every control-flow path from `from` to `to` pass through at least one block in
 // `blocksWithStore`? Used to decide whether a store inside a `WaveIsFirstLane()` guard's
 // true-branch (`from`) is guaranteed to execute before the elected lane reaches the guard's
@@ -676,11 +702,24 @@ static WaveElectionContext collectWaveElectionContext(IRGlobalValueWithCode* fun
 // Here the elected lane can reach the merge block without ever executing the inner store (when
 // `rareCondition` is false), so this walk correctly finds a store-free path and the relaxation
 // below declines to fire -- the read stays flagged, as it must.
+//
+// A store-free forward walk from `from` that never reaches `to` is not, by itself, evidence
+// that a store guards every path: it is equally what happens when `from`'s region diverges away
+// from `to` entirely (an early `return`/`break`/`discard` inside the guard) and never
+// reconverges at the merge block at all. In that case the elected lane gives no guarantee about
+// the state at `to`, and a store anywhere else in the function must not be allowed to satisfy
+// this check by the walk simply draining without objection. So this function first requires
+// that `to` is actually reachable from `from` when stores are *not* treated as barriers
+// (`isBlockReachableFrom`); only once that is established does "the store-free walk fails to
+// reach `to`" mean what it is meant to mean.
 static bool isEveryPathFromBlockedByStore(
     IRBlock* from,
     IRBlock* to,
     const HashSet<IRBlock*>& blocksWithStore)
 {
+    if (!isBlockReachableFrom(from, to))
+        return false;
+
     HashSet<IRBlock*> visited;
     List<IRBlock*> worklist;
     visited.add(from);
