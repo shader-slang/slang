@@ -140,10 +140,11 @@ Commit source, the manifest, licenses, tests, and docs. Do not commit `.slang/`,
 - `slang package test` is reserved but not implemented. The generated `tests/` directory is only a
   convention today.
 - `docs` does not regenerate documentation. Run `build` first.
-- An application that invokes `slangc` itself passes
-  `-search-path-list slang-package-includes.txt`. An API host loads the same paths with
-  `slang_readSearchPathsFile` and assigns them to `SessionDesc.searchPaths`; package state is not
-  injected into arbitrary compiler sessions.
+- An application that compiles shaders or modules with `slangc` passes
+  `-search-path-list slang-package-includes.txt`. That is not how this package tool produces a
+  host executable. An API host loads the same paths with `slang_readSearchPathsFile` and assigns
+  them to `SessionDesc.searchPaths`; package state is not injected into arbitrary compiler
+  sessions.
 - A `build.host` section has no effect on plain `build`; Journey 8 covers the explicit opt-in that
   produces its binary output.
 
@@ -260,9 +261,9 @@ commit the manifest (and lock, if update rewrote it).
 - `update` clones resolver metadata under `.slang/cache/`, examines compatible Git tags, resolves
   the complete transitive graph, and selects one version per package name.
 - A real update prints that exact selection and asks before applying it, unless the solve selects
-  exactly what the committed lock already records. `--yes` is required when no interactive terminal
-  is available. Declining the prompt leaves the workspace untouched and succeeds; it is a decision,
-  not a command failure.
+  exactly what the committed lock already records. In a terminal, declining the prompt leaves the
+  workspace untouched and succeeds; it is a decision, not a command failure. Without a terminal the
+  command does not prompt: it fails and tells you to re-run with `--yes`.
 - A real update materializes Git source under `deps/NAME`, publish-checks new or changed Git
   packages and changed local registrations, checks closure-wide buildability, writes
   `slang-package-lock.json`, and regenerates `slang-package-includes.txt`.

@@ -286,8 +286,9 @@ overrides for that solve; it does not change `slang-package-overlay.json` or rep
 toolchain is omitted unless its constraint fails. Resolver Git clones
 under `.slang/cache/` may still be populated so the tool can inspect available tags. A real update
 prints that report and asks before applying the exact graph it just resolved, unless that graph
-already matches the committed lock. Declining leaves the workspace unchanged and still succeeds.
-Pass `--yes` for a non-interactive invocation. Reproducing a committed lock uses
+already matches the committed lock. In a terminal, declining that prompt leaves the workspace
+unchanged and still succeeds. Without a terminal the command does not prompt: it fails and tells
+you to re-run with `--yes`. Pass `--yes` for a non-interactive invocation. Reproducing a committed lock uses
 `slang package fetch` or `slang package build`; an inconsistent existing lock is an error.
 
 The tool invokes the `git` executable from the system path. Existing Git credential and SSH
@@ -295,16 +296,23 @@ configuration therefore applies without separate package-tool authentication. Gi
 cannot begin with `-`, use Git's command-executing `ext::` transport, or contain whitespace or
 control characters.
 
-After fetching, `slang-package-includes.txt` lists the source
-roots, one per line. Pass the file explicitly with
-`slangc -search-path-list slang-package-includes.txt`; this adds every listed root just as if it
-had been passed with a separate `-I`. Library callers can load the same file with
-`slang_readSearchPathsFile`, assign the returned array and count to
-`slang::SessionDesc::searchPaths` and `searchPathCount`, and keep its `outAllocation` alive until
-`createSession` returns. It is a derived, gitignored file; fetch or update regenerates it. Each
-line is an absolute workspace-rooted filesystem path, so the listed roots remain valid when the
-compiler is invoked from a subdirectory. Package commands do not inject these paths into compiler
-sessions automatically.
+After fetching, `slang-package-includes.txt` lists each package export directory, one per line
+(for example `deps/color-encoding/src`), not the package root. The workspace `src/` is omitted
+because a compiler input file already names that primary. A host that compiles shaders or
+modules itself passes the file to `slangc`:
+
+```sh
+slangc -search-path-list slang-package-includes.txt app/tonemap.slang -target spirv -o tonemap.spv
+```
+
+That is the same as a separate `-I` for each listed directory. `slangi` does not read the list; it
+searches only next to its input file, which is why `slang package run` interprets the flattened
+source bundle instead. Library callers can load the same file with `slang_readSearchPathsFile`,
+assign the returned array and count to `slang::SessionDesc::searchPaths` and `searchPathCount`,
+and keep its `outAllocation` alive until `createSession` returns. It is a derived, gitignored
+file; fetch or update regenerates it. Each line is an absolute path, so the listed directories
+remain valid when the compiler is invoked from a subdirectory. Package commands do not inject
+these paths into compiler sessions automatically.
 
 ## Validating packages
 

@@ -96,15 +96,22 @@ effective `version`, and for Git pins the resolved `ref` and `commit`.
 
 ## Reproduce the locked graph
 
+This clone already has a lock. Before `deps/` exists, status reports that lock as stale and the
+graph as incomplete. It does not say the lock is absent. "Lock absent" is only for a tree with no
+`slang-package-lock.json`. Status returns nonzero only when required JSON cannot be read and
+parsed.
+
 ```sh
+slang package status
 slang package fetch
 git -C deps/ycbcr-display describe --tags --exact-match
 git -C deps/color-convert describe --tags --exact-match
 git -C deps/color-encoding describe --tags --exact-match
 ```
 
-All three `describe` commands should print `v1.0.0`, even though `v1.1.0` already exists and even
-though the later encoding release retracts `1.0.0`. Fetch never consults retractions and never
+Status should print `lock stale, incomplete` and name the missing checkouts under `deps/`. After
+fetch, all three `describe` commands should print `v1.0.0`, even though `v1.1.0` already exists and
+even though `color-encoding` `v1.1.0` retracts `1.0.0`. Fetch never consults retractions and never
 rewrites the lock.
 
 Use fetch to materialize a committed lock without building. `build` also fetches missing locked
@@ -137,9 +144,11 @@ missing or dirty checkouts, edits, or enabled overrides. Status does not inspect
 fetch, update, or contact remotes. When it finds drift, it lists the problems and names the
 corrective command without returning a failure merely because the workspace is dirty or incomplete.
 
-If you run status before fetch, the header says the lock is absent and the graph is incomplete,
-and the following lines name the missing lock or checkouts. Status returns nonzero only when
-required JSON cannot be read and parsed.
+Fetch also writes gitignored `slang-package-includes.txt` (one absolute export directory per
+line). This walkthrough does not invoke `slangc` on that file: `video-preview` is a host
+program, not a shader, and `slangi` does not read the list. After `build`, `slang package run`
+interprets the flattened source bundle. Compiling shaders with the same list is in
+[Slang Source Packages](source-packages).
 
 ## Preview a new solve, then apply it
 
@@ -154,23 +163,26 @@ the constraint rationale. The encoding checkout should still be `v1.0.0`. Resolv
 under `.slang/cache/` may still be populated so the tool can list tags. `--dry-run` cannot be
 combined with `--clean`.
 
-Then apply the solve:
+The report should say it would upgrade all three packages to `1.1.0`. Encoding `1.0.0` is rejected
+because `color-convert@1.1.0` requires `>=1.1.0`, not because the dry-run names the encoding
+retraction. That retraction is extra publisher advice: it would also skip `1.0.0` on update, and
+it still does not rewrite a fetched lock.
+
+Then apply the solve. In a terminal, bare `slang package update` prints the plan and asks;
+declining leaves the workspace unchanged and succeeds. Without a terminal the command does not
+prompt: it fails and tells you to re-run with `--yes`.
 
 ```sh
-slang package update
+slang package update --yes
 git -C deps/ycbcr-display describe --tags --exact-match
 git -C deps/color-convert describe --tags --exact-match
 git -C deps/color-encoding describe --tags --exact-match
 ```
 
-Update prints the report again and asks whether to apply that exact in-memory selection. The
-report is a plan, so it is written in the future tense (`would upgrade`, `Would update 3
+The report is a plan, so it is written in the future tense (`would upgrade`, `Would update 3
 packages`); the past-tense summary is printed only after the lock and the checkouts it names have
-actually been written. Use `slang package update --yes` for automation. All three should now
-print `v1.1.0`. Convert's tighter
-encoding range (`>=1.1.0`) and the
-publisher retraction of `1.0.0` agree: the shared leaf is `color-encoding@v1.1.0`, once, in the
-lock.
+actually been written. All three `describe` commands should now print `v1.1.0`. The shared leaf is
+`color-encoding@v1.1.0`, once, in the lock.
 
 Before clearing search paths or writing `deps/`, update checks that the selected graph is legal:
 identities, trusted edges, toolchain, and exclusions, reading each Git manifest at the selected
@@ -235,12 +247,12 @@ slang package --experimental run --binary
 ```
 
 ```sh
-slang package docs
+slang package docs --print
 ```
 
-`docs` opens `build/docs/index.md` with the registered Markdown application. Pass `--print` to
-write the path instead of launching. It does not copy or regenerate files; run `build` when the
-documentation should change. `slang package test` is reserved and not implemented yet.
+`--print` writes the path to `build/docs/index.md`. Bare `docs` opens that file with the registered
+Markdown application. Neither copies or regenerates files; run `build` when the documentation
+should change. `slang package test` is reserved and not implemented yet.
 
 ## Develop against a local tree
 
