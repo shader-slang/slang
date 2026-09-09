@@ -17,10 +17,10 @@
 //TEST:SIMPLE_EX(filecheck=CUDA): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target cuda -DCUDA
 //TEST:SIMPLE_EX(filecheck=CUDA): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target cuda -DCUDA
 
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -xslang -DSPIRV -Xslang
+//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -xslang -DSPIRV
 
 // TODO: This test revealed a few problems for a path from GLSL to HLSL
-//T-EST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -compute -entry computeMain -source-language glsl -output-using-type -profile cs_6_6 -xslang -DHLSL -Xslang
+//T-EST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -compute -entry computeMain -source-language glsl -output-using-type -profile cs_6_6 -xslang -DHLSL
 
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer

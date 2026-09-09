@@ -7,8 +7,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target glsl -DMODIFIER
 //TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/bugs/gh-4305.slang -stage compute -entry computeMain -target glsl -DQUAD
 //TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/bugs/gh-4305.slang -stage compute -entry computeMain -target glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl -source-language glsl -xslang -DQUAD -Xslang
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl -source-language glsl -Xslang
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl -source-language glsl -xslang -DQUAD
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl -source-language glsl
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;

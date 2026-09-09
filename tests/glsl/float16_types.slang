@@ -2,8 +2,8 @@
 //TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 //TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target hlsl
 //TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target cuda
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -emit-spirv-directly
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -emit-spirv-directly
 
 #version 450
 
