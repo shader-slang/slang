@@ -1771,6 +1771,16 @@ static LegalVal legalizeMakeStruct(
                     ordinaryArgs.add(argPair->ordinaryVal);
                     specialArgs.add(argPair->specialVal);
                 }
+                else if (arg.flavor == LegalVal::Flavor::none)
+                {
+                    // The argument has been legalized to nothing (e.g. the
+                    // value-producing instruction was eliminated). Distribute
+                    // a none value to whichever sides expect this field.
+                    if (ee.flags & Slang::PairInfo::kFlag_hasOrdinary)
+                        ordinaryArgs.add(arg);
+                    if (ee.flags & Slang::PairInfo::kFlag_hasSpecial)
+                        specialArgs.add(arg);
+                }
                 else if (ee.flags & Slang::PairInfo::kFlag_hasOrdinary)
                 {
                     ordinaryArgs.add(arg);
