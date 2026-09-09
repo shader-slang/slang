@@ -56,6 +56,7 @@ static void _printHelp(bool experimental = false)
         "  dependency add <name> --git <url> --version <range>\n"
         "  dependency add <name> --git <url> --ref <ref> --as <version>\n"
         "  dependency add <name> --path <path> --as <version>\n"
+        "  dependency pin <name> [--to <version> | --commit]\n"
         "  dependency remove <name> | dependency list\n"
         "                   Manage direct dependencies in slang-pkg-manifest.json.\n"
         "  override add <name> <path> [as]\n"
@@ -978,6 +979,87 @@ static SlangResult _dependencyRemove(
         "'slang package update'.\n",
         name.getBuffer());
     return SLANG_OK;
+}
+
+/// Write a Git pin into the workspace manifest from the current lock selection.
+///
+/// Default copies the locked exact version as `git` plus `version`, so a later update cannot float
+/// to a newer compatible tag. `--to` writes that exact version instead of the locked one.
+/// `--commit` writes `git` plus `ref` plus `as` using the locked SHA, so a moved tag is not
+/// reselected. A transitive package is promoted to a direct edge using the lock's Git URL. Path
+/// dependencies are already pins. An overlay stays in slang-pkg-workspace.json; this command only
+/// edits committed Git intent. It does not rewrite the lock; inspect status and run update
+/// afterward, the same as `dependency add`.
+static SlangResult _dependencyPin(
+    const String& projectRoot,
+    const String& name,
+    const String& requestedVersion,
+    bool pinCommit,
+    String& outError)
+{
+    if (requestedVersion.getLength() && pinCommit)
+    {
+        outError = "dependency pin --to cannot be combined with --commit.";
+        return SLANG_FAIL;
+    }
+    if (requestedVersion.getLength())
+    {
+        SemanticVersion ignored;
+        SLANG_RETURN_ON_FAIL(parseExactVersion(requestedVersion, ignored, outError));
+    }
+
+    Manifest manifest;
+    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
+    Index existingIndex = _findDependencyIndex(manifest, name);
+    if (existingIndex >= 0 && manifest.dependencies[existingIndex].path.getLength())
+    {
+        outError = String("Path dependency is already pinned: ") + name;
+        return SLANG_FAIL;
+    }
+
+    String lockPath = Path::combine(projectRoot, kLockFileName);
+    if (!File::exists(lockPath))
+    {
+        outError = "dependency pin requires slang-pkg-lock.json. Run 'slang package update'.";
+        return SLANG_FAIL;
+    }
+    LockFile lock;
+    SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
+    Index lockedIndex = findLockedPackageIndex(lock, name);
+    if (lockedIndex < 0)
+    {
+        outError = String("Lock file does not contain package '") + name + "'.";
+        return SLANG_FAIL;
+    }
+    const LockedPackage& locked = lock.packages[lockedIndex];
+    if (!isGitBackedLockedPackage(locked))
+    {
+        outError = String("Cannot pin a path-only package: ") + name;
+        return SLANG_FAIL;
+    }
+    if (pinCommit && !locked.commit.getLength())
+    {
+        outError = String("Lock file does not record a commit for package '") + name + "'.";
+        return SLANG_FAIL;
+    }
+    String pinVersion = requestedVersion.getLength() ? requestedVersion : locked.version;
+    if (!pinCommit && !pinVersion.getLength())
+    {
+        outError = String("Lock file does not record a version for package '") + name + "'.";
+        return SLANG_FAIL;
+    }
+
+    Dependency dependency;
+    dependency.name = name;
+    dependency.git = locked.git;
+    if (pinCommit)
+    {
+        dependency.ref = locked.commit;
+        dependency.as = locked.version;
+    }
+    else
+        dependency.version = pinVersion;
+    return _dependencyAdd(projectRoot, dependency, outError);
 }
 
 static SlangResult _dependencyList(const String& projectRoot, String& outError)
@@ -3578,8 +3660,40 @@ SlangResult executeInDirectory(
             }
             return _dependencyAdd(projectRoot, dependency, outError);
         }
-        outError = "Invalid dependency command. Use 'dependency add', 'dependency remove', or "
-                   "'dependency list'.";
+        if (argc >= 4 && String(argv[2]) == "pin")
+        {
+            String name = argv[3];
+            if (!isValidPackageName(name))
+            {
+                outError = String("Invalid dependency name: ") + name;
+                return SLANG_FAIL;
+            }
+            String requestedVersion;
+            bool pinCommit = false;
+            for (int i = 4; i < argc; ++i)
+            {
+                String option = argv[i];
+                if (option == "--to")
+                {
+                    if (i + 1 >= argc)
+                    {
+                        outError = "Missing value for dependency option: --to";
+                        return SLANG_FAIL;
+                    }
+                    requestedVersion = argv[++i];
+                }
+                else if (option == "--commit")
+                    pinCommit = true;
+                else
+                {
+                    outError = String("Unknown dependency pin option: ") + option;
+                    return SLANG_FAIL;
+                }
+            }
+            return _dependencyPin(projectRoot, name, requestedVersion, pinCommit, outError);
+        }
+        outError = "Invalid dependency command. Use 'dependency add', 'dependency pin', "
+                   "'dependency remove', or 'dependency list'.";
         return SLANG_FAIL;
     }
     if (command == "edit" && argc == 3)

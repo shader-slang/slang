@@ -13,9 +13,9 @@ same application when an upstream package changes its graph and when you extract
 application into a package.
 
 Journeys 1 through 7 use only stable commands, so they describe what the tool supports today
-without any opt-in. Binary module generation, host executable compilation, and `run` are
+without any opt-in. Binary module generation, host executable compilation, and binary `run` are
 experimental, and everything about them is collected in Journey 8, the last journey, so it can be
-read or ignored on its own.
+read or ignored on its own. Source `run` is stable.
 
 This is also a behavioral contract for the package tool. The maintainer appendix turns the
 journeys into must/must-not checks for future command changes.
@@ -225,8 +225,25 @@ git add slang-pkg-manifest.json slang-pkg-lock.json
 git commit
 ```
 
-The manifest records the acceptable range. The lock records the exact tag, commit, effective
-version, dependencies, and exports selected for this workspace.
+The manifest records the acceptable range. The lock records selection identity only: the exact
+solver `version`, plus Git `ref` and `commit`, or an overlay `path`. Declared exports and
+dependencies are reloaded from the selected tree.
+
+To freeze that selection as committed intent, pin the Git edge without copying lock identity into
+the overlay:
+
+```sh
+slang package dependency pin color-encoding
+```
+
+Default pin writes `git` plus the lock's exact `version`. `--to 1.0.0` writes that exact version
+instead. `--commit` writes `git`, `ref` (the locked SHA), and `as` (the lock version). Pin does not
+run `update`; inspect `status` and update afterward, the same as `dependency add`. A later
+compatible tag no longer satisfies a default pin. Pinning a transitive package promotes it to a
+direct edge using the lock's Git URL. Path dependencies and path-only lock rows are already pins.
+
+After pin, inspect `status` and run `update` if the written version differs from the lock, then
+commit the manifest (and lock, if update rewrote it).
 
 ### Tool does
 
@@ -268,7 +285,8 @@ slang package build
 
 ### Current gaps and pitfalls
 
-- Dependency add/remove and pin/ref forms are available, but there is no package registry search.
+- Dependency add/remove cover range, `ref`+`as`, and path+`as` edges. `dependency pin` freezes a
+  Git lock selection as an exact version or SHA; there is no package registry search.
 - Update always solves the entire graph. There is no package-scoped update.
 - `--dry-run` can inspect remote manifests but does not materialize remote source. A preview can
   succeed and the real update can later fail source or module-layout validation.
@@ -381,9 +399,12 @@ slang package edit color-encoding
 ```
 
 The checkout stays at `deps/color-encoding`. `edit` registers an enabled override there, using the
-version from the current lock. Fetch and update do not replace that user-owned tree. The next
-`update` reads its working-tree manifest and writes a Git+path lock row. Changed exports and
-dependencies participate in the full solve; they are not copied into the lock.
+version from the current lock. Fetch and update do not replace that user-owned tree. Compiler
+search paths already named that directory, so claiming it does not require `update` to keep
+building against the checkout. New export directories in its working-tree manifest are picked up
+when the registration is written. New dependency edges still need `update`, because they change
+which packages the lock must contain. The next `update` reads the working-tree manifest and writes
+a Git+path lock row; those edges participate in the full solve and are not copied into the lock.
 
 `edit` also accepts a checkout that already has local changes. That is the recommended recovery
 when you modified `deps/color-encoding` first and only then discovered that fetch and update
@@ -422,7 +443,8 @@ slang package update
 ```
 
 A sibling clone is the same mechanism with a different path. Remove the in-place registration
-first because one package name cannot have two local trees:
+first because one package name cannot have two local trees, then `update` so the lock selects
+that directory:
 
 ```sh
 slang package override add color-encoding ../color-encoding 1.1.0
@@ -458,11 +480,12 @@ same local tree without re-entering its configuration.
   representation.
 - Does not copy or modify the supplied directory. Re-adding the in-place path updates that same
   registration's effective version.
-- Local registration changes regenerate `build/search-paths` when the current lock can represent
-  the newly active source. An override's locked export paths therefore become compiler inputs
-  immediately, mapped to the local directory. If its manifest declares different exports, run
-  `update` to adopt them. Disabling a lock-adopted override needs update before published paths are
-  regenerated.
+- Local registration changes regenerate `build/search-paths` from the active tree. An in-place
+  `edit` already sits at `{workspace.deps}/NAME`, so those paths keep working without `update`; a
+  newly declared export directory on that working tree is included immediately. An out-of-tree
+  override is recorded immediately, but `update` is what writes its path into the lock and
+  resolves any new dependency edges. Disabling a lock-adopted override needs `update` before
+  published Git paths are regenerated.
 - A plain update records each enabled override's original Git identity and local path in the
   definitive lock and resolves all enabled override manifests together.
 - A local-path lock fails on another machine without the matching registration. This is
@@ -471,7 +494,9 @@ same local tree without re-entering its configuration.
 ### Current gaps and pitfalls
 
 - `unedit --adopt` applies only to a direct Git dependency because that is the manifest edge it can
-  pin. A transitive fix must be exposed as direct intent or published upstream.
+  pin. `dependency pin NAME` can promote a transitive Git package to a direct exact-version edge
+  without adopting a working tree. A local-only fix that is not published still needs adopt or an
+  upstream release.
 - An untagged adopted commit requires explicit `--as`; Git object identity does not determine a
   semantic version.
 - Overrides are path-only; there is no user-global Git-to-Git remapping policy.
@@ -536,7 +561,13 @@ git commit
 ```
 
 The consumer's own `slang-pkg-manifest.json` is unchanged. The new package is transitive, but the root
-lock gains an exact row for it.
+lock gains an exact row for it. To make that selection a committed direct requirement:
+
+```sh
+slang package dependency pin color-math
+slang package status
+slang package update
+```
 
 ### Tool does
 
@@ -550,7 +581,8 @@ lock gains an exact row for it.
 - `slang package tree` shows the selected graph, and `slang package why color-math` prints every
   root-to-package path and incoming requirement. These commands explain current graph presence,
   not the historical candidates rejected during the solve; keep the update report when that
-  history matters.
+  history matters. If a locked Git revision is not already under `deps/`, they may populate
+  `.slang/cache`. `status` does not.
 - There is no package-scoped update. Previewing or taking the new `color-encoding` release may
   move other compatible packages in the same solve.
 - `--minimal` preserves the added/changed/unchanged list but intentionally drops the incoming
@@ -940,8 +972,8 @@ That suggests three workflow checks for Slang:
 
 - `init` should leave manifest structure useful without pretending to choose application source,
   library source, or a license for the user.
-- `dependency add` should edit manifest intent without assuming a package registry; update remains
-  the separate operation that selects a pin.
+- `dependency add` and `dependency pin` should edit manifest intent without assuming a package
+  registry; update remains the separate operation that selects or re-checks a pin.
 - A future committed member list should model packages that are always developed and checked in
   together, with one root solve.
 
@@ -1150,8 +1182,10 @@ Git+path lock row; disable the override and update first when the local graph wa
 Use `--adopt` to keep a committed fix. It changes a direct Git dependency in
 `slang-pkg-manifest.json` to `ref` plus `as`, writes `HEAD` as the lock commit, and removes the local
 override. A unique semantic-version tag at `HEAD` supplies both `ref` and `as`; an untagged commit
-uses its full object ID as `ref` and requires `--as VERSION`. The local manifest must still agree
-with the lock. Both destructive clean and adopt require confirmation; pass `--yes` for automation.
+uses its full object ID as `ref` and requires `--as VERSION`. After the overlay is removed, the
+committed tree's declared graph must still resolve onto that Git pin (the package name must match,
+and live edges must still select the lock). Extra export paths alone are not a mismatch. Both
+destructive clean and adopt require confirmation; pass `--yes` for automation.
 
 ### `--experimental`
 
@@ -1159,8 +1193,9 @@ with the lock. Both destructive clean and adopt require confirmation; pass `--ye
 workflows.
 
 **It changes:** `build` also compiles enabled `.slang-module` output and configured host
-executables, and `run` becomes available. The flag is global and must appear before the
-subcommand. Every other journey in this chapter is unaffected by it.
+executables, and `run --binary` becomes available. The flag is global and must appear before the
+subcommand. Source `run` stays available without it. Every other journey in this chapter is
+unaffected by it.
 
 **It does not change:** validation, resolution, bundle output, or documentation collection.
 
@@ -1220,10 +1255,12 @@ partial checkouts and no lock.
 
 ### Edit and override solve different problems
 
-`edit` protects the current checkout but ignores its changed manifest during resolution.
-An enabled `override` redirects a package identity and plain update adopts all enabled override
-manifests. This is a principled distinction; enable/disable keeps local configuration while making
-the active source explicit.
+`edit` and `override add` write the same kind of registration in `slang-pkg-workspace.json`. The
+difference is which directory it names. `edit` claims the checkout that is already at
+`{workspace.deps}/NAME`, so ownership changes without moving compiler inputs; fetch and update
+stop replacing that tree immediately. `override add` with another path records a sidecar tree;
+`update` is what writes that path into the lock and resolves the overlay's dependency graph.
+`--ignore-overrides` still leaves in-place edits active so it cannot replace `deps/NAME`.
 
 ### Local solve writes a definitive but non-portable lock
 
@@ -1359,6 +1396,8 @@ them or update this chapter and its regression tests in the same change.
   to the locked commit; `unedit --clean` restores that commit before removing the registration.
 - `unedit --adopt` pins a direct Git dependency and the lock to committed `HEAD`, requiring
   explicit `--as` unless one semantic-version tag identifies it.
+- `dependency pin` writes Git intent from the current lock without dropping an overlay or
+  rewriting the lock. Default and `--to` are exact versions; `--commit` is the locked SHA.
 - An in-place override's working-tree manifest enters the solve.
 - `override` records a machine-local path and exact effective version. Re-adding
   `{workspace.deps}/NAME` updates the same registration; a different path requires `unedit` first.
@@ -1371,8 +1410,10 @@ them or update this chapter and its regression tests in the same change.
 - Disable an override and update to restore published selection before removing it.
 - `validate NAME` certifies a locked library tree in this workspace, including an enabled override.
   Bare `validate` still rejects the app while any edit or override is enabled.
-- Local-registration changes regenerate `build/search-paths` when the current lock can represent
-  the newly active source. Disabling a lock-adopted override requires update first.
+- Local-registration changes regenerate `build/search-paths` from the active tree. In-place `edit`
+  does not need `update` to keep compiling `deps/NAME`. Out-of-tree overrides need `update` to
+  enter the lock and to activate new dependency edges. Disabling a lock-adopted override requires
+  update first.
 - Dirty, unregistered Git checkouts are not replaced without `--clean`; enabled overrides remain
   protected. Fetch and update check every checkout the current lock owns before they do anything
   else, so update stops before resolving rather than after reporting a plan it cannot apply. The
@@ -1402,7 +1443,8 @@ them or update this chapter and its regression tests in the same change.
 - Detailed update output explains what moved, what stayed, and the incoming constraints.
 - `--minimal` retains one-line changes, unchanged packages, and summary counts. Detailed reports
   include rationale only, then the summary. The installed toolchain is not listed on success.
-- Dependency add/remove changes only the manifest; tree and why read only the current graph.
+- Dependency add/remove changes only the manifest; tree and why explain the current lock graph
+  and may populate `.slang/cache` when a locked Git revision is not already under `deps/`.
 - Materialization prints per-package source/checkout progress. A failure explains that the prior
   lock remains authoritative and how to recover potentially partial derived state.
 - `docs` opens `build/docs/index.md` with the registered application. `--print` writes the path
@@ -1448,7 +1490,7 @@ Start with these unit tests when changing a journey:
   `PackageToolDisabledInPlaceOverrideProtectsDirtyTree`,
   `PackageToolUneditAdoptsCommitPin`, `PackageToolUneditAdoptRejectsManifestDrift`,
   `PackageToolUneditAdoptsVersionTag`,
-  `PackageToolUneditRejectsConflictingOptions`, `PackageToolReadsLegacyEditsAsOverrides`,
+  `PackageToolUneditRejectsConflictingOptions`, `PackageToolRejectsLegacyWorkspaceEdits`,
   `PackageLocalRegistryJSON`.
 - Path dependencies: `PackageToolPathDependencies`,
   `PackageToolFetchRejectsPathLockForGitDependency`, `PackageToolRejectsPathIntoSlangState`,

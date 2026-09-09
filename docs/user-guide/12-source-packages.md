@@ -185,22 +185,20 @@ exclusion changes the workspace's declared resolution intent, so
 Path dependencies and local overrides carry an effective version for solver compatibility, but
 workspace exclusions apply only to remote Git selections.
 
-Each dependency entry has one of four shapes:
+Each dependency entry has one of three shapes, matching `slang package dependency add`:
 
 - `git` plus `version` selects the highest compatible `vMAJOR.MINOR.PATCH` release tag.
 - `path` plus `as` uses one relative tree as the exact semantic version named by `as`.
-- `git`, `ref`, and `as` pins an opaque branch, tag, or full commit ID and uses `as` as its exact
-  solver version.
-- `git`, `version`, `ref`, and `as` adds a compatibility assertion: `as` must satisfy `version`, or
-  manifest validation fails.
+- `git`, `ref`, and `as` pins an opaque branch, tag, or full 40-character commit ID and uses `as`
+  as its exact solver version.
 
 `git` may be a URL or a local Git repository path. A `version` is one or more clauses joined by
 `||`. Each clause is a space-separated intersection of `>`, `>=`, `<`, `<=`, and `!=` comparisons,
 or a single exact version. For example, `>=1.2.0 !=1.3.0` skips 1.3.0, and
 `>=1.0.0 <1.3.0 || >=1.3.1 <2.0.0` accepts either interval. Dependents still unify one version per
 package name: every incoming constraint must match that version. Both `version` and `as` omit the
-release tag's `v` prefix. `ref` is normally a branch or tag, but may be a full commit ID; the lock
-always records the exact commit.
+release tag's `v` prefix. `ref` is a branch, tag, or full 40-character commit ID; the lock always
+records the exact commit.
 
 A dependency `path` must be relative to the manifest that declares it and must be paired with an
 exact `as` version. The target directory must contain its own `slang-pkg-manifest.json`, and its package
@@ -367,10 +365,16 @@ produce a report. It does not inspect `build/`, modify package state, or contact
 Use `slang package dependency add` and `dependency remove` to edit direct manifest edges, and
 `dependency list` to inspect them. Add accepts exactly one source shape:
 `--git URL --version RANGE`, `--git URL --ref REF --as VERSION`, or
-`--path PATH --as VERSION`. These commands change only `slang-pkg-manifest.json`; inspect `status` and
-run `update` afterward. `slang package tree` prints the selected lock graph, while
+`--path PATH --as VERSION`. `dependency pin NAME` rewrites a Git edge from the current lock:
+default writes that lock's exact `version`, `--to MAJOR.MINOR.PATCH` writes a different exact
+version, and `--commit` writes `ref` plus `as` from the locked SHA. A transitive Git package is
+promoted to a direct edge. Path dependencies are already pins. These commands change only
+`slang-pkg-manifest.json`; inspect `status` and run `update` afterward. `slang package tree` prints
+the selected lock graph, while
 `slang package why NAME` prints every current root-to-package path and incoming requirement. Why
-explains the graph that is locked now, not candidates rejected during an earlier solve.
+explains the graph that is locked now, not candidates rejected during an earlier solve. Unlike
+`status`, `tree` and `why` may populate `.slang/cache` when a locked Git revision is not already
+present under `deps/`.
 
 Each `.slang` file that is not below a module's companion directory is a primary module file. Its
 first declaration must be `module NAME;`, where `NAME` matches the filename stem with hyphens
@@ -393,9 +397,11 @@ source remains visible under `deps/`; generated files go under `build/`.
 `slang package edit NAME` marks the existing `{workspace.deps}/NAME` checkout (by default
 `deps/NAME`) as editable without moving it. Under the covers this is an enabled override at that
 path, using the current locked version. Gitignored `slang-pkg-workspace.json` records that the package
-tool no longer owns the tree. Fetch and update do not replace it, and update reads its working-tree
-manifest and writes a Git+path lock row. The checkout may already have local changes when `edit`
-runs; it only has to still be the Git repository the lock names.
+tool no longer owns the tree. Fetch and update do not replace it. Search paths already point at
+that directory, so compiling against it does not wait on `update`. `update` reads the working-tree
+manifest and writes a Git+path lock row when the overlay graph must enter the lock. The checkout
+may already have local changes when `edit` runs; it only has to still be the Git repository the
+lock names.
 
 Plain `unedit NAME` requires a Git-only lock row and a clean checkout at that locked commit.
 `unedit NAME --clean` discards local state and restores the locked commit. Use

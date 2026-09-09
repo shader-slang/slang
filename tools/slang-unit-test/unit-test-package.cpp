@@ -1687,6 +1687,25 @@ SLANG_UNIT_TEST(PackageToolDependencyCommandsAndInitialFetch)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(whyArguments), whyArguments, error)));
 
+    const char* pinPathArguments[] = {"slang-package", "dependency", "pin", "a"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(pinPathArguments), pinPathArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("already pinned")) >= 0);
+    const char* pinTransitivePathArguments[] = {"slang-package", "dependency", "pin", "b"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(pinTransitivePathArguments),
+        pinTransitivePathArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("path-only")) >= 0);
+    const char* pinMissingArguments[] = {"slang-package", "dependency", "pin", "missing"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(pinMissingArguments),
+        pinMissingArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not contain")) >= 0);
+
     const char* removeArguments[] = {"slang-package", "dependency", "remove", "a"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(removeArguments), removeArguments, error)));

@@ -80,12 +80,14 @@ less slang-pkg-lock.json
 `build.host` configures native executables. A dependency may declare `build.host`; only the package
 you run `build` and `run` in produces executables.
 
-Most Git dependencies use `git` plus a `version` range. To follow a branch or non-release tag,
-write `git`, `ref`, and `as`; `ref` chooses the Git name while `as` supplies the exact semantic
-version used by the solver. You may also retain `version` as a checked compatibility assertion:
-validation fails when `as` is outside that range. Path dependencies similarly require `path` plus
-`as`. In all cases the lock records the exact effective version, and Git locks additionally record
-the resolved commit.
+Most Git dependencies use `git` plus a `version` range, written with `slang package dependency
+add NAME --git URL --version RANGE`. To pin a branch, tag, or full 40-character commit, use
+`--git URL --ref REF --as VERSION`; `ref` is Git identity and `as` is the exact solver version.
+Path dependencies use `--path PATH --as VERSION`. After a lock exists,
+`slang package dependency pin NAME` copies that selection into a direct Git exact-version edge.
+`--to MAJOR.MINOR.PATCH` writes a different exact version. `--commit` writes the locked SHA as
+`ref`. The lock records selection identity: the
+effective `version`, and for Git pins the resolved `ref` and `commit`.
 
 ## Reproduce the locked graph
 
@@ -241,9 +243,10 @@ Both commands use overrides recorded in gitignored `slang-pkg-workspace.json`.
 
 `slang package edit NAME` registers `deps/NAME` as an enabled in-place override at the version in
 the current lock. The checkout may already contain local changes: preserving work you have already
-started is the point of the command. Fetch and update will not overwrite it. A plain update reads
-its working-tree manifest, so changed exports and dependencies enter the solve and the resulting
-lock records both the Git identity and local path.
+started is the point of the command. Fetch and update will not overwrite it. Search paths already
+point at that directory, so you can keep compiling without `update`. A plain update reads its
+working-tree manifest, so new dependency edges enter the solve and the resulting lock records
+both the Git identity and local path.
 
 Plain `unedit` succeeds only when the lock is a Git pin and the checkout is clean at that exact
 commit. `unedit NAME --clean` discards local state and restores that commit; pass `--yes` when
