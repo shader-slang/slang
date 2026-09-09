@@ -157,16 +157,16 @@ static SlangResult _requireFormatVersion(
     const char* fileName,
     String& outError)
 {
-    JSONValue value = _find(container, root, "version");
+    JSONValue value = _find(container, root, kFormatVersionKey);
     if (!value.isValid())
     {
-        outError = String("Field 'version' is required in ") + fileName + ".";
+        outError = String("Field 'schema_version' is required in ") + fileName + ".";
         return SLANG_FAIL;
     }
     if (value.getKind() != JSONValue::Kind::Integer ||
         container->asInteger(value) != kFormatVersion)
     {
-        outError = String("Field 'version' in ") + fileName + " must be the integer 1.";
+        outError = String("Field 'schema_version' in ") + fileName + " must be the integer 1.";
         return SLANG_FAIL;
     }
     return SLANG_OK;
@@ -841,9 +841,9 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
             outError = "Field 'host' must be nested under 'build' as 'build.host'.";
             return SLANG_FAIL;
         }
-        if (key != "version" && key != "name" && key != "exports" && key != "license_files" &&
-            key != "dependencies" && key != "retractions" && key != "workspace" && key != "build" &&
-            key != "tools")
+        if (key != "schema_version" && key != "name" && key != "exports" &&
+            key != "license_files" && key != "dependencies" && key != "retractions" &&
+            key != "workspace" && key != "build" && key != "tools")
         {
             outError = String("Unknown field in ") + kPackageFileName + ": " + key;
             return SLANG_FAIL;
@@ -915,7 +915,7 @@ static void _writeKey(JSONWriter& writer, const char* key)
 
 static void _writeFormatVersion(JSONWriter& writer)
 {
-    _writeKey(writer, "version");
+    _writeKey(writer, kFormatVersionKey);
     writer.addIntegerValue(kFormatVersion, SourceLoc());
 }
 
@@ -1173,7 +1173,7 @@ SlangResult readLockFile(const String& path, LockFile& outLock, String& outError
     for (auto pair : json.container->getObject(json.root))
     {
         String key = json.container->getStringFromKey(pair.key);
-        if (key != "version" && key != "packages")
+        if (key != "schema_version" && key != "packages")
         {
             outError = String("Unknown field in ") + kLockFileName + ": " + key;
             return SLANG_FAIL;
@@ -1260,7 +1260,7 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
     for (auto pair : json.container->getObject(json.root))
     {
         String key = json.container->getStringFromKey(pair.key);
-        if (key != "version" && key != "overrides")
+        if (key != "schema_version" && key != "overrides")
         {
             outError = String("Unknown field in ") + kOverlayFileName + ": " + key;
             return SLANG_FAIL;

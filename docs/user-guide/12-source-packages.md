@@ -58,7 +58,7 @@ The manifest declares the package and its source dependencies:
 
 ```json
 {
-  "version": 1,
+  "schema_version": 1,
   "name": "my-shaders",
   "exports": ["src"],
   "license_files": ["LICENSE"],
@@ -99,7 +99,7 @@ The manifest declares the package and its source dependencies:
 }
 ```
 
-`version` is the file format identifier and is currently `1`. `name`, `exports`, and
+`schema_version` is the file format identifier and is currently `1`. `name`, `exports`, and
 `license_files` are also required. `dependencies`, `tools`, `workspace`, and `build` are optional.
 Package manifests allow JSON comments.
 
@@ -243,7 +243,7 @@ inside a Git release must remain in that release's checkout. A missing target is
 `slang package update` resolves all manifests reachable from the workspace package, materializes
 the resulting dependency set, and writes one `slang-package-lock.json` in the workspace root. The
 lockfile is the definitive dependency graph and records both Git and path packages. It starts with
-`"version": 1`, the same file-format identifier as `slang-package.json`.
+`"schema_version": 1`, the same file-format identifier as `slang-package.json`.
 Nested packages' lockfiles are not used for
 that solve. When a lock exists, `slang package fetch` checks that it still satisfies every recorded
 manifest and ensures every direct and transitive Git dependency is at its locked commit under
@@ -430,7 +430,7 @@ For example, the generated local-state file may contain:
 
 ```json
 {
-  "version": 1,
+  "schema_version": 1,
   "overrides": {
     "noise": {
       "path": "deps/noise",

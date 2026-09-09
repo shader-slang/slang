@@ -12,8 +12,9 @@ namespace Slang
 namespace PackageTool
 {
 
-/// File-format identifier written as `"version": 1` in package JSON files.
+/// File-format identifier written as `"schema_version": 1` in package JSON files.
 inline constexpr Int kFormatVersion = 1;
+inline constexpr char const* kFormatVersionKey = "schema_version";
 inline constexpr char const* kPackageFileName = "slang-package.json";
 inline constexpr char const* kLockFileName = "slang-package-lock.json";
 inline constexpr char const* kOverlayFileName = "slang-package-overlay.json";

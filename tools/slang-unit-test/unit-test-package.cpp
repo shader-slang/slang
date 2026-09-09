@@ -143,7 +143,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     const String manifestText =
         "{\n"
         "  // Package manifests allow comments.\n"
-        "  \"version\": 1,\n"
+        "  \"schema_version\": 1,\n"
         "  \"name\": \"root\",\n"
         "  \"exports\": [\"src\"],\n"
         "  \"license_files\": [\"LICENSE\"],\n"
@@ -199,7 +199,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.workspace.bundle.source);
 
     const String pinnedText = "{\n"
-                              "  \"version\": 1,\n"
+                              "  \"schema_version\": 1,\n"
                               "  \"name\": \"root\",\n"
                               "  \"exports\": [\"src\"],\n"
                               "  \"license_files\": [\"LICENSE\"],\n"
@@ -219,7 +219,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.dependencies[0].as == "1.4.0");
 
     const String refOnlyText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
         "\"license_files\":[\"LICENSE\"],\"dependencies\":{\"noise\":{"
         "\"git\":\"https://example.com/noise.git\",\"ref\":\"main\",\"as\":\"2.1.0\"}}}";
     SLANG_CHECK_ABORT(
@@ -229,7 +229,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.dependencies[0].as == "2.1.0");
 
     const String contradictoryPinText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
         "\"license_files\":[\"LICENSE\"],\"dependencies\":{\"noise\":{"
         "\"git\":\"https://example.com/noise.git\",\"version\":\"<2.0.0\","
         "\"ref\":\"main\",\"as\":\"2.1.0\"}}}";
@@ -237,7 +237,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         readManifestText("contradictory-pin.json", contradictoryPinText, manifest, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not satisfy")) >= 0);
 
-    const String missingAsText = "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
+    const String missingAsText = "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
                                  "\"license_files\":[\"LICENSE\"],\"dependencies\":{\"noise\":{"
                                  "\"git\":\"https://example.com/noise.git\",\"ref\":\"main\"}}}";
     SLANG_CHECK(SLANG_FAILED(readManifestText("missing-as.json", missingAsText, manifest, error)));
@@ -245,7 +245,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         error.getUnownedSlice().indexOf(UnownedStringSlice("'ref' and 'as' together")) >= 0);
 
     const String asWithoutRefText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
         "\"license_files\":[\"LICENSE\"],\"dependencies\":{\"noise\":{"
         "\"git\":\"https://example.com/noise.git\",\"version\":\"2.1.0\","
         "\"as\":\"2.1.0\"}}}";
@@ -253,24 +253,25 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         SLANG_FAILED(readManifestText("as-without-ref.json", asWithoutRefText, manifest, error)));
 
     const String unsafeGitText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
         "\"license_files\":[\"LICENSE\"],"
         "\"dependencies\":{\"bad\":{\"git\":\"ext::sh -c bad\",\"version\":\"1.0.0\"}}}";
     SLANG_CHECK(SLANG_FAILED(readManifestText("unsafe-git.json", unsafeGitText, manifest, error)));
 
-    const String unsafeExportText = "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\\n/etc\"],"
-                                    "\"license_files\":[\"LICENSE\"],"
-                                    "\"dependencies\":{}}";
+    const String unsafeExportText =
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\\n/etc\"],"
+        "\"license_files\":[\"LICENSE\"],"
+        "\"dependencies\":{}}";
     SLANG_CHECK(
         SLANG_FAILED(readManifestText("unsafe-export.json", unsafeExportText, manifest, error)));
 
     const String missingLicenseFilesText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"dependencies\":{}}";
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"dependencies\":{}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("missing-license-files.json", missingLicenseFilesText, manifest, error)));
 
     const String pathText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
         "\"license_files\":[\"LICENSE\"],"
         "\"dependencies\":{\"noise\":{\"path\":\"../noise\",\"as\":\"1.0.0\"}}}";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifestText("path.json", pathText, manifest, error)));
@@ -278,7 +279,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.dependencies[0].git.getLength() == 0);
 
     const String mixedSourceText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
         "\"dependencies\":{\"noise\":{\"git\":\"memory:noise\",\"path\":\"../noise\","
         "\"version\":\"1.0.0\"}}}";
@@ -288,14 +289,14 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         error.getUnownedSlice().indexOf(UnownedStringSlice("exactly one of 'git' or 'path'")) >= 0);
 
     const String versionedPathText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
         "\"dependencies\":{\"noise\":{\"path\":\"../noise\",\"version\":\"1.0.0\"}}}";
     SLANG_CHECK(
         SLANG_FAILED(readManifestText("versioned-path.json", versionedPathText, manifest, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Path dependency must")) >= 0);
 
-    const String absolutePathText = "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
+    const String absolutePathText = "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
                                     "\"license_files\":[\"LICENSE\"],"
                                     "\"dependencies\":{\"noise\":{\"path\":\"/tmp/noise\","
                                     "\"as\":\"1.0.0\"}}}";
@@ -307,7 +308,13 @@ SLANG_UNIT_TEST(PackageManifestJSON)
                                    "\"license_files\":[\"LICENSE\"],\"dependencies\":{}}";
     SLANG_CHECK(
         SLANG_FAILED(readManifestText("self-version.json", selfVersionText, manifest, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("must be the integer 1")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
+
+    const String integerVersionKeyText = "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
+                                         "\"license_files\":[\"LICENSE\"],\"dependencies\":{}}";
+    SLANG_CHECK(SLANG_FAILED(
+        readManifestText("integer-version-key.json", integerVersionKeyText, manifest, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String missingFormatVersionText =
         "{\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":[\"LICENSE\"],"
@@ -319,35 +326,36 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("required")) >= 0);
 
-    const String wrongFormatVersionText = "{\"version\":2,\"name\":\"root\",\"exports\":[\"src\"],"
-                                          "\"license_files\":[\"LICENSE\"],\"dependencies\":{}}";
+    const String wrongFormatVersionText =
+        "{\"schema_version\":2,\"name\":\"root\",\"exports\":[\"src\"],"
+        "\"license_files\":[\"LICENSE\"],\"dependencies\":{}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("wrong-format-version.json", wrongFormatVersionText, manifest, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("must be the integer 1")) >= 0);
 
     const String unsafeWorkspaceText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
         "\"dependencies\":{},\"workspace\":{\"dependencies\":\"../deps\",\"build\":\"build\"}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("unsafe-workspace.json", unsafeWorkspaceText, manifest, error)));
 
     const String overlappingWorkspaceText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
         "\"dependencies\":{},\"workspace\":{\"dependencies\":\"out\",\"build\":\"out\"}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("overlapping-workspace.json", overlappingWorkspaceText, manifest, error)));
 
     const String implicitDepsOverlapText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
         "\"dependencies\":{},\"workspace\":{\"build\":\"deps\"}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("implicit-deps-overlap.json", implicitDepsOverlapText, manifest, error)));
 
     const String implicitBuildOverlapText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
         "\"dependencies\":{},\"workspace\":{\"dependencies\":\"build\"}}";
     SLANG_CHECK(SLANG_FAILED(readManifestText(
@@ -357,14 +365,14 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         error)));
 
     const String nestedWorkspaceText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
         "\"dependencies\":{},\"workspace\":{\"dependencies\":\"state/deps\",\"build\":\"state\"}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("nested-workspace.json", nestedWorkspaceText, manifest, error)));
 
     const String disabledBundleText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"workspace\":{\"bundle\":{\"modules\":false,"
         "\"source\":true}}}";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -373,7 +381,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.workspace.bundle.source);
 
     const String unknownBundleFieldText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"workspace\":{\"bundle\":{\"modules\":true,"
         "\"cache\":true}}}";
     SLANG_CHECK(SLANG_FAILED(
@@ -381,7 +389,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String slangToolchainText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"tools\":{\"slang-toolchain\":{\"version\":\">=2026.8."
         "0\"}}}";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -389,14 +397,14 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.slangToolchainConstraint == ">=2026.8.0");
 
     const String unknownToolText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"tools\":{\"dxc\":{\"version\":\">=1.0.0\"}}}";
     SLANG_CHECK(
         SLANG_FAILED(readManifestText("unknown-tool.json", unknownToolText, manifest, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("slang-toolchain")) >= 0);
 
     const String invalidExecutableNameText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"build\":{\"host\":{\"executables\":[\"bin/root\"]}}}";
     SLANG_CHECK(SLANG_FAILED(readManifestText(
         "invalid-executable-name.json",
@@ -405,14 +413,14 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         error)));
 
     const String unknownHostFieldText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"build\":{\"host\":{\"executables\":[\"root\"],"
         "\"source\":\"main\"}}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("unknown-host-field.json", unknownHostFieldText, manifest, error)));
 
     const String missingDefaultText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"build\":{\"host\":{\"executables\":[\"one\",\"two\"]}}"
         "}";
     SLANG_CHECK(SLANG_FAILED(
@@ -420,21 +428,21 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("default")) >= 0);
 
     const String implicitDefaultText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"build\":{\"host\":{\"executables\":[\"only-tool\"]}}}";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readManifestText("implicit-host-default.json", implicitDefaultText, manifest, error)));
     SLANG_CHECK(manifest.build.host.defaultExecutable == "only-tool");
 
     const String topLevelHostText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"host\":{\"executables\":[\"root-tool\"]}}";
     SLANG_CHECK(
         SLANG_FAILED(readManifestText("top-level-host.json", topLevelHostText, manifest, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("build.host")) >= 0);
 
     const String unknownBuildFieldText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"build\":{\"cuda\":true}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("unknown-build-field.json", unknownBuildFieldText, manifest, error)));
@@ -442,21 +450,21 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field in 'build'")) >= 0);
 
     const String legacyExecutableText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"executable\":{\"name\":\"root\"}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("legacy-executable.json", legacyExecutableText, manifest, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String invalidRetractionText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"retractions\":[{\"version\":\"v1.0.0\","
         "\"reason\":\"bad\"}]}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("invalid-retraction.json", invalidRetractionText, manifest, error)));
 
     const String invalidExclusionText =
-        "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"workspace\":{\"excludes\":[{\"package\":\"bad/name\","
         "\"version\":\"1.0.0\",\"reason\":\"bad\"}]}}";
     SLANG_CHECK(SLANG_FAILED(
@@ -474,18 +482,23 @@ SLANG_UNIT_TEST(PackageLockRejectsUnknownFields)
         SLANG_SUCCEEDED(File::writeAllText(path, "{\"lock_version\":1,\"packages\":{}}")));
     SLANG_CHECK(SLANG_FAILED(readLockFile(path, lock, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(path, "{\"version\":1,\"packages\":{}}")));
+    SLANG_CHECK(SLANG_FAILED(readLockFile(path, lock, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(path, "{\"packages\":{}}")));
     SLANG_CHECK(SLANG_FAILED(readLockFile(path, lock, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("required")) >= 0);
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(path, "{\"version\":2,\"packages\":{}}")));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(path, "{\"schema_version\":2,\"packages\":{}}")));
     SLANG_CHECK(SLANG_FAILED(readLockFile(path, lock, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("must be the integer 1")) >= 0);
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(path, "{\"version\":1,\"packages\":{}}")));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(path, "{\"schema_version\":1,\"packages\":{}}")));
     SLANG_CHECK(SLANG_SUCCEEDED(readLockFile(path, lock, error)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         path,
-        "{\"version\":1,\"packages\":{\"noise\":{\"git\":\"https://example.com/noise.git\","
+        "{\"schema_version\":1,\"packages\":{\"noise\":{\"git\":\"https://example.com/noise.git\","
         "\"ref\":\"v1.0.0\",\"commit\":\"0000000000000000000000000000000000000000\","
         "\"version\":\"1.0.0\",\"exports\":[\"src\"]}}}")));
     SLANG_CHECK(SLANG_FAILED(readLockFile(path, lock, error)));
@@ -493,7 +506,7 @@ SLANG_UNIT_TEST(PackageLockRejectsUnknownFields)
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         path,
-        "{\"version\":1,\"packages\":{},\"tools\":{\"slang-toolchain\":{\"version\":"
+        "{\"schema_version\":1,\"packages\":{},\"tools\":{\"slang-toolchain\":{\"version\":"
         "\"2026.8.1\"}}}")));
     SLANG_CHECK(SLANG_FAILED(readLockFile(path, lock, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
@@ -533,29 +546,35 @@ SLANG_UNIT_TEST(PackageLocalRegistryJSON)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(path, workspaceText)));
     SLANG_CHECK(workspaceText.getUnownedSlice().indexOf(UnownedStringSlice("\"enabled\"")) >= 0);
     SLANG_CHECK(workspaceText.getUnownedSlice().indexOf(UnownedStringSlice("\"edits\"")) < 0);
-    SLANG_CHECK(workspaceText.getUnownedSlice().indexOf(UnownedStringSlice("\"version\"")) >= 0);
+    SLANG_CHECK(
+        workspaceText.getUnownedSlice().indexOf(UnownedStringSlice("\"schema_version\"")) >= 0);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         File::writeAllText(path, "{\"schema_version\":2,\"edits\":{\"helper\":{}}}")));
     SLANG_CHECK(SLANG_FAILED(readLocalPackages(path, roundTrip, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         path,
-        "{\"version\":1,\"overrides\":{\"noise\":{\"path\":\"../noise\","
+        "{\"schema_version\":1,\"overrides\":{\"noise\":{\"path\":\"../noise\","
         "\"as\":\"1.2.0\"}}}")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLocalPackages(path, roundTrip, error)));
     SLANG_CHECK(roundTrip[0].enabled);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         path,
-        "{\"version\":2,\"overrides\":{\"noise\":{\"path\":\"../noise\"}}}")));
+        "{\"version\":1,\"overrides\":{\"noise\":{\"path\":\"../noise\"}}}")));
+    SLANG_CHECK(SLANG_FAILED(readLocalPackages(path, roundTrip, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        path,
+        "{\"schema_version\":2,\"overrides\":{\"noise\":{\"path\":\"../noise\"}}}")));
     SLANG_CHECK(SLANG_FAILED(readLocalPackages(path, roundTrip, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("must be the integer 1")) >= 0);
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         path,
-        "{\"version\":1,\"overrides\":{\"noise\":{\"path\":\"/absolute/noise\"}}}")));
+        "{\"schema_version\":1,\"overrides\":{\"noise\":{\"path\":\"/absolute/noise\"}}}")));
     SLANG_CHECK(SLANG_FAILED(readLocalPackages(path, roundTrip, error)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(File::writeAllText(path, "{\"version\":1,\"edits\":{\"noise\":{}}}")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::writeAllText(path, "{\"schema_version\":1,\"edits\":{\"noise\":{}}}")));
     SLANG_CHECK(SLANG_FAILED(readLocalPackages(path, roundTrip, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 }
