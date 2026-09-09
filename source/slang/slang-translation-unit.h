@@ -45,8 +45,9 @@ public:
 
     /// The language explicitly requested through the API or command-line options, if any.
     ///
-    /// Normalizing the deprecated `-allow-glsl` option records `GLSL` here because that option's
-    /// only remaining meaning is an explicit request to treat every translation unit as GLSL.
+    /// Normalizing the deprecated `-allow-glsl` option diagnoses a conflicting non-GLSL value
+    /// before replacing it with `GLSL`, because that option's only remaining meaning is an
+    /// explicit request to treat every translation unit as GLSL.
     SourceLanguage sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
 
     /// The language agreed on by the primary source-file extensions, if any.

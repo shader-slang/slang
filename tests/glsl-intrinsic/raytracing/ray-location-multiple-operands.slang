@@ -2,7 +2,7 @@
 // output, proving that the rewrite saved the next sibling instead of ending after the first
 // removal.
 
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/raytracing/ray-location-multiple-operands.slang -Wno-118 -target spirv-assembly -emit-spirv-directly -stage raygeneration -entry main
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/raytracing/ray-location-multiple-operands.slang -target spirv-assembly -emit-spirv-directly -stage raygeneration -entry main
 
 layout(location = 0) rayPayloadEXT vec4 payload0;
 layout(location = 1) rayPayloadEXT vec4 payload1;

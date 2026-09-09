@@ -1,11 +1,11 @@
-//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target glsl -Wno-118
-//TEST:SIMPLE_EX(filecheck=CHECK_GLSL_SPIRV): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target spirv -emit-spirv-via-glsl -Wno-118
-//TEST:SIMPLE_EX(filecheck=CHECK_SPIR): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -Wno-118
-//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target hlsl -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL_SPIRV): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target spirv -emit-spirv-via-glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_SPIR): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target hlsl
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -emit-spirv-via-glsl -Xslang -Wno-118
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -emit-spirv-directly -Xslang -Wno-118
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-llvm -compute -entry computeMain -source-language glsl -output-using-type -Xslang -DTARGET_LLVM -Xslang -Wno-118
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -emit-spirv-via-glsl -Xslang
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -emit-spirv-directly -Xslang
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-llvm -compute -entry computeMain -source-language glsl -output-using-type -Xslang -DTARGET_LLVM -Xslang
 
 //TEST_INPUT:ubuffer(data=[0 1 -1], stride=4):name=inputBuffer
 buffer MyBlockName1

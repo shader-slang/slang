@@ -6,7 +6,6 @@
 // otherwise independent `SV_Foo` error is intentionally deferred until a stage is available.
 
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang hlsl tests/diagnostics/explicit-language-drops-extension-stage.vert -entry main -no-codegen
-//CHECK: explicitly requested source language overrides the language implied by the extension of input file 'tests/diagnostics/explicit-language-drops-extension-stage.vert'
 
 float4 main(float4 position : POSITION, uint foo : SV_Foo) : SV_Position
 /*CHECK:

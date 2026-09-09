@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -Wno-120 -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -Wno-120
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -lang glsl -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -lang glsl
 
 #version 310 es
 precision highp float;

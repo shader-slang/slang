@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang glsl tests/glsl-intrinsic/image/imageAsParamWithMemoryQualifiersError.slang -stage compute -entry computeMain -target glsl -Wno-118
-//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang glsl tests/glsl-intrinsic/image/imageAsParamWithMemoryQualifiersError.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -Wno-118
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang glsl tests/glsl-intrinsic/image/imageAsParamWithMemoryQualifiersError.slang -stage compute -entry computeMain -target glsl
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang glsl tests/glsl-intrinsic/image/imageAsParamWithMemoryQualifiersError.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
 {

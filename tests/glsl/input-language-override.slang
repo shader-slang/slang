@@ -1,4 +1,4 @@
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/input-language-override.slang -entry main -stage compute -target spirv -emit-spirv-directly -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/input-language-override.slang -entry main -stage compute -target spirv -emit-spirv-directly
 
 #version 450
 

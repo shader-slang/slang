@@ -249,6 +249,18 @@ static void _outputIncludes(
     }
 }
 
+/// Returns the user-facing name of a concrete source language for a diagnostic.
+///
+/// `Unknown` is out of contract because it represents the absence of a language selection rather
+/// than a language that can be named to a user.
+static UnownedStringSlice _getSourceLanguageName(SourceLanguage language)
+{
+    SLANG_RELEASE_ASSERT(language != SourceLanguage::Unknown);
+    auto name = NameValueUtil::findName(TypeTextUtil::getLanguageInfos(), ValueInt(language));
+    SLANG_RELEASE_ASSERT(name.getLength() != 0);
+    return name;
+}
+
 /// Merge one preprocessed source unit's language directive into translation-unit provenance.
 ///
 /// Consider a `.slang` input that was explicitly selected as Slang but starts with `#version 450`.
@@ -287,20 +299,12 @@ static void _applySourceLanguageDirective(
         if (lowerPrecedenceLanguage != SourceLanguage::Unknown &&
             lowerPrecedenceLanguage != directive.language)
         {
-            auto languageInfos = TypeTextUtil::getLanguageInfos();
-            auto selectedLanguage =
-                NameValueUtil::findName(languageInfos, ValueInt(lowerPrecedenceLanguage));
-            auto directiveLanguage =
-                NameValueUtil::findName(languageInfos, ValueInt(directive.language));
-            SLANG_RELEASE_ASSERT(selectedLanguage.getLength() != 0);
-            SLANG_RELEASE_ASSERT(directiveLanguage.getLength() != 0);
             sink->diagnose(Diagnostics::SourceLanguageDirectiveOverridesSelectedLanguage{
-                .directiveLanguage = directiveLanguage,
+                .directiveLanguage = _getSourceLanguageName(directive.language),
                 .selectionSource = lowerPrecedenceSource,
-                .selectedLanguage = selectedLanguage,
+                .selectedLanguage = _getSourceLanguageName(lowerPrecedenceLanguage),
                 .location = directive.location});
         }
-
         // Source directives should agree with the translation-unit language. Honoring a
         // conflicting directive after diagnosing it is a backward-compatibility concession; every
         // phase after preprocessing still reads the resulting single effective value.
@@ -337,8 +341,7 @@ static void _applySourceLanguageDirective(
 
 /// Resolve the extension-implied language of the primary source files and diagnose conflicts.
 ///
-/// With an explicit language, every recognized extension that disagrees emits
-/// `ExplicitSourceLanguageOverridesFileExtension`, and the explicit language remains effective.
+/// An explicit language intentionally overrides every file-name extension without a diagnostic.
 /// It also resolves any disagreement among the extensions, so that disagreement does not emit
 /// `ConflictingSourceFileExtensionLanguages`. Without an explicit language, differing recognized
 /// extensions emit that conflict; their shared provenance is recorded as `Unknown`, while the
@@ -382,11 +385,6 @@ static void _resolveSourceLanguageFromPrimarySourceFiles(
             }
         }
 
-        if (translationUnit->sourceLanguageExplicitlyRequested != SourceLanguage::Unknown &&
-            translationUnit->sourceLanguageExplicitlyRequested != languageImpliedByExtension)
-        {
-            sink->diagnose(Diagnostics::ExplicitSourceLanguageOverridesFileExtension{.path = path});
-        }
     }
 
     // `Unknown` records that there is no single extension-implied language, whether because no
@@ -792,10 +790,19 @@ void FrontEndCompileRequest::applyLegacyAllowGLSLInputOptionToAllTranslationUnit
 
     // The legacy request-wide switch deliberately wins over an explicit non-GLSL selection.
     // Keeping both would recreate the old hybrid mode where a translation unit declared one
-    // language while independent compiler phases enabled GLSL behavior. The deprecation warning
-    // states this compatibility rule: every input translation unit is treated as GLSL.
+    // language while independent compiler phases enabled GLSL behavior. Diagnose that conflict
+    // before replacing the per-translation-unit selection; a file-name extension is only inferred
+    // provenance and therefore does not constitute the same kind of contradictory explicit input.
     for (auto translationUnit : translationUnits)
     {
+        if (translationUnit->sourceLanguageExplicitlyRequested != SourceLanguage::Unknown &&
+            translationUnit->sourceLanguageExplicitlyRequested != SourceLanguage::GLSL)
+        {
+            getSink()->diagnose(
+                Diagnostics::LegacyAllowGlslOverridesExplicitSourceLanguage{
+                    .language = _getSourceLanguageName(
+                        translationUnit->sourceLanguageExplicitlyRequested)});
+        }
         translationUnit->sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
         translationUnit->sourceLanguage = SourceLanguage::GLSL;
     }

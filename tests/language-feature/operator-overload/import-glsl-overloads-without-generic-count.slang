@@ -1,6 +1,6 @@
 //TEST:SIMPLE: -std 2026 -warnings-as-errors 40021 -no-codegen
-//TEST:SIMPLE_EX: -lang glsl tests/language-feature/operator-overload/import-glsl-overloads-without-generic-count.slang -std 202c -Wno-118 -Wno-119 -no-codegen
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/language-feature/operator-overload/import-glsl-overloads-without-generic-count.slang -std 202c -Wno-118 -Wno-119 -target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE_EX: -lang glsl tests/language-feature/operator-overload/import-glsl-overloads-without-generic-count.slang -std 202c -Wno-119 -no-codegen
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/language-feature/operator-overload/import-glsl-overloads-without-generic-count.slang -std 202c -Wno-119 -target spirv-asm -entry computeMain -stage compute
 
 // Slang 202c does not use generic parameter count to rank overloads. The surviving GLSL
 // declarations must therefore beat the core-module operators through OverloadRank alone.

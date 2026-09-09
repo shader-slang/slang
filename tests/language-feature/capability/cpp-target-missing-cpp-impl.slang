@@ -1,5 +1,5 @@
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/language-feature/capability/cpp-target-missing-cpp-impl.slang -target cpp -entry computeMain -stage compute -Wno-118
-//TEST:SIMPLE_EX(filecheck=CHECK_IGNORE_CAPS): -lang glsl tests/language-feature/capability/cpp-target-missing-cpp-impl.slang -target cpp -entry computeMain -stage compute -ignore-capabilities -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/language-feature/capability/cpp-target-missing-cpp-impl.slang -target cpp -entry computeMain -stage compute
+//TEST:SIMPLE_EX(filecheck=CHECK_IGNORE_CAPS): -lang glsl tests/language-feature/capability/cpp-target-missing-cpp-impl.slang -target cpp -entry computeMain -stage compute -ignore-capabilities
 // CHECK_IGNORE_CAPS-NOT: E36107
 // CHECK: error[E36107]
 

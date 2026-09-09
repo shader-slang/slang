@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage fragment -entry main -Wno-120
-//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv -emit-spirv-directly -stage fragment -entry main -Wno-120
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage fragment -entry main -lang glsl
+//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv -emit-spirv-directly -stage fragment -entry main -lang glsl
 
 #version 450
 

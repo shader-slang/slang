@@ -950,8 +950,15 @@ public:
     /// parser-language provenance, so it cannot establish GLSL source semantics and returns false.
     bool isGLSLSourceLanguage()
     {
-        return m_translationUnitRequest &&
-               m_translationUnitRequest->sourceLanguage == SourceLanguage::GLSL;
+        if (!m_translationUnitRequest)
+        {
+            // Reflection, specialization, and API expression-checking contexts can perform
+            // semantic work without originating in a parsed translation unit. Such a context has
+            // no source-language provenance, so it must not enable GLSL-specific semantic rules.
+            return false;
+        }
+
+        return m_translationUnitRequest->sourceLanguage == SourceLanguage::GLSL;
     }
 
     /// Whether builtin operators should use the legacy GLSL operator rules.

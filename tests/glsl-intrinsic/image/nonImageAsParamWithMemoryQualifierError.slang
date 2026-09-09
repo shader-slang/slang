@@ -1,5 +1,5 @@
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/image/nonImageAsParamWithMemoryQualifierError.slang -stage compute -entry computeMain -target glsl -Wno-118
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/image/nonImageAsParamWithMemoryQualifierError.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/image/nonImageAsParamWithMemoryQualifierError.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/image/nonImageAsParamWithMemoryQualifierError.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 
 // restrict modifier is allowed to be dropped as a parameter

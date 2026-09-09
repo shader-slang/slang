@@ -274,12 +274,6 @@ warning(
 )
 
 warning(
-    "explicit-source-language-overrides-file-extension",
-    118,
-    "explicitly requested source language overrides the language implied by the extension of input file '~path'"
-)
-
-warning(
     "redundant-glsl-module-import",
     119,
     "redundant import of the builtin `glsl` module",
@@ -348,6 +342,12 @@ err(
     128,
     "arrays of `atomic_uint` are not supported",
     span { loc = "location", message = "declare each supported atomic counter as a directly-bound global" }
+)
+
+warning(
+    "legacy-allow-glsl-overrides-explicit-source-language",
+    129,
+    "the deprecated `AllowGLSL` compatibility option selects GLSL and overrides an explicit ~language source-language selection on the same translation unit"
 )
 
 err(

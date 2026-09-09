@@ -152,9 +152,11 @@ public:
     /// deprecated request-wide flag.
     ///
     /// The legacy option deliberately takes precedence over an existing non-GLSL selection from
-    /// `-lang` or `addTranslationUnit`. Retaining both would recreate a hybrid mode where the
-    /// translation unit declares one language while unrelated phases independently enable GLSL
-    /// behavior; the deprecation diagnostic instead states that every input is treated as GLSL.
+    /// `-lang` or `addTranslationUnit`. The helper diagnoses that explicit conflict before
+    /// replacing the per-translation-unit selection. It does not diagnose a conflicting file-name
+    /// extension because an extension supplies only an inferred default. Retaining both explicit
+    /// selections would recreate a hybrid mode where the translation unit declares one language
+    /// while unrelated phases independently enable GLSL behavior.
     ///
     /// `EndToEndCompileRequest` calls this method for request-local compatibility state, while
     /// translation-unit parsing calls it when the request inherited a legacy `AllowGLSL` session

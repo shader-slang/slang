@@ -1402,9 +1402,19 @@ struct ICompileRequest : public ISlangUnknown
 
     /** Deprecated. When enabled, treat every translation unit in this request as GLSL.
 
-    Prefer selecting the source language for each translation unit when calling
-    `addTranslationUnit()`. Enabling this compatibility path emits deprecation diagnostic 117
-    when the request is compiled.
+    Prefer selecting the source language when creating each translation unit:
+
+    @code
+    int translationUnit = request->addTranslationUnit(
+        SLANG_SOURCE_LANGUAGE_GLSL,
+        "moduleName");
+    request->addTranslationUnitSourceFile(translationUnit, path);
+    @endcode
+
+    Enabling this compatibility path emits deprecation diagnostic 117 when the request is
+    compiled. If the request already contains a translation unit explicitly selected as a
+    non-GLSL language, diagnostic 129 warns that this request-wide compatibility setting takes
+    precedence and treats that translation unit as GLSL.
      */
     virtual SLANG_NO_THROW void SLANG_MCALL setAllowGLSLInput(bool value) = 0;
 

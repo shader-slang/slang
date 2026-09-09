@@ -1,8 +1,8 @@
-//TEST:SIMPLE_EX(filecheck=CHECK_SPV_SYNTAX): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-undefined-mode.slang -fvk-use-entrypoint-name -target spirv -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV_SYNTAX): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-undefined-mode.slang -fvk-use-entrypoint-name -target spirv
 // CHECK_SPV_SYNTAX: DerivativeGroupQuads{{NV|KHR}}
 // CHECK_SPV_SYNTAX: DerivativeGroupQuads{{NV|KHR}}
 
-//TEST:SIMPLE_EX(filecheck=CHECK_GLSL_SYNTAX): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-undefined-mode.slang -stage compute -entry main2 -target glsl -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL_SYNTAX): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-undefined-mode.slang -stage compute -entry main2 -target glsl
 // CHECK_GLSL_SYNTAX: derivative_group_quadsNV
 
 buffer MyBlockName

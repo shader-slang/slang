@@ -1,17 +1,17 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -Wno-120 -stage compute -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -Wno-120 -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -lang glsl -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE(filecheck=CHECK_SPV): -lang glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly
 
 // not testing hlsl due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -Wno-120 -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -lang glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 // not testing cuda due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -Wno-120 -stage compute -entry computeMain -target cuda -DTARGET_CUDA
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -lang glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 // not testing cpp due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP): -Wno-120 -stage compute -entry computeMain -target cpp -DTARGET_CPP
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP): -lang glsl -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -Wno-118
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -Wno-118 -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -source-language glsl -Xslang -Wno-118 -xslang -DWGPU -render-feature half
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -source-language glsl -Xslang -Wno-118 -xslang -DMETAL
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -source-language glsl -Xslang -xslang -DWGPU -render-feature half
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -source-language glsl -Xslang -xslang -DMETAL
 
 #version 430
 

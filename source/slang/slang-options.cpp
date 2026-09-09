@@ -1238,7 +1238,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::AllowGLSL,
          "-allow-glsl",
          nullptr,
-         "Deprecated. Treat every input translation unit as GLSL."},
+         "Deprecated. Treat every input translation unit as GLSL. Use a GLSL file-name extension "
+         "or `-lang glsl` for each GLSL input instead."},
         {OptionKind::EnableExperimentalPasses,
          "-enable-experimental-passes",
          nullptr,

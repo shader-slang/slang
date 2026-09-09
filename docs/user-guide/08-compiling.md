@@ -205,6 +205,7 @@ If multiple source files are passed to `slangc`, they will be grouped into trans
 Every translation unit has one effective source language.
 An explicit `-lang` option selects that language for the following input files; otherwise, `slangc` infers it from each file-name extension.
 Primary source files grouped into one translation unit must agree on the inferred language unless `-lang` resolves the disagreement.
+Because a file-name extension is only an inferred default, an explicit source-language selection intentionally overrides a mismatching extension without a diagnostic.
 
 A Slang `#language` directive or GLSL `#version` directive is expected to agree with the translation unit's selected language.
 For backward compatibility, the compiler currently warns and honors a conflicting source directive before parsing the translation unit.
@@ -215,6 +216,7 @@ That convenience inference does not account for a later compatibility override f
 
 The deprecated `-allow-glsl` option is a request-wide compatibility spelling that forces every input translation unit to use GLSL.
 New invocations should use a GLSL file-name extension or `-lang glsl` for each GLSL input instead.
+If `-allow-glsl` is combined with an explicit non-GLSL selection for a translation unit, the compiler warns about the conflicting requests and the compatibility option takes precedence.
 
 An `import glsl;` declaration is not a source-language selector.
 In legacy Slang source it imports GLSL declarations and preserves historical GLSL operator behavior without enabling GLSL syntax.

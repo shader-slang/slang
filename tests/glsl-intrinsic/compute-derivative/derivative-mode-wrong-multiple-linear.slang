@@ -1,8 +1,8 @@
-//DIAGNOSTIC_TEST:SIMPLE_EX(diag=SLANG): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-linear.slang -stage compute -entry computeMain -target glsl -DLINEAR_SLANG -Wno-118
-//DIAGNOSTIC_TEST:SIMPLE_EX(diag=SLANG): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-linear.slang -stage compute -entry computeMain -target spirv -DLINEAR_SLANG -Wno-118
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=SLANG): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-linear.slang -stage compute -entry computeMain -target glsl -DLINEAR_SLANG
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=SLANG): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-linear.slang -stage compute -entry computeMain -target spirv -DLINEAR_SLANG
 
-//DIAGNOSTIC_TEST:SIMPLE_EX(diag=GLSL): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-linear.slang -stage compute -entry computeMain -target glsl -DLINEAR_GLSL -Wno-118
-//DIAGNOSTIC_TEST:SIMPLE_EX(diag=GLSL): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-linear.slang -stage compute -entry computeMain -target spirv -DLINEAR_GLSL -Wno-118
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=GLSL): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-linear.slang -stage compute -entry computeMain -target glsl -DLINEAR_GLSL
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=GLSL): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-linear.slang -stage compute -entry computeMain -target spirv -DLINEAR_GLSL
 
 buffer MyBlockName
 {

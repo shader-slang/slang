@@ -1,5 +1,6 @@
 // Reverse the primary-source order to prove that the conflict note follows the first directive,
-// rather than being anchored to a particular file or diagnostic traversal order.
+// rather than being anchored to a particular file or diagnostic traversal order. E00120 is
+// intentionally suppressed because the first directive's extension mismatch is not under test.
 
 //TEST:SIMPLE_EX(filecheck=CHECK): tests/diagnostics/conflicting-source-language-directives-across-files-helper.slang tests/diagnostics/conflicting-source-language-directives-across-files.slang -no-codegen -Wno-120
 

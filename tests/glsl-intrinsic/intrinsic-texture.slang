@@ -1,26 +1,26 @@
-//TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target hlsl -DHLSL -Wno-118
-//TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target hlsl -DHLSL -Wno-118
+//TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target hlsl -DHLSL
+//TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target hlsl -DHLSL
 
 // In GLSL, the transformation to Slang and back shouldn't change GLSL target
-//TEST:SIMPLE_EX(filecheck=GLSL_NOGRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target glsl -DGLSL -DNO_GRADS -Wno-118
-//TEST:SIMPLE_EX(filecheck=GLSL_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target glsl -DGLSL -capability GL_NV_compute_shader_derivatives -Wno-118
-//TEST:SIMPLE_EX(filecheck=GLSL_NOGRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage vertex -entry vertexMain -target glsl -DGLSL -DVERTEX_STAGE -DNO_GRADS -Wno-118
-//TEST:SIMPLE_EX(filecheck=GLSL_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target glsl -DGLSL -Wno-118
+//TEST:SIMPLE_EX(filecheck=GLSL_NOGRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target glsl -DGLSL -DNO_GRADS
+//TEST:SIMPLE_EX(filecheck=GLSL_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target glsl -DGLSL -capability GL_NV_compute_shader_derivatives
+//TEST:SIMPLE_EX(filecheck=GLSL_NOGRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage vertex -entry vertexMain -target glsl -DGLSL -DVERTEX_STAGE -DNO_GRADS
+//TEST:SIMPLE_EX(filecheck=GLSL_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target glsl -DGLSL
 
 // Sampling gradients available. Implicit LOD sampling translates to OpImageSampleImplicitLod and similar
-//TEST:SIMPLE_EX(filecheck=SPIR_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target spirv -DSPIRV -O3 -Wno-118
-//TEST:SIMPLE_EX(filecheck=SPIR_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target spirv -DSPIRV -capability SPV_KHR_compute_shader_derivatives -O3 -Wno-118
+//TEST:SIMPLE_EX(filecheck=SPIR_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target spirv -DSPIRV -O3
+//TEST:SIMPLE_EX(filecheck=SPIR_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target spirv -DSPIRV -capability SPV_KHR_compute_shader_derivatives -O3
 
 // sampling gradients not available. Implicit LOD sampling translates to OpImageSampleExplicitLod with Lod=0 and similar
-//TEST:SIMPLE_EX(filecheck=SPIR_NOGRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage vertex -entry vertexMain -target spirv -DSPIRV -DVERTEX_STAGE -DNO_GRADS -O3 -Wno-118
+//TEST:SIMPLE_EX(filecheck=SPIR_NOGRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage vertex -entry vertexMain -target spirv -DSPIRV -DVERTEX_STAGE -DNO_GRADS -O3
 
-//TEST:SIMPLE_EX(filecheck=CUDA): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target cuda -DCUDA -Wno-118
-//TEST:SIMPLE_EX(filecheck=CUDA): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target cuda -DCUDA -Wno-118
+//TEST:SIMPLE_EX(filecheck=CUDA): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target cuda -DCUDA
+//TEST:SIMPLE_EX(filecheck=CUDA): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target cuda -DCUDA
 
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -xslang -DSPIRV -Xslang -Wno-118
+//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -xslang -DSPIRV -Xslang
 
 // TODO: This test revealed a few problems for a path from GLSL to HLSL
-//T-EST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -compute -entry computeMain -source-language glsl -output-using-type -profile cs_6_6 -xslang -DHLSL -Xslang -Wno-118
+//T-EST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -compute -entry computeMain -source-language glsl -output-using-type -profile cs_6_6 -xslang -DHLSL -Xslang
 
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer

@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE_EX(diag=diag): -lang glsl tests/glsl/ssboMemberMemoryQualifierWriteError.slang -stage compute -entry computeMain -target glsl -Wno-118
-//DIAGNOSTIC_TEST:SIMPLE_EX(diag=diag): -lang glsl tests/glsl/ssboMemberMemoryQualifierWriteError.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -Wno-118
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=diag): -lang glsl tests/glsl/ssboMemberMemoryQualifierWriteError.slang -stage compute -entry computeMain -target glsl
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=diag): -lang glsl tests/glsl/ssboMemberMemoryQualifierWriteError.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 
 volatile buffer MyBlockName1
 {

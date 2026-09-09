@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -Wno-120
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -lang glsl
 #version 310 es
 layout(location = 0) in highp vec4 a_position;
 

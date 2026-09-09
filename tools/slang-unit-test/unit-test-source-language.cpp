@@ -66,7 +66,7 @@ SLANG_UNIT_TEST(sourceLanguageAllowGLSLNormalizesThroughDeprecatedAPI)
     SLANG_CHECK(SLANG_SUCCEEDED(session->createCompileRequest(request.writeRef())));
 
     // The deprecated request-wide API must be reduced to the same effective per-translation-unit
-    // language as the command-line option. It deliberately takes precedence over an explicit
+    // language as the command-line option. It diagnoses and then takes precedence over an explicit
     // non-GLSL selection: pass both an explicit Slang language and a `.slang` path so this
     // GLSL-only syntax cannot compile unless that normalization takes effect. The session also
     // carries `AllowGLSL`, exercising both entry paths into the idempotent normalization helper.
@@ -100,6 +100,7 @@ SLANG_UNIT_TEST(sourceLanguageAllowGLSLNormalizesThroughDeprecatedAPI)
     SLANG_CHECK(warningIndex >= 0);
     SLANG_CHECK(diagnostics.tail(warningIndex + warning.getLength()).indexOf(warning) < 0);
     SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("setAllowGLSLInput()")) >= 0);
+    SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("warning[E00129]")) >= 0);
 }
 
 SLANG_UNIT_TEST(sourceLanguageAllowGLSLDoesNotApplyToImportedModules)

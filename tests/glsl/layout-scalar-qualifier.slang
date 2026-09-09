@@ -1,4 +1,4 @@
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/layout-scalar-qualifier.slang -target spirv-asm -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/layout-scalar-qualifier.slang -target spirv-asm
 
 RWStructuredBuffer<uint> result;
 

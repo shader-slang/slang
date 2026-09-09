@@ -2,7 +2,7 @@
 // serialization and reload, the final direct-SPIR-V pass must still resolve that operand to the
 // linked global carrying `layout(location = 2)`.
 
-//TEST:COMPILE: -lang glsl -Wno-118 tests/glsl-intrinsic/raytracing/ray-location-separate-compilation-module.slang -o tests/glsl-intrinsic/raytracing/ray-location-separate-compilation-module.slang-module
+//TEST:COMPILE: -lang glsl tests/glsl-intrinsic/raytracing/ray-location-separate-compilation-module.slang -o tests/glsl-intrinsic/raytracing/ray-location-separate-compilation-module.slang-module
 //TEST:SIMPLE(filecheck=CHECK): -r tests/glsl-intrinsic/raytracing/ray-location-separate-compilation-module.slang-module -target spirv-assembly -emit-spirv-directly -stage raygeneration -entry main
 
 import "ray-location-separate-compilation-module";

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -stage vertex -entry main -Wno-120
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -stage vertex -entry main -lang glsl
 #version 310 es
 layout(location = 0) in highp vec4 a_position;
 layout(location = 1) in highp vec4 a_coords;
