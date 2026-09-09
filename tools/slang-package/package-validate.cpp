@@ -544,7 +544,7 @@ static SlangResult _readMaterializedManifest(
         if (package.path.getLength() && package.path != localPackages[localIndex].path)
         {
             outError = String("Locked path for package '") + package.name +
-                       "' does not match slang-pkg-overlay.json.";
+                       "' does not match slang-package-overlay.json.";
             return SLANG_FAIL;
         }
         SLANG_RETURN_ON_FAIL(
@@ -561,7 +561,7 @@ static SlangResult _readMaterializedManifest(
             outError));
     }
     if (SLANG_FAILED(
-            readManifest(Path::combine(outPackageRoot, kManifestFileName), outManifest, outError)))
+            readManifest(Path::combine(outPackageRoot, kPackageFileName), outManifest, outError)))
     {
         outError = String("Cannot validate materialized package manifest '") + package.name +
                    "'. Run 'slang package fetch'. " + outError;
@@ -625,13 +625,13 @@ static SlangResult _loadResolvedPackage(
         if (package.path.getLength() && package.path != localPackages[localIndex].path)
         {
             outError = String("Locked path for package '") + package.name +
-                       "' does not match slang-pkg-overlay.json.";
+                       "' does not match slang-package-overlay.json.";
             return SLANG_FAIL;
         }
         SLANG_RETURN_ON_FAIL(
             getLocalPackageRoot(projectRoot, localPackages[localIndex], out.packageRoot, outError));
         if (SLANG_FAILED(readManifest(
-                Path::combine(out.packageRoot, kManifestFileName),
+                Path::combine(out.packageRoot, kPackageFileName),
                 out.manifest,
                 outError)))
         {
@@ -653,8 +653,8 @@ static SlangResult _loadResolvedPackage(
             return SLANG_FAIL;
         }
         String manifestPath = gitRelativeRoot.getLength()
-                                  ? Path::combine(gitRelativeRoot, kManifestFileName)
-                                  : kManifestFileName;
+                                  ? Path::combine(gitRelativeRoot, kPackageFileName)
+                                  : kPackageFileName;
         String manifestText;
         SLANG_RETURN_ON_FAIL(readFileAtRevision(
             parent.gitRepositoryPath,
@@ -682,7 +682,7 @@ static SlangResult _loadResolvedPackage(
             out.packageRoot,
             outError));
         if (SLANG_FAILED(readManifest(
-                Path::combine(out.packageRoot, kManifestFileName),
+                Path::combine(out.packageRoot, kPackageFileName),
                 out.manifest,
                 outError)))
         {
@@ -701,12 +701,9 @@ static SlangResult _loadResolvedPackage(
     String gitError;
     String manifestText;
     String gitRepositoryPath;
-    if (_isCheckoutAtCommit(depsRoot, package.commit) && SLANG_SUCCEEDED(readFileAtRevision(
-                                                             depsRoot,
-                                                             package.commit,
-                                                             kManifestFileName,
-                                                             manifestText,
-                                                             gitError)))
+    if (_isCheckoutAtCommit(depsRoot, package.commit) &&
+        SLANG_SUCCEEDED(
+            readFileAtRevision(depsRoot, package.commit, kPackageFileName, manifestText, gitError)))
     {
         gitRepositoryPath = depsRoot;
     }
@@ -716,7 +713,7 @@ static SlangResult _loadResolvedPackage(
         SLANG_SUCCEEDED(readFileAtRevision(
             cachePath,
             package.commit,
-            kManifestFileName,
+            kPackageFileName,
             manifestText,
             gitError)))
     {
@@ -724,7 +721,7 @@ static SlangResult _loadResolvedPackage(
     }
     if (gitRepositoryPath.getLength())
     {
-        String sourceName = package.git + "@" + package.ref + ":" + kManifestFileName;
+        String sourceName = package.git + "@" + package.ref + ":" + kPackageFileName;
         SLANG_RETURN_ON_FAIL(readManifestText(sourceName, manifestText, out.manifest, outError));
         out.packageRoot = depsRoot;
         out.gitRepositoryPath = gitRepositoryPath;
@@ -747,10 +744,8 @@ static SlangResult _loadResolvedPackage(
             outError = gitError;
         return SLANG_FAIL;
     }
-    if (SLANG_FAILED(readManifest(
-            Path::combine(out.packageRoot, kManifestFileName),
-            out.manifest,
-            outError)))
+    if (SLANG_FAILED(
+            readManifest(Path::combine(out.packageRoot, kPackageFileName), out.manifest, outError)))
     {
         outError = gitError.getLength()
                        ? gitError
@@ -831,7 +826,7 @@ SlangResult validateLegalResolvedProject(
         if (localPackage.as.getLength() && package.version != localPackage.as)
         {
             outError = String("Locked version for local override '") + package.name +
-                       "' does not match slang-pkg-overlay.json. Run 'slang package update'.";
+                       "' does not match slang-package-overlay.json. Run 'slang package update'.";
             return SLANG_FAIL;
         }
     }
@@ -1005,7 +1000,7 @@ SlangResult validateBuildableProject(
 {
     Manifest rootManifest;
     SLANG_RETURN_ON_FAIL(
-        readManifest(Path::combine(projectRoot, kManifestFileName), rootManifest, outError));
+        readManifest(Path::combine(projectRoot, kPackageFileName), rootManifest, outError));
 
     List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
@@ -1018,8 +1013,8 @@ SlangResult validateBuildableProject(
     else if (rootManifest.dependencies.getCount() || localPackages.getCount())
     {
         outError = localPackages.getCount()
-                       ? "Registered local packages require slang-pkg-lock.json."
-                       : "Package dependencies require slang-pkg-lock.json.";
+                       ? "Registered local packages require slang-package-lock.json."
+                       : "Package dependencies require slang-package-lock.json.";
         return SLANG_FAIL;
     }
 

@@ -36,10 +36,10 @@ video-preview
 Three packages constrain `color-encoding`. The resolver intersects those ranges and selects one
 tag, which appears once in the lock and is checked out once under `deps/`.
 
-Clone the workspace. Commands that load the three JSON files (`slang-pkg-manifest.json`,
-`slang-pkg-lock.json`, and `slang-pkg-overlay.json`) also work from ordinary subdirectories,
-such as `src/`. They use the nearest ancestor that contains `slang-pkg-manifest.json`. Nested packages
-under `deps/` keep their own root when they have a manifest.
+Clone the workspace. Commands that load the three JSON files (`slang-package.json`,
+`slang-package-lock.json`, and `slang-package-overlay.json`) also work from ordinary subdirectories,
+such as `src/`. They use the nearest ancestor that contains `slang-package.json`. Nested packages
+under `deps/` keep their own root when they have `slang-package.json`.
 
 ```sh
 git clone https://github.com/jhelferty-nv/video-preview.git
@@ -60,19 +60,19 @@ The workspace lists `video-preview` under `build.host.executables`. The matching
 Open these two committed files first:
 
 ```sh
-less slang-pkg-manifest.json
-less slang-pkg-lock.json
+less slang-package.json
+less slang-package-lock.json
 ```
 
-- `slang-pkg-manifest.json` is published intent: package name, exports, licenses, Git or path
+- `slang-package.json` is published intent: package name, exports, licenses, Git or path
   dependencies, optional `tools.slang-toolchain` for a minimum installed compiler (and thus its
   builtins and standard library), optional `build.host` executables, optional publisher `retractions`,
   and optional root-only `workspace` settings (`deps`, `build`, `excludes`).
-- `slang-pkg-lock.json` is the exact selection this workspace resolved: identity only (`version`,
+- `slang-package-lock.json` is the exact selection this workspace resolved: identity only (`version`,
   Git `ref`/`commit`, overlay `path`). `fetch` reproduces those pins without solving again.
   Declared exports and dependencies are reloaded from overlay working trees or from each locked
   version's manifest.
-- `slang-pkg-overlay.json` is gitignored machine-local override state. `edit NAME` creates an
+- `slang-package-overlay.json` is gitignored machine-local override state. `edit NAME` creates an
   override at `deps/NAME`; other overrides may point elsewhere. The file should not be in the
   clone. If it is missing, that is correct for CI and for a clean checkout.
 
@@ -241,7 +241,7 @@ documentation should change. `slang package test` is reserved and not implemente
 
 ## Develop against a local tree
 
-Both commands use overrides recorded in gitignored `slang-pkg-overlay.json`.
+Both commands use overrides recorded in gitignored `slang-package-overlay.json`.
 
 `slang package edit NAME` registers `deps/NAME` as an enabled in-place override at the version in
 the current lock. The checkout may already contain local changes: preserving work you have already
@@ -275,14 +275,14 @@ registrations. In-place overrides stay active so those checkouts are not replace
 packages that drop out of the published graph. A later plain update restores them. A dry run
 prints the lock diff without writing it. The resulting lock records the
 local path plus the original Git identity, so another machine or CI fails unless it has the same
-`slang-pkg-overlay.json`. Disable the override and run `update` to restore a portable Git pin before
+`slang-package-overlay.json`. Disable the override and run `update` to restore a portable Git pin before
 you remove the registration or commit.
 
 `slang package validate NAME` checks that package's tree against this workspace lock, so
 you can certify a library using an in-place override before a remote tag exists. Bare `validate`
 still rejects the workspace while any override is enabled.
 
-Do not commit `slang-pkg-overlay.json`. Path dependencies in `slang-pkg-manifest.json` are in-package
+Do not commit `slang-package-overlay.json`. Path dependencies in `slang-package.json` are in-package
 vendoring, not extract. Overrides are the laptop way to redirect one identity at a local tree.
 
 ## Extract a package from this application
@@ -314,7 +314,7 @@ origin, disable the override, and `update` so the lock records the published pin
 
 These look similar and are not interchangeable.
 
-**Publisher retractions** live in the tagged `slang-pkg-manifest.json` of the package that published
+**Publisher retractions** live in the tagged `slang-package.json` of the package that published
 the bad release. The tool reads them from the highest available Git tag, even outside your
 requested range. They skip matching Git candidates on `update`. They do **not** invalidate an
 existing lock, so `fetch` in CI stays reproducible after the publisher adds advice.
@@ -328,7 +328,7 @@ relative to declared intent, so you must `update`. Path packages and overrides a
 selections, so remote release exclusions do not filter them even though they carry an effective
 version for solver compatibility.
 
-There is no personal exclude in `slang-pkg-overlay.json`. A machine-local skip that failed `fetch`
+There is no personal exclude in `slang-package-overlay.json`. A machine-local skip that failed `fetch`
 would make CI and your laptop disagree about the same lock. Use a committed exclude when the
 whole project must avoid a release, or an override when you need a different tree on this machine.
 

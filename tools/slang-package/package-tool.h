@@ -17,13 +17,14 @@ SlangResult executeInDirectory(
     const char* const* argv,
     String& outError);
 
-/// Locate the package whose `slang-pkg-manifest.json` should be used for commands started in
+/// Locate the package whose `slang-package.json` should be used for commands started in
 /// `startDirectory`.
 ///
-/// Walk toward filesystem root and stop at the nearest `slang-pkg-manifest.json`. Ordinary
+/// Walk toward filesystem root and stop at the nearest `slang-package.json`. Ordinary
 /// subdirectories such as `src/` therefore load that package's manifest, lock, and
-/// `slang-pkg-overlay.json`. A nested package (for example a dependency under `deps/` or an
-/// example with its own manifest) keeps that nearer root. `init` does not use this discovery path.
+/// `slang-package-overlay.json`. A nested package (for example a dependency under `deps/` or an
+/// example with its own `slang-package.json`) keeps that nearer root. `init` does not use this
+/// discovery path.
 SlangResult discoverPackageRoot(const String& startDirectory, String& outRoot, String& outError);
 
 /// Produce the same workspace-state report printed by `slang package status`.

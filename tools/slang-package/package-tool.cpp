@@ -58,7 +58,7 @@ static void _printHelp(bool experimental = false)
         "  dependency add <name> --path <path> --as <version>\n"
         "  dependency pin <name> [--to <version> | --commit]\n"
         "  dependency remove <name> | dependency list\n"
-        "                   Manage direct dependencies in slang-pkg-manifest.json.\n"
+        "                   Manage direct dependencies in slang-package.json.\n"
         "  override add <name> <path> [as]\n"
         "  override enable|disable|remove <name> | override list\n"
         "                   Manage retained local dependency overrides.\n"
@@ -85,7 +85,8 @@ static void _printHelp(bool experimental = false)
         "Global options:\n"
         "  --experimental   Enable experimental commands and build features.\n"
         "\n"
-        "Commands load slang-pkg-manifest.json, slang-pkg-lock.json, and slang-pkg-overlay.json\n"
+        "Commands load slang-package.json, slang-package-lock.json, and "
+        "slang-package-overlay.json\n"
         "from the nearest ancestor directory that contains the manifest. Nested packages, such\n"
         "as dependencies under deps/, keep their own root when they have a manifest.\n"
         "`init` still creates a package in the current directory.\n");
@@ -153,7 +154,7 @@ SlangResult discoverPackageRoot(const String& startDirectory, String& outRoot, S
     String directory = current;
     for (;;)
     {
-        if (File::exists(Path::combine(directory, kManifestFileName)))
+        if (File::exists(Path::combine(directory, kPackageFileName)))
         {
             outRoot = directory;
             return SLANG_OK;
@@ -164,7 +165,7 @@ SlangResult discoverPackageRoot(const String& startDirectory, String& outRoot, S
         directory = parent;
     }
 
-    outError = String("Cannot find slang-pkg-manifest.json from ") + current +
+    outError = String("Cannot find slang-package.json from ") + current +
                ". Run this command from a package directory or a subdirectory of a package.";
     return SLANG_FAIL;
 }
@@ -323,7 +324,7 @@ static SlangResult _materialize(
         if (isLocalOverrideLockedPackage(package))
         {
             outError = String("Locked local override '") + package.name +
-                       "' is not registered in slang-pkg-overlay.json.";
+                       "' is not registered in slang-package-overlay.json.";
             return SLANG_FAIL;
         }
 
@@ -495,7 +496,7 @@ static SlangResult _readProjectManifest(
     Manifest& outManifest,
     String& outError)
 {
-    return readManifest(Path::combine(projectRoot, kManifestFileName), outManifest, outError);
+    return readManifest(Path::combine(projectRoot, kPackageFileName), outManifest, outError);
 }
 
 static SlangResult _readProjectLock(const String& projectRoot, LockFile& outLock, String& outError)
@@ -561,14 +562,14 @@ static SlangResult _validateLocalPackages(
         if (package->path.getLength() && package->path != localPackage.path)
         {
             outError = String("Locked path for package '") + package->name +
-                       "' does not match slang-pkg-overlay.json. Run "
+                       "' does not match slang-package-overlay.json. Run "
                        "'slang package update'.";
             return SLANG_FAIL;
         }
         if (localPackage.as.getLength() && package->version != localPackage.as)
         {
             outError = String("Locked version for local override '") + package->name +
-                       "' does not match slang-pkg-overlay.json. Run "
+                       "' does not match slang-package-overlay.json. Run "
                        "'slang package update'.";
             return SLANG_FAIL;
         }
@@ -590,7 +591,7 @@ static SlangResult _validateLocalPackages(
             findActiveLocalPackageIndex(localPackages, package.name) < 0)
         {
             outError = String("Locked local package '") + package.name +
-                       "' is not registered in slang-pkg-overlay.json. Run "
+                       "' is not registered in slang-package-overlay.json. Run "
                        "'slang package update' to restore a published pin.";
             return SLANG_FAIL;
         }
@@ -655,7 +656,7 @@ static SlangResult _validateGraphAfterLocalRegistrationChange(
 
         Manifest manifest;
         if (SLANG_FAILED(
-                readManifest(Path::combine(packageRoot, kManifestFileName), manifest, outError)))
+                readManifest(Path::combine(packageRoot, kPackageFileName), manifest, outError)))
         {
             outError = String("Cannot read the dependency manifest of locked package '") +
                        package.name + "'. " + outError;
@@ -756,7 +757,7 @@ static SlangResult _validateLockedPackagePublishable(
         outError));
     Manifest manifest;
     if (SLANG_FAILED(
-            readManifest(Path::combine(packageRoot, kManifestFileName), manifest, outError)))
+            readManifest(Path::combine(packageRoot, kPackageFileName), manifest, outError)))
     {
         outError = String("Cannot validate package '") + package.name + "': " + outError;
         return SLANG_FAIL;
@@ -822,10 +823,10 @@ static SlangResult _validateChangedPublishablePackages(
 
 static SlangResult _init(const String& projectRoot, String& outError)
 {
-    String manifestPath = Path::combine(projectRoot, kManifestFileName);
+    String manifestPath = Path::combine(projectRoot, kPackageFileName);
     if (File::exists(manifestPath))
     {
-        outError = "slang-pkg-manifest.json already exists.";
+        outError = "slang-package.json already exists.";
         return SLANG_FAIL;
     }
 
@@ -880,7 +881,7 @@ static SlangResult _init(const String& projectRoot, String& outError)
         ".slang/",
         "deps/",
         "build/",
-        "slang-pkg-overlay.json",
+        "slang-package-overlay.json",
     };
     StringBuilder updatedIgnore;
     updatedIgnore << gitIgnore;
@@ -922,7 +923,7 @@ static SlangResult _writeValidatedProjectManifest(
     const Manifest& manifest,
     String& outError)
 {
-    String temporaryPath = Path::combine(projectRoot, ".slang-pkg-manifest.json.validate.tmp");
+    String temporaryPath = Path::combine(projectRoot, ".slang-package.json.validate.tmp");
     if (SLANG_FAILED(writeManifest(temporaryPath, manifest, outError)))
         return SLANG_FAIL;
     Manifest validatedManifest;
@@ -930,7 +931,7 @@ static SlangResult _writeValidatedProjectManifest(
     File::remove(temporaryPath);
     if (SLANG_FAILED(result))
         return result;
-    return writeManifest(Path::combine(projectRoot, kManifestFileName), manifest, outError);
+    return writeManifest(Path::combine(projectRoot, kPackageFileName), manifest, outError);
 }
 
 static SlangResult _dependencyAdd(
@@ -951,7 +952,7 @@ static SlangResult _dependencyAdd(
     SLANG_RETURN_ON_FAIL(_writeValidatedProjectManifest(projectRoot, manifest, outError));
     fprintf(
         stdout,
-        "%s dependency '%s' in slang-pkg-manifest.json. Run 'slang package status', then "
+        "%s dependency '%s' in slang-package.json. Run 'slang package status', then "
         "'slang package update'.\n",
         replacing ? "Updated" : "Added",
         dependency.name.getBuffer());
@@ -975,7 +976,7 @@ static SlangResult _dependencyRemove(
     SLANG_RETURN_ON_FAIL(_writeValidatedProjectManifest(projectRoot, manifest, outError));
     fprintf(
         stdout,
-        "Removed dependency '%s' from slang-pkg-manifest.json. Run 'slang package status', then "
+        "Removed dependency '%s' from slang-package.json. Run 'slang package status', then "
         "'slang package update'.\n",
         name.getBuffer());
     return SLANG_OK;
@@ -987,7 +988,7 @@ static SlangResult _dependencyRemove(
 /// to a newer compatible tag. `--to` writes that exact version instead of the locked one.
 /// `--commit` writes `git` plus `ref` plus `as` using the locked SHA, so a moved tag is not
 /// reselected. A transitive package is promoted to a direct edge using the lock's Git URL. Path
-/// dependencies are already pins. An overlay stays in slang-pkg-overlay.json; this command only
+/// dependencies are already pins. An overlay stays in slang-package-overlay.json; this command only
 /// edits committed Git intent. Because an overlay row does not have a locked SHA, `--commit`
 /// requires a Git-only lock row. Its effective version is also local intent, so default pin
 /// requires a Git-only row while `--to` makes the version explicit. This command does not rewrite
@@ -1023,7 +1024,7 @@ static SlangResult _dependencyPin(
     String lockPath = Path::combine(projectRoot, kLockFileName);
     if (!File::exists(lockPath))
     {
-        outError = "dependency pin requires slang-pkg-lock.json. Run 'slang package update'.";
+        outError = "dependency pin requires slang-package-lock.json. Run 'slang package update'.";
         return SLANG_FAIL;
     }
     LockFile lock;
@@ -1296,12 +1297,12 @@ static SlangResult _fetch(
     {
         if (!manifest.dependencies.getCount())
         {
-            outError = "fetch requires slang-pkg-lock.json when there is no dependency graph "
+            outError = "fetch requires slang-package-lock.json when there is no dependency graph "
                        "to resolve. Run 'slang package update' to create an empty lock.";
             return SLANG_FAIL;
         }
         _announceSubcommand(
-            "slang-pkg-lock.json is missing",
+            "slang-package-lock.json is missing",
             assumeYes ? "slang package update --yes" : "slang package update");
         return _update(
             projectRoot,
@@ -1551,7 +1552,7 @@ static SlangResult _update(
         fprintf(
             stderr,
             "slang-package: warning: ignoring enabled overrides for this update; they remain in "
-            "slang-pkg-overlay.json.\n");
+            "slang-package-overlay.json.\n");
     }
     if (dryRun)
     {
@@ -1652,7 +1653,8 @@ static SlangResult _update(
     {
         fprintf(
             stdout,
-            "The workspace contains local package state and requires slang-pkg-overlay.json.\n");
+            "The workspace contains local package state and requires "
+            "slang-package-overlay.json.\n");
     }
     return SLANG_OK;
 }
@@ -1684,7 +1686,7 @@ static SlangResult _validate(const String& projectRoot, String& outError)
     }
     else if (manifest.dependencies.getCount())
     {
-        outError = "Package dependencies require slang-pkg-lock.json before publishing.";
+        outError = "Package dependencies require slang-package-lock.json before publishing.";
         return SLANG_FAIL;
     }
     for (const auto& package : lock.packages)
@@ -1748,7 +1750,7 @@ static SlangResult _validateAllLockedPackages(const String& projectRoot, String&
     {
         if (rootManifest.dependencies.getCount())
         {
-            outError = "Package dependencies require slang-pkg-lock.json.";
+            outError = "Package dependencies require slang-package-lock.json.";
             return SLANG_FAIL;
         }
         fprintf(stdout, "No locked packages to validate.\n");
@@ -1830,12 +1832,12 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
     {
         if (manifest.dependencies.getCount())
         {
-            addFact("no slang-pkg-lock.json", "slang package fetch");
+            addFact("no slang-package-lock.json", "slang package fetch");
             reportedLockDrift = true;
         }
         if (localPackages.getCount())
         {
-            addFact("slang-pkg-overlay.json has no lock");
+            addFact("slang-package-overlay.json has no lock");
             reportedLockDrift = true;
         }
     }
@@ -1857,7 +1859,7 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
     }
 
     // Find the tool-owned checkouts that are absent before inspecting anything inside them.
-    // Reading a dependency's own `slang-pkg-manifest.json` and asking Git about its checkout both
+    // Reading a dependency's own `slang-package.json` and asking Git about its checkout both
     // fail for an absent directory, and those failures would only restate the absence -- one as a
     // missing JSON file, the other as Git refusing to run in a directory that does not exist.
     List<String> unmaterializedNames;
@@ -2516,7 +2518,7 @@ static SlangResult _build(
     }
     else if (manifest.dependencies.getCount())
     {
-        _announceSubcommand("slang-pkg-lock.json is missing", "slang package fetch");
+        _announceSubcommand("slang-package-lock.json is missing", "slang package fetch");
         SLANG_RETURN_ON_FAIL(_fetch(projectRoot, false, true, skipValidate, outError));
         ranFetch = true;
     }
@@ -2690,7 +2692,7 @@ static SlangResult _runSource(
     {
         outError =
             "The workspace does not configure a host executable. Add 'build.host.executables' to "
-            "slang-pkg-manifest.json and run 'slang package build'.";
+            "slang-package.json and run 'slang package build'.";
         return SLANG_FAIL;
     }
     if (!manifest.workspace.bundle.source)
@@ -2746,7 +2748,7 @@ static SlangResult _runBinary(
     {
         outError =
             "The workspace does not configure a host executable. Add 'build.host.executables' to "
-            "slang-pkg-manifest.json and run 'slang package --experimental build'.";
+            "slang-package.json and run 'slang package --experimental build'.";
         return SLANG_FAIL;
     }
 

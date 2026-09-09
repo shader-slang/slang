@@ -266,7 +266,7 @@ SlangResult buildDocumentation(const String& projectRoot, String& outError)
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(
-        readManifest(Path::combine(projectRoot, kManifestFileName), manifest, outError));
+        readManifest(Path::combine(projectRoot, kPackageFileName), manifest, outError));
     List<String> packageNames;
     List<String> packageRoots;
     packageNames.add(manifest.name);

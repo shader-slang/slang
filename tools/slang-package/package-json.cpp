@@ -840,12 +840,12 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
             key != "dependencies" && key != "retractions" && key != "workspace" && key != "build" &&
             key != "tools")
         {
-            outError = String("Unknown field in ") + kManifestFileName + ": " + key;
+            outError = String("Unknown field in ") + kPackageFileName + ": " + key;
             return SLANG_FAIL;
         }
     }
     SLANG_RETURN_ON_FAIL(
-        _requireFormatVersion(json.container, json.root, kManifestFileName, outError));
+        _requireFormatVersion(json.container, json.root, kPackageFileName, outError));
     SLANG_RETURN_ON_FAIL(
         _readRequiredString(json.container, json.root, "name", outManifest.name, outError));
     if (!isValidPackageName(outManifest.name))

@@ -79,7 +79,7 @@ SlangResult readLocalPackageManifest(
     String root;
     SLANG_RETURN_ON_FAIL(getLocalPackageRoot(projectRoot, package, root, outError));
     SLANG_RETURN_ON_FAIL(
-        readManifest(Path::combine(root, kManifestFileName), outManifest, outError));
+        readManifest(Path::combine(root, kPackageFileName), outManifest, outError));
     if (outManifest.name != package.name)
     {
         outError = String("Registered local package '") + package.name + "' has manifest name '" +

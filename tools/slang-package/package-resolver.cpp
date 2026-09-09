@@ -113,10 +113,10 @@ public:
         SLANG_RETURN_ON_FAIL(readFileAtRevision(
             repositoryPath,
             candidate.commit,
-            kManifestFileName,
+            kPackageFileName,
             manifestText,
             outError));
-        String sourceName = git + "@" + candidate.ref + ":" + kManifestFileName;
+        String sourceName = git + "@" + candidate.ref + ":" + kPackageFileName;
         SLANG_RETURN_ON_FAIL(
             readManifestText(sourceName, manifestText, outManifest.manifest, outError));
         outManifest.ownerKey = _gitOwnerKey(packageName, candidate.commit);
@@ -653,8 +653,8 @@ private:
                 return SLANG_FAIL;
             }
             String manifestPath = gitRelativeRoot.getLength()
-                                      ? Path::combine(gitRelativeRoot, kManifestFileName)
-                                      : kManifestFileName;
+                                      ? Path::combine(gitRelativeRoot, kPackageFileName)
+                                      : kPackageFileName;
             String manifestText;
             SLANG_RETURN_ON_FAIL(readFileAtRevision(
                 declaringManifest.gitRepositoryPath,
@@ -701,7 +701,7 @@ private:
                 dependency.name,
                 outError));
             SLANG_RETURN_ON_FAIL(readManifest(
-                Path::combine(outCanonicalPath, kManifestFileName),
+                Path::combine(outCanonicalPath, kPackageFileName),
                 outManifest.manifest,
                 outError));
             outManifest.sourceRoot = outCanonicalPath;

@@ -15,17 +15,17 @@ using the public `video-preview` demo is in
 used when changing the tool, is in
 [Growing an Application with Source Packages](source-package-command-use-cases).
 
-A **package** is a directory with `slang-pkg-manifest.json`. Its name, exports, license files, and
+A **package** is a directory with `slang-package.json`. Its name, exports, license files, and
 dependencies apply wherever that package appears in a graph, including as a Git pin or a path
 dependency.
 
-A **workspace** is the package whose `slang-pkg-manifest.json` starts resolution for a given solve. You
+A **workspace** is the package whose `slang-package.json` starts resolution for a given solve. You
 can run `slang package` from that directory or from an ordinary subdirectory (`src/`, `docs/`, and
-so on). The command loads the workspace `slang-pkg-manifest.json`, `slang-pkg-lock.json`, and
-gitignored `slang-pkg-overlay.json` from the nearest ancestor that contains the manifest. A nested
-package, such as a materialized dependency under `deps/` that has its own `slang-pkg-manifest.json`,
+so on). The command loads the workspace `slang-package.json`, `slang-package-lock.json`, and
+gitignored `slang-package-overlay.json` from the nearest ancestor that contains `slang-package.json`. A nested
+package, such as a materialized dependency under `deps/` that has its own `slang-package.json`,
 keeps that nearer root. `slang package init` still creates a package in the current directory. The
-workspace owns `slang-pkg-lock.json` and generated state under `.slang/`. Nested packages'
+workspace owns `slang-package-lock.json` and generated state under `.slang/`. Nested packages'
 lockfiles are not used for that solve. A module is a Slang language unit (`module NAME;`), not a
 package-manager concept.
 
@@ -34,7 +34,7 @@ package-manager concept.
 A package uses these conventional paths:
 
 ```text
-slang-pkg-manifest.json
+slang-package.json
 LICENSE
 src/
 tests/
@@ -137,7 +137,7 @@ under `build`, not as new top-level siblings of `workspace`.
 The optional `tools` object declares required **system tools**: programs already installed on the
 machine, not source packages and not lock rows. `slang package` checks that each named tool is
 present and that its version satisfies the declared constraint. It does not fetch those tools into
-`deps/` or record their versions in `slang-pkg-lock.json`.
+`deps/` or record their versions in `slang-package-lock.json`.
 
 Schema `1` accepts only `slang-toolchain`, which is the Slang compiler that provides
 `slang-package`, regardless of how it was installed (a shader-slang/slang GitHub release, a Vulkan
@@ -161,7 +161,7 @@ distributions start shipping them independently. Unknown `tools` keys are errors
 
 Ordinary dependency versions come from Git tags named `vMAJOR.MINOR.PATCH`, which package
 publishers must treat as immutable. A manifest may instead pin an opaque branch or tag with `ref`
-and assign its solver identity with `as`. `version` in `slang-pkg-manifest.json` is only the file
+and assign its solver identity with `as`. `version` in `slang-package.json` is only the file
 format version. For a Git package the lock records the resolved ref, exact semantic version, and
 commit; a path package has no ref or commit to record, so its row carries the path and the `as`
 version.
@@ -201,7 +201,7 @@ release tag's `v` prefix. `ref` is a branch, tag, or full 40-character commit ID
 records the exact commit.
 
 A dependency `path` must be relative to the manifest that declares it and must be paired with an
-exact `as` version. The target directory must contain its own `slang-pkg-manifest.json`, and its package
+exact `as` version. The target directory must contain its own `slang-package.json`, and its package
 name must match the dependency key.
 
 For example, a package can check in another package under `vendor/noise`:
@@ -241,9 +241,9 @@ inside a Git release must remain in that release's checkout. A missing target is
 ## Locking and fetching
 
 `slang package update` resolves all manifests reachable from the workspace package, materializes
-the resulting dependency set, and writes one `slang-pkg-lock.json` in the workspace root. The
+the resulting dependency set, and writes one `slang-package-lock.json` in the workspace root. The
 lockfile is the definitive dependency graph and records both Git and path packages. It starts with
-`"version": 1`, the same file-format identifier as `slang-pkg-manifest.json`.
+`"version": 1`, the same file-format identifier as `slang-package.json`.
 Nested packages' lockfiles are not used for
 that solve. When a lock exists, `slang package fetch` checks that it still satisfies every recorded
 manifest and ensures every direct and transitive Git dependency is at its locked commit under
@@ -281,7 +281,7 @@ that checkout, or re-run with `--clean`.
 Run `slang package update` deliberately when manifest constraints or upstream releases change.
 `slang package update --dry-run` prints the selected graph (what moved, what stayed, and why)
 without writing the lock or replacing checkouts. `--ignore-overrides` ignores out-of-tree
-overrides for that solve; it does not change `slang-pkg-overlay.json` or replace in-place overrides.
+overrides for that solve; it does not change `slang-package-overlay.json` or replace in-place overrides.
 `--minimal` keeps one-line package changes and the summary count. The installed Slang
 toolchain is omitted unless its constraint fails. Resolver Git clones
 under `.slang/cache/` may still be populated so the tool can inspect available tags. A real update
@@ -372,7 +372,7 @@ promoted to a direct edge. Pinning leaves an active overlay registered. When the
 selects that overlay, pass `--to` explicitly because its effective version need not be a published
 Git version; `--commit` requires a Git-only lock row because an overlay row has no locked SHA. Path
 dependencies are already pins. These commands change only
-`slang-pkg-manifest.json`; inspect `status` and run `update` afterward. `slang package tree` prints
+`slang-package.json`; inspect `status` and run `update` afterward. `slang package tree` prints
 the selected lock graph, while
 `slang package why NAME` prints every current root-to-package path and incoming requirement. Why
 explains the graph that is locked now, not candidates rejected during an earlier solve. Unlike
@@ -390,16 +390,16 @@ relative to the primary (for example `__include "noise/hash";`), as shown in
 
 ## Creating and editing packages
 
-`slang package init` creates `slang-pkg-manifest.json` and the conventional directories in the current
+`slang package init` creates `slang-package.json` and the conventional directories in the current
 directory. It writes `tools.slang-toolchain` as `>=` the installed compiler version when that
-version can be parsed. It adds `.slang/`, `deps/`, `build/`, and `slang-pkg-overlay.json` to
+version can be parsed. It adds `.slang/`, `deps/`, `build/`, and `slang-package-overlay.json` to
 `.gitignore`.
 `.slang/cache/` contains resolver Git repositories used to inspect release manifests. Fetched
 source remains visible under `deps/`; generated files go under `build/`.
 
 `slang package edit NAME` marks the existing `{workspace.deps}/NAME` checkout (by default
 `deps/NAME`) as editable without moving it. Under the covers this is an enabled override at that
-path, using the current locked version. Gitignored `slang-pkg-overlay.json` records that the package
+path, using the current locked version. Gitignored `slang-package-overlay.json` records that the package
 tool no longer owns the tree. Fetch and update do not replace it. Search paths already point at
 that directory, so compiling against it does not wait on `update`. `update` reads the working-tree
 manifest and writes a Git+path lock row when the overlay graph must enter the lock. The checkout
@@ -452,7 +452,7 @@ their user-owned checkouts. An in-place checkout that is absent from that graph 
 registered so a later plain update can restore it without losing work. An override records its
 original
 Git location and its effective path and requires the matching registration in
-`slang-pkg-overlay.json`; it therefore fails explicitly on another machine or in CI. The override's
+`slang-package-overlay.json`; it therefore fails explicitly on another machine or in CI. The override's
 effective version must satisfy every incoming constraint, and all of its transitive dependencies
 are resolved. Disable enabled overrides and run `slang package update` before removing their
 registrations or committing a portable published resolution.
