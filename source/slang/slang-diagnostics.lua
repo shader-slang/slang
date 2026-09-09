@@ -268,6 +268,13 @@ err(
 )
 
 err(
+    "cannot-load-search-path-list",
+    117,
+    "cannot load search path list",
+    span { loc = "location", message = "~reason" }
+)
+
+err(
     "unknown-source-language",
     19,
     "unknown source language '~language'",
