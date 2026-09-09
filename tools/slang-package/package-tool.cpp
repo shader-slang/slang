@@ -85,7 +85,7 @@ static void _printHelp(bool experimental = false)
         "Global options:\n"
         "  --experimental   Enable experimental commands and build features.\n"
         "\n"
-        "Commands load slang-pkg-manifest.json, slang-pkg-lock.json, and slang-pkg-workspace.json\n"
+        "Commands load slang-pkg-manifest.json, slang-pkg-lock.json, and slang-pkg-overlay.json\n"
         "from the nearest ancestor directory that contains the manifest. Nested packages, such\n"
         "as dependencies under deps/, keep their own root when they have a manifest.\n"
         "`init` still creates a package in the current directory.\n");
@@ -323,7 +323,7 @@ static SlangResult _materialize(
         if (isLocalOverrideLockedPackage(package))
         {
             outError = String("Locked local override '") + package.name +
-                       "' is not registered in slang-pkg-workspace.json.";
+                       "' is not registered in slang-pkg-overlay.json.";
             return SLANG_FAIL;
         }
 
@@ -561,14 +561,14 @@ static SlangResult _validateLocalPackages(
         if (package->path.getLength() && package->path != localPackage.path)
         {
             outError = String("Locked path for package '") + package->name +
-                       "' does not match slang-pkg-workspace.json. Run "
+                       "' does not match slang-pkg-overlay.json. Run "
                        "'slang package update'.";
             return SLANG_FAIL;
         }
         if (localPackage.as.getLength() && package->version != localPackage.as)
         {
             outError = String("Locked version for local override '") + package->name +
-                       "' does not match slang-pkg-workspace.json. Run "
+                       "' does not match slang-pkg-overlay.json. Run "
                        "'slang package update'.";
             return SLANG_FAIL;
         }
@@ -590,7 +590,7 @@ static SlangResult _validateLocalPackages(
             findActiveLocalPackageIndex(localPackages, package.name) < 0)
         {
             outError = String("Locked local package '") + package.name +
-                       "' is not registered in slang-pkg-workspace.json. Run "
+                       "' is not registered in slang-pkg-overlay.json. Run "
                        "'slang package update' to restore a published pin.";
             return SLANG_FAIL;
         }
@@ -880,7 +880,7 @@ static SlangResult _init(const String& projectRoot, String& outError)
         ".slang/",
         "deps/",
         "build/",
-        "slang-pkg-workspace.json",
+        "slang-pkg-overlay.json",
     };
     StringBuilder updatedIgnore;
     updatedIgnore << gitIgnore;
@@ -987,22 +987,25 @@ static SlangResult _dependencyRemove(
 /// to a newer compatible tag. `--to` writes that exact version instead of the locked one.
 /// `--commit` writes `git` plus `ref` plus `as` using the locked SHA, so a moved tag is not
 /// reselected. A transitive package is promoted to a direct edge using the lock's Git URL. Path
-/// dependencies are already pins. An overlay stays in slang-pkg-workspace.json; this command only
-/// edits committed Git intent. It does not rewrite the lock; inspect status and run update
-/// afterward, the same as `dependency add`.
+/// dependencies are already pins. An overlay stays in slang-pkg-overlay.json; this command only
+/// edits committed Git intent. Because an overlay row does not have a locked SHA, `--commit`
+/// requires a Git-only lock row. Its effective version is also local intent, so default pin
+/// requires a Git-only row while `--to` makes the version explicit. This command does not rewrite
+/// the lock; inspect status and run update afterward, the same as `dependency add`.
 static SlangResult _dependencyPin(
     const String& projectRoot,
     const String& name,
     const String& requestedVersion,
+    bool hasRequestedVersion,
     bool pinCommit,
     String& outError)
 {
-    if (requestedVersion.getLength() && pinCommit)
+    if (hasRequestedVersion && pinCommit)
     {
         outError = "dependency pin --to cannot be combined with --commit.";
         return SLANG_FAIL;
     }
-    if (requestedVersion.getLength())
+    if (hasRequestedVersion)
     {
         SemanticVersion ignored;
         SLANG_RETURN_ON_FAIL(parseExactVersion(requestedVersion, ignored, outError));
@@ -1037,12 +1040,30 @@ static SlangResult _dependencyPin(
         outError = String("Cannot pin a path-only package: ") + name;
         return SLANG_FAIL;
     }
-    if (pinCommit && !locked.commit.getLength())
+    if (existingIndex >= 0 && manifest.dependencies[existingIndex].git != locked.git)
     {
-        outError = String("Lock file does not record a commit for package '") + name + "'.";
+        outError = String("Lock file uses a different Git URL for dependency '") + name +
+                   "'. Run 'slang package update'.";
         return SLANG_FAIL;
     }
-    String pinVersion = requestedVersion.getLength() ? requestedVersion : locked.version;
+    if (locked.path.getLength() && pinCommit)
+    {
+        outError = String("Cannot pin overlaid package '") + name +
+                   "' by commit because its lock row selects a local path. Disable the override "
+                   "and run 'slang package update', use --to with a published version, or use "
+                   "'slang package unedit " +
+                   name + " --adopt' to keep the working-tree commit.";
+        return SLANG_FAIL;
+    }
+    if (locked.path.getLength() && !hasRequestedVersion)
+    {
+        outError = String("Cannot infer a published Git version for overlaid package '") + name +
+                   "' because its lock row selects a local path. Pass --to VERSION.";
+        return SLANG_FAIL;
+    }
+    if (pinCommit)
+        SLANG_RELEASE_ASSERT(locked.commit.getLength());
+    String pinVersion = hasRequestedVersion ? requestedVersion : locked.version;
     if (!pinCommit && !pinVersion.getLength())
     {
         outError = String("Lock file does not record a version for package '") + name + "'.";
@@ -1530,7 +1551,7 @@ static SlangResult _update(
         fprintf(
             stderr,
             "slang-package: warning: ignoring enabled overrides for this update; they remain in "
-            "slang-pkg-workspace.json.\n");
+            "slang-pkg-overlay.json.\n");
     }
     if (dryRun)
     {
@@ -1631,7 +1652,7 @@ static SlangResult _update(
     {
         fprintf(
             stdout,
-            "The workspace contains local package state and requires slang-pkg-workspace.json.\n");
+            "The workspace contains local package state and requires slang-pkg-overlay.json.\n");
     }
     return SLANG_OK;
 }
@@ -1814,7 +1835,7 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
         }
         if (localPackages.getCount())
         {
-            addFact("slang-pkg-workspace.json has no lock");
+            addFact("slang-pkg-overlay.json has no lock");
             reportedLockDrift = true;
         }
     }
@@ -3031,6 +3052,7 @@ static SlangResult _adoptInPlaceOverride(
     }
 
     Dependency& dependency = manifest.dependencies[dependencyIndex];
+    dependency.version = String();
     dependency.ref = ref;
     dependency.as = version;
 
@@ -3609,6 +3631,11 @@ SlangResult executeInDirectory(
             return _dependencyList(projectRoot, outError);
         if (argc == 4 && String(argv[2]) == "remove")
             return _dependencyRemove(projectRoot, argv[3], outError);
+        if (argc == 3 && String(argv[2]) == "pin")
+        {
+            outError = "dependency pin requires a package name.";
+            return SLANG_FAIL;
+        }
         if (argc >= 4 && String(argv[2]) == "add")
         {
             Dependency dependency;
@@ -3669,28 +3696,53 @@ SlangResult executeInDirectory(
                 return SLANG_FAIL;
             }
             String requestedVersion;
+            bool hasRequestedVersion = false;
             bool pinCommit = false;
             for (int i = 4; i < argc; ++i)
             {
                 String option = argv[i];
                 if (option == "--to")
                 {
+                    if (hasRequestedVersion)
+                    {
+                        outError = "Duplicate dependency pin option: --to";
+                        return SLANG_FAIL;
+                    }
                     if (i + 1 >= argc)
                     {
                         outError = "Missing value for dependency option: --to";
                         return SLANG_FAIL;
                     }
                     requestedVersion = argv[++i];
+                    hasRequestedVersion = true;
+                    if (!requestedVersion.getLength() || requestedVersion.startsWith("-"))
+                    {
+                        outError = "dependency pin --to requires an exact version.";
+                        return SLANG_FAIL;
+                    }
                 }
                 else if (option == "--commit")
+                {
+                    if (pinCommit)
+                    {
+                        outError = "Duplicate dependency pin option: --commit";
+                        return SLANG_FAIL;
+                    }
                     pinCommit = true;
+                }
                 else
                 {
                     outError = String("Unknown dependency pin option: ") + option;
                     return SLANG_FAIL;
                 }
             }
-            return _dependencyPin(projectRoot, name, requestedVersion, pinCommit, outError);
+            return _dependencyPin(
+                projectRoot,
+                name,
+                requestedVersion,
+                hasRequestedVersion,
+                pinCommit,
+                outError);
         }
         outError = "Invalid dependency command. Use 'dependency add', 'dependency pin', "
                    "'dependency remove', or 'dependency list'.";

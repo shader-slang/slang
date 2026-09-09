@@ -1249,7 +1249,7 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
     SLANG_RETURN_ON_FAIL(_parseJSON(path, json, outError));
     if (json.root.getKind() != JSONValue::Kind::Object)
     {
-        outError = "Workspace file must be an object.";
+        outError = "Overlay file must be an object.";
         return SLANG_FAIL;
     }
     for (auto pair : json.container->getObject(json.root))
@@ -1257,12 +1257,12 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
         String key = json.container->getStringFromKey(pair.key);
         if (key != "version" && key != "overrides")
         {
-            outError = String("Unknown field in ") + kWorkspaceFileName + ": " + key;
+            outError = String("Unknown field in ") + kOverlayFileName + ": " + key;
             return SLANG_FAIL;
         }
     }
     SLANG_RETURN_ON_FAIL(
-        _requireFormatVersion(json.container, json.root, kWorkspaceFileName, outError));
+        _requireFormatVersion(json.container, json.root, kOverlayFileName, outError));
     outPackages.clear();
     JSONValue overrides = _find(json.container, json.root, "overrides");
     if (overrides.getKind() != JSONValue::Kind::Object)

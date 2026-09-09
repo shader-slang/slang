@@ -37,7 +37,7 @@ Three packages constrain `color-encoding`. The resolver intersects those ranges 
 tag, which appears once in the lock and is checked out once under `deps/`.
 
 Clone the workspace. Commands that load the three JSON files (`slang-pkg-manifest.json`,
-`slang-pkg-lock.json`, and `slang-pkg-workspace.json`) also work from ordinary subdirectories,
+`slang-pkg-lock.json`, and `slang-pkg-overlay.json`) also work from ordinary subdirectories,
 such as `src/`. They use the nearest ancestor that contains `slang-pkg-manifest.json`. Nested packages
 under `deps/` keep their own root when they have a manifest.
 
@@ -72,7 +72,7 @@ less slang-pkg-lock.json
   Git `ref`/`commit`, overlay `path`). `fetch` reproduces those pins without solving again.
   Declared exports and dependencies are reloaded from overlay working trees or from each locked
   version's manifest.
-- `slang-pkg-workspace.json` is gitignored machine-local override state. `edit NAME` creates an
+- `slang-pkg-overlay.json` is gitignored machine-local override state. `edit NAME` creates an
   override at `deps/NAME`; other overrides may point elsewhere. The file should not be in the
   clone. If it is missing, that is correct for CI and for a clean checkout.
 
@@ -86,7 +86,9 @@ add NAME --git URL --version RANGE`. To pin a branch, tag, or full 40-character 
 Path dependencies use `--path PATH --as VERSION`. After a lock exists,
 `slang package dependency pin NAME` copies that selection into a direct Git exact-version edge.
 `--to MAJOR.MINOR.PATCH` writes a different exact version. `--commit` writes the locked SHA as
-`ref`. The lock records selection identity: the
+`ref`; it requires a Git-only lock row because an overlay lock row has no locked SHA. Pin leaves an
+active overlay registered, but once the lock selects that overlay, pass `--to` explicitly because
+its effective version need not be published in Git. The lock records selection identity: the
 effective `version`, and for Git pins the resolved `ref` and `commit`.
 
 ## Reproduce the locked graph
@@ -239,7 +241,7 @@ documentation should change. `slang package test` is reserved and not implemente
 
 ## Develop against a local tree
 
-Both commands use overrides recorded in gitignored `slang-pkg-workspace.json`.
+Both commands use overrides recorded in gitignored `slang-pkg-overlay.json`.
 
 `slang package edit NAME` registers `deps/NAME` as an enabled in-place override at the version in
 the current lock. The checkout may already contain local changes: preserving work you have already
@@ -252,8 +254,9 @@ Plain `unedit` succeeds only when the lock is a Git pin and the checkout is clea
 commit. `unedit NAME --clean` discards local state and restores that commit; pass `--yes` when
 confirmation cannot be interactive. To keep a committed fix, use
 `unedit NAME --adopt [--as VERSION]`: this pins the direct dependency in the manifest and writes a
-Git-only lock at `HEAD`. A unique `vMAJOR.MINOR.PATCH` tag at `HEAD` supplies the version;
-otherwise `--as` is required.
+Git-only lock at `HEAD`. It replaces the dependency's version range with canonical `ref` plus `as`
+intent. A unique `vMAJOR.MINOR.PATCH` tag at `HEAD` supplies the version; otherwise `--as` is
+required.
 
 `slang package override add NAME PATH [AS]` points the package at a directory you already have.
 `PATH=deps/NAME` updates the same in-place registration created by `edit`; another path creates an
@@ -272,14 +275,14 @@ registrations. In-place overrides stay active so those checkouts are not replace
 packages that drop out of the published graph. A later plain update restores them. A dry run
 prints the lock diff without writing it. The resulting lock records the
 local path plus the original Git identity, so another machine or CI fails unless it has the same
-`slang-pkg-workspace.json`. Disable the override and run `update` to restore a portable Git pin before
+`slang-pkg-overlay.json`. Disable the override and run `update` to restore a portable Git pin before
 you remove the registration or commit.
 
 `slang package validate NAME` checks that package's tree against this workspace lock, so
 you can certify a library using an in-place override before a remote tag exists. Bare `validate`
 still rejects the workspace while any override is enabled.
 
-Do not commit `slang-pkg-workspace.json`. Path dependencies in `slang-pkg-manifest.json` are in-package
+Do not commit `slang-pkg-overlay.json`. Path dependencies in `slang-pkg-manifest.json` are in-package
 vendoring, not extract. Overrides are the laptop way to redirect one identity at a local tree.
 
 ## Extract a package from this application
@@ -325,7 +328,7 @@ relative to declared intent, so you must `update`. Path packages and overrides a
 selections, so remote release exclusions do not filter them even though they carry an effective
 version for solver compatibility.
 
-There is no personal exclude in `slang-pkg-workspace.json`. A machine-local skip that failed `fetch`
+There is no personal exclude in `slang-pkg-overlay.json`. A machine-local skip that failed `fetch`
 would make CI and your laptop disagree about the same lock. Use a committed exclude when the
 whole project must avoid a release, or an override when you need a different tree on this machine.
 

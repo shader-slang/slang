@@ -503,7 +503,7 @@ SLANG_UNIT_TEST(PackageLocalRegistryJSON)
 {
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
-    String path = Path::combine(temp.path, "slang-pkg-workspace.json");
+    String path = Path::combine(temp.path, "slang-pkg-overlay.json");
     List<LocalPackage> packages;
     LocalPackage package;
     package.name = "noise";
@@ -710,7 +710,7 @@ SLANG_UNIT_TEST(PackageToolInit)
     SLANG_CHECK(gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("deps/")) >= 0);
     SLANG_CHECK(gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("build/")) >= 0);
     SLANG_CHECK(
-        gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("slang-pkg-workspace.json")) >= 0);
+        gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("slang-pkg-overlay.json")) >= 0);
     Index buildIgnoreCount = 0;
     for (auto line : LineParser(gitIgnore.getUnownedSlice()))
         buildIgnoreCount += line.trim() == "build/";
@@ -1475,13 +1475,13 @@ SLANG_UNIT_TEST(PackageToolUpdateRequiresConfirmation)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
     SLANG_CHECK(
         statusReport.getUnownedSlice().indexOf(
-            UnownedStringSlice("slang-pkg-workspace.json has no lock")) >= 0);
+            UnownedStringSlice("slang-pkg-overlay.json has no lock")) >= 0);
     SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("noise: override")) >= 0);
     SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("lock absent")) >= 0);
     SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("incomplete.")) >= 0);
     SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("no lock required")) < 0);
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "slang-pkg-workspace.json"))));
+        SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "slang-pkg-overlay.json"))));
 
     const char* updateArguments[] = {"slang-package", "update"};
     SLANG_CHECK(SLANG_FAILED(
@@ -1705,6 +1705,83 @@ SLANG_UNIT_TEST(PackageToolDependencyCommandsAndInitialFetch)
         pinMissingArguments,
         error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not contain")) >= 0);
+    String manifestBeforeInvalidPins;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::readAllText(rootManifestPath, manifestBeforeInvalidPins)));
+    const char* pinWithoutNameArguments[] = {"slang-package", "dependency", "pin"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(pinWithoutNameArguments),
+        pinWithoutNameArguments,
+        error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("requires a package name")) >= 0);
+    const char* pinInvalidNameArguments[] = {"slang-package", "dependency", "pin", "bad/name"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(pinInvalidNameArguments),
+        pinInvalidNameArguments,
+        error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("Invalid dependency name")) >= 0);
+    const char* pinMissingValueArguments[] = {"slang-package", "dependency", "pin", "a", "--to"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(pinMissingValueArguments),
+        pinMissingValueArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Missing value")) >= 0);
+    const char* pinEmptyValueArguments[] = {"slang-package", "dependency", "pin", "a", "--to", ""};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(pinEmptyValueArguments),
+        pinEmptyValueArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("exact version")) >= 0);
+    const char* pinFlagAsValueArguments[] =
+        {"slang-package", "dependency", "pin", "a", "--to", "--commit"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(pinFlagAsValueArguments),
+        pinFlagAsValueArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("exact version")) >= 0);
+    const char* pinDuplicateToArguments[] = {
+        "slang-package",
+        "dependency",
+        "pin",
+        "a",
+        "--to",
+        "1.0.0",
+        "--to",
+        "1.1.0",
+    };
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(pinDuplicateToArguments),
+        pinDuplicateToArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Duplicate")) >= 0);
+    const char* pinDuplicateCommitArguments[] =
+        {"slang-package", "dependency", "pin", "a", "--commit", "--commit"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(pinDuplicateCommitArguments),
+        pinDuplicateCommitArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Duplicate")) >= 0);
+    const char* pinUnknownOptionArguments[] =
+        {"slang-package", "dependency", "pin", "a", "--unknown"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(pinUnknownOptionArguments),
+        pinUnknownOptionArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown")) >= 0);
+    String manifestAfterInvalidPins;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::readAllText(rootManifestPath, manifestAfterInvalidPins)));
+    SLANG_CHECK(manifestAfterInvalidPins == manifestBeforeInvalidPins);
 
     const char* removeArguments[] = {"slang-package", "dependency", "remove", "a"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -2385,7 +2462,7 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     expectedSearchPath = Path::combine(helperTemp.path, "src");
     SLANG_CHECK(searchPaths.getUnownedSlice().indexOf(expectedSearchPath.getUnownedSlice()) >= 0);
 
-    String registryPath = Path::combine(temp.path, "slang-pkg-workspace.json");
+    String registryPath = Path::combine(temp.path, "slang-pkg-overlay.json");
     List<LocalPackage> registeredPackages;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLocalPackages(registryPath, registeredPackages, error)));
     Index noiseRegistration = -1;
@@ -2422,7 +2499,7 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
         writeManifest(Path::combine(localRoot, "slang-pkg-manifest.json"), local, error)));
 
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "slang-pkg-workspace.json"))));
+        SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "slang-pkg-overlay.json"))));
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("is not registered")) >= 0);
@@ -2774,13 +2851,13 @@ SLANG_UNIT_TEST(PackageStatusReportsDriftButRejectsCorruptJSON)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "slang-pkg-lock.json"))));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::writeAllText(Path::combine(temp.path, "slang-pkg-workspace.json"), "{")));
+        File::writeAllText(Path::combine(temp.path, "slang-pkg-overlay.json"), "{")));
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Invalid JSON")) >= 0);
 
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "slang-pkg-workspace.json"))));
+        SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "slang-pkg-overlay.json"))));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         File::writeAllText(Path::combine(temp.path, "slang-pkg-manifest.json"), "{")));
     SLANG_CHECK(SLANG_FAILED(
@@ -3258,6 +3335,29 @@ SLANG_UNIT_TEST(PackageResolverPinnedRefUsesClaimedVersion)
     dependency.name = "noise";
     dependency.git = "memory:noise";
     dependency.version = ">=1.0.0 <2.0.0";
+    dependency.ref = "main";
+    dependency.as = "1.4.0";
+    root.dependencies.add(dependency);
+
+    PackageTool::LockFile lock;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(root, source, lock, error)));
+    const LockedPackage* noise = _findLockedPackage(lock, "noise");
+    SLANG_CHECK_ABORT(noise);
+    SLANG_CHECK(noise->ref == "main");
+    SLANG_CHECK(noise->version == "1.4.0");
+    SLANG_CHECK(noise->commit == "commit-main");
+}
+
+SLANG_UNIT_TEST(PackageResolverPinnedRefWithoutVersionConstraint)
+{
+    InMemoryPackageSource source;
+    source.addRef("memory:noise", "main", "1.4.0", _makeManifest("noise"));
+
+    Manifest root = _makeManifest("root");
+    Dependency dependency;
+    dependency.name = "noise";
+    dependency.git = "memory:noise";
     dependency.ref = "main";
     dependency.as = "1.4.0";
     root.dependencies.add(dependency);

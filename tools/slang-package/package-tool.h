@@ -22,7 +22,7 @@ SlangResult executeInDirectory(
 ///
 /// Walk toward filesystem root and stop at the nearest `slang-pkg-manifest.json`. Ordinary
 /// subdirectories such as `src/` therefore load that package's manifest, lock, and
-/// `slang-pkg-workspace.json`. A nested package (for example a dependency under `deps/` or an
+/// `slang-pkg-overlay.json`. A nested package (for example a dependency under `deps/` or an
 /// example with its own manifest) keeps that nearer root. `init` does not use this discovery path.
 SlangResult discoverPackageRoot(const String& startDirectory, String& outRoot, String& outError);
 

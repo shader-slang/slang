@@ -16,7 +16,7 @@ namespace PackageTool
 inline constexpr Int kFormatVersion = 1;
 inline constexpr char const* kManifestFileName = "slang-pkg-manifest.json";
 inline constexpr char const* kLockFileName = "slang-pkg-lock.json";
-inline constexpr char const* kWorkspaceFileName = "slang-pkg-workspace.json";
+inline constexpr char const* kOverlayFileName = "slang-pkg-overlay.json";
 
 struct Dependency
 {
@@ -164,7 +164,7 @@ inline String getWorkspaceBuildDirectory(const Manifest& manifest)
 /// - Path-only: `path` and `version` are set; `git` is empty. The package is used in place and is
 ///   trusted only when a manifest `path` edge selected it.
 /// - Local override: `git` and `path` are both set. The Git identity is retained, but the tree at
-///   `path` is used instead; `version` is the version it provides and `slang-pkg-workspace.json`
+///   `path` is used instead; `version` is the version it provides and `slang-pkg-overlay.json`
 ///   must register the same path.
 ///
 /// Declared `exports` and `dependencies` are not stored. Fetch and status reload them from the

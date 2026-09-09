@@ -356,7 +356,8 @@ private:
     {
         for (const auto& requirement : package.gitRequirements)
         {
-            if (!requirement.constraint.matches(version))
+            if (requirement.constraint.clauses.getCount() &&
+                !requirement.constraint.matches(version))
                 return false;
         }
         return true;
@@ -911,7 +912,7 @@ private:
             SemanticVersion selectedVersion;
             SLANG_RETURN_ON_FAIL(
                 parseExactVersion(package.locked.version, selectedVersion, outError));
-            if (!constraint.matches(selectedVersion))
+            if (constraint.clauses.getCount() && !constraint.matches(selectedVersion))
             {
                 outError = String("Path dependency '") + dependency.name + "' provides version " +
                            package.locked.version + ", which conflicts with a Git constraint.";
@@ -935,7 +936,7 @@ private:
             SemanticVersion selectedVersion;
             SLANG_RETURN_ON_FAIL(
                 parseExactVersion(package.locked.version, selectedVersion, outError));
-            if (!constraint.matches(selectedVersion))
+            if (constraint.clauses.getCount() && !constraint.matches(selectedVersion))
             {
                 outError = String("Selected version of package '") + dependency.name +
                            "' conflicts with a transitive constraint.";

@@ -544,7 +544,7 @@ static SlangResult _readMaterializedManifest(
         if (package.path.getLength() && package.path != localPackages[localIndex].path)
         {
             outError = String("Locked path for package '") + package.name +
-                       "' does not match slang-pkg-workspace.json.";
+                       "' does not match slang-pkg-overlay.json.";
             return SLANG_FAIL;
         }
         SLANG_RETURN_ON_FAIL(
@@ -625,7 +625,7 @@ static SlangResult _loadResolvedPackage(
         if (package.path.getLength() && package.path != localPackages[localIndex].path)
         {
             outError = String("Locked path for package '") + package.name +
-                       "' does not match slang-pkg-workspace.json.";
+                       "' does not match slang-pkg-overlay.json.";
             return SLANG_FAIL;
         }
         SLANG_RETURN_ON_FAIL(
@@ -831,7 +831,7 @@ SlangResult validateLegalResolvedProject(
         if (localPackage.as.getLength() && package.version != localPackage.as)
         {
             outError = String("Locked version for local override '") + package.name +
-                       "' does not match slang-pkg-workspace.json. Run 'slang package update'.";
+                       "' does not match slang-pkg-overlay.json. Run 'slang package update'.";
             return SLANG_FAIL;
         }
     }

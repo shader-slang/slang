@@ -36,7 +36,7 @@ SlangResult readProjectLocalPackages(
     List<LocalPackage>& outPackages,
     String& outError)
 {
-    String path = Path::combine(projectRoot, kWorkspaceFileName);
+    String path = Path::combine(projectRoot, kOverlayFileName);
     if (!File::exists(path))
     {
         outPackages.clear();
@@ -50,7 +50,7 @@ SlangResult writeProjectLocalPackages(
     const List<LocalPackage>& packages,
     String& outError)
 {
-    return writeLocalPackages(Path::combine(projectRoot, kWorkspaceFileName), packages, outError);
+    return writeLocalPackages(Path::combine(projectRoot, kOverlayFileName), packages, outError);
 }
 
 SlangResult getLocalPackageRoot(

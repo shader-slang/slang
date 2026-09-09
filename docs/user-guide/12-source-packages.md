@@ -22,7 +22,7 @@ dependency.
 A **workspace** is the package whose `slang-pkg-manifest.json` starts resolution for a given solve. You
 can run `slang package` from that directory or from an ordinary subdirectory (`src/`, `docs/`, and
 so on). The command loads the workspace `slang-pkg-manifest.json`, `slang-pkg-lock.json`, and
-gitignored `slang-pkg-workspace.json` from the nearest ancestor that contains the manifest. A nested
+gitignored `slang-pkg-overlay.json` from the nearest ancestor that contains the manifest. A nested
 package, such as a materialized dependency under `deps/` that has its own `slang-pkg-manifest.json`,
 keeps that nearer root. `slang package init` still creates a package in the current directory. The
 workspace owns `slang-pkg-lock.json` and generated state under `.slang/`. Nested packages'
@@ -281,7 +281,7 @@ that checkout, or re-run with `--clean`.
 Run `slang package update` deliberately when manifest constraints or upstream releases change.
 `slang package update --dry-run` prints the selected graph (what moved, what stayed, and why)
 without writing the lock or replacing checkouts. `--ignore-overrides` ignores out-of-tree
-overrides for that solve; it does not change `slang-pkg-workspace.json` or replace in-place overrides.
+overrides for that solve; it does not change `slang-pkg-overlay.json` or replace in-place overrides.
 `--minimal` keeps one-line package changes and the summary count. The installed Slang
 toolchain is omitted unless its constraint fails. Resolver Git clones
 under `.slang/cache/` may still be populated so the tool can inspect available tags. A real update
@@ -368,7 +368,10 @@ Use `slang package dependency add` and `dependency remove` to edit direct manife
 `--path PATH --as VERSION`. `dependency pin NAME` rewrites a Git edge from the current lock:
 default writes that lock's exact `version`, `--to MAJOR.MINOR.PATCH` writes a different exact
 version, and `--commit` writes `ref` plus `as` from the locked SHA. A transitive Git package is
-promoted to a direct edge. Path dependencies are already pins. These commands change only
+promoted to a direct edge. Pinning leaves an active overlay registered. When the lock row already
+selects that overlay, pass `--to` explicitly because its effective version need not be a published
+Git version; `--commit` requires a Git-only lock row because an overlay row has no locked SHA. Path
+dependencies are already pins. These commands change only
 `slang-pkg-manifest.json`; inspect `status` and run `update` afterward. `slang package tree` prints
 the selected lock graph, while
 `slang package why NAME` prints every current root-to-package path and incoming requirement. Why
@@ -389,14 +392,14 @@ relative to the primary (for example `__include "noise/hash";`), as shown in
 
 `slang package init` creates `slang-pkg-manifest.json` and the conventional directories in the current
 directory. It writes `tools.slang-toolchain` as `>=` the installed compiler version when that
-version can be parsed. It adds `.slang/`, `deps/`, `build/`, and `slang-pkg-workspace.json` to
+version can be parsed. It adds `.slang/`, `deps/`, `build/`, and `slang-pkg-overlay.json` to
 `.gitignore`.
 `.slang/cache/` contains resolver Git repositories used to inspect release manifests. Fetched
 source remains visible under `deps/`; generated files go under `build/`.
 
 `slang package edit NAME` marks the existing `{workspace.deps}/NAME` checkout (by default
 `deps/NAME`) as editable without moving it. Under the covers this is an enabled override at that
-path, using the current locked version. Gitignored `slang-pkg-workspace.json` records that the package
+path, using the current locked version. Gitignored `slang-pkg-overlay.json` records that the package
 tool no longer owns the tree. Fetch and update do not replace it. Search paths already point at
 that directory, so compiling against it does not wait on `update`. `update` reads the working-tree
 manifest and writes a Git+path lock row when the overlay graph must enter the lock. The checkout
@@ -406,8 +409,9 @@ lock names.
 Plain `unedit NAME` requires a Git-only lock row and a clean checkout at that locked commit.
 `unedit NAME --clean` discards local state and restores the locked commit. Use
 `unedit NAME --adopt [--as VERSION]` instead to pin a committed `HEAD` in the direct dependency's
-manifest and lock. A unique `vMAJOR.MINOR.PATCH` tag at `HEAD` supplies the version automatically;
-an untagged commit requires `--as`. Clean and adopt ask for confirmation unless `--yes` is passed.
+manifest and lock, replacing its version range with canonical `ref` plus `as` intent. A unique
+`vMAJOR.MINOR.PATCH` tag at `HEAD` supplies the version automatically; an untagged commit requires
+`--as`. Clean and adopt ask for confirmation unless `--yes` is passed.
 
 For example, the generated local-state file may contain:
 
@@ -448,7 +452,7 @@ their user-owned checkouts. An in-place checkout that is absent from that graph 
 registered so a later plain update can restore it without losing work. An override records its
 original
 Git location and its effective path and requires the matching registration in
-`slang-pkg-workspace.json`; it therefore fails explicitly on another machine or in CI. The override's
+`slang-pkg-overlay.json`; it therefore fails explicitly on another machine or in CI. The override's
 effective version must satisfy every incoming constraint, and all of its transitive dependencies
 are resolved. Disable enabled overrides and run `slang package update` before removing their
 registrations or committing a portable published resolution.

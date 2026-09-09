@@ -36,7 +36,7 @@ view:
   for reproducibility but not enforced. A dependency's nested lock is not used when your workspace
   resolves that dependency. Portability is derived: a Git+path row requires local workspace state,
   while Git-only rows can be fetched elsewhere once their commits are reachable from the remote.
-- `slang-pkg-workspace.json` is machine-local override state. The tool writes it and `init` adds it to
+- `slang-pkg-overlay.json` is machine-local override state. The tool writes it and `init` adds it to
   `.gitignore`. `edit NAME` is shorthand for an override at `{workspace.deps}/NAME`. Do not commit
   this file.
 
@@ -112,7 +112,7 @@ git commit
 ```
 
 Commit source, the manifest, licenses, tests, and docs. Do not commit `.slang/`, `deps/`, `build/`,
-or `slang-pkg-workspace.json`.
+or `slang-pkg-overlay.json`.
 
 ### Tool does
 
@@ -240,7 +240,11 @@ Default pin writes `git` plus the lock's exact `version`. `--to 1.0.0` writes th
 instead. `--commit` writes `git`, `ref` (the locked SHA), and `as` (the lock version). Pin does not
 run `update`; inspect `status` and update afterward, the same as `dependency add`. A later
 compatible tag no longer satisfies a default pin. Pinning a transitive package promotes it to a
-direct edge using the lock's Git URL. Path dependencies and path-only lock rows are already pins.
+direct edge using the lock's Git URL. Pin leaves an active overlay registered. Once the lock row
+selects that overlay, pass `--to` explicitly because its effective version need not be published
+in Git. `--commit` requires a Git-only lock row because an overlay row has no locked SHA; use
+`unedit --adopt` when the intent is to retain the working-tree commit. Path dependencies and
+path-only lock rows are already pins.
 
 After pin, inspect `status` and run `update` if the written version differs from the lock, then
 commit the manifest (and lock, if update rewrote it).
@@ -429,10 +433,11 @@ git -C deps/color-encoding commit -am "Fix conversion"
 slang package unedit color-encoding --adopt --as 1.1.1
 ```
 
-`--adopt` writes the current `HEAD` as the direct Git dependency's `ref`, writes its exact solver
-identity as `as`, converts the lock row back to a Git pin, and removes the overlay. It infers `as`
-when exactly one `vMAJOR.MINOR.PATCH` tag points at `HEAD`; otherwise `--as VERSION` is required.
-The commit or tag must be reachable from the configured remote before another machine can fetch it.
+`--adopt` replaces the direct dependency's version range with the current `HEAD` as `ref` and its
+exact solver identity as `as`, converts the lock row back to a Git pin, and removes the overlay. It
+infers `as` when exactly one `vMAJOR.MINOR.PATCH` tag points at `HEAD`; otherwise `--as VERSION` is
+required. The commit or tag must be reachable from the configured remote before another machine
+can fetch it.
 
 To assign another effective version to the in-place tree, re-add that same override with `as`:
 
@@ -475,7 +480,7 @@ same local tree without re-entering its configuration.
 
 ### Tool does
 
-- Records every local substitution under `overrides` in `slang-pkg-workspace.json`. `edit NAME`
+- Records every local substitution under `overrides` in `slang-pkg-overlay.json`. `edit NAME`
   creates the special case whose path is `{workspace.deps}/NAME`; there is no second edit
   representation.
 - Does not copy or modify the supplied directory. Re-adding the in-place path updates that same
@@ -500,7 +505,7 @@ same local tree without re-entering its configuration.
 - An untagged adopted commit requires explicit `--as`; Git object identity does not determine a
   semantic version.
 - Overrides are path-only; there is no user-global Git-to-Git remapping policy.
-- `slang-pkg-workspace.json` must not be committed. A team-wide source relationship belongs in
+- `slang-pkg-overlay.json` must not be committed. A team-wide source relationship belongs in
   `slang-pkg-manifest.json` as a path or Git dependency.
 - A manifest path dependency cannot be overridden by the current command.
 
@@ -812,7 +817,7 @@ In the root `image-viewer/slang-pkg-manifest.json`, add:
 ```
 
 Then `update` from the root. The path package stays under `packages/color-math`; it is not copied
-to `deps/`. Clone of the application repository reproduces it without `slang-pkg-workspace.json`.
+to `deps/`. Clone of the application repository reproduces it without `slang-pkg-overlay.json`.
 
 #### Publish first, then consume
 
@@ -992,7 +997,7 @@ Go starts a module with
 the modules are always developed together, because a local overlay can make tests differ from
 what downstream users build.
 
-That is the reason to keep Slang's current `slang-pkg-workspace.json` gitignored. It is closer to a
+That is the reason to keep Slang's current `slang-pkg-overlay.json` gitignored. It is closer to a
 Go local workspace or replacement overlay than to a committed Cargo workspace. If Slang adds
 committed package members, they should be a different concept and file.
 
@@ -1037,7 +1042,7 @@ without performing another update.
 
 ### Peer pitfalls to retain in Slang's design
 
-- **Do not leak a local overlay into the published graph.** `slang-pkg-workspace.json` should stay
+- **Do not leak a local overlay into the published graph.** `slang-pkg-overlay.json` should stay
   local; committed path or Git edges belong in the manifest.
 - **Do not confuse a package's own lock with what consumers select.** The solve root owns the
   definitive graph, as with root locks in Cargo and npm.
@@ -1114,7 +1119,7 @@ workspace.
 **Use enabled overrides when:** unpublished local trees should participate in every plain update.
 The resolver uses each enabled override as the only candidate for that package name.
 Non-overridden and disabled packages still resolve from Git. The resulting lock records local
-paths and requires the same `slang-pkg-workspace.json`.
+paths and requires the same `slang-pkg-overlay.json`.
 
 **Use `--ignore-overrides` when:** this command should write the published Git graph without
 disabling registrations. In-place overrides created by `edit` stay active because they own their
@@ -1255,7 +1260,7 @@ partial checkouts and no lock.
 
 ### Edit and override solve different problems
 
-`edit` and `override add` write the same kind of registration in `slang-pkg-workspace.json`. The
+`edit` and `override add` write the same kind of registration in `slang-pkg-overlay.json`. The
 difference is which directory it names. `edit` claims the checkout that is already at
 `{workspace.deps}/NAME`, so ownership changes without moving compiler inputs; fetch and update
 stop replacing that tree immediately. `override add` with another path records a sidecar tree;
@@ -1318,7 +1323,7 @@ belongs in the package tool.
 
 ### Multi-package development
 
-1. Define a committed member model, distinct from gitignored `slang-pkg-workspace.json`, for packages
+1. Define a committed member model, distinct from gitignored `slang-pkg-overlay.json`, for packages
    that are always developed and checked in together.
 2. Add a command that initializes and attaches a child package while preserving import paths.
 3. Make local trial state visibly different from a portable lock, or provide an explicit command
@@ -1396,8 +1401,9 @@ them or update this chapter and its regression tests in the same change.
   to the locked commit; `unedit --clean` restores that commit before removing the registration.
 - `unedit --adopt` pins a direct Git dependency and the lock to committed `HEAD`, requiring
   explicit `--as` unless one semantic-version tag identifies it.
-- `dependency pin` writes Git intent from the current lock without dropping an overlay or
-  rewriting the lock. Default and `--to` are exact versions; `--commit` is the locked SHA.
+- `dependency pin` writes Git intent from the current lock without rewriting the lock and does not
+  drop an overlay. Default uses a Git-only lock's exact version. An overlay lock row requires
+  explicit `--to`; `--commit` is the locked SHA and also requires a Git-only row.
 - An in-place override's working-tree manifest enters the solve.
 - `override` records a machine-local path and exact effective version. Re-adding
   `{workspace.deps}/NAME` updates the same registration; a different path requires `unedit` first.
@@ -1406,7 +1412,7 @@ them or update this chapter and its regression tests in the same change.
 - `update --ignore-overrides` ignores out-of-tree overrides for this command only. In-place
   overrides remain active so it cannot replace a checkout registered through `edit`. An in-place
   package that drops out of the graph stays registered and on disk so a later update can restore it.
-- A local-path lock fails on another machine without matching `slang-pkg-workspace.json`.
+- A local-path lock fails on another machine without matching `slang-pkg-overlay.json`.
 - Disable an override and update to restore published selection before removing it.
 - `validate NAME` certifies a locked library tree in this workspace, including an enabled override.
   Bare `validate` still rejects the app while any edit or override is enabled.
@@ -1505,7 +1511,10 @@ Start with these unit tests when changing a journey:
   `PackageResolveFailureIndentsMultiLineCandidateReason`,
   `PackageResolverUnsatisfiableAfterRetractionAndExclude`.
 - Toolchain selection: `PackageToolSlangToolchain`, `PackageResolverSlangToolchain`.
-- Dependency editing and graph inspection: `PackageToolDependencyCommandsAndInitialFetch`.
+- Dependency editing and graph inspection: `PackageToolDependencyCommandsAndInitialFetch`,
+  `PackageResolverPinnedRefWithoutVersionConstraint`,
+  `PackageToolRefAndAsDependencyWithoutVersionResolves`, `PackageToolDependencyPinFromLock`,
+  `PackageToolDependencyPinPromotesTransitiveAndKeepsOverlay`.
 - Stable source build and experimental binary artifacts: `PackageToolBuild`, `PackageToolRun`,
   `PackageToolExecutableRequiresWorkspaceSource`,
   `PackageToolBuildFetchesMissingLockedCheckouts`,
