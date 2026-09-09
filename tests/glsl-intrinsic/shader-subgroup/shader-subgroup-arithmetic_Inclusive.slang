@@ -1,10 +1,10 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -lang glsl -stage compute -entry computeMain -target glsl -DTARGET_GLSL
-//TEST:SIMPLE(filecheck=CHECK_SPV): -lang glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -lang glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
-//TEST:SIMPLE(filecheck=CHECK_CUDA): -lang glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-arithmetic_Inclusive.slang -stage compute -entry computeMain -target glsl -DTARGET_GLSL
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-arithmetic_Inclusive.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
+//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-arithmetic_Inclusive.slang -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
+//TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-arithmetic_Inclusive.slang -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 
 // not testing cpp due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP): -lang glsl -stage compute -entry computeMain -target cpp -DTARGET_CPP
+//DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CPP): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-arithmetic_Inclusive.slang -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -emit-spirv-directly

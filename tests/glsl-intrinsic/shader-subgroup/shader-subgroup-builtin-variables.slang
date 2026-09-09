@@ -1,12 +1,12 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -lang glsl -stage compute -entry computeMain -target glsl -DTARGET_VK
-//TEST:SIMPLE(filecheck=CHECK_SPV): -lang glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_VK
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables.slang -stage compute -entry computeMain -target glsl -DTARGET_VK
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_VK
 
 // missing implementation of most builtin values due to non trivial translation
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -lang glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
+//DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables.slang -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 // missing implementation of most builtin values due to non trivial translation
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -lang glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA
+//DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables.slang -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 //missing implementation of system (varying?) values
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP): -lang glsl -stage compute -entry computeMain -target cpp -DTARGET_CPP
+//DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CPP): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables.slang -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -xslang -DTARGET_VK
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -emit-spirv-directly -xslang -DTARGET_VK

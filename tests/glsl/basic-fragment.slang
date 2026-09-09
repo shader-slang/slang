@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -lang glsl
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/basic-fragment.slang -target spirv -stage fragment -entry main
 #version 310 es
 precision highp float;
 precision highp int;

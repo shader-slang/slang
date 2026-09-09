@@ -4,8 +4,8 @@
 
 //TEST:SIMPLE_EX(filecheck=CHECK): tests/diagnostics/conflicting-source-language-directives-across-files-helper.slang tests/diagnostics/conflicting-source-language-directives-across-files.slang -no-codegen -Wno-120
 
-// CHECK: conflicting-source-language-directives-across-files.slang:13:2
-// CHECK: 13 | #version 450
+// CHECK: conflicting-source-language-directives-across-files.slang:14:2
+// CHECK: 14 | #version 450
 // CHECK-NEXT: {{ *}}|  ^^^^^^^ this directive selects a different source language
 // CHECK: conflicting-source-language-directives-across-files-helper.slang:1:2
 // CHECK: 1 | #language 2026

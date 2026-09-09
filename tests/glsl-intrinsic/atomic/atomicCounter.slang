@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -lang glsl -stage compute -entry computeMain -target glsl -DTARGET_GLSL
-//TEST:SIMPLE(filecheck=CHECK_SPV): -lang glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/atomic/atomicCounter.slang -stage compute -entry computeMain -target glsl -DTARGET_GLSL
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/atomic/atomicCounter.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -emit-spirv-directly
 #version 430

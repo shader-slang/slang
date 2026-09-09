@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -lang glsl
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/loop-modifier.slang -target spirv -stage vertex -entry main
 #version 310 es
 layout(location = 0) in highp vec4 a_position;
 

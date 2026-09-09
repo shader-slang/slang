@@ -1,7 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -stage compute -entry computeMain -lang glsl -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -stage compute -entry computeMain -lang glsl -target spirv -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -stage compute -entry computeMain -target hlsl -lang glsl
-//TEST:SIMPLE(filecheck=CHECK_CUDA): -stage compute -entry computeMain -target cuda -lang glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target hlsl
+//TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target cuda
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -emit-spirv-directly
 

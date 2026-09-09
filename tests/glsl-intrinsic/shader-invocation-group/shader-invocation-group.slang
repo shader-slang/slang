@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -lang glsl -stage compute -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -lang glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/shader-invocation-group/shader-invocation-group.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/shader-invocation-group/shader-invocation-group.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -emit-spirv-directly
 

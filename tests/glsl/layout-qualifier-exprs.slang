@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry fragmentMain -lang glsl
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage fragment -entry fragmentMain -lang glsl
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/layout-qualifier-exprs.slang -target spirv -stage fragment -entry fragmentMain
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl/layout-qualifier-exprs.slang -target glsl -stage fragment -entry fragmentMain
 
 #version 450
 

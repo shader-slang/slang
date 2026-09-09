@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage fragment -entry main -lang glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv -emit-spirv-directly -stage fragment -entry main -lang glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/subpass-input/subpass-input-as-parameter.slang -target glsl -stage fragment -entry main
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/subpass-input/subpass-input-as-parameter.slang -target spirv -emit-spirv-directly -stage fragment -entry main
 
 #version 450
 

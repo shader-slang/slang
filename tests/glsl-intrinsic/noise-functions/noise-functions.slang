@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -lang glsl -stage compute -entry computeMain -target glsl
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -lang glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK,non-exhaustive): -lang glsl tests/glsl-intrinsic/noise-functions/noise-functions.slang -stage compute -entry computeMain -target glsl
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK,non-exhaustive): -lang glsl tests/glsl-intrinsic/noise-functions/noise-functions.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 #version 460
 
 buffer MyBlockName2

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv -stage compute -entry main -lang glsl
+//TEST:SIMPLE_EX(filecheck=SPIRV): -lang glsl tests/spirv/spec-constant-enum-glsl-local-size.slang -target spirv -stage compute -entry main
 // SPIR-V-only: validates LocalSizeId/SpecId emission for GLSL local_size_* enum specialization constants.
 
 #version 450

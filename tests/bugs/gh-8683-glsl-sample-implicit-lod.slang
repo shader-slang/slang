@@ -1,9 +1,9 @@
-//TEST:SIMPLE(filecheck=VK_VTX): -target spirv -stage vertex -entry vertexMain -lang glsl
-//TEST:SIMPLE(filecheck=VK_FRAG): -target spirv -stage fragment -entry fragmentMain -lang glsl
-//TEST:SIMPLE(filecheck=GLSL_VTX): -target glsl -stage vertex -entry vertexMain -lang glsl
-//TEST:SIMPLE(filecheck=GLSL_FRAG): -target glsl -stage fragment -entry fragmentMain -lang glsl
-//TEST:SIMPLE(filecheck=HLSL_VTX): -target hlsl -stage vertex -entry vertexMain -lang glsl
-//TEST:SIMPLE(filecheck=HLSL_FRAG): -target hlsl -stage fragment -entry fragmentMain -lang glsl
+//TEST:SIMPLE_EX(filecheck=VK_VTX): -lang glsl tests/bugs/gh-8683-glsl-sample-implicit-lod.slang -target spirv -stage vertex -entry vertexMain
+//TEST:SIMPLE_EX(filecheck=VK_FRAG): -lang glsl tests/bugs/gh-8683-glsl-sample-implicit-lod.slang -target spirv -stage fragment -entry fragmentMain
+//TEST:SIMPLE_EX(filecheck=GLSL_VTX): -lang glsl tests/bugs/gh-8683-glsl-sample-implicit-lod.slang -target glsl -stage vertex -entry vertexMain
+//TEST:SIMPLE_EX(filecheck=GLSL_FRAG): -lang glsl tests/bugs/gh-8683-glsl-sample-implicit-lod.slang -target glsl -stage fragment -entry fragmentMain
+//TEST:SIMPLE_EX(filecheck=HLSL_VTX): -lang glsl tests/bugs/gh-8683-glsl-sample-implicit-lod.slang -target hlsl -stage vertex -entry vertexMain
+//TEST:SIMPLE_EX(filecheck=HLSL_FRAG): -lang glsl tests/bugs/gh-8683-glsl-sample-implicit-lod.slang -target hlsl -stage fragment -entry fragmentMain
 
 // Regression test for https://github.com/shader-slang/slang/issues/8683
 //

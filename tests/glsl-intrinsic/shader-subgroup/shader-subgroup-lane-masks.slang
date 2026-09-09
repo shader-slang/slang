@@ -1,9 +1,9 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -lang glsl -stage compute -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -lang glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-lane-masks.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-lane-masks.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 
 // Test that GLSL subgroup lane mask built-in variables work on all targets via the new Wave* functions
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -lang glsl -stage compute -entry computeMain -target hlsl
-//TEST:SIMPLE(filecheck=CHECK_CUDA): -lang glsl -stage compute -entry computeMain -target cuda
+//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-lane-masks.slang -stage compute -entry computeMain -target hlsl
+//TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-lane-masks.slang -stage compute -entry computeMain -target cuda
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -emit-spirv-directly
