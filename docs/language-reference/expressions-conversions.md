@@ -250,7 +250,7 @@ required type exists, and that conversion is allowed to be applied implicitly.
 The following implicit type conversions are allowed:
 
 - `bool` to an integer type
-- integer type to a wider integer type, same signedness (integer promotion)
+- integer type to a wider integer type, same signedness (integer widening)
 - `half` to `float`
 - scalar `T` to `vector<T, N>` (where `N` is any legal value)
 - scalar `T` to `matrix<T, R, C>` (where `R` and `C` are any legal values)
