@@ -68,6 +68,7 @@ enum Extension : uint32_t {
   kSPV_ARM_graph,
   kSPV_ARM_tensors,
   kSPV_EXT_arithmetic_fence,
+  kSPV_EXT_cooperative_matrix_maintenance1,
   kSPV_EXT_demote_to_helper_invocation,
   kSPV_EXT_descriptor_heap,
   kSPV_EXT_descriptor_indexing,

@@ -1544,6 +1544,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return m_NonSemanticDebugInfoExtInst;
     }
 
+    SpvInst* m_debugInfoNone = nullptr;
+
+    SpvInst* getDebugInfoNone()
+    {
+        if (m_debugInfoNone)
+            return m_debugInfoNone;
+        m_debugInfoNone = emitOpDebugInfoNone(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst());
+        return m_debugInfoNone;
+    }
+
     /// The SPIRV OpExtInstImport inst that represents the NonSemantic debug info
     /// extended instruction set.
     SpvInst* m_NonSemanticDebugPrintfExtInst = nullptr;
@@ -2031,7 +2045,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto valueType = getSpvPointerValueType(ptrType);
         auto rule = getPointerArrayStrideLayoutRule(ptrType, valueType);
 
-        if (auto arrayType = as<IRUnsizedArrayType>(valueType))
+        // Array pointees only ever serve element indexing, so use the element
+        // stride. Whole-object stepping goes through the wrapper pointer,
+        // whose pointee is a struct and falls through to the path below.
+        if (auto arrayType = as<IRArrayTypeBase>(valueType))
             return getArrayElementStrideValue(arrayType, rule);
 
         IRSizeAndAlignment sizeAndAlignment;
@@ -2828,11 +2845,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRBuilder builder(inst);
                 builder.setInsertBefore(inst);
                 auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
+                bool hasBindlessTextureNV =
+                    targetCaps.implies(CapabilityAtom::spvBindlessTextureNV);
 
-                if (targetCaps.implies(CapabilityAtom::spvBindlessTextureNV))
+                if (isDescriptorHandleRepresentedAsUInt64(inst, hasBindlessTextureNV))
                 {
-                    // For spvBindlessTextureNV, DescriptorHandleType should be a uint64_t
-                    // (OpTypeInt 64 0)
+                    // Only the texture/sampler-family kinds that `spvBindlessTextureNV` converts
+                    // use the wide `uint64` form (OpTypeInt 64 0); buffers and acceleration
+                    // structures stay `uint2`.
                     return emitOpTypeInt(
                         inst,
                         SpvLiteralInteger::from32(64),
@@ -2840,7 +2860,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 else
                 {
-                    // For other targets, use uint2 (OpTypeVector of 2 uint32)
+                    // uint2 (OpTypeVector of 2 uint32)
                     return emitOpTypeVector(
                         inst,
                         builder.getUIntType(),
@@ -2952,6 +2972,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_CastUInt2ToDescriptorHandle:
         case kIROp_CastUInt64ToDescriptorHandle:
         case kIROp_CastDescriptorHandleToUInt64:
+            {
+                // These casts emit no instruction of their own; the operand is forwarded. A cast
+                // whose operand width differs from the handle's representation cannot reach here:
+                // `isInlinableGlobalInst` lists these ops, so such an initializer is inlined into
+                // the function that uses the handle and the widths are reconciled there.
+                auto inner = ensureInst(inst->getOperand(0));
+                registerInst(inst, inner);
+                return inner;
+            }
         case kIROp_GlobalValueRef:
             {
                 auto inner = ensureInst(inst->getOperand(0));
@@ -4664,7 +4693,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         auto name = getName(debugVar);
         auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
-        auto debugType = emitDebugType(varType, false);
+        auto debugType = emitDebugType(varType);
 
         auto spvDebugLocalVar = emitOpDebugLocalVariable(
             getSection(SpvLogicalSectionID::ConstantsAndTypes),
@@ -4766,7 +4795,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto name = getName(globalInst);
         IRBuilder builder(globalInst);
         auto varType = tryGetPointedToType(&builder, globalInst->getDataType());
-        auto debugType = emitDebugType(varType, false);
+        auto debugType = emitDebugType(varType);
 
         // Use default debug source and line info similar to struct debug type emission
         auto loc = globalInst->findDecoration<IRDebugLocationDecoration>();
@@ -4788,6 +4817,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             name, // linkageName same as name
             spvVar,
             builder.getIntValue(builder.getUIntType(), 0)); // flags
+    }
+
+    // True if one of the four `DescriptorHandle`<->integer cast intrinsics needs a real `OpBitcast`
+    // rather than forwarding its operand unchanged. The integer side named by the op (uint2 or
+    // uint64) may not match the handle's SPIR-V representation, which is kind-dependent under
+    // `spvBindlessTextureNV` (uint64 for the texture/sampler kinds the extension converts, uint2
+    // otherwise). When the two widths match the cast is a no-op; when they differ the 64-bit
+    // `ulong` and the `v2uint` share a layout whose component 0 is the low word, matching the
+    // `__asuint64` packing used elsewhere, so a bitcast is the correct conversion.
+    bool descriptorHandleIntCastNeedsBitcast(IRInst* inst)
+    {
+        auto op = inst->getOp();
+        bool intoHandle =
+            (op == kIROp_CastUInt2ToDescriptorHandle || op == kIROp_CastUInt64ToDescriptorHandle);
+        auto handleType = intoHandle ? inst->getDataType() : inst->getOperand(0)->getDataType();
+        bool hasBindlessTextureNV = m_targetProgram->getTargetReq()->getTargetCaps().implies(
+            CapabilityAtom::spvBindlessTextureNV);
+        bool handleIsUInt64 =
+            isDescriptorHandleRepresentedAsUInt64(handleType, hasBindlessTextureNV);
+        bool intSideIsUInt64 =
+            (op == kIROp_CastUInt64ToDescriptorHandle || op == kIROp_CastDescriptorHandleToUInt64);
+        return handleIsUInt64 != intSideIsUInt64;
     }
 
     SpvInst* emitMakeUInt64(SpvInstParent* parent, IRInst* inst)
@@ -5205,9 +5256,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_CastDescriptorHandleToUInt2:
         case kIROp_CastUInt2ToDescriptorHandle:
-        case kIROp_GlobalValueRef:
         case kIROp_CastUInt64ToDescriptorHandle:
         case kIROp_CastDescriptorHandleToUInt64:
+            {
+                if (descriptorHandleIntCastNeedsBitcast(inst))
+                {
+                    result = emitOpBitcast(parent, inst, inst->getDataType(), inst->getOperand(0));
+                    break;
+                }
+                auto inner = ensureInst(inst->getOperand(0));
+                registerInst(inst, inner);
+                result = inner;
+                break;
+            }
+        case kIROp_GlobalValueRef:
             {
                 auto inner = ensureInst(inst->getOperand(0));
                 registerInst(inst, inner);
@@ -5231,12 +5293,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 auto operand = ensureInst(inst->getOperand(0));
                 SpvOp conversionOp = SpvOpConvertUToSampledImageNV;
-                IRType* resultType = inst->getDataType();
+                IRType* resultType = as<IRType>(unwrapAttributedType(inst->getDataType()));
 
                 switch (resultType->getOp())
                 {
                 case kIROp_TextureType:
-                    conversionOp = SpvOpConvertUToSampledImageNV;
+                    // A combined texture-sampler lowers to `OpTypeSampledImage`, everything else in
+                    // this family (plain textures, texel buffers) to `OpTypeImage`; the conversion
+                    // opcode must match that result type.
+                    conversionOp = cast<IRTextureType>(resultType)->isCombined()
+                                       ? SpvOpConvertUToSampledImageNV
+                                       : SpvOpConvertUToImageNV;
                     result = emitInst(
                         parent,
                         inst,
@@ -5246,6 +5313,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         operand);
                     break;
                 case kIROp_SamplerStateType:
+                case kIROp_SamplerComparisonStateType:
                     conversionOp = SpvOpConvertUToSamplerNV;
                     result = emitInst(
                         parent,
@@ -10614,7 +10682,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (!scope)
             return nullptr;
 
-        SpvInst* neededDebugType = emitDebugType(as<IRFuncType>(debugFunc->getDebugType()), false);
+        SpvInst* neededDebugType = emitDebugType(as<IRFuncType>(debugFunc->getDebugType()));
         SLANG_ASSERT(neededDebugType);
 
         IRBuilder builder(debugFunc);
@@ -10858,9 +10926,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    IRInst* getName(IRInst* inst)
+    IRStringLit* getName(IRInst* inst)
     {
-        IRInst* nameOperand = nullptr;
+        IRStringLit* nameOperand = nullptr;
         for (auto decor : inst->getDecorations())
         {
             if (auto nameHint = as<IRNameHintDecoration>(decor))
@@ -10892,19 +10960,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     static constexpr const int kUnknownPhysicalLayout = 1 << 17;
     static constexpr const int kDebugTypeAtomicQualifier = 3;
 
-    // Normalize matrix layout for debug info emission.
-    // Matrix layout (row-major vs column-major) only affects memory accesses
-    // to buffers.
-    // For non-buffer contexts, matrices are always treated as row-major (in
-    // Slang terms).
-    IRType* normalizeMatrixDebugType(IRType* type, bool isTypeInBuffer)
+    // Normalize matrix types to Slang's row-major layout mode when emitting debug info, matching
+    // the DebugTypeMatrix shape emitted by DXC and glslang. This only selects the debug type and
+    // cache key; it does not transpose matrix values or change matrix accesses or storage
+    // decorations.
+    IRType* normalizeMatrixDebugType(IRType* type)
     {
-        if (isTypeInBuffer)
-            return type; // Keep layout for types in buffers
-
         if (auto matrixType = as<IRMatrixType>(type))
         {
-            // Normalize to row-major for types not in buffers
             if (getIntVal(matrixType->getLayout()) != kMatrixLayoutMode_RowMajor)
             {
                 IRBuilder builder(type);
@@ -10918,7 +10981,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return type;
     }
 
-    SpvInst* emitDebugTypeImpl(IRType* type, bool isTypeInBuffer)
+    SpvInst* emitDebugTypeImpl(IRType* type)
     {
         auto scope = findDebugScope(type);
         if (!scope)
@@ -10930,13 +10993,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             SpvInst* returnType = ensureInst(m_voidType);
             if (!as<IRVoidType>(funcType->getResultType()))
             {
-                returnType = emitDebugType(funcType->getResultType(), isTypeInBuffer);
+                returnType = emitDebugType(funcType->getResultType());
             }
 
             List<SpvInst*> argTypes;
             for (UInt i = 0; i < funcType->getParamCount(); ++i)
             {
-                argTypes.add(emitDebugType(funcType->getParamType(i), isTypeInBuffer));
+                argTypes.add(emitDebugType(funcType->getParamType(i)));
             }
 
             return emitOpDebugTypeFunction(
@@ -11009,12 +11072,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 if (spvFieldType == nullptr)
                 {
-                    bool isFieldTypeInBuffer =
-                        structType->findDecorationImpl(kIROp_SPIRVBlockDecoration) != nullptr ||
-                        structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration) !=
-                            nullptr ||
-                        structType->findDecorationImpl(kIROp_PhysicalTypeDecoration) != nullptr;
-                    spvFieldType = emitDebugType(fieldType, isFieldTypeInBuffer);
+                    spvFieldType = emitDebugType(fieldType);
                 }
 
                 // Check if the field key has a debug location decoration
@@ -11074,7 +11132,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 col,
                 scope,
                 name,
-                builder.getIntValue(builder.getUIntType(), structSizeAlignment.size * 8),
+                ensureInst(
+                    builder.getIntValue(builder.getUIntType(), structSizeAlignment.size * 8)),
                 builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout),
                 members);
         }
@@ -11087,7 +11146,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 nullptr,
                 m_voidType,
                 getNonSemanticDebugInfoExtInst(),
-                emitDebugType(arrayType->getElementType(), isTypeInBuffer),
+                emitDebugType(arrayType->getElementType()),
                 sizedArrayType ? builder.getIntValue(
                                      builder.getUIntType(),
                                      getArraySizeVal(sizedArrayType->getElementCount()))
@@ -11095,7 +11154,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else if (auto vectorType = as<IRVectorType>(type))
         {
-            auto elementType = emitDebugType(vectorType->getElementType(), isTypeInBuffer);
+            auto elementType = emitDebugType(vectorType->getElementType());
             return emitOpDebugTypeVector(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
@@ -11108,35 +11167,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else if (auto matrixType = as<IRMatrixType>(type))
         {
-            IRInst* count = nullptr;
-            bool isSpvColMajor;
-            IRType* innerVectorType = nullptr;
-
-            // kMatrixLayoutMode_RowMajor maps to SpvDecorationColMajor (and vice versa)
-            if (getIntVal(matrixType->getLayout()) == kMatrixLayoutMode_ColumnMajor)
-            {
-                innerVectorType =
-                    builder.getVectorType(matrixType->getElementType(), matrixType->getRowCount());
-                isSpvColMajor = false;
-                count = matrixType->getColumnCount();
-            }
-            else
-            {
-                innerVectorType = builder.getVectorType(
-                    matrixType->getElementType(),
-                    matrixType->getColumnCount());
-                isSpvColMajor = true;
-                count = matrixType->getRowCount();
-            }
-            auto elementType = emitDebugType(innerVectorType, isTypeInBuffer);
+            auto innerVectorType =
+                builder.getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
+            auto elementType = emitDebugType(innerVectorType);
             return emitOpDebugTypeMatrix(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 m_voidType,
                 getNonSemanticDebugInfoExtInst(),
                 elementType,
-                builder.getIntValue(builder.getUIntType(), getIntVal(count)),
-                builder.getBoolValue(isSpvColMajor));
+                builder.getIntValue(builder.getUIntType(), getIntVal(matrixType->getRowCount())),
+                builder.getBoolValue(true));
         }
         else if (as<IRBasicType>(type) || as<IRPackedFloatType>(type))
         {
@@ -11204,7 +11245,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             IRType* baseType = ptrType->getValueType();
             // Emit DebugTypePointer for pointer types.
-            SpvInst* debugBaseType = emitDebugType(baseType, isTypeInBuffer);
+            SpvInst* debugBaseType = emitDebugType(baseType);
             SpvStorageClass storageClass = SpvStorageClassFunction;
             if (ptrType->hasAddressSpace())
                 storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
@@ -11221,7 +11262,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         else if (auto atomicType = as<IRAtomicType>(type))
         {
             auto baseType = atomicType->getElementType();
-            auto debugBaseType = emitDebugType(baseType, isTypeInBuffer);
+            auto debugBaseType = emitDebugType(baseType);
 
             return emitOpDebugTypeQualifier(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
@@ -11237,6 +11278,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRInst* source = m_defaultDebugSource;
         IRInst* line = builder.getIntValue(builder.getUIntType(), 0);
         IRInst* col = line;
+        auto linkageName = builder.getStringValue(
+            (StringBuilder() << "@" << name->getStringSlice()).getUnownedSlice());
 
         // Emit a composite debug type (struct-like for most types)
         return emitOpDebugTypeComposite(
@@ -11250,22 +11293,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             line,
             col,
             scope,
-            name,
-            builder.getIntValue(builder.getUIntType(), 0), // Size (unknown)
+            linkageName,
+            getDebugInfoNone(),
             builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout),
             List<SpvInst*>()); // No members
     }
 
-    SpvInst* emitDebugType(IRType* type, bool isTypeInBuffer)
+    SpvInst* emitDebugType(IRType* type)
     {
-        type = normalizeMatrixDebugType(type, isTypeInBuffer);
+        type = normalizeMatrixDebugType(type);
 
         if (auto debugType = m_mapTypeToDebugType.tryGetValue(type))
             return *debugType;
         bool isStruct = type->getOp() == kIROp_StructType;
         if (isStruct)
             m_emittingTypes.add(type);
-        auto result = emitDebugTypeImpl(type, isTypeInBuffer);
+        auto result = emitDebugTypeImpl(type);
         if (isStruct)
             m_emittingTypes.remove(type);
         m_mapTypeToDebugType[type] = result;
