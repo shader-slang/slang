@@ -153,7 +153,8 @@ IRFunc* emitWitnessTableWrapper(
     IRModule* module,
     IRInst* funcInst,
     IRFuncType* effectiveFuncType,
-    IRFuncType* interfaceRequirementVal)
+    IRFuncType* interfaceRequirementVal,
+    TargetRequest* targetReq)
 {
     auto funcTypeInInterface = interfaceRequirementVal;
     auto targetFuncType = effectiveFuncType;
@@ -178,7 +179,20 @@ IRFunc* emitWitnessTableWrapper(
     // the final target output is left entirely to the downstream compiler's own heuristic
     // inliner, which can decline once the wrapped method body is non-trivial (observed on the
     // CUDA/NVRTC backend specifically).
-    builder->addForceInlineDecoration(wrapperFunc);
+    //
+    // Excluded on the CPU/LLVM-JIT target: force-inlining a wrapper that declares a local
+    // (the pack-after-call temp `maybeUnpackArg` creates for by-reference/setter-style
+    // parameters) into a caller that also force-inlines a sibling wrapper from a different
+    // concrete-type case corrupts that target's own debug-info generation -- confirmed via a
+    // real crash (LLVM's DwarfDebug::finalizeModuleInfo, on conflicting IRLocalVariable
+    // metadata for the two inlined instances) in
+    // tests/language-feature/dynamic-dispatch/special-members-setter.slang's property/subscript
+    // setter case. This is a latent bug in that target's own debug-info emission
+    // (source/slang-llvm/slang-llvm-builder.cpp), not something this pass can fix -- skipping
+    // force-inline here is a target-specific carve-out, not a claim that force-inlining itself
+    // is wrong.
+    if (!isCPUTargetViaLLVM(targetReq))
+        builder->addForceInlineDecoration(wrapperFunc);
 
     builder->setInsertInto(wrapperFunc);
     auto block = builder->emitBlock();
@@ -259,7 +273,8 @@ UInt getUniqueID(IRBuilder* builder, IRInst* inst)
 //
 IRFunc* createDispatchFunc(
     IRFuncType* dispatchFuncType,
-    Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping)
+    Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping,
+    TargetRequest* targetReq)
 {
     // Create a dispatch function with switch-case for each function
     IRBuilder builder(dispatchFuncType->getModule());
@@ -282,8 +297,10 @@ IRFunc* createDispatchFunc(
     // concrete-type implementations (that's the only case this pass runs for), so the
     // `switch` built below is itself the already-resolved dispatch. Leaving it as a separate,
     // non-force-inlined function defeats that resolution by handing the decision back to a
-    // downstream heuristic inliner.
-    builder.addForceInlineDecoration(func);
+    // downstream heuristic inliner. Same CPU/LLVM-JIT exclusion as `emitWitnessTableWrapper`
+    // -- see the comment there.
+    if (!isCPUTargetViaLLVM(targetReq))
+        builder.addForceInlineDecoration(func);
 
     auto entryBlock = builder.emitBlock();
     builder.setInsertInto(entryBlock);
@@ -332,7 +349,8 @@ IRFunc* createDispatchFunc(
             funcInst->getModule(),
             funcInst,
             effectiveFuncType,
-            innerDispatchFuncType);
+            innerDispatchFuncType,
+            targetReq);
 
         // Create case block
         auto caseBlock = builder.emitBlock();
