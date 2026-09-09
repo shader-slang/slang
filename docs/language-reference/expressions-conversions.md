@@ -266,24 +266,29 @@ The following implicit type conversions are allowed:
 The following implicit type conversions are allowed but not recommended. A cell marked "after GitHub issue
 #NNNNN" describes the intended behavior tracked by that issue.
 
-| Conversion                                                          | Compiler diagnostic                                                                                                      |
-|---------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| `bool` to a floating-point type                                     | warning                                                                                                                  |
-| integer type to a `bool`                                            | warning                                                                                                                  |
-| integer type to a narrower integer type                             | warning, unless the source is constant                                                                                   |
-| integer type to a same-width integer type with different signedness | opt-in warning (after GitHub issue [#12928](https://github.com/shader-slang/slang/issues/12928))                         |
-| integer type to `half`                                              | warning, unless the source is constant                                                                                   |
-| integer type to `float` or `double`                                 | warning, unless the source is constant (after GitHub issue [#12929](https://github.com/shader-slang/slang/issues/12929)) |
-| floating-point type to a `bool`                                     | warning                                                                                                                  |
-| floating-point type to an integer type                              | warning                                                                                                                  |
-| floating-point type to a narrower floating-point type               | warning                                                                                                                  |
-| `float` to `double` (potential unintended performance issue)        | warning, function-call arguments only, literals exempted                                                                 |
-| vector to vector, matrix to matrix                                  | same as the element type conversion                                                                                      |
-| `float` to `double`, vector or matrix                               | same as the scalar case above (after GitHub issue [#12930](https://github.com/shader-slang/slang/issues/12930))          |
+| Conversion                                                          | Compiler diagnostic                                                                                                                              |
+|---------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
+| `bool` to a floating-point type                                     | warning                                                                                                                                          |
+| integer type to a `bool`                                            | warning                                                                                                                                          |
+| integer type to a narrower integer type                             | warning, unless the source is a literal with no precision loss (after GitHub issue [#10516](https://github.com/shader-slang/slang/issues/10516)) |
+| integer type to a same-width integer type with different signedness | opt-in warning (after GitHub issue [#12928](https://github.com/shader-slang/slang/issues/12928))                                                 |
+| integer type to `half`                                              | warning, unless the source is a literal with no precision loss (after GitHub issue [#12979](https://github.com/shader-slang/slang/issues/12979)) |
+| integer type to `float` or `double`                                 | warning, unless the source is a literal with no precision loss (after GitHub issue [#12929](https://github.com/shader-slang/slang/issues/12929)) |
+| floating-point type to a `bool`                                     | warning                                                                                                                                          |
+| floating-point type to an integer type                              | warning                                                                                                                                          |
+| floating-point type to a narrower floating-point type               | warning                                                                                                                                          |
+| `float` to `double` (potential unintended performance issue)        | warning, function-call arguments only, literals exempted                                                                                         |
+| vector to vector, matrix to matrix                                  | same as the element type conversion                                                                                                              |
+| `vector<float, N>` to `vector<double, N>`                           | same as the scalar case above (after GitHub issue [#12930](https://github.com/shader-slang/slang/issues/12930))                                  |
+| `matrix<float, R, C>` to `matrix<double, R, C>`                     | same as the scalar case above (after GitHub issue [#12930](https://github.com/shader-slang/slang/issues/12930))                                  |
 
-Where the table says "unless the source is constant" and "literals exempted", the conversion is not diagnosed
-when the source is a constant expression whose value fits in the target type. When the value does not fit, the
-compiler reports a warning about lost precision.
+Where the table says "unless the source is a literal with no precision loss", the conversion is not diagnosed
+when the source is a literal and the value is unchanged by the conversion.
+
+When the source is a binary, octal, or hexadecimal integer literal converted to an integer type, precision is
+considered lost only when set bits are dropped. This allows expressions such as `int16_t v = 0x8000`, where
+the literal value is technically out of range but only unset bits are dropped in truncation. (After GitHub
+issue [#10516](https://github.com/shader-slang/slang/issues/10516).)
 
 > 📝 **Remark:** Some common contexts for implicit type conversions:
 >
@@ -463,6 +468,7 @@ The core module also offers the following concrete HLSL-compatibility conversion
 - [asfloat](../../../core-module-reference/global-decls/asfloat.html)
 - [asfloat16](../../../core-module-reference/global-decls/asfloat16.html)
 - [asint](../../../core-module-reference/global-decls/asint.html)
+- [asint16](../../../core-module-reference/global-decls/asint16.html)
 - [asuint](../../../core-module-reference/global-decls/asuint.html)
 - [asuint16](../../../core-module-reference/global-decls/asuint16.html)
 - [f16tof32](../../../core-module-reference/global-decls/f16tof32.html)
@@ -471,9 +477,10 @@ The core module also offers the following concrete HLSL-compatibility conversion
 A reinterpret cast is more general, and it allows reinterpreting a bit pattern of a different size than the
 target type. A reinterpret cast is invoked using the
 [reinterpret](../../../core-module-reference/global-decls/reinterpret.html) function, and it uses the same
-union type emulation as [interface-conforming variants](types-interface.md). That is, the source value is
-packed into an `AnyValue` struct, which is then unpacked as the target type.
+union type emulation as [interface-conforming variants](types-interface.md).
 
+> 📝 **Remark:** A reinterpret cast is currently implemented by packing the source value into an `AnyValue`
+> struct, which is then unpacked as the target type.
 
 ### Examples
 
