@@ -172,11 +172,12 @@ A matrix can be constructed from vectors in the following ways:
 For details, see [vector initialization functions](../../../core-module-reference/types/vector/init.html) and
 [matrix initialization functions](../../../core-module-reference/types/matrix/init.html).
 
-> ⚠️ **Warning:** In Slang 2025 and earlier, a 4-dimensional vector could be constructed from three arguments,
-> `(vector<T, 2>, T)` or `(T, vector<T, 2>)`. This is inconsistent with the tail-padding by 0 semantics:
-> instead of being padded, the lone element is implicitly converted to a 2-dimensional vector, so
-> `float4(float2(7, 8), 9)` yields `{ 7, 8, 9, 9 }`. These constructors have been removed in Slang 2026. See
-> GitHub issue [#12093](https://github.com/shader-slang/slang/issues/12093) for details.
+> ⚠️ **Warning:** In Slang 2025 and earlier, a 4-dimensional vector could be constructed from a 2-dimensional
+> vector (`vector<T,2>`) and a single element (`T`). However, the single element would be implicitly
+> converted to a 2-dimensional vector with element broadcast instead of tail-padding by 0. As a result,
+> `float4(float2(7, 8), 9)` would yield `{ 7, 8, 9, 9 }`. To avoid confusion, these constructors have been
+> removed in Slang 2026. See GitHub issue [#12093](https://github.com/shader-slang/slang/issues/12093) for
+> details.
 
 > ⚠️ **Warning:** Constructing a vector using an initializer list with a single element is equivalent to
 > initializing with a scalar. That is, the element is broadcast to every component:
@@ -252,10 +253,10 @@ The following implicit type conversions are allowed:
 - `bool` to an integer type
 - integer type to a wider integer type, same signedness (integer widening)
 - `half` to `float`
-- scalar `T` to `vector<T, N>` (where `N` is any legal value)
-- scalar `T` to `matrix<T, R, C>` (where `R` and `C` are any legal values)
-- `vector<T, N>` to `vector<U, N>` where conversion `T` &rarr; `U` is allowed
-- `matrix<T, R, C>` to `matrix<U, R, C>` where conversion `T` &rarr; `U` is allowed
+- scalar `T` to `vector<T,N>` (where `N` is any legal value)
+- scalar `T` to `matrix<T,R,C>` (where `R` and `C` are any legal values)
+- `vector<T,N>` to `vector<U,N>` where conversion `T` &rarr; `U` is allowed
+- `matrix<T,R,C>` to `matrix<U,R,C>` where conversion `T` &rarr; `U` is allowed
 - a type to an interface it conforms to
 - `none` or a value of `T` to `Optional<T>`
 - `nullptr` to any pointer type
@@ -279,8 +280,8 @@ The following implicit type conversions are allowed but not recommended. A cell 
 | floating-point type to a narrower floating-point type               | warning                                                                                                                                          |
 | `float` to `double` (potential unintended performance issue)        | warning, function-call arguments only, literals exempted                                                                                         |
 | vector to vector, matrix to matrix                                  | same as the element type conversion                                                                                                              |
-| `vector<float, N>` to `vector<double, N>`                           | same as the scalar case above (after GitHub issue [#12930](https://github.com/shader-slang/slang/issues/12930))                                  |
-| `matrix<float, R, C>` to `matrix<double, R, C>`                     | same as the scalar case above (after GitHub issue [#12930](https://github.com/shader-slang/slang/issues/12930))                                  |
+| `vector<float,N>` to `vector<double,N>`                             | same as the scalar case above (after GitHub issue [#12930](https://github.com/shader-slang/slang/issues/12930))                                  |
+| `matrix<float,R,C>` to `matrix<double,R,C>`                         | same as the scalar case above (after GitHub issue [#12930](https://github.com/shader-slang/slang/issues/12930))                                  |
 
 Where the table says "unless the source is a literal with no precision loss", the conversion is not diagnosed
 when the source is a literal and the value is unchanged by the conversion.
@@ -300,10 +301,10 @@ issue [#10516](https://github.com/shader-slang/slang/issues/10516).)
 > - [Generic argument application](generics.md) where the argument type does not match the generic parameter
 >   type
 
-> ⚠️ **Warning:** The `T` &rarr; `vector<T, 2>` implicit conversion is why, in Slang 2025 and earlier,
-> `vector<T, 4>` accepted the three-argument initializers `(vector<T, 2>, T)` and `(T, vector<T, 2>)`. Those
-> initializers have been removed in Slang 2026; see the warning under
-> [Conversions Between Scalar, Vector, and Matrix Types](#scalar-vector-matrix).
+> ⚠️ **Warning:** The `T` &rarr; `vector<T,2>` implicit conversion is why, in Slang 2025 and earlier,
+> `vector<T,4>` accepted the three-component initializers `(vector<T,2>, T)` and `(T, vector<T,2>)` with
+> scalar element broadcast instead of tail-padding by 0. Those initializers have been removed in Slang 2026.
+> See the warning under [Conversions Between Scalar, Vector, and Matrix Types](#scalar-vector-matrix).
 
 ### Examples
 
@@ -315,7 +316,7 @@ RWStructuredBuffer<float> output;
 [numthreads(1,1,1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {
-    vector<float,4> v0;
+    vector<float, 4> v0;
 
     // implicit conversion from scalar to vector
     v0 = 1.0; // { 1.0, 1.0, 1.0, 1.0 }
