@@ -173,3 +173,41 @@ docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slan
 # compiles in an ordinary expression. Recorded in
 # _meta/findings/enum-cast-in-generic-array-bound-rejected.yaml.
 docs/generated/tests/design/ast-reference/values/builtinoperationintval-enum-operands-fold.slang
+
+# Surfaced on nightly run 33590098356:
+# https://github.com/shader-slang/slang/actions/runs/33590098356
+# The generated check expects the CUDA output to contain `new C`, but the
+# constructed object is unused and the emitted construction is now absent.
+# The bundle needs to make the construction observable and be regenerated
+# instead of relying on dead emitted code.
+docs/generated/tests/design/ast-reference/declarations/classdecl-reference-type.slang
+
+# Surfaced on nightly run 33590098356 after imported-interface prelinking:
+# https://github.com/shader-slang/slang/actions/runs/33590098356
+# https://github.com/shader-slang/slang/pull/12574
+# Each test now sees two identical `BuiltinRequirementDecoration(25)`
+# decorations on the shared `builtinRequirementKey(25)` instruction. The
+# prelink clone path needs to preserve the one-decoration invariant when a
+# hoistable instruction is reused; the generated checks should not accept the
+# duplicate IR while that compiler fix is pending.
+docs/generated/tests/design/cross-cutting/ir-instructions/decoration-builtin-requirement-key-ir.slang
+docs/generated/tests/design/ir-reference/decorations/builtin-requirement-key-decoration.slang
+docs/generated/tests/design/ir-reference/differentiation/builtin-requirement-decoration.slang
+
+# Surfaced on nightly run 33590098356 after CUDA/OptiX callable-shader support
+# landed in PR #12182:
+# https://github.com/shader-slang/slang/actions/runs/33590098356
+# https://github.com/shader-slang/slang/pull/12182
+# The generated test still expects CUDA to reject callable payload parameters,
+# but that behavior is now supported. The source design document and its test
+# bundle need to be updated and regenerated.
+docs/generated/tests/design/pipeline/04c-layout-ir/raytracing-callable-payload-rejected-on-cuda.slang
+
+# Surfaced on nightly run 33590098356 after type-flow set handling changed:
+# https://github.com/shader-slang/slang/actions/runs/33590098356
+# https://github.com/shader-slang/slang/pull/12616
+# The diagnostic still reports the same two possible types, but their order
+# changed from `Rect, Square` to `Square, Rect`. The set is semantically
+# unordered, so this generated check must become order-independent (or the
+# diagnostic must define a stable order) when the bundle is regenerated.
+docs/generated/tests/design/pipeline/05-ir-passes/typeflow-report-dynamic-dispatch-sites.slang
