@@ -654,7 +654,7 @@ SLANG_UNIT_TEST(PackageToolDiscoversRootFromSubdirectory)
         0);
     String searchPaths;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::readAllText(Path::combine(temp.path, "build/search-paths"), searchPaths)));
+        File::readAllText(Path::combine(temp.path, "slang-package-includes.txt"), searchPaths)));
     String expectedExport = Path::combine(canonicalRoot, "vendor/noise/src");
     SLANG_CHECK(searchPaths.getUnownedSlice().indexOf(expectedExport.getUnownedSlice()) >= 0);
 
@@ -711,6 +711,8 @@ SLANG_UNIT_TEST(PackageToolInit)
     SLANG_CHECK(gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("build/")) >= 0);
     SLANG_CHECK(
         gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("slang-package-overlay.json")) >= 0);
+    SLANG_CHECK(
+        gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("slang-package-includes.txt")) >= 0);
     Index buildIgnoreCount = 0;
     for (auto line : LineParser(gitIgnore.getUnownedSlice()))
         buildIgnoreCount += line.trim() == "build/";
@@ -2103,7 +2105,7 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
     String searchPaths;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::readAllText(Path::combine(temp.path, "build/search-paths"), searchPaths)));
+        File::readAllText(Path::combine(temp.path, "slang-package-includes.txt"), searchPaths)));
     SLANG_CHECK(searchPaths.getUnownedSlice().indexOf(UnownedStringSlice("vendor/a/src")) >= 0);
     SLANG_CHECK(
         searchPaths.getUnownedSlice().indexOf(UnownedStringSlice("vendor/a/vendor/b/src")) >= 0);
@@ -2455,7 +2457,7 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     SLANG_CHECK(SLANG_SUCCEEDED(fetchResult));
     String searchPaths;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::readAllText(Path::combine(temp.path, "build", "search-paths"), searchPaths)));
+        File::readAllText(Path::combine(temp.path, "slang-package-includes.txt"), searchPaths)));
     String expectedSearchPath = Path::combine(localRoot, "src");
     SLANG_CHECK(searchPaths.getUnownedSlice().indexOf(expectedSearchPath.getUnownedSlice()) >= 0);
     expectedSearchPath = Path::combine(helperTemp.path, "src");

@@ -224,11 +224,12 @@ static LockedPackage* _findLockedPackage(LockFile& lock, const String& name)
     return nullptr;
 }
 
-/// Write `build/search-paths` with the same export roots `build` passes to `slangc`.
+/// Write `slang-package-includes.txt` with the same export roots `build` passes to `slangc`.
 ///
 /// Those roots come from `getLockedPackageRoot`, so Git checkouts, path dependencies, and local
 /// overrides are all workspace-rooted. A later `slangc -I` can use a line from this file even when
-/// the compiler is invoked from a subdirectory.
+/// the compiler is invoked from a subdirectory. Fetch and update regenerate it; it is not a build
+/// output.
 static SlangResult _writeSearchPaths(
     const String& projectRoot,
     const Manifest& manifest,
@@ -260,27 +261,20 @@ static SlangResult _writeSearchPaths(
             searchPaths << Path::combine(packageRoot, exportPath) << "\n";
     }
 
-    String buildDirectory = Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest));
-    if (!Path::createDirectoryRecursive(buildDirectory) ||
-        SLANG_FAILED(
-            File::writeAllText(Path::combine(buildDirectory, "search-paths"), searchPaths)))
+    if (SLANG_FAILED(
+            File::writeAllText(Path::combine(projectRoot, kIncludesFileName), searchPaths)))
     {
-        outError = "Cannot write the workspace build/search-paths file.";
+        outError = String("Cannot write ") + kIncludesFileName + ".";
         return SLANG_FAIL;
     }
     return SLANG_OK;
 }
 
-static SlangResult _clearSearchPaths(
-    const String& projectRoot,
-    const Manifest& manifest,
-    String& outError)
+static SlangResult _clearSearchPaths(const String& projectRoot, String& outError)
 {
-    String buildDirectory = Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest));
-    if (!Path::createDirectoryRecursive(buildDirectory) ||
-        SLANG_FAILED(File::writeAllText(Path::combine(buildDirectory, "search-paths"), "")))
+    if (SLANG_FAILED(File::writeAllText(Path::combine(projectRoot, kIncludesFileName), "")))
     {
-        outError = "Cannot clear build/search-paths before materializing packages.";
+        outError = String("Cannot clear ") + kIncludesFileName + " before materializing packages.";
         return SLANG_FAIL;
     }
     return SLANG_OK;
@@ -491,9 +485,11 @@ static void _appendIncompleteMaterializationAdvice(String& ioError, bool previou
         ioError,
         previousLockExists
             ? "The previous lock remains authoritative, but deps/ may be partially changed and "
-              "build/search-paths may be empty. Run 'slang package fetch' to restore it; add "
+              "slang-package-includes.txt may be empty. Run 'slang package fetch' to restore it; "
+              "add "
               "'--clean' only if replacement is intended."
-            : "No lock was written, but deps/ may be partial and build/search-paths may be empty. "
+            : "No lock was written, but deps/ may be partial and slang-package-includes.txt may be "
+              "empty. "
               "Fix the reported error and run 'slang package fetch' again.");
 }
 
@@ -888,6 +884,7 @@ static SlangResult _init(const String& projectRoot, String& outError)
         "deps/",
         "build/",
         "slang-package-overlay.json",
+        "slang-package-includes.txt",
     };
     StringBuilder updatedIgnore;
     updatedIgnore << gitIgnore;
@@ -1193,8 +1190,8 @@ static String _describeDirtyCheckout(
 /// in it is edited without running `slang package edit color-encoding`. Materialization already
 /// refuses to overwrite that tree without `--clean`, but it only reaches that decision after the
 /// graph has been resolved, the plan has been printed, the user has confirmed it, and
-/// `build/search-paths` has been cleared. The user is then told the command failed after reading
-/// a report that described the new graph as if it had been installed.
+/// `slang-package-includes.txt` has been cleared. The user is then told the command failed after
+/// reading a report that described the new graph as if it had been installed.
 ///
 /// Never discarding local work without `--clean` is the overriding rule here, so the trees the
 /// current lock owns are inspected before anything else happens: no solve, no report, no prompt,
@@ -1369,7 +1366,7 @@ static SlangResult _fetch(
                 return SLANG_OK;
         }
     }
-    SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, manifest, outError));
+    SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, outError));
     List<String> changedPackageNames;
     if (SLANG_FAILED(_materialize(
             projectRoot,
@@ -1600,7 +1597,7 @@ static SlangResult _update(
         if (!approved)
             return SLANG_OK;
     }
-    SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, manifest, outError));
+    SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, outError));
     List<String> changedPackageNames;
     if (SLANG_FAILED(_materialize(
             projectRoot,

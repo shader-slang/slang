@@ -116,7 +116,7 @@ git commit
 ```
 
 Commit source, the manifest, licenses, tests, and docs. Do not commit `.slang/`, `deps/`, `build/`,
-or `slang-package-overlay.json`.
+`slang-package-overlay.json`, or `slang-package-includes.txt`.
 
 ### Tool does
 
@@ -126,8 +126,8 @@ or `slang-package-overlay.json`.
   A package with no dependencies does not need a lock. `validate NAME` and `validate --all` apply
   the publishable-package rules to locked trees in this workspace.
 - `build` checks that the available graph is legal and buildable, emits the source bundle under
-  `build/bundle/source`, collects Markdown under `build/docs/`, and regenerates
-  `build/search-paths`. If a locked Git checkout is missing, it runs fetch first. If there is no
+  `build/bundle/source`, and collects Markdown under `build/docs/`. If a locked Git checkout is
+  missing, it runs fetch first. If there is no
   lock and the manifest has dependencies, fetch runs update `--yes` so the first clone can build
   without a prompt. An existing lock is never rewritten. Build does not accept `--clean` or
   `--yes`.
@@ -141,7 +141,7 @@ or `slang-package-overlay.json`.
   convention today.
 - `docs` does not regenerate documentation. Run `build` first.
 - An application that invokes `slangc` itself must consume the export paths written to
-  `build/search-paths`; the package state is not injected into arbitrary compiler sessions.
+  `slang-package-includes.txt`; the package state is not injected into arbitrary compiler sessions.
 - A `build.host` section has no effect on plain `build`; Journey 8 covers the explicit opt-in that
   produces its binary output.
 
@@ -263,7 +263,7 @@ commit the manifest (and lock, if update rewrote it).
   not a command failure.
 - A real update materializes Git source under `deps/NAME`, publish-checks new or changed Git
   packages and changed local registrations, checks closure-wide buildability, writes
-  `slang-package-lock.json`, and regenerates `build/search-paths`.
+  `slang-package-lock.json`, and regenerates `slang-package-includes.txt`.
 - `status` prints one line when the workspace is current. When something is dirty, it lists
   missing checkouts, dirty or diverged pins, enabled overrides, and source
   problems, without inspecting `build/` or contacting remotes. A missing lock or pin is
@@ -489,7 +489,7 @@ same local tree without re-entering its configuration.
   representation.
 - Does not copy or modify the supplied directory. Re-adding the in-place path updates that same
   registration's effective version.
-- Local registration changes regenerate `build/search-paths` from the active tree. An in-place
+- Local registration changes regenerate `slang-package-includes.txt` from the active tree. An in-place
   `edit` already sits at `{workspace.deps}/NAME`, so those paths keep working without `update`; a
   newly declared export directory on that working tree is included immediately. An out-of-tree
   override is recorded immediately, but `update` is what writes its path into the lock and
@@ -509,7 +509,8 @@ same local tree without re-entering its configuration.
 - An untagged adopted commit requires explicit `--as`; Git object identity does not determine a
   semantic version.
 - Overrides are path-only; there is no user-global Git-to-Git remapping policy.
-- `slang-package-overlay.json` must not be committed. A team-wide source relationship belongs in
+- `slang-package-overlay.json` and `slang-package-includes.txt` must not be committed. A team-wide
+  source relationship belongs in
   `slang-package.json` as a path or Git dependency.
 - A manifest path dependency cannot be overridden by the current command.
 
@@ -1424,7 +1425,7 @@ them or update this chapter and its regression tests in the same change.
 - Disable an override and update to restore published selection before removing it.
 - `validate NAME` certifies a locked library tree in this workspace, including an enabled override.
   Bare `validate` still rejects the app while any edit or override is enabled.
-- Local-registration changes regenerate `build/search-paths` from the active tree. In-place `edit`
+- Local-registration changes regenerate `slang-package-includes.txt` from the active tree. In-place `edit`
   does not need `update` to keep compiling `deps/NAME`. Out-of-tree overrides need `update` to
   enter the lock and to activate new dependency edges. Disabling a lock-adopted override requires
   update first.

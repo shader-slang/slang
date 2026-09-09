@@ -285,7 +285,7 @@ you remove the registration or commit.
 you can certify a library using an in-place override before a remote tag exists. Bare `validate`
 still rejects the workspace while any override is enabled.
 
-Do not commit `slang-package-overlay.json`. Path dependencies in `slang-package.json` are in-package
+Do not commit `slang-package-overlay.json` or `slang-package-includes.txt`. Path dependencies in `slang-package.json` are in-package
 vendoring, not extract. Overrides are the laptop way to redirect one identity at a local tree.
 
 ## Extract a package from this application

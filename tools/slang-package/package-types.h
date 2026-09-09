@@ -17,6 +17,7 @@ inline constexpr Int kFormatVersion = 1;
 inline constexpr char const* kPackageFileName = "slang-package.json";
 inline constexpr char const* kLockFileName = "slang-package-lock.json";
 inline constexpr char const* kOverlayFileName = "slang-package-overlay.json";
+inline constexpr char const* kIncludesFileName = "slang-package-includes.txt";
 
 struct Dependency
 {

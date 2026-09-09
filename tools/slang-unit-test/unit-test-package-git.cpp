@@ -615,7 +615,7 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
     SLANG_CHECK(!File::exists(Path::combine(temp.path, "deps/noise")));
     String searchPaths;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::readAllText(Path::combine(temp.path, "out/search-paths"), searchPaths)));
+        File::readAllText(Path::combine(temp.path, "slang-package-includes.txt"), searchPaths)));
     SLANG_CHECK(
         searchPaths.getUnownedSlice().indexOf(UnownedStringSlice("third-party/noise/src")) >= 0);
 
@@ -761,7 +761,7 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), editedLock, error)));
     SLANG_CHECK(editedLock.packages[0].path.getLength() == 0);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::readAllText(Path::combine(temp.path, "out/search-paths"), searchPaths)));
+        File::readAllText(Path::combine(temp.path, "slang-package-includes.txt"), searchPaths)));
     SLANG_CHECK(
         searchPaths.getUnownedSlice().indexOf(UnownedStringSlice("upstream-noise/src")) < 0);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -1332,7 +1332,7 @@ SLANG_UNIT_TEST(PackageToolEditAdoptsLocalTree)
     SLANG_CHECK(lockAfter.packages[noiseIndex].version == "1.0.0");
     String searchPaths;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::readAllText(Path::combine(temp.path, "build/search-paths"), searchPaths)));
+        File::readAllText(Path::combine(temp.path, "slang-package-includes.txt"), searchPaths)));
     SLANG_CHECK(
         searchPaths.getUnownedSlice().indexOf(
             Path::combine(temp.path, "deps/noise/extra").getUnownedSlice()) >= 0);
@@ -2039,7 +2039,7 @@ SLANG_UNIT_TEST(PackageToolFetchRejectsIllegalGraphBeforeMaterialize)
     String repository = Path::combine(temp.path, "upstream-noise");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initRootWithGitNoise(temp.path, repository, error)));
 
-    String searchPathsPath = Path::combine(temp.path, "build/search-paths");
+    String searchPathsPath = Path::combine(temp.path, "slang-package-includes.txt");
     String searchPathsBefore;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(searchPathsPath, searchPathsBefore)));
     String checkoutSource = Path::combine(temp.path, "deps/noise/src/noise.slang");
@@ -2060,7 +2060,7 @@ SLANG_UNIT_TEST(PackageToolFetchRejectsIllegalGraphBeforeMaterialize)
     SLANG_CHECK(
         error.getUnownedSlice().indexOf(UnownedStringSlice("Locked version no longer satisfies")) >=
         0);
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("search-paths")) < 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("slang-package-includes")) < 0);
 
     String searchPathsAfter;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(searchPathsPath, searchPathsAfter)));

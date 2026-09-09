@@ -295,10 +295,10 @@ configuration therefore applies without separate package-tool authentication. Gi
 cannot begin with `-`, use Git's command-executing `ext::` transport, or contain whitespace or
 control characters.
 
-After fetching, `{workspace.build}/search-paths` (by default `build/search-paths`) lists the source
+After fetching, `slang-package-includes.txt` lists the source
 roots, one per line. A caller must translate each line into a separate `slangc -I <path>` argument;
-`slangc` does not read this file directly. It is a derived file and may be deleted with the rest of
-the build directory; fetch or update regenerates it. Each line is a workspace-rooted filesystem
+`slangc` does not read this file directly. It is a derived, gitignored file; fetch or update
+regenerates it. Each line is a workspace-rooted filesystem
 path, so it can be passed to `slangc` from a subdirectory. Package commands do not inject these
 paths into compiler sessions automatically.
 
@@ -392,7 +392,8 @@ relative to the primary (for example `__include "noise/hash";`), as shown in
 
 `slang package init` creates `slang-package.json` and the conventional directories in the current
 directory. It writes `tools.slang-toolchain` as `>=` the installed compiler version when that
-version can be parsed. It adds `.slang/`, `deps/`, `build/`, and `slang-package-overlay.json` to
+version can be parsed. It adds `.slang/`, `deps/`, `build/`, `slang-package-overlay.json`, and
+`slang-package-includes.txt` to
 `.gitignore`. `slang package help` lists commands under the manifest, overlay, lock, and build.
 `.slang/cache/` contains resolver Git repositories used to inspect release manifests. Fetched
 source remains visible under `deps/`; generated files go under `build/`.
@@ -524,7 +525,7 @@ or `slang package --experimental build` when the manifest configures host execut
 
 The initial workspace layout deliberately keeps resolver clones in `.slang/cache/` and compile
 inputs in the workspace. Future versions may add a user-global immutable cache with copy-on-edit,
-let compiler sessions consume workspace metadata without `build/search-paths`, and share immutable
+let compiler sessions consume workspace metadata without `slang-package-includes.txt`, and share immutable
 dependency trees between workspaces. Git-to-Git replacement is also deferred until Slang has a
 global user remapping policy or package-index integration; current overrides intentionally replace
 a dependency with a local path only.
