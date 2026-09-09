@@ -240,9 +240,10 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     const String missingAsText = "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
                                  "\"license_files\":[\"LICENSE\"],\"dependencies\":{\"noise\":{"
                                  "\"git\":\"https://example.com/noise.git\",\"ref\":\"main\"}}}";
-    SLANG_CHECK(SLANG_FAILED(readManifestText("missing-as.json", missingAsText, manifest, error)));
-    SLANG_CHECK(
-        error.getUnownedSlice().indexOf(UnownedStringSlice("'ref' and 'as' together")) >= 0);
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(readManifestText("missing-as.json", missingAsText, manifest, error)));
+    SLANG_CHECK(manifest.dependencies[0].ref == "main");
+    SLANG_CHECK(manifest.dependencies[0].as.getLength() == 0);
 
     const String asWithoutRefText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
@@ -985,6 +986,11 @@ SLANG_UNIT_TEST(PackageToolUneditRejectsConflictingOptions)
     const char* asArguments[] = {"slang-package", "unedit", "noise", "--as", "1.0.0"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(asArguments), asArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("requires --adopt")) >= 0);
+
+    const char* refArguments[] = {"slang-package", "unedit", "noise", "--ref", "main"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(refArguments), refArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("requires --adopt")) >= 0);
 }
 
@@ -3086,6 +3092,25 @@ public:
         return SLANG_FAIL;
     }
 
+    virtual SlangResult deriveReleaseVersion(
+        const String&,
+        const String& git,
+        const String& commit,
+        SemanticVersion& outVersion,
+        String& outError) override
+    {
+        for (const auto& release : releases)
+        {
+            if (release.git == git && release.candidate.commit == commit)
+            {
+                outVersion = release.candidate.version;
+                return SLANG_OK;
+            }
+        }
+        outError = String("Missing in-memory history for ") + git + "@" + commit;
+        return SLANG_FAIL;
+    }
+
     virtual SlangResult listReleaseTags(
         const String&,
         const String& git,
@@ -3367,6 +3392,28 @@ SLANG_UNIT_TEST(PackageResolverPinnedRefUsesClaimedVersion)
     SLANG_CHECK_ABORT(noise);
     SLANG_CHECK(noise->ref == "main");
     SLANG_CHECK(noise->version == "1.4.0");
+    SLANG_CHECK(noise->commit == "commit-main");
+}
+
+SLANG_UNIT_TEST(PackageResolverPinnedRefDerivesAsFromHistory)
+{
+    InMemoryPackageSource source;
+    source.addRef("memory:noise", "main", "1.3.0", _makeManifest("noise"));
+
+    Manifest root = _makeManifest("root");
+    Dependency dependency;
+    dependency.name = "noise";
+    dependency.git = "memory:noise";
+    dependency.ref = "main";
+    root.dependencies.add(dependency);
+
+    PackageTool::LockFile lock;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(root, source, lock, error)));
+    const LockedPackage* noise = _findLockedPackage(lock, "noise");
+    SLANG_CHECK_ABORT(noise);
+    SLANG_CHECK(noise->ref == "main");
+    SLANG_CHECK(noise->version == "1.3.0");
     SLANG_CHECK(noise->commit == "commit-main");
 }
 

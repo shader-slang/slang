@@ -319,6 +319,36 @@ SlangResult getRepositoryHeadCommit(
     return SLANG_OK;
 }
 
+bool isGitObjectId(const UnownedStringSlice& text)
+{
+    if (text.getLength() != 40 && text.getLength() != 64)
+        return false;
+    for (Index i = 0; i < text.getLength(); ++i)
+    {
+        char c = text[i];
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+            return false;
+    }
+    return true;
+}
+
+SlangResult resolveLocalRevision(
+    const String& repositoryPath,
+    const String& revision,
+    String& outCommit,
+    String& outError)
+{
+    List<String> arguments;
+    arguments.add("rev-parse");
+    arguments.add("--verify");
+    arguments.add("--end-of-options");
+    arguments.add(revision + "^{commit}");
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    outCommit = result.standardOutput.trim();
+    return SLANG_OK;
+}
+
 SlangResult findVersionTagAtHead(
     const String& repositoryPath,
     String& outTag,
@@ -350,6 +380,78 @@ SlangResult findVersionTagAtHead(
         outTag = tag;
         outVersion = version;
     }
+    return SLANG_OK;
+}
+
+SlangResult findNearestReleaseTag(
+    const String& repositoryPath,
+    const String& commit,
+    String& outTag,
+    SemanticVersion& outVersion,
+    bool& outFound,
+    String& outError)
+{
+    outFound = false;
+    outTag = String();
+    List<String> arguments;
+    arguments.add("tag");
+    arguments.add("--merged");
+    arguments.add(commit);
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+
+    String nearestTag;
+    SemanticVersion nearestVersion;
+    Int nearestDistance = 0;
+    bool haveNearest = false;
+    bool nearestTied = false;
+    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+    {
+        String tag = line.trim();
+        SemanticVersion version;
+        if (!tag.getLength() || SLANG_FAILED(parseReleaseTag(tag, version)))
+            continue;
+
+        List<String> countArguments;
+        countArguments.add("rev-list");
+        countArguments.add("--count");
+        countArguments.add(tag + ".." + commit);
+        ExecuteResult countResult;
+        SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, countArguments, countResult, outError));
+        String countText = countResult.standardOutput.trim();
+        Int distance = 0;
+        if (SLANG_FAILED(StringUtil::parseInt(countText.getUnownedSlice(), distance)) ||
+            distance < 0)
+        {
+            outError =
+                String("Cannot measure distance from tag '") + tag + "' to commit " + commit + ".";
+            return SLANG_FAIL;
+        }
+
+        if (!haveNearest || distance < nearestDistance)
+        {
+            haveNearest = true;
+            nearestTied = false;
+            nearestDistance = distance;
+            nearestTag = tag;
+            nearestVersion = version;
+        }
+        else if (distance == nearestDistance && (nearestTag != tag || nearestVersion != version))
+        {
+            nearestTied = true;
+        }
+    }
+    if (!haveNearest)
+        return SLANG_OK;
+    if (nearestTied)
+    {
+        outError = "Commit has more than one equally near semantic-version tag; pass --as "
+                   "explicitly.";
+        return SLANG_FAIL;
+    }
+    outFound = true;
+    outTag = nearestTag;
+    outVersion = nearestVersion;
     return SLANG_OK;
 }
 

@@ -392,10 +392,10 @@ static SlangResult _readDependencies(
         }
         else
         {
-            if ((dependency.ref.getLength() != 0) != (dependency.as.getLength() != 0))
+            if (dependency.as.getLength() && !dependency.ref.getLength())
             {
-                outError = String("Git dependency '") + dependency.name +
-                           "' must contain 'ref' and 'as' together.";
+                outError =
+                    String("Git dependency '") + dependency.name + "' has 'as' without 'ref'.";
                 return SLANG_FAIL;
             }
             if (dependency.ref.getLength() && !_isSafeGitRef(dependency.ref))
@@ -405,8 +405,8 @@ static SlangResult _readDependencies(
             }
             if (!dependency.version.getLength() && !dependency.ref.getLength())
             {
-                outError = String("Git dependency '") + dependency.name +
-                           "' requires 'version' or 'ref' with 'as'.";
+                outError =
+                    String("Git dependency '") + dependency.name + "' requires 'version' or 'ref'.";
                 return SLANG_FAIL;
             }
         }
@@ -944,8 +944,11 @@ static void _writeDependency(JSONWriter& writer, const Dependency& dependency)
         {
             _writeKey(writer, "ref");
             writer.addStringValue(dependency.ref.getUnownedSlice(), SourceLoc());
-            _writeKey(writer, "as");
-            writer.addStringValue(dependency.as.getUnownedSlice(), SourceLoc());
+            if (dependency.as.getLength() != 0)
+            {
+                _writeKey(writer, "as");
+                writer.addStringValue(dependency.as.getUnownedSlice(), SourceLoc());
+            }
         }
     }
     writer.endObject(SourceLoc());

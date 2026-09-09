@@ -35,7 +35,7 @@ static void _printHelp(bool experimental = false)
         "Manifest (slang-package.json):\n"
         "  init             Create a package manifest and standard directories.\n"
         "  dependency add <name> --git <url> --version <range>\n"
-        "  dependency add <name> --git <url> --ref <ref> --as <version>\n"
+        "  dependency add <name> --git <url> --ref <ref> [--as <version>]\n"
         "  dependency add <name> --path <path> --as <version>\n"
         "  dependency pin <name> [--to <version> | --commit]\n"
         "                   Write a Git pin from the lock into the manifest.\n"
@@ -47,11 +47,13 @@ static void _printHelp(bool experimental = false)
         "  edit <name>      Make a dependency checkout editable in place.\n"
         "                   Accepts a checkout that already has local changes.\n"
         "                   Fetch and update fail if the selected pin would move it.\n"
-        "  unedit <name> [--clean | --adopt [--as <version>]] [--yes]\n"
+        "  unedit <name> [--clean | --adopt [--ref <ref>] [--as <version>]] [--yes]\n"
         "                   Return a clean checkout to tool ownership.\n"
         "                   --clean restores the locked commit.\n"
         "                   --adopt writes the manifest (and lock) from HEAD, then drops the\n"
-        "                   overlay.\n"
+        "                   overlay. --ref keeps following that branch or tag; without it,\n"
+        "                   HEAD is frozen. Omit --as to derive the version from the nearest\n"
+        "                   release tag in history.\n"
         "\n"
         "Lock (slang-package-lock.json):\n"
         "  fetch [--clean] [--yes] [--skip-validate]\n"
@@ -1122,10 +1124,11 @@ static SlangResult _dependencyList(const String& projectRoot, String& outError)
         {
             fprintf(
                 stdout,
-                "  %s: %s ref %s as %s\n",
+                "  %s: %s ref %s%s%s\n",
                 dependency.name.getBuffer(),
                 dependency.git.getBuffer(),
                 dependency.ref.getBuffer(),
+                dependency.as.getLength() ? " as " : "",
                 dependency.as.getBuffer());
         }
     }
@@ -1499,7 +1502,32 @@ static SlangResult _update(
     {
         for (auto& localPackage : effectiveLocalPackages)
         {
-            if (!isActiveLocalPackage(localPackage) || localPackage.as.getLength())
+            if (!isActiveLocalPackage(localPackage))
+                continue;
+            if (!localPackage.as.getLength())
+            {
+                String checkout;
+                String headCommit;
+                SemanticVersion inferredVersion;
+                String tag;
+                bool foundTag = false;
+                String inferError;
+                if (SLANG_SUCCEEDED(
+                        getLocalPackageRoot(projectRoot, localPackage, checkout, inferError)) &&
+                    SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, headCommit, inferError)) &&
+                    SLANG_SUCCEEDED(findNearestReleaseTag(
+                        checkout,
+                        headCommit,
+                        tag,
+                        inferredVersion,
+                        foundTag,
+                        inferError)) &&
+                    foundTag)
+                {
+                    localPackage.as = formatExactVersion(inferredVersion);
+                }
+            }
+            if (localPackage.as.getLength())
                 continue;
             Index lockedIndex =
                 previousLockPtr ? findLockedPackageIndex(*previousLockPtr, localPackage.name) : -1;
@@ -2019,7 +2047,8 @@ static String _describeDependencyRequirement(const Dependency& dependency)
         return String("path ") + dependency.path + " as " + dependency.as;
     if (dependency.version.getLength())
         return String("version ") + dependency.version;
-    return String("ref ") + dependency.ref + " as " + dependency.as;
+    return String("ref ") + dependency.ref +
+           (dependency.as.getLength() ? String(" as ") + dependency.as : String());
 }
 
 static void _getSortedDependencies(
@@ -2970,14 +2999,16 @@ static SlangResult _edit(const String& projectRoot, const String& name, String& 
 
 /// Replace an in-place override with a committed Git pin at its current `HEAD`.
 ///
-/// The manifest records the manual pin so a later update cannot silently select another release;
-/// the lock records the exact commit that fetch installs. A semantic-version tag supplies `as`
-/// automatically. An untagged commit needs an explicit `--as` because Git identity alone does not
-/// determine the version used by the dependency solver.
+/// The manifest records the pin so a later update cannot silently select another release; the lock
+/// records the exact commit that fetch installs. Omit `requestedRef` to freeze `HEAD` as a commit
+/// or as a unique release tag that points at `HEAD`. Pass `requestedRef` to keep following that
+/// branch or tag. Omit `requestedVersion` to derive `as` from the nearest `vMAJOR.MINOR.PATCH` tag
+/// reachable from `HEAD`.
 static SlangResult _adoptInPlaceOverride(
     const String& projectRoot,
     const String& name,
     const String& requestedVersion,
+    const String& requestedRef,
     bool assumeYes,
     String& outError)
 {
@@ -3037,6 +3068,25 @@ static SlangResult _adoptInPlaceOverride(
 
     String ref = headCommit;
     String version = requestedVersion;
+    if (requestedRef.getLength())
+    {
+        if (isGitObjectId(requestedRef))
+        {
+            outError = String("unedit --adopt --ref cannot be a commit ID: ") + requestedRef +
+                       ". Omit --ref to freeze HEAD.";
+            return SLANG_FAIL;
+        }
+        String resolvedCommit;
+        SLANG_RETURN_ON_FAIL(
+            resolveLocalRevision(checkout, requestedRef, resolvedCommit, outError));
+        if (resolvedCommit != headCommit)
+        {
+            outError = String("unedit --adopt --ref '") + requestedRef +
+                       "' does not point at HEAD. Check out that ref first.";
+            return SLANG_FAIL;
+        }
+        ref = requestedRef;
+    }
     if (version.getLength())
     {
         SemanticVersion ignoredVersion;
@@ -3046,15 +3096,34 @@ static SlangResult _adoptInPlaceOverride(
     {
         SemanticVersion taggedVersion;
         bool foundTag = false;
+        String headTag;
         SLANG_RETURN_ON_FAIL(
-            findVersionTagAtHead(checkout, ref, taggedVersion, foundTag, outError));
-        if (!foundTag)
+            findVersionTagAtHead(checkout, headTag, taggedVersion, foundTag, outError));
+        if (foundTag)
         {
-            outError = String("Editable checkout HEAD has no semantic-version tag: ") + name +
-                       ". Pass --as VERSION to adopt this commit.";
-            return SLANG_FAIL;
+            version = formatExactVersion(taggedVersion);
+            if (!requestedRef.getLength())
+                ref = headTag;
         }
-        version = formatExactVersion(taggedVersion);
+        else
+        {
+            String nearestTag;
+            SLANG_RETURN_ON_FAIL(findNearestReleaseTag(
+                checkout,
+                headCommit,
+                nearestTag,
+                taggedVersion,
+                foundTag,
+                outError));
+            if (!foundTag)
+            {
+                outError = String("Editable checkout HEAD has no semantic-version tag in its "
+                                  "history: ") +
+                           name + ". Pass --as VERSION to adopt this commit.";
+                return SLANG_FAIL;
+            }
+            version = formatExactVersion(taggedVersion);
+        }
     }
 
     Dependency& dependency = manifest.dependencies[dependencyIndex];
@@ -3088,7 +3157,8 @@ static SlangResult _adoptInPlaceOverride(
     bool approved = false;
     SLANG_RETURN_ON_FAIL(_confirmApply(
         assumeYes,
-        "Adopt this commit in the manifest and lock?",
+        requestedRef.getLength() ? "Adopt this ref in the manifest and lock?"
+                                 : "Adopt this commit in the manifest and lock?",
         approved,
         outError));
     if (!approved)
@@ -3141,7 +3211,8 @@ static SlangResult _unedit(
         appendErrorAdvice(
             outError,
             String("To keep the committed checkout, run 'slang package unedit ") + name +
-                " --adopt' (and pass '--as VERSION' when HEAD is untagged). To return to the "
+                " --adopt' (and pass '--as VERSION' when no release tag is in history). To return "
+                "to the "
                 "published graph, run 'slang package override disable " +
                 name + "', then 'slang package update' and 'slang package unedit " + name + "'.");
         return SLANG_FAIL;
@@ -3181,11 +3252,13 @@ static SlangResult _unedit(
                 ? String("Commit the files you want to keep and apply any stashes, then run "
                          "'slang package unedit ") +
                       name +
-                      " --adopt' (and pass '--as VERSION' when HEAD is untagged). To discard all "
+                      " --adopt' (and pass '--as VERSION' when no release tag is in history). To "
+                      "discard all "
                       "local state instead, run 'slang package unedit " +
                       name + " --clean'."
                 : String("To keep these commits, run 'slang package unedit ") + name +
-                      " --adopt' (and pass '--as VERSION' when HEAD is untagged). To discard them "
+                      " --adopt' (and pass '--as VERSION' when no release tag is in history). To "
+                      "discard them "
                       "and restore the locked commit, run 'slang package unedit " +
                       name + " --clean'.";
         appendErrorAdvice(outError, advice);
@@ -3683,12 +3756,11 @@ SlangResult executeInDirectory(
                                    !dependency.path.getLength() && !dependency.ref.getLength() &&
                                    !dependency.as.getLength();
             bool validGitRef = dependency.git.getLength() && dependency.ref.getLength() &&
-                               dependency.as.getLength() && !dependency.path.getLength() &&
-                               !dependency.version.getLength();
+                               !dependency.path.getLength() && !dependency.version.getLength();
             if (!(validPath || validGitVersion || validGitRef))
             {
                 outError = "Dependency add requires exactly one of: --git URL --version RANGE, "
-                           "--git URL --ref REF --as VERSION, or --path PATH --as VERSION.";
+                           "--git URL --ref REF [--as VERSION], or --path PATH --as VERSION.";
                 return SLANG_FAIL;
             }
             return _dependencyAdd(projectRoot, dependency, outError);
@@ -3767,6 +3839,7 @@ SlangResult executeInDirectory(
         bool adopt = false;
         bool assumeYes = false;
         String as;
+        String ref;
         for (int i = 3; i < argc; ++i)
         {
             String flag = argv[i];
@@ -3776,6 +3849,8 @@ SlangResult executeInDirectory(
                 adopt = true;
             else if (flag == "--as" && i + 1 < argc)
                 as = argv[++i];
+            else if (flag == "--ref" && i + 1 < argc)
+                ref = argv[++i];
             else if (flag == "--yes")
                 assumeYes = true;
             else
@@ -3794,13 +3869,18 @@ SlangResult executeInDirectory(
             outError = "unedit --as requires --adopt.";
             return SLANG_FAIL;
         }
+        if (ref.getLength() && !adopt)
+        {
+            outError = "unedit --ref requires --adopt.";
+            return SLANG_FAIL;
+        }
         if (assumeYes && !allowClean && !adopt)
         {
             outError = "unedit --yes requires --clean or --adopt.";
             return SLANG_FAIL;
         }
         if (adopt)
-            return _adoptInPlaceOverride(projectRoot, argv[2], as, assumeYes, outError);
+            return _adoptInPlaceOverride(projectRoot, argv[2], as, ref, assumeYes, outError);
         return _unedit(projectRoot, argv[2], allowClean, assumeYes, outError);
     }
     if (command == "override" && argc == 3 && String(argv[2]) == "list")

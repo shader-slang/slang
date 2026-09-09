@@ -85,7 +85,8 @@ you run `build` and `run` in produces executables.
 
 Most Git dependencies use `git` plus a `version` range, written with `slang package dependency
 add NAME --git URL --version RANGE`. To pin a branch, tag, or full 40-character commit, use
-`--git URL --ref REF --as VERSION`; `ref` is Git identity and `as` is the exact solver version.
+`--git URL --ref REF [--as VERSION]`; `ref` is Git identity and `as` is the exact solver version.
+Omit `--as` to derive that version from the nearest release tag in the pin's history.
 Path dependencies use `--path PATH --as VERSION`. After a lock exists,
 `slang package dependency pin NAME` copies that selection into a direct Git exact-version edge.
 `--to MAJOR.MINOR.PATCH` writes a different exact version. `--commit` writes the locked SHA as
@@ -268,10 +269,9 @@ both the Git identity and local path.
 Plain `unedit` succeeds only when the lock is a Git pin and the checkout is clean at that exact
 commit. `unedit NAME --clean` discards local state and restores that commit; pass `--yes` when
 confirmation cannot be interactive. To keep a committed fix, use
-`unedit NAME --adopt [--as VERSION]`: this pins the direct dependency in the manifest and writes a
-Git-only lock at `HEAD`. It replaces the dependency's version range with canonical `ref` plus `as`
-intent. A unique `vMAJOR.MINOR.PATCH` tag at `HEAD` supplies the version; otherwise `--as` is
-required.
+`unedit NAME --adopt [--ref REF] [--as VERSION]`: this pins the direct dependency in the manifest and writes a
+Git-only lock at `HEAD`. `--ref` keeps following that branch or tag; without it, `HEAD` is frozen.
+Omit `--as` to derive the version from the nearest `vMAJOR.MINOR.PATCH` tag reachable from `HEAD`.
 
 `slang package override add NAME PATH [AS]` points the package at a directory you already have.
 `PATH=deps/NAME` updates the same in-place registration created by `edit`; another path creates an

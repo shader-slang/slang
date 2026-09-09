@@ -76,8 +76,13 @@ SlangResult validateLockedDependency(
     }
     if (dependency.ref.getLength())
     {
-        if (lockedPackage.version != dependency.as ||
-            (!lockedPackage.path.getLength() && lockedPackage.ref != dependency.ref))
+        if (!lockedPackage.path.getLength() && lockedPackage.ref != dependency.ref)
+        {
+            outError = String("Lock file no longer matches the pinned ref for dependency '") +
+                       dependency.name + "'. Run 'slang package update'.";
+            return SLANG_FAIL;
+        }
+        if (dependency.as.getLength() && lockedPackage.version != dependency.as)
         {
             outError = String("Lock file no longer matches the pinned ref for dependency '") +
                        dependency.name + "'. Run 'slang package update'.";

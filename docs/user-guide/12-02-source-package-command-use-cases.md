@@ -446,11 +446,12 @@ git -C deps/color-encoding commit -am "Fix conversion"
 slang package unedit color-encoding --adopt --as 1.1.1
 ```
 
-`--adopt` replaces the direct dependency's version range with the current `HEAD` as `ref` and its
-exact solver identity as `as`, converts the lock row back to a Git pin, and removes the overlay. It
-infers `as` when exactly one `vMAJOR.MINOR.PATCH` tag points at `HEAD`; otherwise `--as VERSION` is
-required. The commit or tag must be reachable from the configured remote before another machine
-can fetch it.
+`--adopt` replaces the direct dependency's version range with a Git pin at `HEAD`, converts the
+lock row back to a Git pin, and removes the overlay. Without `--ref`, a unique release tag at
+`HEAD` becomes both `ref` and `as`; otherwise `ref` is the commit and `as` is derived from the
+nearest ancestor release tag. `--adopt --ref BRANCH` writes that branch as `ref` (it must point at
+`HEAD`) and still locks the SHA. Pass `--as VERSION` to override the derived identity. The commit
+or tag must be reachable from the configured remote before another machine can fetch it.
 
 To assign another effective version to the in-place tree, re-add that same override with `as`:
 
@@ -515,8 +516,8 @@ same local tree without re-entering its configuration.
   pin. `dependency pin NAME` can promote a transitive Git package to a direct exact-version edge
   without adopting a working tree. A local-only fix that is not published still needs adopt or an
   upstream release.
-- An untagged adopted commit requires explicit `--as`; Git object identity does not determine a
-  semantic version.
+- An adopted commit with no `vMAJOR.MINOR.PATCH` tag in its history requires explicit `--as`;
+  Git object identity does not determine a semantic version. An ancestor release tag is enough.
 - Overrides are path-only; there is no user-global Git-to-Git remapping policy.
 - `slang-package-overlay.json` and `slang-package-includes.txt` must not be committed. A team-wide
   source relationship belongs in
@@ -1192,7 +1193,7 @@ row whose version the local tree represents. Supply it for a newly introduced na
 local tree represents another version. The value must satisfy every incoming constraint when you
 run `update`.
 
-### `unedit NAME --clean` and `unedit NAME --adopt [--as VERSION]`
+### `unedit NAME --clean` and `unedit NAME --adopt [--ref REF] [--as VERSION]`
 
 Use plain `unedit` only when the checkout is clean at the Git commit in the lock. `--clean`
 authorizes restoring that commit and discarding local files, commits, and stashes. Both reject a
@@ -1200,8 +1201,10 @@ Git+path lock row; disable the override and update first when the local graph wa
 
 Use `--adopt` to keep a committed fix. It changes a direct Git dependency in
 `slang-package.json` to `ref` plus `as`, writes `HEAD` as the lock commit, and removes the local
-override. A unique semantic-version tag at `HEAD` supplies both `ref` and `as`; an untagged commit
-uses its full object ID as `ref` and requires `--as VERSION`. After the overlay is removed, the
+override. A unique semantic-version tag at `HEAD` supplies both `ref` and `as` when `--ref` is
+omitted. An untagged `HEAD` uses its object ID as `ref` and derives `as` from the nearest ancestor
+release tag, or requires `--as VERSION` when none exists. `--adopt --ref BRANCH` records that
+branch as `ref` while still locking `HEAD`. After the overlay is removed, the
 committed tree's declared graph must still resolve onto that Git pin (the package name must match,
 and live edges must still select the lock). Extra export paths alone are not a mismatch. Both
 destructive clean and adopt require confirmation; pass `--yes` for automation.
@@ -1228,7 +1231,7 @@ drops that registration; it also writes the manifest and lock. Binary run and ho
 behavior appear in `slang package --experimental help`. `init`,
 `status`, `tree`, and `edit` accept no additional arguments; `validate` accepts an optional package
 name or `--all`; `build` accepts only `--skip-validate` (not `--clean` or `--yes`); `unedit`
-accepts `--clean`, or `--adopt` with optional `--as`, plus `--yes`; and `docs` accepts `--print`.
+accepts `--clean`, or `--adopt` with optional `--ref` and `--as`, plus `--yes`; and `docs` accepts `--print`.
 `test` is present but returns a not-implemented error.
 
 ## Gaps, tensions, and intentional asymmetries

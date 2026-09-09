@@ -161,7 +161,8 @@ distributions start shipping them independently. Unknown `tools` keys are errors
 
 Ordinary dependency versions come from Git tags named `vMAJOR.MINOR.PATCH`, which package
 publishers must treat as immutable. A manifest may instead pin an opaque branch or tag with `ref`
-and assign its solver identity with `as`. `version` in `slang-package.json` is only the file
+and omit `as` to derive the solver identity from the nearest release tag on that line, or write
+`as` to assign it explicitly. `schema_version` in `slang-package.json` is only the file
 format version. For a Git package the lock records the resolved ref, exact semantic version, and
 commit; a path package has no ref or commit to record, so its row carries the path and the `as`
 version.
@@ -189,8 +190,9 @@ Each dependency entry has one of three shapes, matching `slang package dependenc
 
 - `git` plus `version` selects the highest compatible `vMAJOR.MINOR.PATCH` release tag.
 - `path` plus `as` uses one relative tree as the exact semantic version named by `as`.
-- `git`, `ref`, and `as` pins an opaque branch, tag, or full 40-character commit ID and uses `as`
-  as its exact solver version.
+- `git`, `ref`, and optional `as` pins an opaque branch, tag, or full 40-character commit ID.
+  Omit `as` to derive the exact solver version from the nearest `vMAJOR.MINOR.PATCH` tag
+  reachable from that commit. Write `as` to claim a different identity.
 
 `git` may be a URL or a local Git repository path. A `version` is one or more clauses joined by
 `||`. Each clause is a space-separated intersection of `>`, `>=`, `<`, `<=`, and `!=` comparisons,
@@ -376,7 +378,7 @@ produce a report. It does not inspect `build/`, modify package state, or contact
 
 Use `slang package dependency add` and `dependency remove` to edit direct manifest edges, and
 `dependency list` to inspect them. Add accepts exactly one source shape:
-`--git URL --version RANGE`, `--git URL --ref REF --as VERSION`, or
+`--git URL --version RANGE`, `--git URL --ref REF [--as VERSION]`, or
 `--path PATH --as VERSION`. `dependency pin NAME` rewrites a Git edge from the current lock:
 default writes that lock's exact `version`, `--to MAJOR.MINOR.PATCH` writes a different exact
 version, and `--commit` writes `ref` plus `as` from the locked SHA. A transitive Git package is
@@ -421,10 +423,12 @@ lock names.
 
 Plain `unedit NAME` requires a Git-only lock row and a clean checkout at that locked commit.
 `unedit NAME --clean` discards local state and restores the locked commit. Use
-`unedit NAME --adopt [--as VERSION]` instead to pin a committed `HEAD` in the direct dependency's
-manifest and lock, replacing its version range with canonical `ref` plus `as` intent. A unique
-`vMAJOR.MINOR.PATCH` tag at `HEAD` supplies the version automatically; an untagged commit requires
-`--as`. Clean and adopt ask for confirmation unless `--yes` is passed.
+`unedit NAME --adopt [--ref REF] [--as VERSION]` instead to pin a committed `HEAD` in the direct dependency's
+manifest and lock, replacing its version range with canonical `ref` plus `as`
+intent. `--ref` keeps following that branch or tag; without it, `HEAD` is frozen as a
+commit (or as a unique release tag that points at `HEAD`). Omit `--as` to derive the
+version from the nearest `vMAJOR.MINOR.PATCH` tag reachable from `HEAD`. An untagged
+history with no ancestor release tag requires `--as`. Clean and adopt ask for confirmation unless `--yes` is passed.
 
 For example, the generated local-state file may contain:
 

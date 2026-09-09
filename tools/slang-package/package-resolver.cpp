@@ -100,6 +100,28 @@ public:
         return PackageTool::resolveReference(git, ref, outCandidate, outError);
     }
 
+    virtual SlangResult deriveReleaseVersion(
+        const String& packageName,
+        const String& git,
+        const String& commit,
+        SemanticVersion& outVersion,
+        String& outError) override
+    {
+        String repositoryPath = Path::combine(cacheRoot, packageName);
+        SLANG_RETURN_ON_FAIL(ensureRepository(projectRoot, git, repositoryPath, outError));
+        String tag;
+        bool found = false;
+        SLANG_RETURN_ON_FAIL(
+            findNearestReleaseTag(repositoryPath, commit, tag, outVersion, found, outError));
+        if (!found)
+        {
+            outError = String("Pinned ref for package '") + packageName +
+                       "' has no semantic-version tag in its Git history. Pass 'as'.";
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
+    }
+
     virtual SlangResult loadManifest(
         const String& packageName,
         const String& git,
@@ -180,6 +202,39 @@ public:
         outCandidate.path = localPackage.path;
         outCandidate.ref = ref;
         outCandidate.version = version;
+        return SLANG_OK;
+    }
+
+    virtual SlangResult deriveReleaseVersion(
+        const String& packageName,
+        const String& git,
+        const String& commit,
+        SemanticVersion& outVersion,
+        String& outError) override
+    {
+        Index localIndex = findActiveLocalPackageIndex(*localPackages, packageName);
+        if (localIndex < 0)
+            return gitSource.deriveReleaseVersion(packageName, git, commit, outVersion, outError);
+
+        const LocalPackage& localPackage = (*localPackages)[localIndex];
+        if (localPackage.as.getLength())
+            return parseExactVersion(localPackage.as, outVersion, outError);
+
+        String checkout;
+        SLANG_RETURN_ON_FAIL(getLocalPackageRoot(projectRoot, localPackage, checkout, outError));
+        String headCommit = commit;
+        if (!headCommit.getLength())
+            SLANG_RETURN_ON_FAIL(getRepositoryHeadCommit(checkout, headCommit, outError));
+        String tag;
+        bool found = false;
+        SLANG_RETURN_ON_FAIL(
+            findNearestReleaseTag(checkout, headCommit, tag, outVersion, found, outError));
+        if (!found)
+        {
+            outError = String("Override for package '") + packageName +
+                       "' has no semantic-version tag in its Git history. Pass 'as'.";
+            return SLANG_FAIL;
+        }
         return SLANG_OK;
     }
 
@@ -375,8 +430,13 @@ private:
                 continue;
             outRef = requirement.ref;
             outAs = requirement.as;
-            String error;
-            SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(parseExactVersion(outAs, outVersion, error)));
+            if (outAs.getLength())
+            {
+                String error;
+                SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(parseExactVersion(outAs, outVersion, error)));
+            }
+            else
+                outVersion = SemanticVersion();
             return true;
         }
         return false;
@@ -585,7 +645,9 @@ private:
         String text = dependency.version;
         if (dependency.ref.getLength())
         {
-            String pin = String("ref ") + dependency.ref + " as " + dependency.as;
+            String pin = String("ref ") + dependency.ref;
+            if (dependency.as.getLength())
+                pin = pin + " as " + dependency.as;
             if (text.getLength())
                 text = text + ", " + pin;
             else
@@ -783,7 +845,7 @@ private:
         String pinnedAs;
         SemanticVersion pinnedVersion;
         if (getPinnedIdentity(package, pinnedRef, pinnedAs, pinnedVersion) &&
-            pinnedVersion != pathVersion)
+            pinnedAs.getLength() && pinnedVersion != pathVersion)
         {
             outError = String("Path dependency '") + dependency.name + "' provides version " +
                        dependency.as + ", which conflicts with pinned Git version " + pinnedAs +
@@ -841,8 +903,14 @@ private:
         {
             for (const auto& existing : package.gitRequirements)
             {
-                if (existing.ref.getLength() &&
-                    (existing.ref != dependency.ref || existing.as != dependency.as))
+                if (existing.ref.getLength() && existing.ref != dependency.ref)
+                {
+                    outError = String("Package '") + dependency.name +
+                               "' is pinned to more than one Git ref or 'as' version.";
+                    return SLANG_FAIL;
+                }
+                if (existing.ref.getLength() && existing.as.getLength() &&
+                    dependency.as.getLength() && existing.as != dependency.as)
                 {
                     outError = String("Package '") + dependency.name +
                                "' is pinned to more than one Git ref or 'as' version.";
@@ -918,7 +986,8 @@ private:
                            package.locked.version + ", which conflicts with a Git constraint.";
                 return SLANG_FAIL;
             }
-            if (dependency.ref.getLength() && dependency.as != package.locked.version)
+            if (dependency.ref.getLength() && dependency.as.getLength() &&
+                dependency.as != package.locked.version)
             {
                 outError = String("Path dependency '") + dependency.name + "' provides version " +
                            package.locked.version + ", which conflicts with pinned Git version " +
@@ -943,7 +1012,8 @@ private:
                 return SLANG_FAIL;
             }
             if (dependency.ref.getLength() &&
-                (package.locked.ref != dependency.ref || package.locked.version != dependency.as))
+                (package.locked.ref != dependency.ref ||
+                 (dependency.as.getLength() && package.locked.version != dependency.as)))
             {
                 outError = String("Selected package '") + dependency.name +
                            "' conflicts with a pinned Git ref.";
@@ -1028,10 +1098,19 @@ private:
                 pinnedRef,
                 candidate,
                 outError));
-            candidate.version = pinnedVersion;
-            candidates.add(candidate);
             if (!candidate.path.getLength())
             {
+                if (pinnedAs.getLength())
+                    candidate.version = pinnedVersion;
+                else
+                {
+                    SLANG_RETURN_ON_FAIL(source->deriveReleaseVersion(
+                        unresolved.name,
+                        unresolved.git,
+                        candidate.commit,
+                        candidate.version,
+                        outError));
+                }
                 List<TagCandidate> releaseCandidates;
                 SLANG_RETURN_ON_FAIL(source->listReleaseTags(
                     unresolved.name,
@@ -1041,6 +1120,7 @@ private:
                 SLANG_RETURN_ON_FAIL(
                     loadPublisherRetractions(unresolved, releaseCandidates, retractions, outError));
             }
+            candidates.add(candidate);
         }
         else
         {

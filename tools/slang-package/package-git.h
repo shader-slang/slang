@@ -49,6 +49,34 @@ SlangResult findVersionTagAtHead(
     bool& outFound,
     String& outError);
 
+/// Resolve `revision` in `repositoryPath` to a 40-character commit ID.
+SlangResult resolveLocalRevision(
+    const String& repositoryPath,
+    const String& revision,
+    String& outCommit,
+    String& outError);
+
+/// Find the nearest `vMAJOR.MINOR.PATCH` tag that is an ancestor of `commit`.
+///
+/// Consider this example: `main` is three commits after `v1.3.0`. The pin still checks out
+/// `main`, and this helper reports `v1.3.0` so the solver can treat that tree as 1.3.0 when `as`
+/// is omitted. Tags that are not ancestors of `commit` are ignored. Two equally near release tags
+/// are an error.
+SlangResult findNearestReleaseTag(
+    const String& repositoryPath,
+    const String& commit,
+    String& outTag,
+    SemanticVersion& outVersion,
+    bool& outFound,
+    String& outError);
+
+/// Return whether `text` is a full Git object ID (40- or 64-character hex).
+bool isGitObjectId(const UnownedStringSlice& text);
+inline bool isGitObjectId(const String& text)
+{
+    return isGitObjectId(text.getUnownedSlice());
+}
+
 /// Return the working-tree root of the Git repository that contains `workingDirectory`.
 ///
 /// This is `git -C workingDirectory rev-parse --show-toplevel`. A nested checkout, such as a

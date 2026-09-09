@@ -27,9 +27,12 @@ struct Dependency
     String path;
     /// Range constraint for a Git dependency, written without a `v` prefix.
     String version;
-    /// An opaque Git branch or tag name that pins this edge instead of selecting a release tag.
+    /// An opaque Git branch, tag, or commit that pins this edge instead of selecting a release tag.
     String ref;
     /// Exact semantic version that a pinned Git ref or path dependency provides.
+    ///
+    /// Omit this on a Git pin to derive the version from the nearest `vMAJOR.MINOR.PATCH` tag
+    /// reachable from the resolved commit. Path dependencies still require it.
     String as;
 };
 
