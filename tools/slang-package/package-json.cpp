@@ -576,14 +576,18 @@ static SlangResult _readWorkspace(
     for (auto pair : container->getObject(workspace))
     {
         String key = container->getStringFromKey(pair.key);
-        if (key != "deps" && key != "build" && key != "excludes" && key != "bundle")
+        if (key != "dependencies" && key != "build" && key != "excludes" && key != "bundle")
         {
             outError = String("Unknown field in 'workspace': ") + key;
             return SLANG_FAIL;
         }
     }
-    SLANG_RETURN_ON_FAIL(
-        _readOptionalString(container, workspace, "deps", outWorkspace.depsDirectory, outError));
+    SLANG_RETURN_ON_FAIL(_readOptionalString(
+        container,
+        workspace,
+        "dependencies",
+        outWorkspace.depsDirectory,
+        outError));
     SLANG_RETURN_ON_FAIL(
         _readOptionalString(container, workspace, "build", outWorkspace.buildDirectory, outError));
     SLANG_RETURN_ON_FAIL(_readExclusions(container, workspace, outWorkspace.exclusions, outError));
@@ -628,7 +632,8 @@ static SlangResult _readWorkspace(
         (outWorkspace.buildDirectory.getLength() &&
          (outWorkspace.buildDirectory == "." || !_isSafeRelativePath(outWorkspace.buildDirectory))))
     {
-        outError = "Workspace 'deps' and 'build' must be relative paths inside the workspace.";
+        outError =
+            "Workspace 'dependencies' and 'build' must be relative paths inside the workspace.";
         return SLANG_FAIL;
     }
     String effectiveDeps =
@@ -637,7 +642,7 @@ static SlangResult _readWorkspace(
         outWorkspace.buildDirectory.getLength() ? outWorkspace.buildDirectory : "build";
     if (_workspacePathsOverlap(effectiveDeps, effectiveBuild))
     {
-        outError = "Workspace 'deps' and 'build' directories must not overlap.";
+        outError = "Workspace 'dependencies' and 'build' directories must not overlap.";
         return SLANG_FAIL;
     }
     return SLANG_OK;
@@ -1007,7 +1012,7 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
         writer.startObject(SourceLoc());
         if (manifest.workspace.depsDirectory.getLength())
         {
-            _writeKey(writer, "deps");
+            _writeKey(writer, "dependencies");
             writer.addStringValue(manifest.workspace.depsDirectory.getUnownedSlice(), SourceLoc());
         }
         if (manifest.workspace.buildDirectory.getLength())

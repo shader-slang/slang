@@ -63,7 +63,7 @@ The manifest declares the package and its source dependencies:
   "exports": ["src"],
   "license_files": ["LICENSE"],
   "workspace": {
-    "deps": "deps",
+    "dependencies": "deps",
     "build": "build",
     "excludes": [
       {
@@ -109,7 +109,7 @@ non-empty license file inside the package repository. `slang package init` creat
 `LICENSE` containing placeholder text; keeping that filename is fine, but the file's placeholder
 contents must be replaced before validation succeeds.
 
-The `workspace` object is read only from the manifest that starts the solve. `deps` is where Git
+The `workspace` object is read only from the manifest that starts the solve. `dependencies` is where Git
 dependency source is materialized, and `build` contains generated workspace output. Their defaults
 are `deps/` and `build/`; `slang package init` writes those defaults explicitly. The same fields in
 a dependency's manifest do not affect the enclosing workspace. `workspace.build` is a directory
@@ -247,7 +247,7 @@ lockfile is the definitive dependency graph and records both Git and path packag
 Nested packages' lockfiles are not used for
 that solve. When a lock exists, `slang package fetch` checks that it still satisfies every recorded
 manifest and ensures every direct and transitive Git dependency is at its locked commit under
-`workspace.deps` (`deps/` by default). Fetch installs that `commit`; it does not ask whether the
+`workspace.dependencies` (`deps/` by default). Fetch installs that `commit`; it does not ask whether the
 recorded release tag still points at it. A publisher who later moves `v1.2.0` does not break
 fetch of a lock that already named a SHA. The next `update` is what sees the new tag identity and
 may select it. A clean checkout already at the locked commit is left untouched; missing or
@@ -398,7 +398,7 @@ version can be parsed. It adds `.slang/`, `deps/`, `build/`, `slang-package-over
 `.slang/cache/` contains resolver Git repositories used to inspect release manifests. Fetched
 source remains visible under `deps/`; generated files go under `build/`.
 
-`slang package edit NAME` marks the existing `{workspace.deps}/NAME` checkout (by default
+`slang package edit NAME` marks the existing `{workspace.dependencies}/NAME` checkout (by default
 `deps/NAME`) as editable without moving it. Under the covers this is an enabled override at that
 path, using the current locked version. Gitignored `slang-package-overlay.json` records that the package
 tool no longer owns the tree. Fetch and update do not replace it. Search paths already point at

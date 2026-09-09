@@ -37,7 +37,7 @@ view:
   resolves that dependency. Portability is derived: a Git+path row requires local workspace state,
   while Git-only rows can be fetched elsewhere once their commits are reachable from the remote.
 - `slang-package-overlay.json` is machine-local override state. The tool writes it and `init` adds it to
-  `.gitignore`. `edit NAME` is shorthand for an override at `{workspace.deps}/NAME`. Do not commit
+  `.gitignore`. `edit NAME` is shorthand for an override at `{workspace.dependencies}/NAME`. Do not commit
   this file.
 
 `slang package help` groups commands under those three files, then build, in pipeline order:
@@ -82,7 +82,7 @@ image-viewer/
 ```
 
 The last two directories are generated state and are ignored. The manifest initially exports
-`src`, names `LICENSE`, configures `deps` and `build`, and records the installed Slang version as
+`src`, names `LICENSE`, configures `workspace.dependencies` (`deps/`) and `workspace.build`, and records the installed Slang version as
 the minimum `tools.slang-toolchain` version when the version is available.
 
 The generated package is deliberately incomplete. It does not add a `build.host` section. Replace the
@@ -485,12 +485,12 @@ same local tree without re-entering its configuration.
 ### Tool does
 
 - Records every local substitution under `overrides` in `slang-package-overlay.json`. `edit NAME`
-  creates the special case whose path is `{workspace.deps}/NAME`; there is no second edit
+  creates the special case whose path is `{workspace.dependencies}/NAME`; there is no second edit
   representation.
 - Does not copy or modify the supplied directory. Re-adding the in-place path updates that same
   registration's effective version.
 - Local registration changes regenerate `slang-package-includes.txt` from the active tree. An in-place
-  `edit` already sits at `{workspace.deps}/NAME`, so those paths keep working without `update`; a
+  `edit` already sits at `{workspace.dependencies}/NAME`, so those paths keep working without `update`; a
   newly declared export directory on that working tree is included immediately. An out-of-tree
   override is recorded immediately, but `update` is what writes its path into the lock and
   resolves any new dependency edges. Disabling a lock-adopted override needs `update` before
@@ -1271,7 +1271,7 @@ partial checkouts and no lock.
 
 `edit` and `override add` write the same kind of registration in `slang-package-overlay.json`. The
 difference is which directory it names. `edit` claims the checkout that is already at
-`{workspace.deps}/NAME`, so ownership changes without moving compiler inputs; fetch and update
+`{workspace.dependencies}/NAME`, so ownership changes without moving compiler inputs; fetch and update
 stop replacing that tree immediately. `override add` with another path records a sidecar tree;
 `update` is what writes that path into the lock and resolves the overlay's dependency graph.
 `--ignore-overrides` still leaves in-place edits active so it cannot replace `deps/NAME`.
@@ -1401,7 +1401,7 @@ them or update this chapter and its regression tests in the same change.
 
 ### Local-development contract
 
-- `edit` creates an enabled override at `{workspace.deps}/NAME`, using the locked version, and
+- `edit` creates an enabled override at `{workspace.dependencies}/NAME`, using the locked version, and
   prevents replacement of that checkout.
 - `edit` accepts a checkout that already holds local changes, and requires only that the directory
   is still the Git repository the lock names. Refusing a dirty tree would withhold the one command
@@ -1415,7 +1415,7 @@ them or update this chapter and its regression tests in the same change.
   explicit `--to`; `--commit` is the locked SHA and also requires a Git-only row.
 - An in-place override's working-tree manifest enters the solve.
 - `override` records a machine-local path and exact effective version. Re-adding
-  `{workspace.deps}/NAME` updates the same registration; a different path requires `unedit` first.
+  `{workspace.dependencies}/NAME` updates the same registration; a different path requires `unedit` first.
 - Enabled overrides participate in plain whole-graph update; disabled overrides retain
   configuration while published resolution is active.
 - `update --ignore-overrides` ignores out-of-tree overrides for this command only. In-place

@@ -71,6 +71,8 @@ struct BundleSettings
 /// these fields, but only the manifest that starts resolution controls materialization and output.
 struct WorkspaceSettings
 {
+    /// Directory Git checkouts occupy. Written as `workspace.dependencies`; `init` defaults it to
+    /// `deps`.
     String depsDirectory;
     String buildDirectory;
     BundleSettings bundle;
@@ -161,7 +163,7 @@ inline String getWorkspaceBuildDirectory(const Manifest& manifest)
 /// One package in `slang-package-lock.json`. Exactly one of these shapes is legal:
 ///
 /// - Git pin: `git`, `ref`, `version`, and `commit` are set; `path` is empty. Fetch materializes
-///   `workspace.deps/<name>` at that commit.
+///   `workspace.dependencies/<name>` at that commit.
 /// - Path-only: `path` and `version` are set; `git` is empty. The package is used in place and is
 ///   trusted only when a manifest `path` edge selected it.
 /// - Local override: `git` and `path` are both set. The Git identity is retained, but the tree at

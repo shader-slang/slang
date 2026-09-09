@@ -157,7 +157,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         "    {\"version\": \"1.1.0\", \"reason\": \"Broken release\"}\n"
         "  ],\n"
         "  \"workspace\": {\n"
-        "    \"deps\": \"third-party\",\n"
+        "    \"dependencies\": \"third-party\",\n"
         "    \"build\": \"out\",\n"
         "    \"excludes\": [\n"
         "      {\"package\": \"noise\", \"version\": \"1.3.0\", \"reason\": \"Workspace "
@@ -328,14 +328,14 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     const String unsafeWorkspaceText =
         "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
-        "\"dependencies\":{},\"workspace\":{\"deps\":\"../deps\",\"build\":\"build\"}}";
+        "\"dependencies\":{},\"workspace\":{\"dependencies\":\"../deps\",\"build\":\"build\"}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("unsafe-workspace.json", unsafeWorkspaceText, manifest, error)));
 
     const String overlappingWorkspaceText =
         "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
-        "\"dependencies\":{},\"workspace\":{\"deps\":\"out\",\"build\":\"out\"}}";
+        "\"dependencies\":{},\"workspace\":{\"dependencies\":\"out\",\"build\":\"out\"}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("overlapping-workspace.json", overlappingWorkspaceText, manifest, error)));
 
@@ -349,7 +349,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     const String implicitBuildOverlapText =
         "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
-        "\"dependencies\":{},\"workspace\":{\"deps\":\"build\"}}";
+        "\"dependencies\":{},\"workspace\":{\"dependencies\":\"build\"}}";
     SLANG_CHECK(SLANG_FAILED(readManifestText(
         "implicit-build-overlap.json",
         implicitBuildOverlapText,
@@ -359,7 +359,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     const String nestedWorkspaceText =
         "{\"version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
-        "\"dependencies\":{},\"workspace\":{\"deps\":\"state/deps\",\"build\":\"state\"}}";
+        "\"dependencies\":{},\"workspace\":{\"dependencies\":\"state/deps\",\"build\":\"state\"}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("nested-workspace.json", nestedWorkspaceText, manifest, error)));
 

@@ -67,7 +67,7 @@ less slang-package-lock.json
 - `slang-package.json` is published intent: package name, exports, licenses, Git or path
   dependencies, optional `tools.slang-toolchain` for a minimum installed compiler (and thus its
   builtins and standard library), optional `build.host` executables, optional publisher `retractions`,
-  and optional root-only `workspace` settings (`deps`, `build`, `excludes`).
+  and optional root-only `workspace` settings (`dependencies`, `build`, `excludes`).
 - `slang-package-lock.json` is the exact selection this workspace resolved: identity only (`version`,
   Git `ref`/`commit`, overlay `path`). `fetch` reproduces those pins without solving again.
   Declared exports and dependencies are reloaded from overlay working trees or from each locked
