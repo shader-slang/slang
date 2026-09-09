@@ -296,11 +296,15 @@ cannot begin with `-`, use Git's command-executing `ext::` transport, or contain
 control characters.
 
 After fetching, `slang-package-includes.txt` lists the source
-roots, one per line. A caller must translate each line into a separate `slangc -I <path>` argument;
-`slangc` does not read this file directly. It is a derived, gitignored file; fetch or update
-regenerates it. Each line is a workspace-rooted filesystem
-path, so it can be passed to `slangc` from a subdirectory. Package commands do not inject these
-paths into compiler sessions automatically.
+roots, one per line. Pass the file explicitly with
+`slangc -search-path-list slang-package-includes.txt`; this adds every listed root just as if it
+had been passed with a separate `-I`. Library callers can load the same file with
+`slang_readSearchPathsFile`, assign the returned array and count to
+`slang::SessionDesc::searchPaths` and `searchPathCount`, and keep its `outAllocation` alive until
+`createSession` returns. It is a derived, gitignored file; fetch or update regenerates it. Each
+line is an absolute workspace-rooted filesystem path, so the listed roots remain valid when the
+compiler is invoked from a subdirectory. Package commands do not inject these paths into compiler
+sessions automatically.
 
 ## Validating packages
 

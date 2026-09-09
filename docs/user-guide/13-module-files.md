@@ -83,7 +83,9 @@ void computeMain(uint2 tid: SV_DispatchThreadID)
 }
 ```
 
-Compile that shader with the export root on the search path, for example `slangc app/tonemap.slang -I src ...`. After `slang package fetch`, pass each path listed in `slang-package-includes.txt` the same way.
+Compile that shader with the export root on the search path, for example
+`slangc app/tonemap.slang -I src ...`. After `slang package fetch`, pass the generated list
+directly with `slangc app/tonemap.slang -search-path-list slang-package-includes.txt ...`.
 
 ## Primary files and import paths
 

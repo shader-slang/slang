@@ -1924,10 +1924,12 @@ SLANG_UNIT_TEST(PackageToolFetchInstallsLockedCommitAfterMovedTag)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initRootWithGitNoise(temp.path, repository, error)));
 
     PackageTool::LockFile lockBefore;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockBefore, error)));
+    String lockPath = Path::combine(temp.path, "slang-package-lock.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(lockPath, lockBefore, error)));
     SLANG_CHECK_ABORT(lockBefore.packages.getCount() == 1);
     const String lockedCommit = lockBefore.packages[0].commit;
+    String lockTextBefore;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(lockPath, lockTextBefore)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(repository, "src/noise.slang"), "module noise;\n// retagged\n")));
@@ -1935,15 +1937,23 @@ SLANG_UNIT_TEST(PackageToolFetchInstallsLockedCommitAfterMovedTag)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(repository, "v1.0.0")));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(Path::removeNonEmpty(Path::combine(temp.path, "deps/noise"))));
+    String searchPathsPath = Path::combine(temp.path, "slang-package-includes.txt");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::remove(searchPathsPath)));
 
     const char* fetchArguments[] = {"slang-package", "fetch"};
     SLANG_CHECK(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
 
     PackageTool::LockFile lockAfter;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockAfter, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(lockPath, lockAfter, error)));
     SLANG_CHECK(lockFilesEqual(lockBefore, lockAfter));
+    String lockTextAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(lockPath, lockTextAfter)));
+    SLANG_CHECK(lockTextAfter == lockTextBefore);
+
+    String searchPaths;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(searchPathsPath, searchPaths)));
+    SLANG_CHECK(searchPaths == Path::combine(temp.path, "deps/noise/src") + "\n");
 
     String headCommit;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(

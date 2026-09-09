@@ -140,8 +140,10 @@ Commit source, the manifest, licenses, tests, and docs. Do not commit `.slang/`,
 - `slang package test` is reserved but not implemented. The generated `tests/` directory is only a
   convention today.
 - `docs` does not regenerate documentation. Run `build` first.
-- An application that invokes `slangc` itself must consume the export paths written to
-  `slang-package-includes.txt`; the package state is not injected into arbitrary compiler sessions.
+- An application that invokes `slangc` itself passes
+  `-search-path-list slang-package-includes.txt`. An API host loads the same paths with
+  `slang_readSearchPathsFile` and assigns them to `SessionDesc.searchPaths`; package state is not
+  injected into arbitrary compiler sessions.
 - A `build.host` section has no effect on plain `build`; Journey 8 covers the explicit opt-in that
   produces its binary output.
 
@@ -276,6 +278,12 @@ commit the manifest (and lock, if update rewrote it).
   slang package fetch
   slang package build
   ```
+
+  With an existing lock, fetch also regenerates `slang-package-includes.txt` without re-solving or
+  rewriting that lock. This is the non-destructive way to restore a missing or stale include list,
+  although fetch may still restore tool-owned checkouts to their locked commits. Do not pass
+  `--clean` unless local checkout state should be discarded. With no lock, fetch delegates to
+  `update --yes` and writes the initial lock.
 
   This is the normal clean-clone and CI path. With a committed lock, `build` fetches any missing
   locked trees first and does not rewrite that lock. With no lock, `build` runs fetch, which runs
