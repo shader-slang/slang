@@ -169,6 +169,7 @@ No trigger of their own; see the first diagram for who calls them. The
 | `ci-materialx-regression-test.yml`                             | MaterialX integration test.              |
 | `cmake-options-build.yml`, `cmake-options-build-container.yml` | Build one CMake-option combination.      |
 | `pr-board-sync.yml`                                            | The PR-board reconciliation engine.      |
+| `issue-board-onboard.yml`                                      | Onboard a new issue onto Slang-All.      |
 
 ## 3. Scheduled
 
@@ -201,9 +202,10 @@ The `pr-*` files — the first four rows — are thin callers around
 `pr-board-sync.yml`; each exists because a different event is the only one
 carrying a particular signal, or the only one carrying secrets for a fork PR.
 See the second diagram, and read [`pr-board-sync.md`](pr-board-sync.md) before
-changing any of them. The remaining rows are standalone bots that call nothing
-and are grouped here only because they react to issue, comment, and review
-events rather than to a PR's code.
+changing any of them. `issue-onboard.yml` is the same thin-caller pattern around
+`issue-board-onboard.yml` for newly opened issues. The remaining rows are
+standalone bots that call nothing and are grouped here because they react to
+issue, comment, and review events rather than to a PR's code.
 
 | Workflow                                                | Purpose                                                      |
 | ------------------------------------------------------- | ------------------------------------------------------------ |
@@ -212,6 +214,7 @@ events rather than to a PR's code.
 | `pr-commit-status.yml`                                  | Board sync when an external commit status settles.           |
 | `pr-review-fork-bridge.yml`, `pr-review-fork-apply.yml` | Two-stage relay for fork-PR reviews.                         |
 | `issue-add-labels.yml`                                  | Labels new issues by the author's team membership.           |
+| `issue-onboard.yml` / `issue-board-onboard.yml`         | Adds a new issue to Slang-All; sets Source; Internal authors are assigned and moved to In Triage / current Sprint. |
 | `claude.yml`                                            | The `@claude` assistant on issues and PRs.                   |
 | `claude-ci-analysis.yml`                                | On demand: analyzes a CI failure and pushes a fix to the PR. |
 

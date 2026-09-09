@@ -25,6 +25,11 @@ jobs:
     # (success -> recovery, failure/error -> Snagged) changes the outcome, and the
     # recompute is idempotent regardless.
     if: ${{ github.event.state != 'pending' }}
+    # Repo-scoped writes (assignees, review requests, comments) use
+    # github-actions[bot]; org-team reads and ProjectsV2 writes still use the PAT.
+    permissions:
+      issues: write
+      pull-requests: write
     uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
     secrets:
       SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}
