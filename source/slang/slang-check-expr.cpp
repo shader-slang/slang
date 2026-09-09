@@ -2590,7 +2590,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     {
         auto opName = funcDeclRef.getName();
 
-        // handle binary operators
+        // handle unary and binary operators
         if (opName == getName("-"))
         {
             if (argCount == 1)
@@ -2600,6 +2600,19 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             else if (argCount == 2)
             {
                 resultValue = constArgVals[0] - constArgVals[1];
+            }
+        }
+        else if (opName == getName("+"))
+        {
+            if (argCount == 1)
+            {
+                resultValue = constArgVals[0];
+            }
+            else if (argCount == 2)
+            {
+                resultValue = static_cast<IntegerLiteralValue>(
+                    static_cast<uint64_t>(constArgVals[0]) +
+                    static_cast<uint64_t>(constArgVals[1]));
             }
         }
         else if (opName == getName("!"))
@@ -2634,7 +2647,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     }                                                                                         \
     while (0)
 
-        CASE_UINT(+); // TODO: this can also be unary...
         CASE_UINT(*);
         CASE_UINT(&);
         CASE_UINT(|);
