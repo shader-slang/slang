@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:01:06Z
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#returnstmt
-//META: doc_section_digest=f1e8b66abbff0395f77b1ea4055b32d0423ac884166270a7cbff04f0383235db
+//META: doc_section_digest=c25c0b38fe3f374b6c53bf5d39f45dbef8f00f160edf334a7927f62cea89fd70
 //META: purpose=The checker matches a ReturnStmt's expression against the enclosing function's declared return type; `return 1;` in a `void` function is rejected because `int` does not implicitly convert to `void`.
 //META: intent=negative
 //META: pipeline_stage=check

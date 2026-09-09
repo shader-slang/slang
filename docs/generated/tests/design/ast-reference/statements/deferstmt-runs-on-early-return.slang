@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#deferstmt
-//META: doc_section_digest=8d7ee5a379aeb4b393aeb766e8179650d332b2a7a6bcc65b16e7e5c13a614827
-//META: purpose=A DeferStmt's inner statement runs even when the enclosing scope exits via early `return`; the IR pipeline materializes it as a scope-exit handler reached on every control-flow path.
+//META: doc_section_digest=9d7a17de2e7a4cacf7a44eefe78eaa8bea0a9a617b555cc1e20d4e784f62d6bf
+//META: purpose=A DeferStmt's inner statement still runs when the enclosing scope exits via an early `return`, not only when the scope falls through its end.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says defer runs when the enclosing scope exits "normally or
-// via return/break/throw". We observe by writing a defer that prints,
-// then taking an early return: the defer must still fire before the
-// caller's next statement.
+// Verifies a deferred statement still runs when the function exits via
+// an early `return`, not only on fall-through. The CHECK asserts the
+// deferred print lands between the function body's print and the
+// caller's next print.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

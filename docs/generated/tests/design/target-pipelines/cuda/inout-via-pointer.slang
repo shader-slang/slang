@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:30:46+00:00
-//META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#undoparametercopy-and-transformparamstoconstref
-//META: doc_section_digest=df689c12929eee6d8d33abe644229b392449cba4ea75164285db25bee7cea6e6
+//META: doc_section_digest=2daf73e31e7ca500dd32820aabeebff047d750c36d45ddc66ec8d467f09ff675
 //META: purpose=undoParameterCopy rewrites explicit inout copy-in copy-out wrappers as pass-by-pointer on CUDA emit.
 //META: intent=functional
 //META: pipeline_stage=emit

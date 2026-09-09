@@ -121,6 +121,10 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(slang::IBlob** outPath) SLANG_OVERRIDE
+    {
+        return getPathFromSymbol((void*)m_compile, outPath);
+    }
 
     /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);

@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:27:31Z
-//META: source_commit=6b490bc8cb3cf11b356ddf70168c5609efa46341
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/01-lex-preprocess.md#literal-scanning-and-value-extraction
-//META: doc_section_digest=3d1fe0ccb147581731904561116b628f50946cd1ba50b6e57e6f7814154570a2
-//META: purpose=Negative probe: a character literal holding more than one character is diagnosed at scan time as an illegal character literal (E10001).
+//META: doc_section_digest=647b640bd681c2f430950851d8d396048217ee710b1310283de6eb1e46d0cb36
+//META: purpose=Negative probe: a character literal holding more than one character is diagnosed at decode time as an illegal character literal (E10001).
 //META: intent=negative
 //META: pipeline_stage=lex
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the multi-character arm of the same scan-time structural
-// check that rejects empty character literals: two characters
-// between the quotes trigger the illegal-character-literal
-// diagnostic, pinned to code E10001.
+// Verifies the "decode left unconsumed input" arm of the same
+// one-character rule: the scanner happily records `'ab'` as one token,
+// and only the value decode notices that a second character remains
+// after the first was consumed. E10001 is pinned to prove the check
+// fires, and the caret spans the whole literal token.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 

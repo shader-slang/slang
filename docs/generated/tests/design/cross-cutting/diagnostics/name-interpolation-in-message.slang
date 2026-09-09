@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T12:30:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
-//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#anatomy-of-a-legacy-diagnostic
-//META: doc_section_digest=04e6b41a5ed7b7f40deee827fed8dac1f618dc77bdfc81ebd67f98a5810bb953
-//META: purpose=Legacy diagnostics interpolate ~param fields into the rendered text; the undeclared name appears quoted in the span message.
-//META: intent=negative
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#anatomy-of-a-diagnostic-entry
+//META: doc_section_digest=3a623795b5dd78e308025c61705ad0257495b87ee059b06c6f6541a5d86c1a61
+//META: purpose=A `~name:Name` interpolation parameter renders the supplied name, quoted, inside the span message.
+//META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc shows legacy `~param` and `~param:Type` interpolation. The
-// undefined-identifier diagnostic uses `~name:Name`. Verify that the
-// specific undeclared name appears quoted in the rendered message.
+// Verifies that a `~name:Name` interpolation parameter reaches the rendered
+// text. An undeclared identifier is referenced and the CHECK asserts the
+// message contains that exact name in quotes, which can only happen if the
+// call site's argument was substituted into the span message.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 void main()
@@ -19,5 +20,4 @@ void main()
     int a = mysteryIdent;
 //CHECK:    ^^^^^^^^^^^^ undefined identifier
 //CHECK:    ^^^^^^^^^^^^ undefined identifier 'mysteryIdent'.
-// CHECK: E30015
 }

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:30:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=f10111d688d4db27a4327f54fd4554f2a754e8e8d68be60a6a92dc615db870b2
 //META: purpose=Fires diagnostic E36104 (use-of-undeclared-capability) - undeclared capability used
 //META: intent=negative
 //META: pipeline_stage=check
@@ -28,4 +28,4 @@ void main()
     caller();
 }
 
-// CHECK: E36104
+//CHECK: E36104

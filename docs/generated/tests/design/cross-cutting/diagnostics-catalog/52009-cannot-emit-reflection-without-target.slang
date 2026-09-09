@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=a63c1be00eede0d7198ea9525a1505997fdb8766fe04d4d61440fc4a6d45b0cf
 //META: purpose=Fires diagnostic E52009 (cannot-emit-reflection-without-target) - cannot emit reflection JSON
 //META: intent=negative
 //META: pipeline_stage=emit
@@ -19,4 +19,4 @@
 [numthreads(1,1,1)]
 void main() {}
 
-// CHECK: E52009
+//CHECK: E52009

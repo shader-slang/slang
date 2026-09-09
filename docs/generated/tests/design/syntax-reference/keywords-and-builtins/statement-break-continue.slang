@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#statement-keywords
-//META: doc_section_digest=4e5c787f52095c6dbdd20c8c0f4df226f6e2e9bbef0e89d6a888ac6bb5940443
+//META: doc_section_digest=58adeae3c01b07a208e3d126aee114b032a435add75925b7e18289c39283719b
 //META: purpose=`break` exits the enclosing loop and `continue` skips to the next iteration; both are statement keywords.
 //META: intent=functional
 //META: pipeline_stage=parse

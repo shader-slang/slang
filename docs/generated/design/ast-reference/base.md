@@ -132,6 +132,19 @@ group of declarations. It has exactly two subclasses: the abstract
 parser produces when one piece of syntax declares several names; see
 [declarations.md](declarations.md) for that node.
 
+A comma-separated declaration is the everyday case:
+
+```slang
+int a = 1, b = 2;
+static const int P = 3, Q = 4;
+```
+
+Each of these lines declares two independent `Decl`s — `a` and `b`,
+`P` and `Q`. Because the group node is itself a
+`ModifiableSyntaxNode`, the modifiers written once in front of the
+group apply to every name it declares: `P` and `Q` are both
+`static const`. A struct's fields group the same way (`int x, y;`).
+
 Fields declared at this level:
 
 - (no additional state)
@@ -147,12 +160,26 @@ type, parameter, generic parameter, ...). Carries a name, the parent
 Fields declared at this level:
 
 - `parentDecl: ContainerDecl*` — containing declaration, set during
-  parsing.
-- `nameAndLoc: NameLoc` — the declared name and its source location.
+  parsing. A declaration is keyed by its parent as well as by its
+  name, so the same simple name declared in two different containers
+  stays distinguishable at a member-access site; `Decl::isChildOf`
+  walks this pointer.
+- `nameAndLoc: NameLoc` — the declared name paired with the source
+  location of the *name token* rather than of the declaration as a
+  whole (`getNameLoc()` returns `nameAndLoc.loc`), which is why a
+  conflicting-declaration diagnostic puts its caret under the name.
 - `inferredCapabilityRequirements: CapabilitySetVal*` — capability set
-  inferred during checking.
+  inferred during checking. Alongside it,
+  `capabilityRequirementProvenance` records, for each atom, the decl
+  reference that caused the requirement, so a capability diagnostic
+  can point back at the use that introduced it; see
+  [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md).
 - `checkState: DeclCheckStateExt` — tracks which checking phases have
-  completed for this declaration.
+  completed for this declaration; `setCheckState` asserts that the
+  state only ever advances. Nothing in program text observes the
+  field directly — it is the bookkeeping behind the `DeclCheckState`
+  sequence described in
+  [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md).
 
 Family page: [declarations.md](declarations.md)
 
@@ -190,7 +217,10 @@ that is filled in by semantic checking.
 Fields declared at this level:
 
 - `type: QualType` — the type assigned to the expression by the
-  checker; null on freshly-parsed expressions.
+  checker; null on freshly-parsed expressions. A `QualType` is more
+  than a `Type*`: its `isLeftValue` flag records whether the
+  expression denotes storage, which is what makes `f() = 5` a
+  *left of `=` is not an l-value* error rather than a type error.
 - `checked: bool` — flag set when the checker has finished with this
   expression.
 
@@ -206,7 +236,10 @@ Fields declared at this level:
 - `next: Modifier*` — next modifier in the linked list on the same
   piece of syntax.
 - `keywordName: Name*` — the keyword (or attribute name) that
-  introduced this modifier.
+  introduced this modifier. The spelling is retained rather than
+  reduced to an anonymous node, and it is the spelling an attribute
+  diagnostic quotes back (`unknown attribute 'NoSuchAttributeXyz'`);
+  `getKeywordNameAndLoc()` pairs it with the modifier's own `loc`.
 
 Family page: [modifiers.md](modifiers.md)
 
@@ -264,7 +297,7 @@ subclasses; they are helpers that wrap or describe nodes.
 | `TypeExp` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A type expression as written by the user (an `Expr` plus the resolved `Type*`). |
 | `WitnessTable` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A compile-time table of interface-requirement-to-implementation mappings; see the entry in [../glossary.md](../glossary.md). |
 | `SyntaxClass<T>` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Reflection-style handle to a concrete AST class, used by the visitor and `as<T>()` infrastructure. |
-| `KnownBuiltinDeclName` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Enum of built-in declaration names (`GeometryStreamAppend`, `DispatchMesh`, `IDifferentiable`, ...) that the compiler recognizes, so that recognition is an enum comparison rather than a string comparison. `getKnownBuiltinDeclNameFromString` maps a spelling to the enumerator; `isDifferentiableInterfaceBuiltin` tests whether an enumerator names one of the differentiable interfaces. |
+| `KnownBuiltinDeclName` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Enum of built-in declaration names (`GeometryStreamAppend`, `DispatchMesh`, `IDifferentiable`, ...). The core module tags each such declaration with its enumerator using the `[KnownBuiltin(n)]` attribute (`attribute_syntax [KnownBuiltin(name : int)]` in [core.meta.slang](../../../../source/slang/core.meta.slang)), so the compiler locates the declaration by enum comparison rather than by string comparison. Membership is not only a lookup speed-up — it gates behavior: `isDifferentiableInterfaceBuiltin` is the authoritative definition of the differentiable-interface family (`IDifferentiable`, `IDifferentiablePtr`, `IForwardDifferentiable`, `IBackwardDifferentiable`, `IBwdCallable`), whose conformance witness-table entries the linker defers when a program does not use auto-diff. `getKnownBuiltinDeclNameFromString` maps a spelling to the enumerator. |
 | `BuiltinOperationKind` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Enum tagging a builtin operator (`Add`, `Sub`, `Less`, ...) recognized by the operator fast path. Stored on the synthesized builtin-operator expression node (see [expressions.md](expressions.md)) and on its constant-folded counterpart (see [values.md](values.md)); mapped from operator-name + `OperatorArity` by `getBuiltinOperationKindFromString`. Integer values are part of the serialized/mangled form (append-only). |
 | `printDiagnosticArg` / `getDiagnosticPos` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Free-function diagnostic helpers: `printDiagnosticArg` overloads format a `Decl` / `Type` / `TypeExp` / `QualType` / `Val` / `DeclRefBase` into a diagnostic message, and `getDiagnosticPos` overloads recover the `SourceLoc` to anchor a diagnostic at. |
 | `Scope` | [slang-ast-base.h](../../../../source/slang/slang-ast-base.h) | Name-lookup data structure; technically a `NodeBase` but used as a helper rather than a syntax node. Created during parsing and attached to container declarations. |

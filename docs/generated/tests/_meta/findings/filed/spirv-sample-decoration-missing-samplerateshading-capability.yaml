@@ -1,0 +1,44 @@
+schema_version: 1
+id: spirv-sample-decoration-missing-samplerateshading-capability
+bundle: design/ast-reference/modifiers
+suspected_kind: wrong-codegen
+title: "SPIR-V: sample interpolation omits OpCapability SampleRateShading"
+observed_at: "2026-08-06T00:00:00+00:00"
+scope: spirv
+evidence:
+  command: "build/Release/bin/slangc docs/generated/tests/design/ast-reference/modifiers/sample-interpolation-emits-on-hlsl.slang -target spirv-asm -entry main -stage fragment"
+  source_slang: docs/generated/tests/design/ast-reference/modifiers/sample-interpolation-emits-on-hlsl.slang
+  observed_summary: |
+    A fragment input declared with the `sample` interpolation modifier lowers to the
+    `Sample` decoration, but the module never declares the capability that decoration
+    requires. The emitted header carries only:
+      OpCapability Shader
+    while the interface variable is decorated:
+      OpDecorate %v_perSample Location 0
+      OpDecorate %v_perSample Sample
+    spirv-val rejects the module:
+      error: line 10: Operand 2 of Decorate requires one of these capabilities:
+      SampleRateShading
+    So any shader using `sample` interpolation produces an invalid SPIR-V module under
+    SLANG_RUN_SPIRV_VALIDATION=1, which is the configuration the nightly runs. The GLSL
+    path emits the same construct correctly, and `-target spirv-asm` itself still exits 0
+    because validation is not run on the assembly path -- the invalid module only surfaces
+    when the binary is validated.
+  exit_code: 0
+expected:
+  claim: |
+    Emitting the `Sample` decoration should also declare `OpCapability SampleRateShading`,
+    as the SPIR-V specification lists that capability as required for the `Sample`
+    decoration. A module Slang emits for a valid Slang program should pass spirv-val.
+  citation_kind: sibling-test
+  citation: tests/spirv/sv-vulkan-sample-position.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 587bc089140d0ba3d6d9e0e0b5d6b1e9e0a5f2c1
+  doc_anchor: docs/generated/design/ast-reference/modifiers.md#interpolation-modifiers
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug (the CHECK is wrong): ruled out -- the decoration the test pins is present and correct; the failure is spirv-val rejecting the module, not a FileCheck mismatch."
+    - "Environment-specific to this host: ruled out -- the capability list is emitted by the compiler and does not depend on the validator version or host architecture."
+    - "SampleRateShading is implied by Shader: ruled out -- the SPIR-V capability graph does not make SampleRateShading a dependency of Shader, which is why spirv-val flags it."

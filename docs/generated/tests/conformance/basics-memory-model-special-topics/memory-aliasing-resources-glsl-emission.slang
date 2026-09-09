@@ -19,6 +19,8 @@
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 ConstantBuffer<int> cbuf;
 RWStructuredBuffer<int> rwbuf;
@@ -44,3 +46,13 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // WGSL: var<uniform> cbuf_{{[0-9]+}} : i32
 // WGSL: var<storage, read_write> rwbuf_{{[0-9]+}} : array<i32>
+
+// HLSL: cbuffer cbuf_{{[0-9]+}} : register(b{{[0-9]+}})
+// HLSL: RWStructuredBuffer<int > rwbuf_{{[0-9]+}} : register(u{{[0-9]+}})
+
+// SPIRV-DAG: OpDecorate %cbuf{{.*}} Binding
+// SPIRV-DAG: OpDecorate %cbuf{{.*}} DescriptorSet
+// SPIRV-DAG: OpDecorate %rwbuf{{.*}} Binding
+// SPIRV-DAG: OpDecorate %rwbuf{{.*}} DescriptorSet
+// SPIRV-DAG: %cbuf = OpVariable %_ptr_Uniform_{{.*}} Uniform
+// SPIRV-DAG: %rwbuf = OpVariable %_ptr_StorageBuffer_{{.*}} StorageBuffer

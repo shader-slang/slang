@@ -1,20 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#partiallyappliedgenericexpr
-//META: doc_section_digest=4d163ab6518243cfde6c2ab59fe21c0686ba293bb213359f9f699f9ab2485f83
+//META: doc_section_digest=00a9c7301a485338c42856c154381b7ce23934b997924e9acae37c26eafc3d55
 //META: purpose=A PartiallyAppliedGenericExpr provides some generic arguments and lets overload resolution infer the rest from call-site argument types.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says when only some generic parameters are explicitly
-// supplied, the result is a PartiallyAppliedGenericExpr that
-// overload resolution completes at the call site. Below, `pair<int>`
-// fixes T=int; U is inferred from the second argument's type (float).
-// The function returns a tuple-like aggregate whose first element
-// has the explicitly-given int type.
+// Verifies that supplying only some of a generic's parameters still yields a
+// callable whose remaining parameters are inferred from the call arguments.
+// `pair<int>` fixes T; U is deduced from the float argument, and the CHECKs
+// read both components back to prove each parameter bound as intended.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

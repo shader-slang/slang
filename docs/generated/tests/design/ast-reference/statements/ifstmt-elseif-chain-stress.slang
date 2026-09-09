@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#ifstmt
-//META: doc_section_digest=10062280ed5cf8f826912bbfaa3a2c63188ff4d4c316ffda45574aab2cc4dc2c
+//META: doc_section_digest=a6c1740eeba3eb150d93ff559a355c4b73decc79a2b471fc7f1203bf5d838824
 //META: purpose=A 5-arm if/else-if/else-if/else-if/else chain (nested IfStmts in each negativeStatement slot) dispatches to exactly the matching arm; later arms do not fire and the final else handles the unmatched fallback.
 //META: intent=stress
 //META: pipeline_stage=check
