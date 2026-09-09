@@ -384,7 +384,6 @@ static void _resolveSourceLanguageFromPrimarySourceFiles(
                     .conflictingPath = path});
             }
         }
-
     }
 
     // `Unknown` records that there is no single extension-implied language, whether because no
@@ -798,10 +797,9 @@ void FrontEndCompileRequest::applyLegacyAllowGLSLInputOptionToAllTranslationUnit
         if (translationUnit->sourceLanguageExplicitlyRequested != SourceLanguage::Unknown &&
             translationUnit->sourceLanguageExplicitlyRequested != SourceLanguage::GLSL)
         {
-            getSink()->diagnose(
-                Diagnostics::LegacyAllowGlslOverridesExplicitSourceLanguage{
-                    .language = _getSourceLanguageName(
-                        translationUnit->sourceLanguageExplicitlyRequested)});
+            getSink()->diagnose(Diagnostics::LegacyAllowGlslOverridesExplicitSourceLanguage{
+                .language =
+                    _getSourceLanguageName(translationUnit->sourceLanguageExplicitlyRequested)});
         }
         translationUnit->sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
         translationUnit->sourceLanguage = SourceLanguage::GLSL;
