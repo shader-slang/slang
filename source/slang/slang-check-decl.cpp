@@ -12079,10 +12079,14 @@ bool SemanticsVisitor::isValidCompileTimeConstantType(Type* type)
 }
 
 // Return true iff `value` is exactly representable in `half` (IEEE binary16),
-// i.e. it round-trips through half unchanged. Comparing in floating point is
-// deliberate: a large-magnitude value rounds to an infinity in half, and
-// casting an infinite/NaN half back to an integer is undefined behavior,
-// whereas the floating-point compare is well-defined for every input.
+// i.e. it round-trips through half unchanged. The intermediate narrowing to
+// `float` is lossless for every value that could matter: any half-representable
+// integer lies in [-65504, 65504], well inside float's exact-integer range
+// (2^24), so the narrowing can never fabricate a false "representable" verdict.
+// Comparing the round-trip in floating point is deliberate: a large-magnitude
+// value rounds to an infinity in half, and casting an infinite half back to an
+// integer is undefined behavior, whereas the floating-point compare is
+// well-defined for every input.
 static bool isIntExactlyRepresentableInHalf(IntegerLiteralValue value)
 {
     return (double)HalfToFloat(FloatToHalf((float)value)) == (double)value;

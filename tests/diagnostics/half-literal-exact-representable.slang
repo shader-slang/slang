@@ -26,6 +26,7 @@ void computeMain()
     half d = 65504;  // largest finite half
     half e = -4096;  // negative, exact
     half f = 4096u;  // exact, unsigned
+    half k = 3072;   // non-power-of-two, exact (locks the (2048, 4096) band)
 
     // Lose precision when rounded to half -> WARN.
     half g = 4097;
@@ -37,11 +38,14 @@ void computeMain()
     half i = 4097u;
 //CHECK:     ^^^^^ implicit conversion not recommended
 //CHECK:     ^^^^^ implicit conversion from 'uint' to 'half' is not recommended
+    half m = -4097;  // negative, lossy (rounds to -4096)
+//CHECK:      ^^^^ implicit conversion not recommended
+//CHECK:      ^^^^ implicit conversion from 'int' to 'half' is not recommended
 
     // Exceed half's finite range (overflow to +inf) -> WARN.
     half j = 131072u;
 //CHECK:     ^^^^^^^ implicit conversion not recommended
 //CHECK:     ^^^^^^^ implicit conversion from 'uint' to 'half' is not recommended
 
-    output[0] = a + b + c + d + e + f + g + h + i + j;
+    output[0] = a + b + c + d + e + f + g + h + i + j + k + m;
 }
