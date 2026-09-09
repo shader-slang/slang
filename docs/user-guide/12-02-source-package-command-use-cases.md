@@ -40,6 +40,10 @@ view:
   `.gitignore`. `edit NAME` is shorthand for an override at `{workspace.deps}/NAME`. Do not commit
   this file.
 
+`slang package help` groups commands under those three files, then build, in pipeline order:
+manifest, overlay, lock. That is the file each command primarily writes or reports. Most commands
+still _read_ the others. `unedit --adopt` drops the overlay and also writes the manifest and lock.
+
 The **workspace** is the package from which you run the command. It owns the one lock for that
 solve. This is not a multi-member workspace in the Cargo or npm sense: Slang currently has no
 committed list of packages that are developed together.
@@ -1207,7 +1211,11 @@ unaffected by it.
 ### Help spellings and commands without flags
 
 `slang package help`, `-help`, and `--help` print stable package help, including source `run`.
-Binary run and host build behavior appear in `slang package --experimental help`. `init`,
+Commands are grouped by the file they primarily write or report: the manifest
+(`slang-package.json`), the overlay (`slang-package-overlay.json`), the lock
+(`slang-package-lock.json`), then build. `unedit --adopt` is listed under overlay because it
+drops that registration; it also writes the manifest and lock. Binary run and host build
+behavior appear in `slang package --experimental help`. `init`,
 `status`, `tree`, and `edit` accept no additional arguments; `validate` accepts an optional package
 name or `--all`; `build` accepts only `--skip-validate` (not `--clean` or `--yes`); `unedit`
 accepts `--clean`, or `--adopt` with optional `--as`, plus `--yes`; and `docs` accepts `--print`.

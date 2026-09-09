@@ -359,7 +359,7 @@ enabled overrides are listed by name. Disabled out-of-tree overrides are silent;
 in-place override remains visible because its `deps/NAME` checkout may still contain local work.
 Like
 `git status`, reportable drift does not make the command fail. Status returns nonzero only when
-required root manifest, existing lock, or workspace JSON cannot be read and parsed well enough to
+required root manifest, existing lock, or overlay JSON cannot be read and parsed well enough to
 produce a report. It does not inspect `build/`, modify package state, or contact remotes.
 
 Use `slang package dependency add` and `dependency remove` to edit direct manifest edges, and
@@ -393,7 +393,7 @@ relative to the primary (for example `__include "noise/hash";`), as shown in
 `slang package init` creates `slang-package.json` and the conventional directories in the current
 directory. It writes `tools.slang-toolchain` as `>=` the installed compiler version when that
 version can be parsed. It adds `.slang/`, `deps/`, `build/`, and `slang-package-overlay.json` to
-`.gitignore`.
+`.gitignore`. `slang package help` lists commands under the manifest, overlay, lock, and build.
 `.slang/cache/` contains resolver Git repositories used to inspect release manifests. Fetched
 source remains visible under `deps/`; generated files go under `build/`.
 

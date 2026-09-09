@@ -76,6 +76,9 @@ less slang-package-lock.json
   override at `deps/NAME`; other overrides may point elsewhere. The file should not be in the
   clone. If it is missing, that is correct for CI and for a clean checkout.
 
+`slang package help` groups commands under those three files, then build, in that pipeline
+order: manifest, overlay, lock.
+
 `build` is a sibling of `workspace` in the manifest. `workspace.build` names the output directory;
 `build.host` configures native executables. A dependency may declare `build.host`; only the package
 you run `build` and `run` in produces executables.
