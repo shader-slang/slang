@@ -12078,15 +12078,10 @@ bool SemanticsVisitor::isValidCompileTimeConstantType(Type* type)
     return isScalarIntegerType(type) || isEnumType(type);
 }
 
-// Return true iff `value` converts to `half` (IEEE binary16) without loss of
-// precision -- that is, iff it round-trips through half exactly. `half` has an
-// 11-bit significand, so every integer up to 2048 is exact, but many larger
-// integers are exact too (4096 = 2^12, 8192 = 2^13, and so on, up to 65504, the
-// largest finite half), while others are not (e.g. 4097 rounds to 4096, and
-// 131072 exceeds half's finite range and becomes +inf). A plain [-2048, 2048]
-// range check therefore misclassifies every exactly-representable integer above
-// 2048 as lossy. The round-trip is compared in floating point on purpose:
-// casting an inf/nan half back to an integer would be undefined behavior,
+// Return true iff `value` is exactly representable in `half` (IEEE binary16),
+// i.e. it round-trips through half unchanged. Comparing in floating point is
+// deliberate: a large-magnitude value rounds to an infinity in half, and
+// casting an infinite/NaN half back to an integer is undefined behavior,
 // whereas the floating-point compare is well-defined for every input.
 static bool isIntExactlyRepresentableInHalf(IntegerLiteralValue value)
 {
