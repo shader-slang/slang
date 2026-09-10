@@ -8,11 +8,17 @@
     float4 color : read(caller, anyhit) : write(caller);
 };
 
+// The error fires whether the member's type is the struct directly or a `typealias` to it.
+typealias NestedAlias = NestedPayload;
+
 [raypayload] struct OuterPayload
 {
     NestedPayload nested : read(caller) : write(caller);
 //CHECK:          ^^^^^^ ray payload field of ray payload struct type must not have access qualifiers
 //CHECK:          ^^^^^^ field 'nested' has a ray payload struct type and inherits that type's access qualifiers; it must not declare its own 'read' or 'write' qualifiers
+    NestedAlias aliased : read(caller) : write(caller);
+//CHECK:        ^^^^^^^ ray payload field of ray payload struct type must not have access qualifiers
+//CHECK:        ^^^^^^^ field 'aliased' has a ray payload struct type and inherits that type's access qualifiers; it must not declare its own 'read' or 'write' qualifiers
     uint flags : read(caller) : write(caller);
 };
 

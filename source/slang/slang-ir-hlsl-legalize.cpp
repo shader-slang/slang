@@ -130,6 +130,11 @@ static void addDefaultPayloadAccessQualifiersToStruct(IRBuilder& builder, IRStru
         // type's own fields (per the DXR PAQ spec) and must carry no qualifier of its own, so do
         // not inject defaults onto it — otherwise the emitter would produce
         // `Nested nested : read(...) : write(...)`, which DXC rejects for a struct-typed member.
+        // This mirrors the frontend exemption in `checkRayPayloadStructFields`
+        // (slang-check-modifier.cpp) — the two gates must stay in sync. We key on
+        // `IRRayPayloadDecoration` only (not `IRVulkanRayPayloadDecoration`): this is the HLSL/DXIL
+        // pass, and its enclosing walk in `legalizeRayPayloadAccessQualifiersForHLSL` filters on
+        // that decoration alone.
         if (auto fieldStructType = as<IRStructType>(field->getFieldType());
             fieldStructType && fieldStructType->findDecoration<IRRayPayloadDecoration>())
             continue;
