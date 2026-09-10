@@ -20,8 +20,8 @@ cbuffer Params
 // REFLECT: "offset": 60
 
 // The layout also reaches the SPIR-V element decorations: Slang `row_major` maps to SPIR-V
-// `ColMajor` (the convention is inverted). Without the fix the dropped modifier left the element
-// decorated `RowMajor` under the column-major default.
+// `ColMajor` (the convention is inverted), so the element is decorated `ColMajor` rather than the
+// `RowMajor` the column-major default would otherwise apply.
 // SPV: OpMemberDecorate {{.*}} ColMajor
 // SPV: OpMemberDecorate {{.*}} MatrixStride 16
 
