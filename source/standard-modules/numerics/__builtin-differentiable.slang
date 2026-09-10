@@ -41,7 +41,7 @@ public matrix<TDestination, R, C, L> __differentiableNumericsConstructMatrixFrom
     TSource : __BuiltinFloatingPointType,
     let R : int,
     let C : int,
-    let L : int>(TSource value)
+    let L : MatrixLayoutMode>(TSource value)
 {
     return matrix<TDestination, R, C, L>(__realCast<TDestination>(value));
 }

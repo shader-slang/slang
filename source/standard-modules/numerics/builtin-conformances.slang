@@ -242,7 +242,7 @@ public extension<let N : int> vector<bool, N> : IBooleanMask
     [__unsafeForceInlineEarly] bool all() { return __numericsBuiltinAll(this); }
 }
 
-public extension<let R : int, let C : int, let L : int>
+public extension<let R : int, let C : int, let L : MatrixLayoutMode>
     matrix<bool, R, C, L> : IBooleanMask
 {
     [__unsafeForceInlineEarly]
@@ -436,7 +436,7 @@ public extension<
     T : __BuiltinFloatingPointType & IScalarFractional,
     let R : int,
     let C : int,
-    let L : int>
+    let L : MatrixLayoutMode>
     matrix<T, R, C, L> : IComponentwiseOrdered
 {
     typealias Scalar = T;
@@ -500,7 +500,7 @@ public extension<
     T : __BuiltinFloatingPointType & IScalarFractional,
     let R : int,
     let C : int,
-    let L : int>
+    let L : MatrixLayoutMode>
     matrix<T, R, C, L> : IFractional
 {
     [__unsafeForceInlineEarly]
