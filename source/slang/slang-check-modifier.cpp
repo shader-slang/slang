@@ -2585,8 +2585,8 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
 }
 
 // Returns true if `type` resolves to a `struct` declaration marked with `[raypayload]`. Such a
-// type carries its own field-level payload access qualifiers, so a member whose type is a ray
-// payload struct inherits those qualifiers and must not (per the DXR PAQ spec) carry any of its own.
+// type carries its own field-level PAQs, so a member of this type inherits them and (per the DXR
+// PAQ spec) must not carry any of its own.
 static bool isRayPayloadStructType(Type* type)
 {
     auto structDecl = isDeclRefTypeOf<StructDecl>(type).getDecl();
@@ -2612,16 +2612,24 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         bool hasReadModifier = readModifier != nullptr;
         bool hasWriteModifier = writeModifier != nullptr;
 
-        if (!hasReadModifier && !hasWriteModifier)
+        // A member whose type is itself a `[raypayload]` struct inherits the field-level PAQs of
+        // that nested type (per the DXR PAQ spec): it must carry no qualifier of its own. So it is
+        // exempt from the read/write requirement, and an explicit qualifier on it is an error
+        // (DXC likewise rejects a qualifier on a struct-typed member).
+        if (isRayPayloadStructType(fieldVarDecl->getType()))
         {
-            // A member whose type is itself a `[raypayload]` struct inherits the field-level PAQs
-            // of that nested type (per the DXR PAQ spec) and needs no qualifier of its own, so it
-            // is exempt from the read/write requirement. Members of any other type must carry one.
-            if (!isRayPayloadStructType(fieldVarDecl->getType()))
+            if (hasReadModifier || hasWriteModifier)
             {
                 getSink()->diagnose(
-                    Diagnostics::RayPayloadFieldMissingAccessQualifiers{.field = fieldVarDecl});
+                    Diagnostics::RayPayloadNestedFieldHasAccessQualifiers{.field = fieldVarDecl});
             }
+            continue;
+        }
+
+        if (!hasReadModifier && !hasWriteModifier)
+        {
+            getSink()->diagnose(
+                Diagnostics::RayPayloadFieldMissingAccessQualifiers{.field = fieldVarDecl});
         }
 
         // Check stage names in read qualifier
