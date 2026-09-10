@@ -646,9 +646,9 @@ static SlangResult _validateLocalPackages(
 /// Validate enough of the locked graph to regenerate search paths after a local registration
 /// changes.
 ///
-/// An overlay may declare dependencies the lock does not yet contain. Those edges wait for
-/// `update`. Existing lock rows must still be reachable, and overlay edges that already have a lock
-/// row must still select that pin.
+/// An overlay or a newly added root manifest edge may name a package the lock does not yet
+/// contain. Those edges wait for `update`. Existing lock rows must still be reachable, and
+/// overlay edges that already have a lock row must still select that pin.
 static SlangResult _validateGraphAfterLocalRegistrationChange(
     const String& projectRoot,
     const Manifest& rootManifest,
@@ -668,7 +668,8 @@ static SlangResult _validateGraphAfterLocalRegistrationChange(
     for (const auto& dependency : rootManifest.dependencies)
     {
         Index packageIndex = findLockedPackageIndex(lock, dependency.name);
-        SLANG_RELEASE_ASSERT(packageIndex >= 0);
+        if (packageIndex < 0)
+            continue;
         SLANG_RETURN_ON_FAIL(validateLockedPathDependency(
             projectRoot,
             projectRoot,

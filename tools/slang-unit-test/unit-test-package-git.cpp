@@ -1460,6 +1460,121 @@ SLANG_UNIT_TEST(PackageToolEditAdoptsLocalTree)
     SLANG_CHECK(findLocalPackageIndex(localPackages, "noise") >= 0);
 }
 
+// Journey 7 records the Git identity first, then points an override at the sidecar before
+// `update` has written a lock row for that name. Search-path regeneration after `override add`
+// must not require that row yet.
+SLANG_UNIT_TEST(PackageToolOverrideAddBeforeFirstLock)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+
+    String noiseRepo = Path::combine(temp.path, "upstream-noise");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(noiseRepo));
+    Manifest noise;
+    noise.name = "noise";
+    noise.exports.add("src");
+    noise.licenseFiles.add("LICENSE");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(noiseRepo, "slang-package.json"), noise, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(noiseRepo, "LICENSE"), "Noise license\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(noiseRepo, "src/noise.slang"), "module noise;\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(noiseRepo)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepo, "v1.0.0")));
+
+    const char* addNoiseArguments[] = {
+        "slang-package",
+        "dependency",
+        "add",
+        "noise",
+        "--git",
+        noiseRepo.getBuffer(),
+        "--version",
+        ">=1.0.0",
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(addNoiseArguments),
+        addNoiseArguments,
+        error)));
+    const char* firstUpdateArguments[] = {"slang-package", "update", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(firstUpdateArguments),
+        firstUpdateArguments,
+        error)));
+
+    String sidecar = Path::combine(temp.path, "sidecar-math");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(sidecar));
+    Manifest math;
+    math.name = "math";
+    math.exports.add("src");
+    math.licenseFiles.add("LICENSE");
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(writeManifest(Path::combine(sidecar, "slang-package.json"), math, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(sidecar, "LICENSE"), "Math license\n")));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(sidecar, "src/math.slang"), "module math;\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(sidecar)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(sidecar, "v1.0.0")));
+
+    const char* addArguments[] = {
+        "slang-package",
+        "dependency",
+        "add",
+        "math",
+        "--git",
+        sidecar.getBuffer(),
+        "--version",
+        ">=1.0.0",
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(addArguments), addArguments, error)));
+    PackageTool::LockFile existingLock;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), existingLock, error)));
+    SLANG_CHECK(findLockedPackageIndex(existingLock, "math") < 0);
+
+    const char* overrideArguments[] = {
+        "slang-package",
+        "override",
+        "add",
+        "math",
+        "sidecar-math",
+        "1.0.0",
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(overrideArguments),
+        overrideArguments,
+        error)));
+    List<LocalPackage> localPackages;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readProjectLocalPackages(temp.path, localPackages, error)));
+    SLANG_CHECK(localPackages.getCount() == 1);
+    SLANG_CHECK(localPackages[0].name == "math");
+    SLANG_CHECK(localPackages[0].path == "sidecar-math");
+    SLANG_CHECK(localPackages[0].as == "1.0.0");
+
+    const char* updateArguments[] = {"slang-package", "update", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    PackageTool::LockFile lock;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lock, error)));
+    SLANG_CHECK(lock.packages.getCount() == 2);
+    Index mathIndex = findLockedPackageIndex(lock, "math");
+    SLANG_CHECK(mathIndex >= 0);
+    SLANG_CHECK(lock.packages[mathIndex].path == "sidecar-math");
+}
+
 // `edit` and `override add NAME deps/NAME` update the same in-place override registration.
 SLANG_UNIT_TEST(PackageToolEditIsInPlaceOverride)
 {
