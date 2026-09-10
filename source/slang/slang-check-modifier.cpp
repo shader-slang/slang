@@ -2584,6 +2584,15 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     postProcessingOnModifiers(m_astBuilder, syntaxNode->modifiers);
 }
 
+// Returns true if `type` resolves to a `struct` declaration marked with `[raypayload]`. Such a
+// type carries its own field-level payload access qualifiers, so a member whose type is a ray
+// payload struct inherits those qualifiers and must not (per the DXR PAQ spec) carry any of its own.
+static bool isRayPayloadStructType(Type* type)
+{
+    auto structDecl = isDeclRefTypeOf<StructDecl>(type).getDecl();
+    return structDecl && structDecl->findModifier<RayPayloadAttribute>();
+}
+
 void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
 {
     // Only check structs with the [raypayload] attribute
@@ -2605,9 +2614,14 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
 
         if (!hasReadModifier && !hasWriteModifier)
         {
-            // Emit the diagnostic error
-            getSink()->diagnose(
-                Diagnostics::RayPayloadFieldMissingAccessQualifiers{.field = fieldVarDecl});
+            // A member whose type is itself a `[raypayload]` struct inherits the field-level PAQs
+            // of that nested type (per the DXR PAQ spec) and needs no qualifier of its own, so it
+            // is exempt from the read/write requirement. Members of any other type must carry one.
+            if (!isRayPayloadStructType(fieldVarDecl->getType()))
+            {
+                getSink()->diagnose(
+                    Diagnostics::RayPayloadFieldMissingAccessQualifiers{.field = fieldVarDecl});
+            }
         }
 
         // Check stage names in read qualifier

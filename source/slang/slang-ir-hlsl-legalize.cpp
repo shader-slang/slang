@@ -126,6 +126,13 @@ static void addDefaultPayloadAccessQualifiersToStruct(IRBuilder& builder, IRStru
 {
     for (auto field : structType->getFields())
     {
+        // A member whose type is itself a `[raypayload]` struct inherits its PAQs from that
+        // type's own fields (per the DXR PAQ spec) and must carry no qualifier of its own, so do
+        // not inject defaults onto it — otherwise the emitter would produce
+        // `Nested nested : read(...) : write(...)`, which DXC rejects for a struct-typed member.
+        if (auto fieldStructType = as<IRStructType>(field->getFieldType());
+            fieldStructType && fieldStructType->findDecoration<IRRayPayloadDecoration>())
+            continue;
         addDefaultPayloadAccessQualifiersToField(builder, field->getKey());
     }
 }
