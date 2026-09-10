@@ -209,7 +209,10 @@ SpvInst* emitOpDebugTypeFunction(
         argTypes);
 }
 
-template<typename T, typename Ts>
+// The `size` operand is either a constant `IRInst*` (a real byte size, as for a struct)
+// or a `DebugInfoNone` `SpvInst*` (an opaque type whose size is unknown), so it is a
+// deduced template parameter; `emitOperand` is overloaded for both.
+template<typename T, typename SizeT, typename Ts>
 SpvInst* emitOpDebugTypeComposite(
     SpvInstParent* parent,
     IRInst* inst,
@@ -222,7 +225,7 @@ SpvInst* emitOpDebugTypeComposite(
     IRInst* col,
     SpvInst* scope,
     IRInst* linkageName,
-    IRInst* size,
+    SizeT size,
     IRInst* flags,
     const Ts& members)
 {
@@ -457,6 +460,19 @@ SpvInst* emitOpDebugNoScope(
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(24));
+}
+
+// DebugInfoNone (ext-inst opcode 0) marks a debug operand whose value is unknown or
+// not representable, e.g. the size of an opaque resource type. It takes no operands.
+template<typename T>
+SpvInst* emitOpDebugInfoNone(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& idResultType,
+    SpvInst* set)
+{
+    static_assert(isSingular<T>);
+    return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(0));
 }
 
 template<typename T>

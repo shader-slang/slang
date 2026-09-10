@@ -497,6 +497,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     OrderedDictionary<SpvInst*, IRPtrTypeBase*> m_forwardDeclaredPointers;
 
     SpvInst* m_nullDwarfExpr = nullptr;
+    SpvInst* m_debugInfoNone = nullptr;
 
     // A hash set to prevent redecorating the same spv inst.
     HashSet<SpvId> m_decoratedSpvInsts;
@@ -10562,6 +10563,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return m_nullDwarfExpr;
     }
 
+    // Return the module's single DebugInfoNone, emitting and caching it on first use.
+    // Used as the Size operand of an opaque type's DebugTypeComposite, whose byte size
+    // is unknown, in place of a misleading integer 0.
+    SpvInst* getDebugInfoNone()
+    {
+        if (m_debugInfoNone)
+            return m_debugInfoNone;
+        m_debugInfoNone = emitOpDebugInfoNone(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst());
+        return m_debugInfoNone;
+    }
+
     SpvInst* emitDebugScope(SpvInstParent* parent, IRDebugScope* debugScope)
     {
         auto inlinedAt = ensureInst(debugScope->getInlinedAt());
@@ -10883,6 +10899,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
 
         return builder.getStringValue(toSlice("unnamed"));
+    }
+
+    // Return the debug LinkageName operand for a composite debug type as an "@"-prefixed
+    // copy of its Name (e.g. Name "Texture2D" -> LinkageName "@Texture2D"). The prefix
+    // disambiguates a builtin opaque type from a user-defined type of the same name, which
+    // would otherwise share an identical LinkageName. `name` is the IRStringLit produced by
+    // getName; the "@" spelling is what issue #12807 asks for, distinct from Slang's IR
+    // mangled name.
+    IRInst* getDebugLinkageName(IRInst* name)
+    {
+        auto nameLit = as<IRStringLit>(name);
+        SLANG_ASSERT(nameLit);
+        IRBuilder builder(name);
+        StringBuilder sb;
+        sb << "@" << nameLit->getStringSlice();
+        return builder.getStringValue(sb.getUnownedSlice());
     }
 
     Dictionary<IRType*, SpvInst*> m_mapTypeToDebugType;
@@ -11249,8 +11281,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             line,
             col,
             scope,
-            name,
-            builder.getIntValue(builder.getUIntType(), 0), // Size (unknown)
+            getDebugLinkageName(name),
+            getDebugInfoNone(), // Size: opaque types have no representable byte size
             builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout),
             List<SpvInst*>()); // No members
     }
