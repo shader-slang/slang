@@ -2303,14 +2303,6 @@ enum MatrixLayoutMode : int
     ColumnMajor = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR),
 }
 
-//@hidden:
-// Declared after MatrixLayoutMode, and typed as it rather than as `int`, because their
-// only purpose is to be passed as the layout argument of `matrix<T, R, C, L>`, and that
-// parameter is a MatrixLayoutMode. Leaving them as `int` would make the constants
-// unusable in the one position they exist for.
-static const MatrixLayoutMode kRowMajorMatrixLayout = MatrixLayoutMode.RowMajor;
-static const MatrixLayoutMode kColumnMajorMatrixLayout = MatrixLayoutMode.ColumnMajor;
-
 //@public:
 /// A matrix with `R` rows and `C` columns, with elements of type `T`.
 /// @category math_types Math types
