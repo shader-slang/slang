@@ -2194,9 +2194,20 @@ int SemanticsVisitor::compareOverloadCandidateSpecificity(
     // to implement, but actually implementing that full check here
     // could make overload resolution far more expensive.
     //
-    // For now we are going to do something far simpler and hackier,
-    // which is to say that a candidate with more generic parameters
-    // is always preferred over one with fewer.
+    // Prior to language version 202c we approximated the rule by comparing
+    // the number of required generic parameters: because a negative result
+    // means the left candidate is preferred, `leftSpecCount - rightSpecCount`
+    // in fact prefers the candidate with *fewer* required generic parameters.
+    // That count is not a sound proxy for semantic specificity (it happens to
+    // agree with the desired answer only when a real structural/constraint
+    // relationship is the actual justification), so in 202c we drop it: when no
+    // other principled rule distinguishes two applicable candidates we would
+    // rather diagnose ambiguity than silently pick one based on this unrelated
+    // scalar count. Removing it lets tied candidates fall through to the
+    // export/scope/`OverloadRank` rules in the caller, and otherwise become
+    // ambiguous. See shader-slang/slang#12829. The count comparison is retained
+    // unchanged for pre-202c language versions, since changing which overload is
+    // selected (or turning a resolved call into an ambiguity) is source-breaking.
     //
     // TODO: We could extend this definition to account for constraints
     // on generic parameters in the count, which would handle the
@@ -2211,10 +2222,13 @@ int SemanticsVisitor::compareOverloadCandidateSpecificity(
     // in some cases disambiguation of which declaration should be
     // preferred will depend on knowing the actual arguments.
     //
-    auto leftSpecCount = getSpecializedParamCount(left.declRef);
-    auto rightSpecCount = getSpecializedParamCount(right.declRef);
-    if (leftSpecCount != rightSpecCount)
-        return int(leftSpecCount - rightSpecCount);
+    if (!isSlang202cOrLater(this))
+    {
+        auto leftSpecCount = getSpecializedParamCount(left.declRef);
+        auto rightSpecCount = getSpecializedParamCount(right.declRef);
+        if (leftSpecCount != rightSpecCount)
+            return int(leftSpecCount - rightSpecCount);
+    }
 
     return 0;
 }
