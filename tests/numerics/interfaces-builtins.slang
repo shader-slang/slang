@@ -375,31 +375,31 @@ void main()
     float2x2 legacyFloatMatrix = legacyBuiltinFloatMatrix(float2x2(1.0));
     int2 legacyIntegerVector = legacyBuiltinIntegerVector(int2(1));
 
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorLeft = 1.0;
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorRight = 2.0;
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorMinimum =
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorLeft = 1.0;
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorRight = 2.0;
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorMinimum =
         realMinimum(rowMajorLeft, rowMajorRight);
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorClamped =
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorClamped =
         realClamp(rowMajorRight, rowMajorLeft, rowMajorRight);
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorSmoothed =
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorSmoothed =
         realSmoothstep(rowMajorLeft, rowMajorRight, rowMajorRight);
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorStep =
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorStep =
         realStep(rowMajorRight, rowMajorLeft);
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorNegative = -1.0;
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorAbsolute =
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorNegative = -1.0;
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorAbsolute =
         absoluteValue(rowMajorNegative);
-    matrix<bool, 2, 2, kRowMajorMatrixLayout> rowMajorFinite =
+    matrix<bool, 2, 2, MatrixLayoutMode.RowMajor> rowMajorFinite =
         floatingPointIsFinite(rowMajorLeft);
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorRounding =
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorRounding =
         floatingPointRounding(rowMajorLeft);
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorFractionalParts =
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorFractionalParts =
         floatingPointFractionalParts(rowMajorLeft);
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorBinaryRepresentation =
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorBinaryRepresentation =
         floatingPointBinaryRepresentationOperations(rowMajorLeft, rowMajorRight);
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorIntegralPart;
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorSplitFractional =
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorIntegralPart;
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorSplitFractional =
         floatingPointSplit(rowMajorLeft, rowMajorIntegralPart);
-    matrix<float, 2, 2, kRowMajorMatrixLayout> rowMajorElementary =
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> rowMajorElementary =
         elementaryCurve(rowMajorLeft);
 
     outputBuffer[0] =

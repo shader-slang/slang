@@ -150,6 +150,57 @@ CI, which uploads its result as an artifact, and this workflow then posts the PR
 comment, because commenting needs a token the build job (possibly running a
 fork's code) must not hold.
 
+### Cherry-picking a SlangPy PR
+
+A Slang change that intentionally breaks SlangPy cannot be landed together with
+its SlangPy counterpart, which leaves a chicken-and-egg problem: both fixes for
+the SlangPy and Slang must land together.
+
+To disconnect the cyclic dependency, `ci-slangpy-trigger-test.yml` can specify
+a SlangPy PR and it will be cherry-picked for SlangPy workflow just in Slang repo.
+
+There are two workflow YML related to this process. Slang uses `ci-slangpy-trigger-test.yml`
+and it simply triggers the existing workflow on SlangPy repo, `ci-latest-slang.yml`.
+Note that their names are similar:
+- `ci-slangpy-trigger-test.yml` is in Slang repo
+- `ci-latest-slang.yml` is in SlangPy repo; not Slang repo.
+
+
+You can specify which PR to cherry-pick by setting the following in `ci-slangpy-trigger-test.yml`:
+
+```yaml
+env:
+  SLANGPY_CHERRY_PICK_PR: "1135" # "" means no cherry-pick
+```
+
+For the security reason, this setting, unfortunately, is not effective unless it is
+merged to `master` branch. It means the CI runs showing up as a part of the PR page
+will ignore this setting.
+
+In order to workaround the limitation, you need to manually trigger the workflow
+with `branch` name and the PR number from "Action" page:
+- https://github.com/shader-slang/slang/actions/workflows/ci-slangpy-trigger-test.yml
+
+Click "Run workflow" button on the right side of the page. It will ask two info:
+- "Use workflow from" that takes a branch name
+- "Slang PR number to test against SlangPy"
+
+The `branch` should be the branch name the PR currently uses. And the branch must be
+a branch in the https://github.com/shader-slang/slang/; not a forked repo.
+
+Once the SlangPy workflow is triggered, you need to track the result from the SlangPy
+side:
+- https://github.com/shader-slang/slangpy/actions/workflows/ci-latest-slang.yml
+
+The manual run reports its result back to the PR, onto the same `SlangPy Tests`
+check that the automatic run wrote. A passing manual run therefore replaces the
+failure, and the PR page will end up green.
+
+It is worth noting that if you needed this feature of cherry-pick with the backward
+compatibility breaking change, you probably need to announce the breaking change to
+the community before merging the change.
+
+
 ## 2. Reusable building blocks (`workflow_call`)
 
 No trigger of their own; see the first diagram for who calls them. The
