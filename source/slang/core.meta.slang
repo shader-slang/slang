@@ -2291,11 +2291,10 @@ struct vector : IRWArray<T>
     int getCount() { return N; }
 }
 
-//@public:
-/// The in-memory element order of a `matrix`.
-/// @remarks `Unknown` takes the order selected for the target. This is an enum rather than an
-/// `int` so an unresolved layout stays recognizable when passed as a generic argument.
-/// @category math_types Math types
+//@hidden:
+// The in-memory element order of a `matrix`. An enum rather than an `int` so that an
+// unresolved layout is still recognizable as a generic argument, where it sits beside
+// the row and column counts.
 enum MatrixLayoutMode : int
 {
     Unknown = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN),

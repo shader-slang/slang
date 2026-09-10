@@ -194,15 +194,11 @@ side:
 
 The manual run reports its result back to the PR, onto the same `SlangPy Tests`
 check that the automatic run wrote. A passing manual run therefore replaces the
-failure, and the PR page ends up green.
+failure, and the PR page will end up green.
 
-That is convenient, but it means the check alone no longer tells you which run
-produced it: the same green mark appears whether the cherry-pick was applied or
-ignored. Please leave a comment on the PR linking the manual run, so a reviewer can
-tell the result came from a run that actually cherry-picked the SlangPy PR.
-
-Note that pushing a new commit re-runs the automatic workflow and turns the check
-back to a failure, so run the manual workflow after the last push.
+It is worth noting that if you needed this feature of cherry-pick with the backward
+compatibility breaking change, you probably need to announce the breaking change to
+the community before merging the change.
 
 
 ## 2. Reusable building blocks (`workflow_call`)
