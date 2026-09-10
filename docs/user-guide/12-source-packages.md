@@ -284,7 +284,10 @@ Run `slang package update` deliberately when manifest constraints or upstream re
 `slang package update --dry-run` prints the selected graph (what moved, what stayed, and why)
 without writing the lock or replacing checkouts. `--ignore-overrides` ignores out-of-tree
 overrides for that solve; it does not change `slang-package-overlay.json` or replace in-place overrides.
-`--minimal` keeps one-line package changes and the summary count. The installed Slang
+`--minimal` keeps one-line package changes and the summary count. `--offline` resolves and
+materializes from `.slang/cache` and existing checkouts only: it does not `ls-remote`, `git fetch`,
+or clone the package URL. A missing cache, ref, or object fails and asks you to re-run without
+`--offline`. The installed Slang
 toolchain is omitted unless its constraint fails. Resolver Git clones
 under `.slang/cache/` may still be populated so the tool can inspect available tags. A real update
 prints that report and asks before applying the exact graph it just resolved, unless that graph

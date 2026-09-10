@@ -60,9 +60,10 @@ static void _printHelp(bool experimental = false)
         "                   Materialize Git pins and regenerate slang-package-includes.txt.\n"
         "                   An existing lock is not rewritten; a missing lock runs update.\n"
         "                   --clean discards local checkout state.\n"
-        "  update [--ignore-overrides] [--clean] [--dry-run] [--minimal] [--yes]\n"
-        "         [--skip-validate]\n"
+        "  update [--ignore-overrides] [--clean] [--dry-run] [--minimal]\n"
+        "         [--offline] [--yes] [--skip-validate]\n"
         "                   Re-resolve dependencies and rewrite the lock.\n"
+        "                   --offline uses .slang/cache only; it does not contact Git remotes.\n"
         "  status           Report lock and graph readiness; details only when dirty.\n"
         "  validate [name] [--all]\n"
         "                   Check that this package is suitable for sharing.\n"
@@ -238,7 +239,8 @@ static SlangResult _writeSearchPaths(
     const Manifest& manifest,
     const LockFile& lock,
     const List<LocalPackage>& localPackages,
-    String& outError)
+    String& outError,
+    bool allowRemoteGit = true)
 {
     StringBuilder searchPaths;
     String depsDirectory = getWorkspaceDepsDirectory(manifest);
@@ -259,7 +261,8 @@ static SlangResult _writeSearchPaths(
             package,
             localPackages,
             packageManifest,
-            outError));
+            outError,
+            allowRemoteGit));
         for (const auto& exportPath : packageManifest.exports)
             searchPaths << Path::combine(packageRoot, exportPath) << "\n";
     }
@@ -291,7 +294,8 @@ static SlangResult _materialize(
     const List<LocalPackage>& localPackages,
     bool allowClean,
     List<String>* outChangedPackageNames,
-    String& outError)
+    String& outError,
+    bool allowRemote = true)
 {
     if (outChangedPackageNames)
         outChangedPackageNames->clear();
@@ -370,6 +374,8 @@ static SlangResult _materialize(
             }
         }
         bool didMaterialize = false;
+        String cachePath =
+            Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
         SLANG_RETURN_ON_FAIL(materializeLockedRevision(
             projectRoot,
             package.git,
@@ -378,7 +384,9 @@ static SlangResult _materialize(
             destination,
             allowClean,
             didMaterialize,
-            outError));
+            outError,
+            allowRemote,
+            cachePath));
         if (didMaterialize)
         {
             if (outChangedPackageNames)
@@ -1287,6 +1295,7 @@ static SlangResult _update(
     bool minimal,
     bool assumeYes,
     bool skipValidate,
+    bool offline,
     String& outError);
 
 static SlangResult _fetch(
@@ -1319,6 +1328,7 @@ static SlangResult _fetch(
             false,
             assumeYes,
             skipValidate,
+            false,
             outError);
     }
 
@@ -1462,6 +1472,7 @@ static SlangResult _update(
     bool minimal,
     bool assumeYes,
     bool skipValidate,
+    bool offline,
     String& outError)
 {
     Manifest manifest;
@@ -1553,12 +1564,19 @@ static SlangResult _update(
             lock,
             outError,
             &warnings,
-            &report));
+            &report,
+            offline));
     }
     else
     {
-        SLANG_RETURN_ON_FAIL(
-            resolveDependencies(projectRoot, manifest, lock, outError, &warnings, &report));
+        SLANG_RETURN_ON_FAIL(resolveDependencies(
+            projectRoot,
+            manifest,
+            lock,
+            outError,
+            &warnings,
+            &report,
+            offline));
     }
     SLANG_RETURN_ON_FAIL(_validateLocalPackages(
         projectRoot,
@@ -1573,7 +1591,8 @@ static SlangResult _update(
         lock,
         effectiveLocalPackages,
         outError,
-        &warnings));
+        &warnings,
+        !offline));
     // The report is printed before anything is materialized, so it always describes a plan. Only
     // the summary printed after the lock and the checkouts have been written may claim the work
     // happened.
@@ -1636,7 +1655,8 @@ static SlangResult _update(
             effectiveLocalPackages,
             allowClean,
             &changedPackageNames,
-            outError)))
+            outError,
+            !offline)))
     {
         _appendIncompleteMaterializationAdvice(outError, previousLockPtr != nullptr);
         return SLANG_FAIL;
@@ -1673,7 +1693,7 @@ static SlangResult _update(
     }
     SLANG_RETURN_ON_FAIL(writeLockFile(lockPath, lock, outError));
     SLANG_RETURN_ON_FAIL(
-        _writeSearchPaths(projectRoot, manifest, lock, effectiveLocalPackages, outError));
+        _writeSearchPaths(projectRoot, manifest, lock, effectiveLocalPackages, outError, !offline));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     if (lockChanges)
@@ -3577,6 +3597,7 @@ SlangResult executeInDirectory(
         bool minimal = false;
         bool assumeYes = false;
         bool skipValidate = false;
+        bool offline = false;
         for (int i = 2; i < argc; ++i)
         {
             String flag = argv[i];
@@ -3588,6 +3609,8 @@ SlangResult executeInDirectory(
                 dryRun = true;
             else if (flag == "--minimal")
                 minimal = true;
+            else if (flag == "--offline")
+                offline = true;
             else if (flag == "--yes")
                 assumeYes = true;
             else if (flag == "--skip-validate")
@@ -3611,6 +3634,7 @@ SlangResult executeInDirectory(
             minimal,
             assumeYes,
             skipValidate,
+            offline,
             outError);
     }
     if (command == "validate")

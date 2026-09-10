@@ -1097,8 +1097,8 @@ populated.
 **It does not prove:** that remote source passes license and module-layout validation. Those trees
 are not materialized during the preview.
 
-**Combinations:** use it with `--minimal` or `--ignore-overrides`. `--dry-run --clean` is rejected
-because there is no checkout replacement to authorize.
+**Combinations:** use it with `--minimal`, `--ignore-overrides`, or `--offline`. `--dry-run --clean`
+is rejected because there is no checkout replacement to authorize.
 
 ### `update --minimal`
 
@@ -1111,6 +1111,22 @@ that information plus rationale, so it does not repeat the one-line list.
 
 **It does not change:** resolution, validation, materialization, or lock output. It is valid on
 both dry-run and real update.
+
+### `update --offline`
+
+**Use it when:** `.slang/cache` is already populated and you need to re-resolve or rematerialize
+without contacting package Git remotes.
+
+**It changes:** `update` lists tags, resolves refs, reads cached manifests, and materializes
+checkouts from the local cache and existing `deps/` trees. It does not `ls-remote`, `git fetch`,
+or clone the package URL. A missing cache, an unknown ref, or a commit that is not a local object
+fails and tells you to re-run without `--offline`.
+
+**It does not change:** fetch, build, validate, tree, why, or docs. Those commands still use Git
+remotes when a locked revision is not already local.
+
+**Combinations:** use it with `--yes`, `--dry-run`, `--minimal`, `--ignore-overrides`, or
+`--skip-validate`. `--dry-run --offline` still writes neither lock nor checkouts.
 
 ### `update --yes`
 

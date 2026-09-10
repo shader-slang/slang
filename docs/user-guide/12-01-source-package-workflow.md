@@ -162,7 +162,8 @@ git -C deps/color-encoding describe --tags --exact-match
 checkouts and the lock file alone. Pass `--minimal` to keep one-line package changes without
 the constraint rationale. The encoding checkout should still be `v1.0.0`. Resolver clones
 under `.slang/cache/` may still be populated so the tool can list tags. `--dry-run` cannot be
-combined with `--clean`.
+combined with `--clean`. Pass `--offline` with `--dry-run` when the cache is already warm and
+you want a preview that does not contact Git remotes.
 
 The report should say it would upgrade all three packages to `1.1.0`. Encoding `1.0.0` is rejected
 because `color-convert@1.1.0` requires `>=1.1.0`, not because the dry-run names the encoding

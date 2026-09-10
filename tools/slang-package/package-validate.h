@@ -47,8 +47,9 @@ SlangResult validatePublishablePackage(
 /// or the path directory). Every live edge must still select the same lock row; every lock row
 /// must be reachable. This is the local "does the current graph still match the lock" check and
 /// does not look for newer Git tags.
-/// `allowRemoteGit` lets Git pins populate `.slang/cache` when the locked revision is not already
-/// local. Status passes false so "needs update" stays a local check.
+/// `allowRemoteGit` lets Git pins clone or fetch `.slang/cache` when the locked revision is not
+/// already local. Status and `update --offline` pass false so those commands do not contact the
+/// package URL; they may still read an existing cache.
 SlangResult validateLegalResolvedProject(
     const String& projectRoot,
     const Manifest& rootManifest,

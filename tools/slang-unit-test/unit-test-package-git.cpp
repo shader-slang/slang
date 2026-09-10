@@ -2250,6 +2250,77 @@ SLANG_UNIT_TEST(PackageToolUpdateDryRunRunsLegalGraphWithoutWriting)
     SLANG_CHECK(!File::exists(Path::combine(temp.path, "deps/grain")));
 }
 
+SLANG_UNIT_TEST(PackageToolUpdateOfflineUsesCacheAndIgnoresNewRemoteTags)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    String repository = Path::combine(temp.path, "upstream-noise");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initRootWithGitNoise(temp.path, repository, error)));
+
+    PackageTool::LockFile lockBefore;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockBefore, error)));
+    SLANG_CHECK_ABORT(lockBefore.packages.getCount() == 1);
+    SLANG_CHECK(lockBefore.packages[0].version == "1.0.0");
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        Path::combine(repository, "src/noise.slang"),
+        "module noise;\n// v1.1.0\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1.0")));
+
+    const char* offlineArguments[] = {"slang-package", "update", "--offline", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(offlineArguments), offlineArguments, error)));
+
+    PackageTool::LockFile lockOffline;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockOffline, error)));
+    SLANG_CHECK(lockFilesEqual(lockBefore, lockOffline));
+
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(Path::removeNonEmpty(Path::combine(temp.path, "deps/noise"))));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(offlineArguments), offlineArguments, error)));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "deps/noise/src/noise.slang")));
+
+    const char* dryRunOfflineArguments[] = {
+        "slang-package",
+        "update",
+        "--offline",
+        "--dry-run",
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(dryRunOfflineArguments),
+        dryRunOfflineArguments,
+        error)));
+
+    const char* onlineArguments[] = {"slang-package", "update", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(onlineArguments), onlineArguments, error)));
+    PackageTool::LockFile lockOnline;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockOnline, error)));
+    SLANG_CHECK_ABORT(lockOnline.packages.getCount() == 1);
+    SLANG_CHECK(lockOnline.packages[0].version == "1.1.0");
+}
+
+SLANG_UNIT_TEST(PackageToolUpdateOfflineFailsWithoutCache)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    String repository = Path::combine(temp.path, "upstream-noise");
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_prepareRootWithUnsolvedGitNoise(temp.path, repository, error)));
+
+    const char* offlineArguments[] = {"slang-package", "update", "--offline", "--yes"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(offlineArguments), offlineArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("without --offline")) >= 0);
+}
+
 SLANG_UNIT_TEST(PackageToolRefAndAsDependencyWithoutVersionResolves)
 {
     TemporaryDirectory temp;

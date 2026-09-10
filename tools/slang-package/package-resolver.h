@@ -88,13 +88,17 @@ SlangResult resolveDependenciesWithSource(
     ResolveReport* outReport = nullptr);
 
 /// Resolve dependencies from Git repositories, using a cache under the workspace root.
+///
+/// When `offline` is true, Git packages are resolved from `.slang/cache` only. Missing cache
+/// entries, refs, or objects fail instead of cloning or fetching the package URL.
 SlangResult resolveDependencies(
     const String& projectRoot,
     const Manifest& manifest,
     LockFile& outLock,
     String& outError,
     List<String>* outWarnings = nullptr,
-    ResolveReport* outReport = nullptr);
+    ResolveReport* outReport = nullptr,
+    bool offline = false);
 
 /// Resolve dependencies using registered local manifests and Git for the remaining packages.
 SlangResult resolveDependenciesFromLocalPackages(
@@ -104,7 +108,8 @@ SlangResult resolveDependenciesFromLocalPackages(
     LockFile& outLock,
     String& outError,
     List<String>* outWarnings = nullptr,
-    ResolveReport* outReport = nullptr);
+    ResolveReport* outReport = nullptr,
+    bool offline = false);
 
 } // namespace PackageTool
 } // namespace Slang

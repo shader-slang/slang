@@ -15,6 +15,12 @@ SlangResult listReleaseTags(
     List<TagCandidate>& outCandidates,
     String& outError);
 
+/// List `vMAJOR.MINOR.PATCH` tags already present in a local clone, without contacting a remote.
+SlangResult listReleaseTagsFromRepository(
+    const String& repositoryPath,
+    List<TagCandidate>& outCandidates,
+    String& outError);
+
 /// Resolve an opaque branch or tag name to the commit currently advertised by the remote.
 SlangResult resolveReference(
     const String& gitURL,
@@ -22,11 +28,23 @@ SlangResult resolveReference(
     TagCandidate& outCandidate,
     String& outError);
 
+/// Resolve `ref` using objects and refs already in `repositoryPath`, without contacting a remote.
+SlangResult resolveReferenceInRepository(
+    const String& repositoryPath,
+    const String& ref,
+    TagCandidate& outCandidate,
+    String& outError);
+
+/// Clone or refresh `repositoryPath` from `gitURL`.
+///
+/// When `allowRemote` is false, the cache must already exist with a matching origin; this does
+/// not clone, fetch, or replace the cache from the network.
 SlangResult ensureRepository(
     const String& workingDirectory,
     const String& gitURL,
     const String& repositoryPath,
-    String& outError);
+    String& outError,
+    bool allowRemote = true);
 
 SlangResult readFileAtRevision(
     const String& repositoryPath,
@@ -110,7 +128,9 @@ SlangResult materializeLockedRevision(
     const String& destination,
     bool allowClean,
     bool& outDidMaterialize,
-    String& outError);
+    String& outError,
+    bool allowRemote = true,
+    const String& localMirror = String());
 
 /// Return whether removing a checkout would discard no changes, commits, or stashes.
 SlangResult isWorkingTreeSafeToRemove(

@@ -695,7 +695,8 @@ static SlangResult _loadResolvedPackage(
 
     // Read the committed manifest out of whichever Git source already has the locked revision,
     // rather than the file in the working tree, so local edits under `deps/` cannot change what
-    // the legal graph sees.
+    // the legal graph sees. `allowRemoteGit` may clone or fetch `.slang/cache`. Offline callers
+    // pass false, which still reads an existing cache and does not contact the package URL.
     String depsRoot = Path::combine(projectRoot, depsDirectory, package.name);
     String cachePath = Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
     String gitError;
@@ -708,8 +709,9 @@ static SlangResult _loadResolvedPackage(
         gitRepositoryPath = depsRoot;
     }
     else if (
-        allowRemoteGit && package.commit.getLength() &&
-        SLANG_SUCCEEDED(ensureRepository(projectRoot, package.git, cachePath, gitError)) &&
+        package.commit.getLength() &&
+        SLANG_SUCCEEDED(
+            ensureRepository(projectRoot, package.git, cachePath, gitError, allowRemoteGit)) &&
         SLANG_SUCCEEDED(readFileAtRevision(
             cachePath,
             package.commit,

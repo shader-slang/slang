@@ -69,11 +69,12 @@ public:
     String projectRoot;
     String cacheRoot;
     String depsDirectory;
+    bool allowRemote = true;
 
     SlangResult initialize(String& outError)
     {
         cacheRoot = Path::combine(projectRoot, ".slang", "cache");
-        if (!Path::createDirectoryRecursive(cacheRoot))
+        if (allowRemote && !Path::createDirectoryRecursive(cacheRoot))
         {
             outError = String("Cannot create package cache directory: ") + cacheRoot;
             return SLANG_FAIL;
@@ -81,23 +82,41 @@ public:
         return SLANG_OK;
     }
 
+    SlangResult ensureCachedRepository(
+        const String& packageName,
+        const String& git,
+        String& outRepositoryPath,
+        String& outError)
+    {
+        outRepositoryPath = Path::combine(cacheRoot, packageName);
+        return ensureRepository(projectRoot, git, outRepositoryPath, outError, allowRemote);
+    }
+
     virtual SlangResult listReleaseTags(
-        const String&,
+        const String& packageName,
         const String& git,
         List<TagCandidate>& outCandidates,
         String& outError) override
     {
-        return PackageTool::listReleaseTags(git, outCandidates, outError);
+        if (allowRemote)
+            return PackageTool::listReleaseTags(git, outCandidates, outError);
+        String repositoryPath;
+        SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
+        return listReleaseTagsFromRepository(repositoryPath, outCandidates, outError);
     }
 
     virtual SlangResult resolveReference(
-        const String&,
+        const String& packageName,
         const String& git,
         const String& ref,
         TagCandidate& outCandidate,
         String& outError) override
     {
-        return PackageTool::resolveReference(git, ref, outCandidate, outError);
+        if (allowRemote)
+            return PackageTool::resolveReference(git, ref, outCandidate, outError);
+        String repositoryPath;
+        SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
+        return resolveReferenceInRepository(repositoryPath, ref, outCandidate, outError);
     }
 
     virtual SlangResult deriveReleaseVersion(
@@ -107,8 +126,8 @@ public:
         SemanticVersion& outVersion,
         String& outError) override
     {
-        String repositoryPath = Path::combine(cacheRoot, packageName);
-        SLANG_RETURN_ON_FAIL(ensureRepository(projectRoot, git, repositoryPath, outError));
+        String repositoryPath;
+        SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
         String tag;
         bool found = false;
         SLANG_RETURN_ON_FAIL(
@@ -129,8 +148,8 @@ public:
         ResolvedManifest& outManifest,
         String& outError) override
     {
-        String repositoryPath = Path::combine(cacheRoot, packageName);
-        SLANG_RETURN_ON_FAIL(ensureRepository(projectRoot, git, repositoryPath, outError));
+        String repositoryPath;
+        SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
         String manifestText;
         SLANG_RETURN_ON_FAIL(readFileAtRevision(
             repositoryPath,
@@ -155,11 +174,13 @@ public:
     String projectRoot;
     const List<LocalPackage>* localPackages = nullptr;
     GitPackageResolverSource gitSource;
+    bool allowRemote = true;
 
     SlangResult initialize(String& outError)
     {
         gitSource.projectRoot = projectRoot;
         gitSource.depsDirectory = depsDirectory;
+        gitSource.allowRemote = allowRemote;
         return gitSource.initialize(outError);
     }
 
@@ -1298,11 +1319,13 @@ SlangResult resolveDependencies(
     LockFile& outLock,
     String& outError,
     List<String>* outWarnings,
-    ResolveReport* outReport)
+    ResolveReport* outReport,
+    bool offline)
 {
     GitPackageResolverSource source;
     source.projectRoot = projectRoot;
     source.depsDirectory = getWorkspaceDepsDirectory(manifest);
+    source.allowRemote = !offline;
     SLANG_RETURN_ON_FAIL(source.initialize(outError));
     Resolver resolver;
     resolver.source = &source;
@@ -1319,12 +1342,14 @@ SlangResult resolveDependenciesFromLocalPackages(
     LockFile& outLock,
     String& outError,
     List<String>* outWarnings,
-    ResolveReport* outReport)
+    ResolveReport* outReport,
+    bool offline)
 {
     LocalPackageResolverSource source;
     source.projectRoot = projectRoot;
     source.depsDirectory = getWorkspaceDepsDirectory(manifest);
     source.localPackages = &localPackages;
+    source.allowRemote = !offline;
     SLANG_RETURN_ON_FAIL(source.initialize(outError));
     Resolver resolver;
     resolver.source = &source;
