@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// package-tool.cpp
 
 #include "package-tool.h"
 

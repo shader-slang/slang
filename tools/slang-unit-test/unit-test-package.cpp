@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// unit-test-package.cpp
 
 #include "core/slang-io.h"
 #include "core/slang-process-util.h"

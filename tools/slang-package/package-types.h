@@ -1,7 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
-#ifndef SLANG_PACKAGE_TYPES_H
-#define SLANG_PACKAGE_TYPES_H
+#pragma once
 
 #include "core/slang-list.h"
 #include "core/slang-semantic-version.h"
@@ -396,5 +393,3 @@ inline void appendErrorAdvice(String& ioError, const String& advice)
 
 } // namespace PackageTool
 } // namespace Slang
-
-#endif

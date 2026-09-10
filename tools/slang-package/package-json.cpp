@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// package-json.cpp
 
 #include "package-json.h"
 

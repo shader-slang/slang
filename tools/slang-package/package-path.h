@@ -1,7 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
-#ifndef SLANG_PACKAGE_PATH_H
-#define SLANG_PACKAGE_PATH_H
+#pragma once
 
 #include "package-types.h"
 
@@ -53,5 +50,3 @@ SlangResult validateLockedPathDependency(
 
 } // namespace PackageTool
 } // namespace Slang
-
-#endif

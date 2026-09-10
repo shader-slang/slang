@@ -1,7 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
-#ifndef SLANG_PACKAGE_REPORT_H
-#define SLANG_PACKAGE_REPORT_H
+#pragma once
 
 #include "package-lock.h"
 #include "package-types.h"
@@ -128,5 +125,3 @@ String formatResolveSummary(
 
 } // namespace PackageTool
 } // namespace Slang
-
-#endif

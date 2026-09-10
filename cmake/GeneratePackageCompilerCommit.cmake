@@ -1,5 +1,3 @@
-# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
 set(commit "unknown")
 set(dirty 0)
 if(GIT_EXECUTABLE AND EXISTS "${SOURCE_DIR}/.git")

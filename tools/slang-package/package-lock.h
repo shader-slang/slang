@@ -1,7 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
-#ifndef SLANG_PACKAGE_LOCK_H
-#define SLANG_PACKAGE_LOCK_H
+#pragma once
 
 #include "package-types.h"
 
@@ -59,5 +56,3 @@ bool lockFilesEqual(const LockFile& left, const LockFile& right);
 
 } // namespace PackageTool
 } // namespace Slang
-
-#endif

@@ -1,7 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
-#ifndef SLANG_PACKAGE_GIT_H
-#define SLANG_PACKAGE_GIT_H
+#pragma once
 
 #include "package-types.h"
 
@@ -151,5 +148,3 @@ SlangResult getWorkingTreeStatus(
 
 } // namespace PackageTool
 } // namespace Slang
-
-#endif

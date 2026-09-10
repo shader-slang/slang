@@ -1,7 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
-#ifndef SLANG_PACKAGE_DOCS_H
-#define SLANG_PACKAGE_DOCS_H
+#pragma once
 
 #include "core/slang-basic.h"
 
@@ -17,5 +14,3 @@ SlangResult buildDocumentation(const String& projectRoot, String& outError);
 
 } // namespace PackageTool
 } // namespace Slang
-
-#endif
