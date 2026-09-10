@@ -6870,11 +6870,9 @@ static bool peekTypeName(Parser* parser)
 // - do substmt while (cond);
 // - defer substmt
 //
-// Currently, in Slang 2026 and previous, the only statement type that is not
+// Currently, in Slang 202c and previous, the only statement type that is not
 // allowed as a substatement is the declaration statement. However, this may
-// change in a future Slang version.
-//
-// See also https://github.com/shader-slang/slang/issues/12296
+// change in a future Slang version. (See GitHub issue #12296)
 static void checkForValidSubstatementType(Parser* parser, Stmt* substmt)
 {
     // We're actually interested in the nested statement, not the label
