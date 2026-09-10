@@ -147,6 +147,12 @@ static float f16_to_f32(uint16_t h)
 
 // ---- helpers ---------------------------------------------------------------
 
+static bool is64(const Value &v)
+{
+    return v.kind == Value::Kind::Float64 || v.kind == Value::Kind::Int64
+        || v.kind == Value::Kind::UInt64;
+}
+
 // Apply a unary float function element-wise.
 static Value fmap1(const Value &a, float (*f32)(float), double (*f64)(double))
 {
@@ -214,6 +220,8 @@ Value dispatch_glsl_std_450(uint32_t inst_id,
                             const std::vector<Value> &args,
                             std::vector<std::string> &diagnostics)
 {
+    auto &a0 = args.size() > 0 ? args[0]
+                               : (const Value &) (*(const Value *) nullptr); // will guard below
     auto get = [&](size_t i) -> const Value &
     {
         static Value undef = Value::make_u32(0);
