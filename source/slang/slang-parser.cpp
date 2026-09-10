@@ -6889,7 +6889,7 @@ static void checkForValidSubstatementType(Parser* parser, Stmt* substmt)
         // If this is a group declaration (e.g., "uint a, b, c;"), diagnose the
         // first member declaration for better clarity
         if (auto declGroup = as<DeclGroup>(decl))
-            if (declGroup->decls.getCount() > 0U)
+            if (declGroup->decls.getCount() > 0)
                 decl = declGroup->decls.getFirst();
 
         printDiagnosticArg(sb, decl->astNodeType);
