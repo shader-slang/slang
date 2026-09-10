@@ -9,7 +9,10 @@ namespace Slang
 {
 Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink)
 {
-    SharedSemanticsContext sharedSemanticsContext(linkage, nullptr, sink);
+    SharedSemanticsContext sharedSemanticsContext(
+        linkage,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());

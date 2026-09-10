@@ -109,6 +109,10 @@ public:
     canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(slang::IBlob** outPath) SLANG_OVERRIDE
+    {
+        return getPathFromSymbol((void*)m_nvrtcCreateProgram, outPath);
+    }
 
     /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -1208,6 +1212,11 @@ SlangResult NVRTCDownstreamCompiler::compile(
         break;
     case FloatingPointMode::Precise:
         {
+            // Disable FMA contraction: NVRTC contracts `a*b+c` into a single fused
+            // `fma.rn` by default, which can change the floating-point result. NVRTC's
+            // other precision defaults (`--prec-div=true`, `--prec-sqrt=true`,
+            // `--ftz=false`) are already precise, so `--fmad=false` alone suffices.
+            cmdLine.addArg("--fmad=false");
             break;
         }
     case FloatingPointMode::Fast:
