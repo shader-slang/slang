@@ -118,15 +118,22 @@ SLANG_UNIT_TEST(metalArgumentBufferLayout)
         auto structLayout = paramBlockLayout->getElementTypeLayout();
         SLANG_CHECK(structLayout != nullptr);
 
-        // Check that offsets follow Metal argument buffer rules
-        // Fields should have 0 offset and meaningful binding indices
+        // Each field now carries both units, a tier 2 uniform byte offset and a tier 1
+        // argument buffer element slot.
         SLANG_CHECK(structLayout->getFieldCount() == 3);
-        SLANG_CHECK(structLayout->getFieldByIndex(0)->getOffset() == 0);
-        SLANG_CHECK(structLayout->getFieldByIndex(1)->getOffset() == 0);
-        SLANG_CHECK(structLayout->getFieldByIndex(2)->getOffset() == 0);
-        SLANG_CHECK(structLayout->getFieldByIndex(0)->getBindingIndex() == 0);
-        SLANG_CHECK(structLayout->getFieldByIndex(1)->getBindingIndex() == 1);
-        SLANG_CHECK(structLayout->getFieldByIndex(2)->getBindingIndex() == 2);
+        auto field0 = structLayout->getFieldByIndex(0);
+        auto field1 = structLayout->getFieldByIndex(1);
+        auto field2 = structLayout->getFieldByIndex(2);
+
+        // The byte offsets match a constant buffer layout of the same struct.
+        SLANG_CHECK(field0->getOffset(slang::ParameterCategory::Uniform) == 0);
+        SLANG_CHECK(field1->getOffset(slang::ParameterCategory::Uniform) == 16);
+        SLANG_CHECK(field2->getOffset(slang::ParameterCategory::Uniform) == 32);
+
+        // The slots run one per member.
+        SLANG_CHECK(field0->getOffset(slang::ParameterCategory::MetalArgumentBufferElement) == 0);
+        SLANG_CHECK(field1->getOffset(slang::ParameterCategory::MetalArgumentBufferElement) == 1);
+        SLANG_CHECK(field2->getOffset(slang::ParameterCategory::MetalArgumentBufferElement) == 2);
     };
 
     testBody();
