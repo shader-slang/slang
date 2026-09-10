@@ -27,20 +27,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
   cancel-in-progress: true
 
-env:
-  # Names a SlangPy PR to merge into SlangPy `main` before SlangPy CI builds. Empty
-  # means "no cherry-pick": every run tests against SlangPy `main` as-is, which is the
-  # normal state.
-  #
-  # A Slang change that breaks SlangPy is a chicken-and-egg problem: until the matching
-  # SlangPy PR lands, every Slang PR fails SlangPy CI. Setting this to that PR's number
-  # asks SlangPy CI to merge it in before building, so both halves are tested together.
-  # SlangPy CI owns the checkout (see ci-latest-slang.yml in shader-slang/slangpy).
-  #
-  # Setting this applies to every Slang PR, so keep the window short: land the SlangPy
-  # PR right after the Slang one, then set this back to "".
-  SLANGPY_CHERRY_PICK_PR: ""
-
 jobs:
   filter:
     runs-on: ubuntu-latest
@@ -179,17 +165,9 @@ jobs:
                 slang_ref: `${{ steps.pr_mq.outputs.ref || steps.pr_auto.outputs.sha || steps.pr_manual.outputs.sha }}`,
                 slang_checkout_mode: `${{ steps.pr_mq.outputs.checkout_mode }}` || 'pr',
                 slang_checkout_repo: `${{ steps.pr_mq.outputs.checkout_repo }}` || '${{ github.repository }}',
-                // `client_payload` is capped at 10 top-level properties by the
-                // repository-dispatch API, and the flat form was already at 10. These
-                // three are informational only -- SlangPy CI reads none of them -- so
-                // they are grouped here to keep the cap free for fields SlangPy acts
-                // on. Nesting does not count against the cap.
-                slang_pr_meta: {
-                  is_fork_pr: `${{ steps.pr_auto.outputs.is_fork_pr || steps.pr_manual.outputs.is_fork_pr || steps.pr_mq.outputs.is_fork_pr }}`,
-                  slang_pr_head_repo: `${{ steps.pr_auto.outputs.head_repo || steps.pr_manual.outputs.head_repo || steps.pr_mq.outputs.head_repo }}`,
-                  slang_trigger_source: '${{ github.event_name }}'
-                },
-                slangpy_cherry_pick_pr: process.env.SLANGPY_CHERRY_PICK_PR || '',
+                is_fork_pr: `${{ steps.pr_auto.outputs.is_fork_pr || steps.pr_manual.outputs.is_fork_pr || steps.pr_mq.outputs.is_fork_pr }}`,
+                slang_pr_head_repo: `${{ steps.pr_auto.outputs.head_repo || steps.pr_manual.outputs.head_repo || steps.pr_mq.outputs.head_repo }}`,
+                slang_trigger_source: '${{ github.event_name }}',
                 slang_pr_title: process.env.PR_TITLE || '',
                 slang_pr_author: `${{ steps.pr_auto.outputs.author || steps.pr_manual.outputs.author || steps.pr_mq.outputs.author }}`
               }
