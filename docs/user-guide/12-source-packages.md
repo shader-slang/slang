@@ -285,11 +285,10 @@ Run `slang package update` deliberately when manifest constraints or upstream re
 without writing the lock or replacing checkouts. `--ignore-overrides` ignores out-of-tree
 overrides for that solve; it does not change `slang-package-overlay.json` or replace in-place overrides.
 `--minimal` keeps one-line package changes and the summary count. `--offline` resolves and
-materializes from `.slang/cache` and existing checkouts only: it does not `ls-remote`, `git fetch`,
-or clone the package URL. A missing cache, ref, or object fails and asks you to re-run without
-`--offline`. The installed Slang
-toolchain is omitted unless its constraint fails. Resolver Git clones
-under `.slang/cache/` may still be populated so the tool can inspect available tags. A real update
+materializes from `.slang/cache` only: it does not fetch or clone the package URL. A missing cache,
+ref, or object fails and asks you to re-run without `--offline`. Online update first refreshes
+those cache repositories from their origins, then uses the same cached resolver and staging path
+as offline update. The installed Slang toolchain is omitted unless its constraint fails. A real update
 prints that report and asks before applying the exact graph it just resolved, unless that graph
 already matches the committed lock. In a terminal, declining that prompt leaves the workspace
 unchanged and still succeeds. Without a terminal the command does not prompt: it fails and tells
@@ -323,8 +322,12 @@ these paths into compiler sessions automatically.
 
 Package validation has three layers:
 
-- The **legal graph** checks closed JSON schemas, dependency and lock identities, trusted path
-  selections, materialized manifests, and toolchain constraints. Commands never skip this layer.
+- The **workspace graph** checks closed JSON schemas, dependency and lock identities, trusted path
+  selections, committed manifests available in `deps/` or `.slang/cache`, and toolchain
+  constraints. Commands never skip this layer.
+- The **upstream cache** check refreshes `.slang/cache` when network access is allowed and verifies
+  that every locked Git ref and commit is represented there. It never copies an adopted commit
+  from `deps/NAME`; that commit becomes upstream-valid only after it reaches the origin.
 - A **buildable workspace** additionally requires every export in the materialized closure to
   exist, every source file to use the required `module` or `implementing` declaration, and every
   primary import path to be unique across the graph. Local overrides and escaping path
@@ -336,13 +339,15 @@ Package validation has three layers:
 Bare `slang package validate` is the **app** sharing check. It applies the publishable-package
 rules to the workspace package, rejects active overrides and a lock that requires local
 override state, and checks that the materialized lock graph is legal. It does not repeat license
-or source-layout checks for unchanged transitive dependencies.
+or source-layout checks for unchanged transitive dependencies. It refreshes and validates the
+upstream cache for every Git lock row.
 
 `slang package validate NAME` is the **library** sharing check in this workspace: the same
 publishable-package rules on that locked tree (an enabled override, path lock row, or
 `deps/NAME`), with Git and path edges checked against this workspace lock rather than a nested
 lock under `NAME`. `slang package validate --all` runs that library check on every locked
 package's tree. Neither named form materializes packages or walks the legal graph again.
+Both refresh and validate the relevant upstream cache repositories.
 
 `build` requires a legal, buildable workspace. It deliberately permits the generated license
 placeholder, overrides, and local path dependencies because those do not prevent
@@ -352,12 +357,15 @@ has dependencies, build runs `fetch` first (without `--clean`). A missing lock m
 Each of those hand-offs prints why the inner command is running. A dirty checkout that would
 require `--clean` still fails; run `slang package fetch --clean` yourself.
 
-`fetch` and `update` always verify the legal graph from selected manifests **before** they clear
-search paths or materialize `deps/`. A Git pin without an active local path is read at its locked
-commit from whichever repository already has that revision: an existing `deps/NAME` checkout when
-it is already the locked commit, so a current workspace needs no network, otherwise `.slang/cache`.
+`fetch` and `update` always verify the workspace graph from selected manifests **before** they
+clear search paths or materialize `deps/`. A Git pin without an active local path is read at its
+locked commit from `deps/NAME` when that repository contains the commit, otherwise from
+`.slang/cache`.
 Either way the committed manifest is read, not the working-tree file, so a dirty checkout cannot
-change what the graph check sees. After materialization, they apply the publishable-package checks
+change what the graph check sees. Online commands refresh origin data only into `.slang/cache`;
+all dependency checkouts then receive objects and refs from that cache. New refs are additive.
+Moving an existing tag or origin-tracking branch in `deps/NAME` is destructive, so the command
+lists all affected packages and refs in its single confirmation. After materialization, they apply the publishable-package checks
 to each Git package whose checkout was newly created or changed, and to each changed local
 registration, then check source layout and import uniqueness across the complete selected graph.
 The closure check includes unchanged packages because a new module can
@@ -377,7 +385,8 @@ in-place override remains visible because its `deps/NAME` checkout may still con
 Like
 `git status`, reportable drift does not make the command fail. Status returns nonzero only when
 required root manifest, existing lock, or overlay JSON cannot be read and parsed well enough to
-produce a report. It does not inspect `build/`, modify package state, or contact remotes.
+produce a report. It also reports when a locked ref or commit is absent from the existing cache.
+It does not inspect `build/`, modify package state, or contact remotes.
 
 Use `slang package dependency add` and `dependency remove` to edit direct manifest edges, and
 `dependency list` to inspect them. Add accepts exactly one source shape:
@@ -393,8 +402,7 @@ dependencies are already pins. These commands change only
 the selected lock graph, while
 `slang package why NAME` prints every current root-to-package path and incoming requirement. Why
 explains the graph that is locked now, not candidates rejected during an earlier solve. Unlike
-`status`, `tree` and `why` may populate `.slang/cache` when a locked Git revision is not already
-present under `deps/`.
+`status`, `tree`, and `why` read local workspace and cache state without contacting remotes.
 
 Each `.slang` file that is not below a module's companion directory is a primary module file. Its
 first declaration must be `module NAME;`, where `NAME` matches the filename stem with hyphens
@@ -412,8 +420,9 @@ directory. It writes `tools.slang-toolchain` as `>=` the installed compiler vers
 version can be parsed. It adds `.slang/`, `deps/`, `build/`, `slang-package-overlay.json`, and
 `slang-package-includes.txt` to
 `.gitignore`. `slang package help` lists commands under the manifest, overlay, lock, and build.
-`.slang/cache/` contains resolver Git repositories used to inspect release manifests. Fetched
-source remains visible under `deps/`; generated files go under `build/`.
+`.slang/cache/` contains the Git repositories last refreshed from package origins. Resolution
+reads those caches, and fetch/update stage their objects and refs into the workspace repositories
+under `deps/`. Fetched source remains visible there; generated files go under `build/`.
 
 `slang package edit NAME` marks the existing `{workspace.dependencies}/NAME` checkout (by default
 `deps/NAME`) as editable without moving it. Under the covers this is an enabled override at that
@@ -431,7 +440,9 @@ manifest and lock, replacing its version range with canonical `ref` plus `as`
 intent. `--ref` keeps following that branch or tag; without it, `HEAD` is frozen as a
 commit (or as a unique release tag that points at `HEAD`). Omit `--as` to derive the
 version from the nearest `vMAJOR.MINOR.PATCH` tag reachable from `HEAD`. An untagged
-history with no ancestor release tag requires `--as`. Clean and adopt ask for confirmation unless `--yes` is passed.
+history with no ancestor release tag requires `--as`. Adoption does not copy the commit into
+`.slang/cache`; push it to the package origin before expecting upstream validation or a fresh
+checkout to succeed. Clean and adopt ask for confirmation unless `--yes` is passed.
 
 For example, the generated local-state file may contain:
 

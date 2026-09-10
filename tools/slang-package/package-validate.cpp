@@ -570,25 +570,6 @@ static SlangResult _readMaterializedManifest(
     return validateLockedPackageManifest(package, outManifest, outError);
 }
 
-/// Return whether a Git checkout is already sitting at exactly `commit`.
-///
-/// Stage 1 of validation runs on every fetch, update, and validate. When `deps/NAME` already holds
-/// the locked revision, its committed manifest is the one the legal graph needs, so reading it
-/// there avoids the `git fetch` that `ensureRepository` performs against the tool-owned cache. A
-/// clean workspace therefore validates without touching the network. During `update` the checkout
-/// still holds the previous commit, so this returns false and the cache answers for the newly
-/// selected revision instead.
-static bool _isCheckoutAtCommit(const String& checkoutPath, const String& commit)
-{
-    if (!commit.getLength())
-        return false;
-    String headCommit;
-    String error;
-    if (SLANG_FAILED(getRepositoryHeadCommit(checkoutPath, headCommit, error)))
-        return false;
-    return headCommit == commit;
-}
-
 struct ResolvedPackageLoad
 {
     Manifest manifest;
@@ -603,8 +584,8 @@ struct ResolvedPackageLoad
 /// Consider this example: `update` selects `noise@v1.1.0` and `noise` vendors `vendor/math` as a
 /// path dependency. Stage 1 must check those identities before it clears search paths or clones
 /// `deps/noise`. A Git pin is therefore read at its locked commit from whichever repository
-/// already has that revision, preferring an existing `deps/NAME` checkout so a clean workspace
-/// needs no network, and falling back to `.slang/cache` when the checkout holds an older commit.
+/// already has that revision, preferring `deps/NAME` as the workspace repository and falling back
+/// to `.slang/cache` before a newly selected package has been staged there.
 /// Nested path packages of that Git tree are read out of the same repository with `git show`.
 /// Overrides and ordinary path packages still use the real directory.
 static SlangResult _loadResolvedPackage(
@@ -615,8 +596,7 @@ static SlangResult _loadResolvedPackage(
     const ResolvedPackageLoad& parent,
     const Dependency& incoming,
     ResolvedPackageLoad& out,
-    String& outError,
-    bool allowRemoteGit)
+    String& outError)
 {
     out = ResolvedPackageLoad();
     Index localIndex = findActiveLocalPackageIndex(localPackages, package.name);
@@ -693,25 +673,23 @@ static SlangResult _loadResolvedPackage(
         return validateLockedPackageManifest(package, out.manifest, outError);
     }
 
-    // Read the committed manifest out of whichever Git source already has the locked revision,
-    // rather than the file in the working tree, so local edits under `deps/` cannot change what
-    // the legal graph sees. `allowRemoteGit` may clone or fetch `.slang/cache`. Offline callers
-    // pass false, which still reads an existing cache and does not contact the package URL.
+    // Read the committed manifest from the workspace repository when possible. `git show` reads
+    // the named commit directly, so this works regardless of the checked-out HEAD and does not let
+    // working-tree edits change the graph. A cache is the fallback for a newly selected commit
+    // that has not been staged into `deps/NAME` yet.
     String depsRoot = Path::combine(projectRoot, depsDirectory, package.name);
     String cachePath = Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
     String gitError;
     String manifestText;
     String gitRepositoryPath;
-    if (_isCheckoutAtCommit(depsRoot, package.commit) &&
-        SLANG_SUCCEEDED(
+    if (SLANG_SUCCEEDED(
             readFileAtRevision(depsRoot, package.commit, kPackageFileName, manifestText, gitError)))
     {
         gitRepositoryPath = depsRoot;
     }
     else if (
         package.commit.getLength() &&
-        SLANG_SUCCEEDED(
-            ensureRepository(projectRoot, package.git, cachePath, gitError, allowRemoteGit)) &&
+        SLANG_SUCCEEDED(requirePackageCache(package.git, cachePath, gitError)) &&
         SLANG_SUCCEEDED(readFileAtRevision(
             cachePath,
             package.commit,
@@ -764,8 +742,7 @@ SlangResult loadLockedPackageGraphManifest(
     const LockedPackage& package,
     const List<LocalPackage>& localPackages,
     Manifest& outManifest,
-    String& outError,
-    bool allowRemoteGit)
+    String& outError)
 {
     ResolvedPackageLoad parent;
     Dependency incoming;
@@ -778,8 +755,7 @@ SlangResult loadLockedPackageGraphManifest(
         parent,
         incoming,
         loaded,
-        outError,
-        allowRemoteGit));
+        outError));
     outManifest = loaded.manifest;
     return SLANG_OK;
 }
@@ -795,14 +771,82 @@ SlangResult validatePublishablePackage(
     return _validatePackageTree(packageRoot, manifest, modules, sourceFiles, outError, true, true);
 }
 
-SlangResult validateLegalResolvedProject(
+enum class CacheRefreshMode
+{
+    None,
+    FromOrigin,
+};
+
+static SlangResult _validateUpstreamResolvedProject(
+    const String& projectRoot,
+    const LockFile& lock,
+    CacheRefreshMode refreshMode,
+    String& outError)
+{
+    for (const auto& package : lock.packages)
+    {
+        if (!isGitBackedLockedPackage(package) || !package.commit.getLength())
+            continue;
+
+        String cachePath =
+            Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
+        String packageError;
+        SlangResult cacheResult =
+            refreshMode == CacheRefreshMode::FromOrigin
+                ? refreshPackageCache(projectRoot, package.git, cachePath, packageError)
+                : requirePackageCache(package.git, cachePath, packageError);
+        if (SLANG_SUCCEEDED(cacheResult))
+        {
+            cacheResult = refreshMode == CacheRefreshMode::FromOrigin
+                              ? fetchCachedCommit(cachePath, package.commit, packageError)
+                              : requireCachedCommit(cachePath, package.commit, packageError);
+        }
+        if (SLANG_FAILED(cacheResult))
+        {
+            outError = String("Upstream cache for package '") + package.name +
+                       "' does not contain locked commit " + package.commit + ". " + packageError;
+            return SLANG_FAIL;
+        }
+
+        TagCandidate refCandidate;
+        if (SLANG_FAILED(
+                resolveCachedReference(cachePath, package.ref, refCandidate, packageError)))
+        {
+            outError = String("Upstream cache for package '") + package.name +
+                       "' does not contain locked ref '" + package.ref + "'. " + packageError;
+            return SLANG_FAIL;
+        }
+    }
+    return SLANG_OK;
+}
+
+SlangResult validateCachedResolvedProject(
+    const String& projectRoot,
+    const LockFile& lock,
+    String& outError)
+{
+    return _validateUpstreamResolvedProject(projectRoot, lock, CacheRefreshMode::None, outError);
+}
+
+SlangResult refreshAndValidateUpstreamResolvedProject(
+    const String& projectRoot,
+    const LockFile& lock,
+    String& outError)
+{
+    return _validateUpstreamResolvedProject(
+        projectRoot,
+        lock,
+        CacheRefreshMode::FromOrigin,
+        outError);
+}
+
+SlangResult validateWorkspaceResolvedProject(
     const String& projectRoot,
     const Manifest& rootManifest,
     const LockFile& lock,
     const List<LocalPackage>& localPackages,
     String& outError,
-    List<String>* outWarnings,
-    bool allowRemoteGit)
+    List<String>* outWarnings)
 {
     SLANG_RETURN_ON_FAIL(validateLockedWorkspaceExclusions(rootManifest, lock, outError));
     List<ResolvedPackageLoad> loadedPackages;
@@ -867,8 +911,7 @@ SlangResult validateLegalResolvedProject(
                     workspaceLoad,
                     dependency,
                     loadedPackages[index],
-                    outError,
-                    allowRemoteGit));
+                    outError));
                 loaded[index] = true;
             }
         }
@@ -905,8 +948,7 @@ SlangResult validateLegalResolvedProject(
                         loadedPackages[index],
                         dependency,
                         loadedPackages[dependencyIndex],
-                        outError,
-                        allowRemoteGit));
+                        outError));
                     loaded[dependencyIndex] = true;
                 }
             }
@@ -945,7 +987,7 @@ SlangResult validateBuildableResolvedProject(
 {
     if (!assumeLegalGraph)
     {
-        SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
+        SLANG_RETURN_ON_FAIL(validateWorkspaceResolvedProject(
             projectRoot,
             rootManifest,
             lock,

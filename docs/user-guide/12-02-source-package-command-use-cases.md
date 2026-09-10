@@ -258,22 +258,24 @@ commit the manifest (and lock, if update rewrote it).
 
 ### Tool does
 
-- `update` clones resolver metadata under `.slang/cache/`, examines compatible Git tags, resolves
-  the complete transitive graph, and selects one version per package name.
+- `update` refreshes origin data under `.slang/cache/`, examines compatible cached Git tags,
+  resolves the complete transitive graph, and selects one version per package name.
 - A real update prints that exact selection and asks before applying it, unless the solve selects
   exactly what the committed lock already records. In a terminal, declining the prompt leaves the
   workspace untouched and succeeds; it is a decision, not a command failure. Without a terminal the
   command does not prompt: it fails and tells you to re-run with `--yes`.
-- A real update materializes Git source under `deps/NAME`, publish-checks new or changed Git
+- A real update stages Git objects and refs from `.slang/cache` into `deps/NAME`, publish-checks new or changed Git
   packages and changed local registrations, checks closure-wide buildability, writes
   `slang-package-lock.json`, and regenerates `slang-package-includes.txt`.
 - `status` prints one line when the workspace is current. When something is dirty, it lists
   missing checkouts, dirty or diverged pins, enabled overrides, and source
-  problems, without inspecting `build/` or contacting remotes. A missing lock or pin is
+  problems and missing cached upstream pins, without inspecting `build/` or contacting remotes. A missing lock or pin is
   `incomplete`; a present graph that fails the source check is `not buildable`. Reportable
   drift does not make status fail.
 - `fetch` subsequently reproduces that lock. It checks out each recorded `commit` and does not
-  consult newer tags, a tag that has since moved, publisher retractions, or version selection:
+  consult newer tags, publisher retractions, or version selection. It does refresh the cache and
+  stages cached refs into `deps/`; moving an existing tag or origin-tracking branch requires the
+  command's consolidated destructive confirmation:
 
   ```sh
   slang package fetch
@@ -601,8 +603,8 @@ slang package update
 - `slang package tree` shows the selected graph, and `slang package why color-math` prints every
   root-to-package path and incoming requirement. These commands explain current graph presence,
   not the historical candidates rejected during the solve; keep the update report when that
-  history matters. If a locked Git revision is not already under `deps/`, they may populate
-  `.slang/cache`. `status` does not.
+  history matters. Like `status`, they read existing workspace and cache state without contacting
+  remotes.
 - There is no package-scoped update. Previewing or taking the new `color-encoding` release may
   move other compatible packages in the same solve.
 - `--minimal` preserves the added/changed/unchanged list but intentionally drops the incoming
@@ -1092,7 +1094,7 @@ or a local-override solve.
 **It changes:** the resolver still reads candidate manifests and prints the same detailed or
 minimal selection report, but it does not write `slang-package-lock.json`, replace dependency
 checkouts, or regenerate materialized state. Resolver caches under `.slang/cache/` may still be
-populated.
+populated. The preview lists existing dependency refs that a real apply would move.
 
 **It does not prove:** that remote source passes license and module-layout validation. Those trees
 are not materialized during the preview.
@@ -1118,12 +1120,13 @@ both dry-run and real update.
 without contacting package Git remotes.
 
 **It changes:** `update` lists tags, resolves refs, reads cached manifests, and materializes
-checkouts from the local cache and existing `deps/` trees. It does not `ls-remote`, `git fetch`,
-or clone the package URL. A missing cache, an unknown ref, or a commit that is not a local object
+checkouts from the local cache. It does not fetch or clone the package URL. A missing cache, an unknown ref, or a commit that is not a local object
 fails and tells you to re-run without `--offline`.
 
-**It does not change:** fetch, build, validate, tree, why, or docs. Those commands still use Git
-remotes when a locked revision is not already local.
+**It does not change:** the cache-to-`deps/` staging path. Online update uses that same path after
+refreshing the cache from origin. Fetch and validate also refresh caches; status, tree, why, and
+docs remain local readers. Offline mode is update-only in the current command surface, so fetch
+still fails when it cannot refresh an origin even if its cache is otherwise warm.
 
 **Combinations:** use it with `--yes`, `--dry-run`, `--minimal`, `--ignore-overrides`, or
 `--skip-validate`. `--dry-run --offline` still writes neither lock nor checkouts.
@@ -1138,10 +1141,11 @@ remote selection a second time. `--dry-run` remains an advisory preview across i
 update may see newer remote state.
 
 The prompt only appears when there is a decision to make: a solve that would change the committed
-lock, or a `--clean` run that would discard local checkout state. Re-running `update` on a graph
-that already matches the lock exits without asking. Materialization also leaves each clean Git
-checkout untouched when it is already at the selected commit; it still restores missing checkouts
-and advances out-of-date ones. Answering “no” prints that nothing was applied and exits
+lock, a `--clean` run that would discard local checkout state, or cache staging that would move an
+existing tag or origin-tracking branch in `deps/`. All affected repositories are listed before
+that one prompt. Re-running `update` on a graph that already matches the lock and has only additive
+cache state exits without asking. Materialization still restores missing checkouts and advances
+out-of-date ones. Answering “no” prints that nothing was applied and exits
 successfully, so a declined update does not fail a script that treats a non-zero exit as a broken
 workspace.
 
@@ -1179,8 +1183,8 @@ accept `--clean`.
 
 ### `fetch --yes`
 
-**Use it when:** fetch has no lock and would run update, or `--clean` would discard checkout
-state, and there is no interactive terminal.
+**Use it when:** fetch has no lock and would run update, `--clean` would discard checkout state, or
+cache staging would move existing named refs, and there is no interactive terminal.
 
 **It does not change:** an existing lock. Build does not take `--yes`; a missing lock makes the
 nested update run as `update --yes` so a first clone can `slang package build` without a prompt.
@@ -1223,7 +1227,9 @@ release tag, or requires `--as VERSION` when none exists. `--adopt --ref BRANCH`
 branch as `ref` while still locking `HEAD`. After the overlay is removed, the
 committed tree's declared graph must still resolve onto that Git pin (the package name must match,
 and live edges must still select the lock). Extra export paths alone are not a mismatch. Both
-destructive clean and adopt require confirmation; pass `--yes` for automation.
+destructive clean and adopt require confirmation; pass `--yes` for automation. Adopt does not copy
+the commit from `deps/NAME` to `.slang/cache`. Push it to origin before `validate`, or before
+another workspace can fetch it.
 
 ### `--experimental`
 
@@ -1266,7 +1272,8 @@ license can ever be valid requires an explicit license choice.
 ### Status reports state; validate gates sharing
 
 `status` prints one line when the lock, checkouts, and graph are current, and lists only the
-dirty items otherwise. Missing pins are `incomplete`; a present graph that fails the source
+dirty items otherwise. It also checks that the existing cache contains every locked Git ref and
+commit, without refreshing it. Missing pins are `incomplete`; a present graph that fails the source
 check is `not buildable`. Like `git status`, reportable drift still returns success; malformed
 required JSON is an error because no reliable report can be produced. Bare `validate` applies the
 license, source-layout, and path-portability rules to the workspace package as the app sharing
@@ -1277,15 +1284,17 @@ package trees in this workspace.
 
 A publisher retraction is new advice about a release that an existing lock may continue to
 reproduce. A release tag that later points at a different commit is the same kind of advice:
-fetch still installs the SHA the lock recorded, and the next `update` is what can select the new
-identity. A root `workspace.excludes` entry is current committed intent for this workspace, so a
+fetch still installs the SHA the lock recorded. It separately discloses and asks before changing
+the existing tag ref under `deps/`; the next `update` is what can select the new identity for the
+lock. A root `workspace.excludes` entry is current committed intent for this workspace, so a
 lock selecting that version is stale. The asymmetry is intentional: publisher advice does not
 retroactively break reproducibility, while the workspace's own changed policy does.
 
 ### Dry-run is not a complete rehearsal
 
 Dry-run promises no lock or checkout mutation. It does run the legal-graph check against selected
-manifests in `.slang/cache` and local trees. It still cannot validate remote source layout, so a
+manifests in `.slang/cache` and local trees, and reports named refs that applying the cache would
+move. It still cannot validate remote source layout, so a
 dry-run report can be correct and the real update can still fail after materialization.
 
 ### Failed update is not fully transactional
@@ -1476,8 +1485,8 @@ them or update this chapter and its regression tests in the same change.
   `validate NAME` and `validate --all` check locked trees against this workspace lock.
 - `--skip-validate` exists only on fetch, update, and build; it warns and keeps lock, manifest,
   closure, toolchain, export, and dirty-checkout checks.
-- `status` diagnoses lock, registration, and checkout state without mutation or remote access. A
-  current workspace is one header line; observations appear only when something is dirty. Missing
+- `status` diagnoses lock, registration, checkout, and cached upstream state without mutation or
+  remote access. A current workspace is one header line; observations appear only when something is dirty. Missing
   pins are `incomplete`; a present graph that fails the source check is `not buildable`. It never
   inspects `build/` and is not the package-quality gate. Reportable drift returns success;
   unreadable or malformed required JSON returns failure.
@@ -1488,7 +1497,7 @@ them or update this chapter and its regression tests in the same change.
 - `--minimal` retains one-line changes, unchanged packages, and summary counts. Detailed reports
   include rationale only, then the summary. The installed toolchain is not listed on success.
 - Dependency add/remove changes only the manifest; tree and why explain the current lock graph
-  and may populate `.slang/cache` when a locked Git revision is not already under `deps/`.
+  from existing workspace and cache state without contacting remotes.
 - Materialization prints per-package source/checkout progress. A failure explains that the prior
   lock remains authoritative and how to recover potentially partial derived state.
 - `docs` opens `build/docs/index.md` with the registered application. `--print` writes the path

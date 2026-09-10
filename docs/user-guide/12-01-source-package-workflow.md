@@ -165,6 +165,9 @@ under `.slang/cache/` may still be populated so the tool can list tags. `--dry-r
 combined with `--clean`. Pass `--offline` with `--dry-run` when the cache is already warm and
 you want a preview that does not contact Git remotes.
 
+The preview also reports any existing tags or origin-tracking branches under `deps/` that applying
+the cached state would move. Those repositories are not changed by the dry run.
+
 The report should say it would upgrade all three packages to `1.1.0`. Encoding `1.0.0` is rejected
 because `color-convert@1.1.0` requires `>=1.1.0`, not because the dry-run names the encoding
 retraction. That retraction is extra publisher advice: it would also skip `1.0.0` on update, and
@@ -188,8 +191,10 @@ actually been written. All three `describe` commands should now print `v1.1.0`. 
 
 Before clearing search paths or writing `deps/`, update checks that the selected graph is legal:
 identities, trusted edges, toolchain, and exclusions, reading each Git manifest at the selected
-commit from `.slang/cache`, or from `deps/NAME` when that checkout already holds the commit. After
-materializing that whole graph, it checks the license, exports, and module layout of each new or
+commit from `deps/NAME` when that repository contains it, otherwise from `.slang/cache`. Online
+update first refreshes only the cache from each origin. It then stages objects, tags, and
+origin-tracking branches from cache into `deps/`; moving an existing named ref is listed for
+confirmation before any dependency repository changes. After materializing that whole graph, it checks the license, exports, and module layout of each new or
 changed Git checkout and each changed local registration, and checks module layout and import
 uniqueness across the complete graph. The new lock and successful resolution report are written
 only after those checks pass. Fetch applies the same

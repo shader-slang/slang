@@ -10,41 +10,40 @@ namespace Slang
 namespace PackageTool
 {
 
-SlangResult listReleaseTags(
-    const String& gitURL,
-    List<TagCandidate>& outCandidates,
-    String& outError);
-
 /// List `vMAJOR.MINOR.PATCH` tags already present in a local clone, without contacting a remote.
 SlangResult listReleaseTagsFromRepository(
     const String& repositoryPath,
     List<TagCandidate>& outCandidates,
     String& outError);
 
-/// Resolve an opaque branch or tag name to the commit currently advertised by the remote.
-SlangResult resolveReference(
-    const String& gitURL,
-    const String& ref,
-    TagCandidate& outCandidate,
-    String& outError);
-
-/// Resolve `ref` using objects and refs already in `repositoryPath`, without contacting a remote.
-SlangResult resolveReferenceInRepository(
+/// Resolve `ref` from the origin-tracking refs and objects already present in a package cache.
+SlangResult resolveCachedReference(
     const String& repositoryPath,
     const String& ref,
     TagCandidate& outCandidate,
     String& outError);
 
-/// Clone or refresh `repositoryPath` from `gitURL`.
-///
-/// When `allowRemote` is false, the cache must already exist with a matching origin; this does
-/// not clone, fetch, or replace the cache from the network.
-SlangResult ensureRepository(
+/// Clone or refresh a package cache from its origin.
+SlangResult refreshPackageCache(
     const String& workingDirectory,
     const String& gitURL,
     const String& repositoryPath,
-    String& outError,
-    bool allowRemote = true);
+    String& outError);
+
+/// Require an existing package cache with the expected origin, without contacting that origin.
+SlangResult requirePackageCache(
+    const String& gitURL,
+    const String& repositoryPath,
+    String& outError);
+
+/// Fetch `commit` from a package cache's origin when it is not already present.
+SlangResult fetchCachedCommit(const String& repositoryPath, const String& commit, String& outError);
+
+/// Require `commit` to exist in a package cache without contacting its origin.
+SlangResult requireCachedCommit(
+    const String& repositoryPath,
+    const String& commit,
+    String& outError);
 
 SlangResult readFileAtRevision(
     const String& repositoryPath,
@@ -107,30 +106,34 @@ SlangResult getGitWorkingTreeRoot(
 /// Return the configured URL for the repository's `origin` remote.
 SlangResult getRepositoryOrigin(const String& repositoryPath, String& outOrigin, String& outError);
 
-SlangResult materializeRevision(
-    const String& workingDirectory,
-    const String& gitURL,
-    const String& revision,
-    const String& destination,
-    String& outError);
-
 /// Materialize `targetCommit` without discarding an existing checkout's work.
 ///
 /// If `destination` exists, it must be clean at `currentCommit`. `allowClean` explicitly permits
-/// deleting and cloning a checkout that has changed files, commits, stashes, or a different origin.
-/// If the checkout is already clean at `targetCommit`, leave it untouched and set
-/// `outDidMaterialize` to false.
+/// deleting and recreating a checkout that has changed files, commits, stashes, or a different
+/// origin. `allowMovingRefs` permits cache staging to change existing named refs after the caller
+/// has disclosed and confirmed those moves. If the checkout is already clean at `targetCommit`,
+/// its work tree stays untouched and `outDidMaterialize` is false, although additive cached refs
+/// may still be staged.
 SlangResult materializeLockedRevision(
-    const String& workingDirectory,
     const String& gitURL,
     const String& currentCommit,
     const String& targetCommit,
     const String& destination,
     bool allowClean,
+    bool allowMovingRefs,
     bool& outDidMaterialize,
     String& outError,
-    bool allowRemote = true,
-    const String& localMirror = String());
+    const String& cachePath);
+
+/// List cache refs whose existing names would move when staged into `destination`.
+///
+/// New refs and objects are additive and are not reported. Tags keep their `refs/tags/*` names;
+/// origin branches keep their `refs/remotes/origin/*` names.
+SlangResult collectMovingCachedRefs(
+    const String& cachePath,
+    const String& destination,
+    List<String>& outRefs,
+    String& outError);
 
 /// Return whether removing a checkout would discard no changes, commits, or stashes.
 SlangResult isWorkingTreeSafeToRemove(

@@ -154,21 +154,6 @@ static SlangResult _parseReleaseTagLines(
     return SLANG_OK;
 }
 
-SlangResult listReleaseTags(
-    const String& gitURL,
-    List<TagCandidate>& outCandidates,
-    String& outError)
-{
-    List<String> arguments;
-    arguments.add("ls-remote");
-    arguments.add("--tags");
-    arguments.add("--");
-    arguments.add(gitURL);
-    ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(_runGit(".", arguments, result, outError));
-    return _parseReleaseTagLines(result.standardOutput, outCandidates, outError);
-}
-
 SlangResult listReleaseTagsFromRepository(
     const String& repositoryPath,
     List<TagCandidate>& outCandidates,
@@ -201,90 +186,6 @@ SlangResult listReleaseTagsFromRepository(
     return _parseReleaseTagLines(result.standardOutput, outCandidates, outError);
 }
 
-SlangResult resolveReference(
-    const String& gitURL,
-    const String& ref,
-    TagCandidate& outCandidate,
-    String& outError)
-{
-    bool isCommit = ref.getLength() == 40;
-    for (Index i = 0; isCommit && i < ref.getLength(); ++i)
-    {
-        char c = ref[i];
-        isCommit = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-    }
-    if (isCommit)
-    {
-        // A commit pin need not be an advertised branch or tag tip. The later manifest load
-        // verifies that the object is reachable from the configured repository.
-        outCandidate = TagCandidate();
-        outCandidate.ref = ref;
-        outCandidate.commit = ref;
-        return SLANG_OK;
-    }
-
-    List<String> arguments;
-    arguments.add("ls-remote");
-    arguments.add("--");
-    arguments.add(gitURL);
-    arguments.add(ref);
-    if (ref.getUnownedSlice().startsWith("refs/tags/"))
-    {
-        arguments.add(ref + "^{}");
-    }
-    else if (!ref.getUnownedSlice().startsWith("refs/") && ref != "HEAD")
-    {
-        arguments.add(String("refs/heads/") + ref);
-        arguments.add(String("refs/tags/") + ref);
-        arguments.add(String("refs/tags/") + ref + "^{}");
-    }
-    ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(_runGit(".", arguments, result, outError));
-
-    String branchCommit;
-    String tagCommit;
-    String directCommit;
-    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
-    {
-        List<UnownedStringSlice> fields;
-        StringUtil::splitOnWhitespace(line, fields);
-        if (fields.getCount() != 2)
-            continue;
-        String reference(fields[1]);
-        String commit(fields[0]);
-        if (reference == ref || (ref == "HEAD" && reference == "HEAD"))
-            directCommit = commit;
-        else if (reference == String("refs/heads/") + ref)
-            branchCommit = commit;
-        else if (reference == String("refs/tags/") + ref)
-        {
-            if (!tagCommit.getLength())
-                tagCommit = commit;
-        }
-        else if (reference == String("refs/tags/") + ref + "^{}")
-            tagCommit = commit;
-        else if (ref.getUnownedSlice().startsWith("refs/tags/") && reference == ref + "^{}")
-            directCommit = commit;
-    }
-    if (branchCommit.getLength() && tagCommit.getLength())
-    {
-        outError = String("Git ref is ambiguous between a branch and tag; use a full ref: ") + ref;
-        return SLANG_FAIL;
-    }
-    String commit = directCommit.getLength()
-                        ? directCommit
-                        : (branchCommit.getLength() ? branchCommit : tagCommit);
-    if (!commit.getLength())
-    {
-        outError = String("Git ref does not exist: ") + ref;
-        return SLANG_FAIL;
-    }
-    outCandidate = TagCandidate();
-    outCandidate.ref = ref;
-    outCandidate.commit = commit;
-    return SLANG_OK;
-}
-
 static SlangResult _selectCommitFromRefLines(
     const String& text,
     const String& ref,
@@ -302,15 +203,10 @@ static SlangResult _selectCommitFromRefLines(
             continue;
         String reference(fields[1]);
         String commit(fields[0]);
-        if (reference == ref || (ref == "HEAD" && reference == "HEAD"))
+        if (reference == ref)
             directCommit = commit;
-        else if (reference == String("refs/heads/") + ref)
-            branchCommit = commit;
         else if (reference == String("refs/remotes/origin/") + ref)
-        {
-            if (!branchCommit.getLength())
-                branchCommit = commit;
-        }
+            branchCommit = commit;
         else if (reference == String("refs/tags/") + ref)
         {
             if (!tagCommit.getLength())
@@ -331,7 +227,7 @@ static SlangResult _selectCommitFromRefLines(
     return SLANG_OK;
 }
 
-SlangResult resolveReferenceInRepository(
+SlangResult resolveCachedReference(
     const String& repositoryPath,
     const String& ref,
     TagCandidate& outCandidate,
@@ -352,32 +248,25 @@ SlangResult resolveReferenceInRepository(
         return SLANG_OK;
     }
 
-    if (ref == "HEAD")
-    {
-        String commit;
-        if (SLANG_FAILED(resolveLocalRevision(repositoryPath, ref, commit, outError)))
-        {
-            outError = String("Git ref does not exist in the local cache; ") +
-                       _offlineUpdateAdvice() + ": " + ref;
-            return SLANG_FAIL;
-        }
-        outCandidate = TagCandidate();
-        outCandidate.ref = ref;
-        outCandidate.commit = commit;
-        return SLANG_OK;
-    }
-
     List<String> arguments;
     arguments.add("show-ref");
     arguments.add("--dereference");
     arguments.add("--");
-    if (ref.getUnownedSlice().startsWith("refs/tags/"))
+    if (ref == "HEAD")
+    {
+        arguments.add("refs/slang-cache/origin/HEAD");
+        arguments.add("refs/remotes/origin/HEAD");
+    }
+    else if (ref.getUnownedSlice().startsWith("refs/tags/"))
     {
         arguments.add(ref);
     }
+    else if (ref.getUnownedSlice().startsWith("refs/heads/"))
+    {
+        arguments.add(String("refs/remotes/origin/") + ref.getUnownedSlice().tail(11));
+    }
     else if (!ref.getUnownedSlice().startsWith("refs/"))
     {
-        arguments.add(String("refs/heads/") + ref);
         arguments.add(String("refs/tags/") + ref);
         arguments.add(String("refs/remotes/origin/") + ref);
     }
@@ -391,7 +280,20 @@ SlangResult resolveReferenceInRepository(
     SLANG_RETURN_ON_FAIL(_executeGit(repositoryPath, arguments, commandLine, result, outError));
 
     String commit;
-    SLANG_RETURN_ON_FAIL(_selectCommitFromRefLines(result.standardOutput, ref, commit, outError));
+    String lookupRef = ref;
+    if (ref == "HEAD")
+    {
+        lookupRef = "refs/slang-cache/origin/HEAD";
+        SLANG_RETURN_ON_FAIL(
+            _selectCommitFromRefLines(result.standardOutput, lookupRef, commit, outError));
+        if (!commit.getLength())
+            lookupRef = "refs/remotes/origin/HEAD";
+    }
+    else if (ref.getUnownedSlice().startsWith("refs/heads/"))
+        lookupRef = String("refs/remotes/origin/") + ref.getUnownedSlice().tail(11);
+    if (!commit.getLength())
+        SLANG_RETURN_ON_FAIL(
+            _selectCommitFromRefLines(result.standardOutput, lookupRef, commit, outError));
     if (!commit.getLength())
     {
         outError = String("Git ref does not exist in the local cache; ") + _offlineUpdateAdvice() +
@@ -472,26 +374,31 @@ static SlangResult _ensureRepository(
 
     List<String> fetchArguments;
     fetchArguments.add("fetch");
-    fetchArguments.add("--tags");
+    fetchArguments.add("--prune");
+    fetchArguments.add("--prune-tags");
     fetchArguments.add("--force");
     fetchArguments.add("origin");
+    fetchArguments.add("+refs/heads/*:refs/remotes/origin/*");
+    fetchArguments.add("+refs/tags/*:refs/tags/*");
+    fetchArguments.add("+HEAD:refs/slang-cache/origin/HEAD");
     return _runGit(repositoryPath, fetchArguments, result, outError);
 }
 
-SlangResult ensureRepository(
+SlangResult refreshPackageCache(
     const String& workingDirectory,
     const String& gitURL,
     const String& repositoryPath,
-    String& outError,
-    bool allowRemote)
+    String& outError)
 {
-    return _ensureRepository(
-        workingDirectory,
-        gitURL,
-        repositoryPath,
-        allowRemote,
-        allowRemote,
-        outError);
+    return _ensureRepository(workingDirectory, gitURL, repositoryPath, true, true, outError);
+}
+
+SlangResult requirePackageCache(
+    const String& gitURL,
+    const String& repositoryPath,
+    String& outError)
+{
+    return _ensureRepository(".", gitURL, repositoryPath, false, false, outError);
 }
 
 SlangResult readFileAtRevision(
@@ -715,31 +622,172 @@ static SlangResult _commitExists(
     return SLANG_OK;
 }
 
-static SlangResult _cloneNoCheckout(
-    const String& workingDirectory,
-    const String& source,
-    const String& destination,
+static SlangResult _ensureCachedCommit(
+    const String& repositoryPath,
+    const String& commit,
+    bool allowRemote,
     String& outError)
 {
+    bool exists = false;
+    SLANG_RETURN_ON_FAIL(_commitExists(repositoryPath, commit, exists, outError));
+    if (exists)
+        return SLANG_OK;
+    if (!allowRemote)
+    {
+        outError = String("Git commit is not in the local cache; ") + _offlineUpdateAdvice() +
+                   ": " + commit;
+        return SLANG_FAIL;
+    }
+
+    List<String> arguments;
+    arguments.add("fetch");
+    arguments.add("origin");
+    arguments.add(commit);
     ExecuteResult result;
-    List<String> cloneArguments;
-    cloneArguments.add("clone");
-    cloneArguments.add("--no-checkout");
-    cloneArguments.add("--");
-    cloneArguments.add(source);
-    cloneArguments.add(destination);
-    return _runGit(workingDirectory, cloneArguments, result, outError);
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    SLANG_RETURN_ON_FAIL(_commitExists(repositoryPath, commit, exists, outError));
+    if (!exists)
+    {
+        outError = String("Git origin did not provide commit: ") + commit;
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+SlangResult fetchCachedCommit(const String& repositoryPath, const String& commit, String& outError)
+{
+    return _ensureCachedCommit(repositoryPath, commit, true, outError);
+}
+
+SlangResult requireCachedCommit(
+    const String& repositoryPath,
+    const String& commit,
+    String& outError)
+{
+    return _ensureCachedCommit(repositoryPath, commit, false, outError);
+}
+
+static SlangResult _listCachedRefNames(
+    const String& cachePath,
+    List<String>& outRefs,
+    String& outError)
+{
+    outRefs.clear();
+    List<String> arguments;
+    arguments.add("for-each-ref");
+    arguments.add("--format=%(refname)");
+    arguments.add("refs/remotes/origin");
+    arguments.add("refs/tags");
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(cachePath, arguments, result, outError));
+    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+    {
+        String ref = line.trim();
+        if (ref.getLength() && ref != "refs/remotes/origin/HEAD")
+            outRefs.add(ref);
+    }
+    return SLANG_OK;
+}
+
+SlangResult collectMovingCachedRefs(
+    const String& cachePath,
+    const String& destination,
+    List<String>& outRefs,
+    String& outError)
+{
+    outRefs.clear();
+    if (!_hasGitDir(destination))
+        return SLANG_OK;
+
+    List<String> cachedRefs;
+    SLANG_RETURN_ON_FAIL(_listCachedRefNames(cachePath, cachedRefs, outError));
+    for (const auto& ref : cachedRefs)
+    {
+        String cachedCommit;
+        SLANG_RETURN_ON_FAIL(resolveLocalRevision(cachePath, ref, cachedCommit, outError));
+        String destinationCommit;
+        String resolveError;
+        if (SLANG_FAILED(resolveLocalRevision(destination, ref, destinationCommit, resolveError)))
+            continue;
+        if (destinationCommit != cachedCommit)
+            outRefs.add(ref);
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _stageCachedRepository(
+    const String& cachePath,
+    const String& destination,
+    const String& targetCommit,
+    bool allowMovingRefs,
+    String& outError)
+{
+    bool cachedCommitExists = false;
+    SLANG_RETURN_ON_FAIL(_commitExists(cachePath, targetCommit, cachedCommitExists, outError));
+    if (!cachedCommitExists)
+    {
+        outError = String("Selected commit is not in the local cache: ") + targetCommit;
+        return SLANG_FAIL;
+    }
+
+    if (!allowMovingRefs)
+    {
+        List<String> movingRefs;
+        SLANG_RETURN_ON_FAIL(collectMovingCachedRefs(cachePath, destination, movingRefs, outError));
+        if (movingRefs.getCount())
+        {
+            outError = String("Cache staging would move an existing dependency ref without "
+                              "confirmation: ") +
+                       movingRefs[0];
+            return SLANG_FAIL;
+        }
+    }
+
+    List<String> cachedRefs;
+    SLANG_RETURN_ON_FAIL(_listCachedRefNames(cachePath, cachedRefs, outError));
+    List<String> arguments;
+    ExecuteResult result;
+    if (cachedRefs.getCount())
+    {
+        arguments.add("fetch");
+        arguments.add("--force");
+        arguments.add("--no-tags");
+        arguments.add("--");
+        arguments.add(cachePath);
+        for (const auto& ref : cachedRefs)
+            arguments.add(String("+") + ref + ":" + ref);
+        SLANG_RETURN_ON_FAIL(_runGit(destination, arguments, result, outError));
+    }
+
+    bool exists = false;
+    SLANG_RETURN_ON_FAIL(_commitExists(destination, targetCommit, exists, outError));
+    if (exists)
+        return SLANG_OK;
+
+    arguments.clear();
+    arguments.add("fetch");
+    arguments.add("--no-tags");
+    arguments.add("--");
+    arguments.add(cachePath);
+    arguments.add(targetCommit);
+    SLANG_RETURN_ON_FAIL(_runGit(destination, arguments, result, outError));
+    SLANG_RETURN_ON_FAIL(_commitExists(destination, targetCommit, exists, outError));
+    if (!exists)
+    {
+        outError = String("Selected commit is not in the local cache: ") + targetCommit;
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
 }
 
 static SlangResult _materializeRevision(
-    const String& workingDirectory,
     const String& gitURL,
     const String& currentCommit,
     const String& targetCommit,
     const String& destination,
     bool allowClean,
-    bool allowRemote,
-    const String& localMirror,
+    bool allowMovingRefs,
+    const String& cachePath,
     bool& ioDidMaterialize,
     String& outError)
 {
@@ -748,34 +796,26 @@ static SlangResult _materializeRevision(
     bool destinationExisted = SLANG_SUCCEEDED(Path::getPathType(destination, &pathType));
     if (!destinationExisted)
     {
-        if (allowRemote)
+        if (!_hasGitDir(cachePath))
         {
-            SLANG_RETURN_ON_FAIL(_cloneNoCheckout(workingDirectory, gitURL, destination, outError));
+            outError = String("Package cache is missing: ") + cachePath;
+            return SLANG_FAIL;
         }
-        else
+        if (!Path::createDirectoryRecursive(destination))
         {
-            if (!_hasGitDir(localMirror))
-            {
-                outError = String("Package cache is missing; ") + _offlineUpdateAdvice() + ": " +
-                           (localMirror.getLength() ? localMirror : destination);
-                return SLANG_FAIL;
-            }
-            if (!Path::createDirectoryRecursive(destination))
-            {
-                outError = String("Cannot create package destination: ") + destination;
-                return SLANG_FAIL;
-            }
-            List<String> initArguments;
-            initArguments.add("init");
-            initArguments.add("-q");
-            SLANG_RETURN_ON_FAIL(_runGit(destination, initArguments, result, outError));
-            List<String> remoteAddArguments;
-            remoteAddArguments.add("remote");
-            remoteAddArguments.add("add");
-            remoteAddArguments.add("origin");
-            remoteAddArguments.add(gitURL);
-            SLANG_RETURN_ON_FAIL(_runGit(destination, remoteAddArguments, result, outError));
+            outError = String("Cannot create package destination: ") + destination;
+            return SLANG_FAIL;
         }
+        List<String> initArguments;
+        initArguments.add("init");
+        initArguments.add("-q");
+        SLANG_RETURN_ON_FAIL(_runGit(destination, initArguments, result, outError));
+        List<String> remoteAddArguments;
+        remoteAddArguments.add("remote");
+        remoteAddArguments.add("add");
+        remoteAddArguments.add("origin");
+        remoteAddArguments.add(gitURL);
+        SLANG_RETURN_ON_FAIL(_runGit(destination, remoteAddArguments, result, outError));
         ioDidMaterialize = true;
     }
     else if (!_hasGitDir(destination))
@@ -793,14 +833,13 @@ static SlangResult _materializeRevision(
             return SLANG_FAIL;
         }
         return _materializeRevision(
-            workingDirectory,
             gitURL,
             String(),
             targetCommit,
             destination,
             false,
-            allowRemote,
-            localMirror,
+            allowMovingRefs,
+            cachePath,
             ioDidMaterialize,
             outError);
     }
@@ -825,14 +864,13 @@ static SlangResult _materializeRevision(
             return SLANG_FAIL;
         }
         return _materializeRevision(
-            workingDirectory,
             gitURL,
             String(),
             targetCommit,
             destination,
             false,
-            allowRemote,
-            localMirror,
+            allowMovingRefs,
+            cachePath,
             ioDidMaterialize,
             outError);
     }
@@ -843,7 +881,16 @@ static SlangResult _materializeRevision(
         SLANG_RETURN_ON_FAIL(getWorkingTreeStatus(destination, currentCommit, status, outError));
         const bool hasUncommittedState = status.changedFileCount != 0 || status.stashCount != 0;
         if (!hasUncommittedState && status.headCommit == targetCommit)
-            return SLANG_OK;
+        {
+            // The work tree is current, but its tags and origin-tracking branches may still lag
+            // behind the cache. Stage those refs without checking out the files again.
+            return _stageCachedRepository(
+                cachePath,
+                destination,
+                targetCommit,
+                allowMovingRefs,
+                outError);
+        }
 
         const bool isSafe = !hasUncommittedState && status.commitsAhead == 0 &&
                             status.commitsBehind == 0 && status.headCommit == currentCommit;
@@ -862,14 +909,13 @@ static SlangResult _materializeRevision(
                 return SLANG_FAIL;
             }
             return _materializeRevision(
-                workingDirectory,
                 gitURL,
                 String(),
                 targetCommit,
                 destination,
                 false,
-                allowRemote,
-                localMirror,
+                allowMovingRefs,
+                cachePath,
                 ioDidMaterialize,
                 outError);
         }
@@ -889,56 +935,20 @@ static SlangResult _materializeRevision(
             return SLANG_FAIL;
         }
         return _materializeRevision(
-            workingDirectory,
             gitURL,
             String(),
             targetCommit,
             destination,
             false,
-            allowRemote,
-            localMirror,
+            allowMovingRefs,
+            cachePath,
             ioDidMaterialize,
             outError);
     }
 
     ioDidMaterialize = true;
-    if (allowRemote)
-    {
-        List<String> fetchArguments;
-        fetchArguments.add("fetch");
-        fetchArguments.add("origin");
-        fetchArguments.add(targetCommit);
-        SLANG_RETURN_ON_FAIL(_runGit(destination, fetchArguments, result, outError));
-    }
-    else
-    {
-        bool exists = false;
-        SLANG_RETURN_ON_FAIL(_commitExists(destination, targetCommit, exists, outError));
-        if (!exists)
-        {
-            if (!_hasGitDir(localMirror))
-            {
-                outError = String("Selected commit is not in the local cache; ") +
-                           _offlineUpdateAdvice() + ": " + targetCommit;
-                return SLANG_FAIL;
-            }
-            List<String> fetchArguments;
-            fetchArguments.add("fetch");
-            fetchArguments.add("--force");
-            fetchArguments.add("--");
-            fetchArguments.add(localMirror);
-            fetchArguments.add("+refs/heads/*:refs/remotes/cache/*");
-            fetchArguments.add("+refs/tags/*:refs/tags/*");
-            SLANG_RETURN_ON_FAIL(_runGit(destination, fetchArguments, result, outError));
-            SLANG_RETURN_ON_FAIL(_commitExists(destination, targetCommit, exists, outError));
-            if (!exists)
-            {
-                outError = String("Selected commit is not in the local cache; ") +
-                           _offlineUpdateAdvice() + ": " + targetCommit;
-                return SLANG_FAIL;
-            }
-        }
-    }
+    SLANG_RETURN_ON_FAIL(
+        _stageCachedRepository(cachePath, destination, targetCommit, allowMovingRefs, outError));
 
     List<String> checkoutArguments;
     checkoutArguments.add("checkout");
@@ -947,49 +957,26 @@ static SlangResult _materializeRevision(
     return _runGit(destination, checkoutArguments, result, outError);
 }
 
-SlangResult materializeRevision(
-    const String& workingDirectory,
-    const String& gitURL,
-    const String& revision,
-    const String& destination,
-    String& outError)
-{
-    bool didMaterialize = false;
-    return _materializeRevision(
-        workingDirectory,
-        gitURL,
-        revision,
-        revision,
-        destination,
-        false,
-        true,
-        String(),
-        didMaterialize,
-        outError);
-}
-
 SlangResult materializeLockedRevision(
-    const String& workingDirectory,
     const String& gitURL,
     const String& currentCommit,
     const String& targetCommit,
     const String& destination,
     bool allowClean,
+    bool allowMovingRefs,
     bool& outDidMaterialize,
     String& outError,
-    bool allowRemote,
-    const String& localMirror)
+    const String& cachePath)
 {
     outDidMaterialize = false;
     return _materializeRevision(
-        workingDirectory,
         gitURL,
         currentCommit,
         targetCommit,
         destination,
         allowClean,
-        allowRemote,
-        localMirror,
+        allowMovingRefs,
+        cachePath,
         outDidMaterialize,
         outError);
 }

@@ -2982,8 +2982,8 @@ SLANG_UNIT_TEST(PackageValidateIgnoresTransitiveAliasThatBuildRejects)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
     Dependency dependency;
     dependency.name = "b";
-    dependency.git = "memory:b";
-    dependency.version = "1.0.0";
+    dependency.path = "deps/b";
+    dependency.as = "1.0.0";
     root.dependencies.add(dependency);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
 
@@ -3002,10 +3002,8 @@ SLANG_UNIT_TEST(PackageValidateIgnoresTransitiveAliasThatBuildRejects)
 
     LockedPackage locked;
     locked.name = "b";
-    locked.git = "memory:b";
-    locked.ref = "v1.0.0";
     locked.version = "1.0.0";
-    locked.commit = "0000000000000000000000000000000000000000";
+    locked.path = "deps/b";
     PackageTool::LockFile lock;
     lock.packages.add(locked);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(

@@ -70,6 +70,7 @@ public:
     String cacheRoot;
     String depsDirectory;
     bool allowRemote = true;
+    List<String> preparedPackages;
 
     SlangResult initialize(String& outError)
     {
@@ -89,7 +90,20 @@ public:
         String& outError)
     {
         outRepositoryPath = Path::combine(cacheRoot, packageName);
-        return ensureRepository(projectRoot, git, outRepositoryPath, outError, allowRemote);
+        String cacheKey = packageName + "\n" + git;
+        if (preparedPackages.indexOf(cacheKey) >= 0)
+            return SLANG_OK;
+        if (allowRemote)
+        {
+            SLANG_RETURN_ON_FAIL(
+                refreshPackageCache(projectRoot, git, outRepositoryPath, outError));
+        }
+        else
+        {
+            SLANG_RETURN_ON_FAIL(requirePackageCache(git, outRepositoryPath, outError));
+        }
+        preparedPackages.add(cacheKey);
+        return SLANG_OK;
     }
 
     virtual SlangResult listReleaseTags(
@@ -98,8 +112,6 @@ public:
         List<TagCandidate>& outCandidates,
         String& outError) override
     {
-        if (allowRemote)
-            return PackageTool::listReleaseTags(git, outCandidates, outError);
         String repositoryPath;
         SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
         return listReleaseTagsFromRepository(repositoryPath, outCandidates, outError);
@@ -112,11 +124,15 @@ public:
         TagCandidate& outCandidate,
         String& outError) override
     {
-        if (allowRemote)
-            return PackageTool::resolveReference(git, ref, outCandidate, outError);
         String repositoryPath;
         SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
-        return resolveReferenceInRepository(repositoryPath, ref, outCandidate, outError);
+        if (isGitObjectId(ref))
+        {
+            SlangResult result = allowRemote ? fetchCachedCommit(repositoryPath, ref, outError)
+                                             : requireCachedCommit(repositoryPath, ref, outError);
+            SLANG_RETURN_ON_FAIL(result);
+        }
+        return resolveCachedReference(repositoryPath, ref, outCandidate, outError);
     }
 
     virtual SlangResult deriveReleaseVersion(
@@ -150,6 +166,10 @@ public:
     {
         String repositoryPath;
         SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
+        SlangResult result = allowRemote
+                                 ? fetchCachedCommit(repositoryPath, candidate.commit, outError)
+                                 : requireCachedCommit(repositoryPath, candidate.commit, outError);
+        SLANG_RETURN_ON_FAIL(result);
         String manifestText;
         SLANG_RETURN_ON_FAIL(readFileAtRevision(
             repositoryPath,

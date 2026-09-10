@@ -217,8 +217,7 @@ static SlangResult _writeSearchPaths(
     const Manifest& manifest,
     const LockFile& lock,
     const List<LocalPackage>& localPackages,
-    String& outError,
-    bool allowRemoteGit = true)
+    String& outError)
 {
     StringBuilder searchPaths;
     String depsDirectory = getWorkspaceDepsDirectory(manifest);
@@ -239,8 +238,7 @@ static SlangResult _writeSearchPaths(
             package,
             localPackages,
             packageManifest,
-            outError,
-            allowRemoteGit));
+            outError));
         for (const auto& exportPath : packageManifest.exports)
             searchPaths << Path::combine(packageRoot, exportPath) << "\n";
     }
@@ -271,9 +269,9 @@ static SlangResult _materialize(
     const LockFile* previousLock,
     const List<LocalPackage>& localPackages,
     bool allowClean,
+    const List<String>& movingRefPackages,
     List<String>* outChangedPackageNames,
-    String& outError,
-    bool allowRemote = true)
+    String& outError)
 {
     if (outChangedPackageNames)
         outChangedPackageNames->clear();
@@ -355,15 +353,14 @@ static SlangResult _materialize(
         String cachePath =
             Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
         SLANG_RETURN_ON_FAIL(materializeLockedRevision(
-            projectRoot,
             package.git,
             currentCommit,
             package.commit,
             destination,
             allowClean,
+            movingRefPackages.indexOf(package.name) >= 0,
             didMaterialize,
             outError,
-            allowRemote,
             cachePath));
         if (didMaterialize)
         {
@@ -468,6 +465,64 @@ static void _printCleanReplacementWarning(const List<String>& packageNames)
         fprintf(stdout, "  %s\n", packageName.getBuffer());
 }
 
+/// Inventory named refs that cache staging would move in existing dependency repositories.
+///
+/// Objects and new refs are additive. An existing tag or origin-tracking branch has a meaning the
+/// user may rely on, so changing its target is disclosed before any dependency repository is
+/// mutated. A checkout already scheduled for `--clean` replacement is omitted because its entire
+/// repository is covered by the stronger replacement warning.
+static SlangResult _collectMovingPackageRefs(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const LockFile& lock,
+    const List<LocalPackage>& localPackages,
+    const List<String>& cleanReplacements,
+    List<String>& outPackageNames,
+    List<String>& outFacts,
+    String& outError)
+{
+    outPackageNames.clear();
+    outFacts.clear();
+    String depsRoot = Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest));
+    String cacheRoot = Path::combine(projectRoot, ".slang", "cache");
+    for (const auto& package : lock.packages)
+    {
+        if (!isGitBackedLockedPackage(package) || package.path.getLength() ||
+            findActiveLocalPackageIndex(localPackages, package.name) >= 0 ||
+            cleanReplacements.indexOf(package.name) >= 0)
+        {
+            continue;
+        }
+
+        String destination = Path::combine(depsRoot, package.name);
+        List<String> refs;
+        SLANG_RETURN_ON_FAIL(collectMovingCachedRefs(
+            Path::combine(cacheRoot, package.name),
+            destination,
+            refs,
+            outError));
+        if (!refs.getCount())
+            continue;
+
+        StringBuilder fact;
+        fact << package.name << ": ";
+        for (Index i = 0; i < refs.getCount(); ++i)
+            fact << (i ? ", " : "") << refs[i];
+        outPackageNames.add(package.name);
+        outFacts.add(fact.produceString());
+    }
+    return SLANG_OK;
+}
+
+static void _printMovingRefWarning(const List<String>& facts)
+{
+    if (!facts.getCount())
+        return;
+    fprintf(stdout, "Staging from cache will move existing refs in:\n");
+    for (const auto& fact : facts)
+        fprintf(stdout, "  %s\n", fact.getBuffer());
+}
+
 static void _appendIncompleteMaterializationAdvice(String& ioError, bool previousLockExists)
 {
     appendErrorAdvice(
@@ -504,17 +559,15 @@ static SlangResult _validateLockAgainstManifest(
     const Manifest& manifest,
     const LockFile& lock,
     const List<LocalPackage>& localPackages,
-    String& outError,
-    bool allowRemoteGit = true)
+    String& outError)
 {
-    return validateLegalResolvedProject(
+    return validateWorkspaceResolvedProject(
         projectRoot,
         manifest,
         lock,
         localPackages,
         outError,
-        nullptr,
-        allowRemoteGit);
+        nullptr);
 }
 
 /// Verify that every registered local tree matches its locked slot and every path lock is
@@ -1322,7 +1375,9 @@ static SlangResult _fetch(
     List<String> warnings;
     SLANG_RETURN_ON_FAIL(
         _validateLocalPackages(projectRoot, manifest, lock, localPackages, outError, &warnings));
-    SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
+    SLANG_RETURN_ON_FAIL(validateLockedWorkspaceExclusions(manifest, lock, outError));
+    SLANG_RETURN_ON_FAIL(refreshAndValidateUpstreamResolvedProject(projectRoot, lock, outError));
+    SLANG_RETURN_ON_FAIL(validateWorkspaceResolvedProject(
         projectRoot,
         manifest,
         lock,
@@ -1346,17 +1401,29 @@ static SlangResult _fetch(
             cleanReplacements,
             outError));
         _printCleanReplacementWarning(cleanReplacements);
-        if (cleanReplacements.getCount())
-        {
-            bool approved = false;
-            SLANG_RETURN_ON_FAIL(_confirmApply(
-                assumeYes,
-                "Discard this local checkout state and fetch?",
-                approved,
-                outError));
-            if (!approved)
-                return SLANG_OK;
-        }
+    }
+    List<String> movingRefPackages;
+    List<String> movingRefFacts;
+    SLANG_RETURN_ON_FAIL(_collectMovingPackageRefs(
+        projectRoot,
+        manifest,
+        lock,
+        localPackages,
+        cleanReplacements,
+        movingRefPackages,
+        movingRefFacts,
+        outError));
+    _printMovingRefWarning(movingRefFacts);
+    if (cleanReplacements.getCount() || movingRefFacts.getCount())
+    {
+        bool approved = false;
+        SLANG_RETURN_ON_FAIL(_confirmApply(
+            assumeYes,
+            "Apply these dependency repository changes?",
+            approved,
+            outError));
+        if (!approved)
+            return SLANG_OK;
     }
     SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, outError));
     List<String> changedPackageNames;
@@ -1367,6 +1434,7 @@ static SlangResult _fetch(
             &lock,
             localPackages,
             allowClean,
+            movingRefPackages,
             &changedPackageNames,
             outError)))
     {
@@ -1563,14 +1631,14 @@ static SlangResult _update(
         effectiveLocalPackages,
         outError,
         &warnings));
-    SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
+    SLANG_RETURN_ON_FAIL(validateWorkspaceResolvedProject(
         projectRoot,
         manifest,
         lock,
         effectiveLocalPackages,
         outError,
-        &warnings,
-        !offline));
+        &warnings));
+    SLANG_RETURN_ON_FAIL(validateCachedResolvedProject(projectRoot, lock, outError));
     // The report is printed before anything is materialized, so it always describes a plan. Only
     // the summary printed after the lock and the checkouts have been written may claim the work
     // happened.
@@ -1582,16 +1650,6 @@ static SlangResult _update(
             stderr,
             "slang-package: warning: ignoring enabled overrides for this update; they remain in "
             "slang-package-overlay.json.\n");
-    }
-    if (dryRun)
-    {
-        for (const auto& warning : warnings)
-            fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
-        if (skipValidate)
-            _warnSkippedSourceValidation();
-        fprintf(stdout, "%s", reportText.getBuffer());
-        fprintf(stdout, "Dry run: lock and dependency checkouts were not modified.\n");
-        return SLANG_OK;
     }
     List<String> cleanReplacements;
     if (allowClean)
@@ -1606,6 +1664,28 @@ static SlangResult _update(
             outError));
         _printCleanReplacementWarning(cleanReplacements);
     }
+    List<String> movingRefPackages;
+    List<String> movingRefFacts;
+    SLANG_RETURN_ON_FAIL(_collectMovingPackageRefs(
+        projectRoot,
+        manifest,
+        lock,
+        effectiveLocalPackages,
+        cleanReplacements,
+        movingRefPackages,
+        movingRefFacts,
+        outError));
+    _printMovingRefWarning(movingRefFacts);
+    if (dryRun)
+    {
+        for (const auto& warning : warnings)
+            fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+        if (skipValidate)
+            _warnSkippedSourceValidation();
+        fprintf(stdout, "%s", reportText.getBuffer());
+        fprintf(stdout, "Dry run: lock and dependency checkouts were not modified.\n");
+        return SLANG_OK;
+    }
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     warnings.clear();
@@ -1616,7 +1696,7 @@ static SlangResult _update(
     // should review, and `--clean` discards local checkout state, but re-running `update` on an
     // already-current graph only checks and validates what the lock already says.
     const bool lockChanges = !previousLockPtr || !lockFilesEqual(*previousLockPtr, lock);
-    if (lockChanges || cleanReplacements.getCount())
+    if (lockChanges || cleanReplacements.getCount() || movingRefFacts.getCount())
     {
         bool approved = false;
         SLANG_RETURN_ON_FAIL(_confirmApply(assumeYes, "Apply this update?", approved, outError));
@@ -1632,9 +1712,9 @@ static SlangResult _update(
             previousLockPtr,
             effectiveLocalPackages,
             allowClean,
+            movingRefPackages,
             &changedPackageNames,
-            outError,
-            !offline)))
+            outError)))
     {
         _appendIncompleteMaterializationAdvice(outError, previousLockPtr != nullptr);
         return SLANG_FAIL;
@@ -1671,7 +1751,7 @@ static SlangResult _update(
     }
     SLANG_RETURN_ON_FAIL(writeLockFile(lockPath, lock, outError));
     SLANG_RETURN_ON_FAIL(
-        _writeSearchPaths(projectRoot, manifest, lock, effectiveLocalPackages, outError, !offline));
+        _writeSearchPaths(projectRoot, manifest, lock, effectiveLocalPackages, outError));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     if (lockChanges)
@@ -1729,7 +1809,9 @@ static SlangResult _validate(const String& projectRoot, String& outError)
     }
 
     List<String> warnings;
-    SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
+    SLANG_RETURN_ON_FAIL(validateLockedWorkspaceExclusions(manifest, lock, outError));
+    SLANG_RETURN_ON_FAIL(refreshAndValidateUpstreamResolvedProject(projectRoot, lock, outError));
+    SLANG_RETURN_ON_FAIL(validateWorkspaceResolvedProject(
         projectRoot,
         manifest,
         lock,
@@ -1759,6 +1841,10 @@ static SlangResult _validateNamedPackage(
         outError = String("Package is not present in the lock file: ") + name;
         return SLANG_FAIL;
     }
+    LockFile packageLock;
+    packageLock.packages.add(lock.packages[packageIndex]);
+    SLANG_RETURN_ON_FAIL(
+        refreshAndValidateUpstreamResolvedProject(projectRoot, packageLock, outError));
     SLANG_RETURN_ON_FAIL(_validateLockedPackagePublishable(
         projectRoot,
         rootManifest,
@@ -1787,6 +1873,7 @@ static SlangResult _validateAllLockedPackages(const String& projectRoot, String&
         return SLANG_OK;
     }
     SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
+    SLANG_RETURN_ON_FAIL(refreshAndValidateUpstreamResolvedProject(projectRoot, lock, outError));
     List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
     List<String> failures;
@@ -1874,7 +1961,7 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
     else
     {
         lockMatchesManifest = SLANG_SUCCEEDED(
-            _validateLockAgainstManifest(projectRoot, manifest, lock, localPackages, issue, false));
+            _validateLockAgainstManifest(projectRoot, manifest, lock, localPackages, issue));
         if (!lockMatchesManifest)
         {
             addFact(issue);
@@ -1885,6 +1972,11 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
         {
             addFact(issue);
             reportedLockDrift = true;
+        }
+        issue = String();
+        if (SLANG_FAILED(validateCachedResolvedProject(projectRoot, lock, issue)))
+        {
+            addFact(issue, "slang package fetch");
         }
     }
 
@@ -3137,7 +3229,7 @@ static SlangResult _adoptInPlaceOverride(
 
     localPackages.removeAt(localIndex);
     List<String> warnings;
-    SLANG_RETURN_ON_FAIL(validateLegalResolvedProject(
+    SLANG_RETURN_ON_FAIL(validateWorkspaceResolvedProject(
         projectRoot,
         manifest,
         lock,
@@ -3277,15 +3369,21 @@ static SlangResult _unedit(
                 return SLANG_OK;
 
             bool didMaterialize = false;
+            String cachePath =
+                Path::combine(Path::combine(projectRoot, ".slang", "cache"), package->name);
+            // The state that triggered this confirmation makes materialization replace the whole
+            // repository, so no surviving ref can move. If the checkout becomes clean before the
+            // mutation, keep ref moves disallowed because they were not listed in this prompt.
             SLANG_RETURN_ON_FAIL(materializeLockedRevision(
-                projectRoot,
                 package->git,
                 package->commit,
                 package->commit,
                 destination,
                 true,
+                false,
                 didMaterialize,
-                outError));
+                outError,
+                cachePath));
         }
     }
     localPackages.removeAt(localIndex);
