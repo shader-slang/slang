@@ -2,6 +2,7 @@
 // cbuffer member is honored.
 
 //TEST:REFLECTION(filecheck=REFLECT):-profile cs_6_0 -target hlsl -no-codegen -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=SPV): -target spirv-asm -profile cs_6_0 -entry main -matrix-layout-column-major
 
 cbuffer Params
 {
@@ -9,13 +10,20 @@ cbuffer Params
     float trailingValue;
 }
 
-// The array element keeps its explicit row-major layout despite the column-major default:
-// each matrix is sized row-major (element stride 32), the two matrices occupy 60 bytes, so
-// the trailing scalar lands at offset 60.
+// The array element keeps its explicit row-major layout despite the column-major default.
+// A `row_major float2x3` lays its two rows on 16-byte boundaries, so the array element stride
+// is 32 while the element's actual data ends after 28 bytes; the array size reclaims the last
+// element's trailing padding: (2-1)*32 + 28 = 60. The trailing scalar then packs at offset 60.
 // REFLECT: "name": "values"
 // REFLECT: "offset": 0, "size": 60, "elementStride": 32
 // REFLECT: "name": "trailingValue"
 // REFLECT: "offset": 60
+
+// The layout also reaches the SPIR-V element decorations: Slang `row_major` maps to SPIR-V
+// `ColMajor` (the convention is inverted). Without the fix the dropped modifier left the element
+// decorated `RowMajor` under the column-major default.
+// SPV: OpMemberDecorate {{.*}} ColMajor
+// SPV: OpMemberDecorate {{.*}} MatrixStride 16
 
 RWStructuredBuffer<float> outputBuffer;
 

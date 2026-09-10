@@ -2144,6 +2144,11 @@ class NoDiffModifier : public TypeModifier
 // (`row_major float2x3`), like `unorm`/`snorm`, keeping the layout on the
 // matrix element itself — including when a declarator wraps it in an array or
 // it precedes a function return type.
+//
+// The parser only moves these off a *declarator*, though; a function parameter
+// keeps its modifiers on the `ParamDecl` (its type is parsed after the
+// modifiers), so that path still applies the layout via `maybeApplyLayoutModifier`
+// (slang-check-decl.cpp) rather than through the type expression.
 FIDDLE(abstract)
 class MatrixLayoutModifier : public TypeModifier
 {
