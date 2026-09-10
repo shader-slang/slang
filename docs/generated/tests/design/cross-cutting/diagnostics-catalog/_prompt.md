@@ -62,7 +62,7 @@ that triggers that diagnostic from a minimum-reproduction input.
 //META: generated_at=<ISO 8601 UTC>
 //META: source_commit=<HEAD>
 //META: doc_ref=source/slang/slang-diagnostics.lua    ← or the appropriate -defs.h
-//META: doc_section_digest=<sha256 of the catalog-entry line>
+//META: doc_section_digest=<output of `_meta/regenerate.py catalog-digest <code>`>
 //META: purpose=Fires diagnostic E<code> (<name>) — <message>
 //META: intent=negative
 //META: pipeline_stage=<lex | parse | check | lower | ir-pass | emit | link>
@@ -71,10 +71,17 @@ that triggers that diagnostic from a minimum-reproduction input.
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 ```
 
-Note the new field `catalog_code` (and `catalog_name`). They are
-catalog-specific and ignored by the existing lint, but make grep
-trivial: `grep "catalog_code=30019" docs/generated/tests` finds the test
-for code 30019.
+Run `catalog-digest` for the digest rather than hashing the entry
+yourself. It is the sha256 of `code<TAB>severity<TAB>name<TAB>message`
+from `_meta/diagnostics-catalog/catalog.txt`, and `lint` recomputes it
+the same way, so a hand-derived value that differs by a column or a
+separator will be reported as drift.
+
+Note the field `catalog_code` (and `catalog_name`). `catalog_code` is
+what `lint` keys the digest recomputation on, so it has to be the code
+exactly as the catalog spells it; it also makes grep trivial:
+`grep "catalog_code=30019" docs/generated/tests` finds the test for code
+30019.
 
 **The test body is the minimum input that fires the diagnostic:**
 

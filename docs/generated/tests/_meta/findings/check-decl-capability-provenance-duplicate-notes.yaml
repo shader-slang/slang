@@ -1,0 +1,43 @@
+schema_version: 1
+id: check-decl-capability-provenance-duplicate-notes
+bundle: coverage/check-decl
+suspected_kind: wrong-diagnostic
+title: "capability provenance repeats the same 'see definition of' note eight times"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: diagnostics
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/coverage/check-decl/capability-target-conflict-provenance.slang -target hlsl"
+  source_slang: docs/generated/tests/coverage/check-decl/capability-target-conflict-provenance.slang
+  exit_code: 255
+  observed_summary: |
+    A `[require(glsl)]` function calling a `[require(hlsl)]` function reports one
+    E36108 error followed by ten notes, eight of which are byte-identical:
+
+      error[E36108]: dependencies not compatible on target
+      note: see using of 'usesHlslOnly'
+      note: see definition of 'usesHlslOnly'
+      note: see definition of 'glslCaller'      <- repeated 8x
+
+    `build/RelWithDebInfo/bin/slangc ... | grep -c "see definition of 'glslCaller'"`
+    reports 8. The repetition tracks the number of failed capability atoms:
+    `SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability` loops over the
+    simplified failed-atom set and calls `diagnoseCapabilityProvenance` once per
+    atom, and each call ends by emitting `SeeDefinitionOf` for the same
+    declaration. The primary error itself is emitted only once.
+expected:
+  claim: |
+    The provenance walk should emit the trailing "see definition of <decl>" note
+    at most once per declaration per diagnostic, as it already does for the
+    callee ('usesHlslOnly'), rather than once per failed capability atom.
+  citation_kind: sibling-test
+  citation: tests/diagnostics/capability-constructor-diagnostic.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/03-semantic-check.md#failure-modes
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Deliberate per-atom reporting: ruled out for the note specifically, because each repetition carries no atom-specific text, so a reader cannot tell the copies apart."
+    - "Test-harness artefact: ruled out — the duplication is reproduced by slangc on the command line, not only through slang-test's diagnostic collector."
+    - "Known nuisance rather than a bug: the hand-written sibling test disables exhaustive diagnostic checking with the comment 'cascading notes for capability errors', so the noise is at least tolerated today."

@@ -10,9 +10,16 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // When a global-scope cbuffer declares a field, a bare identifier in function scope
-// resolves to that field. The emitted HLSL must reference the cbuffer-qualified field
-// (not treat it as an undefined local), confirming implicit cbuffer lookup occurred.
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+// resolves to that field. Every text-emit back-end must therefore route the bare
+// names `scale` and `offset` through the constant-buffer parameter group rather than
+// treat them as undefined locals, confirming implicit cbuffer lookup occurred. The
+// claim is target-dependent (each back-end has its own constant-buffer lowering), so
+// it is exercised on every shader text target.
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 cbuffer Params
 {
@@ -35,7 +42,31 @@ void computeMain()
     outBuf[0] = compute(3);
 }
 
-// The emitted HLSL must reference the cbuffer-qualified field names.
-// CHECK: cbuffer
-// CHECK: scale
-// CHECK: offset
+// HLSL keeps the `cbuffer` construct and qualifies each bare name through the
+// parameter-group instance, so the field reads emit as `Params_N.scale_N`.
+//HLSL-DAG: cbuffer Params_{{[0-9]+}} :
+//HLSL-DAG: Params_{{[0-9]+}}.scale_{{[0-9]+}}
+//HLSL-DAG: Params_{{[0-9]+}}.offset_{{[0-9]+}}
+
+// GLSL lowers the cbuffer to a std140 uniform block; the bare names must still
+// read through that block instance.
+//GLSL-DAG: {{^}}layout(std140) uniform block_
+//GLSL-DAG: Params_{{[0-9]+}}.scale_{{[0-9]+}}
+//GLSL-DAG: Params_{{[0-9]+}}.offset_{{[0-9]+}}
+
+// On SPIR-V the cbuffer becomes a Uniform-storage-class block whose members carry
+// the original field names, and both are loaded through it.
+//SPIRV-DAG: OpMemberName %{{[A-Za-z0-9_]+}} 0 "scale"
+//SPIRV-DAG: OpMemberName %{{[A-Za-z0-9_]+}} 1 "offset"
+//SPIRV-DAG: OpName %{{[A-Za-z0-9_]+}} "Params"
+//SPIRV-DAG: %{{[A-Za-z0-9_]+}} = OpVariable %{{[A-Za-z0-9_]+}} Uniform
+
+// Metal passes the parameter group as a `constant*` pointer, so the bare names
+// emit as pointer-qualified field reads.
+//METAL-DAG: Params_{{[0-9]+}}->scale_{{[0-9]+}}
+//METAL-DAG: Params_{{[0-9]+}}->offset_{{[0-9]+}}
+
+// WGSL binds the parameter group as a `var<uniform>` struct and qualifies both reads.
+//WGSL-DAG: var<uniform> Params_{{[0-9]+}} :
+//WGSL-DAG: Params_{{[0-9]+}}.scale_{{[0-9]+}}
+//WGSL-DAG: Params_{{[0-9]+}}.offset_{{[0-9]+}}

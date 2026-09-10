@@ -256,14 +256,27 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             StringBuilder params;
             int paramCount = 0;
 
+            // Metal and WGSL lower a combined `Sampler2D` into a `{texture, sampler}` pair (see
+            // `lowerCombinedTextureSamplers`, which runs for HLSL/Metal/WGSL/CPU only), injecting a
+            // sampler operand at index 1. `GetDimensions` is a texture-only query, so its
+            // positional
+            // `$N` string is numbered without that sampler; prefix it with the `$q` marker so the
+            // expander skips the injected sampler. On a plain texture `$q` is a no-op. CUDA is not
+            // in the lowering set — its combined `Sampler2D` stays a single `CUtexObject`, so no
+            // marker is needed. See `IntrinsicExpandContext::_emitSpecial` and
+            // shader-slang/slang#11669.
             StringBuilder metal;
+            metal << "$q";
             const char* metalMipLevel = "0";
 
+            // CUDA inline assembly numbers output operands before input operands. The mip-level
+            // input is therefore `%2` for 1D, `%3` for 2D/cube, and `%4` for 3D.
             StringBuilder cuda;
             cuda << "{";
+            const char* cudaTxqPrefix = includeMipInfo ? "txq.level." : "txq.";
 
             StringBuilder wgsl;
-            wgsl << "{";
+            wgsl << "$q{";
 
             if (includeMipInfo)
             {
@@ -281,9 +294,11 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 params << t << "width";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width("
                       << String(metalMipLevel) << ")),";
-                cuda << "uint32_t width; asm(\\\"txq.width.b32 %0, [%1];\\\" : \\\"=r\\\"(width) : "
-                        "\\\"l\\\"($0)); *($"
-                     << String(paramCount) << ") = width;";
+                cuda << "uint32_t width; asm(\\\"" << cudaTxqPrefix << "width.b32 %0, [%1]"
+                     << (includeMipInfo ? ", %2" : "")
+                     << ";\\\" : \\\"=r\\\"(width) : \\\"l\\\"($0)"
+                     << (includeMipInfo ? ", \\\"r\\\"($1)" : "") << "); *($" << String(paramCount)
+                     << ") = width;";
                 wgsl << "($" << String(paramCount) << ") = "
                      << wgslTextureAttributeConversion(
                             dimType,
@@ -299,9 +314,12 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 params << t << "width,";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width("
                       << String(metalMipLevel) << ")),";
-                cuda << "uint32_t w, h; asm(\\\"txq.width.b32 %0, [%2]; txq.height.b32 %1, "
-                        "[%2];\\\" : \\\"=r\\\"(w), \\\"=r\\\"(h) : \\\"l\\\"($0)); *($"
-                     << String(paramCount) << ") = w;";
+                cuda << "uint32_t w, h; asm(\\\"" << cudaTxqPrefix << "width.b32 %0, [%2]"
+                     << (includeMipInfo ? ", %3" : "") << "; " << cudaTxqPrefix
+                     << "height.b32 %1, [%2]" << (includeMipInfo ? ", %3" : "")
+                     << ";\\\" : \\\"=r\\\"(w), \\\"=r\\\"(h) : \\\"l\\\"($0)"
+                     << (includeMipInfo ? ", \\\"r\\\"($1)" : "") << "); *($" << String(paramCount)
+                     << ") = w;";
                 wgsl << "var dim = textureDimensions($0" << (includeMipInfo ? ", $1" : "") << ");";
                 wgsl << "($" << String(paramCount)
                      << ") = " << wgslTextureAttributeConversion(dimType, "dim.x") << ";";
@@ -324,10 +342,13 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 params << t << "width,";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width("
                       << String(metalMipLevel) << ")),";
-                cuda << "uint32_t w, h, d; asm(\\\"txq.width.b32 %0, [%3]; txq.height.b32 %1, "
-                        "[%3]; txq.depth.b32 %2, [%3];\\\" : \\\"=r\\\"(w), \\\"=r\\\"(h), "
-                        "\\\"=r\\\"(d) : \\\"l\\\"($0)); *($"
-                     << String(paramCount) << ") = w;";
+                cuda << "uint32_t w, h, d; asm(\\\"" << cudaTxqPrefix << "width.b32 %0, [%3]"
+                     << (includeMipInfo ? ", %4" : "") << "; " << cudaTxqPrefix
+                     << "height.b32 %1, [%3]" << (includeMipInfo ? ", %4" : "") << "; "
+                     << cudaTxqPrefix << "depth.b32 %2, [%3]" << (includeMipInfo ? ", %4" : "")
+                     << ";\\\" : \\\"=r\\\"(w), \\\"=r\\\"(h), \\\"=r\\\"(d) : \\\"l\\\"($0)"
+                     << (includeMipInfo ? ", \\\"r\\\"($1)" : "") << "); *($" << String(paramCount)
+                     << ") = w;";
                 wgsl << "var dim = textureDimensions($0" << (includeMipInfo ? ", $1" : "") << ");";
                 wgsl << "($" << String(paramCount)
                      << ") = " << wgslTextureAttributeConversion(dimType, "dim.x") << ";";
@@ -400,8 +421,9 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 metal << "(*($" << String(paramCount) << ") = $0.get_num_mip_levels()),";
                 if (cuda.getLength() > 1 && cuda[cuda.getLength() - 1] != ';')
                     cuda << "; ";
-                cuda << "/* txq.num_mipmap_levels not available in CUDA */ *($"
-                     << String(paramCount) << ") = 0;";
+                cuda << "uint32_t levels; asm(\\\"txq.num_mipmap_levels.b32 %0, [%1];\\\" : "
+                        "\\\"=r\\\"(levels) : \\\"l\\\"($0)); *($"
+                     << String(paramCount) << ") = levels;";
                 wgsl << "($" << String(paramCount)
                      << ") = " << wgslTextureAttributeConversion(dimType, "textureNumLevels($0)")
                      << ";";
@@ -601,7 +623,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             sb << "    __glsl_version(450)\n";
 
             sb << "    [require(cpp";
-            if (cuda.getLength())
+            if (cuda.getLength() && !includeMipInfo)
                 sb << "_cuda";
             if (glsl.getLength())
                 sb << "_glsl";
@@ -613,6 +635,12 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             if (wgsl.getLength())
                 sb << "_wgsl";
             sb << ", texture_sm_4_1)]\n";
+
+            // Every mip-level overload also queries the mip count, which requires OptiX. Gate the
+            // whole overload accordingly, even though `txq.level.*` works in plain CUDA. This
+            // `require` adds OptiX as an alternative to the non-CUDA requirement above.
+            if (cuda.getLength() && includeMipInfo)
+                sb << "    [require(cuda, raytracing_stages, texture_sm_4_1)]\n";
 
             writeFunc(
                 "void",

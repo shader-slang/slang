@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:41:39+00:00
-//META: source_commit=199a52d71d360a84e8a13837b913746113a9b510
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=88de88b16c165f633a8ad6ade9438213eb05e41453c58f2679fe7e345b5df561
+//META: doc_section_digest=bae02bfd9f0c35f37e81a96d88e88829e442c28a56e0f30d0bb769febf165f85
 //META: purpose=Negative: checkStaticAssert (Phase B direct call) evaluates a static_assert whose condition depends on a generic value parameter after specialization; instantiating with a failing argument fires E41400.
 //META: intent=negative
 //META: pipeline_stage=ir-pass

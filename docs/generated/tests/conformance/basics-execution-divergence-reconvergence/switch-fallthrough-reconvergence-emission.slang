@@ -15,6 +15,8 @@
 // fall-through and restructures it by duplicating the shared case body.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
@@ -42,6 +44,25 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // SPIRV: single OpSelectionMerge for the outer switch; OpSwitch for dispatch.
 // CHECK: OpSelectionMerge
 // CHECK: OpSwitch
+
+// HLSL: like WGSL, the fall-through is restructured by duplicating the shared
+// case-1 body into the case-0 arm, so case 0 ends in its own break.
+// CHECK_HLSL: switch(
+// CHECK_HLSL: case 0U
+// CHECK_HLSL: result_0 = result_0 + 10U
+// CHECK_HLSL: result_0 = result_0 + 20U
+// CHECK_HLSL: break
+// CHECK_HLSL: case 1U
+// CHECK_HLSL: result_0 = result_0 + 20U
+
+// GLSL: fall-through preserved — the case-0 arm reaches the shared case-1 body
+// with no intervening break, which is the reconvergence point in the emitted text.
+// CHECK_GLSL: switch(
+// CHECK_GLSL: case 0U
+// CHECK_GLSL: result_0 = result_0 + 10U
+// CHECK_GLSL-NOT: break
+// CHECK_GLSL: case 1U
+// CHECK_GLSL: result_0 = result_0 + 20U
 
 // Metal: fall-through preserved — case 0 has no break before case 1.
 // CHECK_METAL: switch(

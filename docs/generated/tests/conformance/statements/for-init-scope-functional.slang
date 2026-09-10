@@ -12,6 +12,10 @@
 // Verifies that the for-loop init variable is scoped to the for statement.
 // Two successive for loops may redeclare the same variable name `i` without conflict.
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outputBuffer;
 
@@ -31,3 +35,31 @@ void computeMain()
 }
 
 // CHECK: void computeMain
+
+// Each target emits two independent loops, the first bounded by 3 and the second
+// by 5. That both `int i` declarations were accepted, and that each loop kept its
+// own bound, is the observable consequence of the init variable's scope ending
+// with its for statement.
+// GLSL: void main()
+// GLSL: for(;;)
+// GLSL: {{.*}} < 3
+// GLSL: for(;;)
+// GLSL: {{.*}} < 5
+
+// METAL: {{\[\[}}kernel{{\]\]}} void computeMain
+// METAL: for(;;)
+// METAL: {{.*}} < int(3)
+// METAL: for(;;)
+// METAL: {{.*}} < int(5)
+
+// WGSL: fn computeMain
+// WGSL: for(;;)
+// WGSL: {{.*}} < i32(3)
+// WGSL: for(;;)
+// WGSL: {{.*}} < i32(5)
+
+// SPIRV: %computeMain = OpFunction
+// SPIRV: OpLoopMerge
+// SPIRV: OpSLessThan %bool %{{[0-9]+}} %int_3
+// SPIRV: OpLoopMerge
+// SPIRV: OpSLessThan %bool %{{[0-9]+}} %int_5

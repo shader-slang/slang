@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=fed1a0f5fb506d6d17a2f4abb7e63d5a4e077f8d625002f32ccbf129ff6be053
+//META: doc_section_digest=e1e4289ccf2cf8781d5b7af4ef06072d4eb6dd19fdb6190ebbd2a0e81eae267f
 //META: purpose=Fires diagnostic E31132 (derivative-member-attribute-can-only-be-used-on-members) -- DerivativeMember on non-member
 //META: intent=negative
 //META: pipeline_stage=check
@@ -17,4 +17,4 @@
 float f;
 
 
-// CHECK: E31132
+//CHECK: E31132

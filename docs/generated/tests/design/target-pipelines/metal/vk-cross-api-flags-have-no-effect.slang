@@ -1,39 +1,40 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
-//META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=355a74cccddb8eb52d0513615291bc6d928b55d9bdd73146a80f6df81b210ae4
-//META: purpose=legalizeUniformBufferLoad / invertYOfPositionOutput / rcpWOfPositionInput are filtered out for Metal (gated on isKhronosTarget || HLSL): Vulkan cross-API flags do not mutate Metal MSL emission. Even with -fvk-invert-y and -fvk-use-dx-position-w set, the emitted SV_Position output is unchanged and no `(-y)` rewrite or `1/w` reciprocal appears.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/target-pipelines/metal.md#metal-specific-runtime-predicates
+//META: doc_section_digest=275b7da5949f8c2296fb59114278d0adffc4d57d97d8e80bf7f6abfea9486334
+//META: purpose=Negative: Vulkan cross-API options are filtered out of the Metal pipeline, so `-fvk-invert-y` and `-fvk-use-dx-position-w` leave the emitted MSL unchanged.
 //META: intent=negative
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc enumerates `legalizeUniformBufferLoad`,
-// `invertYOfPositionOutput`, and `rcpWOfPositionInput` as
-// Khronos/HLSL-gated passes that are filtered out for Metal. Their
-// absence is observable: even passing the Vulkan cross-API flags
-// `-fvk-invert-y` and `-fvk-use-dx-position-w`, the emitted MSL
-// preserves the `SV_Position` output verbatim — no Y-flip and no
-// `1.0 / w` reciprocal rewrite are introduced.
+// Verifies the filtered-out half of the Metal predicate table by asking
+// for two Khronos-only rewrites and showing neither happens: the
+// Y-inversion pass would negate the position's y component and the
+// position-w pass would introduce a reciprocal. The vertex position is
+// derived from a `uniform` so a rewrite could not be constant-folded away;
+// CHECK asserts the emitted position assignment carries neither a negation
+// of the uniform nor a `1.0f /` reciprocal.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage vertex -fvk-invert-y -fvk-use-dx-position-w
+
+uniform float yScale;
 
 struct VOut
 {
     float4 pos : SV_Position;
-};
+}
 
 [shader("vertex")]
 VOut main(uint vid : SV_VertexID)
 {
     VOut o;
-    o.pos = float4(float(vid), 2.0, 3.0, 4.0);
+    o.pos = float4(float(vid), yScale, 0.0, 1.0);
     return o;
 }
 
-// CHECK: #include <metal_stdlib>
-// CHECK: vertex{{.*}} main_0
-// The position is passed through unchanged: no Y inversion, no W reciprocal.
-// CHECK-NOT: pos{{.*}}= {{.*}}-{{.*}}.y
-// CHECK-NOT: 1.0{{.*}}/{{.*}}.w
+// CHECK: vertex
+// CHECK-SAME: main_0
+// CHECK-NOT: 1.0f /
+// CHECK-NOT: - yScale

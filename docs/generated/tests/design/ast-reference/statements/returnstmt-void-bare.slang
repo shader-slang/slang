@@ -1,20 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
-//META: doc_ref=docs/generated/design/ast-reference/statements.md#nodes
-//META: doc_section_digest=9f32f2463c3b3150d88ac333b9a732766e6f477e8e541627f6f4db0faa939a24
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/statements.md#returnstmt
+//META: doc_section_digest=c25c0b38fe3f374b6c53bf5d39f45dbef8f00f160edf334a7927f62cea89fd70
 //META: purpose=A ReturnStmt in a void function is allowed to omit its expression (`return;`); the function halts and statements after the bare return do not execute on the early-return path.
 //META: intent=boundary
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary: bare `return;` form. The doc spells ReturnStmt as
-// "`return` (optionally with an expression)". The void-function
-// side of the optionality is accepted; the partner negative test
-// rejects the non-void side. We observe the halting effect on the
-// early-exit path: only the pre-return print fires when the int
-// argument signals the early return.
+// Verifies the returned expression may be omitted when the enclosing
+// function returns `void`, and that the bare `return` still halts the
+// function. The CHECKs assert the post-return print fires only on the
+// path that did not take the early return.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/shader-slang/slang/docs/generated/tests/_meta/schema/manifest.schema.json",
   "title": "docs/generated/tests manifest",
-  "description": "Schema for docs/generated/tests/_meta/manifest.yaml. Bundle keys are role-rooted (conformance/<doc> for language-reference-anchored bundles, design/<area>/<doc> for generated-design-anchored bundles). Tests in each bundle derive their claims from the bundle's source_doc and are never written against source-line gaps.",
+  "description": "Schema for docs/generated/tests/_meta/manifest.yaml. Bundle keys are role-rooted (conformance/<doc> for language-reference-anchored bundles, design/<area>/<doc> for generated-design-anchored bundles, coverage/<area> for white-box characterization bundles). Doc-anchored bundles (conformance, design) derive their claims from the bundle's source_doc and are never written against source-line gaps; coverage bundles are the single documented exception, selected by uncovered compiler code and asserting observed current behaviour (see docs/generated/tests/coverage/METHODOLOGY.md).",
   "type": "object",
   "required": ["version", "bundles"],
   "additionalProperties": false,
@@ -24,9 +24,26 @@
       },
       "additionalProperties": {
         "type": "object",
-        "required": ["source_doc", "watched_paths"],
+        "required": ["watched_paths"],
         "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": { "role": { "const": "coverage" } },
+              "required": ["role"]
+            },
+            "then": {
+              "not": { "required": ["source_doc"] },
+              "description": "A coverage bundle is selected by coverage gap, so it has no anchoring document; only its watched_paths can invalidate it."
+            },
+            "else": { "required": ["source_doc"] }
+          }
+        ],
         "properties": {
+          "role": {
+            "enum": ["conformance", "design", "coverage"],
+            "description": "Which tree this bundle belongs to, and therefore what its tests are answerable to. Must match the bundle key's first path segment; defaults to that segment when omitted. conformance/design bundles are doc-anchored and require source_doc; coverage bundles are gap-selected and must not declare one."
+          },
           "source_doc": {
             "type": "string",
             "pattern": "^docs/(generated/design|language-reference)/.+\\.md$",

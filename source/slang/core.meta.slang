@@ -3012,21 +3012,6 @@ $(fullPtrType) operator-($(fullPtrType) value, TInt offset)
     return __getOffsetPtr(value, -offset);
 }
 
-__generic<T : IArithmetic>
-[__unsafeForceInlineEarly]
-__prefix T operator+(T value)
-{ return value; }
-
-__generic<T : __BuiltinArithmeticType, let N : int>
-[__unsafeForceInlineEarly]
-__prefix vector<T,N> operator+(vector<T,N> value)
-{ return value; }
-
-__generic<T : __BuiltinArithmeticType, let R : int, let C : int>
-[__unsafeForceInlineEarly]
-__prefix matrix<T,R,C> operator+(matrix<T,R,C> value)
-{ return value; }
-
 ${
 
 static const struct IncDecOpInfo
@@ -3663,6 +3648,15 @@ __prefix T operator -(T v0)
     return v0.neg();
 }
 
+$(attrib)
+__generic<T : $(interfaceName)>
+[__unsafeForceInlineEarly]
+[OverloadRank($(overloadRank))]
+__prefix T operator +(T v0)
+{
+    return v0;
+}
+
 ${
     } // foreach ["IArithmetic", "IFloat"]
 $}
@@ -3712,6 +3706,15 @@ __generic<T : IDifferentiableArithmetic>
 __prefix T operator -(T v0)
 {
     return v0.neg();
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+__prefix T operator +(T v0)
+{
+    return v0;
 }
 
 __generic<T : ILogical>
@@ -4033,10 +4036,6 @@ internal T __frem<T>(T left, T right);
 
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
-
-__generic<T>
-__intrinsic_op( $(kIROp_GetLegalizedSPIRVGlobalParamAddr))
-__Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 
 __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();
@@ -5412,7 +5411,7 @@ semantic sv_waveindex
 
 semantic sv_barycentrics
 {
-    [require(fragment)]
+    [require(fragment, fragmentshaderbarycentric)]
     get : float3;
 }
 

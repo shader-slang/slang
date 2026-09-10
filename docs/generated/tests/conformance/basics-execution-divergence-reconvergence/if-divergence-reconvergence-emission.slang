@@ -15,6 +15,8 @@
 // encode the divergence point and the two arms.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
@@ -41,6 +43,16 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // SPIRV: structured selection with merge block and conditional branch.
 // CHECK: OpSelectionMerge
 // CHECK: OpBranchConditional
+
+// HLSL: if/else preserved with the two arms.
+// CHECK_HLSL: if(
+// CHECK_HLSL: result_0 = 1U
+// CHECK_HLSL: result_0 = 2U
+
+// GLSL: if/else preserved with the two arms.
+// CHECK_GLSL: if(
+// CHECK_GLSL: result_0 = 1U
+// CHECK_GLSL: result_0 = 2U
 
 // Metal: if/else preserved with the two arms.
 // CHECK_METAL: if(

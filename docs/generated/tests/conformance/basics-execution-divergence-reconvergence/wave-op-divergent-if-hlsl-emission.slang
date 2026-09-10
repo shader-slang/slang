@@ -19,6 +19,8 @@
 // hardware warp/subgroup model), so it is listed under ## Untested claims in README.md.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_SPIRV):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
@@ -44,6 +46,17 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK: if(
 // CHECK: WaveActiveMin
 // CHECK: WaveActiveMax
+
+// GLSL: subgroupMin/subgroupMax are the GLSL equivalents; each inside its if-arm.
+// CHECK_GLSL: if(
+// CHECK_GLSL: subgroupMin
+// CHECK_GLSL: subgroupMax
+
+// SPIRV: the two GroupNonUniform ops sit in the two branch arms delimited by
+// the selection merge, not hoisted above it.
+// CHECK_SPIRV: OpSelectionMerge
+// CHECK_SPIRV: OpGroupNonUniformUMin
+// CHECK_SPIRV: OpGroupNonUniformUMax
 
 // Metal: simd_min/simd_max are the Metal equivalents; each inside its if-arm.
 // CHECK_METAL: if(

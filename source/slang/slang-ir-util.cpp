@@ -2191,6 +2191,12 @@ UnownedStringSlice getBuiltinFuncName(IRInst* callee)
         return UnownedStringSlice::fromLiteral("IBwdCallable");
     case KnownBuiltinDeclName::NullDifferential:
         return UnownedStringSlice::fromLiteral("NullDifferential");
+    case KnownBuiltinDeclName::OperatorAddressOf:
+        return UnownedStringSlice::fromLiteral("OperatorAddressOf");
+    case KnownBuiltinDeclName::WaveIsFirstLane:
+        return UnownedStringSlice::fromLiteral("WaveIsFirstLane");
+    case KnownBuiltinDeclName::WaveReadLaneFirst:
+        return UnownedStringSlice::fromLiteral("WaveReadLaneFirst");
     default:
         return UnownedStringSlice();
     }
@@ -3418,6 +3424,22 @@ IRType* getWorkGraphRecordElementType(IRType* type)
     }
 
     return nullptr;
+}
+
+bool isBindlessTextureNVEncodableResourceType(IRType* type)
+{
+    auto unwrapped = unwrapAttributedType(type);
+    return as<IRTextureType>(unwrapped) || as<IRSamplerStateTypeBase>(unwrapped);
+}
+
+bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool hasBindlessTextureNV)
+{
+    if (!hasBindlessTextureNV)
+        return false;
+    auto handleType = as<IRDescriptorHandleType>(descriptorHandleType);
+    if (!handleType)
+        return false;
+    return isBindlessTextureNVEncodableResourceType(handleType->getResourceType());
 }
 
 } // namespace Slang

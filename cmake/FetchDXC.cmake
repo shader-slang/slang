@@ -98,13 +98,13 @@ function(_dxc_stage_hlsl_headers dxc_root dxc_origin)
     endif()
 
     set(_dxc_inc_src "${_dxc_hlsl_include_dir}/dx/linalg.h")
-    set(_dxc_inc_dst "${CMAKE_BINARY_DIR}/dxc/include/dx/linalg.h")
+    set(_dxc_inc_dst "${slang_BINARY_DIR}/dxc/include/dx/linalg.h")
     list(PREPEND _dxc_header_deps "${_dxc_inc_src}")
     add_custom_command(
         OUTPUT "${_dxc_inc_dst}"
         COMMAND
             ${CMAKE_COMMAND} -E copy_directory "${_dxc_hlsl_include_dir}"
-            "${CMAKE_BINARY_DIR}/dxc/include"
+            "${slang_BINARY_DIR}/dxc/include"
         DEPENDS ${_dxc_header_deps}
         VERBATIM
     )
@@ -220,7 +220,7 @@ elseif(
     set(_dxc_probe_url
         "https://github.com/microsoft/DirectXShaderCompiler/releases/download/${_dxc_version_tag}/linux_dxc_${_dxc_release_date}.x86_64.tar.gz"
     )
-    set(_dxc_probe_dir "${CMAKE_BINARY_DIR}/_dxc_probe")
+    set(_dxc_probe_dir "${slang_BINARY_DIR}/_dxc_probe")
     # Include the version tag in the filename so that bumping _dxc_version_tag
     # invalidates the cached tarball and forces a fresh download rather than
     # re-using a stale archive from a previous version.
@@ -756,7 +756,7 @@ if(_dxc_build_from_source)
         foreach(_dll dxcompiler dxil)
             set(_src "${_dxc_build_dir}/${_dxc_dll_subdir}/${_dll}.dll")
             set(_dst
-                "${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/${_dll}.dll"
+                "${slang_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/${_dll}.dll"
             )
             add_custom_command(
                 OUTPUT "${_dst}"
@@ -777,7 +777,7 @@ if(_dxc_build_from_source)
                 "${_dxc_build_dir}/${_dxc_lib_subdir}/${_dxc_shared_library_name}"
             )
             set(_dst
-                "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${_dxc_shared_library_name}"
+                "${slang_BINARY_DIR}/$<CONFIG>/${library_subdir}/${_dxc_shared_library_name}"
             )
             add_custom_command(
                 OUTPUT "${_dst}"
@@ -827,7 +827,7 @@ if(NOT DEFINED SLANG_DXC_BINARY_URL OR SLANG_DXC_BINARY_URL STREQUAL "")
 endif()
 
 message(STATUS "Fetching DXC prebuilt binary from: ${SLANG_DXC_BINARY_URL} ...")
-set(_dxc_prebuilt_stage_stamp "${CMAKE_BINARY_DIR}/dxc/.prebuilt-stage-stamp")
+set(_dxc_prebuilt_stage_stamp "${slang_BINARY_DIR}/dxc/.prebuilt-stage-stamp")
 set(_dxc_prebuilt_stage_stamp_contents "${SLANG_DXC_BINARY_URL}\n")
 if(DEFINED _dxc_url_hash)
     string(APPEND _dxc_prebuilt_stage_stamp_contents "${_dxc_url_hash}\n")
@@ -842,7 +842,7 @@ if(
         STREQUAL
         _dxc_prebuilt_stage_stamp_contents
 )
-    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/dxc")
+    file(MAKE_DIRECTORY "${slang_BINARY_DIR}/dxc")
     file(
         WRITE
         "${_dxc_prebuilt_stage_stamp}"
@@ -882,7 +882,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     endif()
     foreach(_dll dxcompiler dxil)
         set(_src "${dxc_SOURCE_DIR}/bin/${_dxc_arch}/${_dll}.dll")
-        set(_dst "${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/${_dll}.dll")
+        set(_dst "${slang_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/${_dll}.dll")
         add_custom_command(
             OUTPUT "${_dst}"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_src}" "${_dst}"
@@ -904,7 +904,7 @@ elseif(
         )
         set(_src "${dxc_SOURCE_DIR}/lib/${_dxc_shared_library_name}")
         set(_dst
-            "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${_dxc_shared_library_name}"
+            "${slang_BINARY_DIR}/$<CONFIG>/${library_subdir}/${_dxc_shared_library_name}"
         )
         add_custom_command(
             OUTPUT "${_dst}"

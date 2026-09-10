@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#how-target-choice-affects-ir
-//META: doc_section_digest=6f7f7ef77b73b73b7a036bdae99ff624ab46818ddb538ebde1c189c05207c5c0
+//META: doc_section_digest=1103b6c6793a74ba9a2a797712002157cc506284940af6ab698172cadfb6ec8a
 //META: purpose=When the active target has no matching `case` arm in `__target_switch` but a `default:` arm exists, `slang-ir-specialize-target-switch.cpp` selects the default — the legal alternative to the negative "no arm, no default" companion.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

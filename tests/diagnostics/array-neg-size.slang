@@ -10,5 +10,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     bar();
 }
 func bar() -> int[-1];
-//CHECK:           ^ array size must be non-negative
+//CHECK:           ^ error E30025
 //CHECK:           ^ array size must be non-negative.

@@ -607,13 +607,13 @@ flowchart TD
 
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `legalizeByteAddressBufferOps` | [slang-ir-byte-address-legalize.cpp](../../../../source/slang/slang-ir-byte-address-legalize.cpp) | `reqSet.byteAddressBuffer` | Metal options: `scalarizeVectorLoadStore=true`, `treatGetEquivalentStructuredBufferAsGetThis=true`, `translateToStructuredBufferOps=false`, `lowerBasicTypeOps=true`. |
+| 1 | `legalizeByteAddressBufferOps` | [slang-ir-byte-address-legalize.cpp](../../../../source/slang/slang-ir-byte-address-legalize.cpp) | `reqSet.byteAddressBuffer` | Metal options: `scalarizeVectorLoadStore=true`, `treatGetEquivalentStructuredBufferAsGetThis=true`, `translateToStructuredBufferOps=false`, `lowerBasicTypeOps=true`. Together those leave only 4-byte word accesses for emit, and the buffer itself is emitted as a `uint32_t device*`: `MetalSourceEmitter::tryEmitInstExprImpl` renders a surviving `ByteAddressBufferLoad` as `as_type<T>(buf[(offset)>>2])` and a `ByteAddressBufferStore` as `buf[(offset)>>2] = as_type<uint32_t>(v)` ([slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp) lines 925-954, 1476-1480), whose comments record that anything wider must already have been lowered here. |
 | 2 | `validateAtomicOperations` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | `target != SPIRV && target != SPIRVAssembly` | `skipFuncParamValidation = true`. |
 | 3 | `translateGlobalVaryingVar` | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/slang-ir-translate-global-varying-var.cpp) | `reqSet.globalVaryingVar` | Runs after specialization, not in Phase A. |
 | 4 | `resolveVaryingInputRef` | [slang-ir-resolve-varying-input-ref.cpp](../../../../source/slang/slang-ir-resolve-varying-input-ref.cpp) | `reqSet.resolveVaryingInputRef` | |
 | 5 | `fixEntryPointCallsites` | [slang-ir-fix-entrypoint-callsite.cpp](../../../../source/slang/slang-ir-fix-entrypoint-callsite.cpp) | (always) | |
 | 6 | `legalizeIRForMetal` | [slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp) | (`Metal` / `MetalLib` / `MetalLibAssembly` arm at line ~2232) | The central Metal legalizer. |
-| 7 | `floatNonUniformResourceIndex` | [slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/slang-ir-float-non-uniform-resource-index.cpp) | `!isSPIRV(target)` (true for Metal, line ~2272) | `NonUniformResourceIndexFloatMode::Textual`. |
+| 7 | `floatNonUniformResourceIndex` | [slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/slang-ir-float-non-uniform-resource-index.cpp) | `!isSPIRV(target)` (true for Metal, line ~2272) | `NonUniformResourceIndexFloatMode::Textual`. The target predicate lets the pass run, but the HLSL-spelled `NonUniformResourceIndex(index)` cannot feed it: that declaration carries `[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]` ([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 13946), a capability set that excludes Metal, so a Metal use is rejected with `error 36107: unavailable features in entry point` at check time. The reachable Metal surface is `nonuniform(handle)` on a `DescriptorHandle<T>` (same file, line 27817), which is declared with the same `__intrinsic_op($(kIROp_NonUniformResourceIndex))` and carries no `[require]`. |
 | 8 | `legalizeLogicalAndOr` | [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp) | `isMetalTarget` (line ~2277) | |
 | 9 | `legalizeImageSubscript` | [slang-ir-legalize-image-subscript.cpp](../../../../source/slang/slang-ir-legalize-image-subscript.cpp) | (`Metal` / `MetalLib` / `MetalLibAssembly` / `GLSL` / `SPIRV` / `SPIRVAssembly` arm at line ~2293) | Metal needs this because MSL uses Metal-specific texture access patterns. |
 | 10 | `undoParameterCopy` | [slang-ir-undo-param-copy.cpp](../../../../source/slang/slang-ir-undo-param-copy.cpp) | (`Metal` / CPP / CUDA arm at line ~2340) | Only `CodeGenTarget::Metal` appears in the case list — `MetalLib` / `MetalLibAssembly` never reach `linkAndOptimizeIR`. |
@@ -737,9 +737,20 @@ what valid Slang produces on Metal specifically:
   `h` for `BaseType::Half` and `f` for `BaseType::Float` to finite
   floating-point literals, because MSL otherwise types a bare
   decimal as `double` and breaks constructs such as
-  `as_type<ushort>(h)`. NaN / infinity and `BaseType::Double`
-  literals are still emitted bare; the source notes non-finite
-  half/float as a known remaining gap.
+  `as_type<ushort>(h)`. Non-finite literals are handled earlier in
+  the same function and stay bare, spelled as divisions —
+  `(0.0 / 0.0)`, `(1.0 / 0.0)`, `(-1.0 / 0.0)` (lines 1172-1186);
+  the source notes non-finite half/float as a known remaining gap.
+  The `BaseType::Double` arm of the suffix switch falls through to
+  no suffix, but it is unreachable in practice, because `double`
+  is not an emittable Metal type at all:
+  `MetalSourceEmitter::emitSimpleTypeImpl` answers
+  `kIROp_DoubleType` with
+  `SLANG_UNEXPECTED("'double' type emitted")` (line 1302). A
+  shader that carries a `double` to Metal emit therefore aborts
+  with an internal error (`E99997`) rather than being rejected by
+  a capability diagnostic — a known gap, not a designed
+  behaviour.
 
 The bare `Metal` target stops at this text artifact.
 For `MetalLib`, the text is handed to Apple's `metal` command-line
@@ -789,6 +800,68 @@ The bare `Metal` target stops at the text artifact; `MetalLib`
 adds the Apple `metal` compile step, and `MetalLibAssembly` adds a
 further `metal-objdump --disassemble` step on the intermediate
 `.metallib`.
+
+### Entry-point shape
+
+Two emitter decisions shape every Metal signature before any
+parameter is considered.
+`CLikeSourceEmitter::maybeMakeEntryPointNameValid`
+([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+lines 1130-1143) renames an entry point named exactly `main` on
+Metal (and on CPU / CUDA), routing it through `_generateUniqueName`
+so it becomes `main_0`, and reports
+`Diagnostics::MainEntryPointRenamed` (warning `40100`). Entry
+points with any other name are left alone.
+
+`MetalSourceEmitter::emitEntryPointAttributesImpl`
+([slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp)
+lines 218-264) then writes the stage attribute — `[[vertex]]`,
+`[[fragment]]`, `[[kernel]]`, `[[mesh]]`, or `[[object]]`; any
+other stage is a `SLANG_ABORT_COMPILATION("unsupported stage.")`.
+The HLSL `[numthreads(X,Y,Z)]` attribute has no unconditional MSL
+counterpart and is *not* emitted; Metal normally takes the
+threadgroup size from the dispatch call. It reappears only when
+`targetCaps` implies `metallib_4_0`, in which case the compute,
+mesh, and amplification arms prefix the stage attribute with
+`[[required_threads_per_threadgroup(X, Y, Z)]]` built from
+`getComputeThreadGroupSize`. A compute entry point therefore
+emits as `[[kernel]] void main_0(...)` at the default language
+version.
+
+### Resource-type spellings
+
+`emitSimpleTypeImpl` and its `_emitHLSLTextureType` helper
+([slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp)
+lines 58-133 and 1256-1516) map Slang's resource types onto MSL
+spellings, and `emitFuncParamLayoutImpl` (lines 154-192) picks the
+attribute from the layout's resource kind, applying it only when
+the parameter's type matches that kind.
+
+| Slang type | Emitted MSL | Attribute |
+| --- | --- | --- |
+| `Texture1D` / `Texture2D` / `Texture3D` / `TextureCube` | `texture1d` / `texture2d` / `texture3d` / `texturecube`, each `<T, access::sample>` | `[[texture(N)]]` |
+| `Texture2DMS<T>`, `Texture2DArray<T>` | the same stem plus `_ms` and/or `_array`, in that order — e.g. `texture2d_ms_array<T, ...>` | `[[texture(N)]]` |
+| `RWTexture*<T>` (also the append / consume / feedback / rasterizer-ordered access modes) | the same stem with `access::read_write`; a write-only access mode gives `access::write` | `[[texture(N)]]` |
+| a shadow / comparison texture | the `texture` prefix becomes `depth` — e.g. `depth2d<T, access::sample>` | `[[texture(N)]]` |
+| `Buffer<T>` (`IRTextureBufferType`) | `texture_buffer<T>`; a read-access texture buffer or multisampled texture takes `access::read` rather than `access::sample` | `[[texture(N)]]` |
+| `StructuredBuffer<T>` / `RWStructuredBuffer<T>` | `T device*` | `[[buffer(N)]]` |
+| `ByteAddressBuffer` and its RW / rasterizer-ordered forms | `uint32_t device*` | `[[buffer(N)]]` |
+| `ConstantBuffer<T>` / `ParameterBlock<T>` | `T constant*` | `[[buffer(N)]]` |
+| `RaytracingAccelerationStructure` | `metal::raytracing::acceleration_structure<metal::raytracing::instancing>` | `[[buffer(N)]]` |
+| `SamplerState` / `SamplerComparisonState` | `sampler` | `[[sampler(N)]]` |
+| `RayQuery` | `raytracing::intersection_query<raytracing::triangle_data, raytracing::instancing>` | — |
+
+`LayoutResourceKind::VaryingInput` and `MetalPayload` put
+`[[stage_in]]` and `[[payload]]` on the parameter instead of a
+numbered slot.
+
+The `depth*` spelling is not produced by declaring a depth
+texture. MSL splits colour and depth textures into distinct types
+and only `depth2d` offers `sample_compare`, so a `SampleCmp*` on
+an ordinary `Texture2D` goes through the core-module-declared
+`MetalCastToDepthTexture` opcode, which `tryEmitInstExprImpl`
+renders as a local of the depth type initialized by reinterpreting
+the declared texture through a `thread*` cast (lines 676-691).
 
 ## Conditional gates
 
@@ -913,11 +986,22 @@ It walks the module once and performs:
   `[[color(N)]]` system-value decoration (where `N` is the
   `InputAttachmentIndex` from the layout decoration), and every
   `kIROp_SubpassLoad` use is rewritten into a direct reference
-  to that new parameter. Subpass inputs reachable from a
-  non-fragment entry point produce
-  `Diagnostics::SubpassInputUsedOutsideEntryPoint`;
-  multisampled subpass loads produce
+  to that new parameter. A subpass-input global that no fragment
+  entry point reaches produces
+  `Diagnostics::SubpassInputUsedOutsideEntryPoint` (line 300), as
+  does any individual use for which no lowered parameter was
+  created (line 366); multisampled subpass loads produce
   `Diagnostics::MultisampledSubpassInputNotSupportedOnMetal`.
+  The first of those is defence in depth rather than the message
+  a user normally sees: `__SubpassImpl` and its `SubpassLoad`
+  method both carry `[require(glsl_hlsl_metal_spirv, subpass)]`
+  ([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang)
+  lines 22679 and 22692) and `subpass` is a fragment-only
+  capability, so a `SubpassLoad` written into a non-fragment
+  entry point is rejected by the entry-point capability check
+  with `error 36107: unavailable features in entry point` well
+  before this pass runs. The pass's own diagnostic covers IR that
+  arrives by some other route.
   Metal does not have a native `subpassLoad` intrinsic; instead
   Slang maps the construct onto Metal's frame-buffer-fetch
   feature (the per-fragment `[[color(N)]]` input).
@@ -946,6 +1030,29 @@ It walks the module once and performs:
   fragment that already returns its outputs by value is handled
   correctly downstream, and re-wrapping it here would strip the
   field semantics.
+
+  The observable shape for the fragment case is a synthesized
+  result struct returned by value. This fragment
+
+  ```slang
+  [shader("fragment")]
+  void main(float4 pos : SV_Position, out float4 color : SV_Target)
+  { color = float4(pos.x, 1, 0, 1); }
+  ```
+
+  emits as
+
+  ```cpp
+  struct main_Result_0
+  {
+      float4 color_0 [[color(0)]];
+  };
+  [[fragment]] main_Result_0 main_0(/* ... */ [[position]])
+  ```
+
+  where the `_<N>` suffixes are the emitter's name uniquing and
+  `main_0` is the renamed entry point (see
+  [Entry-point shape](#entry-point-shape)).
 
   Because global `uniform` params
   hoisted in Phase A carry an `IREntryPointParamDecoration` naming
