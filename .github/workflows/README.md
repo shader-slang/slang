@@ -150,6 +150,51 @@ CI, which uploads its result as an artifact, and this workflow then posts the PR
 comment, because commenting needs a token the build job (possibly running a
 fork's code) must not hold.
 
+### Cherry-picking a SlangPy PR
+
+A Slang change that intentionally breaks SlangPy cannot be landed together with
+its SlangPy counterpart, which leaves a chicken-and-egg problem: the SlangPy fix
+does not compile until the Slang change has landed, and once it has landed,
+SlangPy `main` no longer compiles against Slang `master`. In between, **every**
+Slang PR fails `SlangPy Tests` through no fault of its own.
+
+To close that window, `ci-slangpy-trigger-test.yml` can name a SlangPy PR for
+SlangPy CI to merge into its `main` before building, so both halves of the change
+are tested together. We only send the number; SlangPy CI owns the checkout (see
+`ci-latest-slang.yml` in `shader-slang/slangpy`).
+
+Set it in `ci-slangpy-trigger-test.yml`:
+
+```yaml
+env:
+  SLANGPY_CHERRY_PICK_PR: "1135" # "" means no cherry-pick
+```
+
+**The setting only takes effect once it is on `master`.** `ci-slangpy-trigger-test.yml`
+runs on `pull_request_target`, which loads the workflow from the base branch — so
+a PR that edits this variable cannot exercise its own edit, and its `SlangPy Tests`
+check reports whatever `master` currently says. That check is therefore
+meaningless on such a PR: it is green when `master` has an empty value, and it
+fails during a breaking-change window regardless of what the PR does. Once the
+setting is on `master` it applies to every Slang PR at once, so keep the window
+short — land the SlangPy PR right after the Slang one, then set this back to `""`
+in a follow-up PR.
+
+**Getting a real result before merging.** Start a manual run, which reads the
+workflow from the branch you select rather than from `master`:
+
+1. Open the [`CI SlangPy Trigger Test` workflow](https://github.com/shader-slang/slang/actions/workflows/ci-slangpy-trigger-test.yml).
+2. Choose **Run workflow**, pick the branch carrying the `SLANGPY_CHERRY_PICK_PR`
+   value, and enter the Slang PR number to test.
+3. Post the resulting run's link as a comment on the PR, since this run is the
+   only evidence the combination works — the PR's own automatic check is not.
+
+The branch must exist in `shader-slang/slang`; the branch picker cannot see a
+fork's branches, so push a temporary branch here if the PR comes from a fork. The
+PR being _tested_ can live on a fork — it is fetched by number, not by branch
+name. SlangPy CI reports back to that PR's head commit, so a manual run updates
+the PR's `SlangPy Tests` status in place.
+
 ## 2. Reusable building blocks (`workflow_call`)
 
 No trigger of their own; see the first diagram for who calls them. The
