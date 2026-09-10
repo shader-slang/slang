@@ -1059,7 +1059,7 @@ public extension<
     T : __BuiltinFloatingPointType & IScalarFloatingPoint,
     let R : int,
     let C : int,
-    let L : int> matrix<T, R, C, L> : IFloatingPoint
+    let L : MatrixLayoutMode> matrix<T, R, C, L> : IFloatingPoint
 {
     [__unsafeForceInlineEarly]
     This floor()
@@ -1240,7 +1240,7 @@ public extension<
     T : __BuiltinFloatingPointType & ITrigonometricFunctions,
     let R : int,
     let C : int,
-    let L : int> matrix<T, R, C, L> : ITrigonometricFunctions
+    let L : MatrixLayoutMode> matrix<T, R, C, L> : ITrigonometricFunctions
 {
     [__unsafeForceInlineEarly]
     This sin()
@@ -1311,7 +1311,7 @@ public extension<
     T : __BuiltinFloatingPointType & IExponentialFunctions,
     let R : int,
     let C : int,
-    let L : int> matrix<T, R, C, L> : IExponentialFunctions
+    let L : MatrixLayoutMode> matrix<T, R, C, L> : IExponentialFunctions
 {
     [__unsafeForceInlineEarly]
     This exponential()
@@ -1421,7 +1421,7 @@ public extension<
     T : __BuiltinFloatingPointType & IInverseTrigonometricFunctions,
     let R : int,
     let C : int,
-    let L : int> matrix<T, R, C, L> : IInverseTrigonometricFunctions
+    let L : MatrixLayoutMode> matrix<T, R, C, L> : IInverseTrigonometricFunctions
 {
     [__unsafeForceInlineEarly]
     This asin()
@@ -1489,7 +1489,7 @@ public extension<
     T : __BuiltinFloatingPointType & IHyperbolicFunctions,
     let R : int,
     let C : int,
-    let L : int> matrix<T, R, C, L> : IHyperbolicFunctions
+    let L : MatrixLayoutMode> matrix<T, R, C, L> : IHyperbolicFunctions
 {
     [__unsafeForceInlineEarly]
     This sinh()
@@ -1581,7 +1581,7 @@ public extension<
     T : __BuiltinFloatingPointType & IRootFunctions,
     let R : int,
     let C : int,
-    let L : int> matrix<T, R, C, L> : IRootFunctions
+    let L : MatrixLayoutMode> matrix<T, R, C, L> : IRootFunctions
 {
     [__unsafeForceInlineEarly]
     This squareRoot()
@@ -1618,7 +1618,7 @@ public extension<
     T : __BuiltinFloatingPointType & IScalarReal,
     let R : int,
     let C : int,
-    let L : int> matrix<T, R, C, L> : IRealOrderingFunctions
+    let L : MatrixLayoutMode> matrix<T, R, C, L> : IRealOrderingFunctions
 {
     [__unsafeForceInlineEarly]
     This minimum(This other)
