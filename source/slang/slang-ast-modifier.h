@@ -2145,10 +2145,12 @@ class NoDiffModifier : public TypeModifier
 // matrix element itself — including when a declarator wraps it in an array or
 // it precedes a function return type.
 //
-// The parser only moves these off a *declarator*, though; a function parameter
-// keeps its modifiers on the `ParamDecl` (its type is parsed after the
-// modifiers), so that path still applies the layout via `maybeApplyLayoutModifier`
-// (slang-check-decl.cpp) rather than through the type expression.
+// The parser only moves these off a *declarator*, though; a traditional-style
+// function parameter (leading-modifier syntax, `void f(row_major float2x3 m)`)
+// keeps its modifiers on the `ParamDecl` — its type is parsed after the
+// modifiers — so that path applies the layout via `maybeApplyLayoutModifier`
+// (slang-check-decl.cpp) instead. (Modern `m: row_major float2x3` syntax puts
+// the modifier on the type expression, so it flows through the graft.)
 FIDDLE(abstract)
 class MatrixLayoutModifier : public TypeModifier
 {
