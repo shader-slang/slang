@@ -2291,10 +2291,6 @@ struct vector : IRWArray<T>
     int getCount() { return N; }
 }
 
-//@hidden:
-static const int kRowMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR);
-static const int kColumnMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
-
 //@public:
 /// The in-memory element order of a `matrix`.
 /// @remarks `Unknown` takes the order selected for the target. This is an enum rather than an
@@ -2306,6 +2302,14 @@ enum MatrixLayoutMode : int
     RowMajor = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR),
     ColumnMajor = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR),
 }
+
+//@hidden:
+// Declared after MatrixLayoutMode, and typed as it rather than as `int`, because their
+// only purpose is to be passed as the layout argument of `matrix<T, R, C, L>`, and that
+// parameter is a MatrixLayoutMode. Leaving them as `int` would make the constants
+// unusable in the one position they exist for.
+static const MatrixLayoutMode kRowMajorMatrixLayout = MatrixLayoutMode.RowMajor;
+static const MatrixLayoutMode kColumnMajorMatrixLayout = MatrixLayoutMode.ColumnMajor;
 
 //@public:
 /// A matrix with `R` rows and `C` columns, with elements of type `T`.
