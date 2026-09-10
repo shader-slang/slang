@@ -27,6 +27,7 @@ in. Every prefix currently in use:
 | `claude-`        | Claude-driven review and CI-failure automation.                     |
 | `perf-`          | Performance measurement and its published results.                  |
 | `container-`     | The CI container images.                                            |
+| `scaler-`        | The GCP runner scaler binary and auto-deployment artifact.          |
 | `sccache-`       | The shared compiler cache.                                          |
 | `issue-`         | Issue-triggered automation.                                         |
 | `reuse-`         | REUSE/SPDX license compliance.                                      |
@@ -207,16 +208,16 @@ changing any of them. `issue-onboard.yml` is the same thin-caller pattern around
 standalone bots that call nothing and are grouped here because they react to
 issue, comment, and review events rather than to a PR's code.
 
-| Workflow                                                | Purpose                                                      |
-| ------------------------------------------------------- | ------------------------------------------------------------ |
-| `pr-maintenance.yml`                                    | Board sync for PR and review events on origin PRs.           |
-| `pr-ci-complete.yml`                                    | Board sync when a gating workflow finishes.                  |
-| `pr-commit-status.yml`                                  | Board sync when an external commit status settles.           |
-| `pr-review-fork-bridge.yml`, `pr-review-fork-apply.yml` | Two-stage relay for fork-PR reviews.                         |
-| `issue-add-labels.yml`                                  | Labels new issues by the author's team membership.           |
+| Workflow                                                | Purpose                                                                                                            |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `pr-maintenance.yml`                                    | Board sync for PR and review events on origin PRs.                                                                 |
+| `pr-ci-complete.yml`                                    | Board sync when a gating workflow finishes.                                                                        |
+| `pr-commit-status.yml`                                  | Board sync when an external commit status settles.                                                                 |
+| `pr-review-fork-bridge.yml`, `pr-review-fork-apply.yml` | Two-stage relay for fork-PR reviews.                                                                               |
+| `issue-add-labels.yml`                                  | Labels new issues by the author's team membership.                                                                 |
 | `issue-onboard.yml` / `issue-board-onboard.yml`         | Adds a new issue to Slang-All; sets Source; Internal authors are assigned and moved to In Triage / current Sprint. |
-| `claude.yml`                                            | The `@claude` assistant on issues and PRs.                   |
-| `claude-ci-analysis.yml`                                | On demand: analyzes a CI failure and pushes a fix to the PR. |
+| `claude.yml`                                            | The `@claude` assistant on issues and PRs.                                                                         |
+| `claude-ci-analysis.yml`                                | On demand: analyzes a CI failure and pushes a fix to the PR.                                                       |
 
 ## 5. Slash-command regenerators
 
@@ -237,6 +238,7 @@ PR against your branch, so a failed check can be fixed without a local checkout.
 | `release.yml`                                                  | version tag            | Builds and publishes the release binaries.                                                                                                                             |
 | `release-linux-glibc-2-27.yml`, `release-linux-glibc-2-28.yml` | version tag, nightly   | Extra Linux builds against older glibc.                                                                                                                                |
 | `container-publish-images.yml`                                 | push/PR on `docker/**` | Publishes the Linux CI container images. A PR validates the version contract only; it never builds a Dockerfile, since that would run PR code on a self-hosted runner. |
+| `scaler-release.yml`                                           | push/PR on scaler code | Validates scaler PRs, then uploads the merged scaler binary as a GitHub artifact for host-side auto-deployment from `gpu-scaler-host`.                                 |
 | `perf-push-benchmark-results.yml`                              | push to master         | Publishes MDL benchmark numbers.                                                                                                                                       |
 
 ## 7. Manual only

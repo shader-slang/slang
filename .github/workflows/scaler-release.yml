@@ -1,0 +1,154 @@
+name: Release GCP Runner Scaler
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "extras/scaler/**"
+      - ".github/workflows/scaler-release.yml"
+  push:
+    branches: [master]
+    paths:
+      - "extras/scaler/**"
+      - ".github/workflows/scaler-release.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scaler-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    name: Validate scaler
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: extras/scaler
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: extras/scaler/go.mod
+          cache-dependency-path: extras/scaler/go.sum
+
+      - name: Check Go formatting
+        run: |
+          set -euo pipefail
+          unformatted="$(gofmt -l .)"
+          if [[ -n "$unformatted" ]]; then
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Test scaler
+        run: go test ./...
+
+      - name: Vet scaler
+        run: go vet ./...
+
+      - name: ShellCheck scaler scripts
+        run: |
+          # startup.sh intentionally logs device-node listings with ls -la so
+          # the CI trace matches what operators type during live debugging.
+          shellcheck -e SC2012 deploy/*.sh internal/gcp/startup.sh
+
+  publish:
+    needs: validate
+    if: github.repository == 'shader-slang/slang' && github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    name: Upload scaler artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: extras/scaler
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: extras/scaler/go.mod
+          cache-dependency-path: extras/scaler/go.sum
+
+      - name: Build Linux scaler
+        run: |
+          set -euo pipefail
+          GOOS=linux GOARCH=amd64 go build -o "${RUNNER_TEMP}/scaler-linux" ./cmd/scaler
+
+      - name: Prepare artifact manifest
+        env:
+          ARTIFACT_NAME: scaler-linux-master
+        run: |
+          set -euo pipefail
+
+          binary="${RUNNER_TEMP}/scaler-linux"
+          artifact_dir="${RUNNER_TEMP}/scaler-artifact"
+          mkdir -p "$artifact_dir"
+          cp "$binary" "${artifact_dir}/scaler-linux"
+
+          md5="$(md5sum "$binary" | awk '{print $1}')"
+          sha256="$(sha256sum "$binary" | awk '{print $1}')"
+          manifest="${artifact_dir}/manifest.json"
+          published_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          export SCALER_MD5="$md5"
+          export SCALER_SHA256="$sha256"
+          export PUBLISHED_AT="$published_at"
+
+          python3 - "$manifest" <<'PY'
+          import json
+          import os
+          import sys
+
+          manifest = {
+              "schema_version": 1,
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "workflow": os.environ["GITHUB_WORKFLOW"],
+              "artifact_name": os.environ["ARTIFACT_NAME"],
+              "commit": os.environ["GITHUB_SHA"],
+              "binary": {
+                  "path": "scaler-linux",
+                  "md5": os.environ["SCALER_MD5"],
+                  "sha256": os.environ["SCALER_SHA256"],
+              },
+              "published_at": os.environ["PUBLISHED_AT"],
+              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+              "workflow_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+          }
+
+          with open(sys.argv[1], "w", encoding="utf-8") as f:
+              json.dump(manifest, f, indent=2, sort_keys=True)
+              f.write("\n")
+          PY
+
+          printf '%s  scaler-linux\n' "$md5" > "${artifact_dir}/scaler-linux.md5"
+          printf '%s  scaler-linux\n' "$sha256" > "${artifact_dir}/scaler-linux.sha256"
+
+      - name: Upload scaler artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: scaler-linux-master
+          path: ${{ runner.temp }}/scaler-artifact/
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
