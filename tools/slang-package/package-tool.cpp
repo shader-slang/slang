@@ -33,73 +33,51 @@ static void _printHelp(bool experimental = false)
         "Usage: slang-package [--experimental] <command>\n"
         "\n"
         "Manifest (slang-package.json):\n"
-        "  init             Create a package manifest and standard directories.\n"
-        "  dependency add <name> --git <url> --version <range>\n"
-        "  dependency add <name> --git <url> --ref <ref> [--as <version>]\n"
+        "  init              Create a package in the current directory.\n"
+        "  dependency add <name> --git <url> (--version <range> | --ref <ref> [--as <ver>])\n"
         "  dependency add <name> --path <path> --as <version>\n"
         "  dependency pin <name> [--to <version> | --commit]\n"
-        "                   Write a Git pin from the lock into the manifest.\n"
-        "  dependency remove <name> | dependency list\n"
+        "  dependency remove <name> | list\n"
         "\n"
         "Overlay (slang-package-overlay.json):\n"
         "  override add <name> <path> [as]\n"
-        "  override enable|disable|remove <name> | override list\n"
-        "  edit <name>      Make a dependency checkout editable in place.\n"
-        "                   Accepts a checkout that already has local changes.\n"
-        "                   Fetch and update fail if the selected pin would move it.\n"
+        "  override enable|disable|remove <name> | list\n"
+        "  edit <name>       Make a Git checkout editable in place.\n"
         "  unedit <name> [--clean | --adopt [--ref <ref>] [--as <version>]] [--yes]\n"
-        "                   Return a clean checkout to tool ownership.\n"
-        "                   --clean restores the locked commit.\n"
-        "                   --adopt writes the manifest (and lock) from HEAD, then drops the\n"
-        "                   overlay. --ref keeps following that branch or tag; without it,\n"
-        "                   HEAD is frozen. Omit --as to derive the version from the nearest\n"
-        "                   release tag in history.\n"
+        "                    --clean restores the lock; --adopt pins HEAD into the manifest.\n"
         "\n"
         "Lock (slang-package-lock.json):\n"
         "  fetch [--clean] [--yes] [--skip-validate]\n"
-        "                   Materialize Git pins and regenerate slang-package-includes.txt.\n"
-        "                   An existing lock is not rewritten; a missing lock runs update.\n"
-        "                   --clean discards local checkout state.\n"
-        "  update [--ignore-overrides] [--clean] [--dry-run] [--minimal]\n"
-        "         [--offline] [--yes] [--skip-validate]\n"
-        "                   Re-resolve dependencies and rewrite the lock.\n"
-        "                   --offline uses .slang/cache only; it does not contact Git remotes.\n"
-        "  status           Report lock and graph readiness; details only when dirty.\n"
+        "                    Install the lock. Missing lock runs update. --clean discards "
+        "checkout state.\n"
+        "  update [--ignore-overrides] [--clean] [--dry-run] [--minimal] [--offline] [--yes]\n"
+        "         [--skip-validate]\n"
+        "                    Re-resolve and rewrite the lock. --offline uses .slang/cache only.\n"
+        "  status            Lock and graph readiness (details only when dirty).\n"
         "  validate [name] [--all]\n"
-        "                   Check that this package is suitable for sharing.\n"
-        "                   validate NAME checks that package's tree against this\n"
-        "                   workspace lock. --all checks every locked package's tree.\n"
-        "  tree             Print the selected dependency graph.\n"
-        "  why <name>       Print every graph path that requires a package.\n"
+        "                    Check this package for sharing; NAME or --all checks locked trees.\n"
+        "  tree              Print the selected dependency graph.\n"
+        "  why <name>        Print every graph path that requires a package.\n"
         "\n"
         "Build:\n"
-        "  build [--skip-validate]\n"
-        "                   Build the source bundle and docs. Fetches if needed.\n"
-        "  run [name] [args...]\n"
-        "                   Interpret a configured executable from the source bundle.\n"
-        "  docs [--print]   Open build/docs/index.md with the registered application.\n"
-        "                   --print writes the path instead of launching.\n");
+        "  build [--skip-validate]   Source bundle and docs; fetches if needed.\n"
+        "  run [name] [args...]      Invoke the interpreter on the source bundle.\n"
+        "  docs [--print]            Open build/docs/index.md (--print writes the path).\n");
     if (experimental)
     {
         fprintf(
             stdout,
-            "\nExperimental commands and build features:\n"
+            "\n"
+            "Experimental:\n"
             "  build            Also generate enabled modules and host executables.\n"
             "  run --binary [name] [args...]\n"
-            "                   Run a native host executable produced by the last experimental "
-            "build.\n");
+            "                   Run a native host executable from the last experimental build.\n");
     }
-    fprintf(
-        stdout,
-        "\n"
-        "  help             Show this help text.\n"
-        "\n"
-        "Global options:\n"
-        "  --experimental   Enable experimental commands and build features.\n"
-        "\n"
-        "Commands start from the nearest slang-package.json. Nested packages keep that root\n"
-        "when they have their own slang-package.json. `init` creates a package in the current\n"
-        "directory.\n");
+    else
+    {
+        fprintf(stdout, "\n--experimental enables experimental options.\n");
+    }
+    fprintf(stdout, "\nCommands start from the nearest slang-package.json.\n");
 }
 
 bool isAffirmativeConfirmationAnswer(const UnownedStringSlice& answer)

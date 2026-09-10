@@ -1243,12 +1243,13 @@ unaffected by it.
 Commands are grouped by the file they primarily write or report: the manifest
 (`slang-package.json`), the overlay (`slang-package-overlay.json`), the lock
 (`slang-package-lock.json`), then build. `unedit --adopt` is listed under overlay because it
-drops that registration; it also writes the manifest and lock. Binary run and host build
-behavior appear in `slang package --experimental help`. `init`,
-`status`, `tree`, and `edit` accept no additional arguments; `validate` accepts an optional package
-name or `--all`; `build` accepts only `--skip-validate` (not `--clean` or `--yes`); `unedit`
-accepts `--clean`, or `--adopt` with optional `--ref` and `--as`, plus `--yes`; and `docs` accepts `--print`.
-`test` is present but returns a not-implemented error.
+drops that registration; it also writes the manifest and lock. Stable help says
+`--experimental` enables experimental options; `slang package --experimental help` lists
+`run --binary` and the extra `build` outputs. `init`, `status`, `tree`, and `edit` accept no
+additional arguments; `validate` accepts an optional package name or `--all`; `build` accepts
+only `--skip-validate` (not `--clean` or `--yes`); `unedit` accepts `--clean`, or `--adopt`
+with optional `--ref` and `--as`, plus `--yes`; and `docs` accepts `--print`. `test` is present
+but returns a not-implemented error.
 
 ## Gaps, tensions, and intentional asymmetries
 
