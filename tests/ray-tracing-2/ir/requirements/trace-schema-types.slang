@@ -125,7 +125,7 @@ struct TestCallableGroup : rt::ICallableGroup
     typealias Callable = TestCallable;
 }
 
-struct TestProgramLayout : rt::ITraceProgramLayout
+struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups =
@@ -135,12 +135,12 @@ struct TestProgramLayout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<TestProgramLayout> program;
+rt::TraceProgramDescriptor<TestSchema> program;
 
 [shader("raygeneration")]
 void main()
 {
-    rt::RayTracer<TestProgramLayout> tracer;
+    rt::RayTracer<TestSchema> tracer;
     rt::RayTraversalDesc desc;
     TestPayload payload;
     tracer.trace(desc, scene, program, payload);
@@ -176,7 +176,7 @@ void main()
 // IR-SAME: %rtx5FTrianglePrimitive, %TestPayload, %TestRecord, %rtx5FTriangleData,
 // IR-SAME: 1 : Int, %TestClosestHit, %TestClosestHitx5Finvoke,
 // IR-SAME: Void, void_constant, Void, void_constant)]
-// IR: structuralRayTracingTrace({{.*}}, %TestProgramLayout, %TestTraceContext,
+// IR: structuralRayTracingTrace({{.*}}, %TestSchema, %TestTraceContext,
 // IR-SAME: %rtx5FHitGroupList, TypePack(%TestHitGroup, %TestProceduralHitGroup),
 // IR-SAME: %rtx5FMissGroupList, TypePack(%TestMissGroup),
 // IR-SAME: %rtx5FCallableGroupList, TypePack(%TestCallableGroup),

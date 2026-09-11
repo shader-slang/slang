@@ -15,7 +15,7 @@ struct TraceContext : rt::ITraceContext
     typealias Motion = rt::NoMotion;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
     typealias HitGroups = rt::NoHitGroups<::TraceContext>;
@@ -29,7 +29,7 @@ struct PushConstants
 }
 
 [[vk::binding(0, 0)]] rt::AccelerationStructure scenes[];
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 RWStructuredBuffer<uint> output;
 
 [shader("raygeneration")]
@@ -40,7 +40,7 @@ void main(uniform PushConstants pushConstants)
     desc.ray.tMax = 100.0;
     desc.instanceMask = 0xff;
 
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
 
     Payload arrayPayload = {};
     tracer.trace(desc, scenes[0], program, arrayPayload);

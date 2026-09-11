@@ -158,7 +158,7 @@ struct CallableGroup : rt::ICallableGroup
     typealias Callable = ::Callable;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
     typealias HitGroups = rt::HitGroupList<::TraceContext, HitGroup, ProceduralHitGroup>;
@@ -167,7 +167,7 @@ struct ProgramLayout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 RWStructuredBuffer<uint> output;
 
 [shader("raygeneration")]
@@ -175,7 +175,7 @@ void main()
 {
     rt::RayTraversalDesc desc = {};
     Payload payload = {};
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
     CallableData data = {payload.value};
     tracer.callShader<CallableContext>(0, program, data);

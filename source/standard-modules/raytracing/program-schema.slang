@@ -103,7 +103,7 @@ public struct NoCallableGroups<TraceContext> : ICallableGroupList<TraceContext>
     public static const int count = 0;
 }
 
-public interface ITraceProgramLayout
+public interface ITraceProgramSchema
 {
     associatedtype TraceContext : ITraceContext;
     associatedtype MissGroups : IMissGroupList<TraceContext>;

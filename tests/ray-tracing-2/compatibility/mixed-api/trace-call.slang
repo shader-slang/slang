@@ -14,9 +14,9 @@ struct TraceContext : rt::ITraceContext
     typealias Motion = rt::NoMotion;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 /*CHECK:
-       ^^^^^^^^^^^^^ the same module also uses the structural API
+       ^^^^^^ the same module also uses the structural API
 */
 {
     typealias TraceContext = ::TraceContext;
@@ -26,7 +26,7 @@ struct ProgramLayout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 
 void legacyTrace(rt::RayTraversalDesc desc, inout Payload payload)
 /*CHECK:
@@ -43,7 +43,7 @@ void main()
     rt::RayTraversalDesc desc = {};
     Payload payload = {};
 
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
     legacyTrace(desc, payload);
 }

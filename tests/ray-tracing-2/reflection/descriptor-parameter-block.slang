@@ -62,7 +62,7 @@ struct MissGroup : rt::IMissGroup
     typealias Miss = ::Miss;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
     typealias HitGroups = rt::HitGroupList<::TraceContext, HitGroup>;
@@ -73,7 +73,7 @@ struct ProgramLayout : rt::ITraceProgramLayout
 struct FrameParameters
 {
     rt::AccelerationStructure scene;
-    rt::TraceProgramDescriptor<ProgramLayout> program;
+    rt::TraceProgramDescriptor<Schema> program;
     RWStructuredBuffer<uint> output;
 }
 
@@ -88,7 +88,7 @@ void main()
     desc.instanceMask = 0xff;
 
     Payload payload = {};
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(desc, frame.scene, frame.program, payload);
     frame.output[0] = payload.value;
 }

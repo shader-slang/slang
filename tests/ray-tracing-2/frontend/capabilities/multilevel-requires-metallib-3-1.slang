@@ -11,7 +11,7 @@ struct TestTraceContext : rt::ITraceContext
     typealias Motion = rt::NoMotion;
 }
 
-struct Layout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::NoHitGroups<TestTraceContext>;
@@ -20,14 +20,14 @@ struct Layout : rt::ITraceProgramLayout
 }
 
 rt::MultiLevelAccelerationStructure<3> scene;
-rt::TraceProgramDescriptor<Layout> program;
+rt::TraceProgramDescriptor<Schema> program;
 
 [shader("raygeneration")]
 void main()
 {
     rt::RayTraversalDesc desc = {};
     TestPayload payload = {};
-    rt::RayTracer<Layout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
 //CHECK:        ^ structural ray-tracing multilevel traversal requires MetalLib 3.1
 //CHECK:        ^ multi-level acceleration structures with two or more levels require the 'metallib_3_1' capability

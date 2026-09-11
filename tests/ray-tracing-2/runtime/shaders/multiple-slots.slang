@@ -110,7 +110,7 @@ struct MissGroup1 : rt::IMissGroup
     typealias Miss = Miss1;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = RuntimeTraceContext;
     typealias HitGroups = rt::HitGroupList<RuntimeTraceContext, HitGroup0, HitGroup1>;
@@ -119,7 +119,7 @@ struct ProgramLayout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 RWStructuredBuffer<RuntimeResult> results;
 
 [shader("raygeneration")]
@@ -140,7 +140,7 @@ void main()
     desc.missIndex = logicalSlot;
 
     RuntimePayload payload = {};
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
 
     results[rayIndex].stage = payload.stage;
@@ -156,8 +156,8 @@ void main()
 // SPIRV-DAG: OpEntryPoint ClosestHitKHR {{.*}} "ClosestHit1"
 // SPIRV-DAG: OpEntryPoint MissKHR {{.*}} "Miss0"
 // SPIRV-DAG: OpEntryPoint MissKHR {{.*}} "Miss1"
-// METAL-DAG: metal::visible_function_table<void(ProgramLayout_rayData_0 thread*)> missFunctions_0;
-// METAL-DAG: metal::visible_function_table<void(ProgramLayout_rayData_0 thread*)> closestHitFunctions_0;
+// METAL-DAG: metal::visible_function_table<void(Schema_rayData_0 thread*)> missFunctions_0;
+// METAL-DAG: metal::visible_function_table<void(Schema_rayData_0 thread*)> closestHitFunctions_0;
 // METAL-DAG: {{\[\[visible\]\]}} void ClosestHit0_0
 // METAL-DAG: {{\[\[visible\]\]}} void ClosestHit1_0
 // METAL-DAG: {{\[\[visible\]\]}} void Miss0_0

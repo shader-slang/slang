@@ -70,7 +70,7 @@ struct SecondCallableGroup : rt::ICallableGroup
     typealias Callable = SecondCallable;
 }
 
-struct TestProgramLayout : rt::ITraceProgramLayout
+struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::NoHitGroups<TestTraceContext>;
@@ -79,19 +79,19 @@ struct TestProgramLayout : rt::ITraceProgramLayout
         rt::CallableGroupList<TestTraceContext, FirstCallableGroup, SecondCallableGroup>;
 }
 
-rt::TraceProgramDescriptor<TestProgramLayout> program;
+rt::TraceProgramDescriptor<TestSchema> program;
 RWStructuredBuffer<uint> output;
 
 void callSecond(inout TestCallableData data)
 {
-    rt::RayTracer<TestProgramLayout> tracer;
+    rt::RayTracer<TestSchema> tracer;
     tracer.callShader<TestCallableContext>(1, program, data);
 }
 
 [shader("raygeneration")]
 void main()
 {
-    rt::RayTracer<TestProgramLayout> tracer;
+    rt::RayTracer<TestSchema> tracer;
     TestCallableData data = {1, 0, 0};
     tracer.callShader<TestCallableContext>(0, program, data);
     output[0] = data.value;

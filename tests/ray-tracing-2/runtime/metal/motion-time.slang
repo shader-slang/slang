@@ -72,7 +72,7 @@ struct MissGroup : rt::IMissGroup
     typealias Miss = RuntimeMiss;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = RuntimeTraceContext;
     typealias HitGroups = rt::HitGroupList<RuntimeTraceContext, HitGroup>;
@@ -81,7 +81,7 @@ struct ProgramLayout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 RWStructuredBuffer<RuntimeResult> results;
 
 [shader("raygeneration")]
@@ -102,7 +102,7 @@ void main()
     desc.instanceMask = 0xff;
 
     RuntimePayload payload = {};
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
 
     results[rayIndex].stage = payload.stage;

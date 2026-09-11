@@ -1,16 +1,16 @@
-//TEST:COMPILE: -experimental-feature tests/ray-tracing-2/ir/serialization-linking/generic-layout-module.slang -o tests/ray-tracing-2/ir/serialization-linking/structural_generic_layout.slang-module
+//TEST:COMPILE: -experimental-feature tests/ray-tracing-2/ir/serialization-linking/generic-schema-module.slang -o tests/ray-tracing-2/ir/serialization-linking/structural_generic_schema.slang-module
 //TEST:SIMPLE(filecheck=UINT): -experimental-feature -target hlsl -profile sm_6_5 -entry mainUint -stage raygeneration
 //TEST:SIMPLE(filecheck=FLOAT): -experimental-feature -target spirv-assembly -emit-spirv-directly -entry mainFloat -stage raygeneration
 
 import slang.raytracing;
-import structural_generic_layout;
+import structural_generic_schema;
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<GenericProgramLayout<uint>> uintProgram;
-rt::TraceProgramDescriptor<GenericProgramLayout<float>> floatProgram;
+rt::TraceProgramDescriptor<GenericSchema<uint>> uintProgram;
+rt::TraceProgramDescriptor<GenericSchema<float>> floatProgram;
 
 void traceValue<T>(
-    rt::TraceProgramDescriptor<GenericProgramLayout<T>> program,
+    rt::TraceProgramDescriptor<GenericSchema<T>> program,
     inout GenericPayload<T> payload)
 {
     rt::RayTraversalDesc desc = {};
@@ -18,7 +18,7 @@ void traceValue<T>(
     desc.ray.tMax = 100.0;
     desc.instanceMask = 0xff;
 
-    rt::RayTracer<GenericProgramLayout<T>> tracer;
+    rt::RayTracer<GenericSchema<T>> tracer;
     tracer.trace(desc, scene, program, payload);
 }
 

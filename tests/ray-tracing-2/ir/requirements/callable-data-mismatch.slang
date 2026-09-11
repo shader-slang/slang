@@ -67,7 +67,7 @@ struct GroupB : rt::ICallableGroup
     typealias Callable = CallableB;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
     typealias HitGroups = rt::NoHitGroups<::TraceContext>;
@@ -75,12 +75,12 @@ struct ProgramLayout : rt::ITraceProgramLayout
     typealias CallableGroups = rt::CallableGroupList<::TraceContext, GroupA, GroupB>;
 }
 
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 
 [shader("raygeneration")]
 void main()
 {
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     DataA data = {};
     tracer.callShader<ContextA>(0, program, data);
 //CHECK:                       ^ incompatible structural ray-tracing callable data
