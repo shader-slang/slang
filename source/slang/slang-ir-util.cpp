@@ -1,5 +1,6 @@
 #include "slang-ir-util.h"
 
+#include "core/slang-short-list.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
@@ -952,7 +953,16 @@ IRInst* getRootAddr(IRInst* addr)
     return addr;
 }
 
-IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes)
+// Walk `addr` to its root, appending each access-chain key LEAF-FIRST. Shared by
+// the public `getRootAddr` (which reverses afterwards, so callers see root-first)
+// and by `canAddressesPotentiallyAlias`, which indexes from the end instead so it
+// can keep its chains on the stack. Templated on the list type for exactly that
+// reason -- one walker means the two cannot drift apart.
+template<typename TChainList, typename TTypeList>
+static IRInst* _collectAccessChainLeafFirst(
+    IRInst* addr,
+    TChainList& outAccessChain,
+    TTypeList* outTypes)
 {
     for (;;)
     {
@@ -971,10 +981,16 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
         }
         break;
     }
+    return addr;
+}
+
+IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes)
+{
+    auto root = _collectAccessChainLeafFirst(addr, outAccessChain, outTypes);
     outAccessChain.reverse();
     if (outTypes)
         outTypes->reverse();
-    return addr;
+    return root;
 }
 
 
@@ -1181,8 +1197,17 @@ bool canAddressesPotentiallyAlias(
     // then they cannot alias.
     if (root1 == root2)
     {
-        List<IRInst*> accessChain1;
-        List<IRInst*> accessChain2;
+        // Stack-allocated, and collected leaf-first so no reverse is needed: the
+        // loop below indexes from the end instead. This branch is the hot one
+        // whenever a target flattens shader parameters into one aggregate
+        // (Metal, and the CPU-like targets), because then every address in the
+        // function shares a root and lands here -- at which point two heap
+        // allocations per query, once per (address, instruction) scan step, are
+        // most of what the surrounding pass does. 8 covers every access chain
+        // that occurs in practice; deeper ones still work, they just spill to the
+        // heap as before.
+        ShortList<IRInst*, 8> accessChain1;
+        ShortList<IRInst*, 8> accessChain2;
 
         // Since getRootBufferOrAddr has a different behavior around
         // RWStructuredBufferGetElementPtr compared to getRootAddr,
@@ -1190,14 +1215,24 @@ bool canAddressesPotentiallyAlias(
         // that we can handle here, so that we don't need to handle the nuance
         // of whether or not to trace past any RWStructuredBufferGetElementPtr.
         //
-        root1 = getRootAddr(addr1, accessChain1, nullptr);
-        root2 = getRootAddr(addr2, accessChain2, nullptr);
+        root1 = _collectAccessChainLeafFirst<ShortList<IRInst*, 8>, List<IRInst*>>(
+            addr1,
+            accessChain1,
+            nullptr);
+        root2 = _collectAccessChainLeafFirst<ShortList<IRInst*, 8>, List<IRInst*>>(
+            addr2,
+            accessChain2,
+            nullptr);
         if (root1 != root2)
             return true;
-        for (Index i = 0; i < Math::Min(accessChain1.getCount(), accessChain2.getCount()); i++)
+        const Index count1 = accessChain1.getCount();
+        const Index count2 = accessChain2.getCount();
+        for (Index i = 0; i < Math::Min(count1, count2); i++)
         {
-            auto node1 = accessChain1[i];
-            auto node2 = accessChain2[i];
+            // Indices run root-first, as they did when both chains were reversed
+            // into root-first `List`s; these are leaf-first, so walk from the end.
+            auto node1 = accessChain1[count1 - 1 - i];
+            auto node2 = accessChain2[count2 - 1 - i];
             if (as<IRStructKey>(node1) && as<IRStructKey>(node2))
             {
                 // Two different field keys means the two addresses cannot alias.
@@ -1658,13 +1693,22 @@ bool isSideEffectFreeFunctionalCall(
 template<typename TFunc>
 void forEachAssociatedCallee(IRInst* callee, TFunc callback)
 {
-    traverseUsers<IRAnnotation>(
-        callee,
-        [&](IRAnnotation* annotation)
-        {
-            if (annotation->getTarget() == callee)
-                callback(annotation->getInst());
-        });
+    // Walked directly rather than through `traverseUsers`, which snapshots the
+    // whole use list into a `List` before iterating. That snapshot exists so a
+    // callback can mutate the IR; this one only reads decorations off the
+    // annotation's target, so it buys nothing here and costs a heap allocation
+    // plus a full copy per query -- and on a hot intrinsic the use list has one
+    // entry per call site. Callers that memoize this query pay that once per
+    // callee; the uncached callers that remain (slang-ir-simplify-for-emit.cpp,
+    // the autodiff passes) pay it per query.
+    for (auto use = callee->firstUse; use; use = use->nextUse)
+    {
+        if (use->usedValue != callee)
+            continue;
+        auto annotation = as<IRAnnotation>(use->getUser());
+        if (annotation && annotation->getTarget() == callee)
+            callback(annotation->getInst());
+    }
 }
 
 bool doesCalleeHaveSideEffect(IRInst* callee)
