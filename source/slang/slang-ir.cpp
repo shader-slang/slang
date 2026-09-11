@@ -9692,6 +9692,13 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_MakeStorageTypeLoweringConfig:
     case kIROp_WeakUse:
     case kIROp_SPIRVLoadTexelPointerFromHeap:
+    // Subgroup ballot and its bit-count read the active-lane set but do not change it, so they
+    // have no side effects. This lets the bit-count emitted between two identical ballots avoid
+    // fencing the same-block ballot dedup in slang-ir-spirv-legalize.cpp. It does NOT make them
+    // movable/hoistable (they are left out of isMovableInst): a ballot's value depends on which
+    // lanes participate at that program point, so it must not be reused across control flow.
+    case kIROp_SPIRVGroupNonUniformBallot:
+    case kIROp_SPIRVGroupNonUniformBallotBitCount:
         return false;
 
     case kIROp_UnboundedFuncElement:

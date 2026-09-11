@@ -1633,6 +1633,24 @@ local insts = {
 	{ waveMaskBallot = { operands = { { "mask" }, { "condition" } } } },
 	-- matchMask = waveMaskBallot(mask, value)
 	{ waveMaskMatch = { operands = { { "mask" }, { "value" } } } },
+	-- SPIR-V `OpGroupNonUniformBallot` at Subgroup scope: produce a uint4 lane mask of the lanes
+	-- for which `predicate` is true. Emitted directly by the SPIR-V backend (see
+	-- slang-emit-spirv.cpp); the Subgroup execution scope is supplied at emit, not stored here.
+	{
+		spirvGroupNonUniformBallot = {
+			struct_name = "SPIRVGroupNonUniformBallot",
+			operands = { { "predicate" } },
+		},
+	},
+	-- SPIR-V `OpGroupNonUniformBallotBitCount` at Subgroup scope: count set bits in the ballot
+	-- `mask`. `groupOp` is a compile-time `SpvGroupOperation` literal (Reduce = 0 for
+	-- WaveActiveCountBits, ExclusiveScan = 2 for WavePrefixCountBits) emitted as a literal word.
+	{
+		spirvGroupNonUniformBallotBitCount = {
+			struct_name = "SPIRVGroupNonUniformBallotBitCount",
+			operands = { { "groupOp" }, { "mask" } },
+		},
+	},
 	-- Texture sampling operation of the form `t.Sample(s,u)`
 	{ sample = { operands = { { "texture" }, { "sampler" }, { "coord" } } } },
 	{ sampleGrad = { operands = { { "texture" }, { "sampler" }, { "coord" }, { "gradX" } } } },

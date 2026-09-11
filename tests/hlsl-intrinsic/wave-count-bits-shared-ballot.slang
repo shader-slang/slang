@@ -1,13 +1,16 @@
-// WavePrefixCountBits and WaveActiveCountBits both build their subgroup lane mask with an
-// OpGroupNonUniformBallot. When both run on the same predicate in one basic block with nothing
-// between them that changes subgroup participation, the two structurally-identical ballots are
-// merged so a single OpGroupNonUniformBallot feeds both OpGroupNonUniformBallotBitCount ops
-// (computeMerged). Anything that might change participation between them conservatively fences the
-// merge, so both ballots survive: a barrier (computeBarrier), a subgroup op that is not on the
-// mask-read whitelist (computeOpaqueOp), or even a side-effect-free call whose callee could still
-// demote a lane (computeCall). Two ballots on *different* predicates are likewise never merged
-// (computeDifferentPredicate), which guards the predicate operand comparison in ballotsAreEquivalent
-// against a future weakening that would silently miscompile one of the two counts.
+// WavePrefixCountBits and WaveActiveCountBits both build their subgroup lane mask with a subgroup
+// ballot, lowered to the first-class SPIRVGroupNonUniformBallot IR op that the SPIR-V backend emits
+// as OpGroupNonUniformBallot. When both run on the same predicate in one basic block with nothing
+// between them that changes subgroup participation, the SPIR-V legalization dedup pass merges the
+// two identical ballot ops (matching by opcode and predicate operand) so a single
+// OpGroupNonUniformBallot feeds both OpGroupNonUniformBallotBitCount ops (computeMerged). The
+// intervening bit-count is side-effect-free, so it does not fence the merge; anything that might
+// change participation between the two ballots does fence it, so both survive: a barrier
+// (computeBarrier), another subgroup op whose side effects fence the merge (computeOpaqueOp), or
+// even a side-effect-free call whose callee could still demote a lane (computeCall). Two ballots on
+// *different* predicates are likewise never merged (computeDifferentPredicate), which guards the
+// dedup pass's predicate-operand comparison against a future weakening that would silently
+// miscompile one of the two counts.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry computeMerged -emit-spirv-directly
 //TEST:SIMPLE(filecheck=CHECK_BARRIER): -target spirv-asm -stage compute -entry computeBarrier -emit-spirv-directly
@@ -84,7 +87,7 @@ void computeDifferentPredicate(uint3 tid : SV_DispatchThreadID)
     bool p = (tid.x & 5) != 0;
     bool q = (tid.x & 2) != 0;
 
-    // Distinct predicates ballot distinct lane masks, so ballotsAreEquivalent must keep them apart:
+    // Distinct predicates ballot distinct lane masks, so the dedup pass must keep them apart:
     // both ballots survive.
     // CHECK_DIFFPRED-COUNT-2: OpGroupNonUniformBallot %v4uint
     uint prefix = WavePrefixCountBits(p);
