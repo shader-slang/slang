@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#simple-modifiers
-//META: doc_section_digest=14131d1346ae80bf12a86c5f0464133e39600a2d8baef546279830e042b6cb1c
+//META: doc_section_digest=56c06b08f61a5eac3a9a9fa44d74ee850f8a6841b9cad895376978a437f1148f
 //META: purpose=`static` and `const` are simple modifiers; a `static const` file-scope binding is a compile-time-known value the parser accepts and the checker treats as read-only.
 //META: intent=functional
 //META: pipeline_stage=parse

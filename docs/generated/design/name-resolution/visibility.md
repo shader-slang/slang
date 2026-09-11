@@ -103,9 +103,14 @@ levels:
   module.
 - `internal`: visible only inside the declaring module
   (including all of its files).
-- `private`: visible only inside the declaring container — that is,
-  the same aggregate type (`struct`, `class`, `interface`, ...) or
-  the same namespace.
+- `private`: visible only inside the declaring aggregate type
+  (`struct`, `class`, `interface`, ...). A namespace is not a legal
+  container for `private`: a namespace member is still a global decl
+  by `isGlobalDecl`
+  ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+  lines 1567-1575), so `private` on it is rejected at the
+  declaration site with `invalid-use-of-private-visibility` (see
+  "Edge cases and failure modes" below).
 
 The mapping is implemented in `getDeclVisibility`
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
@@ -173,6 +178,25 @@ lines 5143-5146).
 `NamespaceDecl` is unconditionally `Public`
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
 lines 21313-21318).
+
+Nothing in the fall-back chain is conditioned on a decl being a
+member of anything, so a function-local `VarDecl` takes the module
+default like any other unmodified decl, and `checkVisibility` runs on
+it along with every other `VarDeclBase`
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+line 2953; a local reaches that path through the
+`ensureDeclBase(..., DefinitionChecked)` in
+`SemanticsStmtVisitor::visitDeclStmt`). In a module declared
+`public module M;` that makes a local `public`, so the
+container-level cap below rejects a local whose type is `internal`
+with `use-of-less-visible-type` (30604) even though the name never
+escapes the function:
+
+```slang
+public module M;
+internal struct Counter { int n; }
+void f() { Counter c; }   // error 30604
+```
 
 ### Where visibility is filtered
 
@@ -242,6 +266,15 @@ lets `extension S { private foo() {...} }`
 work when called from inside `S` itself or from another extension on
 `S` — even a generic extension that specializes to `S`.
 
+That specialization step is guarded on the *candidate's* own
+container being an `ExtensionDecl` (line 1247), so it does not run in
+the other direction. A `private` member declared in the body of a
+generic type `G<T>` is compared as the type's own default decl-ref
+`G<T>` against the requesting extension's target type, and that
+comparison fails: such a member is reachable from neither
+`extension G<int>` nor `extension<T> G<T>`. Only a `private` declared
+in an `extension` crosses instantiations.
+
 ### Container-level cap
 
 `SemanticsVisitor::getTypeVisibility`
@@ -289,7 +322,20 @@ reachability directly:
   lines 41-54) always drops `ExtensionExternVarModifier` decls from
   lookup, and drops an `ExternModifier` member whose parent is an
   `ExtensionDecl`, so those `extern` members are hidden from lookup
-  regardless of their visibility keyword.
+  regardless of their visibility keyword. The user-level spelling is
+  an `extern` member of an `extension`, and the resulting failure is
+  an absence rather than a rejection:
+
+  ```slang
+  extension S { extern int extra; }        // error 31143 here
+  int test(S s) { return s.extra; }        // error 30027 here
+  ```
+
+  The declaration itself is reported as
+  `missing-original-defintion-of-extern-decl` (31143), and the use
+  site as `no-member-of-name-in-type` (30027, "member not found") —
+  not the `decl-is-not-visible` (30600) that a visibility rejection
+  would produce.
 - `HLSLExportModifier` (line 112) is the bare `export` keyword modifier
   and marks a decl for linkage;
   it records linkage intent and does not by itself raise a decl's
@@ -405,17 +451,24 @@ does not appear as a base interface during member lookup
   fires at the inner decl
   ([slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp)
   lines 2385-2389).
-- **`private` outside an aggregate or namespace.** The diagnostic
-  `invalid-use-of-private-visibility`
-  (`slang-diagnostics.lua` 30603) fires when a top-level decl is
-  marked `private`; private only makes sense inside a container.
+- **`private` on a decl that is not a member of a type.** The
+  diagnostic `invalid-use-of-private-visibility`
+  (`slang-diagnostics.lua` 30603) fires at the declaration site
+  ([slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp)
+  lines 2188-2216) for three shapes, not just the top-level one:
+  a module- or file-scope decl, a member of a `namespace` (both are
+  `isGlobalDecl`), and an interface requirement. The message says
+  "is not a member of a type", which is the accurate statement of
+  the rule — a container is not enough, it has to be a type.
 - **Visibility modifier on a node that does not accept one.** The
   diagnostic `invalid-visibility-modifier-on-type-of-decl`
-  (`slang-diagnostics.lua` 36005) fires when, for example, the user
-  marks a namespace `private` or `internal` or otherwise attaches a
-  visibility modifier to an unsupported node kind. (A repeated
-  modifier such as `public public ...` is instead caught by the
-  conflict-group check, which emits `duplicate-modifier`
+  (`slang-diagnostics.lua` 36005) fires when the user marks a
+  namespace `internal`, or otherwise attaches a visibility modifier
+  to an unsupported node kind. `private namespace X` does *not*
+  reach it: the `isGlobalDecl` test above runs first and returns, so
+  a namespace — top-level or nested — is reported as 30603 instead.
+  (A repeated modifier such as `public public ...` is instead caught
+  by the conflict-group check, which emits `duplicate-modifier`
   (`Diagnostics::DuplicateModifier`, `slang-diagnostics.lua` 31202)
   from
   [slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp)
@@ -438,13 +491,17 @@ does not appear as a base interface during member lookup
   `internal` decls invisible, regardless of the caller's language
   version. The legacy module's *own* decls are seen as `public` by
   any caller because the legacy default is `public`.
-- **`extension` on a generic type.** Private access from inside an
-  extension to members declared on a different generic instantiation
-  of the same type works because `isDeclVisibleFromScope` uses
-  `applyExtensionToType` to align the candidate's container type
-  with the requesting scope's container type
+- **`extension` on a generic type.** A `private` member declared in
+  an `extension` is reachable from an extension on a different
+  generic instantiation of the same type, because
+  `isDeclVisibleFromScope` uses `applyExtensionToType` to align the
+  candidate's container type with the requesting scope's container
+  type
   ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
-  lines 1239-1243).
+  lines 1244-1251). That alignment is conditioned on the candidate
+  living in an `ExtensionDecl`, so a `private` member of the generic
+  type's *own* body does not get it and is rejected with
+  `DeclIsNotVisible` from any extension on the type.
 - **Synthesized derivative members.** When auto-diff synthesizes a
   derivative as an `extension` on a function-as-type whose owner is
   itself a struct member, `isDeclVisibleFromScope` resolves the
@@ -455,21 +512,42 @@ does not appear as a base interface during member lookup
   scope — a namespace or a module, since modules are namespace-like —
   `visitUsingDecl`
   ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-  lines 17325-17387) requires its argument to resolve to a
-  `NamespaceDeclBase` and otherwise emits `ExpectedANamespace`; it does
-  not re-export an individual `internal` member, so there is no
-  `using`-specific visibility rejection in the watched paths. The
+  lines 17338-17400) requires its argument to resolve to a
+  `NamespaceDeclBase` and otherwise emits `ExpectedANamespace`
+  (`slang-diagnostics.lua` 30061) — so `using SomeStruct;` is
+  rejected with "expected a namespace" rather than aliasing the
+  struct. A `using` does not re-export an individual `internal`
+  member, so there is no `using`-specific visibility rejection in
+  the watched paths. The
   source-backed rejection path for an alias that exposes a less-visible
   decl is the `FuncAliasDecl` branch of
   `validatePublicCallableOperandVisibility`
   ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-  lines 9192-9247, with the alias branch at 9205-9211): a `public`
+  lines 9198-9251, with the alias branch at 9211-9223): a `public`
   alias whose target is not `Public`, or
   whose target's module is reachable only through a plain (non
   `__exported`) `import`, is rejected with
   `public-custom-derivative-uses-non-exported-import`
   (`Diagnostics::PublicCustomDerivativeUsesNonExportedImport`,
   `slang-diagnostics.lua` 31162).
+
+  A `FuncAliasDecl` is never written by hand: it is synthesized by
+  the AD-2.0 translation of a `[ForwardDerivative(...)]` or
+  `[BackwardDerivative(...)]` attribute, which builds an extension on
+  the primal-function-as-type and gives it an alias member naming the
+  supplied derivative
+  ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+  line 19185 in `translateFwdDerivativeAttributeToAD2`, line 19139;
+  the backward twin starts at 19210). The rejected shape is therefore
+  a `public` primal whose derivative comes from a plainly imported
+  module:
+
+  ```slang
+  import "helper";                    // not `__exported import`
+
+  [ForwardDerivative(helper_fwd)]     // error 31162 here
+  public float f(float x) { return x * x; }
+  ```
 - **`IgnoreForLookupModifier`.** A decl marked
   `IgnoreForLookupModifier` is invisible to lookup regardless of any
   visibility modifier; visibility analysis is therefore moot for

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=4c42743fa13ba59572eed636b00f10b656f7ed3e3045df07b83d48a10fd1cd5e
 //META: purpose=Fires diagnostic E41202 (not-equal-bit-cast-size) - bit_cast size mismatch
 //META: intent=negative
 //META: pipeline_stage=ir-pass
@@ -25,4 +25,4 @@ void main(uint3 tid : SV_DispatchThreadID) {
     o[0] = small;
 }
 
-// CHECK: E41202
+//CHECK: E41202

@@ -1,0 +1,9 @@
+{
+  "slangc": {
+    "lines_covered": 141728,
+    "lines_total": 253389,
+    "regions_covered": 64367,
+    "branches_covered": 48713
+  },
+  "reason": "master + breadth + depth + white-box coverage suite (row 12, 55.93% line)"
+}

@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#astypeexpr--istypeexpr--casttosupertypeexpr
-//META: doc_section_digest=8acefa9f31e1283f2e07f4a5c07a19625522aed173eb000464e0d7fc4693e965
+//META: doc_section_digest=a1b5995779c673c26a303bd7b4c37473fda1915905c75120601e573453457f3a
 //META: purpose=A CastToSuperTypeExpr is inserted when a concrete struct is passed where an interface is expected; the interface method dispatches to the concrete implementation.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says CastToSuperTypeExpr carries the conformance witness
-// for an interface up-cast. We pass a concrete `Sq` where the
-// parameter type is `IShape`; the checker inserts a
-// CastToSuperTypeExpr and the call dispatches to Sq's `area()`.
+// Verifies that passing a concrete struct where an interface parameter is
+// expected inserts the up-cast that carries the conformance witness. The
+// callee invokes the interface method; the CHECK asserts the concrete type's
+// own implementation ran, which requires the witness to have been threaded.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

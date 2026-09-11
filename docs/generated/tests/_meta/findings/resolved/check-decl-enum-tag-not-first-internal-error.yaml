@@ -1,0 +1,45 @@
+schema_version: 1
+id: check-decl-enum-tag-not-first-internal-error
+bundle: coverage/check-decl
+suspected_kind: sigsegv
+title: "enum tag type after interface base aborts with E99997 internal error"
+observed_at: "2026-06-11T12:00:00+00:00"
+scope: diagnostics
+evidence:
+  command: "./build/RelWithDebInfo/bin/slangc docs/generated/tests/coverage/check-decl/_repro/enum-tag-not-first.slang -target hlsl -entry main -stage compute"
+  source_slang: docs/generated/tests/coverage/check-decl/_repro/enum-tag-not-first.slang
+  exit_code: 255
+  observed_summary: |
+    An enum whose base list places an interface before the integer tag
+    type is first correctly diagnosed with E30821, then the compiler
+    aborts with an internal error instead of recovering:
+
+    error[E30821]: an enum type may only have a single tag type, and that
+    type must be listed first in the list of bases
+      2 | enum E : IThing, int { A }
+        |                  ^^^
+    error[E99997]: Slang compilation aborted due to an exception of
+    N5Slang13InternalErrorE unexpected: Unexpected witness structure
+
+    Per the design doc's documented recovery contract ("continue with a
+    placeholder type so that one error does not cascade"), a checked
+    decl that errored should be marked errored and not provoke an
+    InternalError during subsequent processing.
+  stderr_tail: "error[E99997]: Slang compilation aborted due to an exception of N5Slang13InternalErrorE unexpected: Unexpected witness structure"
+expected:
+  claim: |
+    After emitting the E30821 diagnostic for an ill-formed enum base list,
+    the checker should recover gracefully (mark the enum errored) and the
+    compile should terminate with a normal error exit, not abort with an
+    InternalError (E99997 "Unexpected witness structure").
+  citation_kind: doc
+  citation: docs/generated/design/pipeline/03-semantic-check.md#failure-modes
+provenance:
+  agent_model: claude-opus-4-8[1m]
+  source_commit: ef1068b5485e09b3a7afadba2e25f9541e29af42
+  doc_anchor: docs/generated/design/pipeline/03-semantic-check.md#failure-modes
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "The input is genuinely invalid (E30821 is correct); the finding is only about the follow-on InternalError abort, not the diagnostic itself."
+    - "An ordinary 'enum E : int { A }' or 'enum E { A }' compiles cleanly, confirming the abort is specific to the malformed multi-base list."

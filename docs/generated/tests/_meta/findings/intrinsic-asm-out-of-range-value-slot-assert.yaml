@@ -1,0 +1,52 @@
+schema_version: 1
+id: intrinsic-asm-out-of-range-value-slot-assert
+bundle: coverage/lower-to-ir
+suspected_kind: wrong-diagnostic
+scope: diagnostics
+title: "`__intrinsic_asm` with an out-of-range `$N` value slot aborts on an assert"
+observed_at: "2026-08-05T00:00:00+00:00"
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc /tmp/p/b/asm5.slang -target hlsl -entry computeMain -stage compute"
+  source_slang: docs/generated/tests/coverage/lower-to-ir/intrinsic-asm-stmt-type-arg.slang
+  observed_summary: |
+    An `__intrinsic_asm` statement whose format string references a value slot (`$0`)
+    that has no corresponding value argument aborts the compiler with E99997 and a
+    raw assertion message rather than emitting a diagnostic:
+    "assert failure: slang-intrinsic-expand.cpp(370): (0 <= argIndex) && (argIndex < m_argCount)".
+    Exit code is 255 and no output is produced.
+
+    Repro (the type argument occupies the argument list, so there are zero value
+    arguments; the correct spelling for a type slot is `$[0]`, not `$0`):
+
+      RWStructuredBuffer<int> outputBuffer;
+      int zeroOf<T>() { __intrinsic_asm "($0)0", T; }
+      [numthreads(1,1,1)]
+      void computeMain() { outputBuffer[0] = zeroOf<int>(); }
+
+    The well-formed spellings behave correctly and are pinned by the sibling tests in
+    this bundle: `"($0) + 1", x` (value slot with a value argument) and
+    `"(int)sizeof($[0])", T` (type slot with a type argument).
+
+    Not committed as a test: an aborting input cannot ship as a passing
+    characterization test.
+  exit_code: 255
+  stderr_tail: "error[E99997]: Slang compilation aborted due to an exception of N5Slang13InternalErrorE assert failure: slang-intrinsic-expand.cpp(370): (0 <= argIndex) && (argIndex < m_argCount)"
+expected:
+  claim: |
+    A slot index in an `__intrinsic_asm` format string that exceeds the number of
+    supplied value arguments is malformed input and should be reported with a normal
+    diagnostic identifying the offending slot and statement, the way other malformed
+    declarations are. A release-visible assertion abort gives the author no location
+    for the actual mistake -- the reported source location is the call site
+    (`zeroOf<int>()`), not the `__intrinsic_asm` statement that contains the bad slot.
+  citation_kind: sibling-test
+  citation: tests/interop/type-prelude.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/tests/coverage/METHODOLOGY.md#per-test-contract
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Not worth a diagnostic because `__intrinsic_asm` is a core-module-facing facility: possible, but it is reachable from ordinary user source (tests/interop/type-prelude.slang and tests/bugs/gh-3997.slang use it in user code), and an assert abort is not a defensible response to reachable input."
+    - "Test bug: partially true -- the input IS malformed. The finding is about the response to it (assert abort, misattributed location), not about the input being valid."

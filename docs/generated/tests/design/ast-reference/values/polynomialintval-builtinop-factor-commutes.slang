@@ -1,20 +1,20 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:00:25Z
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#polynomial-helpers
-//META: doc_section_digest=1da990ba8dd94f18220add0daa7dee4cb3febec1de73e1e7c2ea3ef1a4ab9eb7
-//META: purpose=A PolynomialIntValFactor's parameter is a general IntVal, not just a generic parameter: sums built over the symbolic division N / 2 canonicalize, so the commuted bounds N / 2 + 1 and 1 + N / 2 name the same array type.
+//META: doc_section_digest=b5eb05716e03d485ee334da2f955b3860ecb75a00316fb77c3e6d6a07ddaf801
+//META: purpose=A polynomial factor's parameter is a general compile-time integer rather than only a generic parameter, so sums built over the symbolic division N / 2 still canonicalize across commuted spellings.
 //META: intent=boundary
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that polynomial canonicalization also works when a factor's
-// base value is itself a symbolic builtin operation (the division
-// N / 2) rather than a bare generic parameter. The two parameters use
-// commuted spellings of the same sum; assigning one array into a local
-// typed like the other checks only if both canonicalize to one type,
-// and CHECK asserts the combined element sum.
+// Verifies canonicalization at the boundary where a factor's base value
+// is itself a symbolic builtin operation rather than a bare generic
+// parameter. The two parameters use commuted spellings of the same sum
+// over (N / 2); assigning one array into a local typed like the other
+// checks only if both canonicalize to one type, and CHECK asserts the
+// combined element sum.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

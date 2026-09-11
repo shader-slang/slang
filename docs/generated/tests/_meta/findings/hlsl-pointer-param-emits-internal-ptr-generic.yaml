@@ -1,0 +1,25 @@
+schema_version: 1
+id: hlsl-pointer-param-emits-internal-ptr-generic
+bundle: conformance/types-pointer
+suspected_kind: wrong-codegen
+scope: hlsl
+title: HLSL emission leaks internal `Ptr<int, 0ULL, ...>` type for a `T*` parameter
+observed_at: 2026-08-05T08:57:06Z
+evidence:
+  command: build/RelWithDebInfo/bin/slangc -target hlsl -entry devicePtrMain -stage compute docs/generated/tests/conformance/types-pointer/declare-star-syntax-emission.slang
+  source_slang: docs/generated/tests/conformance/types-pointer/declare-star-syntax-emission.slang
+  observed_summary: "slangc succeeds and emits `void devicePtrMain(Ptr<int, 0ULL, 4294967297ULL, DefaultLayout > devPtr_0)` plus `entryPointParams_outBuf_0[int(0)] = devPtr_0;` — `Ptr<...>` is a Slang-internal generic with no HLSL definition, and the pointer is assigned straight into an `int` element."
+  exit_code: 0
+expected:
+  claim: "A `T*` entry-point parameter must either be legalized into a construct HLSL actually has, or be rejected with `error[E36107]: unavailable features in entry point` the way `&` already is for the hlsl target; slangc must not emit an undefined `Ptr<...>` type name into HLSL source."
+  citation_kind: doc
+  citation: docs/language-reference/types-pointer.md
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: ed8fa34c20f7ed61ca34b92ea83626541d602495
+  doc_anchor: docs/language-reference/types-pointer.md#syntax
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "That HLSL might have gained a pointer type — it has not; `Ptr` is never declared in the emitted prelude or in the emitted source, so the output cannot compile with DXC."
+    - "That the shader is malformed — the identical shader emits valid `int device*` on metal and a valid `GL_EXT_buffer_reference` block on glsl, and is diagnosed cleanly (E36107) on wgsl-free paths, so the input is accepted Slang."

@@ -1,18 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#downstream-apple-metal-compiler
-//META: doc_section_digest=47dc1979b06f0478ae36fb28d851c48cf8597970c427e3df4913d3436b7c39a0
-//META: purpose=Bare `-target metal` stops at Metal text; the Apple `metal` downstream compiler is invoked only for MetalLib/MetalLibAssembly, so the emitted output is plain MSL source (no .metallib bytes).
+//META: doc_section_digest=65e900d0cbf2c6b34b856edc81e93bce49e3fc22fad6946b0d7bc5d0b4974910
+//META: purpose=Negative: bare `-target metal` stops at the Metal text artifact -- no Apple `metal` compile and no `.metallib` step run.
 //META: intent=negative
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `-target metal` produces only the Metal source artifact. We
-// confirm the output is human-readable MSL (begins with the
-// standard `#include` block) and lacks a `void main(` HLSL-style
-// signature — Metal renames `main` to `main_0`.
+// Verifies that the downstream Apple toolchain is reserved for the
+// `MetalLib*` targets: a bare `-target metal` request must produce
+// human-readable MSL and nothing else, which is why this bundle can run
+// without Xcode at all. CHECK asserts the output is source text starting
+// at the prelude and containing the renamed entry point, and that no
+// HLSL-style `void main(` signature is present.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

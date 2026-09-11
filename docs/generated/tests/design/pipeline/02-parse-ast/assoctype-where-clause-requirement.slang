@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:28:39Z
-//META: source_commit=7a45a039cb7fb0a34e9184c7069a96bccdf08115
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#interface-associated-type-and-__constraint-requirements
-//META: doc_section_digest=9506ab20aaa39e5ee0d868d0a15106a005c8e09b8482625b171772602af36266
+//META: doc_section_digest=87eaa476e05e936a2bb0b7cd0ad066839d24b61d75d234809ccf6e876c8763e3
 //META: purpose=An `associatedtype A where A : IBar` where-clause constraint is relocated to the enclosing interface and behaves identically to the inheritance-clause spelling.
 //META: intent=functional
 //META: pipeline_stage=parse

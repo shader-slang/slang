@@ -874,8 +874,41 @@ struct TypeFlowSpecializationContext
     // This type can be used for insts that are semantically a tuple of a tag (to select a table)
     // and a payload to contain the existential value.
     //
+    // Memoizes `makeTaggedUnionType`. The result is a pure function of
+    // `tableSet`: the walk below derives one concrete/base type per element and
+    // hands the pair to the hash-consing builder, so the same set inst always
+    // produces the same tagged-union type. Witness-table sets are themselves
+    // hash-consed, so pointer identity is set identity.
+    //
+    // This matters because the type-flow fixpoint calls this once per lattice
+    // join, not once per converged value: when N concrete types flow into one
+    // existential the same sets recur constantly, and each call otherwise
+    // re-walks the set and rebuilds a HashSet.
+    //
+    // Keying on a raw pointer is safe here, and the two properties it rests on
+    // are worth stating because a change to either would make a cache hit
+    // return a silently wrong type rather than crash:
+    //
+    //   * A set inst's address is never recycled within a run.
+    //     `IRInst::removeAndDeallocate` unregisters the inst from the
+    //     deduplication maps and detaches it, but never returns its storage to
+    //     the module's `MemoryArena`, which only reclaims on reset at teardown.
+    //     So a key left behind by a discarded set can never come to alias a
+    //     different live one.
+    //   * Mutating a set produces a *new* inst rather than editing one in
+    //     place: re-canonicalisation in `slang-ir.cpp` builds the replacement
+    //     with `getSet` and then `replaceUsesWith` + `removeAndDeallocate`s the
+    //     old one. So a live key's element list cannot change underneath us.
+    //
+    // This is the same pointer-identity property the fixpoint already depends
+    // on for its termination test, `areInfosEqual`.
+    Dictionary<IRWitnessTableSet*, IRTaggedUnionType*> taggedUnionTypeCache;
+
     IRTaggedUnionType* makeTaggedUnionType(IRWitnessTableSet* tableSet)
     {
+        if (auto cached = taggedUnionTypeCache.tryGetValue(tableSet))
+            return *cached;
+
         IRBuilder builder(module);
         HashSet<IRInst*> typeSet;
 
@@ -906,9 +939,11 @@ struct TypeFlowSpecializationContext
             });
 
         // Create the tagged union type out of the type and table collection.
-        return builder.getTaggedUnionType(
+        auto result = builder.getTaggedUnionType(
             tableSet,
             cast<IRTypeSet>(builder.getSet(kIROp_TypeSet, typeSet)));
+        taggedUnionTypeCache[tableSet] = result;
+        return result;
     }
 
     // Check if a witness table set references a [Specialize]-only interface.
@@ -1118,15 +1153,64 @@ struct TypeFlowSpecializationContext
         if (set1 == set2)
             return set1;
 
-        HashSet<IRInst*> allValues;
-        // Collect all values from both sets
-        forEachInSet(module, set1, [&](IRInst* value) { allValues.add(value); });
-        forEachInSet(module, set2, [&](IRInst* value) { allValues.add(value); });
-
+        // A set's operands are canonically ordered by unique ID (that is what
+        // `IRBuilder::getSet` establishes), and both inputs here are existing
+        // sets. So the union is a linear merge of two sorted sequences.
+        //
+        // The previous form collected both sides into a `HashSet` and handed
+        // that to `getSet`, which copied it into a list and sorted it again --
+        // so every join paid O(n+m) hashing plus an O((n+m) log(n+m)) sort to
+        // rebuild an order both inputs already had. This is the hot path of the
+        // type-flow fixpoint, where a variable's set grows one element at a
+        // time, so that round-trip dominates the join.
         IRBuilder builder(module);
-        return as<T>(builder.getSet(
+        const UInt count1 = set1->getOperandCount();
+        const UInt count2 = set2->getOperandCount();
+
+        List<IRInst*>& merged = *module->getContainerPool().getList<IRInst>();
+        merged.reserve(count1 + count2);
+
+        // The two branches below key on different things -- de-duplication on
+        // pointer identity, ordering on `getUniqueID` -- and they agree because
+        // the ID map is one-to-one. Elements are hash-consed, so equal members
+        // are pointer-equal; distinct insts always have distinct IDs. An ID tie
+        // therefore implies `a == b` and is taken by the early-out, so the
+        // `else` below can never be reached by a tie between distinct operands.
+        UInt i = 0;
+        UInt j = 0;
+        while (i < count1 && j < count2)
+        {
+            IRInst* a = set1->getElement(i);
+            IRInst* b = set2->getElement(j);
+            if (a == b)
+            {
+                merged.add(a);
+                ++i;
+                ++j;
+                continue;
+            }
+            if (builder.getUniqueID(a) < builder.getUniqueID(b))
+            {
+                merged.add(a);
+                ++i;
+            }
+            else
+            {
+                merged.add(b);
+                ++j;
+            }
+        }
+        for (; i < count1; ++i)
+            merged.add(set1->getElement(i));
+        for (; j < count2; ++j)
+            merged.add(set2->getElement(j));
+
+        auto unioned = builder.getSetFromSortedElements(
             set1->getOp(),
-            allValues)); // Create a new set with the union of values
+            (UInt)merged.getCount(),
+            merged.getBuffer());
+        module->getContainerPool().free(&merged);
+        return as<T>(unioned);
     }
 
     // Performs a flat (non-structural) union of two propagation infos that are
@@ -2229,6 +2313,17 @@ struct TypeFlowSpecializationContext
         auto structType = as<IRStructType>(makeStruct->getDataType());
         if (!structType)
             return none();
+
+        // `IRMakeStruct` carries exactly one operand per struct field, positionally
+        // (including the synthesized leading field for a base struct). The loop below
+        // relies on that parity, so enforce it rather than read past the operand array.
+        UIndex fieldCount = 0;
+        for (auto field : structType->getFields())
+        {
+            SLANG_UNUSED(field);
+            fieldCount++;
+        }
+        SLANG_RELEASE_ASSERT(makeStruct->getOperandCount() == fieldCount);
 
         UIndex operandIndex = 0;
         for (auto field : structType->getFields())
@@ -3421,6 +3516,59 @@ struct TypeFlowSpecializationContext
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeLookupWitnessMethod");
     }
 
+    // Collect functions reachable from an entry point by following `IRCall`
+    // callees. Seeds from `isEntryPoint` so the seed set matches the lowering
+    // pass's work-list seed.
+    //
+    // Two things about what the walk follows are load-bearing for callers:
+    //   - It stops at a callee with no body (`getFirstBlock()` is null), so an
+    //     imported/intrinsic declaration terminates the walk rather than being
+    //     recorded as reachable-but-opaque.
+    //   - It resolves an `IRSpecialize` callee to the underlying generic's
+    //     `IRFunc` via `getGenericReturnVal`, so a generic callee is recorded as
+    //     the one unspecialized `IRFunc` and all of its specializations collapse
+    //     onto that entry. The set is therefore "generic functions that are
+    //     called", not "specializations that will be emitted" — the right
+    //     granularity for the per-function scan that consumes it, since the
+    //     lookup insts we diagnose live in the generic body.
+    //
+    // This is a direct-call *under*-approximation of "reaches codegen": it does
+    // not follow function-value or witness-table edges, so a function reached
+    // only through those (e.g. a witness method invoked solely via dynamic
+    // dispatch) is not in the set. That is a deliberate, bounded limitation of
+    // the consuming diagnostic, documented at its call site — not a claim that
+    // every emitted body is covered.
+    void collectFuncsReachableFromEntryPoints(HashSet<IRFunc*>& outReachable)
+    {
+        List<IRFunc*> workList;
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (func && isEntryPoint(func) && outReachable.add(func))
+                workList.add(func);
+        }
+        while (workList.getCount())
+        {
+            auto func = workList.getLast();
+            workList.removeLast();
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    auto call = as<IRCall>(inst);
+                    if (!call)
+                        continue;
+                    auto callee = call->getCallee();
+                    if (auto specialize = as<IRSpecialize>(callee))
+                        callee = getGenericReturnVal(specialize->getBase());
+                    auto calleeFunc = as<IRFunc>(callee);
+                    if (calleeFunc && calleeFunc->getFirstBlock() && outReachable.add(calleeFunc))
+                        workList.add(calleeFunc);
+                }
+            }
+        }
+    }
+
     // After specialization has lowered every dispatch site it could, walk any
     // remaining `lookupWitnessMethod` insts whose witness-table operand is not
     // a concrete `IRWitnessTable` and whose interface has no registered
@@ -3440,41 +3588,35 @@ struct TypeFlowSpecializationContext
     // against pre-PR behaviour where DCE simply removed them.
     void diagnoseUnresolvedLookupWitnesses()
     {
+        HashSet<IRFunc*> reachableFromEntryPoint;
+        collectFuncsReachableFromEntryPoints(reachableFromEntryPoint);
         for (auto globalInst : module->getGlobalInsts())
         {
             auto func = as<IRFunc>(globalInst);
             if (!func)
                 continue;
-            // Only diagnose lookups inside top-level functions
-            // that codegen actually emits as standalone callable
-            // bodies — shader entry points plus the various
-            // export decorations (CUDA kernels, DLL exports,
-            // extern-C, etc.). Those are the bodies that survive
-            // into codegen unchanged, so any unresolved lookup
-            // there will reach the unhandled-inst ICE the walker
-            // exists to prevent.
+            // Diagnose lookups in an entry point or a helper reachable from one
+            // via direct calls. Restricting to reachable functions is what keeps
+            // the slangpy carve-out working: `sgl/device/print.slang`'s
+            // `write_arg(IPrintable)` is directly called, so it now falls inside
+            // this set, but its `IPrintable` has registered conformances (the
+            // call sites supply concrete types via generic-pack expansion), so
+            // the zero-conformance gate below sees a nonzero count and skips it.
+            // In other words, the zero-conformance gate — not the old
+            // entry-point-only restriction — is what actually suppresses that
+            // false positive; the entry-point restriction was simply stronger
+            // than it needed to be.
             //
-            // Use the same `isEntryPoint(func)` predicate that
-            // `performDynamicInstLowering` uses to seed its work-
-            // list, so the walker's diagnostic coverage matches
-            // the lowering pass's coverage exactly.
-            //
-            // For non-entry-point helper functions, the typeflow
-            // pass cannot tell whether the helper is reachable
-            // (callers may exist but be themselves dead) or whether
-            // the helper is going to be inlined / DCE'd before
-            // codegen. Diagnosing those is a false positive — the
-            // canonical example is imported-library helpers like
-            // slangpy's `sgl/device/print.slang::write_arg(IPrintable)`
-            // whose `IPrintable arg` parameter is type-erased only
-            // inside the helper. The actual call sites supply
-            // concrete types via generic-pack expansion, but the
-            // pre-inlined helper body still contains an unresolved
-            // lookup at the moment the walker runs. If a real
-            // unresolved lookup escapes into codegen via a non-
-            // entry-point helper, the underlying ICE still fires
-            // and points at the same source location.
-            if (!isEntryPoint(func))
+            // This gate is a direct-call under-approximation, not a completeness
+            // guarantee. A function reached only through a witness-table or
+            // function-value edge is not in `reachableFromEntryPoint`, so if such
+            // a function's body held a lookup on some *other* zero-conformance
+            // interface, that lookup would still reach codegen undiagnosed and
+            // ICE. This is a bounded, known gap: it is strictly better than the
+            // previous entry-point-only behaviour and covers the reported case
+            // (#12486, a directly-reachable helper), but it does not claim to
+            // catch every unresolved dispatch that reaches emit.
+            if (!isEntryPoint(func) && !reachableFromEntryPoint.contains(func))
                 continue;
             for (auto block : func->getBlocks())
             {

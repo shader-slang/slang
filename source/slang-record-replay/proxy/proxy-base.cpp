@@ -116,5 +116,15 @@ ISlangUnknown* unwrapObject(ISlangUnknown* proxy)
     return proxy;
 }
 
+std::atomic<int>& testsOnlyReplayNullFileSystemLiveCount()
+{
+    // Function-local static (module-lifetime), so the count is independent of any
+    // ReplayContext lifecycle. It is declared SLANG_API in proxy-global-session.h so
+    // the unit-test module links to this single definition rather than a hidden
+    // per-module copy (see the declaration comment).
+    static std::atomic<int> count{0};
+    return count;
+}
+
 
 } // namespace SlangRecord

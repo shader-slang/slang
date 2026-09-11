@@ -55,6 +55,17 @@ SPIR-V emit backend after `linkAndOptimizeIR` returns, so that it can
 run after address-space specialization — the reason is stated in the
 comment at lines 2482-2483 of `slang-emit.cpp`.
 
+That call is a direct one rather than a `SLANG_PASS(...)`, so the
+SPIR-V legalization never goes through `wrapPass`, and no
+`BEFORE legalizeSPIRV` / `AFTER legalizeSPIRV` header appears in
+`-dump-ir` output; the only `dumpIR` calls around it in
+[slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)
+are compiled out behind `#if 0`. The same holds for the pre-link
+region described below. `-dump-ir` shows exactly the `SLANG_PASS`
+call sites of `linkAndOptimizeIR` and nothing else, so a stage that
+is invoked as a plain function call is invisible in that stream even
+though it certainly ran.
+
 The pipeline is **not** a fixed list — different targets, different
 optimization levels, and the presence of differentiation or coverage
 instrumentation all change the sequence. Most optional passes are
@@ -145,6 +156,21 @@ as the authoritative ordering for the post-link region.
 
 ## Pass categories
 
+Each row below states what the pass itself does, which is not the same
+question as what a reader can see it do. A large fraction of these
+entries are analyses that build a side structure and leave the IR
+untouched — the entry-point reference graph
+(`buildEntryPointReferenceGraph`), `ReachabilityContext`, the
+dominator tree, the region tree of `generateRegionTreeForFunc`, and
+the autodiff loop-analysis and region passes — and several more are
+normalizations whose result exists only for a later pass to consume.
+Those have **no independent footprint**: nothing in the emitted source
+and no header in the `-dump-ir` stream marks that they ran, and their
+effect is observable only through the pass that consumes their result.
+Where a pass does have a directly observable surface — a diagnostic, a
+synthesized name that survives into the emit, a changed declaration —
+the row names it.
+
 ### Linking and validation
 
 Run early and again after major transformations to catch invariant
@@ -153,7 +179,7 @@ violations.
 | Pass | File | Purpose |
 | --- | --- | --- |
 | Link | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) | Pulls in IR for `import`ed modules so all symbols resolve |
-| Validate | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | Structural sanity checks on the IR module (`validateIRModule`); also hosts `validateAndRemoveAssumeAddress`, run right after linking, and `validateVectorsAndMatrices`, run late against the target's vector / matrix limits |
+| Validate | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | Structural sanity checks on the IR module (`validateIRModule`): use-def and parent/child list consistency, operand dominance, one terminator per block, block parameters before ordinary instructions. It runs only when IR validation is switched on (`validateIRModuleIfEnabled`), and a failure (`IrValidationFailed`) means an earlier pass produced malformed IR — it is a compiler-internal invariant break, not something valid Slang source can provoke, so there is no negative test to write for it. The file also hosts `validateAndRemoveAssumeAddress`, run right after linking, and `validateVectorsAndMatrices`, run late against the target's vector / matrix limits |
 | Check recursion | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | Diagnoses unsupported recursion |
 | Check unsupported inst | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | Per-target reject-list of opcodes |
 | Check shader parameter type | [slang-ir-check-shader-parameter-type.cpp](../../../../source/slang/slang-ir-check-shader-parameter-type.cpp) | Validates shader-parameter type rules |
@@ -207,16 +233,37 @@ concrete IR consumed by emit.
 | Specialize target switch | [slang-ir-specialize-target-switch.cpp](../../../../source/slang/slang-ir-specialize-target-switch.cpp) | Resolves `[target]`-conditional code |
 | Specialize higher-order parameters | [slang-ir-defunctionalization.cpp](../../../../source/slang/slang-ir-defunctionalization.cpp) | `specializeHigherOrderParameters`: rewrites calls that pass a global function to a higher-order function into calls to a specialized variant that references the global directly (the filename is aspirational; no tagged-union conversion happens) |
 | Bind existentials | [slang-ir-bind-existentials.cpp](../../../../source/slang/slang-ir-bind-existentials.cpp) | Resolves dynamic-dispatch interface bindings |
-| AnyValue inference | [slang-ir-any-value-inference.cpp](../../../../source/slang/slang-ir-any-value-inference.cpp) | Determines `AnyValue` size for existentials |
-| AnyValue marshalling | [slang-ir-any-value-marshalling.cpp](../../../../source/slang/slang-ir-any-value-marshalling.cpp) | Pack / unpack values into `AnyValue` |
+| AnyValue inference | [slang-ir-any-value-inference.cpp](../../../../source/slang/slang-ir-any-value-inference.cpp) | Determines `AnyValue` size for existentials (`inferAnyValueSizeWhereNecessary`); the size it settles on is the `N` that shows up in the marshalling function names below. The same file also holds `diagnoseCircularConformances`, which runs before specialization so a self-referential or cross-interface conformance cycle is diagnosed rather than reaching a pass that cannot represent it |
+| AnyValue marshalling | [slang-ir-any-value-marshalling.cpp](../../../../source/slang/slang-ir-any-value-marshalling.cpp) | Pack / unpack values into `AnyValue`: synthesizes one `packAnyValue<N>` / `unpackAnyValue<N>` function per size and replaces every `PackAnyValue` / `UnpackAnyValue` inst with a call to it, so those two names are what a dynamic-dispatch shader shows in the emitted source |
 | Lower dynamic-dispatch insts | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | Lowers the instructions that back dynamic dispatch: `lowerExistentials` (existential extraction, `InterfaceType`, `RTTIHandleType`), `lowerTaggedUnionTypes` / `lowerUntaggedUnionTypes`, and the tag family (`lowerTagTypes`, `lowerTagInsts`, `lowerSequentialIDTagCasts`) |
 | Lower expand type | [slang-ir-lower-expand-type.cpp](../../../../source/slang/slang-ir-lower-expand-type.cpp) | Variadic-pack expansion |
 | Remove unused generic param | [slang-ir-remove-unused-generic-param.cpp](../../../../source/slang/slang-ir-remove-unused-generic-param.cpp) | Cleans up specialized generics |
 | Deduplicate | [slang-ir-deduplicate.cpp](../../../../source/slang/slang-ir-deduplicate.cpp) | Re-deduplicates hoistable insts after edits |
 | Deduplicate generic children | [slang-ir-deduplicate-generic-children.cpp](../../../../source/slang/slang-ir-deduplicate-generic-children.cpp) | Deduplicates within a generic's body |
 | Typeflow set | [slang-ir-typeflow-set.cpp](../../../../source/slang/slang-ir-typeflow-set.cpp) | Type-flow set construction |
-| Typeflow specialize | [slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) | Specialization based on type flow |
+| Typeflow specialize | [slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) | `specializeDynamicInsts`: an interprocedural data-flow analysis that rewrites `LookupWitnessMethod`, `ExtractExistentialValue`, `ExtractExistentialType` and `ExtractExistentialWitnessTable` into specialized forms based on the values that can reach each use, run in a loop with `specializeModule` until neither changes anything. It emits no code of its own; its one direct user surface is the dynamic-dispatch-site report, enabled by `reportDynamicDispatchSites`, which names each call site it could not resolve statically |
 | Constexpr | [slang-ir-constexpr.cpp](../../../../source/slang/slang-ir-constexpr.cpp) | Compile-time evaluation |
+
+`specializeHigherOrderParameters` fires on any parameter whose lowered
+type is an `IRFuncType`, and the surface form that produces one is the
+`functype` type constructor:
+
+```slang
+func apply(f : functype (int) -> int, x : int) -> int { return f(x); }
+func twice(x : int) -> int { return 2 * x; }
+func use(x : int) -> int { return apply(twice, x); }
+```
+
+The `apply(twice, x)` call becomes a call to a variant of `apply` that
+references `twice` directly, so no function-typed value survives to
+emit. The core module declares its higher-order builtins the same way:
+`saturated_cooperation` in
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) takes two
+`functype (A, B) -> C` parameters. `IFunc<...>` does not reach this
+pass — it is an `interface` in
+[core.meta.slang](../../../../source/slang/core.meta.slang), so a
+parameter of that type is an existential and goes through the
+specialization path above instead.
 
 ### Differentiation (autodiff)
 
@@ -238,6 +285,25 @@ The deeper user-level documentation lives in
 | Region | [slang-ir-autodiff-region.cpp](../../../../source/slang/slang-ir-autodiff-region.cpp) | Differentiable-region analysis |
 | Check differentiability | [slang-ir-check-differentiability.cpp](../../../../source/slang/slang-ir-check-differentiability.cpp) | Validates that flagged code is actually differentiable |
 
+Only the endpoints of this family have names a reader can look for.
+Forward mode gives the generated function the name hint
+`s_fwd_<original>`; reverse mode produces `s_bwdProp_<original>` for
+the propagation function and `s_bwdCallableCtx_<original>` for the
+intermediate-context `struct` that carries checkpointed primal values
+between the two halves. Those three names are what a
+`[Differentiable]` function plus a `fwd_diff` / `bwd_diff` call turns
+into in the emitted source. Primal hoist decides, per value, whether
+it is stored in that context or recomputed, so it is visible as the
+field list of `s_bwdCallableCtx_<original>` rather than as anything of
+its own; unzip additionally emits `ReportCheckpointStore` markers when
+`ReportCheckpointIntermediates` is set, which
+`reportCheckpointIntermediates` in
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) later turns
+into a per-function report of the checkpointed intermediates and their
+sizes. Transpose, pairs, CFG normalization, loop analysis and region
+analysis are stages inside that same transcription and leave no
+separately identifiable token.
+
 ### Type and value legalization
 
 Adapt high-level Slang types to the simpler shapes downstream targets
@@ -250,7 +316,7 @@ expect.
 | Legalize binary operator | [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp) | Per-target binary-op legalization |
 | Legalize composite select | [slang-ir-legalize-composite-select.cpp](../../../../source/slang/slang-ir-legalize-composite-select.cpp) | Lowers `select` on composites |
 | Legalize empty array | [slang-ir-legalize-empty-array.cpp](../../../../source/slang/slang-ir-legalize-empty-array.cpp) | Avoids zero-length arrays |
-| Legalize global values | [slang-ir-legalize-global-values.cpp](../../../../source/slang/slang-ir-legalize-global-values.cpp) | Legalizes module-scope values |
+| Legalize global values | [slang-ir-legalize-global-values.cpp](../../../../source/slang/slang-ir-legalize-global-values.cpp) | Legalizes module-scope values: `inlineGlobalValuesAndRemoveIfUnused` clones each global inst the target cannot hold at module scope into every function body that uses it and deletes the global if that leaves it unused, so the global declaration disappears from the emit and its value reappears at each use site. `inlineGlobalConstantsForLegalization` does the same for resource-typed global constants, ahead of resource legalization. Each target supplies its own legality predicates by deriving from `GlobalInstInliningContextGeneric` |
 | Legalize image subscript | [slang-ir-legalize-image-subscript.cpp](../../../../source/slang/slang-ir-legalize-image-subscript.cpp) | Rewrites image indexing |
 | Legalize matrix types | [slang-ir-legalize-matrix-types.cpp](../../../../source/slang/slang-ir-legalize-matrix-types.cpp) | Per-target matrix shape adjustments |
 | Legalize mesh outputs | [slang-ir-legalize-mesh-outputs.cpp](../../../../source/slang/slang-ir-legalize-mesh-outputs.cpp) | Mesh-shader output rewriting |
@@ -272,22 +338,22 @@ expect.
 | Lower error handling | [slang-ir-lower-error-handling.cpp](../../../../source/slang/slang-ir-lower-error-handling.cpp) | `throws` lowering |
 | Lower reinterpret | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reinterpret` operator |
 | Lower out parameters | [slang-ir-lower-out-parameters.cpp](../../../../source/slang/slang-ir-lower-out-parameters.cpp) | Out-parameter ABI translation |
-| Lower copy logical | [slang-ir-lower-copy-logical.cpp](../../../../source/slang/slang-ir-lower-copy-logical.cpp) | Logical-copy semantics |
+| Lower copy logical | [slang-ir-lower-copy-logical.cpp](../../../../source/slang/slang-ir-lower-copy-logical.cpp) | Replaces each `CopyLogical` inst with an explicit field-by-field / element-by-element copy into the destination address. Its only call site is inside SPIR-V legalization, so it never runs for the source-language targets |
 | Lower coopvec | [slang-ir-lower-coopvec.cpp](../../../../source/slang/slang-ir-lower-coopvec.cpp) | Cooperative vectors |
 | Lower COM methods | [slang-ir-lower-com-methods.cpp](../../../../source/slang/slang-ir-lower-com-methods.cpp) | COM-style virtual call lowering |
 | Lower append/consume structured buffer | [slang-ir-lower-append-consume-structured-buffer.cpp](../../../../source/slang/slang-ir-lower-append-consume-structured-buffer.cpp) | Append / consume buffer ABI |
 | Lower binding query | [slang-ir-lower-binding-query.cpp](../../../../source/slang/slang-ir-lower-binding-query.cpp) | Binding-query intrinsic lowering |
 | Lower CPU resource types | [slang-ir-lower-cpu-resource-types.cpp](../../../../source/slang/slang-ir-lower-cpu-resource-types.cpp) | CPU target resource shape |
-| Lower CUDA builtin types | [slang-ir-lower-cuda-builtin-types.cpp](../../../../source/slang/slang-ir-lower-cuda-builtin-types.cpp) | CUDA builtin type adjustments |
+| Lower CUDA builtin types | [slang-ir-lower-cuda-builtin-types.cpp](../../../../source/slang/slang-ir-lower-cuda-builtin-types.cpp) | Flattens matrix, vector, array and `struct` parameters of `[CudaKernel]` functions into plain storage structs holding a single `data` array, plus generated pack / unpack functions called at the kernel boundary. A `float2x2` parameter becomes a struct name-hinted `_MatrixStorage_float2x2` (`_ColMajor` suffixed under column-major layout) and a `float3` becomes `_VectorStorage_float3_`; those names are what the CUDA and PyTorch-binding output shows. Driven from `lowerBuiltinTypesForKernelEntryPoints` in [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) for the CUDA source / header and PyTorch C++ binding targets |
 | Lower GLSL SSBO types | [slang-ir-lower-glsl-ssbo-types.cpp](../../../../source/slang/slang-ir-lower-glsl-ssbo-types.cpp) | GLSL SSBO ABI |
 | Lower dynamic resource heap | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/slang-ir-lower-dynamic-resource-heap.cpp) | Bindless resource heap (`lowerDynamicResourceHeap`), plus `lowerUntypedResourceHandleToUInt`, which reduces any descriptor-heap handle that peephole did not collapse to its underlying `uint` index so emit and layout never see an untyped handle |
 | Wrap cbuffer element | [slang-ir-wrap-cbuffer-element.cpp](../../../../source/slang/slang-ir-wrap-cbuffer-element.cpp) | Wraps cbuffer scalars |
 | Wrap structured buffers | [slang-ir-wrap-structured-buffers.cpp](../../../../source/slang/slang-ir-wrap-structured-buffers.cpp) | Structured-buffer element wrapping |
-| Bit-field accessors | [slang-ir-bit-field-accessors.cpp](../../../../source/slang/slang-ir-bit-field-accessors.cpp) | Bit-field load / store |
-| Address inst elimination | [slang-ir-addr-inst-elimination.cpp](../../../../source/slang/slang-ir-addr-inst-elimination.cpp) | Removes redundant address operations |
-| Extract value from type | [slang-ir-extract-value-from-type.cpp](../../../../source/slang/slang-ir-extract-value-from-type.cpp) | Type-level extraction |
+| Bit-field accessors | [slang-ir-bit-field-accessors.cpp](../../../../source/slang/slang-ir-bit-field-accessors.cpp) | Fills in the bodies of the getter / setter functions carrying `IRBitFieldAccessorDecoration` with shift-and-mask arithmetic over the backing integer, so a bit-field read emits shifts and masks rather than a field access. Runs before linking, from `generateIRForTranslationUnit` |
+| Address inst elimination | [slang-ir-addr-inst-elimination.cpp](../../../../source/slang/slang-ir-addr-inst-elimination.cpp) | Rewrites address load / store into value extract / update — `load(elementPtr(arr, 1))` becomes `elementExtract(load(arr), 1)`, `store(fieldAddr(s, k), v)` becomes a store of `updateField(load(s), k, v)` — so that every remaining `load` / `store` addresses a var or param and SSA construction can promote struct and array elements. Its only caller is `prepareFuncForForwardDiff`, so it runs on the autodiff path rather than for every module |
+| Extract value from type | [slang-ir-extract-value-from-type.cpp](../../../../source/slang/slang-ir-extract-value-from-type.cpp) | Not a module pass: `extractValueAtOffset` emits the code that reads a value of a given byte size at a byte offset out of a `struct`, array, vector or basic-typed value. Bit-cast lowering is its only user |
 | Resolve texture format | [slang-ir-resolve-texture-format.cpp](../../../../source/slang/slang-ir-resolve-texture-format.cpp) | Resolves texture formats |
-| Resolve varying input ref | [slang-ir-resolve-varying-input-ref.cpp](../../../../source/slang/slang-ir-resolve-varying-input-ref.cpp) | Stage-input reference resolution |
+| Resolve varying input ref | [slang-ir-resolve-varying-input-ref.cpp](../../../../source/slang/slang-ir-resolve-varying-input-ref.cpp) | Replaces each `ResolveVaryingInputRef` inst with the global param that actually holds the varying input, following an access chain through a local copy when one was made. Gated on the presence of that opcode, so the pass is skipped entirely for shaders that never take a reference to a stage input |
 
 ### Inlining and call-graph
 
@@ -296,11 +362,11 @@ expect.
 | Inline | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | Function inlining |
 | Call graph | [slang-ir-call-graph.cpp](../../../../source/slang/slang-ir-call-graph.cpp) | Call-graph analysis |
 | Reachability | [slang-ir-reachability.cpp](../../../../source/slang/slang-ir-reachability.cpp) | Reachability analysis |
-| Propagate func properties | [slang-ir-propagate-func-properties.cpp](../../../../source/slang/slang-ir-propagate-func-properties.cpp) | Bottom-up function-property inference |
+| Propagate func properties | [slang-ir-propagate-func-properties.cpp](../../../../source/slang/slang-ir-propagate-func-properties.cpp) | Bottom-up function-property inference: adds `ReadNone` / `NoSideEffect` decorations to functions whose bodies turn out to have neither. Nothing is emitted for the decorations themselves; they change what `doesCalleeHaveSideEffect` reports, so their footprint is that an unused call to an inferred-pure function becomes dead code |
 | DLL export | [slang-ir-dll-export.cpp](../../../../source/slang/slang-ir-dll-export.cpp) | Generates a marshalled native-call export wrapper and moves the export decorations onto it |
 | DLL import | [slang-ir-dll-import.cpp](../../../../source/slang/slang-ir-dll-import.cpp) | Synthesizes runtime library / function-pointer loading plus a marshalled indirect call body |
-| Marshal native call | [slang-ir-marshal-native-call.cpp](../../../../source/slang/slang-ir-marshal-native-call.cpp) | Native ABI marshalling |
-| Defer buffer load | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/slang-ir-defer-buffer-load.cpp) | Sinks buffer loads to first use |
+| Marshal native call | [slang-ir-marshal-native-call.cpp](../../../../source/slang/slang-ir-marshal-native-call.cpp) | Native ABI marshalling. `NativeCallMarshallingContext` is a helper, not a module pass: it maps a Slang type or function type to its native equivalent and builds the conversion code around a call. Its footprint is whatever the three passes that use it — DLL export, DLL import, and COM-method lowering — emit |
+| Defer buffer load | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/slang-ir-defer-buffer-load.cpp) | Pushes a whole-element buffer load down its access chain so only the part that is used is read: `FieldExtract(GetElement(StructuredBufferLoad(s, i), j), k)` becomes an address chain (`RWStructuredBufferGetElementPtr` / `ElementAddress` / `FieldAddress`) ending in a `Load` of the leaf. What changes in the emit is the *width* of the read — `s[i].a[j].k` instead of a copy of the whole element — not the position of a statement. It only bothers with element types worth deferring — arrays and composites containing them, or values above a size threshold — and leaves tiny values alone |
 
 ### Entry-point and parameter handling
 
@@ -315,6 +381,48 @@ expect.
 | Transform params to constref | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/slang-ir-transform-params-to-constref.cpp) | `in` parameters → `const&` (`transformParamsToConstRef`), plus `translateEntryPointInParamToBorrow`, which runs on every target immediately after linking |
 | Undo param copy | [slang-ir-undo-param-copy.cpp](../../../../source/slang/slang-ir-undo-param-copy.cpp) | Undoes pessimistic param copies |
 
+No pass in this category lowers `[numthreads(...)]`, which is the
+entry-point decoration a reader is most likely to go looking for.
+AST-to-IR lowering attaches it to the entry-point function as an
+`IRNumThreadsDecoration` and it survives untouched to emit, where each
+backend writes its own launch-dimension marker from it —
+`numthreads(8, 1, 1)` on HLSL, `local_size_x = 8` on GLSL,
+`OpExecutionMode %main LocalSize 8 1 1` on SPIR-V, `@workgroup_size(8`
+on WGSL. The passes in between only read it (the varying-parameter
+legalizer, global-varying translation, and global-uniform collection
+all consult it), with one exception: SPIR-V legalization adds a
+default `NumThreadsDecoration` of `(1, 1, 1)` to a compute entry point
+that has none.
+
+Two stage-specific rewrites of the entry point itself live in
+[slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp)
+rather than in the passes above. For hull shaders,
+`invokePathConstantFuncInHullShader` splices the
+`[patchconstantfunc]` into the entry point, because GLSL and SPIR-V
+have no separate patch-constant stage: every `return` becomes a branch
+to a new tail block that emits a control barrier, compares
+`SV_OutputControlPointID` against 0, and calls the patch-constant
+function inside the `true` arm. The two patch kinds are supplied from
+different places — an `InputPatch` parameter is satisfied by the entry
+point's own `InputPatch` parameter, while an `OutputPatch` parameter
+is materialized from the control-point output array the entry point
+has just written. A patch-constant parameter that is neither and
+carries no recognized system-value semantic (`SV_OutputControlPointID`
+or `SV_PrimitiveID`) is diagnosed.
+
+For ray-tracing stages, `consolidateRayTracingParameters` counts the
+entry point's varying `out` / `inout` parameters. With at most one it
+hands each parameter to the ordinary single-parameter path; with two
+or more it merges *all* of them into the fields of one anonymous
+`struct`, held in a single global variable in the `IncomingRayPayload`
+address space and decorated with ray-payload location 0, and rewrites
+each parameter use into a field address of that variable. Hit-object
+attributes are not folded in and keep their own variable. Afterwards
+`assignRayPayloadHitObjectAttributeLocations` numbers every payload
+left without an explicit location, using three independent counters —
+ray payload, callable payload, and hit-object attribute — each of
+which skips locations already claimed by an explicit annotation.
+
 ### Layout and binding
 
 | Pass | File | Purpose |
@@ -322,11 +430,11 @@ expect.
 | Layout | [slang-ir-layout.cpp](../../../../source/slang/slang-ir-layout.cpp) | Computes IR-level layout |
 | Collect global uniforms | [slang-ir-collect-global-uniforms.cpp](../../../../source/slang/slang-ir-collect-global-uniforms.cpp) | Gathers globals into uniform buffers |
 | Explicit global context | [slang-ir-explicit-global-context.cpp](../../../../source/slang/slang-ir-explicit-global-context.cpp) | Threads global context through calls |
-| Explicit global init | [slang-ir-explicit-global-init.cpp](../../../../source/slang/slang-ir-explicit-global-init.cpp) | Lifts global initializers |
+| Explicit global init | [slang-ir-explicit-global-init.cpp](../../../../source/slang/slang-ir-explicit-global-init.cpp) | `moveGlobalVarInitializationToEntryPoints` moves initialization logic off global variables and onto each entry point, so the initializer shows up as the first statements of the emitted entry-point body rather than on the global's declaration |
 | Translate global varying var | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/slang-ir-translate-global-varying-var.cpp) | Stage-varying globals |
 | Late require capability | [slang-ir-late-require-capability.cpp](../../../../source/slang/slang-ir-late-require-capability.cpp) | `processLateRequireCapabilityInsts` processes and eliminates the deferred `LateRequireCapability` instructions, diagnosing missing capabilities as warnings or errors depending on `-restrictive-capability-check` |
-| User type hint | [slang-ir-user-type-hint.cpp](../../../../source/slang/slang-ir-user-type-hint.cpp) | Carries user type hints to backends |
-| Metadata | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | Fills in the `ArtifactPostEmitMetadata` at the end of the pipeline: `collectMetadata` for binding and exported-function data, `collectCooperativeMetadata` for cooperative-matrix / cooperative-vector types that survive target lowering |
+| User type hint | [slang-ir-user-type-hint.cpp](../../../../source/slang/slang-ir-user-type-hint.cpp) | `addUserTypeHintDecorations` records each global param's original type name in a `UserTypeNameDecoration` before type lowering can erase it. The SPIR-V backend turns that into an `OpDecorateString ... UserTypeGOOGLE` annotation (requiring `SPV_GOOGLE_user_type`), which is how `-fspv-reflect` reports user-friendly parameter type names |
+| Metadata | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | Fills in the `ArtifactPostEmitMetadata` at the end of the pipeline: `collectMetadata` for binding and exported-function data, `collectCooperativeMetadata` for cooperative-matrix / cooperative-vector types that survive target lowering. None of it reaches the generated source; it is attached to the compiled artifact as `IArtifactPostEmitMetadata` and read back through the compile API, so a test observes it through the host rather than through the emit |
 | String hash | [slang-ir-string-hash.cpp](../../../../source/slang/slang-ir-string-hash.cpp) | Manages the module's global hashed-string-literal pool (`findGlobalHashedStringLiterals` / `addGlobalHashedStringLiterals`) and validates that every `getStringHash` operand is a string literal (`checkGetStringHashInsts`) |
 
 ### Loop transformations
@@ -334,12 +442,12 @@ expect.
 | Pass | File | Purpose |
 | --- | --- | --- |
 | Loop unroll | [slang-ir-loop-unroll.cpp](../../../../source/slang/slang-ir-loop-unroll.cpp) | `[unroll]` enforcement and unrolling |
-| Loop inversion | [slang-ir-loop-inversion.cpp](../../../../source/slang/slang-ir-loop-inversion.cpp) | Loop-form normalization |
-| Fuse satcoop | [slang-ir-fuse-satcoop.cpp](../../../../source/slang/slang-ir-fuse-satcoop.cpp) | Saturated-cooperative fusion |
-| Restructure | [slang-ir-restructure.cpp](../../../../source/slang/slang-ir-restructure.cpp) | Re-forms structured control flow |
-| Restructure scoping | [slang-ir-restructure-scoping.cpp](../../../../source/slang/slang-ir-restructure-scoping.cpp) | Structured-region scope inference |
-| Synthesize active mask | [slang-ir-synthesize-active-mask.cpp](../../../../source/slang/slang-ir-synthesize-active-mask.cpp) | Wave / SIMT active mask |
-| Uniformity | [slang-ir-uniformity.cpp](../../../../source/slang/slang-ir-uniformity.cpp) | Uniformity (divergence) analysis |
+| Loop inversion | [slang-ir-loop-inversion.cpp](../../../../source/slang/slang-ir-loop-inversion.cpp) | Rewrites a loop whose first block is a small conditional branching to the break block into a guarded do-while, duplicating that condition block. It is off unless `CompilerOptionName::LoopInversion` is set, and its only call site is in the pre-link region rather than in `linkAndOptimizeIR` |
+| Fuse satcoop | [slang-ir-fuse-satcoop.cpp](../../../../source/slang/slang-ir-fuse-satcoop.cpp) | Fuses adjacent calls to the core-module `saturated_cooperation` builtin into one, floating the intervening instructions above or below as their dependencies allow, so two wave-match regions in the emit collapse into one |
+| Restructure | [slang-ir-restructure.cpp](../../../../source/slang/slang-ir-restructure.cpp) | Builds the `RegionTree` that gives an IR function a statement-shaped reading of its CFG (`generateRegionTreeForFunc`). It layers information over the CFG instead of rewriting it, so it changes nothing in the IR; the source emitters consume the tree when they turn blocks back into `if` / `for` / `switch`. Control flow it cannot structure is diagnosed |
+| Restructure scoping | [slang-ir-restructure-scoping.cpp](../../../../source/slang/slang-ir-restructure-scoping.cpp) | `fixValueScoping` repairs the case where a value is defined in one region and used in a region that is not nested inside it, which the target language's scoping rules would reject. It inserts temporaries at a broad enough scope, so the visible effect is an extra local variable in the emitted source |
+| Synthesize active mask | [slang-ir-synthesize-active-mask.cpp](../../../../source/slang/slang-ir-synthesize-active-mask.cpp) | Gives every function that uses the wave active mask an explicit mask parameter and rewrites its wave intrinsics to take it; entry points instead compute the mask as the first operation of their body, so the emitted CUDA gains both an extra argument on those helpers and a mask computation at the top of the kernel |
+| Uniformity | [slang-ir-uniformity.cpp](../../../../source/slang/slang-ir-uniformity.cpp) | Uniformity (divergence) analysis, run only under `-validate-uniformity`. Its user-visible output is a diagnostic, and `linkAndOptimizeIR` aborts the compile immediately if it reported an error; the only IR it rewrites is to strip the `TreatAsDynamicUniform` markers once the analysis has consumed them. With the flag off the pass does not run at all |
 
 ### Target-specific lowering
 
@@ -365,7 +473,7 @@ them runs on every target in two different modes; its row says so.
 
 | Pass | File | Purpose |
 | --- | --- | --- |
-| Coverage instrument | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | Synthesizes a `__slang_coverage` buffer (`RWStructuredBuffer<uint64_t>` by default, `uint` when the caller opts down via the validated `counterByteWidth` of `{4, 8}`) and rewrites marker ops into atomic adds; honors `-trace-coverage-binding` / `-trace-coverage-reserved-space` for binding-slot control, and `-trace-coverage-boolean` to record execution as a non-atomic store of `1` instead of an exact count. For Metal targets `linkAndOptimizeIR` caps counting-mode counters at 4 bytes before invoking the pass, because MSL has no 64-bit atomic fetch-add; an explicitly requested 64-bit width is capped with a warning, and boolean mode is exempt because it stores rather than accumulates |
+| Coverage instrument | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | Synthesizes a `__slang_coverage` buffer (`RWStructuredBuffer<uint64_t>` by default, `uint` when the caller opts down via the validated `counterByteWidth` of `{4, 8}`) and rewrites marker ops into atomic adds; honors `-trace-coverage-binding` / `-trace-coverage-reserved-space` for binding-slot control, and `-trace-coverage-boolean` to record execution as a non-atomic store of `1` instead of an exact count. For Metal targets `linkAndOptimizeIR` caps counting-mode counters at 4 bytes before invoking the pass, because MSL has no 64-bit atomic fetch-add; an explicitly requested 64-bit width is capped with a warning, and boolean mode is exempt because it stores rather than accumulates. Two things have to line up for any of this to happen: the linked module must contain coverage marker opcodes (`IncrementCoverageCounter`, `IncrementFunctionCoverageCounter`, `IncrementBranchCoverageCounter`), which is what sets the `coverageTracing` flag in `RequiredLoweringPassSet`, and the pass's `enabled` argument comes from `CodeGenContext::shouldTraceAnyCoverage()`, true when any of the line, function, or branch coverage modes is on. The "caller" that picks `counterByteWidth` is a named user surface: `-trace-coverage-counter-width` on the command line, spelled in bits (`32` or `64`) and validated there, or `CompilerOptionName::TraceCoverageCounterByteWidth` through the API, spelled in bytes (`4` or `8`); with neither set the width is 8 |
 | Finalize coverage metadata | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `finalizeCoverageInstrumentationMetadata`; runs after global / entry-point uniform packing to fill in CPU/CUDA uniform-marshaling fields determined by the final post-packing layout |
 | Insert debug value store | [slang-ir-insert-debug-value-store.cpp](../../../../source/slang/slang-ir-insert-debug-value-store.cpp) | Debug-info preservation across optimization |
 | Liveness | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | Liveness analysis used by debug info |

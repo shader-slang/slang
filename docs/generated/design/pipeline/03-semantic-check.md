@@ -25,6 +25,28 @@ name resolution, overload resolution, or interface conformance.
   validated, default conformance witnesses synthesized, and function
   bodies fully parsed and checked.
 
+Concretely, for
+
+```slang
+interface IFoo { int base(); int twice() { return base() * 2; } }
+struct S : IFoo { int base() { return 6; } }
+int call<T : IFoo>(T v) { return v.twice(); }
+```
+
+the parser hands over an `S` whose base list is still an unchecked
+`Expr`, a `call` body still in `UnparsedStmt` form, and not one `Expr`
+carrying a type. Checking resolves `IFoo` in `S`'s base list and in
+`T`'s constraint to the same decl (*names resolved*); gives
+`v.twice()` the type `int`, which is what makes the call legal
+(*types attached*); records the `S : IFoo` witness table
+(*conformances recorded*); fills that table's `twice` slot with a
+witness for the interface's default body, which `S` never spelled
+(*default conformance witnesses synthesized*); and turns the
+`UnparsedStmt` into a checked `Stmt` tree (*function bodies fully
+parsed and checked*). Nothing here carries a modifier; the checks
+that would apply are described under
+[Modifier validation](#modifier-validation).
+
 The result is the input to AST → IR lowering
 ([04-ast-to-ir.md](04-ast-to-ir.md)).
 
@@ -50,23 +72,31 @@ The `slang-check-*.cpp` family in
 [source/slang/](../../../../source/slang) splits the work by concern.
 Every file collaborates through `SemanticsContext` /
 `SemanticsVisitor` declared in
-[slang-check-impl.h](../../../../source/slang/slang-check-impl.h):
+[slang-check-impl.h](../../../../source/slang/slang-check-impl.h).
 
-| File | Concern |
-| --- | --- |
-| [slang-check.cpp](../../../../source/slang/slang-check.cpp) | Entry point; orchestrates the checking phases |
-| [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp) | `Decl` checking — types, signatures, default values, attributes |
-| [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp) | `Expr` checking — type inference, lvalue-ness, conversions |
-| [slang-check-stmt.cpp](../../../../source/slang/slang-check-stmt.cpp) | `Stmt` checking — control flow, scope rules, return-type validation |
-| [slang-check-type.cpp](../../../../source/slang/slang-check-type.cpp) | Resolves `Type` references that appear in `Expr` form |
-| [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp) | Overload resolution; ranks candidates produced by lookup |
-| [slang-check-conformance.cpp](../../../../source/slang/slang-check-conformance.cpp) | Verifies and synthesizes interface conformances |
-| [slang-check-conversion.cpp](../../../../source/slang/slang-check-conversion.cpp) | Implicit-conversion ranking and coercion site checks |
-| [slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp) | Inheritance and extension lookup; facet computation |
-| [slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp) | Validates modifier combinations and attribute arguments |
-| [slang-check-constraint.cpp](../../../../source/slang/slang-check-constraint.cpp) | Generic constraint solving (`where`-clauses, witness inference) |
-| [slang-check-resolve-val.cpp](../../../../source/slang/slang-check-resolve-val.cpp) | Resolves and canonicalizes `Type`, `DeclRef`, and witness values |
-| [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp) | Entry-point checks: stage-specific signatures, parameter rules |
+The *Example rejection* column names one diagnostic the file itself
+emits, so that each row is a claim a test can be written against
+rather than a label. Three rows have none to name:
+`slang-check-conformance.cpp` and `slang-check-resolve-val.cpp` emit
+no diagnostics at all — they compute a result and leave the reporting
+to whoever asked for it — and `slang-check.cpp`'s only diagnostics are
+about loading a downstream compiler, not about the program.
+
+| File | Concern | Example rejection |
+| --- | --- | --- |
+| [slang-check.cpp](../../../../source/slang/slang-check.cpp) | Entry point; orchestrates the checking phases | none from checking; it sequences the phases |
+| [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp) | `Decl` checking — types, signatures, default values, attributes | `E30200`, a declaration conflicting with an earlier one |
+| [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp) | `Expr` checking — type inference, lvalue-ness, conversions | `E30011`, assigning to something that is not an l-value |
+| [slang-check-stmt.cpp](../../../../source/slang/slang-check-stmt.cpp) | `Stmt` checking — control flow, scope rules, return-type validation | `E30003`, `break` outside a loop or `switch` |
+| [slang-check-type.cpp](../../../../source/slang/slang-check-type.cpp) | Resolves `Type` references that appear in `Expr` form | `E30060`, an expression used where a type is required |
+| [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp) | Overload resolution; ranks candidates produced by lookup | `E40018`, the note naming the argument that rejected a candidate |
+| [slang-check-conformance.cpp](../../../../source/slang/slang-check-conformance.cpp) | Verifies and synthesizes interface conformances | none; a missing requirement is reported as `E38100` by its caller in `slang-check-decl.cpp` |
+| [slang-check-conversion.cpp](../../../../source/slang/slang-check-conversion.cpp) | Implicit-conversion ranking and coercion site checks | `E30523`, too many initializers in an initializer list |
+| [slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp) | Inheritance and extension lookup; facet computation | `E30815`, a circular `extension` |
+| [slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp) | Validates modifier combinations and attribute arguments | `E31202`, two modifiers from one exclusive group on a decl |
+| [slang-check-constraint.cpp](../../../../source/slang/slang-check-constraint.cpp) | Generic constraint solving (`where`-clauses, witness inference) | `E30433`, a pack count that fails a `countof(...)` constraint |
+| [slang-check-resolve-val.cpp](../../../../source/slang/slang-check-resolve-val.cpp) | Resolves and canonicalizes `Type`, `DeclRef`, and witness values | none; a bad resolution result is reported at the use site |
+| [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp) | Entry-point checks: stage-specific signatures, parameter rules | `E38007`, an entry point with no stage |
 
 ## Two-pass interaction with the parser
 
@@ -165,18 +195,28 @@ When a generic cannot be specialized for a call, the failure reason is
 captured eagerly but reported lazily. The constraint solver records a
 `GenericArgumentInferenceFailure`
 ([slang-check-impl.h](../../../../source/slang/slang-check-impl.h)) — a
-tagged union whose `Kind` distinguishes a variadic pack-count mismatch,
-a generic arity mismatch, an ordinary type/value parameter that was
-never inferred, an unsatisfied interface conformance, a general
-constraint that could not be discharged, and a unification conflict
-where two arguments forced one parameter to disagree. Each `Kind`
-stores only the offending fields (counts, the parameter `Decl*`, or the
-substituted sub/super types); the expensive message formatting is
-deferred so that speculative candidates never pay for it. The failure
-is attached to the `OverloadCandidate` and turned into a focused
-diagnostic only if overload resolution selects that failed candidate —
-see the `switch` over `candidate.genericInferenceFailure.kind` in
-`CompleteOverloadCandidate`
+tagged union whose `Kind` selects both the stored payload and the
+diagnostic that will eventually be emitted:
+
+| `Kind` | Diagnostic | Triggered by |
+| --- | --- | --- |
+| `VariadicPackCountMismatch` | `E30433` | `takesTwo(1, 2, 3)` against `void takesTwo<each T>(expand each T args) where countof(T) == 2` |
+| `GenericArityMismatch` | `E30438` | a call whose argument list cannot be matched to the generic's parameter list at all |
+| `OrdinaryGenericParamNotInferred` | `E30439` | `f(1)` against `void f<T>(int a)` — no argument mentions `T` |
+| `InterfaceConformanceNotSatisfied` | `E38029` | `pick(s)` against `T pick<T : IFoo>(T a)` where `S` does not implement `IFoo` |
+| `GenericConstraintNotSatisfied` | `E30440` | `f(1.5f)` against `void f<T>(T a) where T == int`; the fallback for every constraint that is not a conformance |
+| `GenericParamUnificationConflict` | `E30442` | `two(x, y)` against `void two<T>(T a, T b)` with unrelated `A` and `B` |
+
+Every arm follows its error with a "see declaration of" note carrying
+the candidate's rendered signature (`GenericSignatureTried`), and the
+`GenericConstraintNotSatisfied` arm adds a second note pointing at the
+`where`-clause. Each `Kind` stores only the offending fields (counts,
+the parameter `Decl*`, or the substituted sub/super types); the
+expensive message formatting is deferred so that speculative candidates
+never pay for it. The failure is attached to the `OverloadCandidate`
+and turned into a focused diagnostic only if overload resolution
+selects that failed candidate — see the `switch` over
+`candidate.genericInferenceFailure.kind` in `CompleteOverloadCandidate`
 ([slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp)).
 Before this mechanism, every specialization failure collapsed into the
 catch-all `Diagnostics::GenericArgumentInferenceFailed`.
@@ -267,9 +307,70 @@ needs a member that the user did not write but the language guarantees.
 Modifier-specific checks live in
 [slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp):
 which modifiers are allowed on which decls, mutually exclusive
-combinations, attribute argument types, and HLSL-vs-Slang dialect
-differences. Modifier nodes themselves are defined in
+combinations, attribute argument types, and the differences between
+Slang and GLSL input. Modifier nodes themselves are defined in
 [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h).
+
+*Mutually exclusive* is decided by `getModifierConflictGroupKind`
+(line 1564), which maps a modifier's `ASTNodeType` to the group it
+competes in; a second modifier landing in a group already claimed on
+the same decl produces `E31202`. Most modifiers are their own group,
+so a plain repeat (`static static int g;`) is the common case, but the
+groups with more than one member are the ones worth knowing:
+`out`, `inout`, `ref` and `borrow` share a group; `static` and
+`uniform` share one; and `nointerpolation`, `noperspective`, `linear`,
+`sample` and `centroid` share one more.
+
+The dialect axis here is GLSL rather than HLSL. `checkModifier` (line
+1936) computes `isGLSLInput` from the `-allow-glsl` option
+(`CompilerOptionName::AllowGLSL`) or from a `GLSLModuleModifier` on
+the module, and passes it to `isModifierAllowedOnDecl` (line 1675); a
+modifier used in a position that predicate rejects is reported as
+`E31201`. Only a few entries actually branch on the flag —
+`globallycoherent` and `volatile`, for instance, are additionally
+allowed on the fields of a global struct when `isGLSLInput` holds.
+
+### Visibility scopes
+
+`public`, `internal` and `private` are checked like any other
+modifier, but the scope each one names is not the source file.
+`isDeclVisibleFromScope`
+([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp),
+line 1144) decides the question:
+
+| Modifier | Visible from |
+| --- | --- |
+| `public` | any scope, including other modules |
+| `internal` | any scope in the declaring module |
+| `private` | the declaring type or namespace, plus extensions of that same type |
+
+`private` is therefore type-scoped, not file-scoped: a free function
+in the *same* file cannot read a `private` member of a `struct`, and
+the read is rejected with `E30600`. Writing `private` where there is
+no enclosing type for it to scope to — at global scope, or on an
+interface requirement — is rejected up front with `E30603`.
+
+### `dyn interface` restrictions
+
+`validateDynInterfaceUsage` and
+`validateDynInterfaceUseWithInheritanceDecl`
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
+lines 372 and 442) constrain what a `dyn interface` may declare and
+what may conform to one. Both are gated on
+`allowExperimentalDynamicDispatch` (line 364) and are a no-op unless
+the module's language version is 2026 or later (`-std 2026`) *and*
+`-enable-experimental-dynamic-dispatch` was **not** passed — so the
+same source compiles differently under the default `-std`.
+
+When the gate is open, the interface may not be generic (`E33072`)
+and may not declare an associated type (`E33073`), a generic method
+(`E33074`), a `[mutating]` method (`E33075`), a `[Differentiable]`
+method (`E33076`), or a non-`dyn` base interface (`E33077`). A
+conforming type may not acquire the conformance through an `extension`
+(`E33078`) and may not be generic (`E33082`), and its fields may be
+neither unsized (`E33079`), opaque (`E33080`), nor non-copyable
+(`E33081`) — the dynamic representation has to be a copyable,
+fixed-size box.
 
 ## Shader-specific checks
 
@@ -298,15 +399,20 @@ validation rather than the general inference walk:
   function that names such a type to redeclare those capabilities.
   Builtin generic types carrying `MagicTypeModifier`/
   `IntrinsicTypeModifier` already have more specific diagnostics and are
-  filtered out (but still recursed *through*).
+  filtered out (but still recursed *through*). A requirement the target
+  cannot provide — `[require(cpp)] struct Foo<T>` named as `Foo<int>`
+  in a SPIR-V entry point's signature — is reported against the entry
+  point as `E36107`, followed by a `see using of 'Foo'` note.
 - **Unspecialized generic entry points.** A generic entry point such as
   `void main<T>(...)` left genuinely unspecialized lowers to an
   `IRGeneric` rather than an `IRFunc` and used to crash at link time.
   `createSpecializedGlobalAndEntryPointsComponentType`
   ([slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp))
   now uses `Linkage::isSpecialized` together with the presence of
-  specialization-argument strings to decide, and emits the diagnostic
-  only for the truly-unspecialized case.
+  specialization-argument strings to decide, and calls
+  `diagnoseGenericEntryPoint` (line 3964) — which emits `E38014`
+  against the entry-point name — only for the truly-unspecialized
+  case.
 - **Conflicting depth outputs.** A fragment entry point may write at
   most one depth system value. Because the per-parameter semantic check
   looks at each semantic in isolation, the conflict is detected
@@ -316,21 +422,25 @@ validation rather than the general inference walk:
   the return type — unwrapping `Conditional<T>` and array wrappers and
   recursing into struct fields, so a semantic on a field of an
   `out DepthOut a[1]` is still reached — and a collected count above one
-  produces `Diagnostics::MultipleDepthOutputSemantics`, naming the
-  second contributor as conflicting with the first.
+  produces `Diagnostics::MultipleDepthOutputSemantics` (`E30705`),
+  naming the second contributor as conflicting with the first.
 - **System-value semantic type compatibility.** `isSemanticTypeCompatible`
   (line 112) decides whether a declared type may carry a given
   system-value semantic. Two types match when they have the same shape
   (both scalar, or both vectors of equal element count) and their scalar
   element types fall in the same category — integer, floating-point, or
   bool. That admits sign coercions such as `int3` for a `uint3` semantic
-  while still rejecting cross-category ones such as `float` for a `uint`
-  semantic.
+  while still rejecting cross-category ones such as
+  `float gi : SV_GroupIndex`, and a shape mismatch such as
+  `float pos : SV_Position`; both are reported as `E30701`, whose
+  message lists the types the semantic will accept.
 - **Ignored binding modifiers on entry-point parameters.** Slang
   silently ignores `[[vk::binding(...)]]`, `[[vk::push_constant]]`,
   `register()`, and `packoffset()` in some positions, which misleads
   users either way. Entry-point parameter checking therefore reports
-  `Diagnostics::UnhandledModOnEntryPointParameter` for each such
+  `Diagnostics::UnhandledModOnEntryPointParameter` (`E38010`, whose
+  message names the modifier and the parameter and says the modifier
+  will be ignored) for each such
   modifier. Only the `[[vk::binding(...)]]` case is gated — by
   `_allTargetsSupportVkBindingOnEntryPointParameters` (line 1580) over
   all of the linkage's targets and by
@@ -362,23 +472,38 @@ point the user at the likely fix:
   offending argument index and the expected/actual types on the
   candidate, then emits a
   `Diagnostics::OverloadCandidateArgumentTypeMismatch` note per
-  candidate. Candidates are deduplicated by their rendered signature
+  candidate. Calling `void g(A, int)` / `void g(B, float)` with two
+  `float`s reports `E39999` on the call, then an `E40011`
+  `candidate: <signature>` note per candidate, each followed by an
+  `E40018` note reading `argument 0 does not match: expected 'A', got
+  'float'`. Candidates are deduplicated by their rendered signature
   string (not by `Decl*`, which would wrongly collapse distinct
-  specializations such as `foo<float>` and `foo<int>`).
+  specializations such as `foo<float>` and `foo<int>`); at most ten
+  unique candidates are printed and the remainder are summarized by an
+  `E40015` "N more overload candidates" note.
 - **"Did you mean ...?" on undefined identifiers.** When a name fails to
   resolve, `slang-check-expr.cpp` walks the in-scope candidates and, via
   `StringUtil::calcLevenshteinDistanceCaseInsensitive`, attaches a
   conservative similar-name suggestion to the existing
-  `Diagnostics::UndefinedIdentifier` rather than emitting a detached
-  note. The allowed edit distance scales with identifier length and
-  core-module builtins are excluded to keep the suggestion from being
-  noisy.
+  `Diagnostics::UndefinedIdentifier` (`E30015`) rather than emitting a
+  detached note. `findClosestInScopeName` (line 5216) fixes the budget
+  concretely: nothing is suggested for a name under 3 or over 256
+  characters, the allowed distance is
+  `min(3, max(1, length / 3))` — roughly one edit per three characters,
+  floored at one and capped at three — core-module declarations and
+  anything the scope could not access are skipped, and a tie between
+  two distinct names suppresses the suggestion so the output does not
+  depend on scope-walk order. So `myLongVariableNam` suggests
+  `myLongVariableName`, while `ac` does not suggest the in-scope `ab`
+  and `sqr` does not suggest the core module's `sqrt`.
 - **Discarded `[NoDiscard]` results.** `maybeDiagnoseDiscardedNoDiscardResult`
   ([slang-check-stmt.cpp](../../../../source/slang/slang-check-stmt.cpp))
-  fires when the result of a call to a `[NoDiscard]`-marked function is
-  thrown away (e.g. as a bare expression statement), recursing through
+  fires with `E30059` when the result of a call to a
+  `[NoDiscard]`-marked function is thrown away — `f();` written as a
+  bare expression statement — recursing through
   comma, ternary-select, and short-circuit forms to find the discarded
-  sub-expression.
+  sub-expression. A bare discarded constructor call is deliberately
+  excluded.
 
 The diagnostic infrastructure is described in
 [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md).

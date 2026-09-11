@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:03:13Z
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#intval-family
-//META: doc_section_digest=8bbf4cb8daa21d5c3d6e035a494748b9ecec4dbd1090f3e9e250c4555daedc9f
-//META: purpose=A ConstantIntVal is the leaf IntVal used for a known compile-time integer; it stands in for the literal array size at type-check time and the array carries that many elements.
+//META: doc_section_digest=3b7a66f73a4b30e3c18815ae985a8f256039debd8a5caa97ed928ac84dcbb5bd
+//META: purpose=A literal compile-time integer is the immediately-reducible IntVal form, so a literal array bound gives the array exactly that many independently addressable elements.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc names `ConstantIntVal` as the leaf for "a literal
-// compile-time integer". When used as an array dimension, the
-// surrounding `ArrayExpressionType` is parameterised by that
-// IntVal; here a sized `int[5]` carries five independently
-// addressable elements.
+// Verifies the "immediately reducible" end of the IntVal family: a
+// literal used as an array bound is a known constant at check time.
+// The test writes five distinct values into an `int[5]` and prints
+// all five slots; CHECK asserts every slot round-trips, which is only
+// possible if the bound resolved to exactly 5 elements.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

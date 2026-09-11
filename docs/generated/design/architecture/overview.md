@@ -271,7 +271,7 @@ re-ordering, no virtual-method changes mid-vtable, no removal) reflect
 the fact that this surface must keep ABI compatibility with older
 callers. New API is therefore added by *appending*: methods are
 appended to the end of an interface (e.g.
-`IGlobalSession::getDownstreamCompilerVersion`), new capabilities arrive
+`IGlobalSession::saveBuiltinModule`), new capabilities arrive
 as fresh UUID'd interfaces obtained via `castAs` /
 `queryInterface` (e.g. `IBindlessResourceMetadata`), and new
 `CompilerOptionName` enumerators are appended with an explicit integer

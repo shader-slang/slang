@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/base.md#expr-syntaxnode
 //META: doc_section_digest=369743522fa835d335b8cfc1d7160c48df288006a4cdb5149e41fdce6b476f7e
-//META: purpose=Every Expr carries a QualType filled in by the checker; that type is what overload resolution dispatches on.
+//META: purpose=Every Expr carries a type filled in by the checker, and that type is what overload resolution dispatches on.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that an expression's type, attached to the Expr by the
-// checker, is what selects an overload. The expression `1 + 2` must
-// carry type `int` and pick the int overload; `1.0f + 2.0f` must
-// carry type `float` and pick the float overload. If Expr did not
-// carry the checked type, the program could not be type-dispatched.
+// Verifies that the type the checker attaches to a compound expression
+// (not just to a literal) is what drives overload selection. `1 + 2`
+// must be dispatched as `int` and `1.0f + 2.0f` as `float`. CHECK
+// asserts the two probe overloads that fire; an untyped expression
+// could not be routed to either.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

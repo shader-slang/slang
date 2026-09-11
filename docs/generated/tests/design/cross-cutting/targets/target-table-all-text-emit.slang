@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#targets
-//META: doc_section_digest=01592114ee53e6fb4d64d35bfd46e14fb1203ef5ea4792bcbf05944b2edfe91c
-//META: purpose=The doc's Targets table lists HLSL/GLSL/SPIR-V/Metal/WGSL/CUDA/C++ as distinct emit backends; the same source compiles successfully to each text-emit target.
+//META: doc_section_digest=09ecdf153c06b46e85b5bfd65a0136d6c1516c1e42e5e33b4b02ee440f2f963c
+//META: purpose=HLSL, GLSL, SPIR-V, Metal, WGSL, CUDA and C++ are distinct emit backends of the target table, and one source compiles successfully to each of those text-emit targets.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.

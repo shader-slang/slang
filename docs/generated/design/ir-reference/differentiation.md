@@ -192,8 +192,20 @@ are reached through `getBase()` in practice.
 
 Everything in this section is a child of the hoistable
 `TranslateBase` group, so identical translation requests dedupe to a
-single IR value before the translation pass ever sees them. Every
-entry declares only `min_operands`, except `ForwardDifferentiate`
+single IR value before the translation pass ever sees them. The dedupe
+is keyed on the request itself — opcode plus operands — so it is the
+*base function* that decides identity, not the call site:
+
+```slang
+buf[0] = __fwd_diff(f)(DifferentialPair<float>(a, d)).d;
+buf[1] = __fwd_diff(f)(DifferentialPair<float>(d, a)).p;
+```
+
+lowers to one `let %fwd = ForwardDifferentiate(%f)` that both `call`
+insts share, however many times `__fwd_diff(f)` is written and
+whatever arguments each call passes.
+
+Every entry declares only `min_operands`, except `ForwardDifferentiate`
 which also names `baseFn`.
 
 #### Forward-mode
@@ -216,6 +228,18 @@ which also names `baseFn`.
 | `TrivialBackwardDifferentiatePrimal` | `IRTrivialBackwardDifferentiatePrimal` | † `min=1` | H | `SynthesizedFuncDecl` from `checkDifferentiableCallableCommon` for `[TreatAsDifferentiable]` | Trivial primal phase. |
 | `TrivialBackwardDifferentiatePropagate` | `IRTrivialBackwardDifferentiatePropagate` | † `min=1` | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness` | Trivial propagate phase. |
 | `TrivialBackwardRemat` | `IRTrivialBackwardRemat` | † `min=1` | H | `SynthesizedFuncDecl` `remat` from `checkDifferentiableCallableCommon` for `[TreatAsDifferentiable]` | Trivial remat phase. |
+
+None of these opcodes reaches target code, but the functions and types
+the reverse-mode passes build from them do, under generated names a
+reader will meet in emitted HLSL or CUDA. `generateName` in
+[slang-ir-autodiff-rev.cpp](../../../../source/slang/slang-ir-autodiff-rev.cpp)
+gives the propagate function the prefix `s_bwdProp_` (lines 405 and
+726) and the full intermediate-context struct the prefix
+`s_bwdCallableCtx_` (lines 314 and 727), so `f` yields `s_bwdProp_f`
+alongside a `s_bwdCallableCtx_f` struct carrying the hoisted primal
+state. Forward mode is the same shape one prefix over:
+[slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp)
+line 2271 builds `s_fwd_<orig>`.
 
 #### Legacy bridge
 
@@ -249,6 +273,17 @@ three functions — `apply_bwd`, `remat`, and propagate — which
 | `MakeIDifferentiableWitness` | `IRMakeIDifferentiableWitness` | † `min=1` | H | no AST origin — emitted by [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) line 101 | Requests an `IDifferentiable` witness for a `DifferentialPair` / `DifferentialPtrPair` type. |
 | `SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc` | `IRSynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc` | † `min=2` | H | none at this commit — see [Opcodes with no producer at HEAD](#opcodes-with-no-producer-at-head) | Would bridge a legacy combined reverse function into the modern witness form. |
 | `IdentityRemat` | `IRIdentityRemat` | † `min=1` | H | `SynthesizedFuncDecl` `remat` from `_funcExtensionApply` | Marks the remat phase as the identity, for a user-provided `__apply` whose `MinimalContext` is its `BwdCallable`. |
+
+The `__func_extension` surface behind the `_funcExtensionApply` and
+`_funcExtensionBackwardDiff` origins above is experimental and is
+rejected in user code unless `-experimental-feature` is passed:
+`visitFuncExtensionDecl` (lines 16258-16264 of
+[slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp))
+diagnoses any `__func_extension` decl that neither sets that option nor
+comes from the core module. The exemption is what lets core-module
+meta code use the same syntax to attach conditional derivative
+witnesses. `IdentityRemat` therefore has no non-experimental user
+surface at all.
 
 ### Autodiff placeholders
 
@@ -510,6 +545,17 @@ applied to an expression — `visitTreatAsDifferentiableExpr` (line
 `detachDerivative` so that `no_diff` behaves the same on local-array
 indexing as on resource indexing. `removeDetachInsts`, called from
 `finalizeAutoDiffPass`, deletes them once differentiation is done.
+
+`no_diff` on a *parameter declaration* is a different construct and
+produces no `detachDerivative` inst at all. There it is a modifier, not
+an expression: checking moves a `NoDiffModifierVal` off the parameter's
+type onto the `ParamDecl` as a `NoDiffModifier` (lines 6736-6751 of
+[slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
+with the same move for ordinary var decls at lines 2872-2878), and the
+differentiability queries read it from either place
+(`doesTypeHaveNoDiffModifier`, lines 5333 and 5338). The
+attributed-type spelling that carries it is owned by
+[types.md](types.md#differentiation-types).
 
 ### C++ wrappers: hand-written vs generated
 

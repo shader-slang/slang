@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:30:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=c77fee7161ce8202ebbab6d6eb6c82335dc0e6c705fca9841cc6d946a470895d
 //META: purpose=Fires diagnostic E33073 (cannot-have-associated-type-in-dyn-interface) - dyn interfaces cannot have associatedType members
 //META: intent=negative
 //META: pipeline_stage=check
@@ -21,4 +21,4 @@ dyn interface IFoo
     associatedtype T;
 }
 
-// CHECK: E33073
+//CHECK: E33073

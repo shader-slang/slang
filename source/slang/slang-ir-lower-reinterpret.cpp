@@ -156,6 +156,18 @@ struct ReinterpretLoweringContext
         auto operand = inst->getOperand(0);
         auto fromType = operand->getDataType();
         auto toType = inst->getDataType();
+
+        // Distinct symbolic payload sets can become the same physical type before this pass. For
+        // example, both `UntaggedUnion({Foo})` and `UntaggedUnion({Foo, none})` lower to `Foo`.
+        // Their previously required reinterpret is now an identity, so remove it rather than
+        // introducing an unnecessary AnyValue pack/unpack pair.
+        if (fromType == toType)
+        {
+            inst->replaceUsesWith(operand);
+            inst->removeAndDeallocate();
+            return;
+        }
+
         SlangInt fromTypeSize = getAnyValueSize(fromType, targetProgram->getTargetReq());
         SlangInt toTypeSize = getAnyValueSize(toType, targetProgram->getTargetReq());
 

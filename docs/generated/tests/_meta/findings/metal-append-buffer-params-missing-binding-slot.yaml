@@ -1,0 +1,42 @@
+schema_version: 1
+id: metal-append-buffer-params-missing-binding-slot
+bundle: design/target-pipelines/metal
+suspected_kind: wrong-codegen
+title: "Metal: append-buffer element/counter params emit with no [[buffer(N)]] slot"
+observed_at: "2026-08-04T00:00:00+00:00"
+scope: metal
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/design/target-pipelines/metal/append-buffer-params-carry-buffer-slots.slang -target metal -entry main -stage compute"
+  source_slang: docs/generated/tests/design/target-pipelines/metal/append-buffer-params-carry-buffer-slots.slang
+  observed_summary: |
+    `lowerAppendConsumeStructuredBuffers` splits an `AppendStructuredBuffer<float>` into two
+    Metal kernel parameters, but neither of them receives an MSL binding-slot attribute,
+    while the ordinary `RWStructuredBuffer<float>` declared next to it does. The emitted
+    signature is:
+      [[kernel]] void main_0(uint3 tid_0 [[thread_position_in_grid]],
+                             float device* appendBuf_elements_1,
+                             atomic<int> device* appendBuf_counter_1,
+                             float device* outputBuffer_1 [[buffer(3)]])
+    Note also that the one annotated buffer jumps to slot 3, so the slots the two append
+    parameters would have taken are allocated but never written into the source. MSL requires
+    every kernel argument to carry an address-space/binding attribute, so this output is not
+    accepted by the Apple `metal` compiler and the host has no way to bind either pointer.
+  exit_code: 0
+expected:
+  claim: |
+    Every resource-typed parameter of a Metal entry point is emitted with its positional
+    binding attribute -- `[[buffer(N)]]` / `[[texture(N)]]` / `[[sampler(N)]]`. The element
+    and counter pointers synthesized for an append/consume structured buffer are ordinary
+    device buffers and should be no exception.
+  citation_kind: doc
+  citation: docs/generated/design/target-pipelines/metal.md
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+  doc_anchor: docs/generated/design/target-pipelines/metal.md#descriptorhandlet-parameter-binding-emission
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug (wrong CHECK escaping): ruled out -- the raw slangc output above shows the two parameters with no attribute at all, independent of any FileCheck pattern."
+    - "Append buffers are intentionally unbindable on Metal: does not fit, because the pass that produces the two pointers fires precisely so Metal can support the type, and the doc records the append/consume lowering as active for every non-HLSL target."
+    - "The slots are assigned but suppressed on purpose for a bindless path: possible, but the neighbouring plain buffer still prints [[buffer(3)]], so the suppression is not uniform and the emitted source is not valid MSL either way."

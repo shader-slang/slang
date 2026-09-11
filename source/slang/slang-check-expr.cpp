@@ -13,6 +13,7 @@
 
 #include "core/slang-char-util.h"
 #include "core/slang-math.h"
+#include "core/slang-short-dictionary.h"
 #include "core/slang-string-util.h"
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
@@ -1059,7 +1060,15 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
         }
     }
 
-    return ConstructDeclRefExpr(item.declRef, bb, name, loc, originalExpr);
+    auto resultExpr = ConstructDeclRefExpr(item.declRef, bb, name, loc, originalExpr);
+    // A property reference does not produce an `InvokeExpr` during semantic checking. Register
+    // its accessors here so that lowering can later select the getter or setter without losing
+    // the derivative associations needed by the enclosing differentiable function.
+    if (m_parentDifferentiableAttr && item.declRef.as<PropertyDecl>())
+    {
+        registerAssociatedMethods(this, item.declRef);
+    }
+    return resultExpr;
 }
 
 void SemanticsVisitor::suggestCompletionItems(
@@ -1102,7 +1111,7 @@ Expr* SemanticsVisitor::createLookupResultExpr(
 
 static DeclVisibility _getTypeVisibility(
     Type* type,
-    Dictionary<Type*, DeclVisibility>& typeVisibilityCache)
+    ShortDictionary<Type*, DeclVisibility>& typeVisibilityCache)
 {
     if (auto cachedVisibility = typeVisibilityCache.tryGetValue(type))
         return *cachedVisibility;
@@ -1129,7 +1138,10 @@ static DeclVisibility _getTypeVisibility(
 
 DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
 {
-    Dictionary<Type*, DeclVisibility> typeVisibilityCache;
+    // ShortDictionary rather than Dictionary: most types checked here have little or no shared
+    // structure, so the cache typically ends up with only a handful of entries. See the
+    // ShortDictionary doc comment and #12139.
+    ShortDictionary<Type*, DeclVisibility> typeVisibilityCache;
     return _getTypeVisibility(type, typeVisibilityCache);
 }
 
@@ -2578,7 +2590,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     {
         auto opName = funcDeclRef.getName();
 
-        // handle binary operators
+        // handle unary and binary operators
         if (opName == getName("-"))
         {
             if (argCount == 1)
@@ -2588,6 +2600,19 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             else if (argCount == 2)
             {
                 resultValue = constArgVals[0] - constArgVals[1];
+            }
+        }
+        else if (opName == getName("+"))
+        {
+            if (argCount == 1)
+            {
+                resultValue = constArgVals[0];
+            }
+            else if (argCount == 2)
+            {
+                resultValue = static_cast<IntegerLiteralValue>(
+                    static_cast<uint64_t>(constArgVals[0]) +
+                    static_cast<uint64_t>(constArgVals[1]));
             }
         }
         else if (opName == getName("!"))
@@ -2622,7 +2647,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     }                                                                                         \
     while (0)
 
-        CASE_UINT(+); // TODO: this can also be unary...
         CASE_UINT(*);
         CASE_UINT(&);
         CASE_UINT(|);
@@ -3445,6 +3469,19 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
 void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 {
+    // A subscript or property denotes storage, while its accessors are the functions that are
+    // actually called. Register every accessor because the getter-versus-setter decision is
+    // intentionally deferred until lowering materializes the storage reference.
+    if (declRef.as<SubscriptDecl>() || declRef.as<PropertyDecl>())
+    {
+        for (auto accessorDeclRef :
+             getMembersOfType<AccessorDecl>(context->getASTBuilder(), declRef.as<ContainerDecl>()))
+        {
+            registerAssociatedMethods(context, accessorDeclRef);
+        }
+        return;
+    }
+
     // Lower witness for ForwardDifferentiable for this function.
     // First we'll turn it into a func-as-type-expr, then check that
     // to get the function reference as a type, and then get the witness
@@ -3673,14 +3710,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 
             if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
             {
-                if (auto subscriptDeclRef = fnExpr->declRef.as<SubscriptDecl>())
-                {
-                    for (auto accessorDeclRef :
-                         getMembersOfType<AccessorDecl>(m_astBuilder, subscriptDeclRef))
-                        registerAssociatedMethods(this, accessorDeclRef);
-                }
-                else
-                    registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
+                registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
             }
         }
     }
@@ -6297,6 +6327,16 @@ static bool _isSizeOfType(Type* type)
     {
         return false;
     }
+
+    // A `ModifiedType`'s modifiers are layout-transparent, so whether a type has
+    // a size is decided entirely by its base: `sizeof(unorm float4)` is just
+    // `sizeof(float4)`. This matters because the modifier survives into the type
+    // of an ordinary value — loading from a `RWTexture2D<unorm float4>` yields a
+    // `unorm float4` — so rejecting the wrapper here would reject `sizeof` on a
+    // value the user never spelled a modifier on. Unwrapping keeps the list
+    // below about *kinds* of type rather than repeating each kind in a modified
+    // form.
+    type = unwrapModifiedType(type);
 
     if (as<ArithmeticExpressionType>(type) || as<ArrayExpressionType>(type) ||
         as<PtrTypeBase>(type) || as<TupleType>(type) || as<GenericDeclRefType>(type))
@@ -9293,7 +9333,7 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
                         matrixType->getRowCount(),
                         matrixType->getColumnCount(),
                         m_astBuilder->getIntVal(
-                            m_astBuilder->getIntType(),
+                            matrixType->getLayout()->getType(),
                             kMatrixLayoutMode_ColumnMajor));
                 }
                 else
@@ -9303,7 +9343,7 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
                         matrixType->getRowCount(),
                         matrixType->getColumnCount(),
                         m_astBuilder->getIntVal(
-                            m_astBuilder->getIntType(),
+                            matrixType->getLayout()->getType(),
                             kMatrixLayoutMode_RowMajor));
                 }
                 expr->type = m_astBuilder->getTypeType(baseType);
@@ -9521,7 +9561,13 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     const auto& spirvInfo = getSession()->spirvCoreGrammarInfo;
 
     // We will iterate over all the operands in all the insts and check
-    // them
+    // them. Setting `failed` makes us return an error-typed expression via
+    // `CreateErrorExpr` at the end of this function; a caller only keeps that
+    // expression away from IR lowering (which aborts on an ErrorType) when the
+    // sink's error count is non-zero. So every site that sets `failed` must
+    // diagnose an *error*, never a warning — a warning-severity `failed` path
+    // is what caused the abort in #12497. (The lone warning in this function,
+    // SpirvLayoutSensitiveTypeInAsm, deliberately does not set `failed`.)
     bool failed = false;
 
     // Track %id's that have been defined in this asm block.
@@ -9536,10 +9582,12 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
 
         if (opInfo && opInfo->numOperandTypes == 0 && inst.operands.getCount())
         {
+            // Per the `failed` invariant above, this diagnoses an error (not
+            // the parser's E29106 semicolon-hint warning): the opcode takes no
+            // operands, so this is a definite error rather than a recovery guess.
             failed = true;
-            getSink()->diagnose(Diagnostics::SpirvInstructionWithTooManyOperands{
+            getSink()->diagnose(Diagnostics::SpirvInstructionTakesNoOperands{
                 .opcode = inst.opcode.token.getContent(),
-                .maxOperands = 0,
                 .location = inst.opcode.token.loc});
             continue;
         }

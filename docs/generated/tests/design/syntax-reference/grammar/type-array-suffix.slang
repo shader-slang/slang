@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:03:32+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#types
-//META: doc_section_digest=24919d68577e8ac7fef57e804fdf1d69f9063278aeb46ec9c6ca7e3bf3539893
+//META: doc_section_digest=29130252ebb8566d4abf275df716b28c339ea28ecaa9f518d2ddee6bfdd47125
 //META: purpose=`CoreType` accepts the array form `Type '[' Expr ']'`.
 //META: intent=functional
 //META: pipeline_stage=parse
