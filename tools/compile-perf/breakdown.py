@@ -34,7 +34,7 @@ sys.path.insert(0, HERE)  # allow running from any directory
 
 from lib import analyze, corpus, manifest
 
-from lib.buckets import (TREE, BUCKET_ORDER, BUCKET_COLOR, API_TREE,
+from lib.buckets import (TREE, SOURCE_TREE, tree_for, BUCKET_ORDER, BUCKET_COLOR, API_TREE,
                          API_BUCKET_ORDER, buckets, api_buckets, timer_ms)
 
 
@@ -118,7 +118,10 @@ def tree_view(runs, workload):
                 print(f"{'  ' * (depth + 1)}{'(self / unnamed)':30s}"
                       f"{self_ms:9.1f} ms  ({100*self_ms/ci:5.1f}%)")
 
-    show(TREE, 0)
+    # tree_for, not TREE: on a source target emitEntryPointsSourceFromIR is
+    # the PARENT of linkAndOptimizeIR, and printing them as siblings shows
+    # the same milliseconds twice.
+    show(tree_for(timers), 0)
 
 
 def render_stacked_svg(runs, label, metric):
