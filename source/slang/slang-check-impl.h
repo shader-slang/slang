@@ -4087,6 +4087,29 @@ private:
         Expr*& outLeftArg,
         Expr*& outRightArg);
 
+    /// The scalar family (integer, floating-point, or boolean) that an operand element type is
+    /// known to belong to for the purposes of the builtin-operator fast path. All three fields
+    /// are false when the type is not known to belong to any of them.
+    struct BuiltinArithmeticElementFamily
+    {
+        bool isInteger = false;
+        bool isFloat = false;
+        bool isBool = false;
+        bool isKnown() const { return isInteger || isFloat || isBool; }
+    };
+
+    /// Classifies `elementType`'s scalar family for the builtin-operator fast path in
+    /// `convertToBuiltinArithmeticOp`. A concrete `BasicExpressionType` (`int`, `float`, `bool`,
+    /// ...) is classified directly from `BaseTypeInfo`. A generic type parameter constrained to
+    /// one of the `[sealed]` builtin marker interfaces (`__BuiltinIntegerType`,
+    /// `__BuiltinFloatingPointType`, `__BuiltinLogicalType`; see core.meta.slang) is classified
+    /// the same way: those interfaces are sealed, so only the compiler's own builtin scalar types
+    /// can conform to them, which means every legal instantiation of such a parameter is itself a
+    /// `BasicExpressionType` of that family, even though the parameter is not one yet. Any other
+    /// type (aggregates, an unconstrained or differently-constrained generic parameter, etc.)
+    /// classifies as unknown, which the caller treats as "not eligible for the fast path."
+    BuiltinArithmeticElementFamily classifyBuiltinArithmeticElementType(Type* elementType);
+
     // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either
     // `-allow-glsl` is set, or the `glsl` module is in scope (its `operator*` overloads
     // make `mat * mat` a matrix product). The builtin-operator fast path is disabled then.

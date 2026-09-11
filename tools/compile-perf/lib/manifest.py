@@ -360,6 +360,15 @@ WORKLOADS = [
         primary_timers=["SemanticChecking", "frontEndExecute"],
         sweep_sizes=[600, 1200, 2400, 4800],
     ),
+    WorkloadSpec(
+        name="generic_builtin_operator",
+        bucket="typecheck",
+        gen=workloads.gen_generic_builtin_operator,
+        default_size=1000,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[250, 500, 1000, 2000],
+    ),
     # ---- shared-infrastructure / scaling stressors -----------------------
     WorkloadSpec(
         name="ir_builder",

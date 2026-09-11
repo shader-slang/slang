@@ -4697,6 +4697,43 @@ Type* SemanticsExprVisitor::coerceOperandsOfBuiltinBinaryExpr(
     return commonType;
 }
 
+SemanticsExprVisitor::BuiltinArithmeticElementFamily SemanticsExprVisitor::
+    classifyBuiltinArithmeticElementType(Type* elementType)
+{
+    if (auto basicType = as<BasicExpressionType>(elementType))
+    {
+        auto baseType = basicType->getBaseType();
+        auto flags = BaseTypeInfo::getInfo(baseType).flags;
+        BuiltinArithmeticElementFamily family;
+        family.isInteger = (flags & BaseTypeInfo::Flag::Integer) != 0;
+        family.isFloat = (flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+        family.isBool = (baseType == BaseType::Bool);
+        return family;
+    }
+
+    // Not a concrete builtin scalar. Check whether a generic parameter's declared constraint
+    // (or, in principle, any other type) conforms to one of the sealed builtin marker
+    // interfaces; see the declaration comment on `BuiltinArithmeticElementFamily` for why that
+    // is a sound basis for the fast path. `tryGetInterfaceConformanceWitness` goes through
+    // `SharedSemanticsContext::tryGetSubtypeWitnessFromCache`, so repeated calls for the same
+    // `elementType` -- exactly what a generic type parameter reused across many call sites
+    // produces -- are cache hits after the first.
+    //
+    // Each accessor returns null before the core module is available to search (see
+    // `SharedASTBuilder::getBuiltinIntegerType` and its siblings); the classification for that
+    // family is then left unknown rather than querying conformance against a null interface type.
+    auto astBuilder = getASTBuilder();
+    BuiltinArithmeticElementFamily family;
+    if (auto integerInterface = astBuilder->getBuiltinIntegerType())
+        family.isInteger =
+            tryGetInterfaceConformanceWitness(elementType, integerInterface) != nullptr;
+    if (auto floatInterface = astBuilder->getBuiltinFloatingPointType())
+        family.isFloat = tryGetInterfaceConformanceWitness(elementType, floatInterface) != nullptr;
+    if (auto logicalInterface = astBuilder->getBuiltinLogicalType())
+        family.isBool = tryGetInterfaceConformanceWitness(elementType, logicalInterface) != nullptr;
+    return family;
+}
+
 Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
 {
     // Recognize a builtin arithmetic (`+ - * / %`), comparison (`< > <= >=`), equality
@@ -4706,6 +4743,15 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     // lowering / constant folding, skipping generic `operator OP` overload resolution. Returns
     // null to leave the expression for normal resolution. The operator-name is mapped to a
     // `BuiltinOperationKind` once (here), and everything downstream keys off the kind.
+    //
+    // "Builtin" element type is not limited to a concrete `BasicExpressionType`:
+    // `classifyBuiltinArithmeticElementType` also recognizes a generic type parameter
+    // constrained to a sealed builtin marker interface (`T : __BuiltinFloatingPointType`, as in
+    // issue #12458's reproducer), because every legal instantiation of such a parameter is
+    // guaranteed to be a concrete builtin scalar too. Without that, an operator on a
+    // generic-typed operand falls through to full generic overload resolution on every visible
+    // `operator OP` overload -- measured at ~83% of semantic-checking time on that reproducer,
+    // because the wrong candidates it rejects each still pay for generic argument inference.
 
     // Unary prefix operators: `-x` (negate), `!x` (logical-not, bool), `~x` (bitwise-not, int).
     if (as<PrefixExpr>(expr) && expr->arguments.getCount() == 1)
@@ -4735,14 +4781,12 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
             uElementType = v->getElementType();
         else if (auto m = as<MatrixExpressionType>(uOperandType))
             uElementType = m->getElementType();
-        auto uBasic = as<BasicExpressionType>(uElementType);
-        if (!uBasic)
+        auto uFamily = classifyBuiltinArithmeticElementType(uElementType);
+        if (!uFamily.isKnown())
             return nullptr;
-        auto uBaseType = uBasic->getBaseType();
-        auto uFlags = BaseTypeInfo::getInfo(uBaseType).flags;
-        bool uInt = (uFlags & BaseTypeInfo::Flag::Integer) != 0;
-        bool uFloat = (uFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
-        bool uBool = (uBaseType == BaseType::Bool);
+        bool uInt = uFamily.isInteger;
+        bool uFloat = uFamily.isFloat;
+        bool uBool = uFamily.isBool;
         // `-` => signed/float negate; `~` => integer bitwise-not; `!` => bool logical-not.
         bool uEligible = isNeg ? (uInt || uFloat) : (isBitNot ? uInt : /*isLogicalNot*/ uBool);
         if (!uEligible)
@@ -4865,14 +4909,12 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         elementType = vecType->getElementType();
     else if ((matType = as<MatrixExpressionType>(operandType)))
         elementType = matType->getElementType();
-    auto basicElementType = as<BasicExpressionType>(elementType);
-    if (!basicElementType)
+    auto family = classifyBuiltinArithmeticElementType(elementType);
+    if (!family.isKnown())
         return nullptr;
-    auto baseType = basicElementType->getBaseType();
-    auto baseFlags = BaseTypeInfo::getInfo(baseType).flags;
-    bool isIntegerBase = (baseFlags & BaseTypeInfo::Flag::Integer) != 0;
-    bool isFloatBase = (baseFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
-    bool isBoolBase = (baseType == BaseType::Bool);
+    bool isIntegerBase = family.isInteger;
+    bool isFloatBase = family.isFloat;
+    bool isBoolBase = family.isBool;
     // Some operators do not apply to every element type. For example, it is invalid to apply a
     // bitwise operator to a floating-point operand, and arithmetic does not apply to `bool`. When
     // the element type is not valid for the operator family we return null, so the expression
@@ -4927,6 +4969,10 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     node->arguments.add(rightArg);
     node->type = resultType;
     node->loc = expr->loc;
+    // Only `Mod` reads this (to choose `FRem` over `IRem`), but it is resolved here regardless of
+    // `kind`: `elementType` may be an abstract generic parameter by the time IR lowering runs,
+    // which no longer carries a concrete `BaseType` to classify.
+    node->elementTypeIsFloatingPoint = isFloatBase;
 
     // Register the operand/result types in a differentiable scope, regardless of the operator
     // family, matching the breadth of the pre-fast-path `visitInvokeExpr` (which walked all
