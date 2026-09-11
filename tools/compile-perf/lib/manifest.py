@@ -476,10 +476,61 @@ WORKLOADS = [
         default_size=80,
         mode="target",
         extra_flags=SPIRV,
-        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner"],
+        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
+                        "simplifyNonSSAIR", "deferBufferLoad"],
         # Window starts at default_size: below N=80 the total is dominated by a
         # quasi-fixed front-end cost (type sharing makes per-item sema cheap)
         # that would floor-distort the fit; [80..640] measures the pass, not it.
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    # legalizeResourceTypes takes a TargetProgram and behaves differently per
+    # target, but until now the suite only ever measured it on the target where
+    # it is cheapest. Same generator and same ladder as the SPIR-V entry above
+    # (whose name is kept unchanged so its series is unbroken), so the four are
+    # directly comparable -- and they are the widest back-end divergence
+    # anywhere in the suite. Swept on v2026.17.1:
+    #
+    #     N          80     160     320     640     exponent   vs spirv
+    #     spirv    38.6    55.9    99.6   198.8       N^0.79       1.0x
+    #     metal    52.6   144.7   480.3  1790.3       N^1.70       9.0x
+    #     glsl     32.6    95.6   464.8  3114.6       N^2.19      15.7x
+    #     cuda     61.4   273.6  1801.4 13595.6       N^2.60      68.4x
+    #
+    # Again the named pass is not the cost: legalizeResourceTypes is 13-17 ms
+    # at N=640 and does not even run on CUDA. Of the 13.6 s CUDA point, 13.3 s
+    # is deferBufferLoad; of the 3.1 s GLSL point, 2.9 s is simplifyNonSSAIR.
+    # Both primary timers are listed so whichever one a target pays shows up.
+    WorkloadSpec(
+        name="resource_aggregate_metal",
+        bucket="resource_legalize",
+        gen=workloads.gen_resource_aggregate,
+        default_size=80,
+        mode="target",
+        extra_flags=["-target", "metal"],
+        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
+                        "simplifyNonSSAIR", "deferBufferLoad"],
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    WorkloadSpec(
+        name="resource_aggregate_glsl",
+        bucket="resource_legalize",
+        gen=workloads.gen_resource_aggregate,
+        default_size=80,
+        mode="target",
+        extra_flags=["-target", "glsl", "-entry", "computeMain"],
+        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
+                        "simplifyNonSSAIR", "deferBufferLoad"],
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    WorkloadSpec(
+        name="resource_aggregate_cuda",
+        bucket="resource_legalize",
+        gen=workloads.gen_resource_aggregate,
+        default_size=80,
+        mode="target",
+        extra_flags=["-target", "cuda"],
+        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
+                        "simplifyNonSSAIR", "deferBufferLoad"],
         sweep_sizes=[80, 160, 320, 640],
     ),
     WorkloadSpec(
@@ -558,6 +609,172 @@ WORKLOADS = [
         primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
         sweep_sizes=[100, 200, 400, 800],
     ),
+    # ---- back-end legalization matrix --------------------------------------
+    # Same discipline as the rest of the suite -- one axis per workload -- but
+    # each axis is compiled to SEVERAL targets, because for the back end the
+    # signal is the ratio BETWEEN targets on one source, not any single number.
+    # The emit_*/codegen_* family above cannot supply that: its shared source
+    # (gen_codegen) contains none of the constructs the target-specific passes
+    # are gated on, so all six targets agree to within 1.18x. SPIR-V is carried
+    # in every family as the control, since it is what every other workload in
+    # the suite measures. See COVERAGE-ANALYSIS.md for the measurements and for
+    # why a single mixed cross-target shader was rejected.
+    #
+    # Loads in one function: deferBufferLoad + simplifyNonSSAIR. Targets that
+    # move globals into an explicit global context (CUDA) turn every parameter
+    # access into a Load and pay per-load alias/side-effect queries; SPIR-V
+    # keeps them as globals. cuda/spirv measured 0.86x at v2026.2 and 3.63x at
+    # v2026.17 on the same source at this size -- a regression the suite could
+    # not see before this workload existed.
+    WorkloadSpec(
+        name="backend_loads_spirv",
+        bucket="backend_legalize",
+        gen=workloads.gen_resource_load_chain,
+        default_size=320,
+        mode="target",
+        extra_flags=["-target", "spirv", "-emit-spirv-directly"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "deferBufferLoad", "simplifyNonSSAIR"],
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    WorkloadSpec(
+        name="backend_loads_hlsl",
+        bucket="backend_legalize",
+        gen=workloads.gen_resource_load_chain,
+        default_size=320,
+        mode="target",
+        extra_flags=["-target", "hlsl", "-entry", "computeMain"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "deferBufferLoad", "simplifyNonSSAIR"],
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    WorkloadSpec(
+        name="backend_loads_metal",
+        bucket="backend_legalize",
+        gen=workloads.gen_resource_load_chain,
+        default_size=320,
+        mode="target",
+        extra_flags=["-target", "metal"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "deferBufferLoad", "simplifyNonSSAIR"],
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    WorkloadSpec(
+        name="backend_loads_cuda",
+        bucket="backend_legalize",
+        gen=workloads.gen_resource_load_chain,
+        default_size=320,
+        mode="target",
+        extra_flags=["-target", "cuda"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "deferBufferLoad", "simplifyNonSSAIR"],
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    # Combined texture-samplers. The construct is what is isolated here: a
+    # `Sampler2D` is split by `lowerCombinedTextureSamplers` on the non-Khronos
+    # source targets and left alone on the Khronos ones, and no other workload
+    # declares one. Same shape as backend_loads with the texture and sampler
+    # combined, so the pair A/B the split.
+    #
+    # The SPLIT ITSELF IS NOT THE COST. Measured on v2026.17.1 at N=512,
+    # `lowerCombinedTextureSamplers` is 0.5 ms of a 304 ms Metal compile; the
+    # 216 ms is `simplifyNonSSAIR` chewing on the load/store-heavy IR the split
+    # produces. That is why simplifyNonSSAIR is a primary timer here and the
+    # legalization pass is kept alongside it rather than instead of it -- the
+    # pass is cheap today and a regression in it should still alert.
+    WorkloadSpec(
+        name="backend_samplers_spirv",
+        bucket="backend_legalize",
+        gen=workloads.gen_combined_samplers,
+        default_size=256,
+        mode="target",
+        extra_flags=["-target", "spirv", "-emit-spirv-directly"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "lowerCombinedTextureSamplers"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    WorkloadSpec(
+        name="backend_samplers_hlsl",
+        bucket="backend_legalize",
+        gen=workloads.gen_combined_samplers,
+        default_size=256,
+        mode="target",
+        extra_flags=["-target", "hlsl", "-entry", "computeMain"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "lowerCombinedTextureSamplers"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    WorkloadSpec(
+        name="backend_samplers_metal",
+        bucket="backend_legalize",
+        gen=workloads.gen_combined_samplers,
+        default_size=256,
+        mode="target",
+        extra_flags=["-target", "metal"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "lowerCombinedTextureSamplers"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    WorkloadSpec(
+        name="backend_samplers_wgsl",
+        bucket="backend_legalize",
+        gen=workloads.gen_combined_samplers,
+        default_size=256,
+        mode="target",
+        extra_flags=["-target", "wgsl"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "lowerCombinedTextureSamplers"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    # Matrix arithmetic. Two workloads declare a matrix type today; none
+    # computes with one, so the whole matrix lowering path (legalizeMatrixTypes
+    # / specializeMatrixLayout, both target-parameterized; HLSL additionally
+    # runs wrapStructuredBuffersOfMatrices) was unmeasured.
+    #
+    # As with the samplers family, the lowering is not the cost: on v2026.17.1
+    # at N=512 `legalizeMatrixTypes` measures 0.0 ms on every target, while
+    # GLSL spends 560 ms of 686 and CUDA 1254 ms of 1974 in `simplifyNonSSAIR`.
+    # GLSL runs at N^1.60 and CUDA at N^1.98 against SPIR-V's N^0.78.
+    WorkloadSpec(
+        name="backend_matrix_spirv",
+        bucket="backend_legalize",
+        gen=workloads.gen_matrix_chain,
+        default_size=256,
+        mode="target",
+        extra_flags=["-target", "spirv", "-emit-spirv-directly"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    WorkloadSpec(
+        name="backend_matrix_glsl",
+        bucket="backend_legalize",
+        gen=workloads.gen_matrix_chain,
+        default_size=256,
+        mode="target",
+        extra_flags=["-target", "glsl", "-entry", "computeMain"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    WorkloadSpec(
+        name="backend_matrix_metal",
+        bucket="backend_legalize",
+        gen=workloads.gen_matrix_chain,
+        default_size=256,
+        mode="target",
+        extra_flags=["-target", "metal"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    WorkloadSpec(
+        name="backend_matrix_cuda",
+        bucket="backend_legalize",
+        gen=workloads.gen_matrix_chain,
+        default_size=256,
+        mode="target",
+        extra_flags=["-target", "cuda"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
     # ---- downstream compilers (Windows perf runner only) -------------------
     # These measure the full pipeline INCLUDING the downstream compiler (dxc
     # for DXIL, nvrtc for PTX) — an internal application benchmark showed
@@ -599,6 +816,36 @@ BY_NAME = {w.name: w for w in WORKLOADS}
 for _w in WORKLOADS:
     assert not _w.sweep_sizes or _w.default_size in _w.sweep_sizes, (
         f"{_w.name}: default_size {_w.default_size} not in sweep_sizes {_w.sweep_sizes}")
+
+
+# Every back-end family must carry a SPIR-V entry. These workloads exist to
+# measure the ratio BETWEEN targets on one source, and SPIR-V is the control
+# because it is the target every other workload in the suite uses. Dropping it
+# would leave the family measuring absolute milliseconds on machines whose
+# absolute milliseconds are not comparable with anything -- which fails
+# silently, as a plausible-looking chart, rather than as an error.
+for _family in ("backend_loads", "backend_samplers", "backend_matrix"):
+    _members = [w.name for w in WORKLOADS if w.name.startswith(_family + "_")]
+    assert _members, f"{_family}: family has no members"
+    assert f"{_family}_spirv" in _members, (
+        f"{_family}: no SPIR-V control entry; the family's numbers are only "
+        f"meaningful as ratios against it. Members: {_members}")
+del _family, _members
+
+# resource_aggregate is the same shape with the SPIR-V entry named without a
+# suffix, because it predates the family and renaming it would break its
+# cross-release series. Its target variants must keep its generator, size and
+# ladder, or the four stop being comparable -- which is the entire point of
+# running the same source on four targets.
+_base = BY_NAME["resource_aggregate"]
+for _name in ("resource_aggregate_metal", "resource_aggregate_glsl",
+              "resource_aggregate_cuda"):
+    _v = BY_NAME[_name]
+    assert (_v.gen is _base.gen and _v.default_size == _base.default_size
+            and _v.sweep_sizes == _base.sweep_sizes), (
+        f"{_name} must match resource_aggregate's generator/size/ladder exactly; "
+        "the variants are only interpretable as a cross-target comparison")
+del _base, _name, _v
 
 
 def display_order(names):

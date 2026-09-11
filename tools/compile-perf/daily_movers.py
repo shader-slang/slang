@@ -68,7 +68,13 @@ def _partition(workload):
     spec = manifest.BY_NAME.get(workload)
     if spec is not None and spec.mode == "api":
         return buckets.api_buckets, buckets.API_TREE
-    return buckets.buckets, buckets.TREE
+    # SOURCE_TREE, not TREE: `buckets.buckets` picks the shape per run from the
+    # timers, and the tree returned here is used only to enumerate the names the
+    # partition already covers. SOURCE_TREE's names are a superset (it adds
+    # emitEntryPointsSourceFromIR), so it is the correct cover for either shape
+    # -- with TREE, a source-target run would list that timer a second time as
+    # an "also moved" row for a phase the buckets above already accounted for.
+    return buckets.buckets, buckets.SOURCE_TREE
 
 
 def _tree_names(tree):
@@ -188,7 +194,13 @@ def workload_progress(points, workload, step_rel=0.05):
         # informational counters: shown only when they moved noticeably
         # (1 ms, or 1 MiB for the kb-unit memory counters)
         floor = 1024.0 if analyze.unit_of(t) == "kb" else 1.0
-        if abs(b - a) >= floor or (own is not None and abs(own) >= 5.0):
+        # The relative gate needs a counter big enough for a percentage to mean
+        # something. -report-detailed-perf-benchmark reports ~67 per-pass
+        # timers, most of them well under a millisecond on every workload in the
+        # suite; without this, a 0.06 ms pass drifting by 0.004 ms clears the 5%
+        # gate and buries the rows that matter under noise.
+        relevant = own is not None and max(a, b) >= 1.0
+        if abs(b - a) >= floor or (relevant and abs(own) >= 5.0):
             extras.append((t, b - a, own))
     extras.sort(key=lambda r: -abs(r[1]))
 
