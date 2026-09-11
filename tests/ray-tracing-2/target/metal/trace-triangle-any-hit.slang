@@ -24,8 +24,9 @@ struct HitContext : rt::IHitContext
     typealias Record = HitRecord;
 }
 
-struct TestAnyHit : rt::IAnyHitShader<HitContext>
+struct TestAnyHit : rt::IAnyHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         input.payload.visitCount++;

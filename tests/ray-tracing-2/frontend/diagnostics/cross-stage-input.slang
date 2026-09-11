@@ -28,8 +28,9 @@ void invalidAnyHitHelper(
     IgnoreHit();
 }
 
-struct TestClosestHit : rt::IClosestHitShader<TestHitContext>
+struct TestClosestHit : rt::IClosestHitShader
 {
+    typealias Context = TestHitContext;
     void invoke(rt::ClosestHitInput<TestHitContext> input)
     {
         invalidAnyHitHelper(input);

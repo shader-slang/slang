@@ -28,16 +28,18 @@ struct HitContext : rt::IHitContext
 
 RWStructuredBuffer<uint> output;
 
-struct GlobalClosestHit : rt::IClosestHitShader<HitContext>
+struct GlobalClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         input.payload.value = output[0];
     }
 }
 
-struct PlainClosestHit : rt::IClosestHitShader<HitContext>
+struct PlainClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         input.payload.value = 2;

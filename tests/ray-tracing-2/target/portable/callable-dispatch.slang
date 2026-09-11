@@ -39,8 +39,9 @@ struct TestCallableContext : rt::ICallableGroupContext
 
 RWStructuredBuffer<uint> output;
 
-struct TestCallable : rt::ICallableShader<TestCallableContext>
+struct TestCallable : rt::ICallableShader
 {
+    typealias Context = TestCallableContext;
     void invoke(rt::CallableInput<TestCallableContext> input)
     {
         input.data.value += input.record.value;

@@ -22,8 +22,9 @@ struct HitContext : rt::IHitContext
     typealias Record = uint;
 }
 
-struct BadAnyHit : rt::IAnyHitShader<HitContext>
+struct BadAnyHit : rt::IAnyHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
 //CHECK: ^^^^^^ dependencies not compatible on stage
 //CHECK: ^^^^^^ 'invoke' requires support for stage 'anyhit', but stage is unsupported.

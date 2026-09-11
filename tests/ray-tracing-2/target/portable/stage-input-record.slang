@@ -75,40 +75,45 @@ struct CallableContext : rt::ICallableGroupContext
 
 RWStructuredBuffer<uint> output;
 
-struct ClosestHit : rt::IClosestHitShader<HitContext>
+struct ClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         output[0] = input.record.value;
     }
 }
 
-struct AnyHit : rt::IAnyHitShader<HitContext>
+struct AnyHit : rt::IAnyHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         output[1] = input.record.value;
     }
 }
 
-struct Intersection : rt::IIntersectionShader<HitContext>
+struct Intersection : rt::IIntersectionShader
 {
+    typealias Context = HitContext;
     void invoke(rt::IntersectionInput<HitContext> input)
     {
         output[2] = input.record.value;
     }
 }
 
-struct Miss : rt::IMissShader<MissContext>
+struct Miss : rt::IMissShader
 {
+    typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input)
     {
         output[3] = input.record.value;
     }
 }
 
-struct Callable : rt::ICallableShader<CallableContext>
+struct Callable : rt::ICallableShader
 {
+    typealias Context = CallableContext;
     void invoke(rt::CallableInput<CallableContext> input)
     {
         output[4] = input.record.value + input.data.value;

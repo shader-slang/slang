@@ -41,8 +41,9 @@ void updateClosestHitPayload(rt::ClosestHitInput<HitContext> input)
     input.payload.value += 1;
 }
 
-struct ClosestHit : rt::IClosestHitShader<HitContext>
+struct ClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         updateClosestHitPayload(input);
@@ -60,8 +61,9 @@ void updateAnyHitPayload(rt::AnyHitInput<HitContext> input)
     input.payload.value += 2;
 }
 
-struct AnyHit : rt::IAnyHitShader<HitContext>
+struct AnyHit : rt::IAnyHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         updateAnyHitPayload(input);
@@ -76,8 +78,9 @@ void updateMissPayload(rt::MissInput<MissContext> input)
     input.payload.value += 3;
 }
 
-struct Miss : rt::IMissShader<MissContext>
+struct Miss : rt::IMissShader
 {
+    typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input)
     {
         updateMissPayload(input);

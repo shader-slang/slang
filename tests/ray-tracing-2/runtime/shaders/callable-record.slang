@@ -46,8 +46,9 @@ struct RuntimeCallableContext : rt::ICallableGroupContext
     typealias Record = RuntimeCallableRecord;
 }
 
-struct RuntimeCallable : rt::ICallableShader<RuntimeCallableContext>
+struct RuntimeCallable : rt::ICallableShader
 {
+    typealias Context = RuntimeCallableContext;
     void invoke(rt::CallableInput<RuntimeCallableContext> input)
     {
         input.data.value = input.data.value * input.record.factor + 1;

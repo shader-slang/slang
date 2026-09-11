@@ -24,8 +24,9 @@ struct HitContext : rt::IHitContext
     typealias Record = void;
 }
 
-struct ClosestHit : rt::IClosestHitShader<HitContext>
+struct ClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         input.payload.value = 1;
@@ -47,8 +48,9 @@ struct MissContext : rt::IMissGroupContext
     typealias Record = void;
 }
 
-struct Miss : rt::IMissShader<MissContext>
+struct Miss : rt::IMissShader
 {
+    typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input)
     {
         input.payload.value = 2;

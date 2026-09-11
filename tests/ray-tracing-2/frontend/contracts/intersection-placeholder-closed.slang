@@ -20,13 +20,14 @@ struct HitContext : rt::IHitContext
     typealias Record = Record;
 }
 
-struct FakeNoIntersection : rt::IIntersectionStage<HitContext> {}
-//CHECK:                        ^^^^^^^^^^^^^^^^^^ declaration not accessible
-//CHECK:                        ^^^^^^^^^^^^^^^^^^ 'IIntersectionStage' is not accessible from the current context.
+struct FakeNoIntersection : rt::IIntersectionStage
+//CHECK:                        ^^^^^^^^^^^^^^^^^^ cannot inherit from type 'rt.IIntersectionStage' marked 'sealed' in module 'raytracing'
+{
+    typealias Context = HitContext;
+    void invoke(rt::IntersectionInput<HitContext> input) {}
+}
 
 struct HitGroup : rt::IHitGroup
-//CHECK:              ^^^^^^^^^ type argument doesn't conform to interface
-//CHECK:              ^^^^^^^^^ type argument 'HitGroup' does not conform to the required interface 'rt.IHitGroup'
 {
     typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = HitContext;

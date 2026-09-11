@@ -40,16 +40,18 @@ void callCallableFromHelper()
 //CHECK:   ^^^^^^^^^^ 'callShader' cannot be reached from structural any-hit logic
 }
 
-struct BadAnyHit : rt::IAnyHitShader<TestHitContext>
+struct BadAnyHit : rt::IAnyHitShader
 {
+    typealias Context = TestHitContext;
     void invoke(rt::AnyHitInput<TestHitContext> input)
     {
         callCallableFromHelper();
     }
 }
 
-struct TestCallable : rt::ICallableShader<TestCallableContext>
+struct TestCallable : rt::ICallableShader
 {
+    typealias Context = TestCallableContext;
     void invoke(rt::CallableInput<TestCallableContext> input) {}
 }
 

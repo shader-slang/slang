@@ -56,8 +56,9 @@ struct HitContext : rt::IHitContext
 
 void traceSecondary(inout RuntimePayload payload);
 
-struct RuntimeClosestHit : rt::IClosestHitShader<HitContext>
+struct RuntimeClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         input.payload.dispatchIndex = input.dispatchRaysIndex.x;
@@ -85,8 +86,9 @@ struct MissContext : rt::IMissGroupContext
     typealias Record = void;
 }
 
-struct RuntimeMiss : rt::IMissShader<MissContext>
+struct RuntimeMiss : rt::IMissShader
 {
+    typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input)
     {
         input.payload.stage = 20 + input.payload.depth;

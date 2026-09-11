@@ -40,28 +40,33 @@ struct CallableContext : rt::ICallableGroupContext
     typealias Record = TestRecord;
 }
 
-struct ClosestHit : rt::IClosestHitShader<HitContext>
+struct ClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input) {}
 }
 
-struct AnyHit : rt::IAnyHitShader<HitContext>
+struct AnyHit : rt::IAnyHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input) {}
 }
 
-struct Intersection : rt::IIntersectionShader<HitContext>
+struct Intersection : rt::IIntersectionShader
 {
+    typealias Context = HitContext;
     void invoke(rt::IntersectionInput<HitContext> input) {}
 }
 
-struct Miss : rt::IMissShader<MissContext>
+struct Miss : rt::IMissShader
 {
+    typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input) {}
 }
 
-struct Callable : rt::ICallableShader<CallableContext>
+struct Callable : rt::ICallableShader
 {
+    typealias Context = CallableContext;
     void invoke(rt::CallableInput<CallableContext> input) {}
 }
 

@@ -3,65 +3,105 @@ implementing raytracing;
 namespace rt
 {
 
+/// Represents the source implementation of a closest-hit stage.
+///
+/// `Context` fixes the payload, primitive, and shader-record types exposed through the stage
+/// input. The compiler turns `invoke` into a native closest-hit entry point; shader code cannot
+/// call it as an ordinary method.
 [require(structural_raytracing_closesthit)]
-public interface IClosestHitShader<Context>
-    where Context : IHitContext
+public interface IClosestHitShader
 {
+    associatedtype Context : IHitContext;
     void invoke(ClosestHitInput<Context> input);
 }
 
+/// Represents the source implementation of an any-hit stage.
+///
+/// `Context` fixes the candidate's payload, primitive, and shader-record types. The compiler turns
+/// `invoke` into the target's any-hit behavior and preserves `ignoreHit` and candidate-termination
+/// control flow.
 [require(structural_raytracing_anyhit)]
-public interface IAnyHitShader<Context>
-    where Context : IHitContext
+public interface IAnyHitShader
 {
+    associatedtype Context : IHitContext;
     void invoke(AnyHitInput<Context> input);
 }
 
-// This compiler-owned marker admits either IIntersectionShader or the built-in NoIntersection
-// placeholder without exposing a third extension point to user code.
-internal interface IIntersectionStage<Context>
-    where Context : IHitContext
+/// Represents either an intersection shader or the canonical `NoIntersection` placeholder.
+///
+/// This public name is required by the associated-type contract on `IHitGroup`. The sealed
+/// conformance set keeps it compiler-owned: user code implements `IIntersectionShader` instead of
+/// implementing this common interface directly.
+[sealed]
+public interface IIntersectionStage
 {
+    associatedtype Context : IHitContext;
     void invoke(IntersectionInput<Context> input);
 }
 
+/// Represents the source implementation of a procedural-primitive intersection stage.
+///
+/// `Context.Primitive` supplies the custom attributes reported by `input.reportHit`. The compiler
+/// lowers `invoke` to the native intersection mechanism for the selected target.
 [require(structural_raytracing_intersection)]
-public interface IIntersectionShader<Context> : IIntersectionStage<Context>
-    where Context : IHitContext
+public interface IIntersectionShader : IIntersectionStage
 {
     __constraint Context.Primitive : ICustomIntersectionPrimitive;
 }
 
+/// Represents the source implementation of a miss stage.
+///
+/// `Context` fixes the trace payload and miss-record types. The compiler turns `invoke` into a
+/// native miss entry point or the corresponding structural dispatch function.
 [require(structural_raytracing_miss)]
-public interface IMissShader<Context>
-    where Context : IMissGroupContext
+public interface IMissShader
 {
+    associatedtype Context : IMissGroupContext;
     void invoke(MissInput<Context> input);
 }
 
+/// Represents the source implementation of a callable stage.
+///
+/// `Context` fixes the callable-data and callable-record types. The compiler turns `invoke` into a
+/// native callable entry point or the corresponding structural dispatch function.
 [require(structural_raytracing_callable)]
-public interface ICallableShader<Context>
-    where Context : ICallableGroupContext
+public interface ICallableShader
 {
+    associatedtype Context : ICallableGroupContext;
     void invoke(CallableInput<Context> input);
 }
 
-public struct NoClosestHit<Context> : IClosestHitShader<Context>
-    where Context : IHitContext
+/// Selects no closest-hit stage for a hit group.
+///
+/// Its empty `invoke` satisfies the source contract, while structural lowering omits the native
+/// stage when the target does not need a placeholder function.
+public struct NoClosestHit<C> : IClosestHitShader
+    where C : IHitContext
 {
-    public void invoke(ClosestHitInput<Context> input) {}
+    public typealias Context = C;
+    public void invoke(ClosestHitInput<C> input) {}
 }
 
-public struct NoAnyHit<Context> : IAnyHitShader<Context>
-    where Context : IHitContext
+/// Selects no any-hit stage for a hit group.
+///
+/// Its empty `invoke` satisfies the source contract; structural lowering recognizes this exact
+/// standard-module type and does not emit user any-hit behavior.
+public struct NoAnyHit<C> : IAnyHitShader
+    where C : IHitContext
 {
-    public void invoke(AnyHitInput<Context> input) {}
+    public typealias Context = C;
+    public void invoke(AnyHitInput<C> input) {}
 }
 
-public struct NoIntersection<Context> : IIntersectionStage<Context>
-    where Context : IHitContext
+/// Selects hardware intersection instead of a user intersection stage.
+///
+/// Its empty `invoke` satisfies the common stage contract; structural lowering recognizes this
+/// exact standard-module type and omits a procedural intersection entry point.
+public struct NoIntersection<C> : IIntersectionStage
+    where C : IHitContext
 {
-    public void invoke(IntersectionInput<Context> input) {}
+    public typealias Context = C;
+    public void invoke(IntersectionInput<C> input) {}
 }
 
 } // namespace rt

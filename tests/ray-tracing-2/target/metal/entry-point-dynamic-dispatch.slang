@@ -48,8 +48,9 @@ struct HitContext : rt::IHitContext
 
 RWStructuredBuffer<uint> output;
 
-struct ClosestHit : rt::IClosestHitShader<HitContext>
+struct ClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         IShape shape = makeShape(output[0]);
