@@ -13,7 +13,7 @@
 // auto-widened. Adding two `int8_t` globals yields an `add`
 // instruction whose result type stays `Int8`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int8_t a;
 uniform int8_t b;

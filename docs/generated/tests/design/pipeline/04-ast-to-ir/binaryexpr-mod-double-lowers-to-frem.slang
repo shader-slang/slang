@@ -14,7 +14,7 @@
 // too (the selection is float-vs-not, not float32-specific); the
 // result type carries `Double`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform double a;
 uniform double b;

@@ -17,7 +17,7 @@
 // a single operand — and that no `makeVector` with three copies of `%f`
 // was emitted instead.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float f;
 uniform RWStructuredBuffer<float3> buf;

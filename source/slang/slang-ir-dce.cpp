@@ -29,16 +29,24 @@ struct DeadCodeEliminationContext
     // there could be new DCE opportunities.
     bool phiRemoved = false;
 
-    // Querying whether an instruction has been
-    // determined to be live is easy.
-    // To speedup the test, we use the
-    // `scratchData` field of each inst as the marker.
+    // DCE's liveness mark: within `root`'s subtree and for the current fixpoint iteration, an inst
+    // is live iff `scratchData == liveEpoch`. `processInst` bumps `liveEpoch` each iteration, so
+    // the previous iteration's marks are implicitly discarded (a stamp carrying an older epoch
+    // reads as dead) without re-walking the subtree.
     //
+    // `scratchData` is shared, uninitialized-on-entry scratch that other passes leave arbitrary
+    // values in (e.g. the unbounded inst indices `slang-serialize-ir.cpp` writes), so `processInst`
+    // zeroes the subtree once before the first bump; every in-use epoch is therefore >= 1, and no
+    // stale value can be misread as a live mark.
+    UInt64 liveEpoch = 0;
+
+    // Querying whether an instruction has been determined to be live is easy.
     bool isInstAlive(IRInst* inst)
     {
+        SLANG_ASSERT(liveEpoch != 0);
         if (!inst)
             return false;
-        return inst->scratchData != 0;
+        return inst->scratchData == liveEpoch;
     }
 
     // We are going to do an iterative analysis
@@ -68,9 +76,10 @@ struct DeadCodeEliminationContext
         if (!inst)
             return;
 
-        if (!inst->scratchData)
+        SLANG_ASSERT(liveEpoch != 0);
+        if (inst->scratchData != liveEpoch)
         {
-            inst->scratchData = 1;
+            inst->scratchData = liveEpoch;
             workList.add(inst);
         }
     }
@@ -91,10 +100,13 @@ struct DeadCodeEliminationContext
 
         module->invalidateAllAnalysis();
 
+        // Establish the zero baseline that `liveEpoch` relies on (see its declaration).
+        initializeScratchData(root);
+
         for (;;)
         {
-            // Clear the `alive` bits by initializing all scratchData to 0.
-            initializeScratchData(root);
+            // Move to a new epoch, which discards the previous iteration's liveness marks.
+            ++liveEpoch;
 
             workList.clear();
 

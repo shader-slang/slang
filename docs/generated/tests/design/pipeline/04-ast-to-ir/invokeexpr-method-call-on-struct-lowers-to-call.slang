@@ -15,7 +15,7 @@
 // callee is the method's IRFunc and the receiver is the explicit
 // first argument.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct S {
     int side;

@@ -47,10 +47,11 @@ runs:
       with:
         # No arch input defaults to the x64-hosted, x64-target compiler
         # regardless of host architecture, so a native arm64 host would
-        # silently build under x64 emulation. Force arm64 on native arm64
-        # Windows hosts; every other Windows platform in the current matrix
-        # (x86_64 only — no 32-bit x86 caller exists) falls back to x64.
-        arch: ${{ (inputs.os == 'windows' && inputs.platform == 'aarch64') && 'arm64' || 'x64' }}
+        # silently build under x64 emulation. Select this initial toolchain
+        # from the runner's host architecture, not the requested target:
+        # release jobs use it to build host generators before switching to
+        # their explicit cross-compilation toolchain.
+        arch: ${{ (inputs.os == 'windows' && runner.arch == 'ARM64') && 'arm64' || 'x64' }}
 
     - name: Install dependencies (Linux only)
       if: inputs.os == 'linux'

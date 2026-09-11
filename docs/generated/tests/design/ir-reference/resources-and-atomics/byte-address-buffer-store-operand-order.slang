@@ -16,7 +16,7 @@
 // position and a named SSA value in the fourth. Matching is global
 // because the opcode is created inside the library `Store` body.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWByteAddressBuffer rwbabuf;
 uniform RWStructuredBuffer<uint> rwbuf;

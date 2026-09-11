@@ -12,7 +12,7 @@
 // existential is typed by the interface it witnesses, which is what the
 // downstream lookup needs. The CHECK reads the binding's declared type and
 // asserts `witness_table_t(%IFoo)`.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

@@ -12,7 +12,7 @@
 // constrained generic can take it as an argument, but there is nothing to key;
 // the CHECK pins the semicolon-terminated form the dump uses for a childless
 // witness table.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IEmpty { };
 struct E : IEmpty { int payload; };

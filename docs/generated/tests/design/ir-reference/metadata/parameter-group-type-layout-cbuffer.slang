@@ -16,7 +16,7 @@
 // the captured offset-element type layout, and the container operand must be
 // a `varLayout` too -- which is only consistent with the documented order.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 cbuffer CB
 {

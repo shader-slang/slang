@@ -11,7 +11,7 @@
 
 // Boundary: storage axis — `double` element inside a 4x4 matrix.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform matrix<double, 4, 4> m;
 uniform RWStructuredBuffer<double> buf;

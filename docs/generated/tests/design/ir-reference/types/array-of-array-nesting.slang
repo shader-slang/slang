@@ -14,7 +14,7 @@
 // second operand of the outermost `Array`; the inner extent appears in
 // the nested `Array`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Nest { int data[3][4]; }
 uniform Nest s;

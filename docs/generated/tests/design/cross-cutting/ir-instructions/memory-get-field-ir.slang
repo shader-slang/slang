@@ -15,7 +15,7 @@
 // the field read is the rvalue `get_field` form rather than the
 // `get_field_addr` lvalue form.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Foo { int x; int y; }
 

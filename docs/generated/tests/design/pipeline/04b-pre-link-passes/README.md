@@ -24,7 +24,7 @@ at the one point where that pass is visible. For the passes that change
 IR shape, `-dump-ir` emits a `### LOWER-TO-IR:` block holding the
 snapshot taken at the end of Phase D, and the tests FileCheck that block
 with
-`//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute`.
+`//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute`.
 For the Phase D validators, which surface as diagnostics rather than as
 IR shape, the tests use `//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):` with
 caret-anchored annotations and the diagnostic code.

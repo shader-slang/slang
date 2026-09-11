@@ -15,7 +15,7 @@
 // and require every result to be a `ValuePackType`, so a helper that dropped an
 // operand or folded to a scalar would not match.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 #lang slang 2026
 
 struct Tile<T : ICoopElement, let each D : int>

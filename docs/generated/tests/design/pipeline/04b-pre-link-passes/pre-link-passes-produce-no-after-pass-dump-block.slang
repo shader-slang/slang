@@ -19,7 +19,7 @@
 // the trailing CHECK confirms the post-link headings do start afterwards,
 // so the CHECK-NOT is not vacuously passing on an empty dump.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 uniform int a;

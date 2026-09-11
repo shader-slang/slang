@@ -12,7 +12,7 @@
 // Boundary: pure-value-inst row, half-precision side. The doc's
 // "BuiltinOperatorExpr -> IRAdd" claim must hold for narrow floats.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform half a;
 uniform half b;

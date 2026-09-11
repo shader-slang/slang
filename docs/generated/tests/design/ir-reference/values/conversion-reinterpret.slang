@@ -17,7 +17,7 @@
 // `reinterpret(%f)` whose result line is typed `UInt`, which is only
 // produced if the call reached the `__intrinsic_op` route.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float f;
 uniform RWStructuredBuffer<uint> buf;

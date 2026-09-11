@@ -19,7 +19,7 @@
 // nor its early exits can be folded away, and the accumulator is written to the
 // output buffer so the whole body survives.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 uniform int n;

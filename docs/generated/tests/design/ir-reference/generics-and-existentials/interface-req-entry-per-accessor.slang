@@ -13,7 +13,7 @@
 // getter and setter are. The CHECK-DAGs name the two accessor-derived keys and
 // the method key, and the last one pins the interface's operand list at exactly
 // three entries, so an extra entry for the property itself would fail.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IHasProp
 {

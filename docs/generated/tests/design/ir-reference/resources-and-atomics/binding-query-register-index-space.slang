@@ -22,7 +22,7 @@
 // backend can determine — on CUDA the same shader is rejected with
 // `E81111`.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<uint> outBuf;
 SamplerState samp;

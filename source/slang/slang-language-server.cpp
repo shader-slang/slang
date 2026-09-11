@@ -123,7 +123,7 @@ SlangResult LanguageServer::parseNextMessage()
             }
             else if (call.method == ShutdownParams::methodName)
             {
-                m_connection->sendResult(NullResponse::get(), call.id);
+                m_connection->sendNullResult(call.id);
                 return SLANG_OK;
             }
             else if (call.method == InitializeParams::methodName)
@@ -377,8 +377,12 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
             else if (initExpr)
             {
                 DiagnosticSink sink;
-                SharedSemanticsContext semanticContext(version->linkage, module, &sink);
-                SemanticsVisitor semanticsVisitor(&semanticContext);
+                auto semanticContext = SharedSemanticsContext::createForOptionalModule(
+                    version->linkage,
+                    module,
+                    version->linkage->m_optionSet.getLanguageVersion(),
+                    &sink);
+                SemanticsVisitor semanticsVisitor(semanticContext);
                 if (auto intVal = semanticsVisitor.tryFoldIntegerConstantExpression(
                         declRef.substitute(version->linkage->getASTBuilder(), initExpr),
                         SemanticsVisitor::ConstantFoldingKind::LinkTime,
@@ -624,7 +628,7 @@ SlangResult LanguageServer::hover(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -704,13 +708,14 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
             if (auto funcDecl = as<FunctionDeclBase>(declRef.getDecl()))
             {
                 DiagnosticSink sink;
-                SharedSemanticsContext semanticContext(
+                auto semanticContext = SharedSemanticsContext::createForOptionalModule(
                     version->linkage,
                     getModule(funcDecl),
+                    version->linkage->m_optionSet.getLanguageVersion(),
                     &sink);
-                SemanticsVisitor semanticsVisitor(&semanticContext);
+                SemanticsVisitor semanticsVisitor(semanticContext);
 
-                auto assocDecls = semanticContext.getAssociatedDeclsForDecl(funcDecl);
+                auto assocDecls = semanticContext->getAssociatedDeclsForDecl(funcDecl);
                 Decl* bwdDiff = nullptr;
                 Decl* fwdDiff = nullptr;
                 Decl* primalSubst = nullptr;
@@ -1072,7 +1077,7 @@ SlangResult LanguageServer::gotoDefinition(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -1252,7 +1257,7 @@ SlangResult LanguageServer::completion(
 {
     auto result = m_core.completion(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
     else if (result.result.items.getCount())
         m_connection->sendResult(&result.result.items, responseId);
     else
@@ -1414,9 +1419,24 @@ SlangResult LanguageServer::completionResolve(
     const JSONValue& responseId)
 {
     auto result = m_core.completionResolve(args, editItem);
-    if (SLANG_FAILED(result.returnCode) || result.isNull)
+    if (SLANG_FAILED(result.returnCode))
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        // Unlike the other requests, completionItem/resolve has a non-nullable result: LSP requires
+        // it to answer with a CompletionItem or a JSON-RPC error, never null. So report an actual
+        // resolution failure as an error rather than a null result.
+        m_connection->sendError(
+            JSONRPC::ErrorCode::InternalError,
+            UnownedStringSlice("failed to resolve completion item"),
+            responseId);
+        return SLANG_OK;
+    }
+    if (result.isNull)
+    {
+        // The item has no `data` to enrich but carries a textEdit (file/import completions). There
+        // is nothing to add, yet LSP still requires the item back, not null. A CompletionItem
+        // cannot carry a textEdit, so echo the TextEditCompletionItem the client sent to preserve
+        // it.
+        m_connection->sendResult(&editItem, responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -1466,7 +1486,7 @@ SlangResult LanguageServer::semanticTokens(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -1641,7 +1661,7 @@ SlangResult LanguageServer::signatureHelp(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -1840,7 +1860,13 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     // on the best candidate.
     //
     DiagnosticSink sink;
-    SharedSemanticsContext semanticsContext(version->linkage, nullptr, &sink);
+    // Signature help performs ad hoc checking without a primary module so that extension lookup
+    // retains its existing linkage-wide point of view. Its language rules still come from the
+    // parsed document module, including any `#language` directive in that file.
+    SharedSemanticsContext semanticsContext(
+        version->linkage,
+        parsedModule->getModuleDecl()->languageVersion,
+        &sink);
     SemanticsVisitor semanticsVisitor(&semanticsContext);
 
     auto addDeclRef = [&](DeclRef<Decl> declRef)
@@ -2028,7 +2054,7 @@ SlangResult LanguageServer::documentSymbol(
     auto result = m_core.documentSymbol(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2069,7 +2095,7 @@ SlangResult LanguageServer::inlayHint(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2132,7 +2158,7 @@ SlangResult LanguageServer::formatting(
     auto result = m_core.formatting(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2167,7 +2193,7 @@ SlangResult LanguageServer::rangeFormatting(
     auto result = m_core.rangeFormatting(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2218,7 +2244,7 @@ SlangResult LanguageServer::onTypeFormatting(
     auto result = m_core.onTypeFormatting(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2939,7 +2965,7 @@ SlangResult LanguageServer::runCommand(Command& call)
     {
         // If we encountered an internal compiler error, don't crash the language server.
         // Instead we just return a null response.
-        return m_connection->sendResult(NullResponse::get(), call.id);
+        return m_connection->sendNullResult(call.id);
     }
 
     return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);
