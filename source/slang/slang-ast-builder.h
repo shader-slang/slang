@@ -42,6 +42,24 @@ public:
     /// Get the `IDifferentiable` type
     Type* getDiffInterfaceType();
 
+    // The three `[sealed]` marker interfaces that partition the builtin scalar types by family
+    // (`__BuiltinIntegerType`, `__BuiltinFloatingPointType`, `__BuiltinLogicalType`; see
+    // core.meta.slang). Because they are sealed, only the compiler's own builtin scalar types can
+    // conform to them, so a generic type parameter constrained to one of them is guaranteed to be
+    // instantiated with a type of that family. `SemanticsExprVisitor::
+    // classifyBuiltinArithmeticElementType` uses these to widen the builtin-operator fast path to
+    // such a parameter, the same way it already recognizes a concrete `BasicExpressionType`.
+    //
+    // None of the three has a dedicated C++ `Type` subclass the way `IDifferentiable` does, so
+    // they cannot be registered with `__magic_type`, which requires one (it resolves the name
+    // against the AST node class registry, not against a Slang-level declaration). Each is
+    // instead found by a one-time, cached scan of the core module's own top-level declarations
+    // for an exact name match; see the .cpp for why the ordinary scope/lookup machinery is not a
+    // better fit here.
+    Type* getBuiltinIntegerType();
+    Type* getBuiltinFloatingPointType();
+    Type* getBuiltinLogicalType();
+
     Type* getIBufferDataLayoutType();
 
     Type* getErrorType();
@@ -109,6 +127,9 @@ protected:
     Type* m_noneType = nullptr;
     Type* m_diffInterfaceType = nullptr;
     Type* m_forwardDiffFuncInterfaceType = nullptr;
+    Type* m_builtinIntegerType = nullptr;
+    Type* m_builtinFloatingPointType = nullptr;
+    Type* m_builtinLogicalType = nullptr;
     Type* m_builtinTypes[Index(BaseType::CountOf)];
     Dictionary<String, Type*> m_magicEnumTypes;
 
@@ -702,6 +723,16 @@ public:
 
     DeclRef<InterfaceDecl> getDefaultInitializableTypeInterfaceDecl();
     Type* getDefaultInitializableType();
+
+    // See the identically named methods on `SharedASTBuilder` for what these are; these three
+    // forward to them so callers can reach them the same way they reach
+    // `getDifferentiableInterfaceType()` above.
+    Type* getBuiltinIntegerType() { return m_sharedASTBuilder->getBuiltinIntegerType(); }
+    Type* getBuiltinFloatingPointType()
+    {
+        return m_sharedASTBuilder->getBuiltinFloatingPointType();
+    }
+    Type* getBuiltinLogicalType() { return m_sharedASTBuilder->getBuiltinLogicalType(); }
 
     MeshOutputType* getMeshOutputTypeFromModifier(
         HLSLMeshShaderOutputModifier* modifier,

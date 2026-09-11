@@ -650,6 +650,45 @@ def gen_overload_resolution(n):
     return {"overload_resolution.slang": "".join(s)}
 
 
+def gen_generic_builtin_operator(n):
+    """One generic function constrained to a sealed builtin marker interface (`T
+    : __BuiltinFloatingPointType`), with `n` repeated arithmetic/unary
+    expressions over `T`-typed locals -- the shape reported in #12458
+    (thousands of `T(literal)` and `vector<T,C> * T` sites inside one generic
+    function, ~11x slower than the same code with `T` replaced by a concrete
+    `float`). Isolates `SemanticsExprVisitor::convertToBuiltinArithmeticOp`'s
+    builtin-operator fast path specifically for an ABSTRACT generic element
+    type, distinct from sema_generics (breadth of separate generic
+    declarations against the non-sealed `IArithmetic`, each instantiated a few
+    times) and operator_typecheck (concrete mixed-type operators, no generics
+    at all).
+
+    Scaling null: n scales repeated operator expressions against ONE generic
+    function; ideal checking cost is O(n). #12458 measured ~1.36 ms per
+    expression pre-fix (falling through to full generic overload resolution,
+    ~49 candidates tried per site, because the fast path only recognized a
+    concrete `BasicExpressionType`) vs. a few microseconds post-fix (the same
+    fast path a concrete `float` already took, now also recognizing `T`'s
+    sealed constraint).
+    """
+    s = [_HEADER, _buf()]
+    s.append("T compute<T : __BuiltinFloatingPointType>(T a, T b)\n{\n")
+    s.append("    T r = a;\n")
+    for i in range(n):
+        c = f"{(i % 97) + 1}.0"
+        if i % 3 == 0:
+            s.append(f"    r = r * T({c}) + b;\n")
+        elif i % 3 == 1:
+            s.append(f"    r = r + T({c}) * a;\n")
+        else:
+            s.append(f"    r = -r + T({c});\n")
+    s.append("    return r;\n}\n\n")
+    s.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
+    s.append("void computeMain()\n{\n")
+    s.append("    outBuf[0] = compute<float>(outBuf[0], outBuf[0] + 1.0);\n}\n")
+    return {"generic_builtin_operator.slang": "".join(s)}
+
+
 def gen_specialization(n):
     """A generic struct over a type parameter, instantiated at n distinct
     wrapper types. Forces specializeModule to clone the generic n ways.

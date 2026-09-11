@@ -130,6 +130,83 @@ Type* SharedASTBuilder::getDiffInterfaceType()
     return m_diffInterfaceType;
 }
 
+// Finds a top-level declaration of the core module named `name`, recursing into the `FileDecl`s
+// the eager core module source is organized into (core.meta.slang, hlsl.meta.slang,
+// autodiff-base.meta.slang all land in the same `Core` module; see
+// `Session::getBuiltinModuleSource`), the same way `Module::_collectShaderParams` walks a
+// module's members. Returns null before the core module has been compiled or loaded, which
+// callers must tolerate (see `SharedASTBuilder::getBuiltinIntegerType` and its siblings).
+static Decl* _findCoreModuleDeclByName(Session* session, Name* name)
+{
+    auto coreModule = session->getBuiltinModule(slang::BuiltinModuleName::Core);
+    if (!coreModule)
+        return nullptr;
+    auto moduleDecl = coreModule->getModuleDecl();
+    if (!moduleDecl)
+        return nullptr;
+
+    List<ContainerDecl*> workList;
+    workList.add(moduleDecl);
+    for (Index i = 0; i < workList.getCount(); i++)
+    {
+        for (auto member : workList[i]->getDirectMemberDecls())
+        {
+            if (member->getName() == name)
+                return member;
+            if (auto fileDecl = as<FileDecl>(member))
+                workList.add(fileDecl);
+            else if (auto namespaceDecl = as<NamespaceDecl>(member))
+                workList.add(namespaceDecl);
+        }
+    }
+    return nullptr;
+}
+
+// The three `[sealed]` marker interfaces (`__BuiltinIntegerType`, `__BuiltinFloatingPointType`,
+// `__BuiltinLogicalType`) have no dedicated C++ `Type` subclass the way `IDifferentiable` does
+// (`getDiffInterfaceType` above), so they cannot be registered with `__magic_type`: that
+// mechanism resolves its name argument against the AST node class registry
+// (`ASTBuilder::findSyntaxClass`) to fill in `MagicTypeModifier::magicNodeType`, and a name with
+// no matching class leaves that field default-constructed rather than diagnosing the mismatch
+// (a gap the parser's own `// TODO: print diagnostic...` comment on `parseMagicTypeModifierImpl`
+// already acknowledges). `_findCoreModuleDeclByName` looks each one up directly from the core
+// module's own declarations instead, the same declarations `T : __BuiltinFloatingPointType`
+// itself resolves against, and each accessor below caches the result once found so the scan
+// (linear in the size of the core module) runs at most once per session.
+Type* SharedASTBuilder::getBuiltinIntegerType()
+{
+    if (!m_builtinIntegerType)
+    {
+        if (auto decl =
+                _findCoreModuleDeclByName(m_session, m_namePool->getName("__BuiltinIntegerType")))
+            m_builtinIntegerType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(decl));
+    }
+    return m_builtinIntegerType;
+}
+
+Type* SharedASTBuilder::getBuiltinFloatingPointType()
+{
+    if (!m_builtinFloatingPointType)
+    {
+        if (auto decl = _findCoreModuleDeclByName(
+                m_session,
+                m_namePool->getName("__BuiltinFloatingPointType")))
+            m_builtinFloatingPointType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(decl));
+    }
+    return m_builtinFloatingPointType;
+}
+
+Type* SharedASTBuilder::getBuiltinLogicalType()
+{
+    if (!m_builtinLogicalType)
+    {
+        if (auto decl =
+                _findCoreModuleDeclByName(m_session, m_namePool->getName("__BuiltinLogicalType")))
+            m_builtinLogicalType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(decl));
+    }
+    return m_builtinLogicalType;
+}
+
 Type* SharedASTBuilder::getIBufferDataLayoutType()
 {
     if (!m_IBufferDataLayoutType)
