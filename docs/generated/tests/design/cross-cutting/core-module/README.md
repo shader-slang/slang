@@ -112,7 +112,7 @@ exactly one of the two tables.
 
 39. `findStandardModulePath` resolves `slang.neural` to `slang/neural.slang-module` and `experimental.workgraph` to `experimental/workgraph.slang-module`. — `standard-module-neural-experimental-gate.slang`, `standard-module-workgraph-import-resolves.slang`
 40. The experimental module declares `[ExperimentalModule] module workgraph;` and holds the node attributes, the input / output record types and the `BarrierMemoryTypeFlags` / `BarrierSemanticFlags` enums with the `Barrier` overloads. — `standard-module-workgraph-import-resolves.slang`
-41. `[ExperimentalModule]` gates the import rather than merely labelling the module: importing one without enabling experimental features is an error naming the resolved module path and the `-experimental-feature` option. — `standard-module-neural-experimental-gate.slang`
+41. `[ExperimentalModule]` gates the import rather than merely labelling the module: importing one without enabling experimental features fails with `E00104`, naming the resolved module path and the `-experimental-feature` option. — `standard-module-neural-experimental-gate.slang`
 
 **`#preludes`**
 

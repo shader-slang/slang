@@ -89,7 +89,7 @@ the document's own headings.
 22. Every loop is `break`-able, but only `for` is given a `ScopeDecl` of its own.
 23. `ForStmt::initialStatement` is parsed as a statement so a `DeclStmt` can introduce loop variables.
 24. Anything other than a `DeclStmt` or `ExpressionStmt` in the init position is `E20001`, "unexpected statement, expected expression", and the loop node is kept so parsing can recover.
-25. `UnscopedForStmt` is produced instead of `ForStmt` when the source language is HLSL, and it fills in `scopeDecl` but never pushes the scope, so the loop variable leaks into the surrounding scope.
+25. `UnscopedForStmt` is produced instead of `ForStmt` when the source language is HLSL — which follows the input file's extension and cannot be selected with `-lang` — and it fills in `scopeDecl` but never pushes the scope, so the loop variable leaks into the surrounding scope.
 26. `do` parses its body first and then decides: a following `while` produces a `DoWhileStmt`, a following `catch` produces a `CatchStmt`, and anything else is an error.
 
 **`#compiletimeforstmt`**

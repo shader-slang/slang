@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#diagnosed-failures-during-binding
-//META: doc_section_digest=210845004e453a7583de469b0de24d48d58f75a96ce4c3d08e88229e3bb5eb0d
+//META: doc_section_digest=e2b8a3d7e90470ddf90c2688ca17c0fc35d962be5d1c737d928e7881bbc0d3d2
 //META: purpose=The CPU layout-rules family supplies no ray-payload rules either, so the same miss payload that compiles for SPIR-V is rejected with E39032 for -target cpp.
 //META: intent=negative
 //META: pipeline_stage=layout

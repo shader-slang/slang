@@ -230,7 +230,7 @@ covering those constituents rather than by a row of their own.
 98. Lowering errors flow through the same `DiagnosticSink` used by the rest of the front-end.
 99. A statement inside a `switch` body reached while no case label is active is unreachable, and lowering warns once for that leading run with `Diagnostics::UnreachableCode`, tracked by the `warnedUnreachableBeforeFirstCase` flag.
 100. `visitInvokeExprImpl` counts its recursion depth in `IRGenContext::invokeLoweringRecursionDepth` and, past `kMaxIRInvokeLoweringRecursionDepth` (128), diagnoses `Diagnostics::MaximumTypeNestingLevelExceeded` and yields `getPoison(type)` rather than overflowing the native stack.
-101. Nothing in the counter is specific to constructors: it advances once per nested `InvokeExpr`, so a chain of 128 ordinary calls `f(f(...f(x)...))` is already enough to report `fatal error[E39997]: maximum type nesting level exceeded`.
+101. Nothing in the counter is specific to constructors: it advances once per nested `InvokeExpr`, the guard is tested before the counter is incremented for the current call, so a chain of 128 compiles cleanly and 129 is the first depth to report `fatal error[E39997]: maximum type nesting level exceeded`.
 
 **`## Module-level outputs`**
 

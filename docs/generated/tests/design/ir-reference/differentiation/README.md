@@ -115,7 +115,7 @@ in `## Untested claims` rather than given tests.
 33. `TrivialBackwardDifferentiatePrimal` is the trivial primal phase, from a `SynthesizedFuncDecl` created for `[TreatAsDifferentiable]`.
 34. `TrivialBackwardDifferentiatePropagate` is the trivial propagate phase.
 35. `TrivialBackwardRemat` is the trivial remat phase, from the `remat` `SynthesizedFuncDecl` created for `[TreatAsDifferentiable]`.
-36. None of the reverse-mode opcodes reaches target code, but the functions and types the reverse-mode passes build from them do, under generated names a reader will meet in emitted HLSL or CUDA.
+36. None of the reverse-mode opcodes reaches target code, but the functions and types the reverse-mode passes build from them do, under generated names that appear in every source-level text target; SPIR-V is the exception, carrying no `OpName` for the derivative function.
 37. The propagate function gets the prefix `s_bwdProp_` and the full intermediate-context struct the prefix `s_bwdCallableCtx_`, so `f` yields `s_bwdProp_f` alongside a `s_bwdCallableCtx_f` struct carrying the hoisted primal state.
 38. Forward mode is the same shape one prefix over: the forward derivative of `<orig>` is built as `s_fwd_<orig>`.
 

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels
-//META: doc_section_digest=d7075765bda80113ade59214eaa103fee6ef8daf55af7cdaae950e1bb4aec52e
+//META: doc_section_digest=ceb5d5225723810627591493eadff0fc89fc5232324a3c22bb1a0df55b36803b
 //META: purpose=The enum class marker exists to detect an explicit UnscopedEnum on an enum class, and that combination is rejected as a conflicting modifier.
 //META: intent=negative
 //META: pipeline_stage=check
