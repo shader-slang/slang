@@ -4719,6 +4719,18 @@ SemanticsExprVisitor::BuiltinArithmeticElementFamily SemanticsExprVisitor::
     // `elementType` -- exactly what a generic type parameter reused across many call sites
     // produces -- are cache hits after the first.
     //
+    // A constraint declared `where optional T : I` (`OptionalConstraintModifier`) is not proof
+    // that `T` conforms to `I`: the whole point of an optional constraint is that a given
+    // instantiation of `T` may or may not satisfy it, and code outside a `if (T is I)` guard
+    // must not assume it does (see `isWitnessUncheckedOptional`, which the same "is this
+    // conformance actually established here" question already relies on for member lookup).
+    // Treating an unchecked optional witness as sufficient here would let a generic function
+    // like `compute<T>(T a, T b) where optional T : __BuiltinFloatingPointType { return a + b;
+    // }` take the builtin fast path and emit `a + b` verbatim for a `T` that never proved it
+    // supports `+`, instead of falling through to overload resolution the way it must.
+    auto isProvenConformance = [this](SubtypeWitness* witness)
+    { return witness && !isWitnessUncheckedOptional(witness); };
+
     // Each accessor returns null before the core module is available to search (see
     // `SharedASTBuilder::getBuiltinIntegerType` and its siblings); the classification for that
     // family is then left unknown rather than querying conformance against a null interface type.
@@ -4726,11 +4738,13 @@ SemanticsExprVisitor::BuiltinArithmeticElementFamily SemanticsExprVisitor::
     BuiltinArithmeticElementFamily family;
     if (auto integerInterface = astBuilder->getBuiltinIntegerType())
         family.isInteger =
-            tryGetInterfaceConformanceWitness(elementType, integerInterface) != nullptr;
+            isProvenConformance(tryGetInterfaceConformanceWitness(elementType, integerInterface));
     if (auto floatInterface = astBuilder->getBuiltinFloatingPointType())
-        family.isFloat = tryGetInterfaceConformanceWitness(elementType, floatInterface) != nullptr;
+        family.isFloat =
+            isProvenConformance(tryGetInterfaceConformanceWitness(elementType, floatInterface));
     if (auto logicalInterface = astBuilder->getBuiltinLogicalType())
-        family.isBool = tryGetInterfaceConformanceWitness(elementType, logicalInterface) != nullptr;
+        family.isBool =
+            isProvenConformance(tryGetInterfaceConformanceWitness(elementType, logicalInterface));
     return family;
 }
 
