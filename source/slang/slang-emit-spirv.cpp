@@ -6411,6 +6411,26 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 getIRInstSpvID(entryPoint),
                                 SpvExecutionModeEarlyFragmentTests);
                             break;
+                        case kIROp_PostDepthCoverageDecoration:
+                            // PostDepthCoverage makes the input `SV_Coverage` report only the
+                            // samples that survived the early depth/stencil test. The capability
+                            // and execution mode come from SPV_KHR_post_depth_coverage. Per Vulkan
+                            // the PostDepthCoverage execution mode is only valid together with
+                            // EarlyFragmentTests, so require that too; the funnel dedups, so
+                            // pairing with `[earlydepthstencil]` does not emit EarlyFragmentTests
+                            // twice.
+                            ensureExtensionDeclaration(
+                                UnownedStringSlice("SPV_KHR_post_depth_coverage"));
+                            requireSPIRVCapability(SpvCapabilitySampleMaskPostDepthCoverage);
+                            requireSPIRVExecutionMode(
+                                nullptr,
+                                getIRInstSpvID(entryPoint),
+                                SpvExecutionModeEarlyFragmentTests);
+                            requireSPIRVExecutionMode(
+                                nullptr,
+                                getIRInstSpvID(entryPoint),
+                                SpvExecutionModePostDepthCoverage);
+                            break;
                         default:
                             break;
                         }
