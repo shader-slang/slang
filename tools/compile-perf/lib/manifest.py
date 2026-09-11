@@ -476,7 +476,8 @@ WORKLOADS = [
         default_size=80,
         mode="target",
         extra_flags=SPIRV,
-        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner"],
+        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
+                        "simplifyNonSSAIR", "deferBufferLoad"],
         # Window starts at default_size: below N=80 the total is dominated by a
         # quasi-fixed front-end cost (type sharing makes per-item sema cheap)
         # that would floor-distort the fit; [80..640] measures the pass, not it.
@@ -486,10 +487,19 @@ WORKLOADS = [
     # target, but until now the suite only ever measured it on the target where
     # it is cheapest. Same generator and same ladder as the SPIR-V entry above
     # (whose name is kept unchanged so its series is unbroken), so the four are
-    # directly comparable. Measured at N=160 on ToT: 3.83x spread, with
-    # exponents cuda 1.74 / glsl 1.47 / metal 1.38 against SPIR-V's 0.67 --
-    # the widest back-end divergence anywhere in the suite, from a workload
-    # that was already here.
+    # directly comparable -- and they are the widest back-end divergence
+    # anywhere in the suite. Swept on v2026.17.1:
+    #
+    #     N          80     160     320     640     exponent   vs spirv
+    #     spirv    38.6    55.9    99.6   198.8       N^0.79       1.0x
+    #     metal    52.6   144.7   480.3  1790.3       N^1.70       9.0x
+    #     glsl     32.6    95.6   464.8  3114.6       N^2.19      15.7x
+    #     cuda     61.4   273.6  1801.4 13595.6       N^2.60      68.4x
+    #
+    # Again the named pass is not the cost: legalizeResourceTypes is 13-17 ms
+    # at N=640 and does not even run on CUDA. Of the 13.6 s CUDA point, 13.3 s
+    # is deferBufferLoad; of the 3.1 s GLSL point, 2.9 s is simplifyNonSSAIR.
+    # Both primary timers are listed so whichever one a target pays shows up.
     WorkloadSpec(
         name="resource_aggregate_metal",
         bucket="resource_legalize",
@@ -497,7 +507,8 @@ WORKLOADS = [
         default_size=80,
         mode="target",
         extra_flags=["-target", "metal"],
-        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner"],
+        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
+                        "simplifyNonSSAIR", "deferBufferLoad"],
         sweep_sizes=[80, 160, 320, 640],
     ),
     WorkloadSpec(
@@ -507,7 +518,8 @@ WORKLOADS = [
         default_size=80,
         mode="target",
         extra_flags=["-target", "glsl", "-entry", "computeMain"],
-        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner"],
+        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
+                        "simplifyNonSSAIR", "deferBufferLoad"],
         sweep_sizes=[80, 160, 320, 640],
     ),
     WorkloadSpec(
@@ -517,7 +529,8 @@ WORKLOADS = [
         default_size=80,
         mode="target",
         extra_flags=["-target", "cuda"],
-        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner"],
+        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
+                        "simplifyNonSSAIR", "deferBufferLoad"],
         sweep_sizes=[80, 160, 320, 640],
     ),
     WorkloadSpec(
@@ -653,9 +666,18 @@ WORKLOADS = [
         primary_timers=["compileInner", "linkAndOptimizeIR", "deferBufferLoad", "simplifyNonSSAIR"],
         sweep_sizes=[80, 160, 320, 640],
     ),
-    # Combined texture-samplers: lowerCombinedTextureSamplers, which runs on
-    # the non-Khronos source targets only. Same shape as backend_loads with the
-    # texture and sampler combined, so the pair A/B the splitting cost.
+    # Combined texture-samplers. The construct is what is isolated here: a
+    # `Sampler2D` is split by `lowerCombinedTextureSamplers` on the non-Khronos
+    # source targets and left alone on the Khronos ones, and no other workload
+    # declares one. Same shape as backend_loads with the texture and sampler
+    # combined, so the pair A/B the split.
+    #
+    # The SPLIT ITSELF IS NOT THE COST. Measured on v2026.17.1 at N=512,
+    # `lowerCombinedTextureSamplers` is 0.5 ms of a 304 ms Metal compile; the
+    # 216 ms is `simplifyNonSSAIR` chewing on the load/store-heavy IR the split
+    # produces. That is why simplifyNonSSAIR is a primary timer here and the
+    # legalization pass is kept alongside it rather than instead of it -- the
+    # pass is cheap today and a regression in it should still alert.
     WorkloadSpec(
         name="backend_samplers_spirv",
         bucket="backend_legalize",
@@ -663,7 +685,8 @@ WORKLOADS = [
         default_size=256,
         mode="target",
         extra_flags=["-target", "spirv", "-emit-spirv-directly"],
-        primary_timers=["compileInner", "linkAndOptimizeIR", "lowerCombinedTextureSamplers"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "lowerCombinedTextureSamplers"],
         sweep_sizes=[64, 128, 256, 512],
     ),
     WorkloadSpec(
@@ -673,7 +696,8 @@ WORKLOADS = [
         default_size=256,
         mode="target",
         extra_flags=["-target", "hlsl", "-entry", "computeMain"],
-        primary_timers=["compileInner", "linkAndOptimizeIR", "lowerCombinedTextureSamplers"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "lowerCombinedTextureSamplers"],
         sweep_sizes=[64, 128, 256, 512],
     ),
     WorkloadSpec(
@@ -683,7 +707,8 @@ WORKLOADS = [
         default_size=256,
         mode="target",
         extra_flags=["-target", "metal"],
-        primary_timers=["compileInner", "linkAndOptimizeIR", "lowerCombinedTextureSamplers"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "lowerCombinedTextureSamplers"],
         sweep_sizes=[64, 128, 256, 512],
     ),
     WorkloadSpec(
@@ -693,13 +718,19 @@ WORKLOADS = [
         default_size=256,
         mode="target",
         extra_flags=["-target", "wgsl"],
-        primary_timers=["compileInner", "linkAndOptimizeIR", "lowerCombinedTextureSamplers"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "lowerCombinedTextureSamplers"],
         sweep_sizes=[64, 128, 256, 512],
     ),
-    # Matrix arithmetic: legalizeMatrixTypes / specializeMatrixLayout are
-    # target-parameterized, HLSL adds wrapStructuredBuffersOfMatrices, and the
-    # C-family emitters lower matrix ops onto their own helper types. Two
-    # workloads declare a matrix type today; none computes with one.
+    # Matrix arithmetic. Two workloads declare a matrix type today; none
+    # computes with one, so the whole matrix lowering path (legalizeMatrixTypes
+    # / specializeMatrixLayout, both target-parameterized; HLSL additionally
+    # runs wrapStructuredBuffersOfMatrices) was unmeasured.
+    #
+    # As with the samplers family, the lowering is not the cost: on v2026.17.1
+    # at N=512 `legalizeMatrixTypes` measures 0.0 ms on every target, while
+    # GLSL spends 560 ms of 686 and CUDA 1254 ms of 1974 in `simplifyNonSSAIR`.
+    # GLSL runs at N^1.60 and CUDA at N^1.98 against SPIR-V's N^0.78.
     WorkloadSpec(
         name="backend_matrix_spirv",
         bucket="backend_legalize",
@@ -707,7 +738,8 @@ WORKLOADS = [
         default_size=256,
         mode="target",
         extra_flags=["-target", "spirv", "-emit-spirv-directly"],
-        primary_timers=["compileInner", "linkAndOptimizeIR", "legalizeMatrixTypes", "specializeMatrixLayout"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout"],
         sweep_sizes=[64, 128, 256, 512],
     ),
     WorkloadSpec(
@@ -717,7 +749,8 @@ WORKLOADS = [
         default_size=256,
         mode="target",
         extra_flags=["-target", "glsl", "-entry", "computeMain"],
-        primary_timers=["compileInner", "linkAndOptimizeIR", "legalizeMatrixTypes", "specializeMatrixLayout"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout"],
         sweep_sizes=[64, 128, 256, 512],
     ),
     WorkloadSpec(
@@ -727,7 +760,8 @@ WORKLOADS = [
         default_size=256,
         mode="target",
         extra_flags=["-target", "metal"],
-        primary_timers=["compileInner", "linkAndOptimizeIR", "legalizeMatrixTypes", "specializeMatrixLayout"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout"],
         sweep_sizes=[64, 128, 256, 512],
     ),
     WorkloadSpec(
@@ -737,7 +771,8 @@ WORKLOADS = [
         default_size=256,
         mode="target",
         extra_flags=["-target", "cuda"],
-        primary_timers=["compileInner", "linkAndOptimizeIR", "legalizeMatrixTypes", "specializeMatrixLayout"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout"],
         sweep_sizes=[64, 128, 256, 512],
     ),
     # ---- downstream compilers (Windows perf runner only) -------------------

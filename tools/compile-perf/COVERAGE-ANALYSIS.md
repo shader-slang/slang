@@ -242,6 +242,81 @@ entries. Metal, WGSL and CUDA reject it — it uses ray-tracing stages.
 
 ---
 
+## 6b. What the new workloads found once swept
+
+Run locally on macOS arm64 against prebuilt release binaries: a release sweep of
+v2026.12 / .13 / .14 / .16 / .17 / .17.1 at default sizes (there is no v2026.15
+{D} the tags jump 14 to 16), and a complexity sweep of v2026.17.1 over each
+workload's ladder. 5 samples + 1 warmup throughout.
+
+**The headline is that the target-specific legalization passes these workloads
+were built to isolate are not where the time goes.** At the top sweep size on
+v2026.17.1, `legalizeMatrixTypes` measures 0.0 ms on every target,
+`lowerCombinedTextureSamplers` 0.5 ms, and `legalizeResourceTypes` 13-17 ms
+(it does not run on CUDA at all). The cost is the **load/store redundancy
+machinery running over the IR those passes produce** {D} `deferBufferLoad` on
+targets that pack parameters into a global context, `simplifyNonSSAIR`
+everywhere after phi-elimination. The workloads are still the right workloads:
+they are what reaches that machinery, and they discriminate sharply. The
+attribution claim was what needed fixing.
+
+`compileInner` in ms, v2026.17.1, with fitted exponent and ratio to the SPIR-V
+control at the top size:
+
+| workload                   |   80 |   160 |    320 |     640 | exponent | vs spirv |
+| -------------------------- | ---: | ----: | -----: | ------: | -------: | -------: |
+| `resource_aggregate`       | 38.6 |  55.9 |   99.6 |   198.8 |   N^0.79 |     1.0x |
+| `resource_aggregate_metal` | 52.6 | 144.7 |  480.3 |  1790.3 |   N^1.70 |     9.0x |
+| `resource_aggregate_glsl`  | 32.6 |  95.6 |  464.8 |  3114.6 |   N^2.19 |    15.7x |
+| `resource_aggregate_cuda`  | 61.4 | 273.6 | 1801.4 | 13595.6 |   N^2.60 |    68.4x |
+| `backend_loads_spirv`      | 20.1 |  30.4 |   50.0 |    91.5 |   N^0.73 |     1.0x |
+| `backend_loads_hlsl`       | 15.8 |  24.2 |   41.3 |    88.0 |   N^0.82 |     1.0x |
+| `backend_loads_metal`      | 20.6 |  36.9 |   85.8 |   252.1 |   N^1.20 |     2.8x |
+| `backend_loads_cuda`       | 23.6 |  49.1 |  180.6 |  4195.7 |   N^2.49 |    45.8x |
+
+| workload                 |   64 |  128 |   256 |    512 | exponent | vs spirv |
+| ------------------------ | ---: | ---: | ----: | -----: | -------: | -------: |
+| `backend_samplers_spirv` | 19.0 | 24.5 |  45.2 |   73.2 |   N^0.65 |     1.0x |
+| `backend_samplers_hlsl`  | 15.5 | 22.1 |  36.9 |   77.4 |   N^0.77 |     1.1x |
+| `backend_samplers_wgsl`  | 15.5 | 21.9 |  35.5 |   68.8 |   N^0.72 |     0.9x |
+| `backend_samplers_metal` | 20.1 | 39.0 |  95.2 |  304.3 |   N^1.31 |     4.2x |
+| `backend_matrix_spirv`   | 27.6 | 42.2 |  72.3 |  141.0 |   N^0.78 |     1.0x |
+| `backend_matrix_metal`   | 28.7 | 50.0 | 101.9 |  250.2 |   N^1.04 |     1.8x |
+| `backend_matrix_glsl`    | 24.8 | 41.7 | 107.1 |  685.5 |   N^1.60 |     4.9x |
+| `backend_matrix_cuda`    | 32.0 | 63.9 | 242.6 | 1973.9 |   N^1.98 |    14.0x |
+
+Every SPIR-V, HLSL and WGSL column is sub-linear. Every super-linear column is
+one of those two passes: 13.3 s of the 13.6 s CUDA point is `deferBufferLoad`;
+2.9 s of the 3.1 s GLSL point is `simplifyNonSSAIR`; 216 ms of the 304 ms Metal
+sampler point is `simplifyNonSSAIR` against 0.5 ms for the sampler split.
+
+GLSL was a surprise. It was carried only as a second target for the matrix and
+resource families and turns out to be the second-worst target in the suite.
+
+**Across releases the two passes are flat while everything else improved.**
+`backend_loads` at N=320, `compileInner` in ms:
+
+| release    | spirv | hlsl | metal |  cuda | cuda/spirv |
+| ---------- | ----: | ---: | ----: | ----: | ---------: |
+| v2026.12   | 108.2 | 79.5 | 141.0 | 232.3 |      2.15x |
+| v2026.13   | 101.6 | 72.1 | 133.7 | 224.3 |      2.21x |
+| v2026.14   |  56.1 | 44.9 |  89.8 | 186.2 |      3.32x |
+| v2026.16   |  54.1 | 43.0 |  87.5 | 187.6 |      3.47x |
+| v2026.17   |  54.4 | 40.6 |  84.7 | 182.3 |      3.35x |
+| v2026.17.1 |  51.9 | 40.8 |  85.4 | 183.3 |      3.53x |
+
+The per-pass timers show why. On `backend_loads_cuda`, `deferBufferLoad` sits at
+63-68 ms and `simplifyNonSSAIR` at 63-67 ms in **every one of the six
+releases**, while the SPIR-V control's whole `linkAndOptimizeIR` fell from
+57.7 ms to 14.6 ms. The same on `backend_samplers_metal`: `simplifyNonSSAIR`
+53-57 ms throughout, `lowerCombinedTextureSamplers` 0.3 ms throughout, and
+`legalizeResourceTypes` dropped 10.4 ms to 0.9 ms at v2026.14. The ratios widen
+with every release not because the back ends got slower, but because the
+general compile-time work of that window did not reach them.
+
+This is the argument for the detailed timers in one table: none of the
+attribution above is derivable from the base flag's timer set.
+
 ## 7. Proposed work
 
 Ordered by value per unit of risk.

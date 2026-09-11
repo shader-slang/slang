@@ -165,16 +165,55 @@ other workload in the suite measures.
 > super-linear front-end cost dominated it and flattened a 21× cuda/spirv
 > divergence to 1.1×. See `COVERAGE-ANALYSIS.md`.
 
-| Test                      | Targets                  | What it generates                                                  | Targets (compiler stage)                                                                                                                                                                                                                                                                                                                    | Primary timer                         |
-| ------------------------- | ------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| **backend*loads*\***      | spirv, hlsl, metal, cuda | `N` textures, each sampled once, in one entry point                | the **load/store redundancy machinery** (`deferBufferLoad` → `removeRedundancyInFunc` → `tryRemoveRedundantLoad`, and `simplifyNonSSAIR`). Targets that move globals into an explicit global context (CUDA) turn every parameter access into a `Load`; SPIR-V keeps them as globals. The axis is **loads per function**, not resource count | `deferBufferLoad`, `simplifyNonSSAIR` |
-| **backend*samplers*\***   | spirv, hlsl, metal, wgsl | `N` combined `Sampler2D` reads                                     | **`lowerCombinedTextureSamplers`**, which splits a combined texture-sampler for the non-Khronos source targets and is skipped entirely on Khronos ones. No other workload declares a combined sampler. Same shape as `backend_loads_*` with the combination added, so the pair A/B the splitting cost                                       | `lowerCombinedTextureSamplers`        |
-| **backend*matrix*\***     | spirv, glsl, metal, cuda | a chain of `N` `mul`s on `float4x4` read from a `StructuredBuffer` | **matrix legalization** (`legalizeMatrixTypes`, `specializeMatrixLayout`; HLSL adds `wrapStructuredBuffersOfMatrices`, the C-family emitters lower onto their own helper types). Two workloads _declare_ a matrix type; none computed with one                                                                                              | `legalizeMatrixTypes`                 |
-| **resource*aggregate*\*** | (+ metal, glsl, cuda)    | the existing `resource_aggregate` source                           | **`legalizeResourceTypes`**, which takes a `TargetProgram` and behaves differently per target — but was only ever measured on the target where it is cheapest. Widest back-end divergence in the suite: **3.83×** at N=160, exponents cuda 1.74 / glsl 1.47 / metal 1.38 against SPIR-V's 0.67                                              | `legalizeResourceTypes`               |
+| Test                   | Targets                  | What it generates                                                  | Isolates                                                                                                                                                                                         | Primary timers                                     |
+| ---------------------- | ------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| `backend_loads_*`      | spirv, hlsl, metal, cuda | `N` textures, each sampled once, in one entry point                | targets that move globals into an explicit global context (CUDA) turn every parameter access into a `Load`; SPIR-V keeps them as globals. The axis is **loads per function**, not resource count | `deferBufferLoad`, `simplifyNonSSAIR`              |
+| `backend_samplers_*`   | spirv, hlsl, metal, wgsl | `N` combined `Sampler2D` reads                                     | the combined texture-sampler construct, split by `lowerCombinedTextureSamplers` on the non-Khronos source targets and left alone on Khronos ones. No other workload declares one                 | `simplifyNonSSAIR`, `lowerCombinedTextureSamplers` |
+| `backend_matrix_*`     | spirv, glsl, metal, cuda | a chain of `N` `mul`s on `float4x4` read from a `StructuredBuffer` | the matrix lowering path (`legalizeMatrixTypes`, `specializeMatrixLayout`, HLSL's `wrapStructuredBuffersOfMatrices`). Two workloads _declare_ a matrix type; none computed with one              | `simplifyNonSSAIR`, `legalizeMatrixTypes`          |
+| `resource_aggregate_*` | (+ metal, glsl, cuda)    | the existing `resource_aggregate` source                           | `legalizeResourceTypes`, which takes a `TargetProgram` and behaves differently per target, but was only ever measured on the target where it is cheapest                                         | `legalizeResourceTypes`, `simplifyNonSSAIR`        |
 
 The SPIR-V `resource_aggregate` entry keeps its original name so its
 cross-release series is unbroken; the three new targets use the same generator,
 default size and sweep ladder, so all four are directly comparable.
+
+#### What these actually found
+
+**The target-specific legalization passes are not the cost.** Swept on
+v2026.17.1, every one of them is small at every size — `legalizeMatrixTypes`
+measures 0.0 ms on every target, `lowerCombinedTextureSamplers` 0.5 ms,
+`legalizeResourceTypes` 13-17 ms (and it does not run on CUDA at all). What is
+expensive is the **load/store redundancy machinery running over the IR those
+passes produce**, reached two ways: `deferBufferLoad` on targets that pack
+parameters into a global context, and `simplifyNonSSAIR` everywhere after
+phi-elimination. SPIR-V barely pays it, because it keeps resources as opaque
+globals and never generates the load-heavy IR in the first place.
+
+`compileInner` in ms on v2026.17.1, with the fitted exponent and the ratio to
+the SPIR-V control at the top size:
+
+| workload                   |   80 |   160 |    320 |     640 | exponent | vs spirv |
+| -------------------------- | ---: | ----: | -----: | ------: | -------: | -------: |
+| `resource_aggregate`       | 38.6 |  55.9 |   99.6 |   198.8 |   N^0.79 |     1.0x |
+| `resource_aggregate_metal` | 52.6 | 144.7 |  480.3 |  1790.3 |   N^1.70 |     9.0x |
+| `resource_aggregate_glsl`  | 32.6 |  95.6 |  464.8 |  3114.6 |   N^2.19 |    15.7x |
+| `resource_aggregate_cuda`  | 61.4 | 273.6 | 1801.4 | 13595.6 |   N^2.60 |    68.4x |
+| `backend_loads_spirv`      | 20.1 |  30.4 |   50.0 |    91.5 |   N^0.73 |     1.0x |
+| `backend_loads_hlsl`       | 15.8 |  24.2 |   41.3 |    88.0 |   N^0.82 |     1.0x |
+| `backend_loads_metal`      | 20.6 |  36.9 |   85.8 |   252.1 |   N^1.20 |     2.8x |
+| `backend_loads_cuda`       | 23.6 |  49.1 |  180.6 |  4195.7 |   N^2.49 |    45.8x |
+
+Of the 13.6 s CUDA point, 13.3 s is `deferBufferLoad`. Of the 3.1 s GLSL point,
+2.9 s is `simplifyNonSSAIR`. Of the 304 ms Metal `backend_samplers` point at
+N=512, 216 ms is `simplifyNonSSAIR` against 0.5 ms for the sampler split. Every
+SPIR-V, HLSL and WGSL column is sub-linear (N^0.65 to N^0.82); every
+super-linear column is one of those two passes. Filed as #13010.
+
+Across the v2026.12 — v2026.17.1 release sweep both passes are **flat** while
+everything around them improved 2-4x, so the ratios widen with every release:
+`backend_loads` cuda/spirv went 2.15x at v2026.12 to 3.53x at v2026.17.1, and
+`backend_samplers` metal/spirv 1.88x to 2.51x — not because the back ends got
+slower, but because the general compile-time work of that window did not reach
+them.
 
 ### Complexity-scaling test
 

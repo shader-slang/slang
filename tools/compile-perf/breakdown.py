@@ -6,8 +6,13 @@ slangc's -report-perf-benchmark timers are nested:
     compileInner
       frontEndExecute ── parseTranslationUnit, SemanticChecking, generateIR
       generateOutput ─── linkAndOptimizeIR ── specializeModule, simplifyIR, linkIR,
-                                               unrollLoopsInModule, legalize*, inlining*
-                         emitEntryPointsSourceFromIR
+                                               unrollLoopsInModule, legalize*, inlining*,
+                                               deferBufferLoad, simplifyNonSSAIR
+
+  On a SOURCE target (metal/wgsl/hlsl/glsl/cuda) `emitEntryPointsSourceFromIR`
+  sits BETWEEN generateOutput and linkAndOptimizeIR -- it calls it. With
+  `-emit-spirv-directly` there is no such timer and linkAndOptimizeIR hangs
+  directly off generateOutput. lib/buckets.tree_for picks the shape per run.
 
 A parent's time is usually larger than the sum of its named children; the gap is
 real work with no dedicated timer (e.g. the autodiff IR transform shows up as
