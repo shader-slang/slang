@@ -33,7 +33,7 @@ struct TestHitGroup : rt::IHitGroup
     typealias Intersection = rt::NoIntersection<TestHitContext>;
 }
 
-struct TestLayout : rt::ITraceProgramLayout
+struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::HitGroupList<TraceContext, TestHitGroup>;

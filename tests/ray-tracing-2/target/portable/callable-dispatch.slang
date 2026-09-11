@@ -56,7 +56,7 @@ struct TestCallableGroup : rt::ICallableGroup
     typealias Callable = TestCallable;
 }
 
-struct TestProgramLayout : rt::ITraceProgramLayout
+struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::NoHitGroups<TestTraceContext>;
@@ -64,18 +64,18 @@ struct TestProgramLayout : rt::ITraceProgramLayout
     typealias CallableGroups = rt::CallableGroupList<TestTraceContext, TestCallableGroup>;
 }
 
-rt::TraceProgramDescriptor<TestProgramLayout> program;
+rt::TraceProgramDescriptor<TestSchema> program;
 
 [shader("raygeneration")]
 void main()
 {
-    rt::RayTracer<TestProgramLayout> tracer;
+    rt::RayTracer<TestSchema> tracer;
     TestCallableData data = {1, 0, 0};
     tracer.callShader<TestCallableContext>(0, program, data);
     output[0] = data.value;
 }
 
-// IR: structuralRayTracingCallShader({{.*}}, %TestProgramLayout, %TestTraceContext,
+// IR: structuralRayTracingCallShader({{.*}}, %TestSchema, %TestTraceContext,
 // IR-SAME: %rtx5FCallableGroupList, TypePack(%TestCallableGroup), %TestCallableContext,
 // IR-SAME: %TestCallableData,
 

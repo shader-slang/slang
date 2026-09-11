@@ -35,7 +35,7 @@ static RefPtr<StructuralRayTracingStageReflection> _createStageReflection(
 }
 
 static bool _addHitGroups(
-    StructuralRayTracingProgramLayoutReflection* result,
+    StructuralRayTracingProgramSchemaReflection* result,
     ASTBuilder* astBuilder,
     const StructuralRayTracingDeclRegistry& registry,
     Type* groupListType)
@@ -118,7 +118,7 @@ static bool _addHitGroups(
 }
 
 static bool _addMissGroups(
-    StructuralRayTracingProgramLayoutReflection* result,
+    StructuralRayTracingProgramSchemaReflection* result,
     ASTBuilder* astBuilder,
     const StructuralRayTracingDeclRegistry& registry,
     Type* groupListType)
@@ -177,7 +177,7 @@ static bool _addMissGroups(
 }
 
 static bool _addCallableGroups(
-    StructuralRayTracingProgramLayoutReflection* result,
+    StructuralRayTracingProgramSchemaReflection* result,
     ASTBuilder* astBuilder,
     const StructuralRayTracingDeclRegistry& registry,
     Type* groupListType)
@@ -239,7 +239,7 @@ static bool _addCallableGroups(
     return true;
 }
 
-StructuralRayTracingProgramLayoutReflection* findStructuralRayTracingProgramLayoutReflection(
+StructuralRayTracingProgramSchemaReflection* findStructuralRayTracingProgramSchemaReflection(
     ProgramLayout* programLayout,
     const char* name)
 {
@@ -253,17 +253,17 @@ StructuralRayTracingProgramLayoutReflection* findStructuralRayTracingProgramLayo
         return nullptr;
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-    Type* layoutType = nullptr;
+    Type* schemaType = nullptr;
     try
     {
-        layoutType = program->getTypeFromString(name, &sink);
+        schemaType = program->getTypeFromString(name, &sink);
     }
     catch (...)
     {
         return nullptr;
     }
-    layoutType = layoutType ? as<Type>(layoutType->resolve()) : nullptr;
-    if (!layoutType || as<ErrorType>(layoutType))
+    schemaType = schemaType ? as<Type>(schemaType->resolve()) : nullptr;
+    if (!schemaType || as<ErrorType>(schemaType))
         return nullptr;
 
     auto reflectionData = as<StructuralRayTracingReflectionData>(
@@ -273,49 +273,49 @@ StructuralRayTracingProgramLayoutReflection* findStructuralRayTracingProgramLayo
         reflectionData = new StructuralRayTracingReflectionData();
         programLayout->structuralRayTracingReflectionData = RefPtr<RefObject>(reflectionData);
     }
-    for (auto existing : reflectionData->programLayouts)
+    for (auto existing : reflectionData->programSchemas)
     {
-        if (existing->layoutType == layoutType)
+        if (existing->schemaType == schemaType)
             return existing;
     }
 
     auto astBuilder = linkage->getASTBuilder();
-    auto layoutInterface =
-        registry.getMetadataInterface(StructuralRayTracingMetadataKind::TraceProgramLayout);
-    auto layoutInterfaceType =
-        layoutInterface ? DeclRefType::create(astBuilder, makeDeclRef(layoutInterface)) : nullptr;
-    if (!layoutInterfaceType)
+    auto schemaInterface =
+        registry.getMetadataInterface(StructuralRayTracingMetadataKind::TraceProgramSchema);
+    auto schemaInterfaceType =
+        schemaInterface ? DeclRefType::create(astBuilder, makeDeclRef(schemaInterface)) : nullptr;
+    if (!schemaInterfaceType)
         return nullptr;
 
     auto sharedSemanticsContext = linkage->getSemanticsForReflection();
     SemanticsContext semanticsContext(sharedSemanticsContext);
     SemanticsVisitor visitor(semanticsContext);
-    auto layoutWitness = visitor.isSubtype(layoutType, layoutInterfaceType, IsSubTypeOptions::None);
-    if (!layoutWitness)
+    auto schemaWitness = visitor.isSubtype(schemaType, schemaInterfaceType, IsSubTypeOptions::None);
+    if (!schemaWitness)
         return nullptr;
 
     auto traceContextType = registry.resolveAssociatedType(
         astBuilder,
-        layoutWitness,
+        schemaWitness,
         StructuralRayTracingAssociatedTypeKind::ProgramTraceContext);
     auto hitGroupsType = registry.resolveAssociatedType(
         astBuilder,
-        layoutWitness,
+        schemaWitness,
         StructuralRayTracingAssociatedTypeKind::ProgramHitGroups);
     auto missGroupsType = registry.resolveAssociatedType(
         astBuilder,
-        layoutWitness,
+        schemaWitness,
         StructuralRayTracingAssociatedTypeKind::ProgramMissGroups);
     auto callableGroupsType = registry.resolveAssociatedType(
         astBuilder,
-        layoutWitness,
+        schemaWitness,
         StructuralRayTracingAssociatedTypeKind::ProgramCallableGroups);
     if (!traceContextType || !hitGroupsType || !missGroupsType || !callableGroupsType)
         return nullptr;
 
-    RefPtr<StructuralRayTracingProgramLayoutReflection> result =
-        new StructuralRayTracingProgramLayoutReflection();
-    result->layoutType = layoutType;
+    RefPtr<StructuralRayTracingProgramSchemaReflection> result =
+        new StructuralRayTracingProgramSchemaReflection();
+    result->schemaType = schemaType;
     result->traceContextType = traceContextType;
     if (!_addHitGroups(result, astBuilder, registry, hitGroupsType) ||
         !_addMissGroups(result, astBuilder, registry, missGroupsType) ||
@@ -324,7 +324,7 @@ StructuralRayTracingProgramLayoutReflection* findStructuralRayTracingProgramLayo
         return nullptr;
     }
 
-    reflectionData->programLayouts.add(result);
+    reflectionData->programSchemas.add(result);
     return result;
 }
 

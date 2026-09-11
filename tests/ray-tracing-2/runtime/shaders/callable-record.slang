@@ -63,7 +63,7 @@ struct CallableGroup : rt::ICallableGroup
     typealias Callable = RuntimeCallable;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = RuntimeTraceContext;
     typealias HitGroups = rt::NoHitGroups<RuntimeTraceContext>;
@@ -77,14 +77,14 @@ struct RuntimeResult
     uint dispatchWidth;
 }
 
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 RWStructuredBuffer<RuntimeResult> results;
 
 [shader("raygeneration")]
 void main()
 {
     RuntimeCallableData data = { 3, 0, 0 };
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.callShader<RuntimeCallableContext>(0, program, data);
 
     results[0].value = data.value;

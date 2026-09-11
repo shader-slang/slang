@@ -1,9 +1,9 @@
 //TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
 
-// METAL: metal::visible_function_table<void(ProgramLayout_rayData_0 thread*, uchar thread*)> closestHitFunctions_0;
+// METAL: metal::visible_function_table<void(Schema_rayData_0 thread*, uchar thread*)> closestHitFunctions_0;
 // METAL: _S{{[0-9]+}}[_slang_hit_slot](&rayData_{{[0-9]+}}, (thread uchar*)&kernelContext_0);
-// METAL-DAG: {{\[\[visible\]\]}} void GlobalClosestHit_0(ProgramLayout_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
-// METAL-DAG: {{\[\[visible\]\]}} void PlainClosestHit_0(ProgramLayout_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
+// METAL-DAG: {{\[\[visible\]\]}} void GlobalClosestHit_0(Schema_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
+// METAL-DAG: {{\[\[visible\]\]}} void PlainClosestHit_0(Schema_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
 
 import slang.raytracing;
 
@@ -62,7 +62,7 @@ struct PlainHitGroup : rt::IHitGroup
     typealias Intersection = rt::NoIntersection<HitContext>;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = RuntimeTraceContext;
     typealias HitGroups = rt::HitGroupList<RuntimeTraceContext, GlobalHitGroup, PlainHitGroup>;
@@ -71,7 +71,7 @@ struct ProgramLayout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 
 [shader("raygeneration")]
 void main()
@@ -82,7 +82,7 @@ void main()
     desc.instanceMask = 0xff;
 
     RuntimePayload payload = {};
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
     output[1] = payload.value;
 }

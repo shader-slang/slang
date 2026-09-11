@@ -33,7 +33,7 @@ struct TestCallableContext : rt::ICallableGroupContext
 
 void callCallableFromHelper()
 {
-    rt::RayTracer<TestProgramLayout> tracer;
+    rt::RayTracer<TestSchema> tracer;
     TestCallableData data = {0};
     tracer.callShader<TestCallableContext>(0, program, data);
 //CHECK:   ^^^^^^^^^^ callable dispatch is not available from this ray-tracing stage
@@ -69,7 +69,7 @@ struct TestHitGroup : rt::IHitGroup
     typealias Intersection = rt::NoIntersection<TestHitContext>;
 }
 
-struct TestProgramLayout : rt::ITraceProgramLayout
+struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::HitGroupList<TestTraceContext, TestHitGroup>;
@@ -77,4 +77,4 @@ struct TestProgramLayout : rt::ITraceProgramLayout
     typealias CallableGroups = rt::CallableGroupList<TestTraceContext, TestCallableGroup>;
 }
 
-rt::TraceProgramDescriptor<TestProgramLayout> program;
+rt::TraceProgramDescriptor<TestSchema> program;

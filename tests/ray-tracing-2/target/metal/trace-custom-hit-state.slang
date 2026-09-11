@@ -59,7 +59,7 @@ struct HitGroup : rt::IHitGroup
     typealias Intersection = TestIntersection;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::HitGroupList<TestTraceContext, HitGroup>;
@@ -68,29 +68,29 @@ struct ProgramLayout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 
 [shader("raygeneration")]
 void main()
 {
     rt::RayTraversalDesc desc = {};
     TestPayload payload = {};
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
 }
 
-// METAL: struct ProgramLayout_rayData_0
+// METAL: struct Schema_rayData_0
 // METAL: TestPayload_0 payload_{{[0-9]+}};
 // METAL: SphereAttributes_0 HitGroup_attributes_{{[0-9]+}};
 // METAL: uint device* descriptorData_{{[0-9]+}};
 // METAL: uint customHitKind_{{[0-9]+}};
-// METAL: visible_function_table<void(ProgramLayout_rayData_0 thread*, float, uint, float3, float3)>
+// METAL: visible_function_table<void(Schema_rayData_0 thread*, float, uint, float3, float3)>
 // METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing)]]
-// METAL-SAME: ray_data ProgramLayout_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
+// METAL-SAME: ray_data Schema_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
 // METAL: HitGroup_attributes_{{[0-9]+}} =
 // METAL: customHitKind_{{[0-9]+}} = 17U;
 // METAL: {{\[\[visible\]\]}} void TestClosestHit_0(
-// METAL-SAME: ProgramLayout_rayData_0 thread* rayData_{{[0-9]+}},
+// METAL-SAME: Schema_rayData_0 thread* rayData_{{[0-9]+}},
 // METAL-SAME: float distance_{{[0-9]+}},
 // METAL-SAME: uint hitKind_{{[0-9]+}},
 // METAL-SAME: float3 worldSpaceOrigin_{{[0-9]+}},

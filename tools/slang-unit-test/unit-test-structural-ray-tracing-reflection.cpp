@@ -100,7 +100,7 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
             typealias Callable = CallableStage;
         }
 
-        struct ReflectedLayout : rt::ITraceProgramLayout
+        struct ReflectedSchema : rt::ITraceProgramSchema
         {
             typealias TraceContext = TraceContextType;
             typealias HitGroups = rt::HitGroupList<TraceContextType, ReflectedHitGroup>;
@@ -141,13 +141,13 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(module != nullptr);
 
     auto program = module->getLayout();
-    auto layout = program->findTraceProgramLayout("ReflectedLayout");
-    SLANG_CHECK(layout != nullptr);
-    SLANG_CHECK(UnownedStringSlice(layout->getType()->getName()) == "ReflectedLayout");
-    SLANG_CHECK(UnownedStringSlice(layout->getTraceContextType()->getName()) == "TraceContext");
+    auto schema = program->findTraceProgramSchema("ReflectedSchema");
+    SLANG_CHECK(schema != nullptr);
+    SLANG_CHECK(UnownedStringSlice(schema->getType()->getName()) == "ReflectedSchema");
+    SLANG_CHECK(UnownedStringSlice(schema->getTraceContextType()->getName()) == "TraceContext");
 
-    SLANG_CHECK(layout->getHitGroupCount() == 1);
-    auto hitGroup = layout->getHitGroup(0);
+    SLANG_CHECK(schema->getHitGroupCount() == 1);
+    auto hitGroup = schema->getHitGroup(0);
     SLANG_CHECK(hitGroup != nullptr);
     SLANG_CHECK(hitGroup->getSlot() == 4);
     SLANG_CHECK(UnownedStringSlice(hitGroup->getRecordType()->getName()) == "HitRecord");
@@ -159,16 +159,16 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(hitGroup->getAnyHit()->getStage() == SLANG_STAGE_ANY_HIT);
     SLANG_CHECK(hitGroup->getIntersection() == nullptr);
 
-    SLANG_CHECK(layout->getMissGroupCount() == 1);
-    auto missGroup = layout->getMissGroup(0);
+    SLANG_CHECK(schema->getMissGroupCount() == 1);
+    auto missGroup = schema->getMissGroup(0);
     SLANG_CHECK(missGroup != nullptr);
     SLANG_CHECK(missGroup->getSlot() == 2);
     SLANG_CHECK(UnownedStringSlice(missGroup->getRecordType()->getName()) == "MissRecord");
     SLANG_CHECK(missGroup->getMiss()->getStage() == SLANG_STAGE_MISS);
     SLANG_CHECK(UnownedStringSlice(missGroup->getMiss()->getEntryPointName()) == "Miss");
 
-    SLANG_CHECK(layout->getCallableGroupCount() == 1);
-    auto callableGroup = layout->getCallableGroup(0);
+    SLANG_CHECK(schema->getCallableGroupCount() == 1);
+    auto callableGroup = schema->getCallableGroup(0);
     SLANG_CHECK(callableGroup != nullptr);
     SLANG_CHECK(callableGroup->getSlot() == 7);
     SLANG_CHECK(UnownedStringSlice(callableGroup->getRecordType()->getName()) == "CallableRecord");
@@ -177,7 +177,7 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(
         UnownedStringSlice(callableGroup->getCallable()->getEntryPointName()) == "Callable");
 
-    SLANG_CHECK(program->findTraceProgramLayout("HitContext") == nullptr);
+    SLANG_CHECK(program->findTraceProgramSchema("HitContext") == nullptr);
 }
 
 SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
@@ -251,7 +251,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
                 typealias Miss = TestMiss;
             }
 
-            struct ProgramLayout : rt::ITraceProgramLayout
+            struct Schema : rt::ITraceProgramSchema
             {
                 typealias TraceContext = StageNamespace::TraceContext;
                 typealias HitGroups =
@@ -276,7 +276,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
                 typealias Miss = GenericMiss<T>;
             }
 
-            struct GenericProgramLayout<T> : rt::ITraceProgramLayout
+            struct GenericSchema<T> : rt::ITraceProgramSchema
             {
                 typealias TraceContext = StageNamespace::TraceContext;
                 typealias HitGroups = rt::NoHitGroups<StageNamespace::TraceContext>;
@@ -301,7 +301,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
             typealias Miss = main;
         }
 
-        struct MainProgramLayout : rt::ITraceProgramLayout
+        struct MainSchema : rt::ITraceProgramSchema
         {
             typealias TraceContext = StageNamespace::TraceContext;
             typealias HitGroups =
@@ -329,7 +329,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
                 __slang_structural_rt_53746167654e616d6573706163652e546573744d697373;
         }
 
-        struct ReservedPrefixProgramLayout : rt::ITraceProgramLayout
+        struct ReservedPrefixSchema : rt::ITraceProgramSchema
         {
             typealias TraceContext = StageNamespace::TraceContext;
             typealias HitGroups =
@@ -340,8 +340,8 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
         }
 
         rt::AccelerationStructure scene;
-        rt::TraceProgramDescriptor<StageNamespace::ProgramLayout> traceProgram;
-        rt::TraceProgramDescriptor<StageNamespace::GenericProgramLayout<uint>> genericTraceProgram;
+        rt::TraceProgramDescriptor<StageNamespace::Schema> traceProgram;
+        rt::TraceProgramDescriptor<StageNamespace::GenericSchema<uint>> genericTraceProgram;
 
         void traceHelper(inout StageNamespace::Payload payload)
         {
@@ -349,7 +349,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
             desc.ray.direction = float3(0.0f, 0.0f, 1.0f);
             desc.ray.tMax = 1.0f;
             desc.instanceMask = 0xff;
-            rt::RayTracer<StageNamespace::ProgramLayout> tracer;
+            rt::RayTracer<StageNamespace::Schema> tracer;
             tracer.trace(desc, scene, traceProgram, payload);
         }
 
@@ -359,7 +359,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
             desc.ray.direction = float3(0.0f, 0.0f, 1.0f);
             desc.ray.tMax = 1.0f;
             desc.instanceMask = 0xff;
-            rt::RayTracer<StageNamespace::GenericProgramLayout<uint>> tracer;
+            rt::RayTracer<StageNamespace::GenericSchema<uint>> tracer;
             tracer.trace(desc, scene, genericTraceProgram, payload);
         }
     )";
@@ -413,10 +413,10 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
     SLANG_CHECK_ABORT(module != nullptr);
 
     auto reflectedProgram = module->getLayout();
-    auto reflectedLayout = reflectedProgram->findTraceProgramLayout("StageNamespace.ProgramLayout");
-    SLANG_CHECK_ABORT(reflectedLayout != nullptr);
-    auto reflectedClosestHit = reflectedLayout->getHitGroup(0)->getClosestHit();
-    auto reflectedMiss = reflectedLayout->getMissGroup(0)->getMiss();
+    auto reflectedSchema = reflectedProgram->findTraceProgramSchema("StageNamespace.Schema");
+    SLANG_CHECK_ABORT(reflectedSchema != nullptr);
+    auto reflectedClosestHit = reflectedSchema->getHitGroup(0)->getClosestHit();
+    auto reflectedMiss = reflectedSchema->getMissGroup(0)->getMiss();
     SLANG_CHECK_ABORT(reflectedClosestHit != nullptr);
     SLANG_CHECK_ABORT(reflectedMiss != nullptr);
     String closestHitEntryPointName(reflectedClosestHit->getEntryPointName());
@@ -426,26 +426,26 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
     String expectedMissSymbol = String("__miss__") + missEntryPointName;
     String expectedClosestHitSymbol = String("__closesthit__") + closestHitEntryPointName;
 
-    auto reflectedMainLayout = reflectedProgram->findTraceProgramLayout("MainProgramLayout");
-    SLANG_CHECK_ABORT(reflectedMainLayout != nullptr);
-    auto reflectedMain = reflectedMainLayout->getMissGroup(0)->getMiss();
+    auto reflectedMainSchema = reflectedProgram->findTraceProgramSchema("MainSchema");
+    SLANG_CHECK_ABORT(reflectedMainSchema != nullptr);
+    auto reflectedMain = reflectedMainSchema->getMissGroup(0)->getMiss();
     SLANG_CHECK_ABORT(reflectedMain != nullptr);
     String mainEntryPointName(reflectedMain->getEntryPointName());
     SLANG_CHECK(mainEntryPointName == expectedMainName);
 
-    auto reflectedReservedLayout =
-        reflectedProgram->findTraceProgramLayout("ReservedPrefixProgramLayout");
-    SLANG_CHECK_ABORT(reflectedReservedLayout != nullptr);
-    auto reflectedReserved = reflectedReservedLayout->getMissGroup(0)->getMiss();
+    auto reflectedReservedSchema =
+        reflectedProgram->findTraceProgramSchema("ReservedPrefixSchema");
+    SLANG_CHECK_ABORT(reflectedReservedSchema != nullptr);
+    auto reflectedReserved = reflectedReservedSchema->getMissGroup(0)->getMiss();
     SLANG_CHECK_ABORT(reflectedReserved != nullptr);
     String reservedEntryPointName(reflectedReserved->getEntryPointName());
     SLANG_CHECK(reservedEntryPointName != expectedMissName);
     SLANG_CHECK(reservedEntryPointName.getUnownedSlice().startsWith("__slang_structural_rt_"));
 
-    auto reflectedGenericLayout =
-        reflectedProgram->findTraceProgramLayout("StageNamespace.GenericProgramLayout<uint>");
-    SLANG_CHECK_ABORT(reflectedGenericLayout != nullptr);
-    auto reflectedGenericMiss = reflectedGenericLayout->getMissGroup(0)->getMiss();
+    auto reflectedGenericSchema =
+        reflectedProgram->findTraceProgramSchema("StageNamespace.GenericSchema<uint>");
+    SLANG_CHECK_ABORT(reflectedGenericSchema != nullptr);
+    auto reflectedGenericMiss = reflectedGenericSchema->getMissGroup(0)->getMiss();
     SLANG_CHECK_ABORT(reflectedGenericMiss != nullptr);
     String genericMissEntryPointName(reflectedGenericMiss->getEntryPointName());
     SLANG_CHECK(genericMissEntryPointName == expectedGenericMissName);
@@ -531,7 +531,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
         raygenModule->findEntryPointByName("raygenMain", raygenEntryPoint.writeRef())));
 
     // This composite contains no selected structural stage components. The raygen trace operation
-    // must synthesize the same names that the program-layout reflection above advertised.
+    // must synthesize the same names that the program-schema reflection above advertised.
     slang::IComponentType* autoComponents[] = {raygenModule, module, raygenEntryPoint};
     ComPtr<slang::IComponentType> autoProgram;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(

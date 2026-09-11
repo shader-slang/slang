@@ -44,7 +44,7 @@ struct HitGroup : rt::IHitGroup
     typealias Intersection = rt::NoIntersection<HitContext>;
 }
 
-struct Layout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::HitGroupList<TestTraceContext, HitGroup>;
@@ -53,14 +53,14 @@ struct Layout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<Layout> program;
+rt::TraceProgramDescriptor<Schema> program;
 
 [shader("raygeneration")]
 void main()
 {
     rt::RayTraversalDesc desc = {};
     TestPayload payload = {};
-    rt::RayTracer<Layout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
 }
 

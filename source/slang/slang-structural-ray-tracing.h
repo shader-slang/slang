@@ -41,7 +41,7 @@ enum class StructuralRayTracingMetadataKind
     HitGroupList,
     MissGroupList,
     CallableGroupList,
-    TraceProgramLayout,
+    TraceProgramSchema,
     Count,
 };
 

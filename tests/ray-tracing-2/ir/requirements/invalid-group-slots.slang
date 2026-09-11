@@ -91,7 +91,7 @@ struct CallableGroupB : rt::ICallableGroup
     typealias Callable = TestCallable;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::HitGroupList<TestTraceContext, HitGroupA, HitGroupB>;
@@ -101,12 +101,12 @@ struct ProgramLayout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 
 [shader("raygeneration")]
 void main()
 {
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     rt::RayTraversalDesc desc = {};
     TestPayload payload = {};
     tracer.trace(desc, scene, program, payload);
