@@ -15,8 +15,8 @@
 // appear anywhere -- which is what makes the gate, rather than the mere
 // presence of debug info, the thing being observed.
 
-//TEST:SIMPLE(filecheck=STD):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g2
-//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=STD):-target spirv-asm -dump-ir -o - -entry main -stage compute -g2
+//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

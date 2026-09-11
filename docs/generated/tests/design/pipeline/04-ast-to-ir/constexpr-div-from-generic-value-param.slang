@@ -18,7 +18,7 @@
 // itself as the first operand, which is only possible if the extent stayed
 // symbolic through lowering instead of being folded against a concrete `N`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 

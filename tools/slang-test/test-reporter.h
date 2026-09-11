@@ -121,6 +121,14 @@ public:
     /// does not fail the run, since there is not yet a baseline to say what rate is normal.
     void recordTestServerLoss();
 
+    /// Record that a test server returned an unreadable reply under a test that then passed
+    /// on a fresh one.
+    ///
+    /// Kept apart from a loss: the server did not die, and the two rates move independently
+    /// (a run can double its crash count while this stays flat), so one combined number would
+    /// hide which moved.
+    void recordTestServerProtocolError();
+
     /// True if can write output directly to stderr
     bool canWriteStdError() const;
 
@@ -260,6 +268,10 @@ public:
     /// losses than names, and a name repeated. Neither is a bug.
     int m_testServerLossCount = 0;
     Slang::List<Slang::String> m_testServerLossTests;
+
+    /// Malformed-reply counterpart of the two above, with the same count-vs-names contract.
+    int m_testServerProtocolErrorCount = 0;
+    Slang::List<Slang::String> m_testServerProtocolErrorTests;
 
     TestOutputMode m_outputMode = TestOutputMode::Default;
     bool m_dumpOutputOnFailure;

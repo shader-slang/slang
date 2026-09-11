@@ -26,7 +26,7 @@
 
 #ifdef SLANG_CUDA_ENABLE_HALF
 // We don't want half2 operators from cuda_fp16.h (comparison returns bool). Arithmetic for
-// __half2 is defined in the macro SLANG_CUDA_VECTOR_FLOAT_OP_HALF2 below (CUDA intrinsics).
+// __half2 is defined below with the packed CUDA intrinsics (__hadd2, etc.).
 #define __CUDA_NO_HALF2_OPERATORS__
 #include <cuda_fp16.h>
 #endif
@@ -523,174 +523,200 @@ SLANG_VECTOR_GET_ELEMENT(__nv_fp8_e5m2)
 SLANG_VECTOR_GET_ELEMENT_PTR(__nv_fp8_e5m2)
 #endif
 
-#define SLANG_CUDA_VECTOR_BINARY_OP(T, n, op)                                                 \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n operator op(T##n thisVal, T##n other)             \
-    {                                                                                         \
-        T##n result;                                                                          \
-        for (int i = 0; i < n; i++)                                                           \
-            *_slang_vector_get_element_ptr(&result, i) =                                      \
-                _slang_vector_get_element(thisVal, i) op _slang_vector_get_element(other, i); \
-        return result;                                                                        \
-    }
-#define SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, op)                                           \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(T##n thisVal, T##n other)            \
-    {                                                                                           \
-        bool##n result;                                                                         \
-        for (int i = 0; i < n; i++)                                                             \
-            *_slang_vector_get_element_ptr(&result, i) =                                        \
-                (_slang_vector_get_element(thisVal, i) op _slang_vector_get_element(other, i)); \
-        return result;                                                                          \
-    }
-#define SLANG_CUDA_VECTOR_UNARY_OP(T, n, op)                                                       \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n operator op(T##n thisVal)                              \
-    {                                                                                              \
-        T##n result;                                                                               \
-        for (int i = 0; i < n; i++)                                                                \
-            *_slang_vector_get_element_ptr(&result, i) = op _slang_vector_get_element(thisVal, i); \
-        return result;                                                                             \
-    }
+/* The fixed-width vector operators are constrained function templates. The SFINAE constraint on
+   `SlangCudaVectorTraits` (below) is load-bearing: it keeps these operators out of overload
+   resolution for scalars and for types that are not registered vectors. Width is dispatched with
+   `if constexpr`, which is well-formed here only because these are templates: the `.z`/`.w`
+   assignment for a component a narrower type lacks sits in a branch that is not instantiated for
+   it, so it is not type-checked there. Each component is named directly rather than reached through
+   the runtime-index accessor `((T*)(&x))[i]`, which reinterprets the vector as an array of its
+   element type. */
 
-#define SLANG_CUDA_VECTOR_INT_OP(T, n)            \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, +)          \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, -)          \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, *)          \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, /)          \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, %)          \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, ^)          \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, &)          \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, |)          \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, &&)         \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, ||)         \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, >>)         \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, <<)         \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, >)  \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, <)  \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, >=) \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, <=) \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, ==) \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, !=) \
-    SLANG_CUDA_VECTOR_UNARY_OP(T, n, !)           \
-    SLANG_CUDA_VECTOR_UNARY_OP(T, n, -)           \
-    SLANG_CUDA_VECTOR_UNARY_OP(T, n, ~)
+// Minimal in-house `enable_if`; the NVRTC prelude does not pull in <type_traits>.
+template<bool kCondition, typename T = void>
+struct SlangCudaVectorEnableIf
+{
+};
+template<typename T>
+struct SlangCudaVectorEnableIf<true, T>
+{
+    typedef T Type;
+};
 
-#define SLANG_CUDA_VECTOR_INT_OPS(T) \
-    SLANG_CUDA_VECTOR_INT_OP(T, 2)   \
-    SLANG_CUDA_VECTOR_INT_OP(T, 3)   \
-    SLANG_CUDA_VECTOR_INT_OP(T, 4)
+/* Maps a fixed-width CUDA vector type to its width, the bool vector a comparison of it returns, and
+   two element-type properties gating the operators. `kIsIntegral` and `kSupportsFmod` are
+   deliberately not complementary: `bool` is integral but `__half` is neither, because there is no
+   `_slang_fmod(__half, __half)`. The CUDA vector types (`int2`, `char4`, `__half2`, ...) are
+   distinct structs rather than instantiations of one class template, so each is registered
+   individually here. A type with no specialization has no `kWidth`, which is what removes the
+   operator templates from overload resolution for every other type. */
+template<typename T>
+struct SlangCudaVectorTraits;
+#define SLANG_CUDA_VECTOR_TRAITS(VEC, BOOLVEC, WIDTH, IS_INTEGRAL, SUPPORTS_FMOD) \
+    template<>                                                                    \
+    struct SlangCudaVectorTraits<VEC>                                             \
+    {                                                                             \
+        typedef BOOLVEC BoolVector;                                               \
+        static constexpr int kWidth = WIDTH;                                      \
+        static constexpr bool kIsIntegral = IS_INTEGRAL;                          \
+        static constexpr bool kSupportsFmod = SUPPORTS_FMOD;                      \
+    };
+#define SLANG_CUDA_VECTOR_TRAITS_ALL(T, IS_INTEGRAL, SUPPORTS_FMOD)      \
+    SLANG_CUDA_VECTOR_TRAITS(T##2, bool2, 2, IS_INTEGRAL, SUPPORTS_FMOD) \
+    SLANG_CUDA_VECTOR_TRAITS(T##3, bool3, 3, IS_INTEGRAL, SUPPORTS_FMOD) \
+    SLANG_CUDA_VECTOR_TRAITS(T##4, bool4, 4, IS_INTEGRAL, SUPPORTS_FMOD)
 
-SLANG_CUDA_VECTOR_INT_OPS(int)
-SLANG_CUDA_VECTOR_INT_OPS(bool)
-SLANG_CUDA_VECTOR_INT_OPS(uint)
-SLANG_CUDA_VECTOR_INT_OPS(ushort)
-SLANG_CUDA_VECTOR_INT_OPS(short)
-SLANG_CUDA_VECTOR_INT_OPS(char)
-SLANG_CUDA_VECTOR_INT_OPS(uchar)
-SLANG_CUDA_VECTOR_INT_OPS(longlong)
-SLANG_CUDA_VECTOR_INT_OPS(ulonglong)
-
-#define SLANG_CUDA_VECTOR_FLOAT_OP(T, n)          \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, +)          \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, -)          \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, *)          \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, /)          \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, &&)         \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, ||)         \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, >)  \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, <)  \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, >=) \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, <=) \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, ==) \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, !=) \
-    SLANG_CUDA_VECTOR_UNARY_OP(T, n, -)
-/* Special case __half2: use CUDA intrinsics (__hadd2, __hsub2, etc.) so we get one add.f16x2
-   per op; generic macro would give two add.f16. Compare/logical stay element-wise for bool2. */
-#define SLANG_CUDA_VECTOR_FLOAT_OP_HALF2                                                       \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator+(const __half2& lh, const __half2& rh) \
-    {                                                                                          \
-        return __hadd2(lh, rh);                                                                \
-    }                                                                                          \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& lh, const __half2& rh) \
-    {                                                                                          \
-        return __hsub2(lh, rh);                                                                \
-    }                                                                                          \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator*(const __half2& lh, const __half2& rh) \
-    {                                                                                          \
-        return __hmul2(lh, rh);                                                                \
-    }                                                                                          \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator/(const __half2& lh, const __half2& rh) \
-    {                                                                                          \
-        return __h2div(lh, rh);                                                                \
-    }                                                                                          \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& h)                     \
-    {                                                                                          \
-        return __hneg2(h);                                                                     \
-    }                                                                                          \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator+=(__half2& lh, const __half2& rh)     \
-    {                                                                                          \
-        lh = __hadd2(lh, rh);                                                                  \
-        return lh;                                                                             \
-    }                                                                                          \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator-=(__half2& lh, const __half2& rh)     \
-    {                                                                                          \
-        lh = __hsub2(lh, rh);                                                                  \
-        return lh;                                                                             \
-    }                                                                                          \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator*=(__half2& lh, const __half2& rh)     \
-    {                                                                                          \
-        lh = __hmul2(lh, rh);                                                                  \
-        return lh;                                                                             \
-    }                                                                                          \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator/=(__half2& lh, const __half2& rh)     \
-    {                                                                                          \
-        lh = __h2div(lh, rh);                                                                  \
-        return lh;                                                                             \
-    }                                                                                          \
-    SLANG_CUDA_VECTOR_BINARY_OP(__half, 2, &&)                                                 \
-    SLANG_CUDA_VECTOR_BINARY_OP(__half, 2, ||)                                                 \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, >)                                          \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, <)                                          \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, >=)                                         \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, <=)                                         \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, ==)                                         \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, !=)
-/* Explicit per-type expansion (no dispatch, no token-paste with __half) so NVRTC and all compilers
- * behave. */
-#define SLANG_CUDA_VECTOR_FLOAT_OPS_float \
-    SLANG_CUDA_VECTOR_FLOAT_OP(float, 2)  \
-    SLANG_CUDA_VECTOR_FLOAT_OP(float, 3)  \
-    SLANG_CUDA_VECTOR_FLOAT_OP(float, 4)
-#define SLANG_CUDA_VECTOR_FLOAT_OPS_double \
-    SLANG_CUDA_VECTOR_FLOAT_OP(double, 2)  \
-    SLANG_CUDA_VECTOR_FLOAT_OP(double, 3)  \
-    SLANG_CUDA_VECTOR_FLOAT_OP(double, 4)
-#define SLANG_CUDA_VECTOR_FLOAT_OPS___half \
-    SLANG_CUDA_VECTOR_FLOAT_OP_HALF2       \
-    SLANG_CUDA_VECTOR_FLOAT_OP(__half, 3)  \
-    SLANG_CUDA_VECTOR_FLOAT_OP(__half, 4)
-#define SLANG_CUDA_VECTOR_FLOAT_OPS(T) SLANG_CUDA_VECTOR_FLOAT_OPS_##T
-
-SLANG_CUDA_VECTOR_FLOAT_OPS(float)
-SLANG_CUDA_VECTOR_FLOAT_OPS(double)
+SLANG_CUDA_VECTOR_TRAITS_ALL(bool, true, false)
+SLANG_CUDA_VECTOR_TRAITS_ALL(int, true, false)
+SLANG_CUDA_VECTOR_TRAITS_ALL(uint, true, false)
+SLANG_CUDA_VECTOR_TRAITS_ALL(short, true, false)
+SLANG_CUDA_VECTOR_TRAITS_ALL(ushort, true, false)
+SLANG_CUDA_VECTOR_TRAITS_ALL(char, true, false)
+SLANG_CUDA_VECTOR_TRAITS_ALL(uchar, true, false)
+SLANG_CUDA_VECTOR_TRAITS_ALL(longlong, true, false)
+SLANG_CUDA_VECTOR_TRAITS_ALL(ulonglong, true, false)
+SLANG_CUDA_VECTOR_TRAITS_ALL(float, false, true)
+SLANG_CUDA_VECTOR_TRAITS_ALL(double, false, true)
 #if SLANG_CUDA_ENABLE_HALF
-SLANG_CUDA_VECTOR_FLOAT_OPS(__half)
+SLANG_CUDA_VECTOR_TRAITS(__half2, bool2, 2, false, false)
+SLANG_CUDA_VECTOR_TRAITS(__half3, bool3, 3, false, false)
+SLANG_CUDA_VECTOR_TRAITS(__half4, bool4, 4, false, false)
 #endif
-#define SLANG_CUDA_FLOAT_VECTOR_MOD_IMPL(T, n)                                             \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n operator%(const T##n& left, const T##n& right) \
-    {                                                                                      \
-        T##n result;                                                                       \
-        for (int i = 0; i < n; i++)                                                        \
-            *_slang_vector_get_element_ptr(&result, i) = _slang_fmod(                      \
-                _slang_vector_get_element(left, i),                                        \
-                _slang_vector_get_element(right, i));                                      \
-        return result;                                                                     \
-    }
-#define SLANG_CUDA_FLOAT_VECTOR_MOD(T)     \
-    SLANG_CUDA_FLOAT_VECTOR_MOD_IMPL(T, 2) \
-    SLANG_CUDA_FLOAT_VECTOR_MOD_IMPL(T, 3) \
-    SLANG_CUDA_FLOAT_VECTOR_MOD_IMPL(T, 4)
 
-SLANG_CUDA_FLOAT_VECTOR_MOD(float)
-SLANG_CUDA_FLOAT_VECTOR_MOD(double)
+#define SLANG_CUDA_VECTOR_ENABLE_IF \
+    typename SlangCudaVectorEnableIf<(SlangCudaVectorTraits<T>::kWidth > 0)>::Type* = nullptr
+#define SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL \
+    typename SlangCudaVectorEnableIf<SlangCudaVectorTraits<T>::kIsIntegral>::Type* = nullptr
+#define SLANG_CUDA_VECTOR_ENABLE_IF_FMOD \
+    typename SlangCudaVectorEnableIf<SlangCudaVectorTraits<T>::kSupportsFmod>::Type* = nullptr
+
+#define SLANG_CUDA_VECTOR_BINARY_OP(op, ENABLE)                          \
+    template<typename T, ENABLE>                                         \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T operator op(T thisVal, T other) \
+    {                                                                    \
+        T result;                                                        \
+        result.x = thisVal.x op other.x;                                 \
+        result.y = thisVal.y op other.y;                                 \
+        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 3)             \
+            result.z = thisVal.z op other.z;                             \
+        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 4)             \
+            result.w = thisVal.w op other.w;                             \
+        return result;                                                   \
+    }
+#define SLANG_CUDA_VECTOR_COMPARE_OP(op)                                                          \
+    template<typename T, SLANG_CUDA_VECTOR_ENABLE_IF>                                             \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL typename SlangCudaVectorTraits<T>::BoolVector operator op( \
+        T thisVal,                                                                                \
+        T other)                                                                                  \
+    {                                                                                             \
+        typename SlangCudaVectorTraits<T>::BoolVector result;                                     \
+        result.x = thisVal.x op other.x;                                                          \
+        result.y = thisVal.y op other.y;                                                          \
+        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 3)                                      \
+            result.z = thisVal.z op other.z;                                                      \
+        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 4)                                      \
+            result.w = thisVal.w op other.w;                                                      \
+        return result;                                                                            \
+    }
+#define SLANG_CUDA_VECTOR_UNARY_OP(op, ENABLE)                  \
+    template<typename T, ENABLE>                                \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T operator op(T thisVal) \
+    {                                                           \
+        T result;                                               \
+        result.x = op thisVal.x;                                \
+        result.y = op thisVal.y;                                \
+        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 3)    \
+            result.z = op thisVal.z;                            \
+        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 4)    \
+            result.w = op thisVal.w;                            \
+        return result;                                          \
+    }
+
+SLANG_CUDA_VECTOR_BINARY_OP(+, SLANG_CUDA_VECTOR_ENABLE_IF)
+SLANG_CUDA_VECTOR_BINARY_OP(-, SLANG_CUDA_VECTOR_ENABLE_IF)
+SLANG_CUDA_VECTOR_BINARY_OP(*, SLANG_CUDA_VECTOR_ENABLE_IF)
+SLANG_CUDA_VECTOR_BINARY_OP(/, SLANG_CUDA_VECTOR_ENABLE_IF)
+SLANG_CUDA_VECTOR_BINARY_OP(&&, SLANG_CUDA_VECTOR_ENABLE_IF)
+SLANG_CUDA_VECTOR_BINARY_OP(||, SLANG_CUDA_VECTOR_ENABLE_IF)
+SLANG_CUDA_VECTOR_BINARY_OP(%, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
+SLANG_CUDA_VECTOR_BINARY_OP(^, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
+SLANG_CUDA_VECTOR_BINARY_OP(&, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
+SLANG_CUDA_VECTOR_BINARY_OP(|, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
+SLANG_CUDA_VECTOR_BINARY_OP(>>, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
+SLANG_CUDA_VECTOR_BINARY_OP(<<, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
+SLANG_CUDA_VECTOR_COMPARE_OP(>)
+SLANG_CUDA_VECTOR_COMPARE_OP(<)
+SLANG_CUDA_VECTOR_COMPARE_OP(>=)
+SLANG_CUDA_VECTOR_COMPARE_OP(<=)
+SLANG_CUDA_VECTOR_COMPARE_OP(==)
+SLANG_CUDA_VECTOR_COMPARE_OP(!=)
+SLANG_CUDA_VECTOR_UNARY_OP(-, SLANG_CUDA_VECTOR_ENABLE_IF)
+SLANG_CUDA_VECTOR_UNARY_OP(!, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
+SLANG_CUDA_VECTOR_UNARY_OP(~, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
+
+#if SLANG_CUDA_ENABLE_HALF
+/* `__half2` arithmetic is backed by the packed CUDA intrinsics (`__hadd2`, `__hsub2`, ...) so it
+   emits one `add.f16x2` rather than two scalar `add.f16`. These are ordinary (non-template)
+   overloads, so for `__half2` they win overload resolution over the arithmetic templates above,
+   which stay in use for `__half2`'s comparison and logical operators and for `__half3`/`__half4`.
+   (cuda_fp16.h is included with `__CUDA_NO_HALF2_OPERATORS__`, so it supplies none of these
+   itself.)
+   `__half2` is also the only vector type with compound-assignment operators. */
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator+(const __half2& lh, const __half2& rh)
+{
+    return __hadd2(lh, rh);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& lh, const __half2& rh)
+{
+    return __hsub2(lh, rh);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator*(const __half2& lh, const __half2& rh)
+{
+    return __hmul2(lh, rh);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator/(const __half2& lh, const __half2& rh)
+{
+    return __h2div(lh, rh);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& h)
+{
+    return __hneg2(h);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator+=(__half2& lh, const __half2& rh)
+{
+    lh = __hadd2(lh, rh);
+    return lh;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator-=(__half2& lh, const __half2& rh)
+{
+    lh = __hsub2(lh, rh);
+    return lh;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator*=(__half2& lh, const __half2& rh)
+{
+    lh = __hmul2(lh, rh);
+    return lh;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator/=(__half2& lh, const __half2& rh)
+{
+    lh = __h2div(lh, rh);
+    return lh;
+}
+#endif
+// Uses `_slang_fmod`, so it is gated on `kSupportsFmod` rather than reusing the integral `%` above:
+// `__half` is excluded because there is no `_slang_fmod(__half, __half)`.
+template<typename T, SLANG_CUDA_VECTOR_ENABLE_IF_FMOD>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T operator%(T left, T right)
+{
+    T result;
+    result.x = _slang_fmod(left.x, right.x);
+    result.y = _slang_fmod(left.y, right.y);
+    if constexpr (SlangCudaVectorTraits<T>::kWidth >= 3)
+        result.z = _slang_fmod(left.z, right.z);
+    if constexpr (SlangCudaVectorTraits<T>::kWidth >= 4)
+        result.w = _slang_fmod(left.w, right.w);
+    return result;
+}
 
 #if SLANG_CUDA_RTC || SLANG_CUDA_ENABLE_HALF
 #define SLANG_MAKE_VECTOR(T)                                                \
@@ -4345,9 +4371,12 @@ shader appropriately.
 struct UniformEntryPointParams;
 struct UniformState;
 
-// ---------------------- OptiX Ray Payload --------------------------------------
-#ifdef SLANG_CUDA_ENABLE_OPTIX
-
+// ---------------------- Ray-tracing types (always defined) ---------------------
+// RayDesc is a plain POD that shaders may use as ordinary data (ray math) without
+// any OptiX call, so it must be defined for every CUDA/PTX program, not only ray
+// tracing ones. It is emitted via `__target_intrinsic(cuda, RayDesc)` in
+// hlsl.meta.slang, which relies on the prelude to supply the C++ definition. The
+// OptiX *runtime* below stays gated behind SLANG_CUDA_ENABLE_OPTIX.
 struct RayDesc
 {
     float3 Origin;
@@ -4355,6 +4384,9 @@ struct RayDesc
     float3 Direction;
     float TMax;
 };
+
+// ---------------------- OptiX Ray Payload --------------------------------------
+#ifdef SLANG_CUDA_ENABLE_OPTIX
 
 static __forceinline__ __device__ void* unpackOptiXRayPayloadPointer(uint32_t i0, uint32_t i1)
 {
@@ -4813,6 +4845,9 @@ __forceinline__ __device__ bool optixHitObjectIsLSSHit(OptixTraversableHandle* O
 }
 #endif
 
+// Native optixTraverse is an OptiX 8.0+ SER symbol; guard so the prelude stays compilable on
+// OptiX 7.x, where these wrappers would otherwise reference an undeclared function.
+#if (OPTIX_VERSION >= 80000)
 // Internal helper to call optixTraverse with the right number of register arguments
 template<typename T, size_t N = (sizeof(T) + 3) / 4>
 __forceinline__ __device__ void optixTraverseWithRegs(
@@ -5228,6 +5263,7 @@ __forceinline__ __device__ void optixTraverse(
         MultiplierForGeometryContributionToHitGroupIndex,
         MissShaderIndex);
 }
+#endif // OPTIX_VERSION >= 80000
 
 #if (OPTIX_VERSION >= 80100)
 static __forceinline__ __device__ bool slangOptixHitObjectIsHit(OptixTraversableHandle* hitObj)

@@ -15,7 +15,7 @@
 // prints a different integer. Pinning the vertex value locks the mapping
 // so a renumbering of the profile enum is caught.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage vertex
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage vertex
 
 struct VOut { float4 pos : SV_Position; };
 

@@ -13,7 +13,7 @@
 // `methC`, so any positional association would mis-pair the rows. The
 // order-independent CHECK-DAGs assert each key sits with its own
 // implementation, which only holds if entries are read by key.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IMulti
 {

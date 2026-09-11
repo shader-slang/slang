@@ -82,9 +82,14 @@ struct RequiredLoweringPassSet
     bool barrierFlagValidation;
     bool appendConsumeStructuredBuffer;
     bool taggedUnion;
+    bool assumeAddress;
+    bool untaggedUnion;
+    bool tagOps;
+    bool tagType;
     bool lValueCast;
     bool sumVectorMatrix;
     bool lateRequireCapability;
+    bool unresolvedMatrixLayout;
 };
 
 /// A context for code generation in the compiler back-end

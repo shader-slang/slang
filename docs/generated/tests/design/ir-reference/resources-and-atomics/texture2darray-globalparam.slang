@@ -12,7 +12,7 @@
 // `Texture2DArray` shares the 2D shape token but flips the array
 // slot in the `TextureType(...)` operand list to `1`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform Texture2DArray<float4> tex;
 uniform SamplerState samp;

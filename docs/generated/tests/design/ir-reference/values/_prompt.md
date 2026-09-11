@@ -251,11 +251,11 @@ Value-opcode claims are best observed through one of two mechanisms.
    standard form used here is:
 
    ```
-   //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+   //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
    ```
 
    Per the universal `_common.md` rule: combine `-dump-ir` with
-   **`-target <text-target>`** AND **`-o /dev/null`** so the IR dump
+   **`-target <text-target>`** AND **`-o -`** so the IR dump
    goes to stdout uncontaminated by target text.
 
    Anchor patterns at `func %main` (or a user-named helper) to cut
@@ -279,7 +279,7 @@ Do not use any GPU-only directive.
       `ir-reference/values.md` (or one of the listed secondary
       docs).
 - [ ] Every `-dump-ir` test uses `-target <text-target> -dump-ir
--o /dev/null -stage compute -entry main` per CLAUDE.md.
+-o - -stage compute -entry main` per CLAUDE.md.
 - [ ] Outputs escape DCE: write to an `RWStructuredBuffer<T>` so
       the value observation survives to the dump's first stage.
 - [ ] Operands are non-constant (`uniform` globals or values
@@ -306,7 +306,10 @@ These are restated from `_common.md` because they bite hard in
 value-opcode observation tests:
 
 - `-dump-ir` requires `-target <X>` (else compile stops early) and
-  `-o /dev/null` (else target text mixes with IR on stdout).
+  `-o -` (an absolute path such as `/dev/null` is rejected as
+  non-portable; the target text lands in the trailing `standard
+  output` block, after the IR dump, so it cannot disturb an ordered
+  `CHECK`).
 - Constant folding collapses arithmetic on literals. To observe
   `add(%a, %b)` or any binary opcode, both operands must be non-
   constant: read them from `uniform` globals or compute them from

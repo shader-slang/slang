@@ -17,7 +17,7 @@
 // `makeMatrixFromScalar(%f)`, proving the four elements are not spelled
 // out as separate `makeMatrix` operands.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float f;
 uniform RWStructuredBuffer<float> buf;

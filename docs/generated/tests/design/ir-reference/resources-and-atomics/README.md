@@ -22,7 +22,7 @@ the thirteen members of the `AtomicOperation` group.
 
 The catalog rows make one testable kind of claim — _surface construct X
 produces IR opcode Y with operand shape Z_ — so the dominant strategy is
-`//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null
+`//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o -
 -stage compute -entry main`, with CHECK patterns anchored at
 `func %main` when the opcode belongs to the user body, and matched
 globally when the opcode is created inside a core-module function body

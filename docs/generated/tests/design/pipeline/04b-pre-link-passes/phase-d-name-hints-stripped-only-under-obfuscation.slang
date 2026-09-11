@@ -15,8 +15,8 @@
 // and the `-obfuscate` run must show none of them between the snapshot
 // header and the lowered function, which still appears.
 
-//TEST:SIMPLE(filecheck=KEEP):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=STRIP):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -obfuscate
+//TEST:SIMPLE(filecheck=KEEP):-target spirv-asm -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=STRIP):-target spirv-asm -dump-ir -o - -entry main -stage compute -obfuscate
 
 uniform int userNamedGlobal;
 uniform RWStructuredBuffer<int> buf;

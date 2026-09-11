@@ -2,6 +2,16 @@ name: CI Falcor Test Workflow
 
 on:
   workflow_call:
+    inputs:
+      slang-artifact-name:
+        description: >-
+          Name of the slang-tests-* artifact for the test-falcor job to
+          fetch. Defaults to the regular Windows-release artifact; the
+          caller can point this at a separately-built artifact instead
+          (see build-windows-release-cl-x86_64-gpu-falcor in ci.yml).
+        required: false
+        type: string
+        default: slang-tests-windows-x86_64-cl-release
 
 permissions:
   actions: read
@@ -9,13 +19,23 @@ permissions:
 jobs:
   test-falcor:
     name: Test (Falcor)
-    timeout-minutes: 100
+    timeout-minutes: 180
     runs-on: [Linux, self-hosted, X64, falcor-bridge]
     # Vet-and-approve gate: this job runs PR-controlled code on the internal
-    # bridge VM, so it is gated behind the `falcor-ci` environment (required
-    # reviewers = the `ci-approvers` team). A PR by a team member runs
-    # automatically; anyone else's run waits for a one-click approval.
-    environment: falcor-ci
+    # bridge VM, so approval (required reviewers = the `ci-approvers` team)
+    # is required before it runs. The `environment: falcor-ci` gate lives on
+    # falcor-build-approval-gate in ci.yml (upstream of this job, via
+    # build-windows-release-cl-x86_64-gpu-falcor), not here directly --
+    # GitHub charges one approval prompt per job that references an
+    # environment, so putting the gate on both the build and this job would
+    # mean two separate approval clicks per PR for one Falcor run. Every PR's
+    # run pauses for that one upstream approval -- environment protection has
+    # no actor scoping, so there is no "team member" exemption -- and it also
+    # covers this job, since it cannot start until the gated build produces
+    # its artifact. timeout-minutes only counts execution time once this job
+    # starts on a runner, so it does not need to budget for the approval
+    # wait; it still needs to cover the ~45 minute Falcor run plus that run's
+    # own queue for a GPU host on the far side of the bridge.
     defaults:
       run:
         shell: bash
@@ -23,71 +43,7 @@ jobs:
       - name: Run external CI
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          SLANG_CI_ARTIFACT_NAME: slang-tests-windows-x86_64-cl-release
+          SLANG_CI_ARTIFACT_NAME: ${{ inputs.slang-artifact-name }}
         run: |
           set -euo pipefail
           /opt/slang-ci/run-external-ci
-
-  test-falcor-perf:
-    name: Test (Falcor Perf)
-    timeout-minutes: 100
-    runs-on: [Windows, self-hosted, perf]
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Add Git Bash to PATH
-        shell: pwsh
-        run: |
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-        with:
-          persist-credentials: false
-          submodules: "false"
-          fetch-depth: "1"
-      - name: Download Slang build
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
-        with:
-          name: slang-tests-windows-x86_64-cl-release
-          path: build
-
-      - uses: robinraju/release-downloader@28fc21f50d76778e7023361aa1f863e717d3d56f # v1.13
-        id: download
-        with:
-          # The source repository path.
-          # Expected format {owner}/{repo}
-          # Default: ${{ github.repository }}
-          repository: "shader-slang/falcor-compile-perf-test"
-
-          # A flag to set the download target as latest release
-          # The default value is 'false'
-          latest: true
-
-          # The name of the file to download.
-          # Use this field only to specify filenames other than tarball or zipball, if any.
-          # Supports wildcard pattern (eg: '*', '*.deb', '*.zip' etc..)
-          fileName: "falcor_perf_test-*-win-64.zip"
-
-          # Relative path under $GITHUB_WORKSPACE to place the downloaded file(s)
-          # It will create the target directory automatically if not present
-          # eg: out-file-path: "my-downloads" => It will create directory $GITHUB_WORKSPACE/my-downloads
-          out-file-path: "falcor-perf-test"
-
-          # Somehow there is a bug in this flag, the executable extracted is not runnable. We have to
-          # extract ourselves.
-          extract: false
-
-      - name: run falcor-compiler-perf-test
-        env:
-          DOWNLOADED_FILE: ${{ fromJson(steps.download.outputs.downloaded_files)[0] }}
-        run: |
-          set -euo pipefail
-          filename="$DOWNLOADED_FILE"
-          [[ -f "$filename" ]] || { echo "Downloaded file not found: $filename" >&2; exit 1; }
-          python -m zipfile -e "$filename" ./falcor-perf-test
-          export PATH="./build/Release/bin:$PATH"
-          echo "PATH is $PATH"
-          echo "Running falcor performance test..."
-          ./falcor-perf-test/bin/Release/falcor_perftest.exe
-          echo "falcor performance test completed successfully"

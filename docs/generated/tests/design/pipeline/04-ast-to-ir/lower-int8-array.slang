@@ -12,7 +12,7 @@
 // Boundary: storage axis — fixed-size array with narrow element type.
 // Combines the VarDecl-global row with an Array(...) element type.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int8_t arr[4];
 uniform RWStructuredBuffer<int> buf;

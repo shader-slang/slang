@@ -13,7 +13,7 @@
 // float. Verifies the `bitCast` opcode is the same shape at the
 // 64-bit width.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint64_t u64a;
 uniform RWStructuredBuffer<double> buf;

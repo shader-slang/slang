@@ -15,7 +15,7 @@
 // decoration whose name starts with `key_` and embeds the mangled
 // interface/method names — the cross-module unification handle.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IQuack
 {

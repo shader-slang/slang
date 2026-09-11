@@ -13,7 +13,7 @@
 // be instantiated; the CHECK asserts that the type this local carries is
 // spelled `specialize(<Pair>, Int)` in the dump, which is the type-application
 // form of the same opcode.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int inVal;
 uniform RWStructuredBuffer<int> buf;

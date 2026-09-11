@@ -13,7 +13,7 @@
 // parent. The minimum nontrivial member count (1) surfaces exactly one
 // `field(%key, <T>)` row.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Single { int x; }
 

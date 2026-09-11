@@ -17,10 +17,10 @@
 // pre-link snapshot, they must have come from the declaration walk in
 // Phase A rather than from a later pass.
 
-//TEST:SIMPLE(filecheck=NONE):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=LINE):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -trace-coverage
-//TEST:SIMPLE(filecheck=FUNC):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -trace-function-coverage
-//TEST:SIMPLE(filecheck=BRANCH):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -trace-branch-coverage
+//TEST:SIMPLE(filecheck=NONE):-target spirv-asm -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=LINE):-target spirv-asm -dump-ir -o - -entry main -stage compute -trace-coverage
+//TEST:SIMPLE(filecheck=FUNC):-target spirv-asm -dump-ir -o - -entry main -stage compute -trace-function-coverage
+//TEST:SIMPLE(filecheck=BRANCH):-target spirv-asm -dump-ir -o - -entry main -stage compute -trace-branch-coverage
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

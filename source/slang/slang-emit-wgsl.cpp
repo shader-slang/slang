@@ -725,6 +725,16 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitType((IRType*)type->getOperand(0));
             return;
         }
+    case kIROp_AttributedType:
+        {
+            // An attribute (`unorm`/`snorm`, `no_diff`) is a semantic marker that
+            // does not change representation and has no WGSL spelling, so the type
+            // is emitted as its base. Without this, a `unorm float` used as a
+            // struct member or structured-buffer element type reaches here and the
+            // `default` arm emits nothing, producing invalid WGSL (`array<>`).
+            emitType(cast<IRAttributedType>(type)->getBaseType());
+            return;
+        }
     default:
         break;
     }
@@ -1419,34 +1429,6 @@ void WGSLSourceEmitter::emitCallArg(IRInst* inst)
 
 bool WGSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
-    // WGSL emits MakeArray/MakeStruct as constructor expressions, valid in any expression context
-    // (the base class never folds them because C/HLSL initializer lists are not). Fold a
-    // module-scope aggregate constant inline when it is used only as a constituent of another
-    // aggregate, so a nested `static const` (e.g. `int g[2][3]`) does not emit its inner arrays as
-    // separate named decls that the outermost array's `var<private>` initializer would illegally
-    // reference; the outermost (used directly, e.g. runtime-indexed) one stays a declaration.
-    switch (inst->getOp())
-    {
-    case kIROp_MakeArray:
-    case kIROp_MakeStruct:
-    case kIROp_MakeArrayFromElement:
-        if (inst->getParent() && inst->getParent()->getOp() == kIROp_ModuleInst)
-        {
-            bool onlyConstituent = inst->firstUse != nullptr;
-            for (auto use = inst->firstUse; onlyConstituent && use; use = use->nextUse)
-            {
-                auto userOp = use->getUser()->getOp();
-                onlyConstituent = userOp == kIROp_MakeArray || userOp == kIROp_MakeStruct ||
-                                  userOp == kIROp_MakeArrayFromElement;
-            }
-            if (onlyConstituent)
-                return true;
-        }
-        break;
-    default:
-        break;
-    }
-
     bool result = CLikeSourceEmitter::shouldFoldInstIntoUseSites(inst);
     if (result)
     {

@@ -13,7 +13,7 @@
 // opcode for the implicit promotion to a common type before
 // `add` runs.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int8_t i8a;
 uniform int16_t i16a;

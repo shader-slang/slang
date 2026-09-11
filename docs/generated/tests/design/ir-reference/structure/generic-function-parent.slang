@@ -15,7 +15,7 @@
 // header, then requires the inner `func %myGeneric` whose `Func(...)` type
 // mentions the type-parameter value rather than a concrete type.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 uniform int seed;

@@ -18,7 +18,7 @@
 // discard is guarded by a `uniform` comparison so the branch survives to
 // emission instead of being folded away.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage fragment -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage fragment -entry main
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage fragment -entry main
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage fragment -entry main
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage fragment -entry main

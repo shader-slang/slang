@@ -16,7 +16,7 @@
 // the capture fixes the position, matching `%a` on the third operand, `%b` on
 // the fourth and `%c` on the fifth is what proves declaration order.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 struct S
 {

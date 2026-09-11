@@ -15,7 +15,7 @@
 // scalar / resource types each produce their own `let %x : T =
 // global_param` declaration.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int alpha;
 uniform float beta;
