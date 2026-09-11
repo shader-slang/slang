@@ -939,42 +939,62 @@ void addModifier(ModifiableSyntaxNode* syntax, Modifier* modifier)
 //
 // '::'? identifier ('::' identifier)*
 //
-// Returns a single token whose name is the flat, underscore-folded spelling of the (possibly
-// qualified) attribute name, e.g. `a::b` becomes `a_b` and a leading `::` becomes a leading `_`.
-// The fold is intentional: builtin qualified attributes such as `[vk::binding]` are registered
-// under flat names (`vk_binding`), so folding lets them resolve by name. To let the checker also
-// resolve a *user-defined* attribute that lives inside a namespace (which has no flat registered
-// name), the ordered identifier segments are additionally reported via `outSegments`, which is
-// left empty for an unqualified name.
-static Token parseAttributeName(
-    Parser* parser,
-    Token& outOriginalLastToken,
-    List<NameLoc>& outSegments)
+// Parses a (possibly qualified) attribute name and reports it two ways:
+//
+//   * the return value is a single token whose name is the flat, underscore-folded spelling
+//     (`a::b` becomes `a_b`, a leading `::` becomes a leading `_`). This fold is legacy: builtin
+//     qualified attributes such as `[vk::binding]` are registered under flat names (`vk_binding`),
+//     so the checker's legacy fallback resolves them by this name.
+//   * `outNameExpr` receives the name as an ordinary expression — a `VarExpr` for an unqualified
+//     `[Name]`, or a `StaticMemberExpr` chain for a qualified `[a::b::Name]` — so the checker can
+//     resolve it through the normal name-resolution path (which is how a user-defined attribute
+//     declared inside a namespace is found).
+static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken, Expr*& outNameExpr)
 {
     const SourceLoc scopedIdSourceLoc = parser->tokenReader.peekLoc();
 
     // Strip initial :: if there is one
     const TokenType initialTokenType = parser->tokenReader.peekTokenType();
-    if (initialTokenType == TokenType::Scope)
+    const bool isGlobalScoped = (initialTokenType == TokenType::Scope);
+    if (isGlobalScoped)
     {
         parser->ReadToken(TokenType::Scope);
     }
     if (parser->LookAheadToken(TokenType::CompletionRequest))
-        return parser->ReadToken();
+    {
+        Token completionToken = parser->ReadToken();
+        // Surface the completion request as an ordinary name expression so attribute-name
+        // completion flows through the normal path.
+        auto completionExpr = parser->astBuilder->create<VarExpr>();
+        completionExpr->scope = parser->currentScope;
+        completionExpr->loc = completionToken.getLoc();
+        completionExpr->name = completionToken.getName();
+        outNameExpr = completionExpr;
+        return completionToken;
+    }
 
     const Token firstIdentifier = parser->ReadToken(TokenType::Identifier);
     outOriginalLastToken = firstIdentifier;
-    if (initialTokenType != TokenType::Scope &&
-        parser->tokenReader.peekTokenType() != TokenType::Scope)
+
+    // Build the leading `VarExpr` for the first segment. A leading `::` roots the name at the
+    // module (global) scope, exactly as ordinary `::`-qualified name parsing does (see the basic-
+    // type case), so a shadowing local does not capture `[::N::Foo]`.
+    auto firstExpr = parser->astBuilder->create<VarExpr>();
+    firstExpr->scope = isGlobalScoped ? parser->currentModule->ownedScope : parser->currentScope;
+    firstExpr->loc = firstIdentifier.getLoc();
+    firstExpr->name = firstIdentifier.getName();
+    Expr* nameExpr = firstExpr;
+
+    if (!isGlobalScoped && parser->tokenReader.peekTokenType() != TokenType::Scope)
     {
+        // Unqualified `[Name]`: the folded name equals the identifier.
+        outNameExpr = nameExpr;
         return firstIdentifier;
     }
 
-    outSegments.add(NameLoc(firstIdentifier));
-
-    // Build up scoped string
+    // Build up the underscore-folded legacy spelling alongside the `StaticMemberExpr` chain.
     StringBuilder scopedIdentifierBuilder;
-    if (initialTokenType == TokenType::Scope)
+    if (isGlobalScoped)
     {
         scopedIdentifierBuilder.append('_');
     }
@@ -987,9 +1007,16 @@ static Token parseAttributeName(
 
         const Token nextIdentifier(parser->ReadToken(TokenType::Identifier));
         outOriginalLastToken = nextIdentifier;
-        outSegments.add(NameLoc(nextIdentifier));
         scopedIdentifierBuilder.append(nextIdentifier.getContent());
+
+        auto memberExpr = parser->astBuilder->create<StaticMemberExpr>();
+        memberExpr->scope = parser->currentScope;
+        memberExpr->loc = nextIdentifier.getLoc();
+        memberExpr->baseExpression = nameExpr;
+        memberExpr->name = nextIdentifier.getName();
+        nameExpr = memberExpr;
     }
+    outNameExpr = nameExpr;
 
     // Make a 'token'
     SourceManager* sourceManager = parser->sink->getSourceManager();
@@ -1025,15 +1052,15 @@ static void ParseSquareBracketAttributes(Parser* parser, Modifier*** ioModifierL
         //
 
         Token originalLastToken;
-        List<NameLoc> qualifiedNameSegments;
-        Token nameToken = parseAttributeName(parser, originalLastToken, qualifiedNameSegments);
+        Expr* nameExpr = nullptr;
+        Token nameToken = parseAttributeName(parser, originalLastToken, nameExpr);
 
         UncheckedAttribute* modifier = parser->astBuilder->create<UncheckedAttribute>();
         modifier->keywordName = nameToken.getName();
         modifier->loc = originalLastToken.getLoc();
         modifier->scope = parser->currentScope;
         modifier->originalIdentifierToken = originalLastToken;
-        modifier->qualifiedNameSegments = _Move(qualifiedNameSegments);
+        modifier->attributeNameExpr = nameExpr;
 
         if (AdvanceIf(parser, TokenType::LParent))
         {

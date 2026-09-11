@@ -808,6 +808,13 @@ class AttributeBase : public Modifier
     FIDDLE(...)
     FIDDLE() AttributeDecl* attributeDecl = nullptr;
 
+    // The attribute name as written, as an expression: a `VarExpr` for an unqualified `[Name]` or a
+    // `StaticMemberExpr` chain for a qualified `[a::b::Name]`. The checker resolves this through
+    // the normal name-resolution path so that a qualified name (including a user-defined attribute
+    // declared in a namespace) is looked up the same way as any other qualified reference. Null for
+    // attributes not produced from a parsed name (e.g. GLSL layout qualifiers).
+    FIDDLE() Expr* attributeNameExpr = nullptr;
+
     // The original identifier token representing the last part of the qualified name.
     Token originalIdentifierToken;
 
@@ -822,14 +829,6 @@ class UncheckedAttribute : public AttributeBase
     FIDDLE(...)
 
     Scope* scope = nullptr;
-
-    // The ordered identifier segments of a qualified attribute name, e.g. `a`, `b` for
-    // `[a::b(...)]`. This is populated only when the attribute name was written with `::`
-    // qualification; a plain `[name(...)]` leaves it empty. `keywordName` still holds the flat
-    // underscore-folded spelling (e.g. `a_b`) that resolves builtin attributes such as
-    // `[vk::binding]`; these segments let the checker fall back to a scoped lookup when that flat
-    // spelling does not name a known attribute (see `lookUpAttributeDecl`).
-    List<NameLoc> qualifiedNameSegments;
 };
 
 // A GLSL layout qualifier whose value has not yet been resolved or validated.

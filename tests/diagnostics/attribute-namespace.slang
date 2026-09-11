@@ -41,6 +41,14 @@ void usesNested()
 {
 }
 
+// A leading `::` roots the qualified attribute name at the module (global) scope; the folded
+// spelling of `::my_namespace::Example` would be '_my_namespace_Example'.
+// CHECK-NOT: _my_namespace_Example
+[::my_namespace::Example(4)]
+void usesGlobalQualified()
+{
+}
+
 // Negative control: a genuinely undefined qualified attribute must still warn — the qualified-name
 // fallback must not silence real errors.
 // CHECK: warning{{.*}}31000

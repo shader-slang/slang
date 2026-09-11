@@ -2218,37 +2218,21 @@ public:
 
     DeclRef<VarDeclBase> tryGetIntOrEnumSpecializationConstant(Expr* expr);
 
-    AttributeDecl* lookUpAttributeDecl(
+    // Resolve the attribute name written inside `[...]` (a `VarExpr` for `[Name]`, or a
+    // `StaticMemberExpr` chain for `[a::b::Name]`) to the `AttributeDecl` it names, using ordinary
+    // name resolution so a qualified name — including a user-defined attribute declared in a
+    // namespace — resolves like any other qualified reference. Tries the name as written and the
+    // `Foo` -> `FooAttribute` user-defined-attribute convention. Resolution runs under a muting
+    // sink, so a miss is silent and the caller can fall back to the legacy flat lookup. Returns
+    // null when the name does not resolve to a usable attribute.
+    AttributeDecl* lookUpAttributeDeclFromNameExpr(Expr* attributeNameExpr);
+
+    // Resolve an attribute by its legacy flat, underscore-folded name (e.g. `vk_binding` for
+    // `[vk::binding]`). Used as the fallback when `lookUpAttributeDeclFromNameExpr` cannot resolve
+    // the name; scheduled for deprecation in language version 202c (see issue #12668).
+    AttributeDecl* lookUpLegacyUnderscoreConcatenatedAttributeDecl(
         Name* attributeName,
-        Scope* scope,
-        List<NameLoc> const& qualifiedNameSegments);
-
-    // Look up a name directly in `container`, plus in all merged-namespace sibling scopes when
-    // `container` is a namespace (honoring cross-module import visibility). `fromScope` supplies
-    // the current module for that visibility check.
-    LookupResult lookUpDirectMemberIncludingNamespaceSiblings(
-        Name* name,
-        ContainerDecl* container,
-        Scope* fromScope,
-        LookupMask mask);
-
-    // Resolve the final segment of a qualified attribute name as an attribute declared directly in
-    // `container` (either a builtin `AttributeDecl` or a user-defined `struct <name>Attribute`).
-    // `fromScope` supplies the current module for merged-namespace import-visibility filtering.
-    // Sets `outAmbiguous` when the lookup is ambiguous (multiple matches), so the caller rejects
-    // it.
-    AttributeDecl* lookUpAttributeDeclInContainer(
-        Name* lastSegmentName,
-        ContainerDecl* container,
-        Scope* fromScope,
-        bool& outAmbiguous);
-
-    // Resolve a qualified attribute name (e.g. `[my_namespace::Example(...)]`) by walking its
-    // namespace/type qualifier segments and resolving the final segment as an attribute in the
-    // resulting container. Reached only after the flat folded-name lookups fail to produce a usable
-    // attribute, so builtin qualified attributes (`[vk::binding]`, registered under the flat name
-    // `vk_binding`) never take this path.
-    AttributeDecl* lookUpQualifiedAttributeDecl(List<NameLoc> const& segments, Scope* scope);
+        Scope* scope);
 
     bool hasFloatArgs(Attribute* attr, int numArgs);
     bool hasIntArgs(Attribute* attr, int numArgs);

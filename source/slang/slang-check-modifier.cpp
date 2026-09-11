@@ -178,194 +178,108 @@ static AttributeDecl* _getAttributeDeclFromUserDefinedAttributeStruct(
     return attrUsageAttr->attributeDecl;
 }
 
-// Look up a single name directly in `container`, and — when `container` is a namespace — in all of
-// its sibling scopes as well, so that a name declared in any fragment of a namespace that was split
-// across multiple `namespace X { ... }` blocks (possibly in different modules) is found. This
-// mirrors the merged-namespace member lookup that `_lookupStaticMember` performs for `X::member`
-// expressions: it walks `ownedScope->nextSibling`, skips scopes that are only transitively imported
-// into the current module, and deduplicates. `fromScope` supplies the current module for that
-// import-visibility check. Returns the raw `LookupResult`, which may be empty, single, or
-// overloaded — the caller decides how to treat an overload (e.g. as ambiguity).
-LookupResult SemanticsVisitor::lookUpDirectMemberIncludingNamespaceSiblings(
-    Name* name,
-    ContainerDecl* container,
-    Scope* fromScope,
-    LookupMask mask)
+// Return the `AttributeDecl` that a resolved attribute-name declaration denotes: the decl itself
+// when it is already an `AttributeDecl`, or the attribute synthesized from a user-defined attribute
+// `struct` (a `struct` marked `[__AttributeUsage]`). Returns null for any other decl, so a caller
+// that resolves several candidate spellings can keep looking.
+static AttributeDecl* _getAttributeDeclFromResolvedNameDecl(SemanticsVisitor* visitor, Decl* decl)
 {
-    LookupResult result;
-    if (auto namespaceDecl = as<NamespaceDeclBase>(container))
-    {
-        auto namespaceModule = getModuleDecl(namespaceDecl);
-        auto thisModule = fromScope ? getModuleDecl(fromScope->containerDecl) : namespaceModule;
-        HashSet<ContainerDecl*> processedScopes;
-        for (auto scope = namespaceDecl->ownedScope; scope; scope = scope->nextSibling)
-        {
-            auto siblingNamespace = as<NamespaceDeclBase>(scope->containerDecl);
-            if (!siblingNamespace)
-                continue;
-            // Skip a sibling that belongs to a module only transitively imported here.
-            if (thisModule != namespaceModule && namespaceModule != getModuleDecl(siblingNamespace))
-                continue;
-            if (!processedScopes.add(siblingNamespace))
-                continue;
-            AddToLookupResult(
-                result,
-                lookUpDirectAndTransparentMembers(
-                    m_astBuilder,
-                    this,
-                    name,
-                    siblingNamespace,
-                    DeclRef(siblingNamespace),
-                    mask,
-                    getDeclToExcludeFromLookup()));
-        }
-    }
-    else
-    {
-        result = lookUpDirectAndTransparentMembers(
-            m_astBuilder,
-            this,
-            name,
-            container,
-            DeclRef(container),
-            mask,
-            getDeclToExcludeFromLookup());
-    }
-    return result;
+    if (auto attributeDecl = as<AttributeDecl>(decl))
+        return attributeDecl;
+    if (auto structDecl = as<StructDecl>(decl))
+        return _getAttributeDeclFromUserDefinedAttributeStruct(visitor, structDecl);
+    return nullptr;
 }
 
-// Resolve the final segment of a qualified attribute name within a resolved container declaration
-// (a namespace, module, or aggregate type). Mirrors the two name-based lookups used for an
-// unqualified attribute: first a direct `AttributeDecl` named `lastSegment`, then a `struct` named
-// `lastSegment + "Attribute"` carrying `[__AttributeUsage]`. Sets `outAmbiguous` when a lookup
-// finds multiple candidates of the expected kind, so the caller can reject the reference rather
-// than silently picking one. Returns null (with `outAmbiguous` false) when nothing matches.
-AttributeDecl* SemanticsVisitor::lookUpAttributeDeclInContainer(
-    Name* lastSegmentName,
-    ContainerDecl* container,
-    Scope* fromScope,
-    bool& outAmbiguous)
+AttributeDecl* SemanticsVisitor::lookUpAttributeDeclFromNameExpr(Expr* attributeNameExpr)
 {
-    outAmbiguous = false;
-    if (!lastSegmentName || !container)
+    // Resolve the attribute name written inside `[...]` using ordinary name resolution, so that a
+    // qualified name — including a user-defined attribute declared in a namespace, e.g.
+    // `[my_namespace::Example(...)]` — is looked up exactly as any other `my_namespace::Example`
+    // reference would be. `attributeNameExpr` is a `VarExpr` for an unqualified `[Name]` or a
+    // `StaticMemberExpr` chain for a qualified `[a::b::Name]`; both resolve through `CheckTerm`,
+    // which already performs merged-namespace-across-modules member lookup, so no bespoke qualifier
+    // walking is needed here.
+    if (!attributeNameExpr)
         return nullptr;
 
+    // Resolve one spelling of the name quietly. A miss must not surface a diagnostic, because the
+    // caller falls back to the legacy flat lookup; so checking runs on a sub-visitor with a muting
+    // sink and a non-zero error count is treated as "not found". `suffix` is appended to the final
+    // identifier to try the `Foo` -> `FooAttribute` user-defined-attribute naming convention.
+    // Returns the resolved decl, or null on a miss or an ambiguous (overloaded) result.
+    auto resolveSpelling = [&](String const& suffix) -> Decl*
     {
-        LookupResult result = lookUpDirectMemberIncludingNamespaceSiblings(
-            lastSegmentName,
-            container,
-            fromScope,
-            LookupMask::Attribute);
-        if (result.isOverloaded())
+        Expr* nameExpr = attributeNameExpr;
+        if (suffix.getLength())
         {
-            outAmbiguous = true;
-            return nullptr;
-        }
-        if (result.isValid())
-        {
-            if (auto attributeDecl = as<AttributeDecl>(result.item.declRef.getDecl()))
-                return attributeDecl;
-        }
-    }
-
-    auto structNameObj =
-        m_astBuilder->getGlobalSession()->getNameObj(lastSegmentName->text + "Attribute");
-    LookupResult structResult = lookUpDirectMemberIncludingNamespaceSiblings(
-        structNameObj,
-        container,
-        fromScope,
-        LookupMask::type);
-    if (structResult.isOverloaded())
-    {
-        outAmbiguous = true;
-        return nullptr;
-    }
-    if (!structResult.isValid())
-        return nullptr;
-
-    auto structDecl = as<StructDecl>(structResult.item.declRef.getDecl());
-    return _getAttributeDeclFromUserDefinedAttributeStruct(this, structDecl);
-}
-
-// Add every `ContainerDecl` candidate in `result` to `outContainers`; a qualifier segment can
-// resolve to several containers (a namespace merged across imported modules). Non-container
-// candidates are ignored.
-static void _collectContainerCandidates(
-    LookupResult const& result,
-    List<ContainerDecl*>& outContainers)
-{
-    if (!result.isValid())
-        return;
-    if (result.isOverloaded())
-    {
-        for (auto& item : result.items)
-        {
-            if (auto container = as<ContainerDecl>(item.declRef.getDecl()))
-                outContainers.add(container);
-        }
-    }
-    else if (auto container = as<ContainerDecl>(result.item.declRef.getDecl()))
-    {
-        outContainers.add(container);
-    }
-}
-
-AttributeDecl* SemanticsVisitor::lookUpQualifiedAttributeDecl(
-    List<NameLoc> const& segments,
-    Scope* scope)
-{
-    if (segments.getCount() < 2)
-        return nullptr;
-
-    // A qualifier can resolve to multiple containers (a namespace merged across imported modules),
-    // so carry the full set of candidates forward. The first segment uses ordinary scoped lookup,
-    // which walks up to module/global scope.
-    List<ContainerDecl*> containers;
-    _collectContainerCandidates(
-        lookUp(m_astBuilder, this, segments[0].name, scope, LookupMask::Default),
-        containers);
-
-    for (Index i = 1; i + 1 < segments.getCount(); ++i)
-    {
-        List<ContainerDecl*> next;
-        for (auto container : containers)
-        {
-            _collectContainerCandidates(
-                lookUpDirectMemberIncludingNamespaceSiblings(
-                    segments[i].name,
-                    container,
-                    scope,
-                    LookupMask::Default),
-                next);
-        }
-        containers = _Move(next);
-    }
-
-    // Resolve the final segment in each candidate container. If any candidate is itself ambiguous,
-    // or two candidates yield different attributes, the reference is ambiguous: give up and leave
-    // the existing "unknown attribute" warning rather than picking one arbitrarily.
-    AttributeDecl* found = nullptr;
-    for (auto container : containers)
-    {
-        bool ambiguous = false;
-        auto attributeDecl =
-            lookUpAttributeDeclInContainer(segments.getLast().name, container, scope, ambiguous);
-        if (ambiguous)
-            return nullptr;
-        if (attributeDecl)
-        {
-            if (found && found != attributeDecl)
+            // Rebuild only the final segment with the suffixed name, reusing the already-parsed
+            // qualifier (`baseExpression`) so the qualifier is resolved just once.
+            if (auto memberExpr = as<StaticMemberExpr>(attributeNameExpr))
+            {
+                auto suffixed = m_astBuilder->create<StaticMemberExpr>();
+                suffixed->scope = memberExpr->scope;
+                suffixed->loc = memberExpr->loc;
+                suffixed->baseExpression = memberExpr->baseExpression;
+                suffixed->memberOperatorLoc = memberExpr->memberOperatorLoc;
+                suffixed->name = getName(memberExpr->name->text + suffix);
+                nameExpr = suffixed;
+            }
+            else if (auto varExpr = as<VarExpr>(attributeNameExpr))
+            {
+                auto suffixed = m_astBuilder->create<VarExpr>();
+                suffixed->scope = varExpr->scope;
+                suffixed->loc = varExpr->loc;
+                suffixed->name = getName(varExpr->name->text + suffix);
+                nameExpr = suffixed;
+            }
+            else
+            {
                 return nullptr;
-            found = attributeDecl;
+            }
         }
+
+        DiagnosticSink tempSink(getSourceManager(), nullptr, getSink());
+        SemanticsVisitor subVisitor(withSink(&tempSink));
+        Expr* checked = subVisitor.CheckTerm(nameExpr);
+        if (tempSink.getErrorCount() || IsErrorExpr(checked))
+            return nullptr;
+        // A single resolved reference is a `DeclRefExpr`; an ambiguous one is an `OverloadedExpr`,
+        // which we treat as "give up" rather than picking a candidate arbitrarily.
+        if (auto declRefExpr = as<DeclRefExpr>(checked))
+            return declRefExpr->declRef.getDecl();
+        return nullptr;
+    };
+
+    // First the name as written (a builtin `AttributeDecl`, or a `[__AttributeUsage]` struct named
+    // exactly as written), then the `Foo` -> `FooAttribute` convention.
+    if (auto decl = resolveSpelling(String()))
+    {
+        if (auto attributeDecl = _getAttributeDeclFromResolvedNameDecl(this, decl))
+            return attributeDecl;
     }
-    return found;
+    if (auto decl = resolveSpelling(String("Attribute")))
+    {
+        if (auto attributeDecl = _getAttributeDeclFromResolvedNameDecl(this, decl))
+            return attributeDecl;
+    }
+    return nullptr;
 }
 
-AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(
+// Resolve an attribute by its legacy flat, underscore-folded name (e.g. `[vk::binding]` is parsed
+// as the single name `vk_binding`). This is how builtin qualified attributes are registered, and it
+// is the fallback used when `lookUpAttributeDeclFromNameExpr` cannot resolve the name as an
+// ordinary (possibly qualified) reference.
+//
+// This underscore fold is legacy: it discards the qualifier structure of a `::`-qualified name and
+// so cannot find a user-defined attribute declared in a namespace. It is scheduled for
+// deprecation/removal in language version `SLANG_LANGUAGE_VERSION_202C` (see shader-slang/slang
+// issue #12668), once builtin qualified attributes are registered under real namespaces; until then
+// it remains active for all language versions because builtins such as `[vk::binding]` still rely
+// on the flat registration.
+AttributeDecl* SemanticsVisitor::lookUpLegacyUnderscoreConcatenatedAttributeDecl(
     Name* attributeName,
-    Scope* scope,
-    List<NameLoc> const& qualifiedNameSegments)
+    Scope* scope)
 {
     if (!attributeName)
         return nullptr;
@@ -443,17 +357,6 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(
         auto structDecl = lookupResult.item.declRef.as<StructDecl>().getDecl();
         if (auto attributeDecl = _getAttributeDeclFromUserDefinedAttributeStruct(this, structDecl))
             return attributeDecl;
-    }
-
-    // The flat, underscore-folded name did not produce a usable attribute. If the attribute name
-    // was written with `::` qualification (e.g. `[my_namespace::Example(...)]`), the fold destroyed
-    // the qualifier structure, so fall back to a scoped lookup that walks the namespace/type
-    // qualifiers. This is only reached when the flat lookups above fail to produce a usable
-    // attribute, so builtin qualified attributes such as `[vk::binding]` (registered under the flat
-    // name `vk_binding`) are unaffected.
-    if (qualifiedNameSegments.getCount() > 1)
-    {
-        return lookUpQualifiedAttributeDecl(qualifiedNameSegments, scope);
     }
 
     return nullptr;
@@ -1639,8 +1542,18 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     }
 
     auto attrName = uncheckedAttr->getKeywordName();
-    auto attrDecl =
-        lookUpAttributeDecl(attrName, uncheckedAttr->scope, uncheckedAttr->qualifiedNameSegments);
+
+    // Prefer resolving the attribute name as an ordinary (possibly qualified) reference, so a
+    // user-defined attribute declared in a namespace resolves the same way any other qualified name
+    // does. A completion request is left to the legacy path below, which populates the attribute
+    // completion suggestions. `keywordName` carries the legacy underscore-folded spelling that the
+    // fallback needs (e.g. `vk_binding` for `[vk::binding]`), so it stays the single source of that
+    // name rather than reconstructing it from `attributeNameExpr`.
+    AttributeDecl* attrDecl = nullptr;
+    if (attrName != getSession()->getCompletionRequestTokenName())
+        attrDecl = lookUpAttributeDeclFromNameExpr(uncheckedAttr->attributeNameExpr);
+    if (!attrDecl)
+        attrDecl = lookUpLegacyUnderscoreConcatenatedAttributeDecl(attrName, uncheckedAttr->scope);
 
     if (!attrDecl)
     {
