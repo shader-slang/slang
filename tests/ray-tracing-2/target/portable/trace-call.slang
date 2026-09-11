@@ -17,7 +17,7 @@ struct MyTraceContext : rt::ITraceContext
     typealias Motion = rt::NoMotion;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = MyTraceContext;
     typealias HitGroups = rt::NoHitGroups<MyTraceContext>;
@@ -26,12 +26,12 @@ struct ProgramLayout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 RWStructuredBuffer<float> output;
 
 void traceHelper(rt::RayTraversalDesc desc, inout MyPayload payload)
 {
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
 }
 
@@ -54,8 +54,8 @@ void main()
     output[0] = payload.value;
 }
 
-// IR: struct [[PROGRAM_LAYOUT:%ProgramLayout]] : Type
-// IR: structuralRayTracingTrace({{.*}}, [[PROGRAM_LAYOUT]],
+// IR: struct [[PROGRAM_SCHEMA:%Schema]] : Type
+// IR: structuralRayTracingTrace({{.*}}, [[PROGRAM_SCHEMA]],
 // HLSL: TraceRay(
 // HLSL-SAME: .rayFlags
 // SPIRV: OpTraceRayKHR

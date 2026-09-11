@@ -11,7 +11,7 @@ struct MyTraceContext : rt::ITraceContext
     typealias Motion = rt::NoMotion;
 }
 
-struct MyProgramLayout : rt::ITraceProgramLayout
+struct MySchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = MyTraceContext;
     typealias HitGroups = rt::NoHitGroups<MyTraceContext>;
@@ -21,8 +21,8 @@ struct MyProgramLayout : rt::ITraceProgramLayout
 
 RWStructuredBuffer<uint> output;
 
-public extension<ProgramLayout> rt::RayTracer<ProgramLayout>
-    where ProgramLayout : rt::ITraceProgramLayout
+public extension<Schema> rt::RayTracer<Schema>
+    where Schema : rt::ITraceProgramSchema
 {
     public void trace(uint value) { output[0] = value; }
 }
@@ -30,7 +30,7 @@ public extension<ProgramLayout> rt::RayTracer<ProgramLayout>
 [numthreads(1, 1, 1)]
 void main()
 {
-    rt::RayTracer<MyProgramLayout> tracer;
+    rt::RayTracer<MySchema> tracer;
     tracer.trace(42);
 }
 

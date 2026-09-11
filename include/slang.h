@@ -2110,7 +2110,7 @@ public:                                                              \
     typedef SlangReflectionUserAttribute SlangReflectionAttribute;
     typedef struct SlangReflectionFunction SlangReflectionFunction;
     typedef struct SlangReflectionGeneric SlangReflectionGeneric;
-    typedef struct SlangReflectionTraceProgramLayout SlangReflectionTraceProgramLayout;
+    typedef struct SlangReflectionTraceProgramSchema SlangReflectionTraceProgramSchema;
     typedef struct SlangReflectionRayTracingStage SlangReflectionRayTracingStage;
     typedef struct SlangReflectionRayTracingHitGroup SlangReflectionRayTracingHitGroup;
     typedef struct SlangReflectionRayTracingMissGroup SlangReflectionRayTracingMissGroup;
@@ -2136,28 +2136,28 @@ public:                                                              \
     typedef SlangProgramLayout SlangReflection;
     typedef SlangEntryPointLayout SlangReflectionEntryPoint;
 
-    /** Find a structural ray-tracing program layout by its source type name. */
-    SLANG_API SlangReflectionTraceProgramLayout* spReflection_findTraceProgramLayout(
+    /** Find a structural ray-tracing program schema by its source type name. */
+    SLANG_API SlangReflectionTraceProgramSchema* spReflection_findTraceProgramSchema(
         SlangReflection* reflection,
         char const* name);
-    SLANG_API SlangReflectionType* spReflectionTraceProgramLayout_getType(
-        SlangReflectionTraceProgramLayout* layout);
-    SLANG_API SlangReflectionType* spReflectionTraceProgramLayout_getTraceContextType(
-        SlangReflectionTraceProgramLayout* layout);
+    SLANG_API SlangReflectionType* spReflectionTraceProgramSchema_getType(
+        SlangReflectionTraceProgramSchema* schema);
+    SLANG_API SlangReflectionType* spReflectionTraceProgramSchema_getTraceContextType(
+        SlangReflectionTraceProgramSchema* schema);
     SLANG_API SlangUInt
-    spReflectionTraceProgramLayout_getHitGroupCount(SlangReflectionTraceProgramLayout* layout);
-    SLANG_API SlangReflectionRayTracingHitGroup* spReflectionTraceProgramLayout_getHitGroup(
-        SlangReflectionTraceProgramLayout* layout,
+    spReflectionTraceProgramSchema_getHitGroupCount(SlangReflectionTraceProgramSchema* schema);
+    SLANG_API SlangReflectionRayTracingHitGroup* spReflectionTraceProgramSchema_getHitGroup(
+        SlangReflectionTraceProgramSchema* schema,
         SlangUInt index);
     SLANG_API SlangUInt
-    spReflectionTraceProgramLayout_getMissGroupCount(SlangReflectionTraceProgramLayout* layout);
-    SLANG_API SlangReflectionRayTracingMissGroup* spReflectionTraceProgramLayout_getMissGroup(
-        SlangReflectionTraceProgramLayout* layout,
+    spReflectionTraceProgramSchema_getMissGroupCount(SlangReflectionTraceProgramSchema* schema);
+    SLANG_API SlangReflectionRayTracingMissGroup* spReflectionTraceProgramSchema_getMissGroup(
+        SlangReflectionTraceProgramSchema* schema,
         SlangUInt index);
     SLANG_API SlangUInt
-    spReflectionTraceProgramLayout_getCallableGroupCount(SlangReflectionTraceProgramLayout* layout);
-    SLANG_API SlangReflectionRayTracingCallableGroup* spReflectionTraceProgramLayout_getCallableGroup(
-        SlangReflectionTraceProgramLayout* layout,
+    spReflectionTraceProgramSchema_getCallableGroupCount(SlangReflectionTraceProgramSchema* schema);
+    SLANG_API SlangReflectionRayTracingCallableGroup* spReflectionTraceProgramSchema_getCallableGroup(
+        SlangReflectionTraceProgramSchema* schema,
         SlangUInt index);
 
     SLANG_API SlangInt
@@ -2553,7 +2553,7 @@ struct VariableLayoutReflection;
 struct VariableReflection;
 struct FunctionReflection;
 struct GenericReflection;
-struct TraceProgramLayoutReflection;
+struct TraceProgramSchemaReflection;
 struct RayTracingStageReflection;
 struct RayTracingHitGroupReflection;
 struct RayTracingMissGroupReflection;
@@ -3911,49 +3911,49 @@ struct RayTracingCallableGroupReflection
     }
 };
 
-struct TraceProgramLayoutReflection
+struct TraceProgramSchemaReflection
 {
     TypeReflection* getType()
     {
-        return (TypeReflection*)spReflectionTraceProgramLayout_getType(
-            (SlangReflectionTraceProgramLayout*)this);
+        return (TypeReflection*)spReflectionTraceProgramSchema_getType(
+            (SlangReflectionTraceProgramSchema*)this);
     }
     TypeReflection* getTraceContextType()
     {
-        return (TypeReflection*)spReflectionTraceProgramLayout_getTraceContextType(
-            (SlangReflectionTraceProgramLayout*)this);
+        return (TypeReflection*)spReflectionTraceProgramSchema_getTraceContextType(
+            (SlangReflectionTraceProgramSchema*)this);
     }
     SlangUInt getHitGroupCount()
     {
-        return spReflectionTraceProgramLayout_getHitGroupCount(
-            (SlangReflectionTraceProgramLayout*)this);
+        return spReflectionTraceProgramSchema_getHitGroupCount(
+            (SlangReflectionTraceProgramSchema*)this);
     }
     RayTracingHitGroupReflection* getHitGroup(SlangUInt index)
     {
-        return (RayTracingHitGroupReflection*)spReflectionTraceProgramLayout_getHitGroup(
-            (SlangReflectionTraceProgramLayout*)this,
+        return (RayTracingHitGroupReflection*)spReflectionTraceProgramSchema_getHitGroup(
+            (SlangReflectionTraceProgramSchema*)this,
             index);
     }
     SlangUInt getMissGroupCount()
     {
-        return spReflectionTraceProgramLayout_getMissGroupCount(
-            (SlangReflectionTraceProgramLayout*)this);
+        return spReflectionTraceProgramSchema_getMissGroupCount(
+            (SlangReflectionTraceProgramSchema*)this);
     }
     RayTracingMissGroupReflection* getMissGroup(SlangUInt index)
     {
-        return (RayTracingMissGroupReflection*)spReflectionTraceProgramLayout_getMissGroup(
-            (SlangReflectionTraceProgramLayout*)this,
+        return (RayTracingMissGroupReflection*)spReflectionTraceProgramSchema_getMissGroup(
+            (SlangReflectionTraceProgramSchema*)this,
             index);
     }
     SlangUInt getCallableGroupCount()
     {
-        return spReflectionTraceProgramLayout_getCallableGroupCount(
-            (SlangReflectionTraceProgramLayout*)this);
+        return spReflectionTraceProgramSchema_getCallableGroupCount(
+            (SlangReflectionTraceProgramSchema*)this);
     }
     RayTracingCallableGroupReflection* getCallableGroup(SlangUInt index)
     {
-        return (RayTracingCallableGroupReflection*)spReflectionTraceProgramLayout_getCallableGroup(
-            (SlangReflectionTraceProgramLayout*)this,
+        return (RayTracingCallableGroupReflection*)spReflectionTraceProgramSchema_getCallableGroup(
+            (SlangReflectionTraceProgramSchema*)this,
             index);
     }
 };
@@ -4111,9 +4111,9 @@ struct ShaderReflection
             EntryPointReflection*)spReflection_findEntryPointByName((SlangReflection*)this, name);
     }
 
-    TraceProgramLayoutReflection* findTraceProgramLayout(const char* name)
+    TraceProgramSchemaReflection* findTraceProgramSchema(const char* name)
     {
-        return (TraceProgramLayoutReflection*)spReflection_findTraceProgramLayout(
+        return (TraceProgramSchemaReflection*)spReflection_findTraceProgramSchema(
             (SlangReflection*)this,
             name);
     }

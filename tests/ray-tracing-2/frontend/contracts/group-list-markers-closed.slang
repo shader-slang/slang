@@ -30,7 +30,7 @@ struct FakeCallableGroups : rt::ICallableGroupList<MyTraceContext>
     static const int count = 1;
 }
 
-struct Layout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = MyTraceContext;
     typealias HitGroups = FakeHitGroups;
@@ -39,12 +39,12 @@ struct Layout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<Layout> descriptor;
+rt::TraceProgramDescriptor<Schema> descriptor;
 
 [shader("raygeneration")]
 void main()
 {
     PayloadData payload;
-    rt::RayTracer<Layout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace({}, scene, descriptor, payload);
 }

@@ -6,6 +6,6 @@ __include "ray-types";
 __include "contexts";
 __include "stage-inputs";
 __include "stage-contracts";
-__include "program-layout";
+__include "program-schema";
 __include "descriptor";
 __include "trace";

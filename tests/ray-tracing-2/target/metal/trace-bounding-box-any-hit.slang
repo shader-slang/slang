@@ -63,7 +63,7 @@ struct HitGroup : rt::IHitGroup
     typealias Intersection = TestIntersection;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::HitGroupList<TestTraceContext, HitGroup>;
@@ -72,7 +72,7 @@ struct ProgramLayout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 RWStructuredBuffer<uint> output;
 
 [shader("raygeneration")]
@@ -90,13 +90,13 @@ void main()
     desc.missIndex = 0;
 
     TestPayload payload = { output[0], 0 };
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
     output[1] = payload.visitCount;
 }
 
 // METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing)]]
-// METAL-SAME: ray_data ProgramLayout_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
+// METAL-SAME: ray_data Schema_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
 // METAL: visitCount_0 =
 // METAL: normal_0.z
 // METAL: accept_{{[0-9]+}} = false

@@ -132,8 +132,8 @@ static const char* _getMetadataInterfaceName(StructuralRayTracingMetadataKind ki
         return "IMissGroupList";
     case StructuralRayTracingMetadataKind::CallableGroupList:
         return "ICallableGroupList";
-    case StructuralRayTracingMetadataKind::TraceProgramLayout:
-        return "ITraceProgramLayout";
+    case StructuralRayTracingMetadataKind::TraceProgramSchema:
+        return "ITraceProgramSchema";
     default:
         return nullptr;
     }
@@ -423,14 +423,14 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::CallableRecord)] =
         _findAssociatedTypeRequirement(module, "ICallableGroupContext", "Record");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::ProgramTraceContext)] =
-        _findAssociatedTypeRequirement(module, "ITraceProgramLayout", "TraceContext");
+        _findAssociatedTypeRequirement(module, "ITraceProgramSchema", "TraceContext");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::ProgramHitGroups)] =
-        _findAssociatedTypeRequirement(module, "ITraceProgramLayout", "HitGroups");
+        _findAssociatedTypeRequirement(module, "ITraceProgramSchema", "HitGroups");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::ProgramMissGroups)] =
-        _findAssociatedTypeRequirement(module, "ITraceProgramLayout", "MissGroups");
+        _findAssociatedTypeRequirement(module, "ITraceProgramSchema", "MissGroups");
     m_associatedTypeRequirements[int(
         StructuralRayTracingAssociatedTypeKind::ProgramCallableGroups)] =
-        _findAssociatedTypeRequirement(module, "ITraceProgramLayout", "CallableGroups");
+        _findAssociatedTypeRequirement(module, "ITraceProgramSchema", "CallableGroups");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitGroupSlot)] =
         _findAssociatedTypeRequirement(module, "IHitGroup", "Slot");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitGroupContext)] =

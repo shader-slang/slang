@@ -1,4 +1,4 @@
-module structural_generic_layout;
+module structural_generic_schema;
 
 import slang.raytracing;
 
@@ -35,7 +35,7 @@ public struct GenericMissGroup<T> : rt::IMissGroup
     typealias Miss = GenericMiss<T>;
 }
 
-public struct GenericProgramLayout<T> : rt::ITraceProgramLayout
+public struct GenericSchema<T> : rt::ITraceProgramSchema
 {
     typealias TraceContext = GenericTraceContext<T>;
     typealias HitGroups = rt::NoHitGroups<GenericTraceContext<T>>;

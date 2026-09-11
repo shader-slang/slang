@@ -33,7 +33,7 @@ struct TestHitGroup : rt::IHitGroup
     typealias Intersection = rt::NoIntersection<TestHitContext>;
 }
 
-struct TestLayout : rt::ITraceProgramLayout
+struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::HitGroupList<TraceContext, TestHitGroup>;
@@ -51,16 +51,16 @@ void invalidMetadataValues(
     rt::HitGroupList<TestTraceContext, TestHitGroup> list,
 //CHECK:                                             ^^^^ runtime use of structural ray-tracing metadata
 //CHECK:                                             ^^^^ structural ray-tracing metadata type 'rt.HitGroupList<TestTraceContext, TestHitGroup>' has no runtime representation
-    TestLayout layout,
+    TestSchema schema,
 //CHECK:       ^^^^^^ runtime use of structural ray-tracing metadata
-//CHECK:       ^^^^^^ structural ray-tracing metadata type 'TestLayout' has no runtime representation
-    rt::ITraceProgramLayout layoutInterface)
+//CHECK:       ^^^^^^ structural ray-tracing metadata type 'TestSchema' has no runtime representation
+    rt::ITraceProgramSchema schemaInterface)
 //CHECK:                    ^^^^^^^^^^^^^^^ runtime use of structural ray-tracing metadata
-//CHECK:                    ^^^^^^^^^^^^^^^ structural ray-tracing metadata type 'rt.ITraceProgramLayout' has no runtime representation
+//CHECK:                    ^^^^^^^^^^^^^^^ structural ray-tracing metadata type 'rt.ITraceProgramSchema' has no runtime representation
 {
-    TestLayout();
+    TestSchema();
 /*CHECK:
     ^^^^^^^^^^ construction of a structural ray-tracing type
-    ^^^^^^^^^^ structural ray-tracing type 'TestLayout' cannot be constructed by user code
+    ^^^^^^^^^^ structural ray-tracing type 'TestSchema' cannot be constructed by user code
 */
 }

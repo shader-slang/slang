@@ -7,18 +7,18 @@ interface IClosestHitShader
     void invoke();
 }
 
-interface ITraceProgramLayout {}
+interface ITraceProgramSchema {}
 
 struct OrdinaryStage : IClosestHitShader
 {
     void invoke() {}
 }
 
-struct OrdinaryLayout : ITraceProgramLayout {}
+struct OrdinarySchema : ITraceProgramSchema {}
 
-void useOrdinaryTypes(OrdinaryStage stage, OrdinaryLayout layout)
+void useOrdinaryTypes(OrdinaryStage stage, OrdinarySchema schema)
 {
     stage.invoke();
     OrdinaryStage();
-    OrdinaryLayout();
+    OrdinarySchema();
 }

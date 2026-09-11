@@ -14,7 +14,7 @@
 // SPIRV-COUNT-2: OpTraceRayKHR
 // SPIRV_CLOSEST: OpEntryPoint ClosestHitKHR {{.*}} "main"
 // SPIRV_CLOSEST: OpEntryPoint MissKHR {{.*}} "RuntimeMiss"
-// METAL: metal::visible_function_table<void(ProgramLayout_rayData_0 thread*, uchar thread*)> closestHitFunctions_0;
+// METAL: metal::visible_function_table<void(Schema_rayData_0 thread*, uchar thread*)> closestHitFunctions_0;
 // METAL: .intersect(
 // METAL: (thread uchar*)kernelContext
 // METAL: .intersect(
@@ -102,7 +102,7 @@ struct MissGroup : rt::IMissGroup
     typealias Miss = RuntimeMiss;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = RuntimeTraceContext;
     typealias HitGroups = rt::HitGroupList<RuntimeTraceContext, HitGroup>;
@@ -111,7 +111,7 @@ struct ProgramLayout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 RWStructuredBuffer<RuntimeResult> results;
 
 rt::RayTraversalDesc makeTraceDesc(float3 origin)
@@ -131,7 +131,7 @@ rt::RayTraversalDesc makeTraceDesc(float3 origin)
 
 void traceSecondary(inout RuntimePayload payload)
 {
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(makeTraceDesc(float3(2.0, 2.0, 0.0)), scene, program, payload);
 }
 
@@ -140,7 +140,7 @@ void main()
 {
     uint rayIndex = DispatchRaysIndex().x;
     RuntimePayload payload = {};
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     float3 origin = rayIndex == 0 ? float3(0.25, 0.25, 0.0) : float3(2.0, 2.0, 0.0);
     tracer.trace(makeTraceDesc(origin), scene, program, payload);
 

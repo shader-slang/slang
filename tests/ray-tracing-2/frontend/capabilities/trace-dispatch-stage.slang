@@ -28,7 +28,7 @@ struct BadAnyHit : rt::IAnyHitShader<HitContext>
 //CHECK: ^^^^^^ dependencies not compatible on stage
 //CHECK: ^^^^^^ 'invoke' requires support for stage 'anyhit', but stage is unsupported.
     {
-        rt::RayTracer<Layout> tracer;
+        rt::RayTracer<Schema> tracer;
         tracer.trace({}, scene, descriptor, input.payload);
 //CHECK:                                          ^^^^^^^ conflicting capability requirement
 //CHECK:                                          ^^^^^^^ 'payload' requires capability
@@ -44,7 +44,7 @@ struct HitGroup : rt::IHitGroup
     typealias Intersection = rt::NoIntersection<HitContext>;
 }
 
-struct Layout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = MyTraceContext;
     typealias HitGroups = rt::HitGroupList<TraceContext, HitGroup>;
@@ -53,4 +53,4 @@ struct Layout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<Layout> descriptor;
+rt::TraceProgramDescriptor<Schema> descriptor;

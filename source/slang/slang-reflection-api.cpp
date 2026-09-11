@@ -5411,78 +5411,78 @@ static SlangStage _getReflectedRayTracingStage(StructuralRayTracingStageKind kin
     }
 }
 
-SLANG_API SlangReflectionTraceProgramLayout* spReflection_findTraceProgramLayout(
+SLANG_API SlangReflectionTraceProgramSchema* spReflection_findTraceProgramSchema(
     SlangReflection* reflection,
     char const* name)
 {
-    return (SlangReflectionTraceProgramLayout*)findStructuralRayTracingProgramLayoutReflection(
+    return (SlangReflectionTraceProgramSchema*)findStructuralRayTracingProgramSchemaReflection(
         convert(reflection),
         name);
 }
 
-SLANG_API SlangReflectionType* spReflectionTraceProgramLayout_getType(
-    SlangReflectionTraceProgramLayout* layout)
+SLANG_API SlangReflectionType* spReflectionTraceProgramSchema_getType(
+    SlangReflectionTraceProgramSchema* schema)
 {
-    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
-    return reflectedLayout ? convert(reflectedLayout->layoutType) : nullptr;
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    return reflectedSchema ? convert(reflectedSchema->schemaType) : nullptr;
 }
 
-SLANG_API SlangReflectionType* spReflectionTraceProgramLayout_getTraceContextType(
-    SlangReflectionTraceProgramLayout* layout)
+SLANG_API SlangReflectionType* spReflectionTraceProgramSchema_getTraceContextType(
+    SlangReflectionTraceProgramSchema* schema)
 {
-    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
-    return reflectedLayout ? convert(reflectedLayout->traceContextType) : nullptr;
-}
-
-SLANG_API SlangUInt
-spReflectionTraceProgramLayout_getHitGroupCount(SlangReflectionTraceProgramLayout* layout)
-{
-    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
-    return reflectedLayout ? SlangUInt(reflectedLayout->hitGroups.getCount()) : 0;
-}
-
-SLANG_API SlangReflectionRayTracingHitGroup* spReflectionTraceProgramLayout_getHitGroup(
-    SlangReflectionTraceProgramLayout* layout,
-    SlangUInt index)
-{
-    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
-    if (!reflectedLayout || index >= SlangUInt(reflectedLayout->hitGroups.getCount()))
-        return nullptr;
-    return (SlangReflectionRayTracingHitGroup*)reflectedLayout->hitGroups[Index(index)].Ptr();
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    return reflectedSchema ? convert(reflectedSchema->traceContextType) : nullptr;
 }
 
 SLANG_API SlangUInt
-spReflectionTraceProgramLayout_getMissGroupCount(SlangReflectionTraceProgramLayout* layout)
+spReflectionTraceProgramSchema_getHitGroupCount(SlangReflectionTraceProgramSchema* schema)
 {
-    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
-    return reflectedLayout ? SlangUInt(reflectedLayout->missGroups.getCount()) : 0;
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    return reflectedSchema ? SlangUInt(reflectedSchema->hitGroups.getCount()) : 0;
 }
 
-SLANG_API SlangReflectionRayTracingMissGroup* spReflectionTraceProgramLayout_getMissGroup(
-    SlangReflectionTraceProgramLayout* layout,
+SLANG_API SlangReflectionRayTracingHitGroup* spReflectionTraceProgramSchema_getHitGroup(
+    SlangReflectionTraceProgramSchema* schema,
     SlangUInt index)
 {
-    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
-    if (!reflectedLayout || index >= SlangUInt(reflectedLayout->missGroups.getCount()))
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    if (!reflectedSchema || index >= SlangUInt(reflectedSchema->hitGroups.getCount()))
         return nullptr;
-    return (SlangReflectionRayTracingMissGroup*)reflectedLayout->missGroups[Index(index)].Ptr();
+    return (SlangReflectionRayTracingHitGroup*)reflectedSchema->hitGroups[Index(index)].Ptr();
 }
 
 SLANG_API SlangUInt
-spReflectionTraceProgramLayout_getCallableGroupCount(SlangReflectionTraceProgramLayout* layout)
+spReflectionTraceProgramSchema_getMissGroupCount(SlangReflectionTraceProgramSchema* schema)
 {
-    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
-    return reflectedLayout ? SlangUInt(reflectedLayout->callableGroups.getCount()) : 0;
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    return reflectedSchema ? SlangUInt(reflectedSchema->missGroups.getCount()) : 0;
 }
 
-SLANG_API SlangReflectionRayTracingCallableGroup* spReflectionTraceProgramLayout_getCallableGroup(
-    SlangReflectionTraceProgramLayout* layout,
+SLANG_API SlangReflectionRayTracingMissGroup* spReflectionTraceProgramSchema_getMissGroup(
+    SlangReflectionTraceProgramSchema* schema,
     SlangUInt index)
 {
-    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
-    if (!reflectedLayout || index >= SlangUInt(reflectedLayout->callableGroups.getCount()))
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    if (!reflectedSchema || index >= SlangUInt(reflectedSchema->missGroups.getCount()))
         return nullptr;
-    return (SlangReflectionRayTracingCallableGroup*)reflectedLayout->callableGroups[Index(index)]
+    return (SlangReflectionRayTracingMissGroup*)reflectedSchema->missGroups[Index(index)].Ptr();
+}
+
+SLANG_API SlangUInt
+spReflectionTraceProgramSchema_getCallableGroupCount(SlangReflectionTraceProgramSchema* schema)
+{
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    return reflectedSchema ? SlangUInt(reflectedSchema->callableGroups.getCount()) : 0;
+}
+
+SLANG_API SlangReflectionRayTracingCallableGroup* spReflectionTraceProgramSchema_getCallableGroup(
+    SlangReflectionTraceProgramSchema* schema,
+    SlangUInt index)
+{
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    if (!reflectedSchema || index >= SlangUInt(reflectedSchema->callableGroups.getCount()))
+        return nullptr;
+    return (SlangReflectionRayTracingCallableGroup*)reflectedSchema->callableGroups[Index(index)]
         .Ptr();
 }
 

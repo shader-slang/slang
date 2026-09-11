@@ -52,10 +52,10 @@ public:
     RefPtr<StructuralRayTracingStageReflection> callable;
 };
 
-class StructuralRayTracingProgramLayoutReflection : public RefObject
+class StructuralRayTracingProgramSchemaReflection : public RefObject
 {
 public:
-    Type* layoutType = nullptr;
+    Type* schemaType = nullptr;
     Type* traceContextType = nullptr;
     List<RefPtr<StructuralRayTracingHitGroupReflection>> hitGroups;
     List<RefPtr<StructuralRayTracingMissGroupReflection>> missGroups;
@@ -65,10 +65,10 @@ public:
 class StructuralRayTracingReflectionData : public RefObject
 {
 public:
-    List<RefPtr<StructuralRayTracingProgramLayoutReflection>> programLayouts;
+    List<RefPtr<StructuralRayTracingProgramSchemaReflection>> programSchemas;
 };
 
-StructuralRayTracingProgramLayoutReflection* findStructuralRayTracingProgramLayoutReflection(
+StructuralRayTracingProgramSchemaReflection* findStructuralRayTracingProgramSchemaReflection(
     ProgramLayout* programLayout,
     const char* name);
 

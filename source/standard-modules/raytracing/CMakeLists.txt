@@ -6,7 +6,7 @@ set(raytracing_shader_sources
     contexts.slang
     stage-inputs.slang
     stage-contracts.slang
-    program-layout.slang
+    program-schema.slang
     descriptor.slang
     trace.slang
 )

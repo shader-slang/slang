@@ -17,7 +17,7 @@ struct TraceContext : rt::ITraceContext
     typealias Motion = rt::NoMotion;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
     typealias HitGroups = rt::NoHitGroups<::TraceContext>;
@@ -26,14 +26,14 @@ struct ProgramLayout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 
 [shader("raygeneration")]
 void main()
 {
     rt::RayTraversalDesc desc = {};
     Payload payload = {};
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
 }
 

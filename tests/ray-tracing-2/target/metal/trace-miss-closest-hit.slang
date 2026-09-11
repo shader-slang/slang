@@ -63,7 +63,7 @@ struct MissGroup : rt::IMissGroup
     typealias Miss = TestMiss;
 }
 
-struct ProgramLayout : rt::ITraceProgramLayout
+struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::HitGroupList<TestTraceContext, HitGroup>;
@@ -72,7 +72,7 @@ struct ProgramLayout : rt::ITraceProgramLayout
 }
 
 rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<ProgramLayout> program;
+rt::TraceProgramDescriptor<Schema> program;
 RWStructuredBuffer<uint> output;
 
 [shader("raygeneration")]
@@ -90,18 +90,18 @@ void main()
     desc.missIndex = 0;
 
     TestPayload payload = { 0 };
-    rt::RayTracer<ProgramLayout> tracer;
+    rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
     output[0] = payload.value;
 }
 
-// METAL: struct ProgramLayout_rayData_0
+// METAL: struct Schema_rayData_0
 // METAL: TestPayload_0 payload_{{[0-9]+}};
 // METAL: struct rt_TraceProgramDescriptorResources_default_0
-// METAL: metal::visible_function_table<void(ProgramLayout_rayData_0 thread*)> missFunctions_0;
-// METAL: metal::visible_function_table<void(ProgramLayout_rayData_0 thread*)> closestHitFunctions_0;
+// METAL: metal::visible_function_table<void(Schema_rayData_0 thread*)> missFunctions_0;
+// METAL: metal::visible_function_table<void(Schema_rayData_0 thread*)> closestHitFunctions_0;
 // METAL: {{\[\[kernel\]\]}} void main_0(
-// METAL: thread ProgramLayout_rayData_0 [[RAY_DATA:rayData_[0-9]+]];
+// METAL: thread Schema_rayData_0 [[RAY_DATA:rayData_[0-9]+]];
 // METAL: metal::raytracing::intersector<metal::raytracing::instancing> _slang_intersector;
 // METAL: _slang_intersector.assume_geometry_type(metal::raytracing::geometry_type::triangle);
 // METAL: _slang_intersector.intersect(
@@ -110,7 +110,7 @@ void main()
 // METAL: _S{{[0-9]+}}[desc_0.missIndex_0](&rayData_{{[0-9]+}});
 // METAL: uint _slang_hit_slot = _S{{[0-9]+}}[_S{{[0-9]+}}[0] + _slang_result.instance_id]
 // METAL: _S{{[0-9]+}}[_slang_hit_slot](&rayData_{{[0-9]+}});
-// METAL: {{\[\[visible\]\]}} void TestMiss_0(ProgramLayout_rayData_0 thread* [[MISS_DATA:rayData_[0-9]+]])
+// METAL: {{\[\[visible\]\]}} void TestMiss_0(Schema_rayData_0 thread* [[MISS_DATA:rayData_[0-9]+]])
 // METAL: (&[[MISS_DATA]]->payload_{{[0-9]+}})->value_0 = 2U;
-// METAL: {{\[\[visible\]\]}} void TestClosestHit_0(ProgramLayout_rayData_0 thread* [[HIT_DATA:rayData_[0-9]+]])
+// METAL: {{\[\[visible\]\]}} void TestClosestHit_0(Schema_rayData_0 thread* [[HIT_DATA:rayData_[0-9]+]])
 // METAL: (&[[HIT_DATA]]->payload_{{[0-9]+}})->value_0 = 1U;
