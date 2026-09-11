@@ -962,15 +962,10 @@ static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken, Exp
     }
     if (parser->LookAheadToken(TokenType::CompletionRequest))
     {
-        Token completionToken = parser->ReadToken();
-        // Surface the completion request as an ordinary name expression so attribute-name
-        // completion flows through the normal path.
-        auto completionExpr = parser->astBuilder->create<VarExpr>();
-        completionExpr->scope = parser->currentScope;
-        completionExpr->loc = completionToken.getLoc();
-        completionExpr->name = completionToken.getName();
-        outNameExpr = completionExpr;
-        return completionToken;
+        // A completion request is resolved entirely by the legacy underscore-folded lookup, which
+        // populates the attribute completion suggestions from `keywordName`; `checkAttribute` skips
+        // the expression path for it, so leave `outNameExpr` unset.
+        return parser->ReadToken();
     }
 
     const Token firstIdentifier = parser->ReadToken(TokenType::Identifier);
@@ -978,9 +973,12 @@ static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken, Exp
 
     // Build the leading `VarExpr` for the first segment. A leading `::` roots the name at the
     // module (global) scope, exactly as ordinary `::`-qualified name parsing does (see the basic-
-    // type case), so a shadowing local does not capture `[::N::Foo]`.
+    // type case), so a shadowing local does not capture `[::N::Foo]`. `currentModule` is null when
+    // a term string is parsed via the reflection API (`parseTermFromSourceFile` does not set it),
+    // so fall back to the current scope there rather than dereferencing null.
     auto firstExpr = parser->astBuilder->create<VarExpr>();
-    firstExpr->scope = isGlobalScoped ? parser->currentModule->ownedScope : parser->currentScope;
+    firstExpr->scope = (isGlobalScoped && parser->currentModule) ? parser->currentModule->ownedScope
+                                                                 : parser->currentScope;
     firstExpr->loc = firstIdentifier.getLoc();
     firstExpr->name = firstIdentifier.getName();
     Expr* nameExpr = firstExpr;

@@ -235,10 +235,18 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDeclFromNameExpr(Expr* attribute
             }
             else
             {
-                return nullptr;
+                // `attributeNameExpr` is always a `VarExpr` or a `StaticMemberExpr` chain — its
+                // sole producer is `parseAttributeName` — so any other kind is a broken invariant.
+                SLANG_UNEXPECTED("unexpected attribute-name expression kind");
             }
         }
 
+        // Resolve under a muting sink: a miss (unknown name or ambiguity) then produces no
+        // user-visible diagnostic, so the caller can fall back to the legacy lookup. Other effects
+        // of `CheckTerm` are safe to perform speculatively — it caches its result on the node and
+        // is idempotent on an already-checked one, and any decl-check state it advances is
+        // monotonic — so reusing `baseExpression` across the two spellings resolves the qualifier
+        // at most once and leaves no partial state behind on a miss.
         DiagnosticSink tempSink(getSourceManager(), nullptr, getSink());
         SemanticsVisitor subVisitor(withSink(&tempSink));
         Expr* checked = subVisitor.CheckTerm(nameExpr);

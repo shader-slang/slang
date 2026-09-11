@@ -49,6 +49,15 @@ void usesGlobalQualified()
 {
 }
 
+// The exact struct name resolves on the first, unsuffixed attempt (the name as written, before the
+// `Foo`->`FooAttribute` retry) — a spelling the legacy flat lookup never resolved. Its folded form
+// would be 'my_namespace_ExampleAttribute'.
+// CHECK-NOT: my_namespace_ExampleAttribute
+[my_namespace::ExampleAttribute(5)]
+void usesExactStructName()
+{
+}
+
 // Negative control: a genuinely undefined qualified attribute must still warn — the qualified-name
 // fallback must not silence real errors.
 // CHECK: warning{{.*}}31000
