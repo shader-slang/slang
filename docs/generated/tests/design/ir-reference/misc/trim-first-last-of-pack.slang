@@ -15,7 +15,7 @@
 // single slot. `countof` around the trim keeps the result live so the inst
 // survives to the dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 

@@ -12,7 +12,7 @@
 // Boundary: combined axes — rectangular shape AND narrow element
 // type. Verifies both axes commute through the Mat(...) row.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform matrix<half, 3, 2> m;
 uniform RWStructuredBuffer<half> buf;

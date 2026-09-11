@@ -13,7 +13,7 @@
 // operand is Int16. Two `int16_t` fields surface two `field(%key,
 // Int16)` rows.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Coord { int16_t x; int16_t y; }
 

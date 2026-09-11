@@ -15,7 +15,7 @@
 // asserts the presence of each without depending on which handle the
 // lowering visits first.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o - -stage compute -entry main
 
 uniform DescriptorHandle<SamplerState> samp;
 uniform DescriptorHandle<Texture2D<float4>> tex;

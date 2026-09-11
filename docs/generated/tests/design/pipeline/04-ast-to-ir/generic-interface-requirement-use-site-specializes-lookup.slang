@@ -17,7 +17,7 @@
 // and require the call to specialize that value with the method's `Int`
 // argument before invoking it.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IOps
 {

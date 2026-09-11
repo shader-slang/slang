@@ -2460,6 +2460,29 @@ class TestPendingApprovalsLive(unittest.TestCase):
         # pending_approvals kwarg is never passed to generate_health_html.
         self.assertNotIn("render_pending_approvals", html)
 
+    def test_pending_approvals_js_esc_is_reachable_from_catch_handler(self):
+        # esc() must be declared in the IIFE's outer scope, not inside the
+        # .then() callback that builds the table. If it is only declared
+        # inside that .then(), a promise rejection before that point (e.g.
+        # the first fetch() failing because an unauthenticated client hit
+        # GitHub's rate limit) reaches the trailing .catch(), which itself
+        # calls esc() -- throwing a ReferenceError there means innerHTML is
+        # never set and the panel is stuck showing "Loading..." forever.
+        js = ci_health.PENDING_APPROVALS_JS
+        iife_start = js.index("(function () {")
+        first_fetch = js.index("fetch(url)")
+        esc_decl = js.index("function esc(s)")
+        self.assertGreater(esc_decl, iife_start)
+        self.assertLess(
+            esc_decl, first_fetch,
+            "esc() must be declared before the first fetch() call so the "
+            "trailing .catch() handler can reach it if that fetch fails",
+        )
+        self.assertEqual(
+            js.count("function esc(s)"), 1,
+            "esc() should be defined once, not duplicated inside a nested .then()",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

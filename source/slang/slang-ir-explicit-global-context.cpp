@@ -440,6 +440,8 @@ struct IntroduceExplicitGlobalContextPass
         auto key = builder.createStructKey();
         builder.createStructField(m_contextStructType, key, fieldDataType);
 
+        key->sourceLoc = originalInst->sourceLoc;
+
         // Clone all original decorations to the new struct key.
         IRCloneEnv cloneEnv;
         cloneInstDecorationsAndChildren(&cloneEnv, m_module, originalInst, key);

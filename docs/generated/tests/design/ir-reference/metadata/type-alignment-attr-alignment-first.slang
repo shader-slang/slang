@@ -16,7 +16,7 @@
 // habit `size` and `offset` teach -- would see 16 and 4 as kind enumerators,
 // which is exactly the confusion this shape guards against.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 struct S
 {

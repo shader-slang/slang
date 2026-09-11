@@ -13,7 +13,7 @@
 // back to the body header carrying the next iteration's induction
 // values — both the running sum and the incremented index.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;

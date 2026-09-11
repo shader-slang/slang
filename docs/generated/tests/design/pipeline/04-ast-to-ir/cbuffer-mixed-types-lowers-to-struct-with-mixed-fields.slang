@@ -14,7 +14,7 @@
 // scalar `Int`, `Vec(Float, 3)`, and `Mat(Float, 4, 4, 0)` appear
 // as the three `field(...)` row types in declaration order.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 cbuffer CB {
     int i;

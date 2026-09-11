@@ -12,7 +12,7 @@
 // declaration, becomes its own module-scope IR value. The buffer element type
 // is `T`, so the parameter cannot be folded away, and the CHECK pins the
 // `global_generic_param` line with its `Type` result.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 type_param T;
 

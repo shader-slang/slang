@@ -12,7 +12,7 @@
 // a struct field of Half lowers to a field(...) row carrying Half. A
 // struct holding a `half` field produces a `field(%key, Half)` row.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct HalfBox { half value; }
 

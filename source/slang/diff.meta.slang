@@ -2101,6 +2101,12 @@ SIMPLE_UNARY_DERIVATIVE_IMPL(exp, exp(dpx.p))
 COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(exp, exp(dpx.p))
 SIMPLE_UNARY_DERIVATIVE_IMPL(exp2, exp2(dpx.p)* T(0.69314718055994530941723212145818))
 COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(exp2, exp2(dpx.p) * T(0.69314718055994530941723212145818))
+SIMPLE_UNARY_DERIVATIVE_IMPL(
+    exp10,
+    exp10(dpx.p) * T(2.3025850929940456840179914546844))
+COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(
+    exp10,
+    exp10(dpx.p) * T(2.3025850929940456840179914546844))
 // sin, sinh
 SIMPLE_UNARY_DERIVATIVE_IMPL(sin, cos(dpx.p))
 COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(sin, cos(dpx.p))
@@ -2656,7 +2662,7 @@ void __sincos_impl(vector<T, N> x, out vector<T, N> s, out vector<T, N> c)
     c = cos(x);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1 : int, let L2 : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1 : MatrixLayoutMode, let L2 : MatrixLayoutMode>
 [Differentiable]
 [PrimalSubstituteOf(sincos)]
 [PreferRecompute]

@@ -18,7 +18,7 @@
 // rather than to the index being dynamic — `idx` is a `uniform` in one case and
 // a literal in the other, and both still produce `getElementPtr`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 uniform int idx;

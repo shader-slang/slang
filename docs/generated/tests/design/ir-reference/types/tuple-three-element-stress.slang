@@ -14,7 +14,7 @@
 // variadic operand list preserves all element types in order —
 // distinct from the two-element smoke test.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float a;
 uniform int b;

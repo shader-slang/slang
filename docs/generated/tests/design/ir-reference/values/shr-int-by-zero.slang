@@ -12,7 +12,7 @@
 // Lower-edge of the shift-amount axis on `shr`. The signed
 // operand exercises the documented "arithmetic shift" key.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

@@ -15,7 +15,7 @@
 // twice, and the user entry point `func %main` is still present after the
 // final observed round (cleanup simplifies without dropping live code).
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after simplifyIR -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after simplifyIR -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

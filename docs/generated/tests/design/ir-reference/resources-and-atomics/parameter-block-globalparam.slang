@@ -13,7 +13,7 @@
 // in the Shader IO row as another flavor of module-scope shader
 // parameter; it shares the `global_param` opcode.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Params { int4 vals; }
 ParameterBlock<Params> pb;

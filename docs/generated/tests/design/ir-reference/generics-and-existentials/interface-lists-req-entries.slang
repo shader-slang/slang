@@ -12,7 +12,7 @@
 // itself rather than floating free: the interface inst lists them as its
 // operands. The CHECK pins a two-operand list for a two-requirement interface,
 // with the closing parenthesis so a longer list would not match.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IBar
 {

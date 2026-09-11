@@ -11,7 +11,7 @@
 
 // Boundary: explicit-cast axis — double to float.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform double d;
 uniform RWStructuredBuffer<float> buf;

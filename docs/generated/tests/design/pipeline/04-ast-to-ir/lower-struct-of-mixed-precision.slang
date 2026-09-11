@@ -14,7 +14,7 @@
 // the per-field IR type carries through the StructDecl row
 // without any homogenization to a common precision.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Mixed {
     int8_t i8;

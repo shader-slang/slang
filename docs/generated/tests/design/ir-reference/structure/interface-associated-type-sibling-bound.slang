@@ -17,7 +17,7 @@
 // plus the interface's method), so no extra entries were synthesized for the
 // bound.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int seed;
 uniform RWStructuredBuffer<int> buf;

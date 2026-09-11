@@ -11,7 +11,7 @@
 // Stresses the variadic argument tail well past the two operands the schema
 // names. Eight type parameters must all survive into one argument list; the
 // CHECK spells all eight, so a truncated tail fails.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

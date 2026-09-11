@@ -17,7 +17,7 @@
 // `CastEnumToInt` consuming that same value, which pins the direction
 // of each cast rather than just their presence.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 enum Color : int
 {

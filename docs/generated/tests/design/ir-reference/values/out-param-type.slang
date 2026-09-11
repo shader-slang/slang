@@ -15,7 +15,7 @@
 // type the cast is not emitted, but the parameter's IR type is
 // still `OutParam(<T>)`; this test anchors on that shape.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

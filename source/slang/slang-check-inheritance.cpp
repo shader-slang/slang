@@ -458,12 +458,25 @@ SubtypeWitness* SharedSemanticsContext::_specializeInterfaceInheritanceWitness(
     SLANG_ASSERT(selfIsSubtypeOfBase);
     SLANG_ASSERT(baseIsSubtypeOfFacet);
 
+    SpecializeInterfaceInheritanceWitnessKey key = {
+        baseInterfaceDecl,
+        selfIsSubtypeOfBase,
+        baseIsSubtypeOfFacet};
+    if (auto found = m_specializeInterfaceInheritanceWitnessCache.tryGetValue(key))
+        return *found;
+
     auto lookupSubstitution = SubstitutionSet(_getASTBuilder()->getLookupDeclRef(
         selfIsSubtypeOfBase,
         baseInterfaceDecl->getThisTypeDecl()));
 
-    return as<SubtypeWitness>(
-        baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution));
+    // `as<SubtypeWitness>` can be null if substitution ever produced a non-witness `Val` for a
+    // witness input -- caching that is intentional and harmless: a cached null and a freshly
+    // recomputed null behave identically to every caller, so there is nothing this cache changes
+    // about how that case is handled.
+    auto result =
+        as<SubtypeWitness>(baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution));
+    m_specializeInterfaceInheritanceWitnessCache.add(key, result);
+    return result;
 }
 
 bool SharedSemanticsContext::tryResolveConstraintTypes(

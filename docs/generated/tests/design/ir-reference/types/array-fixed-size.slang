@@ -14,7 +14,7 @@
 // `int[3]` together surface `Array(Float, 8 : Int)` and `Array(Int, 3
 // : Int)` in the dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Bag { float data[8]; }
 

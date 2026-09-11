@@ -15,7 +15,7 @@
 // `interface(...)` operand list to hold exactly two values by anchoring the end
 // of the line, so a third synthesized entry would fail.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface ITwo
 {

@@ -13,7 +13,7 @@
 // specializeModule pass the function carries a single concrete
 // `Func(Float, Float, Float)` signature.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after specializeModule -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after specializeModule -o - -stage compute -entry main
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;

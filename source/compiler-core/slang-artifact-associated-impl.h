@@ -206,6 +206,7 @@ struct SyntheticResourceRecord
     int32_t uniformOffset = -1;
     int32_t uniformStride = 0;
     String debugName;
+    int32_t bindlessIndex = -1;
 };
 
 // Internal registry for stable synthetic resource ids. Public API

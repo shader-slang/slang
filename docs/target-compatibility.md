@@ -16,7 +16,7 @@ Items with ^ means there is some discussion about support later in the document 
 | [u/int64_t Type](#int64_t)                           | No    | Yes ^     | Yes     | Yes            | Yes   | Yes       |
 | u/int64_t Intrinsics                                 | No    | No        | Yes     | Yes            | Yes   | Yes       |
 | [int matrix](#int-matrix)                            | Yes   | Yes       | No +    | Yes            | No    | Yes       |
-| [tex.GetDimensions](#tex-get-dimensions)             | Yes   | Yes       | Yes     | No             | Yes   | Yes       |
+| [tex.GetDimensions](#tex-get-dimensions)             | Yes   | Yes       | Yes     | Partial ^      | Yes   | Yes       |
 | [SM6.0 Wave Intrinsics](#sm6-wave)                   | No    | Yes       | Partial | Yes ^          | No    | No        |
 | SM6.0 Quad Intrinsics                                | No    | Yes       | No +    | No             | No    | No        |
 | [SM6.5 Wave Intrinsics](#sm6.5-wave)                 | No    | Yes ^     | No +    | Yes ^          | No    | No        |
@@ -86,7 +86,10 @@ Means can use matrix types containing integer types.
 
 ## tex.GetDimensions
 
-tex.GetDimensions is the GetDimensions method on 'texture' objects. This is not supported on CUDA as CUDA has no equivalent functionality to get these values. GetDimensions work on Buffer resource types on CUDA.
+tex.GetDimensions is the GetDimensions method on 'texture' objects. CUDA supports querying texture
+width, height, and depth. Overloads taking a mip level are only available in OptiX ray-tracing
+stages, where they also return the mip-level count. Array-size and sample-count output parameters
+are currently written as zero. GetDimensions works on Buffer resource types on CUDA.
 
 <a id="sm6-wave"></a>
 
@@ -204,7 +207,7 @@ In practice to write shader code that works across D3D12 and VK you should have 
 
 ## tex.Load
 
-tex.Load is only supported on CUDA for Texture1D. Additionally CUDA only allows such access for linear memory, meaning the bound texture can also not have mip maps. Load _is_ allowed on RWTexture types of other dimensions including 1D on CUDA.
+tex.Load on a read-only texture is supported on CUDA for `Texture1D`, `Texture2D`, `Texture3D`, and the 1D/2D array forms; the mip map selection argument is ignored (the fetch reads the base level). Load is also allowed on RWTexture types on CUDA. Note: half-typed textures are not supported for Load or SampleLevel on CUDA (use a float texture).
 
 <a id="full-bool"></a>
 

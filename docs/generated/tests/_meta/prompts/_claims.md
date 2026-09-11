@@ -85,13 +85,14 @@ invent claims):
   [`_common.md` § Exercise every feasible back-end](_common.md). Targets
   that can't express the claim go in `## Untested claims`
   (`unsupported-on-target`), never a weakened CHECK.
+
 - **Construct & legalization variants (depth).** When the doc describes a
-  transform or emission whose handling *branches on* the input's type,
+  transform or emission whose handling _branches on_ the input's type,
   shape, or form — a type-mapping / layout table, an opcode or decoration
   list, per-element-type array strides, per-op atomics, per-address-space
   storage classes — instantiate **one test per row / branch the doc
   enumerates**, not one test for the whole table. This is where emission
-  and legalization *depth* lives: a single `StructuredBuffer<int>` stride
+  and legalization _depth_ lives: a single `StructuredBuffer<int>` stride
   test does not exercise the `int8`/`int64`/struct/`float4[3]` stride
   branches the layout rules describe, nor does one `InterlockedAdd` cover
   the and/or/xor/min/max/exchange/compare-exchange forms. Re-read the
@@ -114,16 +115,16 @@ answer. A rich doc yields a rich bundle.
 
 ### Systematic variant expansion when the doc names a family but doesn't enumerate it
 
-The design docs frequently state a rule *generically* — "atomic intrinsics
+The design docs frequently state a rule _generically_ — "atomic intrinsics
 lower to the corresponding target op", "structured-buffer layout follows
 the rules below", "narrow integer types are emitted per the target's width
 support" — without spelling out the individual members or cells the
 compiler branches on. You may instantiate the individual cells **even when
 the immediate doc section does not list them**, under all of the following
-conditions. This is *not* a license to write tests against observed
+conditions. This is _not_ a license to write tests against observed
 uncovered code (see [`_expand.md` § The hard rule](_expand.md)); it is a
 disciplined way to read an authoritative source for the variants it
-*implies*.
+_implies_.
 
 1. **The variant axis is real, confirmed by an authoritative surface — not
    guessed.** Enumerate the candidate cells from one of:
@@ -150,7 +151,7 @@ disciplined way to read an authoritative source for the variants it
 
 3. **Establish each cell's behaviour by running the compiler — never by
    assuming it works.** For each candidate cell, compile it and classify
-   the *actual* result:
+   the _actual_ result:
    - **clean, expected-shape output** → keep the test; pin the `CHECK` to
      the **real emitted text** you observed.
    - **clean rejection / diagnostic** → keep it as a **negative test**
@@ -166,24 +167,29 @@ disciplined way to read an authoritative source for the variants it
    classified rather than assumed green.
 
 4. **Prune cells that collapse — branch-driven, not Cartesian.** The
-   surface gives you the *candidate* grid; keep only the cells the pipeline
+   surface gives you the _candidate_ grid; keep only the cells the pipeline
    treats distinctly:
    - keep cells the surface itself distinguishes (signed vs. unsigned
      `Min`/`Max` are different ops; `device` vs. `threadgroup` atomics are
      different address spaces);
    - when you cannot tell two cells apart from the spec, compile both and
      **diff the emitted text** (observing output is always allowed; reading
-     *coverage* is not). Identical emission ⇒ keep one representative and
+     _coverage_ is not). Identical emission ⇒ keep one representative and
      note the rest in the claim's `Tests` cell as "same emission".
 
-5. **`CHECK` tightness.** Pin the token that *identifies the cell* — the
+5. **`CHECK` tightness.** Pin the token that _identifies the cell_ — the
    specific op (`OpAtomicAnd`), decoration (`ArrayStride 2`), or layout
-   token — tightly, and leave incidental names / IDs / registers wild
-   (`%{{[0-9]+}}`, `a_{{[0-9]+}}`). A cell whose distinguishing token you
+   token — tightly, and leave everything the claim does not rest on wild:
+   names / IDs / registers (`%{{[0-9]+}}`, `a_{{[0-9]+}}`), and equally
+   the declaration specifiers and qualifiers around the token under test
+   (`__device__`, `__noinline__`, `inline`, `static`). Those are stable
+   rather than volatile, so they read as safe to pin, but they are not
+   what the claim is about — see [`_common.md`](_common.md) § FileCheck /
+   CHECK pattern hygiene, rule 8. A cell whose distinguishing token you
    cannot name is a cell you have not differentiated — fold it back into
    the collapse step above.
 
-Coverage still never tells you *which cells to add* — only **which bundles
+Coverage still never tells you _which cells to add_ — only **which bundles
 are worth this effort**. The candidate grid comes from the surface; the
 keep/drop decision comes from observed compiler output.
 

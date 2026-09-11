@@ -16,7 +16,7 @@
 // the other arm runs. The CHECK pins the `IsType` inside `func %main` with `%A`
 // as the tested type, and the two CHECK-NOTs bracket it so that no
 // `GetSequentialID` may appear anywhere in the dump, before or after.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int v; int run(int x) { return v + x; } };

@@ -16,7 +16,7 @@
 // to be that break label and its afterBlock to be the same block as its
 // trueBlock. A pass that assumed four distinct operands would be wrong here.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;

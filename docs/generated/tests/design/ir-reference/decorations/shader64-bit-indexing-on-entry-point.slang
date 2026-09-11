@@ -14,7 +14,7 @@
 // `[shader64BitIndexing]` line followed by `func %main`, which is the
 // entry-point-scoped placement the SPIR-V execution mode requires.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

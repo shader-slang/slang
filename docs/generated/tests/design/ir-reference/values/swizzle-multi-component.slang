@@ -16,7 +16,7 @@
 // bundle covers single-component swizzle from a `uint3`; this test
 // covers multi-component and the inline literal-index encoding.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float4 v;
 uniform RWStructuredBuffer<float3> vbuf;

@@ -13,7 +13,7 @@
 // 64-bit. The doc's sign-extension wording implies one opcode
 // regardless of how many bits are filled.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int8_t i8a;
 uniform RWStructuredBuffer<int64_t> buf;

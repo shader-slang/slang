@@ -147,7 +147,7 @@ jobs:
           repository: "shader-slang/MDL-SDK"
           # Pin to a known-good commit so corpus drift doesn't silently shift
           # mdl_dxr timings. Update this pin intentionally when refreshing the
-          # corpus, then resync history (compile-perf-release-sweep force=true).
+          # corpus, then resync history (perf-compile-release-sweep force=true).
           ref: "446562493bed1b175e7cf105425ca3596764652f"
           path: "external/MDL-SDK"
           persist-credentials: false

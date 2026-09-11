@@ -13,7 +13,7 @@
 // hoistable") with operands `(elementType, elementCount)`. A local
 // `int[4]` appears as an `Array(Int, 4 : Int)` type in the IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int i;
 uniform StructuredBuffer<int> in_buf;

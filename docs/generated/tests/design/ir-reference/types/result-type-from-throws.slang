@@ -17,7 +17,7 @@
 // which shows the declared return type became the first Result operand
 // and the thrown enum became the second.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o -
 
 enum MyErr { Bad }
 

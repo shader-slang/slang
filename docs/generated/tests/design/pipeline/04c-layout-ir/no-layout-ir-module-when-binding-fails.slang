@@ -15,7 +15,7 @@
 // still produced, and the CHECK-NOTs confirm no layout instruction or
 // layout decoration exists anywhere in the dump - construction never ran.
 
-//TEST:SIMPLE(filecheck=CHECK):-target metal -dump-ir -o /dev/null -entry main -stage miss
+//TEST:SIMPLE(filecheck=CHECK):-target metal -dump-ir -o - -entry main -stage miss
 
 struct Payload
 {

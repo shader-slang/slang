@@ -16,7 +16,7 @@
 // walk from the named `CB` field key to its container var layout and require
 // the kind there to be 2 on both the size and the offset side.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 
 cbuffer CB
 {

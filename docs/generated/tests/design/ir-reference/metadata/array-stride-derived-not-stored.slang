@@ -18,7 +18,7 @@
 // the element layout and require that element to report size 4 and alignment
 // 4, so the two levels are shown to disagree exactly as the doc says.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 
 cbuffer CB
 {
