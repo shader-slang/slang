@@ -43,13 +43,15 @@ struct ContextB : rt::ICallableGroupContext
     typealias Record = ::Record;
 }
 
-struct CallableA : rt::ICallableShader<ContextA>
+struct CallableA : rt::ICallableShader
 {
+    typealias Context = ContextA;
     void invoke(rt::CallableInput<ContextA> input) {}
 }
 
-struct CallableB : rt::ICallableShader<ContextB>
+struct CallableB : rt::ICallableShader
 {
+    typealias Context = ContextB;
     void invoke(rt::CallableInput<ContextB> input) {}
 }
 

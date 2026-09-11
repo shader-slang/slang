@@ -48,8 +48,9 @@ struct TestMissContext : rt::IMissGroupContext
     typealias Record = TestRecord;
 }
 
-struct TestMiss : rt::IMissShader<TestMissContext>
+struct TestMiss : rt::IMissShader
 {
+    typealias Context = TestMissContext;
     void invoke(rt::MissInput<TestMissContext> input) {}
 }
 
@@ -72,8 +73,9 @@ struct TestCallableContext : rt::ICallableGroupContext
     typealias Record = TestRecord;
 }
 
-struct TestCallable : rt::ICallableShader<TestCallableContext>
+struct TestCallable : rt::ICallableShader
 {
+    typealias Context = TestCallableContext;
     void invoke(rt::CallableInput<TestCallableContext> input) {}
 }
 

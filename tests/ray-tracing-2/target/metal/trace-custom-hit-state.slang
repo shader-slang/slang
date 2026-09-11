@@ -31,8 +31,9 @@ struct HitContext : rt::IHitContext
     typealias Record = TestRecord;
 }
 
-struct TestIntersection : rt::IIntersectionShader<HitContext>
+struct TestIntersection : rt::IIntersectionShader
 {
+    typealias Context = HitContext;
     void invoke(rt::IntersectionInput<HitContext> input)
     {
         SphereAttributes attributes = { float3(1.0, 2.0, 3.0) };
@@ -40,8 +41,9 @@ struct TestIntersection : rt::IIntersectionShader<HitContext>
     }
 }
 
-struct TestClosestHit : rt::IClosestHitShader<HitContext>
+struct TestClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         input.payload.value = input.attributes.normal.x + input.distance + input.hitKind;

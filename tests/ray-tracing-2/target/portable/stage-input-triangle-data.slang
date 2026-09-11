@@ -36,8 +36,9 @@ void applyClosestHitTriangleData(rt::ClosestHitInput<HitContext> input)
     input.payload.value = triangle.barycentricCoord.x + (triangle.frontFacing ? 1.0 : 0.0);
 }
 
-struct ClosestHit : rt::IClosestHitShader<HitContext>
+struct ClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         applyClosestHitTriangleData(input);
@@ -63,8 +64,9 @@ void applyAnyHitTriangleData(rt::AnyHitInput<HitContext> input)
     input.payload.value = triangle.barycentricCoord.y + (triangle.frontFacing ? 2.0 : 0.0);
 }
 
-struct AnyHit : rt::IAnyHitShader<HitContext>
+struct AnyHit : rt::IAnyHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         applyAnyHitTriangleData(input);

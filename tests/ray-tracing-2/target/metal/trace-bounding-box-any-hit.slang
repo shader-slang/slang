@@ -29,8 +29,9 @@ struct HitContext : rt::IHitContext
     typealias Record = HitRecord;
 }
 
-struct TestIntersection : rt::IIntersectionShader<HitContext>
+struct TestIntersection : rt::IIntersectionShader
 {
+    typealias Context = HitContext;
     void invoke(rt::IntersectionInput<HitContext> input)
     {
         HitAttributes farAttributes = { float3(0.0, 0.0, 1.0) };
@@ -42,8 +43,9 @@ struct TestIntersection : rt::IIntersectionShader<HitContext>
     }
 }
 
-struct TestAnyHit : rt::IAnyHitShader<HitContext>
+struct TestAnyHit : rt::IAnyHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         input.payload.visitCount++;

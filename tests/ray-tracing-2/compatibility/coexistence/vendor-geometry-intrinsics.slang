@@ -41,8 +41,9 @@ struct HitContext : rt::IHitContext
     typealias Record = VendorRecord;
 }
 
-struct VendorClosestHit : rt::IClosestHitShader<HitContext>
+struct VendorClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         input.payload.clusterID = GetClusterID();

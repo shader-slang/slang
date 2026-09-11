@@ -28,8 +28,9 @@ struct TestHitContext : rt::IHitContext
     typealias Record = TestRecord;
 }
 
-struct TestClosestHit : rt::IClosestHitShader<TestHitContext>
+struct TestClosestHit : rt::IClosestHitShader
 {
+    typealias Context = TestHitContext;
     void invoke(rt::ClosestHitInput<TestHitContext> input) {}
 }
 
@@ -54,18 +55,21 @@ struct TestProceduralHitContext : rt::IHitContext
     typealias Record = TestRecord;
 }
 
-struct TestProceduralClosestHit : rt::IClosestHitShader<TestProceduralHitContext>
+struct TestProceduralClosestHit : rt::IClosestHitShader
 {
+    typealias Context = TestProceduralHitContext;
     void invoke(rt::ClosestHitInput<TestProceduralHitContext> input) {}
 }
 
-struct TestAnyHit : rt::IAnyHitShader<TestProceduralHitContext>
+struct TestAnyHit : rt::IAnyHitShader
 {
+    typealias Context = TestProceduralHitContext;
     void invoke(rt::AnyHitInput<TestProceduralHitContext> input) {}
 }
 
-struct TestIntersection : rt::IIntersectionShader<TestProceduralHitContext>
+struct TestIntersection : rt::IIntersectionShader
 {
+    typealias Context = TestProceduralHitContext;
     void invoke(rt::IntersectionInput<TestProceduralHitContext> input) {}
 }
 
@@ -89,8 +93,9 @@ struct TestMissContext : rt::IMissGroupContext
     typealias Record = TestRecord;
 }
 
-struct TestMiss : rt::IMissShader<TestMissContext>
+struct TestMiss : rt::IMissShader
 {
+    typealias Context = TestMissContext;
     void invoke(rt::MissInput<TestMissContext> input) {}
 }
 
@@ -113,8 +118,9 @@ struct TestCallableContext : rt::ICallableGroupContext
     typealias Record = TestRecord;
 }
 
-struct TestCallable : rt::ICallableShader<TestCallableContext>
+struct TestCallable : rt::ICallableShader
 {
+    typealias Context = TestCallableContext;
     void invoke(rt::CallableInput<TestCallableContext> input) {}
 }
 

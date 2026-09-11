@@ -23,8 +23,9 @@ struct HitContext : rt::IHitContext
 
 RWStructuredBuffer<uint> values;
 
-struct RuntimeAnyHit : rt::IAnyHitShader<HitContext>
+struct RuntimeAnyHit : rt::IAnyHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         input.payload.value += values[0];

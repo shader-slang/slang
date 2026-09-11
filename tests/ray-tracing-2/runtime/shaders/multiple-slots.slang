@@ -42,8 +42,9 @@ struct MissContext : rt::IMissGroupContext
     typealias Record = RuntimeRecord;
 }
 
-struct ClosestHit0 : rt::IClosestHitShader<HitContext>
+struct ClosestHit0 : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         input.payload.stage = 10;
@@ -51,8 +52,9 @@ struct ClosestHit0 : rt::IClosestHitShader<HitContext>
     }
 }
 
-struct ClosestHit1 : rt::IClosestHitShader<HitContext>
+struct ClosestHit1 : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         input.payload.stage = 11;
@@ -60,8 +62,9 @@ struct ClosestHit1 : rt::IClosestHitShader<HitContext>
     }
 }
 
-struct Miss0 : rt::IMissShader<MissContext>
+struct Miss0 : rt::IMissShader
 {
+    typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input)
     {
         input.payload.stage = 20;
@@ -69,8 +72,9 @@ struct Miss0 : rt::IMissShader<MissContext>
     }
 }
 
-struct Miss1 : rt::IMissShader<MissContext>
+struct Miss1 : rt::IMissShader
 {
+    typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input)
     {
         input.payload.stage = 21;

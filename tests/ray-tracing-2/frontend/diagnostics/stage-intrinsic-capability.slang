@@ -25,8 +25,9 @@ void invalidAnyHitHelper()
     IgnoreHit();
 }
 
-struct TestClosestHit : rt::IClosestHitShader<TestHitContext>
+struct TestClosestHit : rt::IClosestHitShader
 {
+    typealias Context = TestHitContext;
     void invoke(rt::ClosestHitInput<TestHitContext> input)
 //CHECK: ^^^^^^ dependencies not compatible on stage
 //CHECK: ^^^^^^ 'invoke' requires support for stage 'closesthit', but stage is unsupported.

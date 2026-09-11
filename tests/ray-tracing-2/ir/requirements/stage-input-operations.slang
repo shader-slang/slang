@@ -42,8 +42,9 @@ struct MissContext : rt::IMissGroupContext
 
 RWStructuredBuffer<float4> output;
 
-struct ClosestHit : rt::IClosestHitShader<TriangleContext>
+struct ClosestHit : rt::IClosestHitShader
 {
+    typealias Context = TriangleContext;
     void invoke(rt::ClosestHitInput<TriangleContext> input)
     {
         output[0] = float4(
@@ -59,8 +60,9 @@ struct ClosestHit : rt::IClosestHitShader<TriangleContext>
 // CH: structuralRayTracingGetRayTCurrent
 // CH: structuralRayTracingGetHitKind
 
-struct AnyHit : rt::IAnyHitShader<TriangleContext>
+struct AnyHit : rt::IAnyHitShader
 {
+    typealias Context = TriangleContext;
     void invoke(rt::AnyHitInput<TriangleContext> input)
     {
         if (input.worldSpaceOrigin.x + input.worldSpaceDirection.x + input.distance > 0.0)
@@ -77,8 +79,9 @@ struct AnyHit : rt::IAnyHitShader<TriangleContext>
 // AH: structuralRayTracingGetHitKind
 // AH: structuralRayTracingAcceptHitAndEndSearch
 
-struct Intersection : rt::IIntersectionShader<ProceduralContext>
+struct Intersection : rt::IIntersectionShader
 {
+    typealias Context = ProceduralContext;
     void invoke(rt::IntersectionInput<ProceduralContext> input)
     {
         let ray = input.objectSpaceRay;
@@ -99,8 +102,9 @@ struct Intersection : rt::IIntersectionShader<ProceduralContext>
 // IS: structuralRayTracingReportHit
 // IS: structuralRayTracingReportHitWithKind
 
-struct Miss : rt::IMissShader<MissContext>
+struct Miss : rt::IMissShader
 {
+    typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input)
     {
         output[0] = float4(input.worldSpaceOrigin + input.worldSpaceDirection, 1.0);

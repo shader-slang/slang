@@ -52,23 +52,27 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
             typealias Record = CallableRecordType;
         }
 
-        struct ClosestHit : rt::IClosestHitShader<HitContext>
+        struct ClosestHit : rt::IClosestHitShader
         {
+            typealias Context = HitContext;
             void invoke(rt::ClosestHitInput<HitContext> input) {}
         }
 
-        struct AnyHit : rt::IAnyHitShader<HitContext>
+        struct AnyHit : rt::IAnyHitShader
         {
+            typealias Context = HitContext;
             void invoke(rt::AnyHitInput<HitContext> input) {}
         }
 
-        struct Miss : rt::IMissShader<MissContext>
+        struct Miss : rt::IMissShader
         {
+            typealias Context = MissContext;
             void invoke(rt::MissInput<MissContext> input) {}
         }
 
-        struct Callable : rt::ICallableShader<CallableContext>
+        struct Callable : rt::ICallableShader
         {
+            typealias Context = CallableContext;
             void invoke(rt::CallableInput<CallableContext> input) {}
         }
 
@@ -219,8 +223,9 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
                 typealias Record = StageNamespace::Record;
             }
 
-            struct TestClosestHit : rt::IClosestHitShader<HitContext>
+            struct TestClosestHit : rt::IClosestHitShader
             {
+                typealias Context = HitContext;
                 void invoke(rt::ClosestHitInput<HitContext> input)
                 {
                     input.payload.value = input.triangle.barycentricCoord.x;
@@ -236,8 +241,9 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
                 typealias Intersection = rt::NoIntersection<HitContext>;
             }
 
-            struct TestMiss : rt::IMissShader<MissContext>
+            struct TestMiss : rt::IMissShader
             {
+                typealias Context = MissContext;
                 void invoke(rt::MissInput<MissContext> input)
                 {
                     input.payload.value = 1.0f;
@@ -261,8 +267,9 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
                 typealias CallableGroups = rt::NoCallableGroups<StageNamespace::TraceContext>;
             }
 
-            struct GenericMiss<T> : rt::IMissShader<MissContext>
+            struct GenericMiss<T> : rt::IMissShader
             {
+                typealias Context = MissContext;
                 void invoke(rt::MissInput<MissContext> input)
                 {
                     input.payload.value = 4.0f;
@@ -286,8 +293,9 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
             }
         }
 
-        struct main : rt::IMissShader<StageNamespace::MissContext>
+        struct main : rt::IMissShader
         {
+            typealias Context = StageNamespace::MissContext;
             void invoke(rt::MissInput<StageNamespace::MissContext> input)
             {
                 input.payload.value = 2.0f;
@@ -313,8 +321,9 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
         // This legal source identifier is exactly the encoded spelling of
         // `StageNamespace.TestMiss`. It must itself be encoded to keep the mapping injective.
         struct __slang_structural_rt_53746167654e616d6573706163652e546573744d697373
-            : rt::IMissShader<StageNamespace::MissContext>
+            : rt::IMissShader
         {
+            typealias Context = StageNamespace::MissContext;
             void invoke(rt::MissInput<StageNamespace::MissContext> input)
             {
                 input.payload.value = 3.0f;
@@ -433,8 +442,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
     String mainEntryPointName(reflectedMain->getEntryPointName());
     SLANG_CHECK(mainEntryPointName == expectedMainName);
 
-    auto reflectedReservedSchema =
-        reflectedProgram->findTraceProgramSchema("ReservedPrefixSchema");
+    auto reflectedReservedSchema = reflectedProgram->findTraceProgramSchema("ReservedPrefixSchema");
     SLANG_CHECK_ABORT(reflectedReservedSchema != nullptr);
     auto reflectedReserved = reflectedReservedSchema->getMissGroup(0)->getMiss();
     SLANG_CHECK_ABORT(reflectedReserved != nullptr);
