@@ -40,7 +40,8 @@ void readInput(__constref rt::ClosestHitInput<HitContext> input) {}
 //CHECK:                                                  ^^^^^ storage of a structural ray-tracing stage input
 //CHECK:                                                  ^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
 
-struct ClosestHitStage : rt::IClosestHitShader<HitContext>
+struct ClosestHitStage : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input) {}
 }

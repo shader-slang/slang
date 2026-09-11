@@ -20,8 +20,9 @@ public struct GenericMissContext<T> : rt::IMissGroupContext
     typealias Record = void;
 }
 
-public struct GenericMiss<T> : rt::IMissShader<GenericMissContext<T>>
+public struct GenericMiss<T> : rt::IMissShader
 {
+    typealias Context = GenericMissContext<T>;
     void invoke(rt::MissInput<GenericMissContext<T>> input)
     {
         input.payload.value = input.payload.value;

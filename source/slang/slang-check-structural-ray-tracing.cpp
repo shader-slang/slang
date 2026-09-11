@@ -752,15 +752,18 @@ static StructuralRayTracingRuntimeTypeKind _getDirectStructuralRuntimeTypeKind(
     {
         if (auto typeDecl = declRefType->getDeclRef().as<AggTypeDecl>())
         {
-            visitor->ensureDecl(typeDecl, DeclCheckState::ReadyForConformances);
             auto kind =
                 _getInterfaceRuntimeTypeKind(registry, as<InterfaceDecl>(typeDecl.getDecl()));
             if (kind != StructuralRayTracingRuntimeTypeKind::None)
                 return kind;
 
-            // A parameter can be checked before inheritance facets have been cached for its
-            // concrete type. Inspect the declared bases as well so that the restriction does not
-            // depend on declaration-checking order.
+            // Consider a parameter declared as `TestHitGroup group`, where `TestHitGroup` directly
+            // inherits `IHitGroup`. Parameter signatures can be checked before the compiler has
+            // built `TestHitGroup`'s conformance witness. Recognizing the declared base only needs
+            // that base's type, and forcing the complete witness here can diagnose otherwise-valid
+            // associated-type constraints before dependent stage conformances have populated their
+            // witness tables. Inspect direct bases first so this runtime restriction is independent
+            // of that order.
             for (auto inheritanceDecl :
                  typeDecl.getDecl()->getDirectMemberDeclsOfType<InheritanceDecl>())
             {

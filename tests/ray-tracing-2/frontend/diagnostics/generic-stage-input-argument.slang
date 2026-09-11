@@ -27,8 +27,9 @@ struct HitContext : rt::IHitContext
 
 void consume<T>(T value) {}
 
-struct ClosestHit : rt::IClosestHitShader<HitContext>
+struct ClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         consume(input);

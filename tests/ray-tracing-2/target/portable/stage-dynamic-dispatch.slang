@@ -63,8 +63,9 @@ struct ProceduralHitContext : rt::IHitContext
     typealias Record = void;
 }
 
-struct ClosestHit : rt::IClosestHitShader<HitContext>
+struct ClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         IShape shape = makeShape(input.payload.value);
@@ -72,8 +73,9 @@ struct ClosestHit : rt::IClosestHitShader<HitContext>
     }
 }
 
-struct AnyHit : rt::IAnyHitShader<HitContext>
+struct AnyHit : rt::IAnyHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         IShape shape = makeShape(input.payload.value);
@@ -81,8 +83,9 @@ struct AnyHit : rt::IAnyHitShader<HitContext>
     }
 }
 
-struct Intersection : rt::IIntersectionShader<ProceduralHitContext>
+struct Intersection : rt::IIntersectionShader
 {
+    typealias Context = ProceduralHitContext;
     void invoke(rt::IntersectionInput<ProceduralHitContext> input)
     {
         IShape shape = makeShape(input.primitiveIndex);
@@ -114,8 +117,9 @@ struct MissContext : rt::IMissGroupContext
     typealias Record = void;
 }
 
-struct Miss : rt::IMissShader<MissContext>
+struct Miss : rt::IMissShader
 {
+    typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input)
     {
         IShape shape = makeShape(input.payload.value);
@@ -142,8 +146,9 @@ struct CallableContext : rt::ICallableGroupContext
     typealias Record = void;
 }
 
-struct Callable : rt::ICallableShader<CallableContext>
+struct Callable : rt::ICallableShader
 {
+    typealias Context = CallableContext;
     void invoke(rt::CallableInput<CallableContext> input)
     {
         IShape shape = makeShape(input.data.value);

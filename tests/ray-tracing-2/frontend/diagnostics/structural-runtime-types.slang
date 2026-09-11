@@ -19,8 +19,9 @@ struct TestHitContext : rt::IHitContext
     typealias Record = TestRecord;
 }
 
-struct TestClosestHit : rt::IClosestHitShader<TestHitContext>
+struct TestClosestHit : rt::IClosestHitShader
 {
+    typealias Context = TestHitContext;
     void invoke(rt::ClosestHitInput<TestHitContext> input) {}
 }
 
@@ -66,9 +67,9 @@ rt::ClosestHitInput<TestHitContext> invalidResult();
 */
 
 [require(closesthit)]
-void invalidInterfaceValue(rt::IClosestHitShader<TestHitContext> stage) {}
-//CHECK:                                                         ^^^^^ runtime use of a structural ray-tracing stage type
-//CHECK:                                                         ^^^^^ structural ray-tracing stage type 'rt.IClosestHitShader<TestHitContext>' has no runtime representation
+void invalidInterfaceValue(rt::IClosestHitShader stage) {}
+//CHECK:                                         ^^^^^ runtime use of a structural ray-tracing stage type
+//CHECK:                                         ^^^^^ structural ray-tracing stage type 'rt.IClosestHitShader' has no runtime representation
 
 TestClosestHit invalidStageResult();
 /*CHECK:

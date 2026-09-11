@@ -37,8 +37,9 @@ struct TestCallableContext : rt::ICallableGroupContext
 
 void callSecond(inout TestCallableData data);
 
-struct FirstCallable : rt::ICallableShader<TestCallableContext>
+struct FirstCallable : rt::ICallableShader
 {
+    typealias Context = TestCallableContext;
     void invoke(rt::CallableInput<TestCallableContext> input)
     {
         input.data.value += input.record.value;
@@ -46,8 +47,9 @@ struct FirstCallable : rt::ICallableShader<TestCallableContext>
     }
 }
 
-struct SecondCallable : rt::ICallableShader<TestCallableContext>
+struct SecondCallable : rt::ICallableShader
 {
+    typealias Context = TestCallableContext;
     void invoke(rt::CallableInput<TestCallableContext> input)
     {
         input.data.value *= input.record.value;

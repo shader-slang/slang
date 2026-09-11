@@ -28,8 +28,9 @@ struct HitContext : rt::IHitContext
     typealias Record = TestRecord;
 }
 
-struct TestIntersection : rt::IIntersectionShader<HitContext>
+struct TestIntersection : rt::IIntersectionShader
 {
+    typealias Context = HitContext;
     void invoke(rt::IntersectionInput<HitContext> input)
     {
         float value = input.objectSpaceRay.origin.x + input.objectSpaceRay.direction.y;
@@ -40,8 +41,9 @@ struct TestIntersection : rt::IIntersectionShader<HitContext>
     }
 }
 
-struct TestAnyHit : rt::IAnyHitShader<HitContext>
+struct TestAnyHit : rt::IAnyHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         input.payload.value = input.worldSpaceOrigin.x + input.worldSpaceDirection.y;

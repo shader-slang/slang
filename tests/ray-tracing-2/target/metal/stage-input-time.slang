@@ -32,16 +32,18 @@ struct MissContext : rt::IMissGroupContext
     typealias Record = void;
 }
 
-struct TestClosestHit : rt::IClosestHitShader<HitContext>
+struct TestClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         input.payload.value = input.time + input.attributes.value;
     }
 }
 
-struct TestAnyHit : rt::IAnyHitShader<HitContext>
+struct TestAnyHit : rt::IAnyHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         input.payload.value += input.time;
@@ -50,8 +52,9 @@ struct TestAnyHit : rt::IAnyHitShader<HitContext>
     }
 }
 
-struct TestIntersection : rt::IIntersectionShader<HitContext>
+struct TestIntersection : rt::IIntersectionShader
 {
+    typealias Context = HitContext;
     void invoke(rt::IntersectionInput<HitContext> input)
     {
         Attributes attributes = {input.time};
@@ -59,8 +62,9 @@ struct TestIntersection : rt::IIntersectionShader<HitContext>
     }
 }
 
-struct TestMiss : rt::IMissShader<MissContext>
+struct TestMiss : rt::IMissShader
 {
+    typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input)
     {
         input.payload.value = input.time;

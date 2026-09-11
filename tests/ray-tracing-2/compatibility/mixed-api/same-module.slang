@@ -20,11 +20,12 @@ struct HitContext : rt::IHitContext
     typealias Record = TestRecord;
 }
 
-struct StructuralClosestHit : rt::IClosestHitShader<HitContext>
+struct StructuralClosestHit : rt::IClosestHitShader
 /*CHECK:
        ^^^^^^^^^^^^^^^^^^^^ the same module also uses the structural API
 */
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input) {}
 }
 

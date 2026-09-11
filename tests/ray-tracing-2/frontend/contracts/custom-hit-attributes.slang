@@ -31,8 +31,9 @@ struct ProceduralContext : rt::IHitContext
     typealias Record = TestRecord;
 }
 
-struct InvalidClosestHit : rt::IClosestHitShader<TriangleContext>
+struct InvalidClosestHit : rt::IClosestHitShader
 {
+    typealias Context = TriangleContext;
     void invoke(rt::ClosestHitInput<TriangleContext> input)
     {
         let attributes = input.attributes;
@@ -41,8 +42,9 @@ struct InvalidClosestHit : rt::IClosestHitShader<TriangleContext>
     }
 }
 
-struct InvalidProceduralClosestHit : rt::IClosestHitShader<ProceduralContext>
+struct InvalidProceduralClosestHit : rt::IClosestHitShader
 {
+    typealias Context = ProceduralContext;
     void invoke(rt::ClosestHitInput<ProceduralContext> input)
     {
         let triangle = input.triangle;

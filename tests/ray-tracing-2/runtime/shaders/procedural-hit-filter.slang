@@ -63,8 +63,9 @@ struct HitContext : rt::IHitContext
     typealias Record = void;
 }
 
-struct RuntimeIntersection : rt::IIntersectionShader<HitContext>
+struct RuntimeIntersection : rt::IIntersectionShader
 {
+    typealias Context = HitContext;
     void invoke(rt::IntersectionInput<HitContext> input)
     {
         uint rayIndex = input.dispatchRaysIndex.x;
@@ -81,8 +82,9 @@ struct RuntimeIntersection : rt::IIntersectionShader<HitContext>
     }
 }
 
-struct RuntimeAnyHit : rt::IAnyHitShader<HitContext>
+struct RuntimeAnyHit : rt::IAnyHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         input.payload.anyHitCount++;
@@ -100,8 +102,9 @@ struct RuntimeAnyHit : rt::IAnyHitShader<HitContext>
     }
 }
 
-struct RuntimeClosestHit : rt::IClosestHitShader<HitContext>
+struct RuntimeClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         input.payload.stage = 3;
@@ -124,8 +127,9 @@ struct MissContext : rt::IMissGroupContext
     typealias Record = void;
 }
 
-struct RuntimeMiss : rt::IMissShader<MissContext>
+struct RuntimeMiss : rt::IMissShader
 {
+    typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input)
     {
         input.payload.stage = 2;

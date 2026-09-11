@@ -19,8 +19,9 @@ struct HitContext : rt::IHitContext
     typealias Record = TestRecord;
 }
 
-struct ClosestHit : rt::IClosestHitShader<HitContext>
+struct ClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     uint state;
 //CHECK: ^^^^^ stateful structural ray-tracing stage
 //CHECK: ^^^^^ instance field 'state' is not allowed because structural ray-tracing stage implementations are compiler-created

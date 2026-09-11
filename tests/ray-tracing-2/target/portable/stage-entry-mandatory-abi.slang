@@ -62,23 +62,27 @@ struct TestCallableContext : rt::ICallableGroupContext
     typealias Record = TestRecord;
 }
 
-struct EmptyCustomClosestHit : rt::IClosestHitShader<CustomHitContext>
+struct EmptyCustomClosestHit : rt::IClosestHitShader
 {
+    typealias Context = CustomHitContext;
     void invoke(rt::ClosestHitInput<CustomHitContext> input) {}
 }
 
-struct EmptyTriangleAnyHit : rt::IAnyHitShader<TriangleHitContext>
+struct EmptyTriangleAnyHit : rt::IAnyHitShader
 {
+    typealias Context = TriangleHitContext;
     void invoke(rt::AnyHitInput<TriangleHitContext> input) {}
 }
 
-struct EmptyMiss : rt::IMissShader<TestMissContext>
+struct EmptyMiss : rt::IMissShader
 {
+    typealias Context = TestMissContext;
     void invoke(rt::MissInput<TestMissContext> input) {}
 }
 
-struct EmptyCallable : rt::ICallableShader<TestCallableContext>
+struct EmptyCallable : rt::ICallableShader
 {
+    typealias Context = TestCallableContext;
     void invoke(rt::CallableInput<TestCallableContext> input) {}
 }
 
@@ -87,8 +91,9 @@ void updateCallableData(rt::CallableInput<TestCallableContext> input)
     input.data.value++;
 }
 
-struct UsingCallable : rt::ICallableShader<TestCallableContext>
+struct UsingCallable : rt::ICallableShader
 {
+    typealias Context = TestCallableContext;
     void invoke(rt::CallableInput<TestCallableContext> input)
     {
         updateCallableData(input);

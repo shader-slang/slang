@@ -40,8 +40,9 @@ void applyClosestHitAttributes(rt::ClosestHitInput<HitContext> input)
     input.payload.value = input.attributes.value.x;
 }
 
-struct ClosestHit : rt::IClosestHitShader<HitContext>
+struct ClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         applyClosestHitAttributes(input);
@@ -62,8 +63,9 @@ void applyAnyHitAttributes(rt::AnyHitInput<HitContext> input)
     input.payload.value = input.attributes.value.y;
 }
 
-struct AnyHit : rt::IAnyHitShader<HitContext>
+struct AnyHit : rt::IAnyHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         applyAnyHitAttributes(input);

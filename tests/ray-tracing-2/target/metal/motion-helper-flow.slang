@@ -21,8 +21,9 @@ struct HitContext : rt::IHitContext
     typealias Record = void;
 }
 
-struct TestClosestHit : rt::IClosestHitShader<HitContext>
+struct TestClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         input.payload.value = 1;

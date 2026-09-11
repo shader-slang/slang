@@ -19,8 +19,9 @@ struct HitContext : rt::IHitContext
     typealias Record = Record;
 }
 
-struct BadClosestHit : rt::IClosestHitShader<HitContext>
+struct BadClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     /* CHECK:
          ^^^^^^ E36107

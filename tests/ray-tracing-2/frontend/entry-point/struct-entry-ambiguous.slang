@@ -21,12 +21,13 @@ struct HitContext : rt::IHitContext
     typealias Record = TestRecord;
 }
 
-struct MultiStage : rt::IClosestHitShader<HitContext>, rt::IAnyHitShader<HitContext>
+struct MultiStage : rt::IClosestHitShader, rt::IAnyHitShader
 /*CHECK:
        ^^^^^^^^^^ ambiguous structural ray-tracing entry point stage
        ^^^^^^^^^^ struct 'MultiStage' implements more than one executable ray-tracing stage; use '-stage <name>' to select one
 */
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input) {}
     void invoke(rt::AnyHitInput<HitContext> input) {}
 }

@@ -24,8 +24,9 @@ struct HitContext : rt::IHitContext
 
 rt::AccelerationStructure scene;
 
-struct QueryClosestHit : rt::IClosestHitShader<HitContext>
+struct QueryClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         RayDesc ray = {};

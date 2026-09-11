@@ -28,8 +28,9 @@ struct HitContext : rt::IHitContext
     typealias Record = HitRecord;
 }
 
-struct TestIntersection : rt::IIntersectionShader<HitContext>
+struct TestIntersection : rt::IIntersectionShader
 {
+    typealias Context = HitContext;
     void invoke(rt::IntersectionInput<HitContext> input)
     {
         HitAttributes farAttributes = { float3(0.0, 0.0, 1.0) };

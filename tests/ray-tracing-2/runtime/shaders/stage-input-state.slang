@@ -45,8 +45,9 @@ uint quantize(float value, float scale)
     return uint(value * scale + 0.5);
 }
 
-struct RuntimeClosestHit : rt::IClosestHitShader<HitContext>
+struct RuntimeClosestHit : rt::IClosestHitShader
 {
+    typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         let objectRay = input.objectSpaceRay;
@@ -85,8 +86,9 @@ struct MissContext : rt::IMissGroupContext
     typealias Record = void;
 }
 
-struct RuntimeMiss : rt::IMissShader<MissContext>
+struct RuntimeMiss : rt::IMissShader
 {
+    typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input)
     {
         input.payload.stage = 2;
