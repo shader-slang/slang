@@ -7,8 +7,7 @@ import slang.raytracing;
 // CHECK-DAG: intersection_stage_interface(
 // CHECK-DAG: miss_stage_interface(
 // CHECK-DAG: callable_stage_interface(
-// CHECK: [nameHint("local.IClosestHitShader")]
-// CHECK-NEXT: {{.*}}= interface(
+// CHECK-DAG: let %localx5FIClosestHitShader{{.*}}= interface(
 
 struct TestPayload {}
 struct TestRecord {}
@@ -79,5 +78,15 @@ struct OrdinaryInterfaceImplementation : local::IClosestHitShader<int>
     void invoke() {}
 }
 
+void invokeOrdinaryInterface(local::IClosestHitShader<int> stage)
+{
+    stage.invoke();
+}
+
 [numthreads(1, 1, 1)]
-void main() {}
+void main()
+{
+    // Keep the user-defined interface reachable so this test observes its ordinary IR identity
+    // even when dead-code elimination removes unused interface declarations.
+    invokeOrdinaryInterface(OrdinaryInterfaceImplementation());
+}

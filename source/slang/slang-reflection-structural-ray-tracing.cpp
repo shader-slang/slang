@@ -287,7 +287,8 @@ StructuralRayTracingProgramLayoutReflection* findStructuralRayTracingProgramLayo
     if (!layoutInterfaceType)
         return nullptr;
 
-    SemanticsContext semanticsContext(linkage->getSemanticsForReflection());
+    auto sharedSemanticsContext = linkage->getSemanticsForReflection();
+    SemanticsContext semanticsContext(sharedSemanticsContext);
     SemanticsVisitor visitor(semanticsContext);
     auto layoutWitness = visitor.isSubtype(layoutType, layoutInterfaceType, IsSubTypeOptions::None);
     if (!layoutWitness)
