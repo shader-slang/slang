@@ -476,6 +476,12 @@ covering those constituents rather than by a row of their own.
 
 ## Doc gaps observed
 
+(none) — no gaps remain open against this bundle's source document.
+
+Every gap previously listed here was fixed on the documentation side and
+recorded in `docs/generated/design/_meta/doc-gap-state.json`; the answers
+are now in the source document itself.
+
 All nine rows recorded by the previous pass have been retired: the doc-gap
 fill answered every one of them — the flavor table gained its "Slang surface
 that produces it" column, the mapping table gained its `IndexExpr` /
@@ -485,9 +491,3 @@ pack-count, `E40017` and `E39997` claims all acquired the worked examples
 they were missing (four of this pass's new tests are built directly from
 them). The rows below are new, and all three come from running the doc's own
 worked examples against the compiler.
-
-| Anchor | Kind | Gap | Suggested addition |
-| ------ | ---- | --- | ------------------ |
-| [#diagnostics-during-lowering](../../../../design/pipeline/04-ast-to-ir.md#diagnostics-during-lowering) | drift-from-source | The doc says "A chain of 128 ordinary calls — `f(f(...f(x)...))` — is already enough to reach the limit and report `fatal error[E39997]`". A chain of exactly 128 calls compiles cleanly with no diagnostic; 129 is the first depth that reports E39997. A reader who builds the documented reproducer at the documented depth sees nothing happen. | Change "a chain of 128 ordinary calls" to "a chain of 129", or state the rule as "one more than the `kMaxIRInvokeLoweringRecursionDepth` limit of 128" so the off-by-one between the budget and the triggering depth is explicit. |
-| [#generics-and-existentials](../../../../design/pipeline/04-ast-to-ir.md#generics-and-existentials) | drift-from-source | The worked example's dump excerpt is written with plain underscores — `witness_table_entry(%IFoo_zero,  %S_zero)` and `%IFoo_twice`. The real `-dump-ir` output mangles the underscore, printing `witness_table_entry(%IFoox5Fzero,%Sx5Fzero)` and `%IFoox5Ftwice`, with no space after the comma. A reader grepping the dump for the names as written finds nothing. | Paste the excerpt verbatim from an actual `-dump-ir` run (mangled `x5F` spellings included), or add a one-line note that requirement-key and implementation names appear mangled in the dump and that `_` renders as `x5F`. |
-| [#loweredvalinfo-and-the-lowering-environment](../../../../design/pipeline/04-ast-to-ir.md#loweredvalinfo-and-the-lowering-environment) | drift-from-source | The `ImplicitCastedLValue` row says the use site emits "whichever conversion inst `emitCast` picks, on a read; on a write, that cast applied to the source followed by a store into the base". Passing a `uint` local to an `inout int` parameter instead emits a single `inOutImplicitCast(%x)` yielding the `Ptr(Int)` the call consumes — no read-cast / write-cast pair appears. The row also does not mention that the flavor is unreachable for an `int`/`float` conversion, which is rejected outright with `E30047` plus the note `E30063` "Slang does not support using an implicit cast as an l-value with this type". | Name `inOutImplicitCast` as the inst the argument position actually produces (keeping the read/write cast description for the non-argument uses, if any), and add the carve-out that an implicit cast l-value is only admitted between types the compiler can round-trip — `int`/`uint` yes, `int`/`float` diagnosed as E30047. |

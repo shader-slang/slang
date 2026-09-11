@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#wgslsourceemitter-policy-overrides-and-bool-conditioned-values
-//META: doc_section_digest=d47eda324078a32dbc73f59419bad83ce4ed4cd8713fc5e48372759b3592f93c
+//META: doc_section_digest=4257ff9be02b99251d770da11abeb8bfa7d80ed5fd4d56efef79e6f40ff84e49
 //META: purpose=shouldEmitSwitchCaseTerminatingBreak returns false for WGSL so the trailing break Slang places at the end of every switch case is omitted
 //META: intent=functional
 //META: pipeline_stage=emit

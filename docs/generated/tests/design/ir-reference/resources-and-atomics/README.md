@@ -419,8 +419,8 @@ user-observable consequence, and are all classified in
 
 ## Doc gaps observed
 
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#mesh-shader-outputs](../../../../design/ir-reference/resources-and-atomics.md#mesh-shader-outputs) | drift-from-source | The `metalSetPrimitive` and `metalSetIndices` rows say "(no producer at HEAD)" and [#the-metalset-builder-helpers](../../../../design/ir-reference/resources-and-atomics.md#the-metalset-builder-helpers) says "nothing creates them", but `core.meta.slang` carries `__intrinsic_op($(kIROp_MetalSetIndices))` and `__intrinsic_op($(kIROp_MetalSetPrimitive))` declarations, and a `-target metal -stage mesh` compile puts all three `metalSet*` opcodes in the IR dump. | Replace the "(no producer at HEAD)" AST-origin cells for `metalSetPrimitive` and `metalSetIndices` with their `core.meta.slang` `__intrinsic_op` origins, and narrow the `metalSet*` builder-helper note so it is only about the two unused `IRBuilder` helpers. |
-| [#resource-queries-and-modifiers](../../../../design/ir-reference/resources-and-atomics.md#resource-queries-and-modifiers) | drift-from-source | The "no public wrapper" paragraph names `__getUntypedBufferPtr` as part of "the whole surface", but no declaration of that name exists in `hlsl.meta.slang`; the intrinsic that produces the `getUntypedBufferPtr` opcode is `__getByteAddressBufferPtr`. Writing the name the paragraph gives does not compile. | Correct the surface name to `__getByteAddressBufferPtr` and note its two overloads (`ByteAddressBuffer` and `RWByteAddressBuffer`); add `__metal_asDepthTexture` to the same list, since `MetalCastToDepthTexture` has no public wrapper either. |
-| [#resource-queries-and-modifiers](../../../../design/ir-reference/resources-and-atomics.md#resource-queries-and-modifiers) | undocumented-behavior | The `getRegisterIndex` / `getRegisterSpace` rows say only "register index/space the resource is bound to". In practice `__getRegisterIndex` and `__getRegisterSpace` are declared only for textures and `SamplerState`, so passing a `StructuredBuffer` is a type error (`E30019`), and even a valid call fails on `-target cuda` with `E81111` ("cannot determine register/space for NVAPI resource"). | State which resource kinds the two queries accept and note that they need a target whose binding model assigns a register/space, naming the `E81111` a CUDA compile produces. |
+(none) — no gaps remain open against this bundle's source document.
+
+Every gap previously listed here was fixed on the documentation side and
+recorded in `docs/generated/design/_meta/doc-gap-state.json`; the answers
+are now in the source document itself.

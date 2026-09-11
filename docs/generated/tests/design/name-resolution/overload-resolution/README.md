@@ -402,12 +402,11 @@ the two tables below; every claim appears in exactly one of them.
 
 ## Doc gaps observed
 
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#edge-cases-and-failure-modes](../../../../design/name-resolution/overload-resolution.md#edge-cases-and-failure-modes) | drift-from-source | The `GenericConstraintNotSatisfied` row lists type coercion (`where U(T)`) alongside equality and non-empty pack as spellings that reach `GenericArgumentDoesNotSatisfyConstraint`. `where T == int` and `where nonempty(T)` do report E30440 "could not satisfy the generic constraint ...", but an unsatisfied `where U(T)` reports E38043 "type coerce constraint not satisfied" with a "see definition of" note instead. | Name E38043 as the diagnostic for the type-coercion spelling, or drop `where U(T)` from the list of kinds that fall back to `GenericArgumentDoesNotSatisfyConstraint`. |
-| [#conversion-costs](../../../../design/name-resolution/overload-resolution.md#conversion-costs) | missing-surface | The `kConversionCost_MutablePtrToConstPtr` (20) row names a mutable-pointer-to-const-pointer conversion, but the only user spelling of that pair, `Ptr<int>` to `Ptr<int, Access::Read>`, is rejected implicitly: the compiler reports a type mismatch and offers the conversion only as an explicit one. A reader cannot construct a call where this level is charged. | Name the declaration form that produces an implicit mutable-to-const pointer conversion, or mark the row as unreachable from user source. |
-| [#conversion-costs](../../../../design/name-resolution/overload-resolution.md#conversion-costs) | missing-surface | The rows for `kConversionCost_MatrixLayout` (5), `kConversionCost_GetRef` (5), `kConversionCost_FailedOptionalConstraint` (150), `kConversionCost_LValueCast` (800) and `kConversionCost_ScalarToCoopVector` (1) each give a one-phrase meaning with no Slang construct that produces them, so a reader cannot write a call that pays the level. | Add a "user surface" column to the cost table giving one minimal Slang expression per row, or mark the rows that are only reachable from core-module code. |
-| [#tie-breaking-comparator](../../../../design/name-resolution/overload-resolution.md#tie-breaking-comparator) | undocumented-behavior | Step 8 says the `[OverloadRank(N)]` attribute is declared `@internal` and that `core.meta.slang` / `hlsl.meta.slang` are its only users in the tree. Written in an ordinary `.slang` file the attribute is nevertheless accepted and does break an otherwise-ambiguous tie, and the doc does not say whether user code may rely on that. | State next to step 8 whether `[OverloadRank(N)]` is supported in user code or only tolerated, so a reader knows whether the tie-break is part of the language surface. |
+(none) — no gaps remain open against this bundle's source document.
+
+Every gap previously listed here was fixed on the documentation side and
+recorded in `docs/generated/design/_meta/doc-gap-state.json`; the answers
+are now in the source document itself.
 
 ## Sibling-bundle overlap
 

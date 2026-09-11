@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#unparsedstmt
-//META: doc_section_digest=da6b2976e07e82351dcae3f0e6a90c9ff8bd389577c5ae84c5765417486e37c3
+//META: doc_section_digest=d0df162cb22aff8cf7542eb35d785418202f8815172ec4ac1d4f6e3b04b74e89
 //META: purpose=A function body is captured as raw tokens while declarations are parsed and only turned into a real block later, so a body may name a function declared further down the same file.
 //META: intent=functional
 //META: pipeline_stage=parse
