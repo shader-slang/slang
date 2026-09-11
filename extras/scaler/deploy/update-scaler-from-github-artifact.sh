@@ -19,6 +19,9 @@ DRAIN_TIMEOUT_SECONDS="${DRAIN_TIMEOUT_SECONDS:-1500}"
 LOCK_FILE="${SCALER_LOCK_FILE:-/tmp/scaler-auto-update.lock}"
 GITHUB_API_VERSION="${GITHUB_API_VERSION:-2026-03-10}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-${SCALER_TOKEN:-}}}"
+CURL_CONNECT_TIMEOUT_SECONDS="${CURL_CONNECT_TIMEOUT_SECONDS:-10}"
+CURL_SPEED_LIMIT_BYTES="${CURL_SPEED_LIMIT_BYTES:-1024}"
+CURL_SPEED_TIME_SECONDS="${CURL_SPEED_TIME_SECONDS:-60}"
 
 log() {
   printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
@@ -41,12 +44,18 @@ github_api() {
   url="$1"
   if [ -n "$GITHUB_TOKEN" ]; then
     curl -fsSL --retry 3 --retry-delay 5 \
+      --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" \
+      --speed-limit "$CURL_SPEED_LIMIT_BYTES" \
+      --speed-time "$CURL_SPEED_TIME_SECONDS" \
       -H "Accept: application/vnd.github+json" \
       -H "Authorization: Bearer ${GITHUB_TOKEN}" \
       -H "X-GitHub-Api-Version: ${GITHUB_API_VERSION}" \
       "$url"
   else
     curl -fsSL --retry 3 --retry-delay 5 \
+      --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" \
+      --speed-limit "$CURL_SPEED_LIMIT_BYTES" \
+      --speed-time "$CURL_SPEED_TIME_SECONDS" \
       -H "Accept: application/vnd.github+json" \
       -H "X-GitHub-Api-Version: ${GITHUB_API_VERSION}" \
       "$url"
@@ -58,12 +67,18 @@ github_download() {
   output="$2"
   if [ -n "$GITHUB_TOKEN" ]; then
     curl -fL --retry 3 --retry-delay 5 \
+      --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" \
+      --speed-limit "$CURL_SPEED_LIMIT_BYTES" \
+      --speed-time "$CURL_SPEED_TIME_SECONDS" \
       -H "Accept: application/vnd.github+json" \
       -H "Authorization: Bearer ${GITHUB_TOKEN}" \
       -H "X-GitHub-Api-Version: ${GITHUB_API_VERSION}" \
       -o "$output" "$url"
   else
     curl -fL --retry 3 --retry-delay 5 \
+      --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" \
+      --speed-limit "$CURL_SPEED_LIMIT_BYTES" \
+      --speed-time "$CURL_SPEED_TIME_SECONDS" \
       -H "Accept: application/vnd.github+json" \
       -H "X-GitHub-Api-Version: ${GITHUB_API_VERSION}" \
       -o "$output" "$url"
@@ -109,27 +124,75 @@ sha256_file() {
   fi
 }
 
-is_enabled() {
-  run_privileged systemctl is-enabled "$1" >/dev/null 2>&1
-}
-
 is_active() {
   run_privileged systemctl is-active --quiet "$1"
 }
 
-start_service_if_enabled() {
-  svc="$1"
-  if is_enabled "$svc"; then
-    run_privileged systemctl start "$svc"
-  fi
+start_previously_stopped() {
+  stopped_services="$1"
+  for svc in $stopped_services; do
+    log "$svc: restarting after skipped update"
+    run_privileged systemctl start "$svc" || true
+  done
 }
 
 restart_previously_stopped() {
   stopped_services="$1"
   for svc in $stopped_services; do
-    log "$svc: restarting after skipped update"
-    start_service_if_enabled "$svc" || true
+    log "$svc: restarting after rollback"
+    run_privileged systemctl restart "$svc" || run_privileged systemctl start "$svc" || true
   done
+}
+
+restore_after_post_drain_failure() {
+  reason="$1"
+  log "ERROR: ${reason}; restoring previous scaler state"
+
+  if [ "$backup_available" = "1" ]; then
+    run_privileged install -m 755 -o scaler -g scaler "$backup_binary" "$installed_binary" || true
+  else
+    log "no previous scaler binary was available to restore"
+  fi
+
+  restart_previously_stopped "$stopped_services"
+  exit 1
+}
+
+write_current_state() {
+  run_privileged cp "$manifest" "${SCALER_STATE_DIR}/current-manifest.json" || return 1
+  printf '%s\n' "$commit" | run_privileged tee "${SCALER_STATE_DIR}/current-commit" >/dev/null ||
+    return 1
+  printf '%s\n' "$actual_md5" | run_privileged tee "${SCALER_STATE_DIR}/current-md5" >/dev/null ||
+    return 1
+  printf '%s\n' "$actual_sha256" | run_privileged tee "${SCALER_STATE_DIR}/current-sha256" >/dev/null ||
+    return 1
+}
+
+write_current_state_or_restore() {
+  if ! write_current_state; then
+    restore_after_post_drain_failure "failed to write scaler state files"
+  fi
+}
+
+start_updated_services_or_restore() {
+  failed=0
+  for svc in $stopped_services; do
+    if run_privileged systemctl start "$svc"; then
+      if is_active "$svc"; then
+        log "$svc: active"
+      else
+        log "$svc: FAILED TO START"
+        failed=1
+      fi
+    else
+      log "$svc: FAILED TO START"
+      failed=1
+    fi
+  done
+
+  if [ "$failed" -ne 0 ]; then
+    restore_after_post_drain_failure "one or more scaler services failed to start"
+  fi
 }
 
 case "$DRAIN_TIMEOUT_SECONDS" in
@@ -273,6 +336,8 @@ fi
 chmod 755 "$binary"
 
 installed_binary="${SCALER_INSTALL_DIR}/scaler"
+backup_binary="${tmp_dir}/scaler.previous"
+backup_available=0
 if [ -f "$installed_binary" ]; then
   installed_md5="$(md5_file "$installed_binary")"
   if [ "$installed_md5" = "$expected_md5" ]; then
@@ -284,6 +349,9 @@ if [ -f "$installed_binary" ]; then
     printf '%s\n' "$expected_sha256" | run_privileged tee "${SCALER_STATE_DIR}/current-sha256" >/dev/null
     exit 0
   fi
+
+  run_privileged cp "$installed_binary" "$backup_binary"
+  backup_available=1
 fi
 
 stopped_services=""
@@ -307,7 +375,7 @@ for svc in $SCALER_SERVICES; do
 
   if is_active "$svc"; then
     log "$svc: still active after ${elapsed}s; leaving it to finish draining and skipping update"
-    restart_previously_stopped "$stopped_services"
+    start_previously_stopped "$stopped_services"
     exit 0
   fi
 
@@ -317,31 +385,14 @@ for svc in $SCALER_SERVICES; do
 done
 
 log "installing scaler ${commit}"
-run_privileged install -d -m 755 "$SCALER_INSTALL_DIR"
-run_privileged install -d -m 755 "$SCALER_STATE_DIR"
-run_privileged install -m 755 -o scaler -g scaler "$binary" "${SCALER_INSTALL_DIR}/scaler"
-run_privileged cp "$manifest" "${SCALER_STATE_DIR}/current-manifest.json"
-printf '%s\n' "$commit" | run_privileged tee "${SCALER_STATE_DIR}/current-commit" >/dev/null
-printf '%s\n' "$actual_md5" | run_privileged tee "${SCALER_STATE_DIR}/current-md5" >/dev/null
-printf '%s\n' "$actual_sha256" | run_privileged tee "${SCALER_STATE_DIR}/current-sha256" >/dev/null
+run_privileged install -d -m 755 "$SCALER_INSTALL_DIR" ||
+  restore_after_post_drain_failure "failed to create scaler install directory"
+run_privileged install -d -m 755 "$SCALER_STATE_DIR" ||
+  restore_after_post_drain_failure "failed to create scaler state directory"
+run_privileged install -m 755 -o scaler -g scaler "$binary" "${SCALER_INSTALL_DIR}/scaler" ||
+  restore_after_post_drain_failure "failed to install scaler binary"
 
-failed=0
-for svc in $SCALER_SERVICES; do
-  if is_enabled "$svc"; then
-    run_privileged systemctl start "$svc"
-    if is_active "$svc"; then
-      log "$svc: active"
-    else
-      log "$svc: FAILED TO START"
-      failed=1
-    fi
-  else
-    log "$svc: not enabled"
-  fi
-done
-
-if [ "$failed" -ne 0 ]; then
-  die "one or more scaler services failed to start"
-fi
+start_updated_services_or_restore
+write_current_state_or_restore
 
 log "scaler update complete: ${commit}"

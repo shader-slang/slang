@@ -64,6 +64,9 @@ jobs:
         run: |
           # startup.sh intentionally logs device-node listings with ls -la so
           # the CI trace matches what operators type during live debugging.
+          for script in deploy/*.sh internal/gcp/startup.sh; do
+            bash -n "$script"
+          done
           shellcheck -e SC2012 deploy/*.sh internal/gcp/startup.sh
 
   publish:

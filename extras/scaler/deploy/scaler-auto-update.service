@@ -6,6 +6,6 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-EnvironmentFile=/opt/scaler/scaler.env
+EnvironmentFile=-/opt/scaler/scaler.env
 ExecStart=/opt/scaler/update-scaler-from-github-artifact.sh
 Environment=DRAIN_TIMEOUT_SECONDS=1500
