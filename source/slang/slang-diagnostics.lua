@@ -5472,6 +5472,13 @@ err(
     span { loc = "location", message = "Invalid output topology '~topology' for stage '~stage', must be one of: ~validTopologies" }
 )
 
+warning(
+    "post-depth-coverage-target-not-supported",
+    50062,
+    "`[postdepthcoverage]` is not supported on this target and will be ignored",
+    span { loc = "location", message = "the `[postdepthcoverage]` attribute has no effect on target '~target'; `SV_Coverage` will report all covered samples (pre-depth), not only those that survived the early depth/stencil test. Post-depth coverage is currently emitted only for SPIR-V and GLSL." }
+)
+
 err(
     "no-type-conformances-found-for-interface",
     50100,

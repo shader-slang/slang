@@ -14878,6 +14878,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
             }
+            else if (auto postDepthCoverageAttr = as<PostDepthCoverageAttribute>(modifier))
+            {
+                // Preserve the attribute's location on the decoration so a later
+                // unsupported-target diagnostic can point at `[postdepthcoverage]` itself.
+                auto decoration =
+                    getBuilder()->addSimpleDecoration<IRPostDepthCoverageDecoration>(irFunc);
+                decoration->sourceLoc = postDepthCoverageAttr->loc;
+            }
             else if (auto domainAttr = as<DomainAttribute>(modifier))
             {
                 IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), domainAttr);
