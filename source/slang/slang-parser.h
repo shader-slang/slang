@@ -17,13 +17,19 @@ void parseSourceFile(
     Scope* outerScope,
     ContainerDecl* parentDecl);
 
+// Parse a term (type or expression) from a standalone string, outside any module. Used by the
+// reflection / string-parse APIs (getTypeFromString, parseExprFromString) and
+// specialization-argument parsing. `languageVersion` is the version to assume while parsing, since
+// this path has no owning module to read it from; callers pass the session's configured version
+// (SLANG_LANGUAGE_VERSION_DEFAULT if unknown).
 Expr* parseTermFromSourceFile(
     ASTBuilder* astBuilder,
     TokenSpan const& tokens,
     DiagnosticSink* sink,
     Scope* outerScope,
     NamePool* namePool,
-    SourceLanguage sourceLanguage);
+    SourceLanguage sourceLanguage,
+    SlangLanguageVersion languageVersion);
 
 struct SemanticsVisitor;
 
