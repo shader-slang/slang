@@ -143,7 +143,11 @@ jobs:
               ./emsdk activate 6.0.0
               source ./emsdk_env.sh
             popd
-            emcmake cmake -DSLANG_GENERATORS_PATH=build-platform-generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+            emcmake cmake \
+              -DSLANG_GENERATORS_PATH=build-platform-generators/bin \
+              -DSLANG_INSTALL_USER_SKILLS=ON \
+              --preset emscripten \
+              -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
             cmake --build --preset emscripten --config Release --target slang-wasm
             exit 0
           fi
@@ -156,6 +160,7 @@ jobs:
           cmake --preset default --fresh \
             -DSLANG_GENERATORS_PATH=build-platform-generators/bin \
             -DSLANG_ENABLE_EXAMPLES=OFF \
+            -DSLANG_INSTALL_USER_SKILLS=ON \
             -DSLANG_ENABLE_RELEASE_LTO=ON \
             -DSLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF \
             "-DSLANG_SLANG_LLVM_FLAVOR=$(
@@ -291,6 +296,7 @@ jobs:
             cp build.em/Release/bin/slang-wasm.js "${base}/slang-wasm.js"
             cp build.em/Release/bin/interface.d.ts "${base}/interface.d.ts"
             cp -R LICENSES "${base}/LICENSES"
+            cmake --install build.em --config Release --component user-skills --prefix "${base}"
             (cd "${base}" && zip -r "../${base}.zip" .)
             echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
 
@@ -304,6 +310,7 @@ jobs:
             cp build.em/external/cmark/src/Release/libcmark-gfm.a "${base_libs}/lib/"
             cp build.em/Release/include/*.h "${base_libs}/include/"
             cp -R LICENSES "${base_libs}/LICENSES"
+            cmake --install build.em --config Release --component user-skills --prefix "${base_libs}"
             (cd "${base_libs}" && zip -r "../${base_libs}.zip" .)
             echo "SLANG_WASM_LIBS_ARCHIVE=${base_libs}.zip" >> "$GITHUB_OUTPUT"
 
@@ -351,6 +358,24 @@ jobs:
             tar -czvf ../${base}.tar.gz .
             cd ../
           fi
+
+      - name: Verify bundled user skills
+        env:
+          BINARY_ARCHIVE_ZIP: ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_ZIP }}
+          BINARY_ARCHIVE_TAR: ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_TAR }}
+          WASM_LIBS_ARCHIVE: ${{ steps.package.outputs.SLANG_WASM_LIBS_ARCHIVE }}
+        run: |
+          expected_commit=$(git rev-parse HEAD:external/slang-user-skills)
+          archives=()
+          for archive in "$BINARY_ARCHIVE_ZIP" "$BINARY_ARCHIVE_TAR" "$WASM_LIBS_ARCHIVE"; do
+            if [[ -n "$archive" ]]; then
+              archives+=("$archive")
+            fi
+          done
+          python3 extras/verify-user-skills-package.py \
+            --source-dir external/slang-user-skills \
+            --expected-commit "$expected_commit" \
+            "${archives[@]}"
 
       - name: File check
         run: |
