@@ -1131,3 +1131,293 @@ def gen_rt_renderer(n):
     )
     return files
 
+
+# --------------------------------------------------------------------------- #
+# Falcor2/MaterialX shape gaps: these mirror specific patterns found in real
+# MaterialX-generated Falcor2 material shaders (`generated.slang`, ~2400
+# lines / 62 functions / 8 switches / 12 generic instantiations) that no
+# existing workload above covers. See shader-slang/slang#13010's investigation
+# and shader-slang/slang#12941 (Performance Initiative) for the source survey.
+# --------------------------------------------------------------------------- #
+
+def gen_generic_reinterpret_dispatch(n):
+    """An n-slot "tagged stack" mirroring MaterialX's `MxStackData` pattern: a
+    fixed struct with `n` fields, each a DISTINCT concrete implementation of an
+    `[anyValueSize(...)]` interface, and one generic `setSlot<T : IShade>(int
+    slot, T value)` that reinterprets `value` into the concrete slot type
+    selected by `slot` inside an n-way switch -- the same shape as real
+    MaterialX-generated code's `set_bsdf<TBSDF : IBSDF>(int bsdf_index, TBSDF
+    bsdf)`, which does `reinterpret<ConcreteType, TBSDF>(bsdf)` per case to
+    store one of ~11 differently-typed BSDF slots (e.g.
+    `MxCompensatedDielectricBSDF<MxDielectricFresnel,
+    MxTurquinAnalyticDielectricCompensation, MxScatterStaticRMode>`, 2-3
+    levels of nested generic composition) into a common-layout stack struct.
+
+    This is distinct from every existing generic/dispatch workload:
+    `generic_nesting` self-nests ONE type N levels deep (a chain, not N
+    distinct slot types); `dynamic_dispatch`/`existential_aggregate` dispatch
+    through a witness table with trivial non-generic implementations and never
+    call `reinterpret`. Here every slot is a separately-generated concrete
+    type, and writing into it requires the compiler to validate
+    `reinterpret`'s size equality across `n` distinct generic specializations
+    each reached through a switch, stressing specializeModule and the
+    reinterpret lowering path (`kIROp_Reinterpret`) together at the same
+    breadth other dispatch workloads test for witness tables alone.
+
+    Scaling null: `setSlot<T>` is specialized once per distinct slot type (n
+    specializations), and each specialization contains the full n-case
+    switch, so the workload's OWN generated-code size is O(n^2) by
+    construction (unlike this suite's other breadth workloads, which are
+    O(n)) -- that quadratic floor is the honest baseline to compare a sweep
+    against, not O(n). Measured at n=8/16/32/64 (2026-09, Release, local):
+    compileInner 34/91/406/2370 ms, i.e. roughly 2.7x/4.5x/5.8x per doubling
+    -- growing FASTER than the O(n^2) floor already predicts, and dominated
+    by `generateOutput` cost not explained by any visible leaf timer (see the
+    WorkloadSpec comment). Not yet root-caused; flagging as an open finding
+    rather than a workload bug, since compile-testing (this file's purpose)
+    confirmed the source is valid and the growth is real, reproducible
+    compiler behavior.
+    """
+    s = [_HEADER, _buf()]
+    s.append("[anyValueSize(16)]\ninterface IShade { float shade(float x); }\n\n")
+    for i in range(n):
+        s.append(
+            f"struct Wrap{i} : IShade {{ float a; float b; "
+            f"float shade(float x) {{ return x * a + b * {i % 5 + 1}.0; }} }}\n"
+        )
+    s.append("\nstruct Stack\n{\n")
+    for i in range(n):
+        s.append(f"    Wrap{i} slot{i};\n")
+    s.append("}\n\n")
+    s.append("void setSlot<T : IShade>(inout Stack st, int slot, T value)\n{\n")
+    s.append("    switch (slot)\n    {\n")
+    for i in range(n):
+        s.append(f"    case {i}: st.slot{i} = reinterpret<Wrap{i}, T>(value); break;\n")
+    s.append("    }\n}\n\n")
+    s.append("float evalSlot(Stack st, int slot, float x)\n{\n")
+    s.append("    switch (slot)\n    {\n")
+    for i in range(n):
+        s.append(f"    case {i}: return st.slot{i}.shade(x);\n")
+    s.append("    default: return 0.0;\n    }\n}\n\n")
+    s.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
+    s.append("void computeMain()\n{\n    Stack st;\n")
+    for i in range(n):
+        s.append(f"    {{ Wrap{i} w; w.a = {i % 7}.0; w.b = {i % 11}.0; setSlot(st, {i}, w); }}\n")
+    s.append("    float acc = 0.0;\n")
+    for i in range(n):
+        s.append(f"    acc += evalSlot(st, {i}, outBuf[0] + {i}.0);\n")
+    s.append("    outBuf[0] = acc;\n}\n")
+    return {"generic_reinterpret_dispatch.slang": "".join(s)}
+
+
+def gen_flat_expr_dag(n):
+    """A single basic block of `n` sequential `float3` locals, each one binary
+    op combining two EARLIER locals (not always the immediately-preceding one),
+    forming a wide expression DAG rather than a linear dependency chain -- the
+    shape of MaterialX-generated code's weight-computation blocks (observed:
+    80+ consecutive `const float3 nNN = nAA * nBB;` statements in one block of
+    real `generated.slang` output, each combining two DIFFERENT earlier
+    temporaries rather than threading one accumulator). No resources, no
+    generics, no control flow: this isolates the pure local-value axis from
+    `backend_loads_*` (resource `Call`s specifically) and from `gen_codegen`
+    (a single serially-dependent accumulator chain, `acc = acc*k +
+    sin(acc)...`, which reuses one variable rather than keeping N live named
+    temporaries). A wide DAG of live locals is what stresses per-block
+    CSE/dedup (`DeduplicateContext::deduplicate` in
+    slang-ir-redundancy-removal.cpp) and the redundant load/store elimination
+    fixed in shader-slang/slang#13012 differently than a resource-heavy or
+    serially-dependent shape: every local is a candidate for the backward scan
+    in `tryRemoveRedundantLoad`, and the DAG's width (many simultaneously-live
+    temporaries) is what real material code produces, not the narrow chains or
+    resource-Call-heavy shapes the rest of the suite already isolates.
+
+    Scaling null: n scales independent binary-op statements in one block; ideal
+    cost is O(n).
+    """
+    s = [_HEADER, _buf()]
+    s.append('[shader("compute")]\n[numthreads(64,1,1)]\n')
+    s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
+    s.append("    float3 n0 = float3(outBuf[tid.x], outBuf[tid.x] + 1.0, outBuf[tid.x] + 2.0);\n")
+    s.append("    float3 n1 = n0 * 1.0009 + float3(0.1, 0.2, 0.3);\n")
+    ops = ["*", "+", "-"]
+    for i in range(2, n):
+        lhs = i - 1
+        rhs = max(0, i - 3 - (i % 5))
+        op = ops[i % len(ops)]
+        s.append(f"    float3 n{i} = n{lhs} {op} n{rhs} + float3({i % 13}.0, {i % 7}.0, {i % 11}.0) * 0.01;\n")
+    s.append(f"    outBuf[tid.x] = n{n - 1}.x + n{n - 1}.y + n{n - 1}.z;\n}}\n")
+    return {"flat_expr_dag.slang": "".join(s)}
+
+
+def gen_vector_matrix_overload_set(n):
+    """A user-defined function name (`mx_mix`, mirroring MaterialX's own
+    `mx_matrix_mul`/`mx_square`/etc. naming) overloaded across float, float2,
+    float3, float4, float3x3 and float4x4 -- 6 overloads including MATRIX
+    types, which `overload_resolution` does not cover (its fixed 12-candidate
+    `pick`/`pick2` set spans scalar + vector only). `n` call sites rotate
+    through all 6 argument types so every call re-ranks the full
+    scalar/vector/matrix candidate set, isolating overload resolution's cost
+    specifically when matrix types are in the candidate pool (a materially
+    larger per-candidate conversion-rank computation than scalar/vector).
+
+    Scaling null: n scales call sites against a FIXED 6-overload candidate set;
+    ideal resolution cost is O(n).
+    """
+    s = [_HEADER, _buf()]
+    s.append("float mx_mix(float a, float b, float t) { return a + (b - a) * t; }\n")
+    s.append("float2 mx_mix(float2 a, float2 b, float t) { return a + (b - a) * t; }\n")
+    s.append("float3 mx_mix(float3 a, float3 b, float t) { return a + (b - a) * t; }\n")
+    s.append("float4 mx_mix(float4 a, float4 b, float t) { return a + (b - a) * t; }\n")
+    s.append(
+        "float3x3 mx_mix(float3x3 a, float3x3 b, float t) { return a + (b - a) * t; }\n"
+    )
+    s.append(
+        "float4x4 mx_mix(float4x4 a, float4x4 b, float t) { return a + (b - a) * t; }\n\n"
+    )
+    kinds = ["float", "float2", "float3", "float4", "float3x3", "float4x4"]
+    for i in range(n):
+        ty = kinds[i % len(kinds)]
+        s.append(
+            f"float call_{i}() {{ {ty} a = {ty}({i % 5}.0); {ty} b = {ty}({i % 7}.0); "
+            f"{ty} r = mx_mix(a, b, {i % 11}.0 * 0.1); "
+            + (
+                "return r;\n}\n"
+                if ty == "float"
+                else f"return r[0]{'[0]' if 'x' in ty else ''};\n}}\n"
+            )
+        )
+    s.append('\n[shader("compute")]\n[numthreads(1,1,1)]\n')
+    s.append("void computeMain()\n{\n    float acc = 0.0;\n")
+    # Cap computeMain call sites at 64: beyond this the entry point itself (not
+    # the per-call overload-resolution cost we're measuring) becomes the
+    # bottleneck, matching the existing overload_resolution/implicit_conversion
+    # convention.
+    for i in range(min(n, 64)):
+        s.append(f"    acc += call_{i}();\n")
+    s.append("    outBuf[0] = acc;\n}\n")
+    return {"vector_matrix_overload_set.slang": "".join(s)}
+
+
+def gen_generic_method_dispatch(n):
+    """`n` implementations of an interface whose REQUIRED method is itself
+    generic (`U combine<U : IArithmetic>(U a, U b)`), dispatched through a
+    runtime-typed existential -- combining the two axes `sema_generics`
+    (generic functions) and `dynamic_dispatch`/`existential_aggregate`
+    (witness-table dispatch) test SEPARATELY. Mirrors real Falcor2 material
+    code, where `IMaterial`'s required methods are themselves generic
+    (`setup_material_instance<LodSampler : ILodSampler>`,
+    `eval_opacity<TLodSampler : ILodSampler>`) rather than the interface
+    methods in the rest of this suite, which are all non-generic. `combine`
+    stays purely in `U`'s domain (matching `sema_generics`/`complexity_ladder`'s
+    own `T : IArithmetic` helpers, which never cast T to/from a concrete type)
+    so it type-checks for ANY `U : IArithmetic`, not only `float`. Each call
+    site instantiates the generic method at a different concrete type AND
+    resolves it through the witness table, so both specializeModule's generic
+    substitution and its witness-table lowering run at every call.
+
+    Scaling null: n scales implementations and call sites, each O(1); ideal
+    cost is O(n).
+    """
+    s = [_HEADER, _buf()]
+    s.append(
+        "[anyValueSize(16)]\ninterface IUnit { U combine<U : IArithmetic>(U a, U b); }\n\n"
+    )
+    for i in range(n):
+        ops = ("a * a + b * a + a", "a * b - a + b", "a + b * b - a")[i % 3]
+        s.append(
+            f"struct Unit{i} : IUnit {{\n"
+            f"    float weight;\n"
+            f"    U combine<U : IArithmetic>(U a, U b) {{ return {ops}; }}\n"
+            f"}}\n"
+        )
+    s.append("\nfloat run(IUnit u, float x) { return u.combine(x, x + 1.0); }\n\n")
+    s.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
+    s.append("void computeMain()\n{\n    float acc = 0.0;\n")
+    for i in range(n):
+        s.append(f"    {{ Unit{i} u; u.weight = {i % 9}.0; acc += run(u, outBuf[0] + {i}.0); }}\n")
+    s.append("    outBuf[0] = acc;\n}\n")
+    return {"generic_method_dispatch.slang": "".join(s)}
+
+
+def gen_conditional_compilation(n):
+    """`n` `#if`/`#else`/`#endif`-gated function bodies, each behind a distinct
+    macro defined to a rotating 0/1 value, so roughly half the generated text
+    is textually present in the token stream but discarded by the
+    preprocessor's conditional-inclusion skip path, and half is retained and
+    reaches the parser -- mirroring MaterialX-generated code's heavy use of
+    per-material-graph conditionals (`#if MATERIALX_HAS_EMISSION`, `#if
+    MATERIALX_EVALUATE_OPACITY`, `#if MATERIALX_PAYLOAD_SIZE >
+    MATERIAL_PAYLOAD_LIMIT`), which gate large blocks based on `#define`s that
+    vary per generated material. No existing workload has more than a handful
+    of directives; `parse`/`diagnostics_clean` are unconditioned code, so
+    preprocessor conditional-skip cost at scale is otherwise untested.
+
+    Scaling null: n scales directive pairs and gated bodies, each O(1); ideal
+    preprocessing cost is O(n).
+    """
+    s = [_HEADER, _buf()]
+    for i in range(n):
+        s.append(f"#define FEATURE_{i} {i % 2}\n")
+    s.append("\n")
+    for i in range(n):
+        s.append(f"#if FEATURE_{i}\n")
+        s.append(
+            f"float feat_{i}(float x) {{ return x * {i % 5 + 1}.0 + sin(x + {i % 7}.0); }}\n"
+        )
+        s.append("#else\n")
+        s.append(f"float feat_{i}(float x) {{ return x - {i % 3 + 1}.0; }}\n")
+        s.append("#endif\n")
+    s.append('\n[shader("compute")]\n[numthreads(1,1,1)]\n')
+    s.append("void computeMain()\n{\n    float acc = outBuf[0];\n")
+    for i in range(min(n, 64)):
+        s.append(f"    acc = feat_{i}(acc);\n")
+    s.append("    outBuf[0] = acc;\n}\n")
+    return {"conditional_compilation.slang": "".join(s)}
+
+
+def gen_material_module_graph(n):
+    """`n` importable modules, each a MODERATELY COMPLEX "material" (an
+    interface implementation with a branchy helper, a generic call and a small
+    bounded loop -- comparable per-module weight to one rung of
+    `complexity_ladder`), plus a main file that imports all of them and
+    dispatches across them through a common interface. `module_link` already
+    scales module COUNT, but each of its modules is a single one-line
+    function; real Falcor2 "first_frame_s" compiles and links potentially
+    dozens of ~2000-line generated MaterialX modules TOGETHER in one session
+    (the smallest real example: `capture_material_compilation.py`'s
+    "test-materials" case bundles 10 distinct materials compiled and dispatched
+    together). This is module_link's missing axis: per-module CONTENT weight,
+    not just module count, combined with cross-module dynamic dispatch.
+
+    Scaling null: n scales module count, each a fixed-weight O(1) module;
+    ideal load+link+specialize cost is O(n) (real Falcor2 first-frame cost is
+    the thing to compare a super-linear finding here against).
+    """
+    files = {}
+    for i in range(n):
+        files[f"material_{i}.slang"] = (
+            _HEADER
+            + f"module material_{i};\n\n"
+            + f"public interface IMaterial{i} {{ float shade(float x); }}\n\n"
+            + f"public struct Material{i} : IMaterial{i}\n{{\n"
+            + f"    public float shade(float x)\n    {{\n"
+            + f"        float t = x * {i % 5 + 1}.0009 + sin(x + {i % 7}.0);\n"
+            + f"        if (t > {i % 11}.0) t = t * 1.01 + cos(t * 0.5);\n"
+            + f"        else t = t - sin(t * 0.5) * 0.25;\n"
+            + f"        [MaxIters(4)] for (int k = 0; k < (int(t) & 3) + 1; ++k)\n"
+            + f"            t = t * 0.999 + gpoly_{i}<float>(t, {i % 5}.0);\n"
+            + f"        return t;\n    }}\n}}\n\n"
+            + f"public T gpoly_{i}<T : IArithmetic>(T a, T b) {{ return a * a + b * a + a; }}\n"
+        )
+    main = [_HEADER]
+    for i in range(n):
+        main.append(f"import material_{i};\n")
+    main.append("\n" + _buf())
+    main.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
+    main.append("void computeMain()\n{\n    float acc = outBuf[0];\n")
+    for i in range(n):
+        main.append(f"    {{ Material{i} m; acc = m.shade(acc); }}\n")
+    main.append("    outBuf[0] = acc;\n}\n")
+    files["material_main.slang"] = "".join(main)
+    return files
+
