@@ -21,6 +21,18 @@
 #   extras/hashmap-matrix.sh ABSL_FLAT/BOOST TSL_ROBIN/WYHASH
 #
 # A combination is written MAP/HASH. Each line of output is one result.
+#
+# By default every combination is built at once, with the machine's cores divided
+# evenly between them. Two environment variables override that:
+#
+#   SLANG_HASHMAP_MATRIX_JOBS=N    build at most N combinations at a time
+#   SLANG_HASHMAP_MATRIX_CORES=N   give each build N cores
+#
+# Setting a third runs the test suite against each combination that built, one
+# combination at a time, after all the builds have finished. Its value is passed
+# to sti as filter regexes, so a subset can be picked:
+#
+#   SLANG_HASHMAP_MATRIX_TEST='^tests/compute' extras/hashmap-matrix.sh
 
 set -u
 
@@ -41,10 +53,18 @@ hashes=(WYHASH BOOST ABSL STD)
 default_map=UNORDERED_DENSE
 default_hash=WYHASH
 
-# The targets worth building to prove a combination compiles. Everything that
-# uses Slang::Dictionary ends up in one of these two, and slang-rt compiles
-# source/core a second time with its own export macros.
-targets=(slang slang-rt)
+# The targets worth building. Everything that uses Slang::Dictionary ends up in
+# slang or slang-rt, and slang-rt compiles source/core a second time with its own
+# export macros, so those two prove a combination compiles. slang-test is built
+# as well so the combination can also be run: its CMake REQUIRES pulls in slangd,
+# test-server, test-process, slang-reflection-test and slang-unit-test, and
+# slangc and slangi are the tools the tests actually invoke. gfx is built because
+# a handful of tests import the gfx module and load the library by name.
+targets=(slang slang-rt slangc slangi slang-test gfx)
+
+# Tests to run against each combination, as sti filter regexes. Empty means the
+# combinations are only built, not run.
+read -ra test_filters <<<"${SLANG_HASHMAP_MATRIX_TEST:-}"
 
 # A nix devShell exports the flags this checkout is normally configured with
 # (system LLVM, system DXC, ...). Honour them so these builds match the
@@ -78,9 +98,49 @@ case "${1:-}" in
     ;;
 esac
 
-# Share the machine between the concurrent builds.
+# Reorder the combinations so that a spanning subset comes first: every map and
+# every hash is exercised at least once before any pair is repeated. The two are
+# chosen independently and most compile failures are caused by one of them alone,
+# so this prefix -- eight or so builds out of the full thirty-two -- is where
+# nearly all the information is. The remainder still runs, and confirms that no
+# failure needs a *particular* pairing, but it can be cut short with much less
+# lost.
+#
+# Both the spanning prefix and the remainder are shuffled, so that repeated runs
+# pick different representatives rather than re-proving the same ones.
+span_first() {
+    local -a shuffled=()
+    mapfile -t shuffled < <(printf '%s\n' "$@" | shuf)
+
+    local -A seen_map=() seen_hash=()
+    local -a spanning=() remainder=()
+    local combo map hash
+    for combo in "${shuffled[@]}"; do
+        IFS=/ read -r map hash <<<"$combo"
+        if [ -z "${seen_map[$map]:-}" ] || [ -z "${seen_hash[$hash]:-}" ]; then
+            seen_map[$map]=1
+            seen_hash[$hash]=1
+            spanning+=("$combo")
+        else
+            remainder+=("$combo")
+        fi
+    done
+    printf '%s\n' "${spanning[@]}" "${remainder[@]}"
+}
+
+if command -v shuf >/dev/null 2>&1; then
+    mapfile -t combos < <(span_first "${combos[@]}")
+fi
+
+# How many builds to run at once, and how to share the machine between them.
+# Running every combination concurrently finds a compile error in any of them
+# soonest, but gives each build so few cores that none of them finishes quickly;
+# a smaller SLANG_HASHMAP_MATRIX_JOBS trades that breadth for combinations that
+# actually complete.
 total_cores=$(nproc 2>/dev/null || echo 4)
-cores_each=$((total_cores / ${#combos[@]}))
+max_jobs=${SLANG_HASHMAP_MATRIX_JOBS:-${#combos[@]}}
+[ "$max_jobs" -lt 1 ] && max_jobs=1
+cores_each=${SLANG_HASHMAP_MATRIX_CORES:-$((total_cores / max_jobs))}
 [ "$cores_each" -lt 1 ] && cores_each=1
 
 build_dir_for() {
@@ -96,10 +156,16 @@ configure_one() {
     mkdir -p "$dir" || return 1
     : >"$log"
 
+    # slang-test is only defined when SLANG_ENABLE_TESTS is on, and CMake refuses
+    # that combination unless SLANG_ENABLE_SLANG_RHI is on too, so both are set
+    # together. gfx is on for the same reason: it generates the gfx.slang module,
+    # without which tests that import it fail for a reason that has nothing to do
+    # with the hash map under test.
     if cmake -S . -B "$dir" -G "Ninja Multi-Config" \
-        -DSLANG_ENABLE_TESTS=OFF \
+        -DSLANG_ENABLE_TESTS=ON \
+        -DSLANG_ENABLE_SLANG_RHI=ON \
+        -DSLANG_ENABLE_GFX=ON \
         -DSLANG_ENABLE_EXAMPLES=OFF \
-        -DSLANG_ENABLE_GFX=OFF \
         -DSLANG_ENABLE_REPLAYER=OFF \
         -DSLANG_ENABLE_PCH=OFF \
         "${nix_flags[@]}" \
@@ -118,14 +184,42 @@ build_one() {
     dir=$(build_dir_for "$map" "$hash")
     local log="$dir/hashmap-matrix.log"
 
+    # Builds run in background subshells, so success is recorded on disk rather
+    # than in a shell array. The test phase below reads these markers to decide
+    # which combinations are worth running.
+    rm -f "$dir/hashmap-matrix.built"
+
     if cmake --build "$dir" --config Debug --parallel "$cores_each" \
         --target "${targets[@]}" >>"$log" 2>&1; then
+        : >"$dir/hashmap-matrix.built"
         echo "$map/$hash: OK ($dir)"
         return 0
     fi
     {
         echo "$map/$hash: BUILD FAILED ($log)"
         grep -E "error:" "$log" | sort -u | head -20
+    }
+    return 1
+}
+
+# Run the requested tests against one combination's own slang-test. sti is given
+# that binary explicitly, because it otherwise picks the newest build directory
+# on the machine, which during a matrix run is some other combination entirely.
+test_one() {
+    local map="$1" hash="$2"
+    local dir
+    dir=$(build_dir_for "$map" "$hash")
+    local log="$dir/hashmap-matrix-test.log"
+
+    if sti --slang-test "$dir/Debug/bin/slang-test" \
+        "${test_filters[@]}" >"$log" 2>&1; then
+        echo "$map/$hash: TESTS PASSED ($dir)"
+        return 0
+    fi
+    {
+        echo "$map/$hash: TESTS FAILED ($log)"
+        grep -E "^(failed|FAILED|error)" "$log" | head -20
+        tail -5 "$log"
     }
     return 1
 }
@@ -154,15 +248,37 @@ if [ "${#configured[@]}" -eq 0 ]; then
     exit 1
 fi
 
-echo "Building ${#configured[@]} combinations, $cores_each core(s) each..."
-pids=()
+echo "Building ${#configured[@]} combinations, $max_jobs at a time, $cores_each core(s) each..."
+running=0
 for combo in "${configured[@]}"; do
+    # Wait for a slot before starting the next build. `wait -n` returns as soon
+    # as any one of the background builds finishes, and yields that build's exit
+    # status, so a failure anywhere is still recorded.
+    while [ "$running" -ge "$max_jobs" ]; do
+        wait -n || status=1
+        running=$((running - 1))
+    done
     IFS=/ read -r map hash <<<"$combo"
     build_one "$map" "$hash" &
-    pids+=("$!")
+    running=$((running + 1))
 done
-for pid in "${pids[@]}"; do
-    wait "$pid" || status=1
+while [ "$running" -gt 0 ]; do
+    wait -n || status=1
+    running=$((running - 1))
 done
+
+# Run the tests one combination at a time, in the same order the builds were
+# started. sti already saturates the machine by itself, so there is nothing to
+# gain from overlapping two of them, and keeping them serial means a failure is
+# attributable to one combination rather than to contention between several.
+if [ "${#test_filters[@]}" -gt 0 ]; then
+    echo "Testing with filters: ${test_filters[*]}"
+    for combo in "${configured[@]}"; do
+        IFS=/ read -r map hash <<<"$combo"
+        dir=$(build_dir_for "$map" "$hash")
+        [ -e "$dir/hashmap-matrix.built" ] || continue
+        test_one "$map" "$hash" || status=1
+    done
+fi
 
 exit $status
