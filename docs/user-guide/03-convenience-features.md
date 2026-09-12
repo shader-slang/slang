@@ -1054,6 +1054,10 @@ void g()
 
 You can chain multiple catch statements for different types of errors.
 
+A shader entry point function may not have a `throws` declaration, since it is
+invoked by the pipeline rather than by other Slang code. An entry point that
+calls a throwing function must handle the error with a `do-catch` statement.
+
 Special Scoping Syntax
 -------------------
 
