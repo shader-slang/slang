@@ -221,16 +221,16 @@ Consequences worth writing down:
 
 ## 7. Suggested changes
 
-Ordered by value. Nothing here is implemented on this branch -- it is a
-proposal.
+Ordered by value. Items 1-6 are **implemented on this branch**; item 7 is
+left as a follow-up.
 
-### Remove
+### Remove (done)
 
 1. **`generic_nesting`** and **`generic_nesting_eval`** -- cannot fire
    (§3), and the exponential they were built for no longer exists. Removing
    them also removes the two worst-behaved series in the local view.
 
-### Replace
+### Replace (done)
 
 2. **`diagnostics_clean`** -- rebuild it as a workload that actually emits
    diagnostics: N functions each producing one warning (or one error, with
@@ -240,7 +240,7 @@ proposal.
    the name. If that is not wanted, delete it outright -- as it stands it is
    a small, noisy duplicate of `parse`.
 
-### Resize (one step up the existing ladder in each case)
+### Resize (done -- one step up the existing ladder in each case)
 
 3. `interface_depth` 64 -> **128**, `conformance` 600 -> **2400**,
    `overload_resolution` 600 -> **2400**, `resource_aggregate` 80 -> **320**.
@@ -248,7 +248,7 @@ proposal.
    ~50 ms line where a single perturbed sample can carry the median past the
    gate.
 
-### Fix declarations
+### Fix declarations (done)
 
 4. Add `SLANG_PROFILE` to `writeSerializedModuleIR` (`slang-serialize-ir.cpp`)
    -- a one-line compiler change that makes `serialize` measurable at all.
@@ -260,7 +260,7 @@ proposal.
    that actually carry their cost, and update the README rows that describe
    them. A declared target at 1-19% is a claim the data does not support.
 
-### Guard against recurrence
+### Guard against recurrence (6 done, 7 follow-up)
 
 6. Add import-time self-checks to `lib/manifest.py`, in the style already
    there:
@@ -278,6 +278,32 @@ proposal.
    870 ms workload needs 87 ms to say anything.
 
 ---
+
+## 8. What the implementation measures
+
+After the changes, on the v2026.17.1 release binary (local, so treat the
+absolute numbers as indicative and the shares as real):
+
+| workload              | before                       | after                                         |
+| --------------------- | ---------------------------- | --------------------------------------------- |
+| `diagnostics`         | 23 ms, 0 diagnostics emitted | 124 ms, N diagnostics, `SemanticChecking` 86% |
+| `interface_depth`     | 26.6 ms, 58% on-target       | 174.6 ms, 92% on-target                       |
+| `conformance`         | 39.5 ms                      | 157.6 ms                                      |
+| `overload_resolution` | 30.1 ms                      | 71.0 ms                                       |
+| `resource_aggregate`  | 37.9 ms                      | 104.3 ms                                      |
+| `serialize`           | declared timer did not exist | `writeSerializedModuleIR` present (2.9%)      |
+
+`serialize` is honest but still not ideal: the timer now exists, so
+`trend.py` can alert on it per-counter, but the workload remains 82%
+front end, so its _headline_ still cannot see a serialization regression.
+Making serialization dominate needs a generator with much more data and much
+less to type-check -- worth doing, not done here.
+
+The full suite runs 29/29 with the changes. The suite-health report is silent
+against a build carrying the `writeSerializedModuleIR` instrumentation, and
+against an older release binary it correctly reports that one timer as
+missing -- which is the intended behaviour, since a release sweep measures
+binaries that predate any new counter.
 
 ## Appendix: how to reproduce
 
