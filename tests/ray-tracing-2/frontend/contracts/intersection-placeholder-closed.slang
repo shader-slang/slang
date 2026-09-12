@@ -7,7 +7,7 @@ struct PayloadData
 {
     uint value;
 }
-struct Record {}
+struct MaterialRecord {}
 
 struct MyTraceContext : rt::ITraceContext
 {
@@ -20,7 +20,7 @@ struct HitContext : rt::IHitContext
     typealias TraceContext = MyTraceContext;
     typealias Payload = PayloadData;
     typealias Primitive = rt::TrianglePrimitive;
-    typealias Record = Record;
+    typealias Record = MaterialRecord;
 }
 
 struct FakeNoIntersection : rt::IIntersectionStage

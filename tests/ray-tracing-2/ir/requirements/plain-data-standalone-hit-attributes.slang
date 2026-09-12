@@ -4,23 +4,23 @@
 
 import slang.raytracing;
 
-struct Payload
+struct PayloadData
 {
     uint value;
 }
 
 struct InvalidAttributes
-// CH: ^^^^^^^^^^^^^^^^^ structural ray-tracing ABI data is not portable plain data
+// CH: structural ray-tracing ABI data is not portable plain data
 // CH: ^^^^^^^^^^^^^^^^^ type 'InvalidAttributes' is used as structural ray-tracing intersection-attribute data but does not have a fixed-size, copyable plain-data representation
-// AH: ^^^^^^^^^^^^^^^^^ structural ray-tracing ABI data is not portable plain data
+// AH: structural ray-tracing ABI data is not portable plain data
 // AH: ^^^^^^^^^^^^^^^^^ type 'InvalidAttributes' is used as structural ray-tracing intersection-attribute data but does not have a fixed-size, copyable plain-data representation
-// IS: ^^^^^^^^^^^^^^^^^ structural ray-tracing ABI data is not portable plain data
+// IS: structural ray-tracing ABI data is not portable plain data
 // IS: ^^^^^^^^^^^^^^^^^ type 'InvalidAttributes' is used as structural ray-tracing intersection-attribute data but does not have a fixed-size, copyable plain-data representation
 {
     Texture2D texture;
 }
 
-struct TraceContext : rt::ITraceContext
+struct SceneTraceContext : rt::ITraceContext
 {
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
@@ -28,8 +28,8 @@ struct TraceContext : rt::ITraceContext
 
 struct HitContext : rt::IHitContext
 {
-    typealias TraceContext = TraceContext;
-    typealias Payload = Payload;
+    typealias TraceContext = SceneTraceContext;
+    typealias Payload = PayloadData;
     typealias Primitive = rt::BoundingBoxPrimitive<InvalidAttributes>;
     typealias Record = void;
 }
