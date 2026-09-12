@@ -723,8 +723,8 @@ endif()
 
 # The MIT/Apache-2.0 statically-linked deps, given the same per-dep notice
 # treatment as the BSD-family deps above. spirv-tools ships a LICENSE only (no
-# upstream NOTICE file), so there is no Apache-2.0 section 4(d) NOTICE to carry:
-# its LICENSE is the notice.
+# upstream NOTICE file), so there is no Apache-2.0 section 4(d) NOTICE to carry;
+# only its LICENSE is installed.
 if(NOT SLANG_USE_SYSTEM_MINIZ AND NOT SLANG_OVERRIDE_MINIZ_PATH)
     install(
         FILES "${slang_SOURCE_DIR}/external/miniz/LICENSE"
