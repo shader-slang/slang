@@ -4,12 +4,6 @@
 // Test __getAddress on a pointer field accessed through a uniform pointer.
 // __getAddress(data->ptr) where ptr is int** produces int*** — a multi-level
 // pointer that exercises our lowering pass.
-//
-// Note: __getAddress on structured buffer subscripts (e.g. buf[i]) is a
-// pre-existing frontend limitation on all targets. The working pattern is
-// accessing through pointer fields as shown here.
-//
-// See: https://github.com/shader-slang/slang/issues/10841
 
 struct Inner
 {
