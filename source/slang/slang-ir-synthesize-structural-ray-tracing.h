@@ -10,6 +10,14 @@ struct IRModule;
 struct IRFunc;
 struct IRInst;
 class DiagnosticSink;
+class TargetRequest;
+
+/// Validate the payload and record ABI types of a selected standalone structural stage.
+bool validateStructuralRayTracingEntryPoint(IRFunc* entryPoint, DiagnosticSink* sink);
+
+/// Validate the target-independent relationships encoded by one structural trace or callable
+/// operation after linking and specialization have made its complete closed schema available.
+bool validateStructuralRayTracingSchemaOperation(IRInst* operation, DiagnosticSink* sink);
 
 /// Replace selected logical stage methods with zero-parameter native entry-point adapters before
 /// generic entry-point legalization examines their signatures.
@@ -31,6 +39,6 @@ void lowerMetalStructuralRayTracingStageInputOperations(
 
 /// Lower structural trace and callable-dispatch operations through their portable
 /// standard-module bodies.
-void lowerPortableStructuralRayTracingOperations(IRModule* module);
+void lowerPortableStructuralRayTracingOperations(IRModule* module, TargetRequest* targetRequest);
 
 } // namespace Slang

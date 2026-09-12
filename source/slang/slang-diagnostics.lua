@@ -4350,20 +4350,6 @@ err(
 )
 
 err(
-    "invalid-structural-ray-tracing-group-slot",
-    38058,
-    "invalid structural ray-tracing group slot",
-    span { loc = "location", message = "~section group slot ~slot:Int must be non-negative" }
-)
-
-err(
-    "duplicate-structural-ray-tracing-group-slot",
-    38059,
-    "duplicate structural ray-tracing group slot",
-    span { loc = "location", message = "~section group slot ~slot:Int is declared more than once in the trace program" }
-)
-
-err(
     "structural-ray-tracing-curve-requires-metal",
     38060,
     "structural ray-tracing curve primitives require Metal",
@@ -4374,14 +4360,14 @@ err(
     "structural-ray-tracing-callable-data-mismatch",
     38061,
     "incompatible structural ray-tracing callable data",
-    span { loc = "location", message = "callable group slot ~slot:Int uses data type '~actualType:IRInst', but this call expects '~expectedType:IRInst'" }
+    span { loc = "location", message = "callable shader '~shader:IRInst' uses data type '~actualType:IRInst', which does not match the required callable data type '~expectedType:IRInst'" }
 )
 
 err(
-    "structural-ray-tracing-call-without-groups",
+    "structural-ray-tracing-call-without-shaders",
     38062,
-    "structural callable dispatch requires a callable group",
-    span { loc = "location", message = "this trace program has no callable groups to dispatch" }
+    "structural callable dispatch requires a callable shader",
+    span { loc = "location", message = "this trace program schema has no callable shaders to dispatch" }
 )
 
 err(
@@ -4446,6 +4432,83 @@ err(
     38071,
     "global parameter is unavailable from a Metal intersection function",
     span { loc = "location", message = "structural intersection and any-hit logic cannot reference global shader parameters in the first-version Metal lowering" }
+)
+
+err(
+    "structural-ray-tracing-entry-trace-context-mismatch",
+    38072,
+    "structural ray-tracing entry uses a different trace context",
+    span { loc = "location", message = "entry '~entry:IRInst' uses trace context '~actualType:IRInst', but schema '~schema:IRInst' requires '~expectedType:IRInst'" }
+)
+
+err(
+    "structural-ray-tracing-payload-not-served",
+    38073,
+    "structural ray-tracing schema does not serve this payload",
+    span { loc = "location", message = "schema '~schema:IRInst' has no hit group or miss shader for payload type '~payloadType:IRInst'" }
+)
+
+err(
+    "duplicate-structural-ray-tracing-entry",
+    38074,
+    "duplicate structural ray-tracing entry",
+    span { loc = "location", message = "~section entry '~entry:IRInst' is listed more than once in schema '~schema:IRInst'" }
+)
+
+err(
+    "structural-ray-tracing-empty-payload-value",
+    38075,
+    "an empty structural ray-tracing payload has no explicit value",
+    span { loc = "location", message = "empty payload type '~payloadType:Type' is represented implicitly; omit the payload argument to 'trace' and do not access 'input.payload'" }
+)
+
+err(
+    "structural-ray-tracing-empty-payload-not-found",
+    38076,
+    "structural ray-tracing schema has no empty payload",
+    span { loc = "location", message = "schema '~schemaType:Type' has no concrete empty payload served by a hit group or miss shader" }
+)
+
+err(
+    "structural-ray-tracing-ambiguous-empty-payload",
+    38077,
+    "structural ray-tracing schema has multiple empty payloads",
+    span { loc = "location", message = "schema '~schemaType:Type' serves distinct empty payload types '~firstPayloadType:Type' and '~secondPayloadType:Type'; the three-argument 'trace' overload cannot choose between them" }
+)
+
+err(
+    "structural-ray-tracing-schema-not-closed",
+    38078,
+    "structural ray-tracing schema is not concrete and closed",
+    span { loc = "location", message = "the three-argument 'trace' overload requires a concrete closed schema, but schema '~schemaType:Type' has an unresolved hit-group or miss-shader payload type" }
+)
+
+err(
+    "structural-ray-tracing-record-not-plain-data",
+    38079,
+    "structural ray-tracing ABI data is not portable plain data",
+    span { loc = "location", message = "type '~type:IRInst' is used as structural ray-tracing ~role data but does not have a fixed-size, copyable plain-data representation" }
+)
+
+err(
+    "structural-ray-tracing-empty-payload-value-ir",
+    38081,
+    "an empty structural ray-tracing payload has no explicit value",
+    span { loc = "location", message = "empty payload type '~payloadType:IRInst' is represented implicitly; omit the payload argument to 'trace' and do not access 'input.payload'" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-name-collision",
+    38082,
+    "conflicting structural ray-tracing entry-point name",
+    span { loc = "location", message = "physical entry-point name '~physicalName:String' is requested by distinct structural stages '~firstStage:String' and '~secondStage:String'" }
+)
+
+err(
+    "structural-ray-tracing-void-abi-data",
+    38080,
+    "structural ray-tracing ABI data cannot be void",
+    span { loc = "location", message = "'void' cannot be used as structural ray-tracing ~role data; use a concrete plain-data type" }
 )
 
 err(

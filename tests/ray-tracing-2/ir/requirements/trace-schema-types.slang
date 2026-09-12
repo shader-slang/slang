@@ -13,7 +13,6 @@ struct TestPayload
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -24,6 +23,7 @@ struct TestRecord
 struct TestHitContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::TrianglePrimitive;
     typealias Record = TestRecord;
 }
@@ -36,7 +36,6 @@ struct TestClosestHit : rt::IClosestHitShader
 
 struct TestHitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = TestHitContext;
     typealias ClosestHit = TestClosestHit;
     typealias AnyHit = rt::NoAnyHit<TestHitContext>;
@@ -51,6 +50,7 @@ struct TestAttributes
 struct TestProceduralHitContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::BoundingBoxPrimitive<TestAttributes>;
     typealias Record = TestRecord;
 }
@@ -73,23 +73,18 @@ struct TestIntersection : rt::IIntersectionShader
     void invoke(rt::IntersectionInput<TestProceduralHitContext> input) {}
 }
 
-struct TestProceduralSlot : rt::IShaderGroupSlot
-{
-    static const int index = 3;
-}
-
 struct TestProceduralHitGroup : rt::IHitGroup
 {
-    typealias Slot = TestProceduralSlot;
     typealias Context = TestProceduralHitContext;
     typealias ClosestHit = TestProceduralClosestHit;
     typealias AnyHit = TestAnyHit;
     typealias Intersection = TestIntersection;
 }
 
-struct TestMissContext : rt::IMissGroupContext
+struct TestMissContext : rt::IPayloadContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Record = TestRecord;
 }
 
@@ -99,19 +94,12 @@ struct TestMiss : rt::IMissShader
     void invoke(rt::MissInput<TestMissContext> input) {}
 }
 
-struct TestMissGroup : rt::IMissGroup
-{
-    typealias Slot = rt::MissSlot<1>;
-    typealias Context = TestMissContext;
-    typealias Miss = TestMiss;
-}
-
 struct TestCallableData
 {
     uint value;
 }
 
-struct TestCallableContext : rt::ICallableGroupContext
+struct TestCallableContext : rt::ICallableContext
 {
     typealias TraceContext = TestTraceContext;
     typealias CallableData = TestCallableData;
@@ -124,20 +112,12 @@ struct TestCallable : rt::ICallableShader
     void invoke(rt::CallableInput<TestCallableContext> input) {}
 }
 
-struct TestCallableGroup : rt::ICallableGroup
-{
-    typealias Slot = rt::CallableSlot<2>;
-    typealias Context = TestCallableContext;
-    typealias Callable = TestCallable;
-}
-
 struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups =
-        rt::HitGroupList<TestTraceContext, TestHitGroup, TestProceduralHitGroup>;
-    typealias MissGroups = rt::MissGroupList<TestTraceContext, TestMissGroup>;
-    typealias CallableGroups = rt::CallableGroupList<TestTraceContext, TestCallableGroup>;
+    typealias HitGroups = rt::HitGroupList<TestHitGroup, TestProceduralHitGroup>;
+    typealias MissShaders = rt::MissShaderList<TestMiss>;
+    typealias CallableShaders = rt::CallableShaderList<TestCallable>;
 }
 
 rt::AccelerationStructure scene;
@@ -164,28 +144,30 @@ void main()
 // IR: func %TestIntersectionx5Finvoke
 // IR: [nameHint("TestClosestHit.invoke")]
 // IR: func %TestClosestHitx5Finvoke
-// IR: [structuralRayTracingCallableGroupInfo(%TestCallableGroup,
-// IR-SAME: %rtx5FShaderGroupSlot{{[0-9]*}}, 2 : Int, %TestCallableContext,
-// IR-SAME: %TestCallableData, %TestRecord, %TestCallable,
-// IR-SAME: %TestCallablex5Finvoke)]
-// IR: [structuralRayTracingMissGroupInfo(%TestMissGroup,
-// IR-SAME: %rtx5FShaderGroupSlot{{[0-9]*}}, 1 : Int, %TestMissContext,
-// IR-SAME: %TestPayload, %TestRecord, %TestMiss, %TestMissx5Finvoke)]
+// IR: [structuralRayTracingCallableShaderInfo(0 : Int, %TestCallableContext,
+// IR-SAME: %TestTraceContext, %TestCallableData, %TestRecord, %TestCallable,
+// IR-SAME: "TestCallable", {{.*}}, %TestCallablex5Finvoke)]
+// IR: [structuralRayTracingMissShaderInfo(0 : Int, %TestMissContext,
+// IR-SAME: %TestTraceContext, %TestPayload, {{.*}}, %TestRecord, %TestMiss,
+// IR-SAME: "TestMiss", {{.*}}, %TestMissx5Finvoke)]
 // IR: [structuralRayTracingHitGroupInfo(%TestProceduralHitGroup,
-// IR-SAME: %TestProceduralSlot, 3 : Int, %TestProceduralHitContext,
-// IR-SAME: %rtx5FBoundingBoxPrimitive, %TestPayload, %TestRecord,
+// IR-SAME: "TestProceduralHitGroup", 1 : Int, %TestProceduralHitContext, %TestTraceContext,
+// IR-SAME: %rtx5FBoundingBoxPrimitive, %TestPayload, {{.*}}, %TestRecord,
 // IR-SAME: %TestAttributes, 3 : Int, %TestProceduralClosestHit,
-// IR-SAME: %TestProceduralClosestHitx5Finvoke, %TestAnyHit, %TestAnyHitx5Finvoke,
-// IR-SAME: %TestIntersection, %TestIntersectionx5Finvoke)]
+// IR-SAME: "TestProceduralClosestHit", {{.*}}, true, %TestProceduralClosestHitx5Finvoke,
+// IR-SAME: %TestAnyHit, "TestAnyHit", {{.*}}, true, %TestAnyHitx5Finvoke,
+// IR-SAME: %TestIntersection, "TestIntersection", {{.*}}, true, %TestIntersectionx5Finvoke)]
 // IR: [structuralRayTracingHitGroupInfo(%TestHitGroup,
-// IR-SAME: %rtx5FShaderGroupSlot{{[0-9]*}}, 0 : Int, %TestHitContext,
-// IR-SAME: %rtx5FTrianglePrimitive, %TestPayload, %TestRecord, %rtx5FTriangleData,
-// IR-SAME: 1 : Int, %TestClosestHit, %TestClosestHitx5Finvoke,
-// IR-SAME: Void, void_constant, Void, void_constant)]
-// IR: structuralRayTracingTrace({{.*}}, %TestSchema, %TestTraceContext,
+// IR-SAME: "TestHitGroup", 0 : Int, %TestHitContext, %TestTraceContext,
+// IR-SAME: %rtx5FTrianglePrimitive,
+// IR-SAME: %TestPayload, {{.*}}, %TestRecord, %rtx5FTriangleData,
+// IR-SAME: 1 : Int, %TestClosestHit, "TestClosestHit", {{.*}}, true,
+// IR-SAME: %TestClosestHitx5Finvoke, Void, "", "", false, void_constant,
+// IR-SAME: Void, "", "", false, void_constant)]
+// IR: structuralRayTracingTrace({{.*}}, %TestSchema, "TestSchema", %TestTraceContext, %TestPayload,
 // IR-SAME: %rtx5FHitGroupList, TypePack(%TestHitGroup, %TestProceduralHitGroup),
-// IR-SAME: %rtx5FMissGroupList, TypePack(%TestMissGroup),
-// IR-SAME: %rtx5FCallableGroupList, TypePack(%TestCallableGroup),
+// IR-SAME: %rtx5FMissShaderList, TypePack(%TestMiss),
+// IR-SAME: %rtx5FCallableShaderList, TypePack(%TestCallable),
 
 // HLSL-DAG: [shader("raygeneration")]void main()
 // HLSL-DAG: [shader("callable")]void TestCallable(inout TestCallableData_0

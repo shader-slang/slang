@@ -10,17 +10,31 @@ struct Payload
 
 struct TraceContext : rt::ITraceContext
 {
-    typealias Payload = ::Payload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
+}
+
+struct MissRecord {}
+
+struct MissContext : rt::IPayloadContext
+{
+    typealias TraceContext = ::TraceContext;
+    typealias Payload = ::Payload;
+    typealias Record = MissRecord;
+}
+
+struct MissShader : rt::IMissShader
+{
+    typealias Context = MissContext;
+    void invoke(rt::MissInput<MissContext> input) {}
 }
 
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
-    typealias HitGroups = rt::NoHitGroups<::TraceContext>;
-    typealias MissGroups = rt::NoMissGroups<::TraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<::TraceContext>;
+    typealias HitGroups = rt::NoHitGroups;
+    typealias MissShaders = rt::MissShaderList<MissShader>;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 struct PushConstants

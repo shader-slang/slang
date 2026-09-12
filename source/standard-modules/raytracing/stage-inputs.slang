@@ -3,14 +3,15 @@ implementing raytracing;
 namespace rt
 {
 
-// These are compiler-provided, zero-storage views. The compiler recognizes the exact accessors
-// below, maps storage-free properties such as payload to the target ABI, and retains the ordinary
-// source bodies where they already express the D3D/Vulkan implementation.
+/// Provides the payload, record, hit data, and ray state available to a closest-hit stage.
+///
+/// This is a compiler-provided zero-storage view. Its properties map directly to native stage
+/// parameters or built-in state and therefore do not add fields to the generated entry point.
 [require(structural_raytracing_closesthit)]
 public struct ClosestHitInput<Context>
     where Context : IHitContext
 {
-    public property Context.TraceContext.Payload payload
+    public property Context.Payload payload
     {
         ref;
     }
@@ -336,11 +337,15 @@ public extension<Context> ClosestHitInput<Context>
     }
 }
 
+/// Provides the candidate payload, record, hit data, and ray state available to an any-hit stage.
+///
+/// Control methods on this zero-storage view map to native any-hit operations on portable targets
+/// and to the generated Metal candidate-dispatch contract.
 [require(structural_raytracing_anyhit)]
 public struct AnyHitInput<Context>
     where Context : IHitContext
 {
-    public property Context.TraceContext.Payload payload
+    public property Context.Payload payload
     {
         ref;
     }
@@ -694,6 +699,11 @@ public extension<Context> AnyHitInput<Context>
     }
 }
 
+/// Provides the record and ray state used by a procedural intersection stage.
+///
+/// `reportHit` submits each candidate and its `Context.Primitive.Attributes` value. On D3D and
+/// Vulkan it maps to the native report-intersection operation; Metal lowering preserves the same
+/// candidate-filtering behavior in the generated intersection function.
 [require(structural_raytracing_intersection)]
 public struct IntersectionInput<Context>
     where Context : IHitContext
@@ -984,11 +994,15 @@ public extension<Context> IntersectionInput<Context>
     }
 }
 
+/// Provides the payload, record, and ray state available to a miss stage.
+///
+/// This zero-storage view lets one source contract map to native miss parameters on portable
+/// targets and to Metal's generated post-traversal dispatch.
 [require(structural_raytracing_miss)]
 public struct MissInput<Context>
-    where Context : IMissGroupContext
+    where Context : IPayloadContext
 {
-    public property Context.TraceContext.Payload payload
+    public property Context.Payload payload
     {
         ref;
     }
@@ -1119,7 +1133,7 @@ public struct MissInput<Context>
 }
 
 public extension<Context> MissInput<Context>
-    where Context : IMissGroupContext
+    where Context : IPayloadContext
     where Context.TraceContext.Motion : IEnabledRayMotion
 {
     public property float time
@@ -1138,9 +1152,13 @@ public extension<Context> MissInput<Context>
     }
 }
 
+/// Provides callable data, record data, and dispatch coordinates to a callable stage.
+///
+/// The data property is the native inout callable-data parameter; record data identifies the
+/// runtime callable SBT record selected by `callShader`.
 [require(structural_raytracing_callable)]
 public struct CallableInput<Context>
-    where Context : ICallableGroupContext
+    where Context : ICallableContext
 {
     public property Context.CallableData data
     {

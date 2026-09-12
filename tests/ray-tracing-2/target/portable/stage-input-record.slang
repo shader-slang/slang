@@ -23,7 +23,6 @@ struct TestPayload
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -41,6 +40,7 @@ struct HitAttributes
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::BoundingBoxPrimitive<HitAttributes>;
     typealias Record = HitRecord;
 }
@@ -50,9 +50,10 @@ struct MissRecord
     uint value;
 }
 
-struct MissContext : rt::IMissGroupContext
+struct MissContext : rt::IPayloadContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Record = MissRecord;
 }
 
@@ -66,7 +67,7 @@ struct CallableRecord
     uint value;
 }
 
-struct CallableContext : rt::ICallableGroupContext
+struct CallableContext : rt::ICallableContext
 {
     typealias TraceContext = TestTraceContext;
     typealias CallableData = ::CallableData;

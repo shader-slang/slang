@@ -18,7 +18,6 @@ struct TestRecord {}
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -31,6 +30,7 @@ struct CustomAttributes
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::BoundingBoxPrimitive<CustomAttributes>;
     typealias Record = TestRecord;
 }

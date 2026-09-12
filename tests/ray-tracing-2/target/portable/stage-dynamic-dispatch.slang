@@ -39,7 +39,6 @@ struct Payload
 
 struct TraceContext : rt::ITraceContext
 {
-    typealias Payload = ::Payload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -47,6 +46,7 @@ struct TraceContext : rt::ITraceContext
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = ::TraceContext;
+    typealias Payload = ::Payload;
     typealias Primitive = rt::TrianglePrimitive;
     typealias Record = void;
 }
@@ -59,6 +59,7 @@ struct HitAttributes
 struct ProceduralHitContext : rt::IHitContext
 {
     typealias TraceContext = ::TraceContext;
+    typealias Payload = ::Payload;
     typealias Primitive = rt::BoundingBoxPrimitive<HitAttributes>;
     typealias Record = void;
 }
@@ -95,7 +96,6 @@ struct Intersection : rt::IIntersectionShader
 
 struct HitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = HitContext;
     typealias ClosestHit = ::ClosestHit;
     typealias AnyHit = ::AnyHit;
@@ -104,16 +104,16 @@ struct HitGroup : rt::IHitGroup
 
 struct ProceduralHitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<1>;
     typealias Context = ProceduralHitContext;
     typealias ClosestHit = rt::NoClosestHit<ProceduralHitContext>;
     typealias AnyHit = rt::NoAnyHit<ProceduralHitContext>;
     typealias Intersection = ::Intersection;
 }
 
-struct MissContext : rt::IMissGroupContext
+struct MissContext : rt::IPayloadContext
 {
     typealias TraceContext = ::TraceContext;
+    typealias Payload = ::Payload;
     typealias Record = void;
 }
 
@@ -127,19 +127,12 @@ struct Miss : rt::IMissShader
     }
 }
 
-struct MissGroup : rt::IMissGroup
-{
-    typealias Slot = rt::MissSlot<0>;
-    typealias Context = MissContext;
-    typealias Miss = ::Miss;
-}
-
 struct CallableData
 {
     uint value;
 }
 
-struct CallableContext : rt::ICallableGroupContext
+struct CallableContext : rt::ICallableContext
 {
     typealias TraceContext = ::TraceContext;
     typealias CallableData = ::CallableData;
@@ -156,19 +149,12 @@ struct Callable : rt::ICallableShader
     }
 }
 
-struct CallableGroup : rt::ICallableGroup
-{
-    typealias Slot = rt::CallableSlot<0>;
-    typealias Context = CallableContext;
-    typealias Callable = ::Callable;
-}
-
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
-    typealias HitGroups = rt::HitGroupList<::TraceContext, HitGroup, ProceduralHitGroup>;
-    typealias MissGroups = rt::MissGroupList<::TraceContext, MissGroup>;
-    typealias CallableGroups = rt::CallableGroupList<::TraceContext, CallableGroup>;
+    typealias HitGroups = rt::HitGroupList<HitGroup, ProceduralHitGroup>;
+    typealias MissShaders = rt::MissShaderList<::Miss>;
+    typealias CallableShaders = rt::CallableShaderList<::Callable>;
 }
 
 rt::AccelerationStructure scene;

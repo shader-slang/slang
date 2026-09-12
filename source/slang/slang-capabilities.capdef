@@ -1600,6 +1600,11 @@ alias structural_raytracing_trace = cuda_glsl_hlsl_spirv + raygen_closesthit_mis
                                     | _closesthit + metal
                                     | _miss + metal;
 
+/// Instance motion available to the structural ray-tracing API. Metal encodes the requirement on
+/// its intersector type, while Vulkan and OptiX pass a ray time to their native trace operation.
+/// [Compound]
+alias structural_raytracing_instance_motion = metallib_2_4 | raytracing_motionblur;
+
 /// Collection of shader stages
 /// [Compound]
 alias anyhit_closesthit_intersection = anyhit | closesthit | intersection;

@@ -14,7 +14,6 @@ struct Attributes
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::PrimitiveAndInstanceMotion;
 }
@@ -22,13 +21,15 @@ struct TestTraceContext : rt::ITraceContext
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::BoundingBoxPrimitive<Attributes>;
     typealias Record = void;
 }
 
-struct MissContext : rt::IMissGroupContext
+struct MissContext : rt::IPayloadContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Record = void;
 }
 
@@ -73,26 +74,18 @@ struct TestMiss : rt::IMissShader
 
 struct HitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = HitContext;
     typealias ClosestHit = TestClosestHit;
     typealias AnyHit = TestAnyHit;
     typealias Intersection = TestIntersection;
 }
 
-struct MissGroup : rt::IMissGroup
-{
-    typealias Slot = rt::MissSlot<0>;
-    typealias Context = MissContext;
-    typealias Miss = TestMiss;
-}
-
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups = rt::HitGroupList<TestTraceContext, HitGroup>;
-    typealias MissGroups = rt::MissGroupList<TestTraceContext, MissGroup>;
-    typealias CallableGroups = rt::NoCallableGroups<TestTraceContext>;
+    typealias HitGroups = rt::HitGroupList<HitGroup>;
+    typealias MissShaders = rt::MissShaderList<TestMiss>;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 rt::AccelerationStructure scene;
@@ -112,6 +105,6 @@ void main()
 // METAL-DAG: float rayTime_{{[0-9]+}};
 // METAL-DAG: (&{{rayData_[0-9]+}})->rayTime_{{[0-9]+}} = {{desc_[0-9]+}}.time_{{[0-9]+}};
 // METAL-DAG: {{\[\[intersection\(bounding_box,}}
-// METAL-DAG: {{\[\[visible\]\]}} void TestClosestHit_0
-// METAL-DAG: {{\[\[visible\]\]}} void TestMiss_0
+// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_
+// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_
 // METAL-NOT: structuralRayTracingGetRayTime

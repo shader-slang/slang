@@ -1,9 +1,9 @@
 //TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
 
 // METAL: metal::visible_function_table<void(Schema_rayData_0 thread*, uchar thread*)> closestHitFunctions_0;
-// METAL: _S{{[0-9]+}}[_slang_hit_slot](&rayData_{{[0-9]+}}, (thread uchar*)&kernelContext_0);
-// METAL-DAG: {{\[\[visible\]\]}} void GlobalClosestHit_0(Schema_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
-// METAL-DAG: {{\[\[visible\]\]}} void PlainClosestHit_0(Schema_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
+// METAL: ](&rayData_{{[0-9]+}}, (thread uchar*)&kernelContext_0);
+// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
+// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
 
 import slang.raytracing;
 
@@ -14,7 +14,6 @@ struct RuntimePayload
 
 struct RuntimeTraceContext : rt::ITraceContext
 {
-    typealias Payload = RuntimePayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -22,6 +21,7 @@ struct RuntimeTraceContext : rt::ITraceContext
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = RuntimeTraceContext;
+    typealias Payload = RuntimePayload;
     typealias Primitive = rt::TrianglePrimitive;
     typealias Record = void;
 }
@@ -48,7 +48,6 @@ struct PlainClosestHit : rt::IClosestHitShader
 
 struct GlobalHitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = HitContext;
     typealias ClosestHit = GlobalClosestHit;
     typealias AnyHit = rt::NoAnyHit<HitContext>;
@@ -57,7 +56,6 @@ struct GlobalHitGroup : rt::IHitGroup
 
 struct PlainHitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<1>;
     typealias Context = HitContext;
     typealias ClosestHit = PlainClosestHit;
     typealias AnyHit = rt::NoAnyHit<HitContext>;
@@ -67,9 +65,9 @@ struct PlainHitGroup : rt::IHitGroup
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = RuntimeTraceContext;
-    typealias HitGroups = rt::HitGroupList<RuntimeTraceContext, GlobalHitGroup, PlainHitGroup>;
-    typealias MissGroups = rt::NoMissGroups<RuntimeTraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<RuntimeTraceContext>;
+    typealias HitGroups = rt::HitGroupList<GlobalHitGroup, PlainHitGroup>;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 rt::AccelerationStructure scene;

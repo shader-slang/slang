@@ -12,17 +12,29 @@ struct MyPayload
 
 struct MyTraceContext : rt::ITraceContext
 {
-    typealias Payload = MyPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
+}
+
+struct MyMissContext : rt::IPayloadContext
+{
+    typealias TraceContext = MyTraceContext;
+    typealias Payload = MyPayload;
+    typealias Record = void;
+}
+
+struct MyMiss : rt::IMissShader
+{
+    typealias Context = MyMissContext;
+    void invoke(rt::MissInput<MyMissContext> input) {}
 }
 
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = MyTraceContext;
-    typealias HitGroups = rt::NoHitGroups<MyTraceContext>;
-    typealias MissGroups = rt::NoMissGroups<MyTraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<MyTraceContext>;
+    typealias HitGroups = rt::NoHitGroups;
+    typealias MissShaders = rt::MissShaderList<MyMiss>;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 rt::AccelerationStructure scene;
@@ -55,10 +67,11 @@ void main()
 }
 
 // IR: struct [[PROGRAM_SCHEMA:%Schema]] : Type
-// IR: structuralRayTracingTrace({{.*}}, [[PROGRAM_SCHEMA]],
+// IR: structuralRayTracingTrace({{.*}}, [[PROGRAM_SCHEMA]], "Schema",
 // HLSL: TraceRay(
 // HLSL-SAME: .rayFlags
 // SPIRV: OpTraceRayKHR
 // METAL: {{\[\[kernel\]\]}} void main_0(
-// METAL-NOT: acceleration_structure
-// METAL-NOT: TraceProgramDescriptor
+// METAL-SAME: metal::raytracing::acceleration_structure
+// METAL-SAME: rt_TraceProgramDescriptorResources
+// METAL: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(

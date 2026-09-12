@@ -9,12 +9,14 @@ struct FakePrimitive : rt::IIntersectionPrimitive
     typealias Attributes = float2;
 }
 
-struct PayloadData {}
+struct PayloadData
+{
+    uint value;
+}
 struct Record {}
 
 struct MyTraceContext : rt::ITraceContext
 {
-    typealias Payload = PayloadData;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -22,6 +24,7 @@ struct MyTraceContext : rt::ITraceContext
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = MyTraceContext;
+    typealias Payload = PayloadData;
     typealias Primitive = FakePrimitive;
     typealias Record = Record;
 }
@@ -34,7 +37,6 @@ struct ClosestHitStage : rt::IClosestHitShader
 
 struct HitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = HitContext;
     typealias ClosestHit = ClosestHitStage;
     typealias AnyHit = rt::NoAnyHit<HitContext>;
@@ -44,9 +46,9 @@ struct HitGroup : rt::IHitGroup
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = MyTraceContext;
-    typealias HitGroups = rt::HitGroupList<TraceContext, HitGroup>;
-    typealias MissGroups = rt::NoMissGroups<TraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<TraceContext>;
+    typealias HitGroups = rt::HitGroupList<HitGroup>;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 rt::AccelerationStructure scene;

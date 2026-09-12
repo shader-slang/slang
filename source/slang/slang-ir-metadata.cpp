@@ -201,6 +201,33 @@ static bool doesInstAndChildrenUseBindlessResourceHeap(IRInst* inst, SlangInt bi
     return false;
 }
 
+// Preserves the Metal ABI fact produced by structural ray-tracing lowering. The decoration lives
+// on the schema-specific physical descriptor type, so its schema identity cannot be confused with
+// another descriptor that started from the same erased source placeholder type.
+static void _collectStructuralRayTracingMetalPayloadMetadata(
+    IRInst* inst,
+    ArtifactPostEmitMetadata& outMetadata)
+{
+    for (auto decoration : inst->getDecorations())
+    {
+        auto payloadMetadata = as<IRStructuralRayTracingMetalPayloadMetadataDecoration>(decoration);
+        if (!payloadMetadata)
+            continue;
+
+        auto payloadIndex = payloadMetadata->getPayloadIndex()->getValue();
+        auto signature = payloadMetadata->getIntersectionFunctionSignature()->getValue();
+        SLANG_RELEASE_ASSERT(
+            std::in_range<uint32_t>(payloadIndex) && std::in_range<uint32_t>(signature));
+
+        StructuralRayTracingMetalPayloadRecord record;
+        record.schemaName = payloadMetadata->getSchemaName()->getStringSlice();
+        record.payloadIndex = uint32_t(payloadIndex);
+        record.intersectionFunctionSignature =
+            slang::MetalIntersectionFunctionSignature(uint32_t(signature));
+        outMetadata.m_structuralRayTracingMetalPayloads.add(_Move(record));
+    }
+}
+
 void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadata)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
@@ -291,6 +318,8 @@ void collectMetadata(
     bool usesBindlessResourceHeap = false;
     for (const auto& inst : irModule->getGlobalInsts())
     {
+        _collectStructuralRayTracingMetalPayloadMetadata(inst, outMetadata);
+
         if (bindlessSpaceIndex >= 0 && !usesBindlessResourceHeap)
         {
             if (doesInstAndChildrenUseBindlessResourceHeap(inst, bindlessSpaceIndex))
@@ -318,6 +347,25 @@ void collectMetadata(
         collectMetadataFromInst(param, outMetadata);
     }
     outMetadata.m_usesBindlessResourceHeap = usesBindlessResourceHeap;
+
+    // Decoration insertion order is intentionally not semantic, and later IR transforms may also
+    // reorder otherwise-independent global types. Sort by the public lookup key so metadata order
+    // is deterministic without making either compiler detail part of the host ABI.
+    outMetadata.m_structuralRayTracingMetalPayloads.sort(
+        [](const auto& left, const auto& right)
+        {
+            if (left.schemaName != right.schemaName)
+                return left.schemaName < right.schemaName;
+            return left.payloadIndex < right.payloadIndex;
+        });
+    for (Index i = 1; i < outMetadata.m_structuralRayTracingMetalPayloads.getCount(); ++i)
+    {
+        const auto& previous = outMetadata.m_structuralRayTracingMetalPayloads[i - 1];
+        const auto& current = outMetadata.m_structuralRayTracingMetalPayloads[i];
+        SLANG_RELEASE_ASSERT(
+            previous.schemaName != current.schemaName ||
+            previous.payloadIndex != current.payloadIndex);
+    }
 }
 
 static SlangScalarType _getScalarTypeFromIRType(IRType* type)

@@ -5,6 +5,7 @@
 #include "slang-ast-decl.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
 #include "slang-rich-diagnostics.h"
@@ -10105,18 +10106,11 @@ static IROp parseIROp(Parser* parser, Token& outToken)
         }
     }
 
-    if ((op >= kIROp_FirstRaytracingStageInterface && op <= kIROp_LastRaytracingStageInterface) ||
-        (op >= kIROp_FirstStructuralRayTracingStageInputOperation &&
-         op <= kIROp_LastStructuralRayTracingStageInputOperation) ||
-        op == kIROp_StructuralRayTracingTrace || op == kIROp_StructuralRayTracingCallShader ||
-        op == kIROp_MetalStructuralRayTracingTrace ||
-        op == kIROp_MetalStructuralRayTracingCallShader ||
-        op == kIROp_StructuralRayTracingHitGroupInfoDecoration ||
-        op == kIROp_StructuralRayTracingMissGroupInfoDecoration ||
-        op == kIROp_StructuralRayTracingCallableGroupInfoDecoration ||
-        op == kIROp_MetalIntersectionFunctionTable || op == kIROp_MetalVisibleFunctionTable ||
-        op == kIROp_MetalVisibleFunctionDecoration ||
-        op == kIROp_MetalIntersectionFunctionDecoration)
+    // The core module is compiler-owned source and defines the trusted HLSL wrappers for the
+    // Metal-only dispatch-system-value operations. User modules must not spell any structural
+    // ray-tracing IR operation directly; their source-level access is provided exclusively by the
+    // registered `slang.raytracing` contracts.
+    if (!parser->options.isCoreModule && isCompilerOwnedStructuralRayTracingIROp(op))
     {
         parser->sink->diagnose(Diagnostics::CompilerOwnedIntrinsicOp{
             .operation = outToken.getContent(),

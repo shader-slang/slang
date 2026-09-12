@@ -7,7 +7,6 @@ struct TestRecord {}
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -15,6 +14,7 @@ struct TestTraceContext : rt::ITraceContext
 struct TestHitContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::TrianglePrimitive;
     typealias Record = TestRecord;
 }
@@ -24,7 +24,7 @@ struct TestCallableData
     uint value;
 }
 
-struct TestCallableContext : rt::ICallableGroupContext
+struct TestCallableContext : rt::ICallableContext
 {
     typealias TraceContext = TestTraceContext;
     typealias CallableData = TestCallableData;
@@ -55,16 +55,8 @@ struct TestCallable : rt::ICallableShader
     void invoke(rt::CallableInput<TestCallableContext> input) {}
 }
 
-struct TestCallableGroup : rt::ICallableGroup
-{
-    typealias Slot = rt::CallableSlot<0>;
-    typealias Context = TestCallableContext;
-    typealias Callable = TestCallable;
-}
-
 struct TestHitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = TestHitContext;
     typealias ClosestHit = rt::NoClosestHit<TestHitContext>;
     typealias AnyHit = BadAnyHit;
@@ -74,9 +66,9 @@ struct TestHitGroup : rt::IHitGroup
 struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups = rt::HitGroupList<TestTraceContext, TestHitGroup>;
-    typealias MissGroups = rt::NoMissGroups<TestTraceContext>;
-    typealias CallableGroups = rt::CallableGroupList<TestTraceContext, TestCallableGroup>;
+    typealias HitGroups = rt::HitGroupList<TestHitGroup>;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::CallableShaderList<TestCallable>;
 }
 
 rt::TraceProgramDescriptor<TestSchema> program;

@@ -479,6 +479,55 @@ SubtypeWitness* SharedSemanticsContext::_specializeInterfaceInheritanceWitness(
     return result;
 }
 
+SubtypeWitness* SharedSemanticsContext::tryProjectInterfaceSubtypeWitness(
+    SubtypeWitness* selfIsSubtypeOfBase,
+    Type* targetInterfaceType)
+{
+    selfIsSubtypeOfBase =
+        selfIsSubtypeOfBase ? as<SubtypeWitness>(selfIsSubtypeOfBase->resolve()) : nullptr;
+    targetInterfaceType = targetInterfaceType ? as<Type>(targetInterfaceType->resolve()) : nullptr;
+    if (!selfIsSubtypeOfBase || !targetInterfaceType)
+        return nullptr;
+
+    auto baseInterfaceType = as<DeclRefType>(selfIsSubtypeOfBase->getSup()->resolve());
+    auto baseInterfaceDeclRef = baseInterfaceType
+                                    ? baseInterfaceType->getDeclRef().as<InterfaceDecl>()
+                                    : DeclRef<InterfaceDecl>();
+    if (!baseInterfaceDeclRef)
+        return nullptr;
+
+    if (baseInterfaceType->equals(targetInterfaceType))
+        return selfIsSubtypeOfBase;
+
+    // `getInheritanceInfo(Base)` is the source of truth for Base's flattened interface
+    // inheritance. Its facet witness is still rooted at `Base.This`, so specialize that witness
+    // with the caller's exact `Self : Base` proof. Querying `Self` here would lose that proof and
+    // could select another conformance that happens to have the same target interface.
+    for (auto facet : getInheritanceInfo(baseInterfaceType).facets)
+    {
+        auto facetType = facet->getType() ? as<Type>(facet->getType()->resolve()) : nullptr;
+        if (!facetType || !facetType->equals(targetInterfaceType))
+            continue;
+
+        auto baseIsSubtypeOfTarget =
+            facet->subtypeWitness ? as<SubtypeWitness>(facet->subtypeWitness->resolve()) : nullptr;
+        if (!baseIsSubtypeOfTarget)
+            return nullptr;
+
+        auto projectedWitness = _specializeInterfaceInheritanceWitness(
+            baseInterfaceDeclRef.getDecl(),
+            selfIsSubtypeOfBase,
+            baseIsSubtypeOfTarget);
+        projectedWitness =
+            projectedWitness ? as<SubtypeWitness>(projectedWitness->resolve()) : nullptr;
+        SLANG_RELEASE_ASSERT(
+            projectedWitness && projectedWitness->getSub()->equals(selfIsSubtypeOfBase->getSub()) &&
+            projectedWitness->getSup()->equals(targetInterfaceType));
+        return projectedWitness;
+    }
+    return nullptr;
+}
+
 bool SharedSemanticsContext::tryResolveConstraintTypes(
     DeclRef<GenericTypeConstraintDecl> constraintDeclRef)
 {

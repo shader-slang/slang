@@ -9,7 +9,6 @@ struct TestPayload
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -27,6 +26,7 @@ struct TestRecord
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::BoundingBoxPrimitive<SphereAttributes>;
     typealias Record = TestRecord;
 }
@@ -54,7 +54,6 @@ struct TestClosestHit : rt::IClosestHitShader
 
 struct HitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = HitContext;
     typealias ClosestHit = TestClosestHit;
     typealias AnyHit = rt::NoAnyHit<HitContext>;
@@ -64,9 +63,9 @@ struct HitGroup : rt::IHitGroup
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups = rt::HitGroupList<TestTraceContext, HitGroup>;
-    typealias MissGroups = rt::NoMissGroups<TestTraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<TestTraceContext>;
+    typealias HitGroups = rt::HitGroupList<HitGroup>;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 rt::AccelerationStructure scene;
@@ -91,7 +90,7 @@ void main()
 // METAL-SAME: ray_data Schema_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
 // METAL: HitGroup_attributes_{{[0-9]+}} =
 // METAL: customHitKind_{{[0-9]+}} = 17U;
-// METAL: {{\[\[visible\]\]}} void TestClosestHit_0(
+// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(
 // METAL-SAME: Schema_rayData_0 thread* rayData_{{[0-9]+}},
 // METAL-SAME: float distance_{{[0-9]+}},
 // METAL-SAME: uint hitKind_{{[0-9]+}},

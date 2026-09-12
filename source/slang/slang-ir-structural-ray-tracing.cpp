@@ -1,6 +1,7 @@
 #include "slang-ir-structural-ray-tracing.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
 #include "slang-module.h"
@@ -90,15 +91,173 @@ IROp getStructuralRayTracingStageInputOperationOp(StructuralRayTracingStageInput
     }
 }
 
-String getStructuralRayTracingSourceTypeName(IRType* type)
+bool isCompilerOwnedStructuralRayTracingIROp(IROp op)
 {
-    // Structural stage and group types originate from named source structs. IR lowering preserves
-    // that source name on the canonical type, and generated entry points and table functions both
-    // use it as their public name. A missing decoration means that an upstream producer discarded
-    // required identity; inventing a fallback name here would hide that representation error.
-    auto nameHint = type ? type->findDecoration<IRNameHintDecoration>() : nullptr;
-    SLANG_RELEASE_ASSERT(nameHint);
-    return String(nameHint->getName());
+    if ((op >= kIROp_FirstRaytracingStageInterface && op <= kIROp_LastRaytracingStageInterface) ||
+        (op >= kIROp_FirstStructuralRayTracingStageInputOperation &&
+         op <= kIROp_LastStructuralRayTracingStageInputOperation))
+    {
+        return true;
+    }
+
+    switch (op)
+    {
+    case kIROp_StructuralRayTracingTrace:
+    case kIROp_StructuralRayTracingCallShader:
+    case kIROp_MetalStructuralRayTracingTrace:
+    case kIROp_MetalStructuralRayTracingCallShader:
+    case kIROp_MetalStructuralRayTracingDispatchRaysIndex:
+    case kIROp_MetalStructuralRayTracingDispatchRaysDimensions:
+    case kIROp_StructuralRayTracingEntryPointInfoDecoration:
+    case kIROp_StructuralRayTracingProgramPayloadLocationDecoration:
+    case kIROp_StructuralRayTracingSemanticallyEmptyPayloadDecoration:
+    case kIROp_StructuralRayTracingMetalPayloadMetadataDecoration:
+    case kIROp_StructuralRayTracingHitGroupInfoDecoration:
+    case kIROp_StructuralRayTracingMissShaderInfoDecoration:
+    case kIROp_StructuralRayTracingCallableShaderInfoDecoration:
+    case kIROp_MetalIntersectionFunctionTable:
+    case kIROp_MetalVisibleFunctionTable:
+    case kIROp_MetalVisibleFunctionDecoration:
+    case kIROp_MetalIntersectionFunctionDecoration:
+        return true;
+    default:
+        return false;
+    }
+}
+
+IRFunc* getStructuralRayTracingHitGroupStageInvoke(
+    IRStructuralRayTracingHitGroupInfoDecoration* group,
+    StructuralRayTracingStageKind stageKind)
+{
+    SLANG_RELEASE_ASSERT(group);
+
+    IRType* stageType = nullptr;
+    IRStringLit* sourceTypeName = nullptr;
+    IRStringLit* typeIdentity = nullptr;
+    IRBoolLit* isPresent = nullptr;
+    IRInst* invoke = nullptr;
+    switch (stageKind)
+    {
+    case StructuralRayTracingStageKind::ClosestHit:
+        stageType = group->getClosestHitType();
+        sourceTypeName = group->getClosestHitSourceTypeName();
+        typeIdentity = group->getClosestHitTypeIdentity();
+        isPresent = group->getHasClosestHit();
+        invoke = group->getClosestHit();
+        break;
+    case StructuralRayTracingStageKind::AnyHit:
+        stageType = group->getAnyHitType();
+        sourceTypeName = group->getAnyHitSourceTypeName();
+        typeIdentity = group->getAnyHitTypeIdentity();
+        isPresent = group->getHasAnyHit();
+        invoke = group->getAnyHit();
+        break;
+    case StructuralRayTracingStageKind::Intersection:
+        stageType = group->getIntersectionType();
+        sourceTypeName = group->getIntersectionSourceTypeName();
+        typeIdentity = group->getIntersectionTypeIdentity();
+        isPresent = group->getHasIntersection();
+        invoke = group->getIntersection();
+        break;
+    default:
+        SLANG_UNEXPECTED("hit group does not contain the requested structural stage");
+    }
+
+    SLANG_RELEASE_ASSERT(stageType && sourceTypeName && typeIdentity && isPresent && invoke);
+    if (!isPresent->getValue())
+    {
+        SLANG_RELEASE_ASSERT(
+            as<IRVoidType>(stageType) && sourceTypeName->getStringSlice().getLength() == 0 &&
+            typeIdentity->getStringSlice().getLength() == 0 && as<IRVoidLit>(invoke));
+        return nullptr;
+    }
+
+    auto func = as<IRFunc>(invoke);
+    SLANG_RELEASE_ASSERT(
+        func && !as<IRVoidType>(stageType) && sourceTypeName->getStringSlice().getLength() != 0 &&
+        typeIdentity->getStringSlice().getLength() != 0);
+    return func;
+}
+
+bool isSemanticallyEmptyStructuralRayTracingPayloadType(IRType* type)
+{
+    auto resolvedType = type ? getResolvedInstForDecorations(unwrapAttributedType(type)) : nullptr;
+    return resolvedType &&
+           resolvedType->findDecoration<IRStructuralRayTracingSemanticallyEmptyPayloadDecoration>();
+}
+
+// Collect every concrete Vulkan ray-payload location in the lexical IR subtree. Payload
+// decorations may belong to globals, entry-point parameters, or declarations inside generics, so
+// a module-scope-only scan would miss valid legacy locations. The negative value `-1` asks later
+// legalization to choose a location and therefore does not reserve one here.
+void collectUsedVulkanRayPayloadLocations(IRInst* root, HashSet<IRIntegerValue>& outLocations)
+{
+    for (auto inst = root->getFirstDecorationOrChild(); inst; inst = inst->getNextInst())
+    {
+        if (as<IRVulkanRayPayloadDecoration>(inst) || as<IRVulkanRayPayloadInDecoration>(inst))
+        {
+            auto location = cast<IRIntLit>(inst->getOperand(0))->getValue();
+            if (location >= 0)
+                outLocations.add(location);
+        }
+        collectUsedVulkanRayPayloadLocations(inst, outLocations);
+    }
+}
+
+void addStructuralRayTracingProgramPayloadLocation(
+    IRBuilder& builder,
+    IRInst* owner,
+    IRType* payloadType,
+    IRType* payloadSemanticType,
+    IRIntegerValue location)
+{
+    SLANG_RELEASE_ASSERT(owner && payloadType && payloadSemanticType && location >= 0);
+    for (auto decoration : owner->getDecorations())
+    {
+        auto existing = as<IRStructuralRayTracingProgramPayloadLocationDecoration>(decoration);
+        if (!existing || existing->getPayloadSemanticType() != payloadSemanticType)
+        {
+            continue;
+        }
+        // One owner represents one linked program (or one schema operation in that program), so a
+        // semantic payload identity has exactly one realized type and location at this target
+        // phase. Distinct identities may intentionally use different locations even when their
+        // physical layouts are identical.
+        SLANG_RELEASE_ASSERT(existing->getLocation()->getValue() == location);
+        SLANG_RELEASE_ASSERT(existing->getPayloadType() == payloadType);
+        return;
+    }
+
+    IRInst* operands[] = {
+        payloadType,
+        payloadSemanticType,
+        builder.getIntValue(builder.getIntType(), location),
+    };
+    builder.addDecoration(
+        owner,
+        kIROp_StructuralRayTracingProgramPayloadLocationDecoration,
+        operands,
+        SLANG_COUNT_OF(operands));
+}
+
+IRIntegerValue findStructuralRayTracingProgramPayloadLocation(
+    IRInst* owner,
+    IRType* payloadSemanticType)
+{
+    SLANG_RELEASE_ASSERT(owner && payloadSemanticType);
+    IRIntegerValue result = -1;
+    for (auto decoration : owner->getDecorations())
+    {
+        auto assignment = as<IRStructuralRayTracingProgramPayloadLocationDecoration>(decoration);
+        if (!assignment || assignment->getPayloadSemanticType() != payloadSemanticType)
+        {
+            continue;
+        }
+        auto location = assignment->getLocation()->getValue();
+        SLANG_RELEASE_ASSERT(result < 0 || result == location);
+        result = location;
+    }
+    return result;
 }
 
 void addStructuralRayTracingEntryPointInfo(
@@ -106,18 +265,23 @@ void addStructuralRayTracingEntryPointInfo(
     IRFunc* func,
     const StructuralRayTracingEntryPointIRInfo& info)
 {
-    SLANG_RELEASE_ASSERT(info.invoke && info.stageType);
+    SLANG_RELEASE_ASSERT(
+        info.invoke && info.stageType && info.stageSourceTypeName && info.stageTypeIdentity);
     auto voidType = builder.getVoidType();
     IRInst* operands[] = {
         builder.getIntValue(builder.getIntType(), IRIntegerValue(info.stageKind)),
         info.invoke,
         info.stageType,
+        info.stageSourceTypeName,
+        info.stageTypeIdentity,
         info.contextType ? info.contextType : voidType,
         info.payloadType ? info.payloadType : voidType,
+        info.payloadSemanticType ? info.payloadSemanticType : builder.getVoidType(),
         info.recordType ? info.recordType : voidType,
         info.hitAttributesType ? info.hitAttributesType : voidType,
         info.callableDataType ? info.callableDataType : voidType,
         builder.getIntValue(builder.getIntType(), IRIntegerValue(info.hitAttributesKind)),
+        builder.getIntValue(builder.getIntType(), info.payloadLocation),
     };
     builder.addDecoration(
         func,
