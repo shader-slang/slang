@@ -721,10 +721,12 @@ if(
     )
 endif()
 
-# The MIT/Apache-2.0 statically-linked deps, given the same per-dep notice
-# treatment as the BSD-family deps above. spirv-tools ships a LICENSE only (no
-# upstream NOTICE file), so there is no Apache-2.0 section 4(d) NOTICE to carry;
-# only its LICENSE is installed.
+# The MIT/Apache-2.0 counterpart to the BSD-family notices above. Inclusion rule
+# for this third-party-notices set: ship a notice for every vendored dep whose
+# code is compiled into a shipped binary -- object code or instantiated
+# templates. That is why the header-only unordered_dense is included (its
+# templates compile into the shipped libraries), while vendored deps that
+# contribute no compiled code get none.
 if(NOT SLANG_USE_SYSTEM_MINIZ AND NOT SLANG_OVERRIDE_MINIZ_PATH)
     install(
         FILES "${slang_SOURCE_DIR}/external/miniz/LICENSE"
@@ -751,7 +753,10 @@ endif()
 # (SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC, default on for Windows). This condition
 # mirrors SLANG_BUILD_MIMALLOC in external/CMakeLists.txt so the notice ships
 # whenever mimalloc's code lands in a shipped binary, including the
-# SPIRV-Tools-only case where SLANG_ENABLE_MIMALLOC is off.
+# SPIRV-Tools-only case where SLANG_ENABLE_MIMALLOC is off. SLANG_BUILD_MIMALLOC
+# is set() there without PARENT_SCOPE, so it is not visible at this top-level
+# scope: this inline copy is deliberate -- do not collapse it to reference the
+# variable, which would be silently false and stop the notice shipping.
 if(
     (
         SLANG_ENABLE_MIMALLOC
@@ -771,6 +776,8 @@ if(
         EXCLUDE_FROM_ALL
     )
 endif()
+# spirv-tools is Apache-2.0 and ships a LICENSE only (no upstream NOTICE file),
+# so there is no section 4(d) NOTICE to carry; only its LICENSE is installed.
 if(
     SLANG_ENABLE_SLANG_GLSLANG
     AND NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
