@@ -23,8 +23,12 @@ int getWaveCount()
     }
 }
 
-// CHECK: __global__ void forward
+// getWaveCount is a user [ForceInline]; on CUDA it is deferred to NVRTC and emitted as a separate
+// __forceinline__ __device__ function (#12623). __stage_switch still resolves to the compute case,
+// so blockDim is present and the default static_assert ("Only support compute stage") is not taken.
+// CHECK: __forceinline__ __device__ int getWaveCount
 // CHECK: blockDim
+// CHECK: __global__ void forward
 // CHECK-NOT: Only support compute stage
 [CUDAKernel]
 void forward(TensorView<float> output)

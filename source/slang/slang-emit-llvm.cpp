@@ -2394,7 +2394,8 @@ struct LLVMEmitter
         // Attach attributes based on decorations!
         if (func->findDecoration<IRReadNoneDecoration>())
             funcAttributes |= SLANG_LLVM_FUNC_ATTR_READNONE;
-        if (func->findDecoration<IRForceInlineDecoration>())
+        if (func->findDecoration<IRForceInlineDecoration>() ||
+            func->findDecoration<IRUserForceInlineDecoration>())
             funcAttributes |= SLANG_LLVM_FUNC_ATTR_ALWAYSINLINE;
         if (func->findDecoration<IRNoInlineDecoration>())
             funcAttributes |= SLANG_LLVM_FUNC_ATTR_NOINLINE;

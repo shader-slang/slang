@@ -69,11 +69,15 @@ void computeMain(uint tid : SV_GroupIndex)
 // HLSL: if(([[RET]].data_0[int(0)]) == 30.0f)
 // HLSL: passed_0 = ([[RET]].data_0[int(1)]) == 70.0f;
 
-// CUDA: Vec_0 [[RET:_S[0-9]+]];
+// On CUDA the [ForceInline] helpers are deferred to NVRTC (#12623): `make` is emitted as a separate
+// __forceinline__ __device__ function whose returned value computeMain reads back. The returned data
+// still carries 30.0f/70.0f — the return value is not lost, which is the bug this test guards.
+// CUDA: __forceinline__ __device__ Vec_0 make_0()
 // CUDA: for(;;)
-// CUDA: (&[[RET]])->data_0 = (&output_0)->data_0;
-// CUDA: if(((&[[RET]])->data_0[int(0)]) == 30.0f)
-// CUDA: passed_0 = ((&[[RET]])->data_0[int(1)]) == 70.0f;
+// CUDA: (&output_0)->data_0[int(0)] = 30.0f;
+// CUDA: Vec_0 [[V:_S[0-9]+]] = make_0();
+// CUDA: if(([[V]].data_0[int(0)]) == 30.0f)
+// CUDA: passed_0 = ([[V]].data_0[int(1)]) == 70.0f;
 
 // CPP: Vec_0 [[RET:_S[0-9]+]];
 // CPP: for(;;)
