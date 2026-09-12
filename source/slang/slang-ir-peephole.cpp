@@ -164,9 +164,9 @@ struct PeepholeContext : InstPassBase
     }
 
     // Return the floating-point mode in effect for `inst`: the global `-fp-mode` option, overridden
-    // by the enclosing function's `IRFloatingPointModeOverrideDecoration`. A function-local override
-    // applies only within that function, so the mode is resolved per inst. Same resolution as
-    // `isFloatingPointModePrecise` (slang-emit-spirv.cpp).
+    // by the enclosing function's `IRFloatingPointModeOverrideDecoration`. A function-local
+    // override applies only within that function, so the mode is resolved per inst. Same resolution
+    // as `isFloatingPointModePrecise` (slang-emit-spirv.cpp).
     FloatingPointMode getEffectiveFloatingPointMode(IRInst* inst)
     {
         FloatingPointMode mode = targetProgram
