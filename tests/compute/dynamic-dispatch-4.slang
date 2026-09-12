@@ -15,7 +15,7 @@ interface IInterface
 int GenericCompute<T:IInterface>(int inVal)
 {
     T obj;
-    obj.Compute(3);
+    (void)obj.Compute(3);
     return obj.Compute(inVal); // 3 + inVal
 }
 

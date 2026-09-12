@@ -152,12 +152,12 @@ bool checkAllImageStore()
     loadCheck = loadCheck && load_image_cubeArray() == 0;
     imageStore(image_2dMultiSampleArray, ivec3(0), 1, uvec4(0));
     loadCheck = loadCheck && load_image_2dMultiSampleArray() == 0;
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return loadCheck;
 }
 bool checkAllImageSamples()
 {
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return true
         && imageSamples(image_2dMultiSample) == 2
         && imageSamples(image_2dMultiSampleArray) == 2
@@ -165,7 +165,7 @@ bool checkAllImageSamples()
 }
 bool checkAllImageAtomicAdd()
 {
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return true
         && imageAtomicAdd(image_1d, 0, 0) == 1
         && load_image_1d() == 1
@@ -193,7 +193,7 @@ bool checkAllImageAtomicAdd()
 }
 bool checkAllImageAtomicExchange()
 {
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return true
         && imageAtomicExchange(image_1d, 0, 0) == 1
         && load_image_1d() == 0
@@ -221,7 +221,7 @@ bool checkAllImageAtomicExchange()
 }
 bool checkAllImageAtomicMin()
 {
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return true
         && imageAtomicMin(image_1d, 0, 0) == 1
         && load_image_1d() == 0
@@ -249,7 +249,7 @@ bool checkAllImageAtomicMin()
 }
 bool checkAllImageAtomicMax()
 {
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return true
         && imageAtomicMax(image_1d, 0, 0) == 1
         && load_image_1d() == 1
@@ -277,7 +277,7 @@ bool checkAllImageAtomicMax()
 }
 bool checkAllImageAtomicAnd()
 {
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return true
         && imageAtomicAnd(image_1d, 0, 1) == 1
         && load_image_1d() == 1
@@ -305,7 +305,7 @@ bool checkAllImageAtomicAnd()
 }
 bool checkAllImageAtomicOr()
 {
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return true
         && imageAtomicOr(image_1d, 0, 1) == 1
         && load_image_1d() == 1
@@ -333,7 +333,7 @@ bool checkAllImageAtomicOr()
 }
 bool checkAllImageAtomicXor()
 {
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return true
         && imageAtomicXor(image_1d, 0, 1) == 1
         && load_image_1d() == 0
@@ -361,7 +361,7 @@ bool checkAllImageAtomicXor()
 }
 bool checkAllImageAtomicCompSwap()
 {
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return true
         && imageAtomicCompSwap(image_1d, 0, 0, 2) == 1
         && load_image_1d() == 1

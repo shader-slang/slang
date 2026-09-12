@@ -47,7 +47,7 @@ bool testAbortRayTrace() {
 bool testProceedRayTrace() {
     rayQueryEXT q;
     rayQueryInitializeEXT(q, scene, gl_RayFlagsNoneEXT, 0xff, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f);
-    rayQueryProceedEXT(q);
+    (void)rayQueryProceedEXT(q);
 
     return true
         && rayQueryGetIntersectionTypeEXT(q, true) == gl_RayQueryCommittedIntersectionTriangleEXT
@@ -58,7 +58,7 @@ bool testProceedRayTrace() {
 bool testProceedRayAuxInfo() {
     rayQueryEXT q;
     rayQueryInitializeEXT(q, scene, gl_RayFlagsNoneEXT, 0xff, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f);
-    rayQueryProceedEXT(q);
+    (void)rayQueryProceedEXT(q);
 
     return true
         && rayQueryGetRayTMinEXT(q) == 0.01f

@@ -115,7 +115,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     ft += half(e);
 
     half ip;
-    modf(ft, ip);
+    (void)modf(ft, ip);
     ft += ip;
 
     // CHECK: 5AF0

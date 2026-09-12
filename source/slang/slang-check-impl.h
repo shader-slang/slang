@@ -3761,6 +3761,80 @@ public:
 
     Expr* CheckExpr(Expr* expr);
 
+    /// Is the given `type` a proper type — a type permitted as the type of an expression?
+    /// Most proper types describe ordinary runtime values (`int`, `String`, `Optional<float>`);
+    /// `void` is also a proper type (the type of an expression that produces no value). Non-proper
+    /// types are the types given to an expression that names a type, a namespace, or an unapplied
+    /// generic — those expressions do not denote a value.
+    bool isProperType(Type* type);
+
+    /// Is the given checked `expr` an instance of a proper type? (consistent with isProperType)
+    bool isExprOfProperType(Expr* expr);
+
+    /// Fully check `expr` and enforce that it has a proper type.
+    ///
+    /// If checking leaves `expr` naming a type, an unapplied generic, or a namespace rather than a
+    /// value, this diagnoses an error and rewrites `expr` to have an `ErrorType`, so that downstream
+    /// checks naturally skip it via the usual cascading-error avoidance. A `void`-typed expression
+    /// is a proper-typed value and is accepted.
+    Expr* checkExprOfProperType(Expr* expr);
+
+    /// Check an expression that appears in a statement-like context.
+    ///
+    /// A statement-like context is one where the value of the expression will be ignored, and
+    /// thus it is executed entirely for any possible side effects it produces.
+    ///
+    /// This procedure both checks the (unchecked) input `expr`, and also validates that
+    /// it satisfies all additional constraints that are expected for an expression used
+    /// entirely for its side effects.
+    Expr* checkExprInStmtLikeContext(Expr* expr);
+
+    /// Return `expr` as a traditional function/method call (`f(x)`, `obj.method()`), or null if it
+    /// is not one. This excludes operator expressions (`a + b`, `a, b`) and casts (`(int)x`), both
+    /// of which are `InvokeExpr` subtypes that are call-like but are not treated as calls here.
+    InvokeExpr* asCallExpr(Expr* expr);
+
+    /// Does the (unchecked) form of `expr` mean its result may be ignored without a diagnostic? True
+    /// for an assignment or compound assignment (`x = y`, `x += y`) and a prefix/postfix `++`/`--`,
+    /// all of which yield a value but are written for their effect.
+    bool doesExprFormAllowIgnoringResult(Expr* expr);
+
+    /// Is the (unchecked) syntactic form of `expr` one that is appropriate as a statement — i.e. a
+    /// form normally evaluated for its effect? True for a call (including a cast), an assignment or
+    /// compound assignment, a prefix/postfix `++`/`--`, an inline `spirv_asm` block, and an
+    /// `expand e` when `e`'s form is appropriate; false otherwise (a bare variable, a lambda, ...).
+    bool isExprSyntacticFormAppropriateForStmtLikeContext(Expr* expr);
+
+    /// Record the source location of each discarded leaf of the (unchecked) `uncheckedExpr` whose
+    /// form allows ignoring its result (per `doesExprFormAllowIgnoringResult`). The type pass reads
+    /// this decision by location, so the syntactic judgment is made on the unchecked form. Locations
+    /// are stored as their raw values, since a `SourceLoc` is not directly hashable.
+    void collectResultIgnoringDiscardedLeafLocs(
+        Expr* uncheckedExpr,
+        HashSet<SourceLoc::RawValue>& ioLocs);
+
+    /// Invoke `callback` on each leaf of the checked `checkedExpr` whose value becomes the whole
+    /// expression's result and is therefore discarded, peeling transparent wrappers and recursing
+    /// into the pass-through operands of a comma, ternary, short-circuit, and `expand`.
+    void forEachDiscardedLeaf(Expr* checkedExpr, const std::function<void(Expr*)>& callback);
+
+    /// Diagnose a discarded result at a single checked `leaf`, using its type and callee attributes
+    /// and the pre-check carve-out decision in `resultIgnoringLeafLocs`.
+    void maybeDiagnoseDiscardedResultAtLeaf(
+        Expr* leaf,
+        const HashSet<SourceLoc::RawValue>& resultIgnoringLeafLocs);
+
+    /// If `leaf` is a discarded `==` (a likely mistyped `=`), emit the dedicated diagnostic and
+    /// return true; otherwise return false.
+    bool maybeDiagnoseDanglingEquality(Expr* leaf);
+
+    /// If `leaf` is a discarded call to a `[NoDiscard]` function, emit its diagnostic and return
+    /// true; otherwise return false.
+    bool maybeDiagnoseDiscardedNoDiscardResult(Expr* leaf);
+
+    /// Is `leaf` a call whose callee is marked `[DiscardableResult]`, so that discarding its result
+    /// draws no diagnostic?
+    bool calleeDeclAllowsDiscardingResult(Expr* leaf);
 
     void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
     void _checkAliasedOutArguments(
@@ -4159,11 +4233,6 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
     void visitExpressionStmt(ExpressionStmt* stmt);
 
     void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt);
-
-    // If `expr` is the discarded result of a call to a `[NoDiscard]` function,
-    // emit an error. Used for any context where an expression's result is
-    // ignored (an expression statement, or a `for` loop's side-effect expression).
-    void maybeDiagnoseDiscardedNoDiscardResult(Expr* expr);
 
     // Try to infer the max number of iterations the loop will run.
     void tryInferLoopMaxIterations(ForStmt* stmt);

@@ -9862,6 +9862,7 @@ public uint atomicCounterIncrement(atomic_uint c)
 
 __glsl_version(430)
 [require(glsl, atomic_glsl)]
+[DiscardableResult]
 [ForceInline] public uint atomicCounterDecrement_GLSL_helper(atomic_uint c)
 {
     __target_switch
