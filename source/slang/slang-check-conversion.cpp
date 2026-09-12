@@ -1625,6 +1625,69 @@ static bool isSigned(Type* t)
     }
 }
 
+// Return true if the integer `value` is exactly representable in a binary
+// floating-point type with `mantissaBits` bits of precision, counting the
+// implicit leading 1 (`float` has 24, `double` has 53). An integer is exact iff
+// the significant bits of its magnitude -- i.e. the value with its trailing
+// zeros removed -- fit in the mantissa. For example 123 and 2^28 are exact in
+// `float`, but 123456789 needs 27 significant bits and is rounded to 123456792.
+//
+// `value` is the raw 64-bit payload of an integer literal of a source type that
+// is `sourceBitWidth` bits wide and unsigned iff `isSourceUnsigned`. The payload
+// is first reduced to that width, because the parser folds a unary `-`/`+`/`~` on
+// a literal into the literal node without truncating to the source type until IR
+// lowering: e.g. `-0xffffffff` (a `uint`) folds to the 64-bit value -4294967295,
+// but the value actually converted is `(uint)(-4294967295) == 1u`. Reducing to 32
+// unsigned bits recovers 1, which is representable. This is sound for a literal
+// because negation and bitwise-not both commute with truncation mod 2^width, so a
+// chain of unary ops reduced once at the end equals wrapping at each step. The
+// magnitude is then taken by signedness: an unsigned source uses the reduced value
+// directly (so UINT64_MAX is the full 2^64-1), a signed source uses its
+// two's-complement magnitude (so -1 is magnitude 1, not a spurious 2^64-1).
+static bool isIntExactlyRepresentableWithMantissaBits(
+    IntegerLiteralValue value,
+    bool isSourceUnsigned,
+    int sourceBitWidth,
+    int mantissaBits)
+{
+    uint64_t bits = (uint64_t)value;
+    if (sourceBitWidth < 64)
+    {
+        uint64_t mask = (UINT64_C(1) << sourceBitWidth) - 1;
+        bits &= mask;
+        if (!isSourceUnsigned && (bits & (UINT64_C(1) << (sourceBitWidth - 1))))
+            bits |= ~mask;
+    }
+    uint64_t magnitude;
+    if (isSourceUnsigned)
+    {
+        magnitude = bits;
+    }
+    else
+    {
+#if SLANG_VC
+// Disable MSVC warning: "unary minus operator applied to unsigned type, result still unsigned"
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
+        magnitude = (int64_t)bits >= 0 ? bits : -bits;
+#if SLANG_VC
+#pragma warning(pop)
+#endif
+    }
+    if (magnitude == 0)
+        return true;
+    while ((magnitude & 1) == 0)
+        magnitude >>= 1;
+    int significantBits = 0;
+    while (magnitude)
+    {
+        significantBits++;
+        magnitude >>= 1;
+    }
+    return significantBits <= mantissaBits;
+}
+
 int getMaximumTypeBitSize(Type* t)
 {
     auto basicType = as<BasicExpressionType>(t);
@@ -2766,8 +2829,9 @@ bool SemanticsVisitor::_coerce(
                 if (auto moduleDecl = module->getModuleDecl())
                     isCoreModule = moduleDecl->hasModifier<FromCoreModuleModifier>();
 
-            // Cache the constant-fold result so both the overflow check and
-            // the UnrecommendedImplicitConversion check can reuse it.
+            // Cache the constant-fold result so the overflow check, the
+            // UnrecommendedImplicitConversion check, and the lossy
+            // integer->float/double check below can all reuse it.
             ConstantIntVal* cachedFoldedVal = nullptr;
             bool hasFolded = false;
             auto getFoldedIntVal = [&]() -> ConstantIntVal*
@@ -2888,6 +2952,145 @@ bool SemanticsVisitor::_coerce(
                 {
                     if (!as<FloatingPointLiteralExpr>(fromExpr))
                         sink->diagnose(Diagnostics::ImplicitConversionToDouble{.expr = fromExpr});
+                }
+            }
+
+            // Warn on implicit integer -> float/double conversions that may lose
+            // precision. Integer -> float/double conversions (any width) are
+            // costed below the general warning threshold (float/double are the
+            // preferred integer->real overload targets), so the
+            // UnrecommendedImplicitConversion branch above never reaches them;
+            // this independent block needs no cost guard of its own.
+            //
+            // Scope: scalar targets only. A vector/matrix target is not a
+            // BasicExpressionType, so mantissaBits stays 0 and the block is
+            // skipped -- element-wise/broadcast conversions (e.g.
+            // `float3 v = 123456789;`) are not diagnosed here.
+            //
+            // The default-on path checks a bare literal value, never a folded
+            // binary constant expression: constant folding evaluates in 64 bits
+            // without wrapping at each typed operation -- e.g. `uint(0xffffffff) + 2`
+            // folds to 0x100000001, not the 1u it is at runtime -- so a folded
+            // expression's value cannot be trusted here (a sound check is left to
+            // #12933).
+            int mantissaBits = 0;
+            bool toDouble = false;
+            if (auto basicToType = as<BasicExpressionType>(toType))
+            {
+                switch (basicToType->getBaseType())
+                {
+                case BaseType::Float:
+                    mantissaBits = 24;
+                    break;
+                case BaseType::Double:
+                    mantissaBits = 53;
+                    toDouble = true;
+                    break;
+                // half is intentionally excluded: int -> half is NOT costed below
+                // the threshold, so it already warns via
+                // UnrecommendedImplicitConversion (E30081); covering it here would
+                // double-warn.
+                default:
+                    break;
+                }
+            }
+            // IntPtr/UIntPtr are pointer-width: the target pointer width is 32 or
+            // 64 bits and is not known here (getMaximumTypeBitSize reports the
+            // 64-bit maximum). They are handled specially in each branch below so a
+            // value that is exact on some target is never spuriously flagged -- a
+            // literal is diagnosed only when lossy at *both* candidate widths, and
+            // the non-constant heuristic uses the 32-bit minimum. Otherwise loss
+            // would be over-reported (e.g. `0x100000001z` is 1 at 32 bits, and
+            // pointer -> double is exact at 32 bits).
+            auto fromBasicType = as<BasicExpressionType>(fromType.type);
+            bool fromIsPointerWidth =
+                fromBasicType && (fromBasicType->getBaseType() == BaseType::IntPtr ||
+                                  fromBasicType->getBaseType() == BaseType::UIntPtr);
+            // Restrict to scalar builtin integer sources. (bool also satisfies
+            // isScalarIntegerType, but getMaximumTypeBitSize has no bool case and
+            // returns 0, so a bool source reaches neither branch below -- 0 is not
+            // > mantissaBits, and a bool is not an IntegerLiteralExpr -- and is
+            // harmlessly skipped.)
+            if (!isCoreModule && sink && mantissaBits != 0 && isScalarIntegerType(fromType.type))
+            {
+                // Look through parentheses: `(123456789)` is the same literal
+                // conversion as `123456789` and must be diagnosed identically.
+                Expr* peeledExpr = fromExpr;
+                while (auto parenExpr = as<ParenExpr>(peeledExpr))
+                    peeledExpr = parenExpr->base;
+
+                if (as<IntegerLiteralExpr>(peeledExpr))
+                {
+                    // A literal (including a parser-folded unary `-`/`+`/`~` on a
+                    // literal) carries a single value with no binary arithmetic,
+                    // so reducing its payload to the source width recovers exactly
+                    // what is converted -- see the helper's contract, which takes
+                    // the source width and signedness to do that reduction. The
+                    // `val` guard skips the rare case of a literal that fails to
+                    // fold (only reachable on an earlier-error path). For a
+                    // pointer-width source the width is 32 or 64 (unknown here), so
+                    // warn only when the value is not representable at *either*
+                    // width -- a value exact at one width may be the real one.
+                    if (auto val = getFoldedIntVal())
+                    {
+                        bool unsignedSrc = !isSigned(fromType.type);
+                        IntegerLiteralValue v = val->getValue();
+                        bool lossy = fromIsPointerWidth
+                                         ? (!isIntExactlyRepresentableWithMantissaBits(
+                                                v,
+                                                unsignedSrc,
+                                                32,
+                                                mantissaBits) &&
+                                            !isIntExactlyRepresentableWithMantissaBits(
+                                                v,
+                                                unsignedSrc,
+                                                64,
+                                                mantissaBits))
+                                         : !isIntExactlyRepresentableWithMantissaBits(
+                                               v,
+                                               unsignedSrc,
+                                               getMaximumTypeBitSize(fromType.type),
+                                               mantissaBits);
+                        if (lossy)
+                        {
+                            if (toDouble)
+                                sink->diagnose(Diagnostics::LossyImplicitIntegerToDoubleConversion{
+                                    .fromType = fromType.type,
+                                    .toType = toType,
+                                    .expr = fromExpr});
+                            else
+                                sink->diagnose(Diagnostics::LossyImplicitIntegerToFloatConversion{
+                                    .fromType = fromType.type,
+                                    .toType = toType,
+                                    .expr = fromExpr});
+                        }
+                    }
+                }
+                // A non-constant source (constant folding fails) that is wide
+                // enough to lose precision. The width comparison is a conservative
+                // bound, exact here only because integer widths are coarse
+                // (8/16/32/64): none lands in the (25..31)/(54..63) gap where the
+                // width could exceed the mantissa while every representable value
+                // still fits. A pointer-width source uses its 32-bit minimum, so it
+                // warns only where even the narrowest target loses precision (so
+                // pointer -> float warns, pointer -> double -- exact at 32 bits --
+                // does not).
+                else if (
+                    !getFoldedIntVal() &&
+                    (fromIsPointerWidth ? 32 : getMaximumTypeBitSize(fromType.type)) > mantissaBits)
+                {
+                    if (toDouble)
+                        sink->diagnose(
+                            Diagnostics::PotentiallyLossyImplicitIntegerToDoubleConversion{
+                                .fromType = fromType.type,
+                                .toType = toType,
+                                .expr = fromExpr});
+                    else
+                        sink->diagnose(
+                            Diagnostics::PotentiallyLossyImplicitIntegerToFloatConversion{
+                                .fromType = fromType.type,
+                                .toType = toType,
+                                .expr = fromExpr});
                 }
             }
         }
