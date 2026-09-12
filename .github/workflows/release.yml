@@ -291,6 +291,13 @@ jobs:
             cp build.em/Release/bin/slang-wasm.js "${base}/slang-wasm.js"
             cp build.em/Release/bin/interface.d.ts "${base}/interface.d.ts"
             cp -R LICENSES "${base}/LICENSES"
+            # CPack ships third-party notices for the native packages; the WASM
+            # package is assembled by hand here, so copy the notices for the
+            # vendored deps statically linked into slang-wasm (cmark via slang,
+            # lz4 directly and via core). glslang is not part of the WASM build.
+            mkdir -p "${base}/third-party-notices"
+            cp external/cmark/COPYING "${base}/third-party-notices/cmark-COPYING"
+            cp external/lz4/lib/LICENSE "${base}/third-party-notices/lz4-LICENSE"
             (cd "${base}" && zip -r "../${base}.zip" .)
             echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
 
@@ -304,6 +311,11 @@ jobs:
             cp build.em/external/cmark/src/Release/libcmark-gfm.a "${base_libs}/lib/"
             cp build.em/Release/include/*.h "${base_libs}/include/"
             cp -R LICENSES "${base_libs}/LICENSES"
+            # Same third-party notices for the shipped vendored static libraries
+            # (libcmark-gfm.a, liblz4.a).
+            mkdir -p "${base_libs}/third-party-notices"
+            cp external/cmark/COPYING "${base_libs}/third-party-notices/cmark-COPYING"
+            cp external/lz4/lib/LICENSE "${base_libs}/third-party-notices/lz4-LICENSE"
             (cd "${base_libs}" && zip -r "../${base_libs}.zip" .)
             echo "SLANG_WASM_LIBS_ARCHIVE=${base_libs}.zip" >> "$GITHUB_OUTPUT"
 

@@ -2292,13 +2292,20 @@ struct vector : IRWArray<T>
 }
 
 //@hidden:
-static const int kRowMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR);
-static const int kColumnMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
+// The in-memory element order of a `matrix`. An enum rather than an `int` so that an
+// unresolved layout is still recognizable as a generic argument, where it sits beside
+// the row and column counts.
+enum MatrixLayoutMode : int
+{
+    Unknown = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN),
+    RowMajor = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR),
+    ColumnMajor = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR),
+}
 
 //@public:
 /// A matrix with `R` rows and `C` columns, with elements of type `T`.
 /// @category math_types Math types
-__generic<T = float, let R : int = 4, let C : int = 4, let L : int = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)>
+__generic<T = float, let R : int = 4, let C : int = 4, let L : MatrixLayoutMode = MatrixLayoutMode.Unknown>
 __magic_type(MatrixExpressionType)
 struct matrix : IRWArray<vector<T,C>>
 {
@@ -2455,7 +2462,7 @@ extension vector<T,N> : IDifferentiable
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : int>
+__generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : MatrixLayoutMode>
 extension matrix<T,N,M,L> : IFloat
 {
     // TODO(sai): not sure what's going on here? With the previous commit this was (this <= other)
@@ -2498,7 +2505,7 @@ extension matrix<T,N,M,L> : IFloat
 
 }
 
-__generic<T:IDifferentiable, let N : int, let M : int, let L : int>
+__generic<T:IDifferentiable, let N : int, let M : int, let L : MatrixLayoutMode>
 extension matrix<T,N,M,L> : IDifferentiable
 {
     // IDifferentiable.
@@ -2519,7 +2526,7 @@ extension matrix<T,N,M,L> : IDifferentiable
     }
 }
 
-__generic<let R : int, let C : int, let L : int>
+__generic<let R : int, let C : int, let L : MatrixLayoutMode>
 extension matrix<int16_t,R,C,L>
 {
     typealias T = int16_t;
@@ -2536,14 +2543,14 @@ vector<T,N*2> __makeVector(vector<T,N> vec1, vector<T,N> vec2);
 __generic<T>
 extension vector<T, 4>
 {
-    __generic<let L : int>
+    __generic<let L : MatrixLayoutMode>
     [__unsafeForceInlineEarly]
     __init(matrix<T, 2, 2, L> value)
     {
         this = __makeVector(value[0], value[1]);
     }
 }
-__generic<T, let L : int>
+__generic<T, let L : MatrixLayoutMode>
 extension matrix<T, 2, 2, L>
 {
     [__unsafeForceInlineEarly]
@@ -2832,7 +2839,7 @@ ${
 for( int R = 1; R <= 4; ++R )
 for( int C = 1; C <= 4; ++C )
 {
-    sb << "__generic<T, let L:int> __extension matrix<T, " << R << "," << C << ", L>\n{\n";
+    sb << "__generic<T, let L : MatrixLayoutMode> __extension matrix<T, " << R << "," << C << ", L>\n{\n";
 
     // initialize from R*C scalars
     if (R == 1 || C == 1)
@@ -2906,7 +2913,7 @@ __generic<ToType, let N : int> extension vector<ToType,N>
 }
 
 // If T is implicitly convertible to U, then matrix<T,R,C,L> is implicitly convertible to matrix<U,R,C,L>.
-__generic<ToType, let R : int, let C : int, let L : int> extension matrix<ToType,R,C,L>
+__generic<ToType, let R : int, let C : int, let L : MatrixLayoutMode> extension matrix<ToType,R,C,L>
 {
     __implicit_conversion(constraint)
     __intrinsic_op(BuiltinCast)
@@ -3012,21 +3019,6 @@ $(fullPtrType) operator-($(fullPtrType) value, TInt offset)
     return __getOffsetPtr(value, -offset);
 }
 
-__generic<T : IArithmetic>
-[__unsafeForceInlineEarly]
-__prefix T operator+(T value)
-{ return value; }
-
-__generic<T : __BuiltinArithmeticType, let N : int>
-[__unsafeForceInlineEarly]
-__prefix vector<T,N> operator+(vector<T,N> value)
-{ return value; }
-
-__generic<T : __BuiltinArithmeticType, let R : int, let C : int>
-[__unsafeForceInlineEarly]
-__prefix matrix<T,R,C> operator+(matrix<T,R,C> value)
-{ return value; }
-
 ${
 
 static const struct IncDecOpInfo
@@ -3066,7 +3058,7 @@ vector<T,N> operator$(op.name)(in out vector<T,N> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) __builtin_cast<T>(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
-__generic<T : __BuiltinArithmeticType, let R : int, let C : int, let L : int>
+__generic<T : __BuiltinArithmeticType, let R : int, let C : int, let L : MatrixLayoutMode>
 [__unsafeForceInlineEarly]
 matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C,L> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) __builtin_cast<T>(1); return $(fixity.returnVal); }
@@ -3257,7 +3249,7 @@ __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M :
 __intrinsic_op($(info.op))
 matrix<L,N,M> operator$(info.name)(matrix<L,N,M> left, matrix<R,N,M> right);
 
-__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : int>
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : MatrixLayoutMode>
 [__unsafeForceInlineEarly]
 matrix<L, N, M> operator$(info.name)=(in out matrix<L, N, M, Layout> left, matrix<R, N, M> right)
 {
@@ -3289,7 +3281,7 @@ __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M :
 __intrinsic_op($(info.op))
 matrix<L,N,M> operator$(info.name)(matrix<L,N,M> left, R right);
 
-__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : int>
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : MatrixLayoutMode>
 [__unsafeForceInlineEarly]
 matrix<L,N,M> operator$(info.name)=(in out matrix<L,N,M, Layout> left, R right)
 {
@@ -3344,7 +3336,7 @@ ${
         return left;
     }
 
-    __generic<T : $(op.interface), let R : int, let C : int, let Layout : int>
+    __generic<T : $(op.interface), let R : int, let C : int, let Layout : MatrixLayoutMode>
     [__unsafeForceInlineEarly]
     matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C,Layout> left, matrix<T,R,C> right)
     {
@@ -3352,7 +3344,7 @@ ${
         return left;
     }
 
-    __generic<T : $(op.interface), let R : int, let C : int, let Layout : int>
+    __generic<T : $(op.interface), let R : int, let C : int, let Layout : MatrixLayoutMode>
     [__unsafeForceInlineEarly]
     matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C, Layout> left, T right)
     {
@@ -3663,6 +3655,15 @@ __prefix T operator -(T v0)
     return v0.neg();
 }
 
+$(attrib)
+__generic<T : $(interfaceName)>
+[__unsafeForceInlineEarly]
+[OverloadRank($(overloadRank))]
+__prefix T operator +(T v0)
+{
+    return v0;
+}
+
 ${
     } // foreach ["IArithmetic", "IFloat"]
 $}
@@ -3712,6 +3713,15 @@ __generic<T : IDifferentiableArithmetic>
 __prefix T operator -(T v0)
 {
     return v0.neg();
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+__prefix T operator +(T v0)
+{
+    return v0;
 }
 
 __generic<T : ILogical>
@@ -4033,10 +4043,6 @@ internal T __frem<T>(T left, T right);
 
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
-
-__generic<T>
-__intrinsic_op( $(kIROp_GetLegalizedSPIRVGlobalParamAddr))
-__Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 
 __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();
@@ -4540,6 +4546,11 @@ attribute_syntax [outputcontrolpoints(count: int)]  : OutputControlPointsAttribu
 /// @param topology The output primitive type, must be one of "point", "line", "triangle_cw", and "triangle_ccw".
 __attributeTarget(FuncDecl)
 attribute_syntax [outputtopology(topology)]         : OutputTopologyAttribute;
+
+/// Used on an hull shader entrypoint to declare the output primitive type of the tessellator.
+/// @param topology The output primitive type, must be one of "point", "line", "triangle_cw", and "triangle_ccw".
+__attributeTarget(FuncDecl)
+attribute_syntax [OutputTopology(topology)]         : OutputTopologyAttribute;
 
 /// Used on an hull shader entrypoint to specify the patch type used by the hull shader.
 /// @param mode The patch type used by the hull shader. Valid values are "tri", "quad" and "isoline".

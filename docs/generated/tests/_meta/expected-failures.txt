@@ -34,22 +34,6 @@
 # Not for: untracked flakes or anything that would otherwise be silently
 # silenced. Every entry needs a comment block above it explaining why.
 
-# https://github.com/shader-slang/slang/issues/11375 — slangi VM
-# "operand access out of bounds in constants section" on the second
-# `printf` after a function call that took an `inout` parameter and
-# returned `bool`. Predates PR #11221.
-docs/generated/tests/design/ast-reference/expressions/logic-and-short-circuit.slang
-docs/generated/tests/design/ast-reference/expressions/logic-or-short-circuit.slang
-docs/generated/tests/design/ast-reference/expressions/bwd-differentiate-expr.slang
-docs/generated/tests/design/ast-reference/statements/ifstmt-predicate-evaluated-once.slang
-
-# https://github.com/shader-slang/slang/issues/11402 — slangi VM
-# treats the bool `false` literal as `true` inside a function body
-# when passed as a bool argument. Frontend HLSL/CPU emit are correct,
-# so the bug is in the bytecode VM. Discovered while writing the
-# language-reference/expressions-literal bundle.
-docs/generated/tests/conformance/expressions-literal/bool-true-false.slang
-
 # https://github.com/shader-slang/slang/issues/11403 — slangi VM
 # short-circuits `?:` contra the language-reference spec. The HLSL
 # emit shows both branches; the VM evaluates only the selected
@@ -107,22 +91,17 @@ docs/generated/tests/design/ast-reference/expressions/countof-static-array.slang
 docs/generated/tests/design/ir-reference/misc/countof-fixed-size-array.slang (cpu)
 
 # Pending: docs/generated/tests/_meta/findings/new-expr-with-constructor-args-internal-error.yaml
-# `new T(args)` on a class that declares a matching `__init` aborts with
-# `E99997 ... InternalError ... could not resolve target declaration for
-# call` on every target tried (hlsl, cpp, host-cpp, spirv-asm, slangi).
-# The zero-argument `new T()` form compiles. (Will become a tracking issue
-# after human triage.)
-# The emission fan-out added glsl/spirv-asm/metal/wgsl directives to the same
-# file, and the abort is not target-specific, so every sub-test fails too.
-# NOTE: `lint_expected_failures` resolves each entry as a path on disk, so it
-# flags the `<file>.<n>` sub-test names as unresolvable; the lint rule does not
-# yet know about slang-test's sub-test naming. Remove the whole block when the
-# abort is fixed.
-docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang
+# The `E99997 ... could not resolve target declaration for call` abort this
+# block was opened for is fixed by
+# https://github.com/shader-slang/slang/pull/12519, so the hlsl (`.slang`),
+# metal (`.slang.3`) and wgsl (`.slang.4`) directives now pass and have been
+# removed from this block. What remains is the separate emission gap #12519
+# called out: a class object materialized in a shader still fails to emit on
+# the Khronos targets, so glsl (`.slang.1`) reports `E99999 ... unhandled
+# type` and spirv-asm (`.slang.2`) reports `E99997 ... Unhandled global inst
+# in spirv-emit`. Remove these two once class emission works there.
 docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang.1
 docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang.2
-docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang.3
-docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang.4
 
 # Pending: docs/generated/tests/_meta/findings/switch-case-decl-used-in-later-case-invalid-cpp-emit.yaml
 # A local declared under one `switch` case label and used under another is
@@ -131,14 +110,6 @@ docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.
 # undeclared `shared_0`, so clang rejects the generated file. (Will become
 # a tracking issue after human triage.)
 docs/generated/tests/design/ast-reference/statements/switchstmt-case-decl-used-in-later-case.slang (cpu)
-
-# Pending: docs/generated/tests/_meta/findings/slangi-vm-narrow-int-return-not-sign-extended.yaml
-# Under slangi, a negative `int8_t` / `int16_t` value returned from a
-# function comes back zero-extended: `int8_t f() { return int8_t(-128); }`
-# prints 128 instead of -128, while the same constant read directly (or
-# emitted for `-target cpp`) keeps its sign. (Will become a tracking issue
-# after human triage.)
-docs/generated/tests/design/cross-cutting/core-module/core-int8-min-return-boundary.slang
 
 # Pending: docs/generated/tests/_meta/findings/metal-append-buffer-params-missing-binding-slot.yaml
 # On `-target metal` the element and counter pointers that
@@ -173,3 +144,76 @@ docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slan
 # compiles in an ordinary expression. Recorded in
 # _meta/findings/enum-cast-in-generic-array-bound-rejected.yaml.
 docs/generated/tests/design/ast-reference/values/builtinoperationintval-enum-operands-fold.slang
+
+# Surfaced on nightly run 34310111817 (first failed on the 2026-09-02
+# nightly and every nightly since):
+# https://github.com/shader-slang/slang/actions/runs/34310111817
+# Compiler bug, bisected to
+# https://github.com/shader-slang/slang/pull/12574. `prelinkIR` now clones
+# an imported interface's definition into the user module instead of
+# re-deriving it. `builtinRequirementKey` is hoistable, so the linker's
+# cloner (`cloneInst` in slang-ir-link.cpp) dedups the cloned key onto the
+# one lowering already created — and then runs `cloneDecorationsAndChildren`
+# on that pre-existing inst anyway, so it ends up with
+# `BuiltinRequirementDecoration` twice. slang-ir-clone.cpp guards against
+# exactly this case (see PR #12569); the linker's cloner has no equivalent
+# guard. All three tests pin "the role decoration is immediately followed by
+# the key built from the same ordinal", which the duplicated line breaks.
+# Remove once the linker stops grafting decorations onto a dedup hit.
+docs/generated/tests/design/cross-cutting/ir-instructions/decoration-builtin-requirement-key-ir.slang
+docs/generated/tests/design/ir-reference/decorations/builtin-requirement-key-decoration.slang
+docs/generated/tests/design/ir-reference/differentiation/builtin-requirement-decoration.slang
+
+# Surfaced on nightly run 34310111817:
+# https://github.com/shader-slang/slang/actions/runs/34310111817
+# Test bug rather than a compiler bug. `//CHECK: new C` used to match only
+# because the compiler aborted on `new C(7)` and the `E99997` note echoed the
+# offending source line `C a = new C(7);` back into the output.
+# https://github.com/shader-slang/slang/pull/12519 fixed that abort, so the
+# file compiles — and since `a` is never read, DCE drops the allocation and
+# the emitted C++ entry point body is empty, so nothing can match. Remove
+# once the bundle is regenerated with an observation point that keeps the
+# allocation live (for example storing `a.v` into a buffer).
+docs/generated/tests/design/ast-reference/declarations/classdecl-reference-type.slang
+
+# Surfaced on nightly run 34310111817:
+# https://github.com/shader-slang/slang/actions/runs/34310111817
+# Obsolete test. https://github.com/shader-slang/slang/pull/12182 added
+# CUDA/OptiX callable support, so
+# `CUDALayoutRulesFamilyImpl::getCallablePayloadParameterRules()` returns
+# real rules and the `E39032` rejection this test asserts no longer happens;
+# the entry point now emits as `__direct_callable__main_0`. The doc the test
+# is anchored to went stale the same way — docs/generated/design/pipeline/
+# 04c-layout-ir.md still lists CUDA as returning `nullptr` from that
+# accessor. Remove once that doc and this bundle are regenerated.
+docs/generated/tests/design/pipeline/04c-layout-ir/raytracing-callable-payload-rejected-on-cuda.slang
+
+# Surfaced on nightly run 34310111817:
+# https://github.com/shader-slang/slang/actions/runs/34310111817
+# Diagnostic text drift rather than a compiler bug.
+# https://github.com/shader-slang/slang/pull/12616 merges type-flow sets
+# directly instead of through an intermediate hash set, so `E50102` now
+# reports "2 possible types: 'Square, Rect'" where the pinned text says
+# "'Rect, Square'". Remove once the expected text is regenerated — or once
+# the diagnostic sorts the list, which would make the text order-stable by
+# construction rather than a reflection of the merge order.
+docs/generated/tests/design/pipeline/05-ir-passes/typeflow-report-dynamic-dispatch-sites.slang
+
+# Surfaced on nightly run 34561421312:
+# https://github.com/shader-slang/slang/actions/runs/34561421312
+# Generated expectations awaiting bundle regeneration. PR #12986 changed
+# the matrix-layout operand's dumped IR type from `Int` to `Enum(Int)`,
+# and PR #12884 added the `base_instance` parameter to Metal vertex
+# entry-point signatures. The compiler output is intentional; these
+# failures are stale generated test content.
+docs/generated/tests/coverage/legalize/metal-vertex-compute-sysvals.slang
+docs/generated/tests/design/ir-reference/types/mat1x1-minimum-shape.slang
+docs/generated/tests/design/ir-reference/types/mat-shape-operands.slang
+docs/generated/tests/design/ir-reference/types/mat-rectangular-2x3.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/cbuffer-mixed-types-lowers-to-struct-with-mixed-fields.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/lower-double-matrix.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/lower-half-matrix.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/lower-mat-double-rectangular.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/lower-mat-half-rectangular.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/lower-mat2x4-rectangular.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/lower-mat4x2-rectangular.slang

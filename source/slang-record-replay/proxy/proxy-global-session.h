@@ -8,9 +8,61 @@
 #include "slang-com-helper.h"
 #include "slang.h"
 
+#include <atomic>
+
 namespace SlangRecord
 {
 using namespace Slang;
+
+/// Live-instance count of `ReplayNullFileSystem`, for the unit test's deterministic
+/// #12865 leak guard. Exported (`SLANG_API`, default visibility) on purpose: the
+/// build uses `-fvisibility=hidden`, and the stand-in is constructed/destroyed inside
+/// libslang (from `createSession`'s playback arm) while the test observes the count
+/// from the separately-linked `slang-unit-test-tool` module. A plain (hidden) class
+/// static would resolve to a *different* copy in each module and always read zero
+/// from the test; a single exported symbol makes both modules share one counter (the
+/// same reason `wrapObject`/`ReplayContext::get` are `SLANG_API`).
+SLANG_API std::atomic<int>& testsOnlyReplayNullFileSystemLiveCount();
+
+/// A properly reference-counted no-op file system used as the replay stand-in
+/// for a recorded custom file system on the reading `kCustomFileSystemHandle`
+/// arm of `createSession` (see below).
+///
+/// The user's real custom file system is not available during playback, so a
+/// placeholder is wrapped in its place. Behaviour matches `NULLFileSystem`
+/// (all file I/O operations return `SLANG_E_NOT_AVAILABLE`), but the lifetime
+/// model differs: `NULLFileSystem` is a singleton whose `addRef`/`release` are no-ops,
+/// so a per-call heap instance of it could never reach a zero refcount and would
+/// leak. This subclass counts references per instance and deletes itself on the
+/// final release, so a fresh instance can be created for each replayed custom-FS
+/// session -- giving each a distinct proxy registration, which preserves the
+/// record/playback handle sequence -- without leaking.
+///
+/// Only `addRef`/`release` are overridden; `queryInterface` (from the
+/// `SLANG_IUNKNOWN_QUERY_INTERFACE` macro) and `castAs` are inherited from
+/// `NULLFileSystem` unchanged. That is deliberate and load-bearing: the inherited
+/// `queryInterface` calls `addRef()` *virtually*, so the reference the wrapper takes
+/// while wrapping lands on this override's `m_refCount` rather than the base's no-op
+/// counter. Inheriting the rest is therefore safe -- the only behaviour that must
+/// differ from the singleton base is the reference counting, and it does.
+class ReplayNullFileSystem : public NULLFileSystem
+{
+public:
+    ReplayNullFileSystem() { ++testsOnlyReplayNullFileSystemLiveCount(); }
+    ~ReplayNullFileSystem() SLANG_OVERRIDE { --testsOnlyReplayNullFileSystemLiveCount(); }
+
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return ++m_refCount; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        uint32_t remaining = --m_refCount;
+        if (remaining == 0)
+            delete this;
+        return remaining;
+    }
+
+private:
+    std::atomic<uint32_t> m_refCount = 1;
+};
 
 class GlobalSessionProxy : public ProxyBase<slang::IGlobalSession>
 {
@@ -80,14 +132,25 @@ public:
             uint64_t handle = 0;
             if (desc.fileSystem)
             {
-                desc.fileSystem->addRef();
                 if (_ctx.isInterfaceRegistered(desc.fileSystem))
                 {
+                    // Already wrapped once: wrapObject() returns the existing proxy
+                    // and only adds a reference to that proxy, leaving the user's
+                    // file system untouched, so no reference is owed on it here. That
+                    // proxy reference is owning, and is balanced by the shared
+                    // ownsFileSystemWrapper release() after the real createSession below.
                     desc2.fileSystem = wrapObject(desc.fileSystem);
                     handle = _ctx.getProxyHandle(desc2.fileSystem);
                 }
                 else
                 {
+                    // First wrap of this file system: wrapObject() -> tryWrap() takes
+                    // ownership of one reference on it (it calls
+                    // desc.fileSystem->release()), so pre-add one here for it to
+                    // consume; otherwise it would consume the caller's own reference.
+                    // (The already-registered branch above owes no such addRef -- see
+                    // its comment.)
+                    desc.fileSystem->addRef();
                     desc2.fileSystem = wrapObject(desc.fileSystem);
                     handle = kCustomFileSystemHandle;
                 }
@@ -114,9 +177,27 @@ public:
                 }
             case kCustomFileSystemHandle:
                 {
-                    auto nfs = new NULLFileSystem();
-                    nfs->addRef();
-                    desc2.fileSystem = wrapObject(nfs);
+                    // Create a fresh stand-in file system for the recorded custom
+                    // file system (unavailable at playback). It must be a distinct
+                    // object per call so each replayed custom-FS session takes its
+                    // own proxy registration, matching the recorded handle sequence.
+                    //
+                    // Bind it through an ISlangMutableFileSystem* (not the concrete
+                    // ReplayNullFileSystem*): the type-safe wrapObject<T> template QIs
+                    // the wrapped proxy back to T, which is valid only when T is a COM
+                    // interface with a getTypeGuid(). Deducing T as the concrete impl
+                    // type makes toSlangInterface<T> call release() on the proxy through
+                    // a wrong-typed pointer (undefined behaviour). Wrapping an interface
+                    // pointer mirrors the default arm's
+                    // wrapObject(OSFileSystem::getMutableSingleton()).
+                    //
+                    // wrapObject() adopts one reference (its inner tryWrap() calls
+                    // release()), so hand over the single reference from `new` -- do not
+                    // pre-add another, or the object would never be freed. The proxy's
+                    // m_actual then holds the only reference, and ReplayNullFileSystem's
+                    // per-instance ref counting deletes it once that proxy is destroyed.
+                    ISlangMutableFileSystem* standIn = new ReplayNullFileSystem();
+                    desc2.fileSystem = wrapObject(standIn);
                     ownsFileSystemWrapper = true;
                     break;
                 }
@@ -277,31 +358,22 @@ public:
         RECORD_RETURN(result);
     }
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDownstreamCompilerVersion(
-        SlangPassThrough passThrough,
-        int* outMajor,
-        int* outMinor) override
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDownstreamCompilerPath(SlangPassThrough passThrough, ISlangBlob** outPath) override
     {
         RECORD_CALL();
         RECORD_INPUT(passThrough);
-        PREPARE_POINTER_OUTPUT(outMajor);
-        PREPARE_POINTER_OUTPUT(outMinor);
-        auto result = getActual<slang::IGlobalSession>()->getDownstreamCompilerVersion(
-            passThrough,
-            outMajor,
-            outMinor);
-        // On failure the actual API returns without writing *outMajor/*outMinor. The record
-        // stream has a fixed schema and must still serialize both output slots, so redirect to the
-        // zero-initialized temporaries created by PREPARE_POINTER_OUTPUT above and record a defined
-        // 0 instead of reading the caller's uninitialized memory (see issue #11865). The caller's
-        // memory is left untouched.
+        PREPARE_POINTER_OUTPUT(outPath);
+        auto result =
+            getActual<slang::IGlobalSession>()->getDownstreamCompilerPath(passThrough, outPath);
+        // On failure the actual API returns without writing *outPath. The record stream has a fixed
+        // schema and must still serialize the output slot, so redirect to the zero-initialized
+        // temporary created by PREPARE_POINTER_OUTPUT above and record a defined null instead of
+        // reading the caller's uninitialized memory (see issue #11865). The caller's memory is left
+        // untouched.
         if (SLANG_FAILED(result))
-        {
-            outMajor = &_temp_outMajor;
-            outMinor = &_temp_outMinor;
-        }
-        RECORD_OUTPUT(outMajor);
-        RECORD_OUTPUT(outMinor);
+            outPath = &_temp_outPath;
+        RECORD_COM_OUTPUT(outPath);
         RECORD_RETURN(result);
     }
 
