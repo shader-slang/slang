@@ -151,6 +151,8 @@ struct Intersection : rt::IIntersectionShader
                            input.minDistance + input.objectToWorld[0][0] +
                            input.worldToObject[0][0] + float(input.dispatchRaysIndex.x) +
                            float(input.dispatchRaysDimensions.x);
+        // Keep both report-hit paths: Metal lowering must preserve dominance-compatible block
+        // order when it turns their results into block parameters for the candidate arm.
         if (!input.reportHit(ray.tMin + input.objectToWorld[0][0], attributes))
             input.reportHit(ray.tMax, 1, attributes);
     }

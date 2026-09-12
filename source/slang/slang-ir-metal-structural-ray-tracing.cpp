@@ -6,6 +6,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-synthesize-structural-ray-tracing.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-structural-ray-tracing.h"
@@ -2589,6 +2590,11 @@ static void _lowerProceduralReportHitOperations(
         builder.setInsertInto(rejectedBlock);
         _emitBranchWithBool(builder, continuation, false);
     }
+
+    // Splitting a block for a later report-hit operation can append its new continuation after
+    // blocks that it dominates. Restore dominance order because cloning a multi-block function
+    // relies on block parameters being encountered before uses in dominated blocks.
+    sortBlocksInFunc(adapter);
 }
 
 static void _lowerProceduralIntersectionInputs(
