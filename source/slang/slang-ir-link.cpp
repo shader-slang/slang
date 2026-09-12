@@ -2449,6 +2449,21 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // having to add the overhead of lazy initialization a la
     // function-`static` variables).
 
+    // Entry-point passes assume an `IREntryPointDecoration` function has layout, but
+    // export cloning can pull in a `[shader]`+`export` import that has none; drop the
+    // decoration from non-selected global functions so they stay ordinary exports.
+    HashSet<IRInst*> selectedEntryPoints;
+    for (auto entryPoint : irEntryPoints)
+        selectedEntryPoints.add(entryPoint);
+    for (auto inst : state->irModule->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(inst);
+        if (!func || selectedEntryPoints.contains(func))
+            continue;
+        if (auto entryPointDecor = func->findDecoration<IREntryPointDecoration>())
+            entryPointDecor->removeAndDeallocate();
+    }
+
     // Now that we've cloned the entry point and everything
     // it refers to, we can package up the data we return
     // to the caller.
