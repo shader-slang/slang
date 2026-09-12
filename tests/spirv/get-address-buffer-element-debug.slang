@@ -12,13 +12,20 @@
 // storage classes disagreed, failing SPIR-V validation. The address-space specialization pass now
 // specializes such a slot's contained pointer to the value's StorageBuffer space, so both
 // spellings stay logical StorageBuffer end-to-end and validation passes.
+//
+// The buggy output keeps the *slot's* contained pointee physical (a
+// _ptr_Function__ptr_<physical>_int slot with a mismatched OpStore). Asserting the logical
+// StorageBuffer pointer is *present* is not enough on its own -- the element value is always a
+// StorageBuffer pointer, so it appears in the buggy output too. This file takes no
+// integer-to-pointer cast, so a correct compile emits no physical pointer at all; asserting the
+// physical storage class is *absent* is what distinguishes the fixed output from the buggy one.
+// (slang-test removes -g embedded source before FileCheck for SPIR-V targets, so the CHECK-NOT
+// does not self-match this comment.)
 
-// -O0 run: no debug info, so the disassembly does not embed this source; a plain error scan is safe.
-//CHECK-NOT: error:
+//CHECK-NOT: PhysicalStorageBuffer
 //CHECK: OpTypePointer StorageBuffer %int
 
-// -g2 run: -g embeds the source text into an OpString, so a CHECK-NOT would match this very
-// comment; assert positively instead and let SPIR-V validation gate correctness.
+//CHECKDBG-NOT: PhysicalStorageBuffer
 //CHECKDBG: OpTypePointer StorageBuffer %int
 
 RWStructuredBuffer<int> outputBuffer;

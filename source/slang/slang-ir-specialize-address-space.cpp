@@ -143,32 +143,26 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         return getAddressSpaceFromVarType(funcType->getResultType());
     }
 
-    // Join the address spaces flowing into a phi (a non-entry block parameter) and, if two
-    // predecessors carry different concrete address spaces, diagnose an inconsistent pointer
-    // address space exactly once. Returns the joined concrete address space, or `Generic` if
-    // no predecessor has been resolved yet. This is the single place that classifies a phi's
-    // address space, called both when the phi is first resolved and when it is revisited, so
-    // that a predecessor resolved on a later fixpoint iteration is still checked for conflict.
+    // Join the address spaces flowing into a phi (a non-entry block parameter) and return the
+    // joined concrete address space, or `Generic` if no predecessor has been resolved yet.
+    // Called both when the phi is first resolved and when it is revisited, so a predecessor
+    // resolved on a later fixpoint iteration can still refine the mapping.
+    //
+    // This does not diagnose a phi that merges two *different* concrete address spaces:
+    // `SPIRVLegalizationContext::processParam` (slang-ir-spirv-legalize.cpp) already reports
+    // that, and it runs while phis still exist — by the time this pass runs on the only
+    // sink-carrying path (SPIR-V) phis have been eliminated, so a phi conflict never reaches
+    // here with a sink. Diagnosing it here would be dead on every path (no other caller passes a
+    // sink) and would double-report with `processParam`. A conflicting phi therefore just joins
+    // to its last concrete arg here; compilation has already failed via `processParam`.
     AddressSpace resolvePhiAddrSpace(IRInst* param)
     {
         AddressSpace joined = AddressSpace::Generic;
         for (auto arg : getPhiArgs(param))
         {
             auto argAddrSpace = getAddrSpace(arg);
-            if (argAddrSpace == AddressSpace::Generic)
-                continue;
-            if (joined != AddressSpace::Generic && joined != argAddrSpace)
-            {
-                // The block parameter merges pointer values from different concrete address
-                // spaces (e.g. a phi of a `StorageBuffer` and a `Device` pointer). A single
-                // pointer value cannot inhabit two storage classes, so diagnose rather than
-                // silently taking one arm.
-                if (sink && diagnosedAddrSpaceConflicts.add(param))
-                    sink->diagnose(Diagnostics::InconsistentPointerAddressSpace{
-                        .inst = param,
-                        .location = param->sourceLoc});
-            }
-            joined = argAddrSpace;
+            if (argAddrSpace != AddressSpace::Generic)
+                joined = argAddrSpace;
         }
         return joined;
     }
@@ -189,15 +183,15 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 {
                     // If we have already assigned an address space to this instruction, then skip
                     // it -- except for a phi, whose predecessors may resolve on different fixpoint
-                    // iterations: re-check its arguments so a later-resolved predecessor carrying a
-                    // conflicting address space is still diagnosed.
+                    // iterations: re-join its arguments so a later-resolved predecessor can refine
+                    // the mapping.
                     if (mapInstToAddrSpace.containsKey(inst))
                     {
                         // A phi may have been mapped from its (possibly stale) declared type
                         // before its predecessors resolved. Re-join its arguments; if they now
                         // agree on a different concrete address space, adopt it and keep the
                         // fixpoint going, so a consistent set of incoming values corrects the
-                        // mapping (and a later-resolved conflicting predecessor is diagnosed).
+                        // mapping.
                         if (inst->getOp() == kIROp_Param && !isFirstBlock)
                         {
                             auto joined = resolvePhiAddrSpace(inst);
@@ -448,6 +442,17 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
             return getStoredValueAddrSpace(value->getOperand(0));
+        case kIROp_Param:
+            // A block parameter (phi) contributes its address space only once the main fixpoint
+            // has resolved one (into `mapInstToAddrSpace`, read by `getPointerValueAddrSpace`
+            // below). Until then treat it as unknown rather than reading its stale surface type,
+            // so a slot fed both a reconciled slot-load (→ `StorageBuffer`) and a not-yet-resolved
+            // pointer phi (→ still `Device`) does not compute a spurious conflict — matching the
+            // load-of-an-unreconciled-slot case above and keeping convergence independent of when
+            // phis are resolved.
+            if (!mapInstToAddrSpace.containsKey(value))
+                return AddressSpace::Generic;
+            break;
         }
         return getPointerValueAddrSpace(value);
     }
@@ -530,9 +535,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             return false;
 
         // Record the slot's resolved address space so a load of it stored into another slot
-        // resolves correctly regardless of visitation order. Recording (or refining) it is
-        // itself progress, because it can unblock a slot fed from this one; the value only
-        // moves toward a concrete address space (never oscillates), so the fixpoint is finite.
+        // resolves correctly regardless of visitation order; recording or refining it is
+        // progress that can unblock a slot fed from this one.
         bool madeProgress = false;
         auto recorded = reconciledSlotAddrSpace.tryGetValue(slot);
         if (!recorded || *recorded != storedAddrSpace)
@@ -574,12 +578,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
     void reconcilePointerSlots()
     {
-        // Outer fixpoint. Reconciling slots retypes their loads; propagating those retyped
-        // loads may in turn retype the derived pointer ops and block parameters that feed
-        // *other* slots, which must then be reconciled (e.g. a pointer flowing through a
-        // block parameter and stored back into a slot). Both steps only move address spaces
-        // toward a concrete value -- each slot refines a bounded number of times and each inst
-        // is retyped at most once -- so the combined loop terminates.
+        // Outer fixpoint: reconciling slots retypes their loads; propagating those loads can
+        // retype derived ops / block parameters that feed *other* slots, which are then
+        // reconciled on the next round (e.g. a pointer flowing through a block parameter and
+        // stored back into a slot). Terminates because address spaces only move toward a
+        // concrete value; see the PR's process report for the full argument.
         for (;;)
         {
             List<IRInst*> reconciledLoads;
@@ -637,7 +640,16 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // loads) up front lets the dataflow below propagate the specialized address space
         // through derived pointer ops, phi/block parameters, calls, and returns via the
         // existing machinery, rather than leaving stale `Device` types on the users.
-        reconcilePointerSlots();
+        //
+        // Gated to the SPIR-V path (the only caller that passes a `sink`). This pre-pass — and
+        // its `InconsistentPointerAddressSpace` conflict diagnostic — is the SPIR-V-specific fix
+        // for the logical-`StorageBuffer`-vs-physical-`Device` slot mismatch (#12581). The other
+        // callers (Metal/WGSL/GLSL legalization) pass no sink; running it there would silently
+        // change their slot types with no diagnostic on a genuine conflict, a behavior change
+        // this PR neither needs nor tests. Their address-space handling is intentionally left
+        // as-is.
+        if (sink)
+            reconcilePointerSlots();
 
         HashSet<IRFunc*> newWorkList;
         while (workList.getCount())

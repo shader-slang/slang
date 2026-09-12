@@ -26,7 +26,7 @@ RWStructuredBuffer<int, Std430DataLayout> rwBuffer430;
 RWStructuredBuffer<int> output;
 
 [numthreads(1, 1, 1)]
-void computeMain(int id : SV_DispatchThreadID)
+void computeMain(uint3 id : SV_DispatchThreadID)
 {
     int* p1 = __getAddress(rwBuffer[id.x]);
     int* p2 = __getAddress(rovBuffer[id.x]);
