@@ -113,10 +113,10 @@ FAMILIES = {
     # rather than one type with a flag because whether a buffer is a string's first or replaces one
     # it already had is a property of each allocation, not of the line that made it.
     "StringBufferAllocation": Family(
-        "StringBufferAllocation", "inline buffer", False, sweep=(8, 16, 24, 32)
+        "StringBufferAllocation", "inline buffer", False, sweep=(4, 8, 12, 16, 24, 32, 64)
     ),
     "StringBufferGrowth": Family(
-        "StringBufferGrowth", "inline buffer", False, sweep=(8, 16, 24, 32)
+        "StringBufferGrowth", "inline buffer", False, sweep=(4, 8, 12, 16, 24, 32, 64)
     ),
     # An interned identifier. Reported separately from strings in general because identifiers are
     # short in a way that strings are not, and it is their distribution, not the aggregate one,
@@ -131,6 +131,10 @@ UNKNOWN_FAMILY = Family("other", None, True)
 # An `OrderedHashSet` is an `OrderedDictionary` with no value type. It is reported alongside the
 # ordered dictionaries, so it shares their family name, but it must not be charged for a value.
 ORDERED_HASH_SET_FAMILY = Family("OrderedDictionary", None, False)
+
+# A `Short*` site promoting more often than this is treated as having declared too small a
+# capacity, rather than as a site that merely sees the occasional large case.
+PROMOTION_CONCERN = 0.05
 
 # Rough costs used only to order candidates against one another; the ranking is the deliverable,
 # not the absolute figure.
@@ -285,6 +289,24 @@ class Site:
         return fitting / self.folded
 
     @property
+    def overprovision_bytes(self):
+        """For a `Short*` site, the unused inline bytes each instance carries, and their total.
+
+        An over-sized inline capacity is not free just because it is never filled. The array is
+        held by value, so every instance -- usually a stack frame -- is that much larger whether or
+        not the elements are used, and pays for it on construction. Returning both the per-instance
+        figure and the total over every construction keeps the two costs distinguishable: the first
+        is what a stack frame carries, the second is what the workload pays for it overall.
+        """
+        if not self.inline_capacity:
+            return 0, 0
+        slack = self.inline_capacity - self.best()["capacity"]
+        if slack <= 0:
+            return 0, 0
+        per_instance = slack * self.element_size
+        return per_instance, per_instance * self.instances
+
+    @property
     def promotion_rate(self):
         """For a `Short*` site, the fraction of instances that outgrew its declared capacity.
 
@@ -366,9 +388,17 @@ def load(patterns):
     if not files:
         sys.exit(f"no stats files matched {patterns}")
 
+    skipped = []
     for path in files:
-        with open(path) as f:
-            data = json.load(f)
+        # A process killed before its exit handler finished leaves a truncated or empty file. That
+        # is routine when collecting over a test suite, where processes are cancelled, so such a
+        # file is reported and skipped rather than abandoning the whole merge.
+        try:
+            with open(path) as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            skipped.append((path, error))
+            continue
         for record in data["records"]:
             container = parse_container_type(record["signature"])
             site = Site(record["file"], record["line"], record["function"], container)
@@ -381,7 +411,7 @@ def load(patterns):
                 existing = site
                 existing.backtraces = []
             existing.merge(record)
-    return list(sites.values()), files
+    return list(sites.values()), files, skipped
 
 
 def symbolize(sites, binary_override=None):
@@ -530,6 +560,21 @@ def report_conversion_candidates(family, sites, args, symbols):
         for context in caller_frames(site, symbols):
             print(f"{'':<46} context: {context}")
 
+    shown = candidates[: args.top]
+    tail = [s for s in candidates[args.top :] if s.best()["allocationsAvoided"] > 0]
+    if tail:
+        print(
+            f"\n  ... and {len(tail)} further convertible sites worth "
+            f"{sum(s.best()['allocationsAvoided'] for s in tail):,} allocations between them"
+        )
+    total = sum(s.best()["allocationsAvoided"] for s in candidates)
+    if total:
+        top = shown[0].best()["allocationsAvoided"] if shown else 0
+        print(
+            f"  {len(candidates)} convertible sites, {total:,} allocations avoidable in all; "
+            f"the single largest is {top / total * 100:.0f}% of that"
+        )
+
     print(f"\nDisqualified by operation mix: {len(disqualified)} of {len(sites)} sites")
     reasons = defaultdict(int)
     for site in disqualified:
@@ -542,32 +587,66 @@ def report_conversion_candidates(family, sites, args, symbols):
 def report_short_capacities(family, sites, args, symbols):
     """Judge the inline capacity each existing `Short*` site already declares.
 
-    A site whose instances never promote has a capacity that is at least large enough, and possibly
-    larger than it needs to be; a site that promotes often is paying for inline storage it abandons,
-    and either wants a larger capacity or should not have been a `Short*` at all.
+    The capacity can be wrong in two directions and they cost differently, so they are reported
+    separately. Too large, and every instance carries inline slots it never fills, which is paid in
+    object size on every construction. Too small, and instances promote to the heap, which is the
+    allocation the inline array existed to avoid.
     """
-    sites = sorted(sites, key=lambda s: -s.instances)
+    over = []
+    under = []
+    fine = []
+    for site in sites:
+        per_instance, total = site.overprovision_bytes
+        if site.promotion_rate > PROMOTION_CONCERN:
+            under.append(site)
+        elif total:
+            over.append((total, per_instance, site))
+        else:
+            fine.append(site)
+    over.sort(key=lambda t: -t[0])
+    under.sort(key=lambda s: -s.instances * s.promotion_rate)
+
     print()
     print("=" * 120)
     print(f"{family.name.upper()}  (verdict on the declared inline capacity)   ({len(sites)} sites)")
     print("=" * 120)
     print(
-        f"{'site':<46} {'container':<34} {'inst':>9} {'declared':>9} "
-        f"{'promoted':>9} {'suggest':>8}"
+        f"{len(fine)} well sized, {len(over)} larger than needed, "
+        f"{len(under)} promoting in more than {PROMOTION_CONCERN * 100:.0f}% of instances."
     )
-    print("-" * 120)
-    for site in sites[: args.top]:
-        suggestion = site.best()["capacity"]
+
+    if under:
+        print("\nTOO SMALL -- promoting to the heap, which the inline array exists to prevent:")
+        print(f"{'site':<46} {'container':<30} {'inst':>10} {'declared':>9} {'promoted':>9} {'wants':>6}")
+        print("-" * 120)
+        for site in under[: args.top]:
+            print(
+                f"{short_location(site):<46} {site.container[:29]:<30} {site.instances:>10,} "
+                f"{site.inline_capacity:>9} {site.promotion_rate * 100:>8.1f}% "
+                f"{site.best()['capacity']:>6}"
+            )
+            for context in caller_frames(site, symbols):
+                print(f"{'':<46} context: {context}")
+
+    if over:
+        print("\nLARGER THAN NEEDED -- inline slots carried by every instance and never filled,")
+        print("ranked by those bytes summed over every construction:")
         print(
-            f"{short_location(site):<46} {site.container[:33]:<34} {site.instances:>9,} "
-            f"{site.inline_capacity:>9} {site.promotion_rate * 100:>8.1f}% {suggestion:>8}"
+            f"{'site':<46} {'container':<30} {'inst':>10} {'decl':>5} "
+            f"{'wants':>6} {'slack/obj':>10} {'total':>9}"
         )
-        sweep = "  ".join(
-            f"C={c}:{site.fraction_fitting(c) * 100:.0f}%" for c in family.sweep
+        print("-" * 120)
+        for total, per_instance, site in over[: args.top]:
+            print(
+                f"{short_location(site):<46} {site.container[:29]:<30} {site.instances:>10,} "
+                f"{site.inline_capacity:>5} {site.best()['capacity']:>6} "
+                f"{per_instance:>9,}B {total / 1048576:>8,.0f}MB"
+            )
+        grand = sum(t for t, _, _ in over)
+        print(
+            f"\n  total over all {len(over)} sites: {grand / 1048576:,.0f}MB of object footprint "
+            f"constructed and never used"
         )
-        print(f"{'':<46} sweep: {sweep}")
-        for context in caller_frames(site, symbols):
-            print(f"{'':<46} context: {context}")
 
 
 def report_sizes_only(family, sites, args, symbols):
@@ -710,6 +789,84 @@ def report_hashed_strings(family, sites, args, symbols):
             print(f"{'':<46} context: {context}")
 
 
+def report_blocked(sites, args, symbols):
+    """Report sites that would convert well but for a single operation.
+
+    These are worth listing separately because the obstacle is one call rather than the shape of
+    the data. Often that call can be removed or replaced, which turns a disqualified site into a
+    candidate; and a site kept on the heap by one `getBuffer` deserves a different conversation
+    from one that genuinely needs a hash table.
+    """
+    blocked = []
+    for site in sites:
+        if not site.folded or not site.family.target or site.family.is_short:
+            continue
+        reasons = site.disqualifiers()
+        if len(reasons) == 1 and site.fraction_fitting(8) > 0.95 and site.instances >= 1000:
+            blocked.append((site.instances, site, reasons[0]))
+    blocked.sort(key=lambda t: -t[0])
+
+    print()
+    print("=" * 120)
+    print("BLOCKED BY A SINGLE OPERATION")
+    print("=" * 120)
+    print(
+        f"{len(blocked)} sites stay within 8 elements in over 95% of instances and are"
+    )
+    print("disqualified by exactly one operation, which may be removable.")
+    print(f"\n{'site':<46} {'container':<34} {'inst':>11}   blocked by")
+    print("-" * 120)
+    for instances, site, reason in blocked[: args.top]:
+        print(
+            f"{short_location(site):<46} {site.container[:33]:<34} {instances:>11,}   {reason}"
+        )
+
+
+def report_addressable(sites, args):
+    """Summarise the whole opportunity, so that its concentration is visible.
+
+    Printed as one figure per family and one overall, because the totals answer a question the
+    per-site tables cannot: whether converting containers is worth doing broadly, or whether the
+    benefit sits in a handful of declarations and the rest is noise.
+    """
+    print()
+    print("=" * 120)
+    print("TOTAL ADDRESSABLE")
+    print("=" * 120)
+    total_saved = 0
+    total_mem = 0
+    rows = []
+    for name in ("List", "Dictionary", "HashSet"):
+        group = [
+            s
+            for s in sites
+            if s.family.name == name
+            and s.folded
+            and not s.disqualifiers()
+            and s.best()["allocationsAvoided"] > 0
+        ]
+        saved = sum(s.best()["allocationsAvoided"] for s in group)
+        mem = sum(s.best()["memoryBytes"] for s in group)
+        total_saved += saved
+        total_mem += mem
+        if group:
+            rows.append((name, len(group), saved, mem))
+    for name, count, saved, mem in rows:
+        print(
+            f"  {name:<12} {count:>4} convertible sites   {saved:>12,} allocations   "
+            f"{mem / 1048576:>8,.1f}MB inline"
+        )
+    print(
+        f"  {'all':<12} {sum(r[1] for r in rows):>4} sites             "
+        f"{total_saved:>12,} allocations   {total_mem / 1048576:>8,.1f}MB inline"
+    )
+    print(
+        "\nThe inline figure is `capacity x elementSize x liveHighWater`: what the arrays would add\n"
+        "to the objects alive at the peak. It is a memory cost paid for an allocation saving, so a\n"
+        "site is only worth converting if that trade reads well for it specifically."
+    )
+
+
 def report_anti_candidates(sites, args):
     """Report sites that should not be converted, which can matter more than the ranking.
 
@@ -763,9 +920,17 @@ def main():
     parser.add_argument("--json", help="write the full ranking to this path")
     args = parser.parse_args()
 
-    sites, files = load(args.patterns)
+    sites, files, skipped = load(args.patterns)
     total_instances = sum(s.instances for s in sites)
-    print(f"merged {len(files)} file(s): {len(sites)} records, {total_instances:,} events")
+    print(
+        f"merged {len(files) - len(skipped)} of {len(files)} file(s): "
+        f"{len(sites)} records, {total_instances:,} events"
+    )
+    if skipped:
+        print(
+            f"  skipped {len(skipped)} unreadable file(s), most likely written by a process "
+            f"that was killed before it finished dumping"
+        )
 
     by_family = defaultdict(list)
     for site in sites:
@@ -805,6 +970,8 @@ def main():
         report_strings(FAMILIES["StringBufferAllocation"], strings, args, symbols)
 
     if not args.family:
+        report_blocked(sites, args, symbols)
+        report_addressable(sites, args)
         report_anti_candidates(sites, args)
 
     if args.json:

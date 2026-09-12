@@ -351,6 +351,12 @@ is understated. Expect a larger ratio in an optimized build.
   thereafter doubles; recording the allocated size would put a floor under the histogram and make a
   small inline buffer look useless when the strings are in fact short.
 
+## Results
+
+`findings.md` records what two profiles -- a core-module compile and the whole test suite --
+actually showed, together with what to distrust in those numbers and what the instrumentation
+does not measure.
+
 ## Status
 
 All of `Dictionary`, `HashSet`, `List`, `ShortList`, `ShortDictionary`, `OrderedDictionary`,
