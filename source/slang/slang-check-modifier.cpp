@@ -2584,6 +2584,19 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     postProcessingOnModifiers(m_astBuilder, syntaxNode->modifiers);
 }
 
+// Returns true if `type` resolves (through any `typealias`/`typedef` sugar) to a `struct`
+// declaration marked with `[raypayload]`. Such a type carries its own field-level PAQs, so a
+// member of this type inherits them and (per the DXR PAQ spec) must not carry any of its own.
+// Canonicalizing first keeps this frontend gate aligned with the IR legalize gate, which always
+// sees the alias already resolved to the underlying `IRStructType`.
+static bool isRayPayloadStructType(Type* type)
+{
+    if (!type)
+        return false;
+    auto structDecl = isDeclRefTypeOf<StructDecl>(type->getCanonicalType()).getDecl();
+    return structDecl && structDecl->findModifier<RayPayloadAttribute>();
+}
+
 void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
 {
     // Only check structs with the [raypayload] attribute
@@ -2603,9 +2616,26 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         bool hasReadModifier = readModifier != nullptr;
         bool hasWriteModifier = writeModifier != nullptr;
 
+        // A member whose type is itself a `[raypayload]` struct inherits the field-level PAQs of
+        // that nested type (per the DXR PAQ spec): it must carry no qualifier of its own. So it is
+        // exempt from the read/write requirement, and an explicit qualifier on it is an error (DXC
+        // likewise rejects a qualifier on a struct-typed member). The `continue` below also skips
+        // the stage-name validation on purpose: the qualifier is disallowed outright, so reporting
+        // an invalid stage inside it would be redundant. This exemption is mirrored on the IR side
+        // in `addDefaultPayloadAccessQualifiersToStruct` (slang-ir-hlsl-legalize.cpp) — the two
+        // gates must stay in sync.
+        if (isRayPayloadStructType(fieldVarDecl->getType()))
+        {
+            if (hasReadModifier || hasWriteModifier)
+            {
+                getSink()->diagnose(
+                    Diagnostics::RayPayloadNestedFieldHasAccessQualifiers{.field = fieldVarDecl});
+            }
+            continue;
+        }
+
         if (!hasReadModifier && !hasWriteModifier)
         {
-            // Emit the diagnostic error
             getSink()->diagnose(
                 Diagnostics::RayPayloadFieldMissingAccessQualifiers{.field = fieldVarDecl});
         }
