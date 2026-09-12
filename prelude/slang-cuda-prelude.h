@@ -4703,6 +4703,7 @@ __forceinline__ __device__ void optixTrace(
     uint32_t MultiplierForGeometryContributionToHitGroupIndex,
     uint32_t MissShaderIndex,
     RayDesc Ray,
+    float RayTime,
     T* Payload)
 {
     constexpr size_t numRegs = (sizeof(T) + 3) / 4;
@@ -4719,7 +4720,7 @@ __forceinline__ __device__ void optixTrace(
             Ray.Direction,
             Ray.TMin,
             Ray.TMax,
-            0.f, /* Time for motion blur */
+            RayTime,
             InstanceInclusionMask,
             RayFlags,
             RayContributionToHitGroupIndex,
@@ -4742,7 +4743,7 @@ __forceinline__ __device__ void optixTrace(
             Ray.Direction,
             Ray.TMin,
             Ray.TMax,
-            0.f,
+            RayTime,
             InstanceInclusionMask,
             RayFlags,
             RayContributionToHitGroupIndex,
@@ -4753,9 +4754,59 @@ __forceinline__ __device__ void optixTrace(
     }
 }
 
-// Non-template overload for empty payload case.
-// When Slang's type legalization eliminates an empty payload struct,
-// the generated code calls optixTrace without a payload argument.
+// An ordinary TraceRay has no source-level time argument, so preserve its existing behavior by
+// delegating to the time-bearing implementation with time zero. TraceMotionRay selects the overload
+// above, which keeps payload packing identical while forwarding the caller's ray time.
+template<typename T>
+__forceinline__ __device__ void optixTrace(
+    OptixTraversableHandle AccelerationStructure,
+    uint32_t RayFlags,
+    uint32_t InstanceInclusionMask,
+    uint32_t RayContributionToHitGroupIndex,
+    uint32_t MultiplierForGeometryContributionToHitGroupIndex,
+    uint32_t MissShaderIndex,
+    RayDesc Ray,
+    T* Payload)
+{
+    optixTrace(
+        AccelerationStructure,
+        RayFlags,
+        InstanceInclusionMask,
+        RayContributionToHitGroupIndex,
+        MultiplierForGeometryContributionToHitGroupIndex,
+        MissShaderIndex,
+        Ray,
+        0.f,
+        Payload);
+}
+
+// Type legalization removes an empty payload from the generated call. This time-bearing overload
+// ensures that an empty-payload TraceMotionRay still preserves the caller's ray time.
+__forceinline__ __device__ void optixTrace(
+    OptixTraversableHandle AccelerationStructure,
+    uint32_t RayFlags,
+    uint32_t InstanceInclusionMask,
+    uint32_t RayContributionToHitGroupIndex,
+    uint32_t MultiplierForGeometryContributionToHitGroupIndex,
+    uint32_t MissShaderIndex,
+    RayDesc Ray,
+    float RayTime)
+{
+    optixTrace(
+        AccelerationStructure,
+        Ray.Origin,
+        Ray.Direction,
+        Ray.TMin,
+        Ray.TMax,
+        RayTime,
+        InstanceInclusionMask,
+        RayFlags,
+        RayContributionToHitGroupIndex,
+        MultiplierForGeometryContributionToHitGroupIndex,
+        MissShaderIndex);
+}
+
+// Preserve the empty-payload TraceRay ABI by selecting time zero.
 __forceinline__ __device__ void optixTrace(
     OptixTraversableHandle AccelerationStructure,
     uint32_t RayFlags,
@@ -4767,16 +4818,13 @@ __forceinline__ __device__ void optixTrace(
 {
     optixTrace(
         AccelerationStructure,
-        Ray.Origin,
-        Ray.Direction,
-        Ray.TMin,
-        Ray.TMax,
-        0.f,
-        InstanceInclusionMask,
         RayFlags,
+        InstanceInclusionMask,
         RayContributionToHitGroupIndex,
         MultiplierForGeometryContributionToHitGroupIndex,
-        MissShaderIndex);
+        MissShaderIndex,
+        Ray,
+        0.f);
 }
 
 #if (OPTIX_VERSION >= 90000)
