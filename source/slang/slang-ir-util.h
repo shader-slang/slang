@@ -375,7 +375,15 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
 
 bool isPtrLikeOrHandleType(IRInst* type);
 
-bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, IRInst* addr);
+// `calleeSideEffectCache` is optional; see `doesCalleeHaveSideEffect`'s memoized overload above
+// for its sharing/staleness contract. Passing one turns the `kIROp_Call` case's
+// `doesCalleeHaveSideEffect` query from O(#call sites to that callee) into an O(1) cache hit
+// after the first query for a given callee.
+bool canInstHaveSideEffectAtAddress(
+    IRGlobalValueWithCode* func,
+    IRInst* inst,
+    IRInst* addr,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);
 
 /// Get a unit-type (aka `void`) value using the `poison` instruction,
 /// which indicates an undefined (and potentially unstable) value.

@@ -100,7 +100,10 @@ void simplifyIR(
                 funcChanged |= applySparseConditionalConstantPropagation(func, target, sink);
                 funcChanged |= peepholeOptimize(target, func);
                 if (options.removeRedundancy)
-                    funcChanged |= removeRedundancyInFunc(func, options.hoistLoopInvariantInsts);
+                    funcChanged |= removeRedundancyInFunc(
+                        func,
+                        options.hoistLoopInvariantInsts,
+                        options.deadCodeElimOptions.calleeSideEffectCache);
                 funcChanged |= simplifyCFG(func, options.cfgOptions);
                 // Note: we disregard the `changed` state from dead code elimination pass since
                 // SCCP pass could be generating temporarily evaluated constant values and never
@@ -141,7 +144,10 @@ void simplifyNonSSAIR(
         changed |= peepholeOptimize(target, module, options.peepholeOptions);
 
         if (!options.minimalOptimization)
-            changed |= removeRedundancy(module, options.hoistLoopInvariantInsts);
+            changed |= removeRedundancy(
+                module,
+                options.hoistLoopInvariantInsts,
+                options.deadCodeElimOptions.calleeSideEffectCache);
         changed |= simplifyCFG(module, options.cfgOptions);
 
         // Note: we disregard the `changed` state from dead code elimination pass since
@@ -176,7 +182,10 @@ void simplifyFunc(
         changed |= applySparseConditionalConstantPropagation(func, target, sink);
         changed |= peepholeOptimize(target, func);
         if (!options.minimalOptimization)
-            changed |= removeRedundancyInFunc(func, options.hoistLoopInvariantInsts);
+            changed |= removeRedundancyInFunc(
+                func,
+                options.hoistLoopInvariantInsts,
+                options.deadCodeElimOptions.calleeSideEffectCache);
         changed |= simplifyCFG(func, options.cfgOptions);
 
         // Note: we disregard the `changed` state from dead code elimination pass since
