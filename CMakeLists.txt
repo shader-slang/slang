@@ -721,6 +721,78 @@ if(
     )
 endif()
 
+# The MIT/Apache-2.0 counterparts to the BSD-family notices above (issue
+# #13023, the follow-up to #13021). These vendored deps are likewise statically
+# linked into the shipped libraries -- miniz, unordered_dense, and mimalloc are
+# MIT; spirv-tools is Apache-2.0 -- so binary redistribution must reproduce
+# their copyright notices too. As above, each condition mirrors the source
+# selection in external/CMakeLists.txt so a notice ships only when the vendored
+# submodule (not a system copy or an override path) is the source we build
+# against, and a missing notice file then fails the install loudly rather than
+# silently shipping a non-compliant package. spirv-tools ships a LICENSE only
+# (no upstream NOTICE file exists), so there is no Apache-2.0 section 4(d)
+# NOTICE to carry: reproducing its LICENSE satisfies the attribution
+# requirement.
+if(NOT SLANG_USE_SYSTEM_MINIZ AND NOT SLANG_OVERRIDE_MINIZ_PATH)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/miniz/LICENSE"
+        DESTINATION third-party-notices
+        RENAME miniz-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+if(
+    NOT SLANG_USE_SYSTEM_UNORDERED_DENSE
+    AND NOT SLANG_OVERRIDE_UNORDERED_DENSE_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/unordered_dense/LICENSE"
+        DESTINATION third-party-notices
+        RENAME unordered_dense-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+# mimalloc is statically linked either into the Slang libraries
+# (SLANG_ENABLE_MIMALLOC) or into SPIRV-Tools and thus slang-glslang
+# (SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC, default on for Windows). This condition
+# mirrors SLANG_BUILD_MIMALLOC in external/CMakeLists.txt so the notice ships
+# whenever mimalloc's code lands in a shipped binary, including the
+# SPIRV-Tools-only case where SLANG_ENABLE_MIMALLOC is off.
+if(
+    (
+        SLANG_ENABLE_MIMALLOC
+        OR (
+            SLANG_ENABLE_SLANG_GLSLANG
+            AND NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
+            AND SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
+        )
+    )
+    AND NOT SLANG_OVERRIDE_MIMALLOC_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/mimalloc/LICENSE"
+        DESTINATION third-party-notices
+        RENAME mimalloc-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+if(
+    SLANG_ENABLE_SLANG_GLSLANG
+    AND NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
+    AND NOT SLANG_OVERRIDE_SPIRV_TOOLS_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/spirv-tools/LICENSE"
+        DESTINATION third-party-notices
+        RENAME spirv-tools-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+
 install(
     DIRECTORY "${slang_SOURCE_DIR}/docs/"
     DESTINATION share/doc/slang
