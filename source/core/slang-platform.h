@@ -155,6 +155,15 @@ struct PlatformUtil
     /// Will return SLANG_E_NOT_FOUND if the variable is not set
     static SlangResult getEnvironmentVariable(const UnownedStringSlice& name, StringBuilder& out);
 
+    /// Sets an environment variable for this process, or removes it when `value` is null.
+    ///
+    /// Affects this process and anything it spawns afterwards, since a child inherits the
+    /// environment at creation. That is the point: it lets a test run the same executable
+    /// twice under different settings without a build-time switch.
+    static SlangResult setEnvironmentVariable(
+        const UnownedStringSlice& name,
+        const UnownedStringSlice* value);
+
     /// Get the path to this instance (the path to the dll/executable/shared library the call is in)
     /// NOTE! This is not supported on all platforms, and will return SLANG_E_NOT_IMPLEMENTED in
     /// that scenario

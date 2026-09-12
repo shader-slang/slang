@@ -494,7 +494,7 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
 
 static void collectSpecialCaseInstructions(List<IRInst*>& stores, IRBlock* block)
 {
-    for (auto inst = block->getFirstInst(); inst; inst = inst->next)
+    for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
     {
         if (as<IRGenericAsm>(inst))
             stores.add(inst);
@@ -1344,7 +1344,7 @@ static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, Di
     // Work backwards, get exit points and find sources
     for (auto block : func->getBlocks())
     {
-        for (auto inst = block->getFirstInst(); inst; inst = inst->next)
+        for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
         {
             auto ret = as<IRReturn>(inst);
             if (!ret)

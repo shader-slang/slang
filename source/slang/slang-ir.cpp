@@ -222,7 +222,7 @@ void IRInstListBase::Iterator::operator++()
 {
     if (inst)
     {
-        inst = inst->next;
+        inst = inst->getNextInst();
     }
 }
 
@@ -232,7 +232,7 @@ IRInstListBase::Iterator IRInstListBase::begin()
 }
 IRInstListBase::Iterator IRInstListBase::end()
 {
-    return Iterator(last ? last->next : nullptr);
+    return Iterator(last ? last->getNextInst() : nullptr);
 }
 
 //
@@ -457,7 +457,7 @@ void IRBlock::addParam(IRParam* param)
     //
     if (auto lastParam = getLastParam())
     {
-        if (lastParam->next)
+        if (lastParam->getNextInst())
             param->insertAfter(lastParam);
         else
             param->insertAtEnd(this);
@@ -2888,7 +2888,7 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
             {
                 auto insertLoc = getInsertLoc().getInst();
                 bool isAfter = false;
-                for (auto cur = insertLoc->next; cur; cur = cur->next)
+                for (auto cur = insertLoc->getNextInst(); cur; cur = cur->getNextInst())
                 {
                     if (cur == foundInst)
                     {
@@ -8900,9 +8900,73 @@ void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
     }
 }
 
+namespace
+{
+std::atomic<Index> g_liveIRModuleCount{0};
+}
+
+void _noteIRModuleCreated()
+{
+    g_liveIRModuleCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+void _noteIRModuleDestroyed()
+{
+    g_liveIRModuleCount.fetch_sub(1, std::memory_order_relaxed);
+}
+
+Index getLiveIRModuleCount()
+{
+    return g_liveIRModuleCount.load(std::memory_order_relaxed);
+}
+
+namespace
+{
+std::atomic<Index> g_deferredBodyLoaderInstallCount{0};
+}
+
+void _noteDeferredBodyLoaderInstalled()
+{
+    g_deferredBodyLoaderInstallCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+Index getDeferredBodyLoaderInstallCount()
+{
+    return g_deferredBodyLoaderInstallCount.load(std::memory_order_relaxed);
+}
+
+namespace
+{
+std::atomic<Index> g_deferredBodyMaterializationCount{0};
+}
+
+namespace
+{
+std::atomic<Index> g_deferralDeclinedForSpanMismatchCount{0};
+}
+
+void _noteDeferralDeclinedForSpanMismatch()
+{
+    g_deferralDeclinedForSpanMismatchCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+Index getDeferralDeclinedForSpanMismatchCount()
+{
+    return g_deferralDeclinedForSpanMismatchCount.load(std::memory_order_relaxed);
+}
+
+Index getDeferredBodyMaterializationCount()
+{
+    return g_deferredBodyMaterializationCount.load(std::memory_order_relaxed);
+}
+
 IRDecoration* IRInst::getFirstDecoration()
 {
-    return as<IRDecoration>(getFirstDecorationOrChild());
+    // Decoration lookup runs on every instruction of every module, so it does not
+    // materialize: decorations precede children, and `as<IRDecoration>` stops this
+    // walk at the first non-decoration. The load is acquire because a deferred body
+    // attaches here on a global that has no decorations.
+    return as<IRDecoration>(peekFirstDecorationOrChild());
 }
 
 IRDecoration* IRInst::getLastDecoration()
@@ -8917,13 +8981,58 @@ IRDecoration* IRInst::getLastDecoration()
     return decoration;
 }
 
-IRInstList<IRDecoration> IRInst::getDecorations()
+IRDecorationList IRInst::getDecorations()
 {
-    return IRInstList<IRDecoration>(getFirstDecoration(), getLastDecoration());
+    // Only the head is needed: the list ends where the decorations do, by type.
+    return IRDecorationList(getFirstDecoration());
+}
+
+IRDecoration* IRDecorationList::Iterator::operator*()
+{
+    // Everything this list yields is a decoration: `getDecorations()` seeds the head with
+    // `getFirstDecoration()`, which is an `as<IRDecoration>`, and `operator++` below stops
+    // at the first non-decoration. Checked rather than taken on faith, because a raw cast
+    // is the one spelling in this file that would convert a body instruction into a
+    // decoration without complaint.
+    SLANG_ASSERT(as<IRDecoration>(inst));
+    return static_cast<IRDecoration*>(inst);
+}
+
+void IRDecorationList::Iterator::operator++()
+{
+    // `peek` rather than `getNextInst`: this walk must not materialize, or looking up
+    // a decoration would force the body of every global it passes. Acquire, because for
+    // a global whose body is deferred this link is the one a concurrent materialization
+    // publishes into.
+    inst = inst->peekNextInst();
+    // The iteration stops here rather than at a saved sentinel, so a body appearing
+    // mid-walk ends it instead of being walked as though it were more decorations.
+    if (inst && !as<IRDecoration>(inst))
+        inst = nullptr;
+}
+
+void IRInst::_materializeDeferredBody()
+{
+    // The flag is cleared by the loader, under its lock, once the children are
+    // linked -- not here. Clearing it first would let a second thread proceed to
+    // read children that are still being built.
+    auto module = getModule();
+    auto loader = module ? module->getDeferredBodyLoader() : nullptr;
+
+    // An instruction flagged as deferred with no loader to decode it is an
+    // impossible shape: only the deserializer sets the flag, and it installs the
+    // loader on the same module in the same step. Returning quietly here would
+    // hand the caller an empty body for an instruction whose children exist in the
+    // serialized blob, with no diagnostic, and leave the flag set so that every
+    // later access repeats this slow path.
+    SLANG_RELEASE_ASSERT(loader);
+    g_deferredBodyMaterializationCount.fetch_add(1, std::memory_order_relaxed);
+    loader->materializeDeferredBody(this);
 }
 
 IRInst* IRInst::getFirstChild()
 {
+    ensureBodyMaterialized();
     // The children come after any decorations,
     // so if there are any decorations, then
     // the first child is right after the last decoration.
@@ -8939,6 +9048,7 @@ IRInst* IRInst::getFirstChild()
 
 IRInst* IRInst::getLastChild()
 {
+    ensureBodyMaterialized();
     // The children come after any decorations, so
     // that the last item in the list of children
     // and decorations is the last child *unless*
@@ -9243,6 +9353,12 @@ void IRInst::replaceUsesWith(IRInst* other)
 
 // Insert this instruction into the same basic block
 // as `other`, right before it.
+//
+// Reading `other`'s neighbour is what decides where to splice, and on the last
+// decoration of a global whose body is still encoded that link reads as null until the
+// body is attached. Nothing here has to arrange for that: `getPrevInst`/`getNextInst`
+// materialize `other`'s parent before returning the link, so the neighbour this splices
+// against is the real one.
 void IRInst::insertBefore(IRInst* other)
 {
     SLANG_ASSERT(other);
@@ -9268,6 +9384,24 @@ void IRInst::moveToStart()
 
 void IRInst::_insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent)
 {
+    // This deliberately does *not* decode a still-encoded `inParent`, even though it
+    // looks like the natural place for it -- and had it once.
+    //
+    // It is in fact the one place it must not happen. `inPrev` and `inNext` were read by
+    // the caller before this ran, and on a global whose body is still encoded the link
+    // after the last decoration reads as null. Decoding here would attach the body to
+    // that link and then let the splice proceed against the caller's stale null:
+    // `inParent->setLastDecorationOrChild(this)` publishes this instruction as the last
+    // child, and the body decoded a moment earlier is orphaned -- silently, with no crash
+    // and nothing to diagnose.
+    //
+    // Decoding belongs where a link is *read*, which is what `getNextInst`,
+    // `getPrevInst`, `getFirstDecorationOrChild` and `getLastDecorationOrChild` do, and
+    // every caller of this function reaches its neighbours through one of them. A caller that used
+    // the `peek` pair instead does not get here quietly: the neighbour assertions just
+    // below re-read the links through the materializing accessors, so a stale pair fails
+    // there.
+
     // Make sure this instruction has been removed from any previous parent
     this->removeFromParent();
 
@@ -9277,24 +9411,24 @@ void IRInst::_insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent)
 
     if (inPrev)
     {
-        inPrev->next = this;
+        inPrev->setNextInst(this);
     }
     else
     {
-        inParent->m_decorationsAndChildren.first = this;
+        inParent->setFirstDecorationOrChild(this);
     }
 
     if (inNext)
     {
-        inNext->prev = this;
+        inNext->setPrevInst(this);
     }
     else
     {
-        inParent->m_decorationsAndChildren.last = this;
+        inParent->setLastDecorationOrChild(this);
     }
 
-    this->prev = inPrev;
-    this->next = inNext;
+    this->setPrevInst(inPrev);
+    this->setNextInst(inNext);
     this->parent = inParent;
 
 #if _DEBUG
@@ -9350,6 +9484,9 @@ void IRInst::insertAt(IRInsertLoc const& loc)
 // and then destroy it (it had better have no uses!)
 void IRInst::removeFromParent()
 {
+    // No decoding here either, for the reason `_insertAt` gives: `getPrevInst` and
+    // `getNextInst` below decode the parent before handing back a link, so the unlink
+    // already happens against the real child list without this arranging it first.
     auto oldParent = getParent();
 
     // If we don't currently have a parent, then
@@ -9363,25 +9500,25 @@ void IRInst::removeFromParent()
     if (pp)
     {
         SLANG_ASSERT(pp->getParent() == oldParent);
-        pp->next = nn;
+        pp->setNextInst(nn);
     }
     else
     {
-        oldParent->m_decorationsAndChildren.first = nn;
+        oldParent->setFirstDecorationOrChild(nn);
     }
 
     if (nn)
     {
         SLANG_ASSERT(nn->getParent() == oldParent);
-        nn->prev = pp;
+        nn->setPrevInst(pp);
     }
     else
     {
-        oldParent->m_decorationsAndChildren.last = pp;
+        oldParent->setLastDecorationOrChild(pp);
     }
 
-    prev = nullptr;
-    next = nullptr;
+    setPrevInst(nullptr);
+    setNextInst(nullptr);
     parent = nullptr;
 }
 

@@ -36,7 +36,15 @@ struct IRDecoration : IRInst
 {
     FIDDLE(baseInst())
 
-    IRDecoration* getNextDecoration() { return as<IRDecoration>(getNextInst()); }
+    IRDecoration* getNextDecoration()
+    {
+        // `peek` rather than `getNextInst`: materializing here would force a body
+        // merely to look up a decoration, which is what on-demand loading exists to
+        // avoid. The last decoration's link is where a deferred body attaches, so this
+        // step can race a concurrent materialization; the acquire inside `peek` pairs
+        // with the release store that publishes the chain.
+        return as<IRDecoration>(peekNextInst());
+    }
 };
 
 // Associates an IR-level decoration with a source declaration
