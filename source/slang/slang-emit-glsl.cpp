@@ -1805,6 +1805,32 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
     // parameters/results, local variables, etc. Additional legalization
     // steps are required to guarantee these conditions.
     //
+    // When emitting unbounded-size resource arrays with GLSL we need
+    // to use the `GL_EXT_nonuniform_qualifier` extension to ensure
+    // that they are not treated as "implicitly-sized arrays" which
+    // are arrays that have a fixed size that just isn't specified
+    // at the declaration site (instead being inferred from use sites).
+    //
+    // While the extension primarily introduces the `nonuniformEXT`
+    // qualifier that we use to implement `NonUniformResourceIndex`,
+    // it also changes the GLSL language semantics around (resource) array
+    // declarations that don't specify a size.
+    //
+    // This must run before the specialized buffer / parameter-group
+    // declarations below, which `return` early: without it, an unsized
+    // (bindless) array of the resource kinds those branches handle --
+    // structured and byte-address buffers, parameter groups, SSBOs -- would
+    // skip the request, while textures and samplers (which fall through to
+    // the tail) would still reach it.
+    //
+    if (as<IRUnsizedArrayType>(varType))
+    {
+        if (isResourceType(unwrapArray(varType)))
+        {
+            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_nonuniform_qualifier"));
+        }
+    }
+
     if (auto paramBlockType = as<IRUniformParameterGroupType>(unwrapArray(varType)))
     {
         _emitGLSLParameterGroup(varDecl, paramBlockType);
@@ -1846,25 +1872,6 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
         {
             _maybeEmitGLSLBuiltin(varDecl, name);
             return true;
-        }
-    }
-
-    // When emitting unbounded-size resource arrays with GLSL we need
-    // to use the `GL_EXT_nonuniform_qualifier` extension to ensure
-    // that they are not treated as "implicitly-sized arrays" which
-    // are arrays that have a fixed size that just isn't specified
-    // at the declaration site (instead being inferred from use sites).
-    //
-    // While the extension primarily introduces the `nonuniformEXT`
-    // qualifier that we use to implement `NonUniformResourceIndex`,
-    // it also changes the GLSL language semantics around (resource) array
-    // declarations that don't specify a size.
-    //
-    if (as<IRUnsizedArrayType>(varType))
-    {
-        if (isResourceType(unwrapArray(varType)))
-        {
-            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_nonuniform_qualifier"));
         }
     }
 
