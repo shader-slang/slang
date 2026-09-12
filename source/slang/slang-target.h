@@ -130,7 +130,16 @@ public:
         return optionSet.getEnumOption<CodeGenTarget>(CompilerOptionName::Target);
     }
 
-    // TypeLayouts created on the fly by reflection API
+    // TypeLayouts created on the fly by the reflection API, for the
+    // program-less path (`ISession::getTypeLayout`) where there is no
+    // `ProgramLayout` to scope the cache to. The key is just `{type, rules}`:
+    // `Type*` lives in the linkage-owned `ASTBuilder` arena, which outlives
+    // every program, so entries here never dangle.
+    //
+    // When a `ProgramLayout` IS available, the cache instead lives on the
+    // owning `TargetProgram` (see `TargetProgram::getProgramScopedTypeLayouts`), so
+    // that a cache entry has exactly the program's lifetime and cannot be aliased by
+    // a later program reusing a freed `ProgramLayout` address.
     struct TypeLayoutKey
     {
         Type* type;
@@ -149,9 +158,15 @@ public:
     };
     Dictionary<TypeLayoutKey, RefPtr<TypeLayout>> typeLayouts;
 
-    Dictionary<TypeLayoutKey, RefPtr<TypeLayout>>& getTypeLayouts() { return typeLayouts; }
+    Dictionary<TypeLayoutKey, RefPtr<TypeLayout>>& getProgramlessTypeLayouts()
+    {
+        return typeLayouts;
+    }
 
-    TypeLayout* getTypeLayout(Type* type, slang::LayoutRules rules);
+    TypeLayout* getTypeLayout(
+        Type* type,
+        slang::LayoutRules rules,
+        ProgramLayout* programLayout = nullptr);
 
     CompilerOptionSet& getOptionSet() { return optionSet; }
 
