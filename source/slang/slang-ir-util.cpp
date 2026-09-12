@@ -847,6 +847,80 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     case kIROp_TextureFootprintType:
         sb << "TextureFootprint";
         break;
+    // The following opaque builtin types carry no name-hint/linkage decoration, and their operands
+    // form the type's identity. Each case renders the surface name plus those operands, so
+    // consumers (chiefly SPIR-V debug info) get a real name instead of the empty hint that would
+    // collapse distinct instantiations into the literal "unnamed".
+    case kIROp_DescriptorHandleType:
+        sb << "DescriptorHandle<";
+        getTypeNameHint(sb, as<IRDescriptorHandleType>(type)->getResourceType());
+        sb << ">";
+        break;
+    case kIROp_RayQueryType:
+        // The first operand is the ray-flags value (RayQueryType has min_operands == 1, so
+        // getOperand(0) is in bounds); include it so `RayQuery<flags>` instantiations that differ
+        // only in flags get distinct names.
+        sb << "RayQuery<";
+        getTypeNameHint(sb, type->getOperand(0));
+        sb << ">";
+        break;
+    case kIROp_CoopVectorType:
+        sb << "CoopVec<";
+        getTypeNameHint(sb, as<IRCoopVectorType>(type)->getElementType());
+        sb << ",";
+        getTypeNameHint(sb, as<IRCoopVectorType>(type)->getElementCount());
+        sb << ">";
+        break;
+    case kIROp_CoopMatrixType:
+        {
+            // Include every operand (scope and use as well as element/shape): each is part of the
+            // cooperative-matrix type identity, so omitting any would collide distinct types.
+            auto coopMat = as<IRCoopMatrixType>(type);
+            sb << "CoopMat<";
+            getTypeNameHint(sb, coopMat->getElementType());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getScope());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getRowCount());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getColumnCount());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getMatrixUse());
+            sb << ">";
+        }
+        break;
+    case kIROp_TensorAddressingTensorLayoutType:
+        {
+            auto tensorLayout = as<IRTensorAddressingTensorLayoutType>(type);
+            sb << "TensorLayout<";
+            getTypeNameHint(sb, tensorLayout->getDimension());
+            sb << ",";
+            getTypeNameHint(sb, tensorLayout->getClampMode());
+            sb << ">";
+        }
+        break;
+    case kIROp_TensorAddressingTensorViewType:
+        {
+            // Operands are [dimension, hasDimension, permutation...]; the two leading operands are
+            // rendered by name, so the remaining `getOperandCount() - 2` are the permutation. Only
+            // the first `dimension`-many permutation entries are meaningful; trailing slots are the
+            // sentinel 255 (padding that the OpTypeTensorViewNV writer in the SPIR-V emitter
+            // ignores). This function deliberately renders every slot so the name stays a faithful,
+            // collision-free function of the full operand list.
+            auto tensorView = as<IRTensorAddressingTensorViewType>(type);
+            sb << "TensorView<";
+            getTypeNameHint(sb, tensorView->getDimension());
+            sb << ",";
+            getTypeNameHint(sb, tensorView->getHasDimension());
+            UInt permutationCount = tensorView->getOperandCount() - 2;
+            for (UInt i = 0; i < permutationCount; i++)
+            {
+                sb << ",";
+                getTypeNameHint(sb, tensorView->getPermutation((int)i));
+            }
+            sb << ">";
+        }
+        break;
     case kIROp_Specialize:
         {
             auto specialize = as<IRSpecialize>(type);
