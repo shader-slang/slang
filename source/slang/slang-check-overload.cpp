@@ -1185,16 +1185,6 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
     auto substArgs = tryGetGenericArguments(candidate.subst, genericDeclRef.getDecl());
     SLANG_ASSERT(substArgs.getCount());
 
-    bool genericIsOutermost = true;
-    for (auto p = genericDeclRef.getDecl()->parentDecl; p; p = p->parentDecl)
-    {
-        if (as<GenericDecl>(p))
-        {
-            genericIsOutermost = false;
-            break;
-        }
-    }
-
     Index explicitCount = candidate.explicitGenericArgCount;
     if (explicitCount < 0 || explicitCount > substArgs.getCount())
         explicitCount = substArgs.getCount();
@@ -1217,41 +1207,36 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
     //
     // On solver failure we fall through to the per-constraint loop, which
     // re-derives the failing constraint to emit a precise diagnostic (the solver
-    // reports none). The solver's `setProvidedArg` requires an outermost generic
-    // when ordinary arguments are provided, so a nested generic application keeps
-    // the linear pass for now.
-    if (genericIsOutermost)
+    // reports none). The provided arguments belong to `genericDeclRef` itself;
+    // any enclosing generic substitutions are already carried by that decl-ref.
+    ShortList<Val*> providedOrdinaryArgs;
+    for (Index i = 0; i < explicitCount; i++)
+        providedOrdinaryArgs.add(substArgs[i]);
+
+    GenericInferenceContext inferenceContext;
+    inferenceContext.genericDecl = genericDeclRef.getDecl();
+
+    ConversionCost solveCost = kConversionCost_None;
+    auto solved = trySolveGenericArguments(
+        _Move(inferenceContext),
+        genericDeclRef,
+        providedOrdinaryArgs.getArrayView().arrayView,
+        solveCost);
+    if (solved)
     {
-        ShortList<Val*> providedOrdinaryArgs;
-        for (Index i = 0; i < explicitCount; i++)
-            providedOrdinaryArgs.add(substArgs[i]);
-
-        GenericInferenceContext inferenceContext;
-        inferenceContext.genericDecl = genericDeclRef.getDecl();
-
-        ConversionCost solveCost = kConversionCost_None;
-        auto solved = trySolveGenericArguments(
-            _Move(inferenceContext),
-            genericDeclRef,
-            providedOrdinaryArgs.getArrayView().arrayView,
-            solveCost);
-        if (solved)
-        {
-            auto solvedArgs =
-                tryGetGenericArguments(SubstitutionSet(solved), genericDeclRef.getDecl());
-            candidate.subst =
-                SubstitutionSet(m_astBuilder->getGenericAppDeclRef(genericDeclRef, solvedArgs));
-            // Note: deliberately do not fold `solveCost` into `conversionCostSum`
-            // here. The previous per-constraint validation added no conformance
-            // cost at this stage, and doing so shifts overload ranking (e.g.
-            // breaks ties that should stay ambiguous).
-            return true;
-        }
-        // Solver failed: in real mode fall through so the per-constraint loop can
-        // emit a precise diagnostic; in just-trying mode reject the candidate.
-        if (context.mode == OverloadResolveContext::Mode::JustTrying)
-            return false;
+        auto solvedArgs = tryGetGenericArguments(SubstitutionSet(solved), genericDeclRef.getDecl());
+        candidate.subst =
+            SubstitutionSet(m_astBuilder->getGenericAppDeclRef(genericDeclRef, solvedArgs));
+        // Note: deliberately do not fold `solveCost` into `conversionCostSum`
+        // here. The previous per-constraint validation added no conformance
+        // cost at this stage, and doing so shifts overload ranking (e.g.
+        // breaks ties that should stay ambiguous).
+        return true;
     }
+    // Solver failed: in real mode fall through so the per-constraint loop can
+    // emit a precise diagnostic; in just-trying mode reject the candidate.
+    if (context.mode == OverloadResolveContext::Mode::JustTrying)
+        return false;
 
     ShortList<Val*> newArgs;
     for (auto arg : substArgs)
