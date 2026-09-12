@@ -1927,6 +1927,7 @@ local insts = {
 			{ vulkanCallablePayload = { struct_name = "VulkanCallablePayloadDecoration" } },
 			{ vulkanCallablePayloadIn = { struct_name = "VulkanCallablePayloadInDecoration" } },
 			{ earlyDepthStencil = { struct_name = "EarlyDepthStencilDecoration" } },
+			{ postDepthCoverage = { struct_name = "PostDepthCoverageDecoration" } },
 			-- Marks a fragment entry point whose `gl_FragDepth` output is constrained to
 			-- only ever increase / decrease the fixed-function depth (HLSL
 			-- SV_DepthGreaterEqual / SV_DepthLessEqual). Carried on the entry point so the
