@@ -7422,7 +7422,7 @@ static PtrType* getValidTypeForAddressOf(
             // invariant so a future accessor reusing this op surfaces rather than silently
             // producing a spurious E31160.
             auto baseType = unwrapModifiedType(functionMemberExpr->baseExpression->type.type);
-            SLANG_ASSERT(
+            SLANG_RELEASE_ASSERT(
                 as<HLSLRWStructuredBufferType>(baseType) ||
                 as<HLSLRasterizerOrderedStructuredBufferType>(baseType));
             return m_astBuilder->getPtrType(
