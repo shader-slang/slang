@@ -479,45 +479,44 @@ static StructuralRayTracingStageKind _getStructuralStage(Stage stage)
     }
 }
 
-struct StructuralStageContextInfo
+static StructuralRayTracingAssociatedTypeKind _getStructuralStageContextRequirement(
+    StructuralRayTracingStageKind stageKind)
 {
-    Type* type = nullptr;
-    SubtypeWitness* witness = nullptr;
-};
-
-static StructuralStageContextInfo _getStructuralStageContextInfo(FuncDecl* invokeMethod)
-{
-    if (!invokeMethod || invokeMethod->getParameters().getCount() != 1)
-        return {};
-
-    auto inputType = as<DeclRefType>(invokeMethod->getParameters()[0]->type.type);
-    if (!inputType)
-        return {};
-    auto genericApp = SubstitutionSet(inputType->getDeclRef()).findGenericAppDeclRef();
-    if (!genericApp || genericApp->getArgCount() < 2)
-        return {};
-
-    return {
-        as<Type>(genericApp->getArg(0)),
-        as<SubtypeWitness>(genericApp->getArg(1)->resolve()),
-    };
+    switch (stageKind)
+    {
+    case StructuralRayTracingStageKind::ClosestHit:
+        return StructuralRayTracingAssociatedTypeKind::ClosestHitShaderContext;
+    case StructuralRayTracingStageKind::AnyHit:
+        return StructuralRayTracingAssociatedTypeKind::AnyHitShaderContext;
+    case StructuralRayTracingStageKind::Intersection:
+        return StructuralRayTracingAssociatedTypeKind::IntersectionStageContext;
+    case StructuralRayTracingStageKind::Miss:
+        return StructuralRayTracingAssociatedTypeKind::MissShaderContext;
+    case StructuralRayTracingStageKind::Callable:
+        return StructuralRayTracingAssociatedTypeKind::CallableShaderContext;
+    default:
+        SLANG_UNEXPECTED("invalid structural ray-tracing stage kind");
+    }
 }
 
 static bool _populateStructuralEntryPointInfo(
     StructuralRayTracingDeclRegistry& registry,
     SemanticsVisitor* visitor,
     StructuralRayTracingStageKind stageKind,
+    SubtypeWitness* stageWitness,
     FuncDecl* invokeMethod,
     StructuralRayTracingEntryPointInfo* outInfo)
 {
     outInfo->stageKind = stageKind;
     outInfo->invokeMethod = invokeMethod;
-    auto context = _getStructuralStageContextInfo(invokeMethod);
-    outInfo->contextType = context.type;
-    if (!context.type || !context.witness)
-        return false;
-
     auto astBuilder = visitor->getASTBuilder();
+    auto contextRequirement = _getStructuralStageContextRequirement(stageKind);
+    outInfo->contextType =
+        registry.resolveAssociatedType(astBuilder, stageWitness, contextRequirement);
+    auto contextWitness =
+        registry.resolveAssociatedTypeConstraint(astBuilder, stageWitness, contextRequirement);
+    if (!outInfo->contextType || !contextWitness)
+        return false;
 
     switch (stageKind)
     {
@@ -527,23 +526,19 @@ static bool _populateStructuralEntryPointInfo(
         {
             outInfo->recordType = registry.resolveAssociatedType(
                 astBuilder,
-                context.witness,
-                StructuralRayTracingAssociatedTypeKind::HitRecord);
-            if (stageKind == StructuralRayTracingStageKind::Intersection)
-                return outInfo->recordType != nullptr;
-
-            auto traceContextWitness = registry.resolveAssociatedTypeConstraint(
-                astBuilder,
-                context.witness,
-                StructuralRayTracingAssociatedTypeKind::HitTraceContext);
-            outInfo->payloadType = registry.resolveAssociatedType(
-                astBuilder,
-                traceContextWitness,
-                StructuralRayTracingAssociatedTypeKind::TracePayload);
+                contextWitness,
+                StructuralRayTracingAssociatedTypeKind::StageRecord);
+            if (stageKind != StructuralRayTracingStageKind::Intersection)
+            {
+                outInfo->payloadType = registry.resolveAssociatedType(
+                    astBuilder,
+                    contextWitness,
+                    StructuralRayTracingAssociatedTypeKind::PayloadContextPayload);
+            }
 
             auto primitiveWitness = registry.resolveAssociatedTypeConstraint(
                 astBuilder,
-                context.witness,
+                contextWitness,
                 StructuralRayTracingAssociatedTypeKind::HitPrimitive);
             outInfo->hitAttributesType = registry.resolveAssociatedType(
                 astBuilder,
@@ -551,37 +546,35 @@ static bool _populateStructuralEntryPointInfo(
                 StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes);
             auto primitive = registry.resolveAssociatedType(
                 astBuilder,
-                context.witness,
+                contextWitness,
                 StructuralRayTracingAssociatedTypeKind::HitPrimitive);
             outInfo->hitAttributesKind = registry.getHitAttributesKind(primitive);
-            return outInfo->payloadType && outInfo->recordType && outInfo->hitAttributesType &&
+            return (stageKind == StructuralRayTracingStageKind::Intersection ||
+                    outInfo->payloadType) &&
+                   outInfo->recordType && outInfo->hitAttributesType &&
                    outInfo->hitAttributesKind != StructuralRayTracingHitAttributesKind::None;
         }
     case StructuralRayTracingStageKind::Miss:
         {
-            auto traceContextWitness = registry.resolveAssociatedTypeConstraint(
-                astBuilder,
-                context.witness,
-                StructuralRayTracingAssociatedTypeKind::MissTraceContext);
             outInfo->payloadType = registry.resolveAssociatedType(
                 astBuilder,
-                traceContextWitness,
-                StructuralRayTracingAssociatedTypeKind::TracePayload);
+                contextWitness,
+                StructuralRayTracingAssociatedTypeKind::PayloadContextPayload);
             outInfo->recordType = registry.resolveAssociatedType(
                 astBuilder,
-                context.witness,
-                StructuralRayTracingAssociatedTypeKind::MissRecord);
+                contextWitness,
+                StructuralRayTracingAssociatedTypeKind::StageRecord);
             return outInfo->payloadType && outInfo->recordType;
         }
     case StructuralRayTracingStageKind::Callable:
         outInfo->callableDataType = registry.resolveAssociatedType(
             astBuilder,
-            context.witness,
+            contextWitness,
             StructuralRayTracingAssociatedTypeKind::CallableData);
         outInfo->recordType = registry.resolveAssociatedType(
             astBuilder,
-            context.witness,
-            StructuralRayTracingAssociatedTypeKind::CallableRecord);
+            contextWitness,
+            StructuralRayTracingAssociatedTypeKind::StageRecord);
         return outInfo->callableDataType && outInfo->recordType;
     default:
         return false;
@@ -622,6 +615,7 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     visitor.ensureDecl(stageTypeDeclRef, DeclCheckState::ReadyForConformances);
 
     FunctionDeclBase* stageImplementations[int(StructuralRayTracingStageKind::Count)] = {};
+    SubtypeWitness* stageWitnesses[int(StructuralRayTracingStageKind::Count)] = {};
     auto stageType = DeclRefType::create(linkage->getASTBuilder(), stageTypeDeclRef);
     outInfo->stageType = stageType;
     for (auto facet : visitor.getShared()->getInheritanceInfo(stageType).facets)
@@ -630,11 +624,19 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
         auto kind = registry.getStageKind(interfaceDeclRef.getDecl());
         if (kind != StructuralRayTracingStageKind::Count)
         {
-            stageImplementations[int(kind)] = _getStageImplementationFromSubtypeWitness(
-                visitor.getASTBuilder(),
-                registry,
-                kind,
-                facet->subtypeWitness);
+            // `IIntersectionShader` inherits the non-executable `IIntersectionStage` marker, so
+            // inheritance discovery reports both facets for one implementation. Only the
+            // executable interface has an `invoke` requirement; do not let the marker's empty
+            // lookup erase the implementation found through `IIntersectionShader`.
+            if (auto implementation = _getStageImplementationFromSubtypeWitness(
+                    visitor.getASTBuilder(),
+                    registry,
+                    kind,
+                    facet->subtypeWitness))
+            {
+                stageImplementations[int(kind)] = implementation;
+                stageWitnesses[int(kind)] = facet->subtypeWitness;
+            }
         }
     }
 
@@ -704,6 +706,7 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
             registry,
             &visitor,
             selectedStage,
+            stageWitnesses[int(selectedStage)],
             invokeMethod,
             outInfo))
     {
@@ -1043,6 +1046,77 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(Invok
         StructuralRayTracingRuntimeTypeKind::StageInput,
         invalidType,
         invoke->functionExpr->loc);
+    return true;
+}
+
+bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingEmptyPayloadArgument(InvokeExpr* invoke)
+{
+    auto functionDeclRefExpr = as<DeclRefExpr>(invoke->functionExpr);
+    auto functionDecl = functionDeclRefExpr
+                            ? as<FunctionDeclBase>(functionDeclRefExpr->declRef.getDecl())
+                            : nullptr;
+    if (!functionDecl)
+        return false;
+
+    auto& registry = getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto traceMethodInfo = registry.getTraceMethodInfo(functionDecl);
+    if (!traceMethodInfo ||
+        traceMethodInfo->kind != StructuralRayTracingTraceMethodKind::ExplicitPayload)
+        return false;
+
+    auto parameters = functionDecl->getParameters();
+    SLANG_RELEASE_ASSERT(
+        traceMethodInfo->payloadParameterIndex >= 0 &&
+        traceMethodInfo->payloadParameterIndex < parameters.getCount() &&
+        traceMethodInfo->payloadParameterIndex < invoke->arguments.getCount());
+    auto payloadParameter = parameters[traceMethodInfo->payloadParameterIndex];
+    auto payloadType =
+        functionDeclRefExpr->declRef.substitute(m_astBuilder, payloadParameter->type.type);
+
+    if (!isSemanticallyEmptyStructuralRayTracingPayload(m_astBuilder, payloadType))
+        return false;
+
+    getSink()->diagnose(Diagnostics::StructuralRayTracingEmptyPayloadValue{
+        .payloadType = payloadType,
+        .location = invoke->arguments[traceMethodInfo->payloadParameterIndex]->loc});
+    return true;
+}
+
+bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingEmptyPayloadAccess(
+    DeclRefExpr* propertyExpr)
+{
+    auto& registry = getLinkage()->getStructuralRayTracingDeclRegistry();
+    if (!registry.isInitialized())
+        return false;
+
+    auto propertyDeclRef = propertyExpr->declRef.as<PropertyDecl>();
+    if (!propertyDeclRef)
+        return false;
+
+    // A checked `input.payload` remains a property-valued `MemberExpr`; choosing its `ref`
+    // accessor is deliberately deferred until storage lowering. Authenticate the property through
+    // that trusted accessor, but use the checked member expression's specialized type as the
+    // semantic source of truth for `Context.Payload`.
+    bool isPayloadProperty = false;
+    for (auto accessorDeclRef :
+         getMembersOfType<AccessorDecl>(m_astBuilder, propertyDeclRef.as<ContainerDecl>()))
+    {
+        if (registry.getStageInputOperationKind(accessorDeclRef.getDecl()) ==
+            StructuralRayTracingStageInputOperationKind::Payload)
+        {
+            isPayloadProperty = true;
+            break;
+        }
+    }
+    if (!isPayloadProperty ||
+        !isSemanticallyEmptyStructuralRayTracingPayload(m_astBuilder, propertyExpr->type.type))
+    {
+        return false;
+    }
+
+    getSink()->diagnose(Diagnostics::StructuralRayTracingEmptyPayloadValue{
+        .payloadType = propertyExpr->type.type,
+        .location = propertyExpr->loc});
     return true;
 }
 

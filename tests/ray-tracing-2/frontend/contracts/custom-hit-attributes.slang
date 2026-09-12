@@ -7,7 +7,6 @@ struct TestRecord {}
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -15,6 +14,7 @@ struct TestTraceContext : rt::ITraceContext
 struct TriangleContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::TrianglePrimitive;
     typealias Record = TestRecord;
 }
@@ -27,6 +27,7 @@ struct CustomAttributes
 struct ProceduralContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::BoundingBoxPrimitive<CustomAttributes>;
     typealias Record = TestRecord;
 }

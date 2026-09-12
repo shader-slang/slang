@@ -3,129 +3,100 @@ implementing raytracing;
 namespace rt
 {
 
-public interface IShaderGroupSlot
-{
-    static const int index;
-}
-
-public struct ShaderGroupSlot<let indexValue : int> : IShaderGroupSlot
-{
-    public static const int index = indexValue;
-}
-
-public typealias HitGroupSlot<let indexValue : int> = ShaderGroupSlot<indexValue>;
-public typealias MissSlot<let indexValue : int> = ShaderGroupSlot<indexValue>;
-public typealias CallableSlot<let indexValue : int> = ShaderGroupSlot<indexValue>;
-
-/// Describes the closest-hit, any-hit, and intersection stages associated with one hit record.
+/// Describes the closest-hit, any-hit, and intersection stages available as one native hit group.
 ///
-/// All three stages must use the group's `Context`, so the type system fixes one payload,
-/// primitive, record, and custom-attribute contract for the complete hit group.
+/// The group describes executable code and its shared context, not a physical SBT record. A host
+/// may place the same group in any number of records and provide different `Context.Record` values.
 public interface IHitGroup
 {
-    associatedtype Slot : IShaderGroupSlot;
-    associatedtype Context : IHitContext;
-    associatedtype ClosestHit : IClosestHitShader;
-    associatedtype AnyHit : IAnyHitShader;
-    associatedtype Intersection : IIntersectionStage;
+    associatedtype Context;
+    __constraint Context : IHitContext;
+    associatedtype ClosestHit;
+    __constraint ClosestHit : IClosestHitShader;
+    associatedtype AnyHit;
+    __constraint AnyHit : IAnyHitShader;
+    associatedtype Intersection;
+    __constraint Intersection : IIntersectionStage;
     __constraint ClosestHit.Context == Context;
     __constraint AnyHit.Context == Context;
     __constraint Intersection.Context == Context;
 }
 
-/// Describes the miss stage associated with one miss record.
+/// Marks the closed set of hit groups available to a trace program schema.
 ///
-/// The explicit constraint makes the group's payload and record context identical to the context
-/// declared by its miss-stage implementation.
-public interface IMissGroup
-{
-    associatedtype Slot : IShaderGroupSlot;
-    associatedtype Context : IMissGroupContext;
-    associatedtype Miss : IMissShader;
-    __constraint Miss.Context == Context;
-}
+/// The interface is sealed so the compiler only needs to decode the standard list forms.
+[sealed]
+public interface IHitGroupList
+{}
 
-/// Describes the callable stage associated with one callable record.
+/// Marks the closed set of miss shaders available to a trace program schema.
 ///
-/// The explicit constraint makes the group's callable-data and record context identical to the
-/// context declared by its callable-stage implementation.
-public interface ICallableGroup
-{
-    associatedtype Slot : IShaderGroupSlot;
-    associatedtype Context : ICallableGroupContext;
-    associatedtype Callable : ICallableShader;
-    __constraint Callable.Context == Context;
-}
-
+/// A miss SBT record binds one shader, so miss entries do not need a wrapper group type.
 [sealed]
-public interface IHitGroupList<TraceContext>
-    where TraceContext : ITraceContext
-{
-    static const int count;
-}
+public interface IMissShaderList
+{}
 
+/// Marks the closed set of callable shaders available to a trace program schema.
+///
+/// A callable SBT record binds one shader, so callable entries do not need a wrapper group type.
 [sealed]
-public interface IMissGroupList<TraceContext>
-    where TraceContext : ITraceContext
-{
-    static const int count;
-}
+public interface ICallableShaderList
+{}
 
-[sealed]
-public interface ICallableGroupList<TraceContext>
-    where TraceContext : ITraceContext
-{
-    static const int count;
-}
-
-public struct HitGroupList<TraceContext, each Group> : IHitGroupList<TraceContext>
-    where TraceContext : ITraceContext
-    where Group : IHitGroup
-    where expand each Group.Context.TraceContext == TraceContext
+/// Lists the hit-group implementations available to a trace program schema.
+///
+/// Declaration order determines the dense function index within each payload partition. It does
+/// not determine where a host places records in the runtime SBT.
+public struct HitGroupList<each Group> : IHitGroupList
+    where expand each Group : IHitGroup
 {
     public static const int count = countof(Group);
 }
 
-public struct MissGroupList<TraceContext, each Group> : IMissGroupList<TraceContext>
-    where TraceContext : ITraceContext
-    where Group : IMissGroup
-    where expand each Group.Context.TraceContext == TraceContext
+/// Lists the miss-stage implementations available to a trace program schema.
+///
+/// Declaration order determines the dense function index within each payload partition.
+public struct MissShaderList<each Shader> : IMissShaderList
+    where expand each Shader : IMissShader
 {
-    public static const int count = countof(Group);
+    public static const int count = countof(Shader);
 }
 
-public struct CallableGroupList<TraceContext, each Group> : ICallableGroupList<TraceContext>
-    where TraceContext : ITraceContext
-    where Group : ICallableGroup
-    where expand each Group.Context.TraceContext == TraceContext
+/// Lists the callable-stage implementations available to a trace program schema.
+///
+/// Declaration order determines the program-wide dense function index.
+public struct CallableShaderList<each Shader> : ICallableShaderList
+    where expand each Shader : ICallableShader
 {
-    public static const int count = countof(Group);
+    public static const int count = countof(Shader);
 }
 
-public struct NoHitGroups<TraceContext> : IHitGroupList<TraceContext>
-    where TraceContext : ITraceContext
-{
-    public static const int count = 0;
-}
+/// Selects an empty hit-group section.
+public struct NoHitGroups : IHitGroupList
+{}
 
-public struct NoMissGroups<TraceContext> : IMissGroupList<TraceContext>
-    where TraceContext : ITraceContext
-{
-    public static const int count = 0;
-}
+/// Selects an empty miss-shader section.
+public struct NoMissShaders : IMissShaderList
+{}
 
-public struct NoCallableGroups<TraceContext> : ICallableGroupList<TraceContext>
-    where TraceContext : ITraceContext
-{
-    public static const int count = 0;
-}
+/// Selects an empty callable-shader section.
+public struct NoCallableShaders : ICallableShaderList
+{}
 
+/// Describes the finite set of ray-tracing code available to one linked program.
+///
+/// The schema contains no physical SBT positions. Reflection maps these entry types to target
+/// identifiers or link-specific function indices that the host writes into runtime records.
 public interface ITraceProgramSchema
 {
-    associatedtype TraceContext : ITraceContext;
-    associatedtype MissGroups : IMissGroupList<TraceContext>;
-    associatedtype HitGroups : IHitGroupList<TraceContext>;
-    associatedtype CallableGroups : ICallableGroupList<TraceContext>;
+    associatedtype TraceContext;
+    __constraint TraceContext : ITraceContext;
+    associatedtype HitGroups;
+    __constraint HitGroups : IHitGroupList;
+    associatedtype MissShaders;
+    __constraint MissShaders : IMissShaderList;
+    associatedtype CallableShaders;
+    __constraint CallableShaders : ICallableShaderList;
 }
 
 } // namespace rt

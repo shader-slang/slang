@@ -6,7 +6,6 @@ struct MyPayload {}
 
 struct MyTraceContext : rt::ITraceContext
 {
-    typealias Payload = MyPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -14,9 +13,9 @@ struct MyTraceContext : rt::ITraceContext
 struct MySchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = MyTraceContext;
-    typealias HitGroups = rt::NoHitGroups<MyTraceContext>;
-    typealias MissGroups = rt::NoMissGroups<MyTraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<MyTraceContext>;
+    typealias HitGroups = rt::NoHitGroups;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 RWStructuredBuffer<uint> output;

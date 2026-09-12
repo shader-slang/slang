@@ -9,20 +9,32 @@ struct Payload
 
 struct TraceContext : rt::ITraceContext
 {
-    typealias Payload = ::Payload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
 
-struct Schema : rt::ITraceProgramSchema
-/*CHECK:
-       ^^^^^^ the same module also uses the structural API
-*/
+struct MissContext : rt::IPayloadContext
 {
     typealias TraceContext = ::TraceContext;
-    typealias HitGroups = rt::NoHitGroups<::TraceContext>;
-    typealias MissGroups = rt::NoMissGroups<::TraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<::TraceContext>;
+    typealias Payload = ::Payload;
+    typealias Record = void;
+}
+
+struct StructuralMiss : rt::IMissShader
+/*CHECK:
+       ^^^^^^^^^^^^^^ the same module also uses the structural API
+*/
+{
+    typealias Context = MissContext;
+    void invoke(rt::MissInput<MissContext> input) {}
+}
+
+struct Schema : rt::ITraceProgramSchema
+{
+    typealias TraceContext = ::TraceContext;
+    typealias HitGroups = rt::NoHitGroups;
+    typealias MissShaders = rt::MissShaderList<StructuralMiss>;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 rt::AccelerationStructure scene;

@@ -3,29 +3,31 @@
 
 import slang.raytracing;
 
-struct PayloadData {}
+struct PayloadData
+{
+    uint value;
+}
 
 struct MyTraceContext : rt::ITraceContext
 {
-    typealias Payload = PayloadData;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
 
-struct FakeHitGroups : rt::IHitGroupList<MyTraceContext>
-//CHECK:                   ^^^^^^^^^^^^^ cannot inherit from type 'rt.IHitGroupList<MyTraceContext>' marked 'sealed' in module 'raytracing'
+struct FakeHitGroups : rt::IHitGroupList
+//CHECK:                   ^^^^^^^^^^^^^ cannot inherit from type 'rt.IHitGroupList' marked 'sealed' in module 'raytracing'
 {
     static const int count = 1;
 }
 
-struct FakeMissGroups : rt::IMissGroupList<MyTraceContext>
-//CHECK:                    ^^^^^^^^^^^^^^ cannot inherit from type 'rt.IMissGroupList<MyTraceContext>' marked 'sealed' in module 'raytracing'
+struct FakeMissShaders : rt::IMissShaderList
+//CHECK:                     ^^^^^^^^^^^^^^^ cannot inherit from type 'rt.IMissShaderList' marked 'sealed' in module 'raytracing'
 {
     static const int count = 1;
 }
 
-struct FakeCallableGroups : rt::ICallableGroupList<MyTraceContext>
-//CHECK:                        ^^^^^^^^^^^^^^^^^^ cannot inherit from type 'rt.ICallableGroupList<MyTraceContext>' marked 'sealed' in module 'raytracing'
+struct FakeCallableShaders : rt::ICallableShaderList
+//CHECK:                         ^^^^^^^^^^^^^^^^^^^ cannot inherit from type 'rt.ICallableShaderList' marked 'sealed' in module 'raytracing'
 {
     static const int count = 1;
 }
@@ -34,8 +36,8 @@ struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = MyTraceContext;
     typealias HitGroups = FakeHitGroups;
-    typealias MissGroups = rt::NoMissGroups<TraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<TraceContext>;
+    typealias MissShaders = FakeMissShaders;
+    typealias CallableShaders = FakeCallableShaders;
 }
 
 rt::AccelerationStructure scene;

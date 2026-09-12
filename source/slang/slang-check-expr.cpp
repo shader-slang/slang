@@ -4287,6 +4287,9 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
         if (diagnoseInvalidStructuralRayTracingGenericArguments(invoke))
             return CreateErrorExpr(invoke);
 
+        if (diagnoseInvalidStructuralRayTracingEmptyPayloadArgument(invoke))
+            return CreateErrorExpr(invoke);
+
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
         {
             if (!funcType->getErrorType()->equals(m_astBuilder->getBottomType()))
@@ -9121,7 +9124,14 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
             }
         }
     }
-    return createLookupResultExpr(expr->name, lookupResult, expr->baseExpression, expr->loc, expr);
+    auto resultExpr =
+        createLookupResultExpr(expr->name, lookupResult, expr->baseExpression, expr->loc, expr);
+    if (auto propertyExpr = as<DeclRefExpr>(resultExpr))
+    {
+        if (diagnoseInvalidStructuralRayTracingEmptyPayloadAccess(propertyExpr))
+            return CreateErrorExpr(propertyExpr);
+    }
+    return resultExpr;
 }
 
 Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)

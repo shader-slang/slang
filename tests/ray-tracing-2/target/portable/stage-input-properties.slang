@@ -23,7 +23,6 @@ struct TestRecord {}
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -31,6 +30,7 @@ struct TestTraceContext : rt::ITraceContext
 struct TriangleContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::TrianglePrimitive;
     typealias Record = TestRecord;
 }
@@ -43,13 +43,15 @@ struct CustomAttributes
 struct ProceduralContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::BoundingBoxPrimitive<CustomAttributes>;
     typealias Record = TestRecord;
 }
 
-struct MissContext : rt::IMissGroupContext
+struct MissContext : rt::IPayloadContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Record = TestRecord;
 }
 
@@ -200,7 +202,6 @@ typealias MissStage = Miss;
 
 struct TriangleHitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = TriangleContext;
     typealias ClosestHit = ClosestHitStage;
     typealias AnyHit = AnyHitStage;
@@ -209,27 +210,19 @@ struct TriangleHitGroup : rt::IHitGroup
 
 struct ProceduralHitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<1>;
     typealias Context = ProceduralContext;
     typealias ClosestHit = rt::NoClosestHit<Context>;
     typealias AnyHit = rt::NoAnyHit<Context>;
     typealias Intersection = IntersectionStage;
 }
 
-struct TestMissGroup : rt::IMissGroup
-{
-    typealias Slot = rt::MissSlot<0>;
-    typealias Context = MissContext;
-    typealias Miss = MissStage;
-}
-
 struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups =
-        rt::HitGroupList<TestTraceContext, TriangleHitGroup, ProceduralHitGroup>;
-    typealias MissGroups = rt::MissGroupList<TestTraceContext, TestMissGroup>;
-    typealias CallableGroups = rt::NoCallableGroups<TestTraceContext>;
+        rt::HitGroupList<TriangleHitGroup, ProceduralHitGroup>;
+    typealias MissShaders = rt::MissShaderList<MissStage>;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 rt::AccelerationStructure scene;
@@ -265,7 +258,8 @@ void main()
 // DXILLAYOUT-DAG: Intersection
 // DXILLAYOUT-DAG: Miss
 
-// METALLAYOUT-DAG: {{\[\[visible\]\]}} void ClosestHit_
+// The Metal emitter sanitizes the compiler-owned physical adapter name for source output.
+// METALLAYOUT-DAG: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}
 // METALLAYOUT-DAG: {{\[\[intersection\(triangle,}}
 // METALLAYOUT-DAG: uint primitiveIndex_{{[0-9]+}} {{\[\[primitive_id\]\]}}
 // METALLAYOUT-DAG: uint geometryIndex_{{[0-9]+}} {{\[\[geometry_id\]\]}}

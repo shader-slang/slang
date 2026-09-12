@@ -1,7 +1,11 @@
 #include "slang-ir-synthesize-structural-ray-tracing.h"
 
+#include "slang-ir-clone.h"
+#include "slang-ir-dominators.h"
+#include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-structural-ray-tracing.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-structural-ray-tracing.h"
@@ -59,12 +63,16 @@ static void _addStructuralRayTracingEntryPointInfo(
     StructuralRayTracingStageKind stageKind,
     IRFunc* invoke,
     IRType* stageType,
+    IRStringLit* stageSourceTypeName,
+    IRStringLit* stageTypeIdentity,
     IRType* contextType,
     IRType* payloadType,
+    IRType* payloadSemanticType,
     IRType* recordType,
     IRType* hitAttributesType,
     StructuralRayTracingHitAttributesKind hitAttributesKind,
-    IRType* callableDataType)
+    IRType* callableDataType,
+    IRIntegerValue payloadLocation)
 {
     addStructuralRayTracingEntryPointInfo(
         builder,
@@ -73,33 +81,109 @@ static void _addStructuralRayTracingEntryPointInfo(
             .stageKind = stageKind,
             .invoke = invoke,
             .stageType = stageType,
+            .stageSourceTypeName = stageSourceTypeName,
+            .stageTypeIdentity = stageTypeIdentity,
             .contextType = contextType,
             .payloadType = payloadType,
+            .payloadSemanticType = payloadSemanticType,
             .recordType = recordType,
             .hitAttributesType = hitAttributesType,
             .callableDataType = callableDataType,
             .hitAttributesKind = hitAttributesKind,
+            .payloadLocation = payloadLocation,
         });
 }
 
 struct StructuralRayTracingGeneratedEntryPoint
 {
     StructuralRayTracingStageKind stageKind;
-    IRFunc* invoke;
+    IRStringLit* stageSourceTypeName;
+    IRStringLit* stageTypeIdentity;
+    String physicalName;
     IRFunc* adapter;
 };
 
 static IRFunc* _findGeneratedStructuralRayTracingEntryPoint(
     const List<StructuralRayTracingGeneratedEntryPoint>& generated,
     StructuralRayTracingStageKind stageKind,
-    IRFunc* invoke)
+    IRStringLit* stageTypeIdentity,
+    UnownedStringSlice physicalName)
+{
+    // A schema may list the same stage in many records, and those exact requests should share one
+    // native adapter. A renamed selected entry point is a different request even when the schema
+    // also references that same semantic stage: the selected adapter keeps the client-provided
+    // symbol while the schema materializes the default symbol advertised by reflection.
+    for (auto& item : generated)
+    {
+        if (item.stageKind == stageKind &&
+            item.stageTypeIdentity->getStringSlice() == stageTypeIdentity->getStringSlice() &&
+            item.physicalName.getUnownedSlice() == physicalName)
+        {
+            return item.adapter;
+        }
+    }
+    return nullptr;
+}
+
+static const StructuralRayTracingGeneratedEntryPoint* _findStructuralRayTracingPhysicalNameOwner(
+    const List<StructuralRayTracingGeneratedEntryPoint>& generated,
+    UnownedStringSlice physicalName)
 {
     for (auto& item : generated)
     {
-        if (item.stageKind == stageKind && item.invoke == invoke)
-            return item.adapter;
+        if (item.physicalName.getUnownedSlice() == physicalName)
+            return &item;
     }
     return nullptr;
+}
+
+static bool _validateStructuralRayTracingPhysicalNameOwner(
+    const List<StructuralRayTracingGeneratedEntryPoint>& generated,
+    StructuralRayTracingStageKind stageKind,
+    IRStringLit* stageSourceTypeName,
+    IRStringLit* stageTypeIdentity,
+    UnownedStringSlice physicalName,
+    SourceLoc location,
+    DiagnosticSink* sink)
+{
+    auto owner = _findStructuralRayTracingPhysicalNameOwner(generated, physicalName);
+    if (!owner || (owner->stageKind == stageKind && owner->stageTypeIdentity->getStringSlice() ==
+                                                        stageTypeIdentity->getStringSlice()))
+    {
+        return true;
+    }
+
+    // Preparation has no diagnostic sink, so retain both requests and let the post-specialization
+    // synthesis boundary report the conflict. That later boundary is also where schema-generated
+    // and explicitly selected adapters first coexist.
+    if (!sink)
+        return true;
+
+    sink->diagnose(Diagnostics::StructuralRayTracingEntryPointNameCollision{
+        .physicalName = String(physicalName),
+        .firstStage = String(owner->stageSourceTypeName->getStringSlice()),
+        .secondStage = String(stageSourceTypeName->getStringSlice()),
+        .location = location});
+    return false;
+}
+
+static String _getRequestedStructuralRayTracingEntryPointName(
+    StructuralRayTracingStageKind stageKind,
+    IRFunc* invoke,
+    IRStringLit* stageSourceTypeName)
+{
+    SLANG_RELEASE_ASSERT(invoke && stageSourceTypeName);
+    auto result = getStructuralRayTracingEntryPointName(stageSourceTypeName->getStringSlice());
+    // The selected source function carries the component API's rename until the preparation pass
+    // replaces it. Schema-only functions have no entry-point decoration and therefore retain the
+    // deterministic default name.
+    if (auto entryPoint = invoke->findDecoration<IREntryPointDecoration>())
+    {
+        auto selectedStage = entryPoint->getProfile().getStage();
+        SLANG_RELEASE_ASSERT(selectedStage == _getStructuralRayTracingNativeStage(stageKind));
+        result = entryPoint->getName()->getStringSlice();
+    }
+    return result;
 }
 
 static IRFunc* _generateStructuralRayTracingEntryPoint(
@@ -108,6 +192,9 @@ static IRFunc* _generateStructuralRayTracingEntryPoint(
     List<StructuralRayTracingGeneratedEntryPoint>& generated,
     StructuralRayTracingStageKind stageKind,
     IRType* stageType,
+    IRStringLit* stageSourceTypeName,
+    IRStringLit* stageTypeIdentity,
+    bool isPresent,
     IRInst* invokeValue,
     IRType* contextType,
     IRType* payloadType = nullptr,
@@ -115,14 +202,58 @@ static IRFunc* _generateStructuralRayTracingEntryPoint(
     IRType* hitAttributesType = nullptr,
     StructuralRayTracingHitAttributesKind hitAttributesKind =
         StructuralRayTracingHitAttributesKind::None,
-    IRType* callableDataType = nullptr)
+    IRType* callableDataType = nullptr,
+    IRType* payloadSemanticType = nullptr,
+    IRIntegerValue payloadLocation = -1,
+    DiagnosticSink* sink = nullptr,
+    IRInst* diagnosticOwner = nullptr)
 {
-    auto invoke = _getStructuralRayTracingStageFunc(invokeValue);
-    if (!invoke)
-        return nullptr;
-    if (auto existing = _findGeneratedStructuralRayTracingEntryPoint(generated, stageKind, invoke))
+    SLANG_RELEASE_ASSERT(stageType && stageSourceTypeName && stageTypeIdentity && invokeValue);
+    if (!isPresent)
     {
+        SLANG_RELEASE_ASSERT(
+            as<IRVoidType>(stageType) && stageSourceTypeName->getStringSlice().getLength() == 0 &&
+            stageTypeIdentity->getStringSlice().getLength() == 0 && as<IRVoidLit>(invokeValue));
+        return nullptr;
+    }
+
+    auto invoke = _getStructuralRayTracingStageFunc(invokeValue);
+    SLANG_RELEASE_ASSERT(
+        invoke && !as<IRVoidType>(stageType) &&
+        stageSourceTypeName->getStringSlice().getLength() != 0 &&
+        stageTypeIdentity->getStringSlice().getLength() != 0);
+    SLANG_RELEASE_ASSERT(
+        !payloadType || as<IRVoidType>(payloadType) ||
+        (payloadSemanticType && payloadLocation >= 0));
+
+    auto name =
+        _getRequestedStructuralRayTracingEntryPointName(stageKind, invoke, stageSourceTypeName);
+    if (auto existing = _findGeneratedStructuralRayTracingEntryPoint(
+            generated,
+            stageKind,
+            stageTypeIdentity,
+            name.getUnownedSlice()))
+    {
+        auto info = existing->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+        SLANG_RELEASE_ASSERT(
+            !info || payloadLocation < 0 || info->getPayloadLocation()->getValue() < 0 ||
+            info->getPayloadLocation()->getValue() == payloadLocation);
         return existing;
+    }
+
+    auto diagnosticLocation = diagnosticOwner && diagnosticOwner->sourceLoc.isValid()
+                                  ? diagnosticOwner->sourceLoc
+                                  : invoke->sourceLoc;
+    if (!_validateStructuralRayTracingPhysicalNameOwner(
+            generated,
+            stageKind,
+            stageSourceTypeName,
+            stageTypeIdentity,
+            name.getUnownedSlice(),
+            diagnosticLocation,
+            sink))
+    {
+        return nullptr;
     }
 
     IRBuilder builder(module);
@@ -131,12 +262,6 @@ static IRFunc* _generateStructuralRayTracingEntryPoint(
     adapter->setFullType(builder.getFuncType(List<IRType*>(), builder.getVoidType()));
 
     auto stage = _getStructuralRayTracingNativeStage(stageKind);
-    auto name = getStructuralRayTracingEntryPointName(
-        getStructuralRayTracingSourceTypeName(stageType).getUnownedSlice());
-    // A selected structural stage may have been renamed through the component API. Preserve its
-    // physical entry-point name when replacing the selected function with this adapter.
-    if (auto entryPoint = invoke->findDecoration<IREntryPointDecoration>())
-        name = entryPoint->getName()->getStringSlice();
     builder.addNameHintDecoration(adapter, name.getUnownedSlice());
     builder.addEntryPointDecoration(
         adapter,
@@ -151,12 +276,16 @@ static IRFunc* _generateStructuralRayTracingEntryPoint(
         stageKind,
         invoke,
         stageType,
+        stageSourceTypeName,
+        stageTypeIdentity,
         contextType,
         payloadType,
+        payloadSemanticType,
         recordType,
         hitAttributesType,
         hitAttributesKind,
-        callableDataType);
+        callableDataType,
+        payloadLocation);
 
     builder.setInsertInto(adapter);
     builder.emitBlock();
@@ -167,60 +296,660 @@ static IRFunc* _generateStructuralRayTracingEntryPoint(
         .emitCallInst(invoke->getResultType(), invoke, arguments.getCount(), arguments.getBuffer());
     builder.emitReturn();
 
-    generated.add({stageKind, invoke, adapter});
+    generated.add({stageKind, stageSourceTypeName, stageTypeIdentity, name, adapter});
     ioEntryPoints.add(adapter);
     return adapter;
 }
 
-static void _validateStructuralRayTracingGroupSlot(
-    IRInst* traceOperation,
-    IRIntLit* slotIndex,
-    const char* section,
-    HashSet<IRIntegerValue>& usedSlots,
+static bool _validateStructuralRayTracingEntryTraceContext(
+    IRInst* operation,
+    IRType* schema,
+    IRType* expectedTraceContext,
+    IRType* entry,
+    IRType* actualTraceContext,
     DiagnosticSink* sink)
 {
-    auto value = slotIndex->getValue();
-    if (value < 0)
+    if (actualTraceContext == expectedTraceContext)
+        return true;
+
+    sink->diagnose(Diagnostics::StructuralRayTracingEntryTraceContextMismatch{
+        .entry = entry,
+        .actualType = actualTraceContext,
+        .schema = schema,
+        .expectedType = expectedTraceContext,
+        .location = operation->sourceLoc});
+    return false;
+}
+
+static bool _insertStructuralRayTracingEntry(
+    IRInst* operation,
+    IRType* schema,
+    IRType* entry,
+    const char* section,
+    HashSet<IRType*>& entries,
+    DiagnosticSink* sink)
+{
+    if (entries.add(entry))
+        return true;
+
+    sink->diagnose(Diagnostics::DuplicateStructuralRayTracingEntry{
+        .section = section,
+        .entry = entry,
+        .schema = schema,
+        .location = operation->sourceLoc});
+    return false;
+}
+
+// Return whether `type` has a fixed-size, ordinary value representation that every structural
+// ray-tracing target can copy through its native payload or shader-record ABI.
+//
+// Consider this example:
+//
+//     struct MaterialRecord { Texture2D texture; }
+//     struct HitContext : IHitContext { typealias Record = MaterialRecord; ... }
+//
+// AST-to-IR lowering puts the concrete `%MaterialRecord` type directly on each
+// `structuralRayTracingHitGroupInfo` decoration. Generic specialization runs before this file
+// validates those decorations, so a closed schema reaches this helper as basic, aggregate, enum,
+// or disallowed opaque IR types rather than as source declarations that need to be rediscovered.
+// Keeping this check on those canonical decoration operands gives descriptor lowering and native
+// entry-point synthesis one target-independent contract.
+static bool _isStructuralRayTracingPlainDataTypeImpl(
+    IRType* type,
+    HashSet<IRType*>& activeStructTypes)
+{
+    type = as<IRType>(unwrapAttributedType(type));
+    if (!type)
+        return false;
+
+    // A non-copyable declaration cannot become portable merely because each of its fields could
+    // otherwise be copied. `getResolvedInstForDecorations` follows the defining generic, when
+    // present, solely to find that declaration decoration; field recursion still uses the
+    // specialized concrete type below.
+    if (getResolvedInstForDecorations(type)->findDecoration<IRNonCopyableTypeDecoration>())
+        return false;
+
+    if (auto basicType = as<IRBasicType>(type))
+        return basicType->getBaseType() != BaseType::Void;
+    if (isPackedFloatType(type))
+        return true;
+
+    // Plain ABI data must have a concrete size at this boundary. A specialized vector, matrix, or
+    // array therefore carries literal dimensions; accepting a symbolic generic operand here would
+    // advertise a fixed record or payload size that target layout cannot actually compute.
+    switch (type->getOp())
     {
-        sink->diagnose(Diagnostics::InvalidStructuralRayTracingGroupSlot{
-            .section = section,
-            .slot = Int64(value),
-            .location = traceOperation->sourceLoc});
-        return;
-    }
-    if (!usedSlots.add(value))
-    {
-        sink->diagnose(Diagnostics::DuplicateStructuralRayTracingGroupSlot{
-            .section = section,
-            .slot = Int64(value),
-            .location = traceOperation->sourceLoc});
+    case kIROp_VectorType:
+        {
+            auto vectorType = cast<IRVectorType>(type);
+            return as<IRIntLit>(vectorType->getElementCount()) &&
+                   _isStructuralRayTracingPlainDataTypeImpl(
+                       vectorType->getElementType(),
+                       activeStructTypes);
+        }
+
+    case kIROp_MatrixType:
+        {
+            auto matrixType = cast<IRMatrixType>(type);
+            return as<IRIntLit>(matrixType->getRowCount()) &&
+                   as<IRIntLit>(matrixType->getColumnCount()) &&
+                   _isStructuralRayTracingPlainDataTypeImpl(
+                       matrixType->getElementType(),
+                       activeStructTypes);
+        }
+
+    case kIROp_EnumType:
+        return _isStructuralRayTracingPlainDataTypeImpl(
+            cast<IREnumType>(type)->getTagType(),
+            activeStructTypes);
+
+    case kIROp_ArrayType:
+        {
+            auto arrayType = cast<IRArrayType>(type);
+            return as<IRIntLit>(arrayType->getElementCount()) &&
+                   _isStructuralRayTracingPlainDataTypeImpl(
+                       arrayType->getElementType(),
+                       activeStructTypes);
+        }
+
+    case kIROp_StructType:
+        {
+            // A by-value cycle has no finite representation. Slang normally rejects one before IR
+            // generation, but treating it as non-plain here keeps this ABI boundary total over IR.
+            if (!activeStructTypes.add(type))
+                return false;
+
+            bool result = true;
+            for (auto field : cast<IRStructType>(type)->getFields())
+            {
+                if (!_isStructuralRayTracingPlainDataTypeImpl(
+                        field->getFieldType(),
+                        activeStructTypes))
+                {
+                    result = false;
+                    break;
+                }
+            }
+            activeStructTypes.remove(type);
+            return result;
+        }
+
+    default:
+        // This closed whitelist intentionally excludes unsized arrays, pointer/ref-like types,
+        // atomics, interfaces/existentials, resources, and all other opaque handles.
+        return false;
     }
 }
 
-static void _validateStructuralRayTracingCallableData(
-    IRStructuralRayTracingCallShader* callOperation,
+static bool _isStructuralRayTracingPlainDataType(IRType* type)
+{
+    HashSet<IRType*> activeStructTypes;
+    return _isStructuralRayTracingPlainDataTypeImpl(type, activeStructTypes);
+}
+
+enum class StructuralRayTracingDataRole
+{
+    Payload,
+    Record,
+    Callable,
+    IntersectionAttribute,
+};
+
+using StructuralRayTracingDataDiagnosticKey = KeyValuePair<IRType*, UInt>;
+
+static UnownedStringSlice _getStructuralRayTracingDataRoleName(StructuralRayTracingDataRole role)
+{
+    switch (role)
+    {
+    case StructuralRayTracingDataRole::Payload:
+        return toSlice("payload");
+    case StructuralRayTracingDataRole::Record:
+        return toSlice("record");
+    case StructuralRayTracingDataRole::Callable:
+        return toSlice("callable");
+    case StructuralRayTracingDataRole::IntersectionAttribute:
+        return toSlice("intersection-attribute");
+    default:
+        SLANG_UNEXPECTED("invalid structural ray-tracing data role");
+    }
+}
+
+static bool _validateStructuralRayTracingDataType(
+    IRInst* owner,
+    IRType* type,
+    StructuralRayTracingDataRole role,
+    HashSet<StructuralRayTracingDataDiagnosticKey>& diagnosedTypes,
     DiagnosticSink* sink)
 {
-    bool hasCallableGroup = false;
-    for (auto decoration : callOperation->getDecorations())
+    auto canonicalType = as<IRType>(unwrapAttributedType(type));
+    SLANG_RELEASE_ASSERT(canonicalType);
+    if (as<IRVoidType>(canonicalType))
     {
-        auto group = as<IRStructuralRayTracingCallableGroupInfoDecoration>(decoration);
-        if (!group)
-            continue;
-        hasCallableGroup = true;
-        if (group->getCallableDataType() != callOperation->getCallableDataType())
+        if (role == StructuralRayTracingDataRole::Record)
+            return true;
+
+        // `void` is deliberately valid for a record that carries no application data, but every
+        // transported ABI role needs a concrete type. Include the role in the deduplication key:
+        // one schema can independently misuse `void` as both CallableData and custom attributes,
+        // and reporting only the first role would hide the second contract violation.
+        StructuralRayTracingDataDiagnosticKey key(canonicalType, UInt(role));
+        if (diagnosedTypes.add(key))
         {
-            sink->diagnose(Diagnostics::StructuralRayTracingCallableDataMismatch{
-                .slot = Int64(group->getSlotIndex()->getValue()),
-                .actualType = group->getCallableDataType(),
-                .expectedType = callOperation->getCallableDataType(),
-                .location = callOperation->sourceLoc});
+            auto location =
+                owner->sourceLoc.isValid() ? owner->sourceLoc : canonicalType->sourceLoc;
+            sink->diagnose(Diagnostics::StructuralRayTracingVoidAbiData{
+                .role = _getStructuralRayTracingDataRoleName(role),
+                .location = location});
+        }
+        return false;
+    }
+
+    if (_isStructuralRayTracingPlainDataType(canonicalType))
+        return true;
+
+    // A schema commonly repeats one payload or record across several stages. Diagnose the type
+    // once at the owning trace/call operation instead of producing one follow-on error per entry.
+    StructuralRayTracingDataDiagnosticKey key(canonicalType, UInt(role));
+    if (diagnosedTypes.add(key))
+    {
+        auto location = owner->sourceLoc.isValid() ? owner->sourceLoc : canonicalType->sourceLoc;
+        sink->diagnose(Diagnostics::StructuralRayTracingRecordNotPlainData{
+            .type = canonicalType,
+            .role = _getStructuralRayTracingDataRoleName(role),
+            .location = location});
+    }
+    return false;
+}
+
+static IRInst* _findReachableStructuralRayTracingPayloadAccess(
+    IRFunc* func,
+    HashSet<IRFunc*>& visitedFunctions)
+{
+    if (!func || !visitedFunctions.add(func))
+        return nullptr;
+
+    // Only visit executable CFG blocks. This excludes operations in unreachable blocks while
+    // still following ordinary helper calls from the concrete, post-specialization stage body.
+    // `getResolvedInstForDecorations` handles a remaining specialized generic callee by resolving
+    // it to the function body selected by the call.
+    for (auto block : getReversePostorder(func))
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (inst->getOp() == kIROp_StructuralRayTracingGetPayload)
+                return inst;
+
+            if (auto call = as<IRCall>(inst))
+            {
+                auto callee = as<IRFunc>(getResolvedInstForDecorations(call->getCallee()));
+                if (auto access =
+                        _findReachableStructuralRayTracingPayloadAccess(callee, visitedFunctions))
+                {
+                    return access;
+                }
+            }
         }
     }
-    if (!hasCallableGroup)
+    return nullptr;
+}
+
+static bool _validateStructuralRayTracingEmptyPayloadAccess(
+    IRInst* invokeValue,
+    IRType* payloadType,
+    HashSet<IRInst*>& diagnosedAccesses,
+    DiagnosticSink* sink)
+{
+    if (!isSemanticallyEmptyStructuralRayTracingPayloadType(payloadType))
+        return true;
+
+    auto invoke = as<IRFunc>(getResolvedInstForDecorations(invokeValue));
+    if (!invoke)
+        return true;
+    HashSet<IRFunc*> visitedFunctions;
+    auto access = _findReachableStructuralRayTracingPayloadAccess(invoke, visitedFunctions);
+    if (!access)
+        return true;
+
+    if (diagnosedAccesses.add(access))
     {
-        sink->diagnose(Diagnostics::StructuralRayTracingCallWithoutGroups{
-            .location = callOperation->sourceLoc});
+        sink->diagnose(Diagnostics::StructuralRayTracingEmptyPayloadValueIr{
+            .payloadType = payloadType,
+            .location = access->sourceLoc});
+    }
+    return false;
+}
+
+bool validateStructuralRayTracingEntryPoint(IRFunc* entryPoint, DiagnosticSink* sink)
+{
+    auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+    if (!info)
+        return true;
+
+    HashSet<StructuralRayTracingDataDiagnosticKey> diagnosedTypes;
+    HashSet<IRInst*> diagnosedEmptyPayloadAccesses;
+    bool isValid = true;
+    auto stageKind = StructuralRayTracingStageKind(info->getStageKind()->getValue());
+    if (stageKind == StructuralRayTracingStageKind::ClosestHit ||
+        stageKind == StructuralRayTracingStageKind::AnyHit ||
+        stageKind == StructuralRayTracingStageKind::Miss)
+    {
+        isValid &= _validateStructuralRayTracingDataType(
+            entryPoint,
+            info->getPayloadType(),
+            StructuralRayTracingDataRole::Payload,
+            diagnosedTypes,
+            sink);
+        isValid &= _validateStructuralRayTracingEmptyPayloadAccess(
+            info->getInvoke(),
+            info->getPayloadType(),
+            diagnosedEmptyPayloadAccesses,
+            sink);
+    }
+    else if (stageKind == StructuralRayTracingStageKind::Callable)
+    {
+        isValid &= _validateStructuralRayTracingDataType(
+            entryPoint,
+            info->getCallableDataType(),
+            StructuralRayTracingDataRole::Callable,
+            diagnosedTypes,
+            sink);
+    }
+    if ((stageKind == StructuralRayTracingStageKind::ClosestHit ||
+         stageKind == StructuralRayTracingStageKind::AnyHit ||
+         stageKind == StructuralRayTracingStageKind::Intersection) &&
+        StructuralRayTracingHitAttributesKind(info->getHitAttributesKind()->getValue()) ==
+            StructuralRayTracingHitAttributesKind::Custom)
+    {
+        isValid &= _validateStructuralRayTracingDataType(
+            entryPoint,
+            info->getHitAttributesType(),
+            StructuralRayTracingDataRole::IntersectionAttribute,
+            diagnosedTypes,
+            sink);
+    }
+    isValid &= _validateStructuralRayTracingDataType(
+        entryPoint,
+        info->getRecordType(),
+        StructuralRayTracingDataRole::Record,
+        diagnosedTypes,
+        sink);
+    return isValid;
+}
+
+bool validateStructuralRayTracingSchemaOperation(IRInst* operation, DiagnosticSink* sink)
+{
+    auto traceOperation = as<IRStructuralRayTracingTrace>(operation);
+    auto callOperation = as<IRStructuralRayTracingCallShader>(operation);
+    SLANG_RELEASE_ASSERT(traceOperation || callOperation);
+
+    IRType* schema = as<IRType>(
+        traceOperation ? traceOperation->getProgramLayout() : callOperation->getProgramLayout());
+    IRType* expectedTraceContext = as<IRType>(
+        traceOperation ? traceOperation->getTraceContext() : callOperation->getTraceContext());
+    SLANG_RELEASE_ASSERT(schema && expectedTraceContext);
+    bool isValid = true;
+    bool isPayloadServed = !traceOperation;
+    HashSet<IRType*> hitGroups;
+    HashSet<IRType*> missShaders;
+    HashSet<IRType*> callableShaders;
+    HashSet<StructuralRayTracingDataDiagnosticKey> diagnosedDataTypes;
+    HashSet<IRInst*> diagnosedEmptyPayloadAccesses;
+    IRType* schemaCallableDataType = nullptr;
+    IRStructuralRayTracingCallableShaderInfoDecoration* firstCallableEntry = nullptr;
+
+    if (traceOperation)
+    {
+        auto methodKind =
+            StructuralRayTracingTraceMethodKind(traceOperation->getTraceMethodKind()->getValue());
+        SLANG_RELEASE_ASSERT(methodKind != StructuralRayTracingTraceMethodKind::None);
+        if (methodKind == StructuralRayTracingTraceMethodKind::ExplicitPayload &&
+            isSemanticallyEmptyStructuralRayTracingPayloadType(traceOperation->getPayloadType()))
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingEmptyPayloadValueIr{
+                .payloadType = traceOperation->getPayloadType(),
+                .location = operation->sourceLoc});
+            isValid = false;
+        }
+    }
+
+    for (auto decoration : operation->getDecorations())
+    {
+        if (auto entry = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration))
+        {
+            auto closestHit = getStructuralRayTracingHitGroupStageInvoke(
+                entry,
+                StructuralRayTracingStageKind::ClosestHit);
+            auto anyHit = getStructuralRayTracingHitGroupStageInvoke(
+                entry,
+                StructuralRayTracingStageKind::AnyHit);
+            // Resolve the intersection stage here even though payload-access validation does not
+            // consume it. This schema boundary validates all three presence records before any
+            // target-specific adapter interprets the group.
+            getStructuralRayTracingHitGroupStageInvoke(
+                entry,
+                StructuralRayTracingStageKind::Intersection);
+            isValid &= _validateStructuralRayTracingDataType(
+                operation,
+                entry->getPayloadType(),
+                StructuralRayTracingDataRole::Payload,
+                diagnosedDataTypes,
+                sink);
+            isValid &= _validateStructuralRayTracingDataType(
+                operation,
+                entry->getRecordType(),
+                StructuralRayTracingDataRole::Record,
+                diagnosedDataTypes,
+                sink);
+            if (StructuralRayTracingHitAttributesKind(entry->getHitAttributesKind()->getValue()) ==
+                StructuralRayTracingHitAttributesKind::Custom)
+            {
+                isValid &= _validateStructuralRayTracingDataType(
+                    operation,
+                    cast<IRType>(entry->getHitAttributesType()),
+                    StructuralRayTracingDataRole::IntersectionAttribute,
+                    diagnosedDataTypes,
+                    sink);
+            }
+            isValid &= _validateStructuralRayTracingEmptyPayloadAccess(
+                closestHit,
+                entry->getPayloadType(),
+                diagnosedEmptyPayloadAccesses,
+                sink);
+            isValid &= _validateStructuralRayTracingEmptyPayloadAccess(
+                anyHit,
+                entry->getPayloadType(),
+                diagnosedEmptyPayloadAccesses,
+                sink);
+            isValid &= _validateStructuralRayTracingEntryTraceContext(
+                operation,
+                schema,
+                expectedTraceContext,
+                entry->getGroupType(),
+                entry->getTraceContextType(),
+                sink);
+            isValid &= _insertStructuralRayTracingEntry(
+                operation,
+                schema,
+                entry->getGroupType(),
+                "hit-group",
+                hitGroups,
+                sink);
+            // Two distinct payload declarations may have the same native layout. Serving a trace
+            // is a source contract, so compare the specialization-aware semantic type operand,
+            // not the ABI payload type that later legalization is free to rewrite.
+            if (traceOperation &&
+                entry->getPayloadSemanticType() == traceOperation->getPayloadSemanticType())
+                isPayloadServed = true;
+        }
+        else if (auto entry = as<IRStructuralRayTracingMissShaderInfoDecoration>(decoration))
+        {
+            isValid &= _validateStructuralRayTracingDataType(
+                operation,
+                entry->getPayloadType(),
+                StructuralRayTracingDataRole::Payload,
+                diagnosedDataTypes,
+                sink);
+            isValid &= _validateStructuralRayTracingDataType(
+                operation,
+                entry->getRecordType(),
+                StructuralRayTracingDataRole::Record,
+                diagnosedDataTypes,
+                sink);
+            isValid &= _validateStructuralRayTracingEmptyPayloadAccess(
+                entry->getMiss(),
+                entry->getPayloadType(),
+                diagnosedEmptyPayloadAccesses,
+                sink);
+            isValid &= _validateStructuralRayTracingEntryTraceContext(
+                operation,
+                schema,
+                expectedTraceContext,
+                entry->getMissType(),
+                entry->getTraceContextType(),
+                sink);
+            isValid &= _insertStructuralRayTracingEntry(
+                operation,
+                schema,
+                entry->getMissType(),
+                "miss-shader",
+                missShaders,
+                sink);
+            if (traceOperation &&
+                entry->getPayloadSemanticType() == traceOperation->getPayloadSemanticType())
+                isPayloadServed = true;
+        }
+        else if (auto entry = as<IRStructuralRayTracingCallableShaderInfoDecoration>(decoration))
+        {
+            // Metal exposes one schema-wide callable visible-function table, so every callable
+            // entry must share one ABI. Validate that invariant from the complete linked schema,
+            // even when the operation that activated the schema is a trace rather than a callable
+            // dispatch. Function index zero is the declaration-order source of truth.
+            if (!firstCallableEntry || entry->getFunctionIndex()->getValue() <
+                                           firstCallableEntry->getFunctionIndex()->getValue())
+            {
+                firstCallableEntry = entry;
+                schemaCallableDataType = as<IRType>(entry->getCallableDataType());
+            }
+            isValid &= _validateStructuralRayTracingDataType(
+                operation,
+                entry->getRecordType(),
+                StructuralRayTracingDataRole::Record,
+                diagnosedDataTypes,
+                sink);
+            isValid &= _validateStructuralRayTracingDataType(
+                operation,
+                cast<IRType>(entry->getCallableDataType()),
+                StructuralRayTracingDataRole::Callable,
+                diagnosedDataTypes,
+                sink);
+            isValid &= _validateStructuralRayTracingEntryTraceContext(
+                operation,
+                schema,
+                expectedTraceContext,
+                entry->getCallableType(),
+                entry->getTraceContextType(),
+                sink);
+            isValid &= _insertStructuralRayTracingEntry(
+                operation,
+                schema,
+                entry->getCallableType(),
+                "callable-shader",
+                callableShaders,
+                sink);
+        }
+    }
+
+    if (firstCallableEntry)
+    {
+        for (auto decoration : operation->getDecorations())
+        {
+            auto entry = as<IRStructuralRayTracingCallableShaderInfoDecoration>(decoration);
+            if (!entry || entry->getCallableDataType() == schemaCallableDataType)
+                continue;
+            sink->diagnose(Diagnostics::StructuralRayTracingCallableDataMismatch{
+                .shader = entry->getCallableType(),
+                .actualType = entry->getCallableDataType(),
+                .expectedType = schemaCallableDataType,
+                .location = operation->sourceLoc});
+            isValid = false;
+        }
+    }
+    if (callOperation)
+    {
+        if (!firstCallableEntry)
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingCallWithoutShaders{
+                .location = operation->sourceLoc});
+            isValid = false;
+        }
+        else if (callOperation->getCallableDataType() != schemaCallableDataType)
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingCallableDataMismatch{
+                .shader = firstCallableEntry->getCallableType(),
+                .actualType = firstCallableEntry->getCallableDataType(),
+                .expectedType = callOperation->getCallableDataType(),
+                .location = operation->sourceLoc});
+            isValid = false;
+        }
+    }
+
+    if (!isPayloadServed)
+    {
+        sink->diagnose(Diagnostics::StructuralRayTracingPayloadNotServed{
+            .schema = schema,
+            .payloadType = traceOperation->getPayloadType(),
+            .location = operation->sourceLoc});
+        isValid = false;
+    }
+    return isValid;
+}
+
+static IRIntegerValue _materializeStructuralRayTracingPayloadLocation(
+    IRModule* module,
+    IRInst* schemaOperation,
+    IRType* payloadType,
+    IRType* payloadSemanticType,
+    IRIntegerValue location)
+{
+    auto moduleInst = module->getModuleInst();
+    // Manifest construction assigns the location before any per-entry clone. Materialization only
+    // publishes that already-decided integer beside the local cloned type; it never attempts to
+    // recover semantic identity across a later specialization boundary.
+    SLANG_RELEASE_ASSERT(location >= 0);
+
+    IRBuilder builder(module);
+    addStructuralRayTracingProgramPayloadLocation(
+        builder,
+        moduleInst,
+        payloadType,
+        payloadSemanticType,
+        location);
+    if (schemaOperation)
+    {
+        addStructuralRayTracingProgramPayloadLocation(
+            builder,
+            schemaOperation,
+            payloadType,
+            payloadSemanticType,
+            location);
+    }
+    return location;
+}
+
+static void _materializeStructuralRayTracingPayloadLocations(
+    IRModule* module,
+    const List<IRInst*>& programOperations)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(inst);
+        auto info =
+            func ? func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>() : nullptr;
+        if (!info || as<IRVoidType>(info->getPayloadType()))
+            continue;
+        auto location = _materializeStructuralRayTracingPayloadLocation(
+            module,
+            nullptr,
+            info->getPayloadType(),
+            info->getPayloadSemanticType(),
+            info->getPayloadLocation()->getValue());
+        SLANG_RELEASE_ASSERT(info->getPayloadLocation()->getValue() == location);
+    }
+
+    for (auto operation : programOperations)
+    {
+        if (auto trace = as<IRStructuralRayTracingTrace>(operation))
+        {
+            _materializeStructuralRayTracingPayloadLocation(
+                module,
+                operation,
+                trace->getPayloadType(),
+                trace->getPayloadSemanticType(),
+                trace->getPayloadLocation()->getValue());
+        }
+        for (auto decoration : operation->getDecorations())
+        {
+            if (auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration))
+            {
+                if (as<IRVoidType>(group->getPayloadType()))
+                    continue;
+                _materializeStructuralRayTracingPayloadLocation(
+                    module,
+                    operation,
+                    group->getPayloadType(),
+                    group->getPayloadSemanticType(),
+                    group->getPayloadLocation()->getValue());
+            }
+            else if (auto entry = as<IRStructuralRayTracingMissShaderInfoDecoration>(decoration))
+            {
+                _materializeStructuralRayTracingPayloadLocation(
+                    module,
+                    operation,
+                    entry->getPayloadType(),
+                    entry->getPayloadSemanticType(),
+                    entry->getPayloadLocation()->getValue());
+            }
+        }
     }
 }
 
@@ -255,13 +984,18 @@ void preparePortableStructuralRayTracingEntryPoints(IRModule* module, List<IRFun
             generated,
             stageKind,
             info->getStageType(),
+            info->getStageSourceTypeName(),
+            info->getStageTypeIdentity(),
+            true,
             info->getInvoke(),
             info->getContextType(),
             info->getPayloadType(),
             info->getRecordType(),
             info->getHitAttributesType(),
             StructuralRayTracingHitAttributesKind(info->getHitAttributesKind()->getValue()),
-            info->getCallableDataType());
+            info->getCallableDataType(),
+            info->getPayloadSemanticType(),
+            info->getPayloadLocation()->getValue());
         if (auto entryPointDecoration = entryPoint->findDecoration<IREntryPointDecoration>())
             entryPointDecoration->removeAndDeallocate();
         info->removeAndDeallocate();
@@ -275,6 +1009,7 @@ void synthesizePortableStructuralRayTracingEntryPoints(
 {
     List<IRInst*> programOperations;
     _collectProgramOperations(module->getModuleInst(), programOperations);
+    _materializeStructuralRayTracingPayloadLocations(module, programOperations);
     List<StructuralRayTracingGeneratedEntryPoint> generated;
 
     for (auto entryPoint : ioEntryPoints)
@@ -282,32 +1017,56 @@ void synthesizePortableStructuralRayTracingEntryPoints(
         if (auto info =
                 entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
         {
+            if (!validateStructuralRayTracingEntryPoint(entryPoint, sink))
+                continue;
+            auto entryPointDecoration = entryPoint->findDecoration<IREntryPointDecoration>();
+            SLANG_RELEASE_ASSERT(entryPointDecoration);
+            auto stageKind = StructuralRayTracingStageKind(info->getStageKind()->getValue());
+            auto physicalName = entryPointDecoration->getName()->getStringSlice();
+            if (_findGeneratedStructuralRayTracingEntryPoint(
+                    generated,
+                    stageKind,
+                    info->getStageTypeIdentity(),
+                    physicalName))
+            {
+                continue;
+            }
+            if (!_validateStructuralRayTracingPhysicalNameOwner(
+                    generated,
+                    stageKind,
+                    info->getStageSourceTypeName(),
+                    info->getStageTypeIdentity(),
+                    physicalName,
+                    info->getInvoke()->sourceLoc,
+                    sink))
+            {
+                continue;
+            }
             generated.add(
-                {StructuralRayTracingStageKind(info->getStageKind()->getValue()),
-                 as<IRFunc>(info->getInvoke()),
+                {stageKind,
+                 info->getStageSourceTypeName(),
+                 info->getStageTypeIdentity(),
+                 String(physicalName),
                  entryPoint});
         }
     }
 
     for (auto operation : programOperations)
     {
-        if (auto callOperation = as<IRStructuralRayTracingCallShader>(operation))
-            _validateStructuralRayTracingCallableData(callOperation, sink);
-        HashSet<IRIntegerValue> hitSlots;
-        HashSet<IRIntegerValue> missSlots;
-        HashSet<IRIntegerValue> callableSlots;
+        // Schema validation is the boundary at which every linked structural entry is visible.
+        // Do not synthesize target entry points from an invalid schema: doing so would produce
+        // follow-on diagnostics from entry points whose contexts or payloads are already known to
+        // be incompatible with this operation.
+        if (!validateStructuralRayTracingSchemaOperation(operation, sink))
+            continue;
         for (auto decoration : operation->getDecorations())
         {
             if (auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration))
             {
-                _validateStructuralRayTracingGroupSlot(
-                    operation,
-                    group->getSlotIndex(),
-                    "hit",
-                    hitSlots,
-                    sink);
                 auto hitAttributesKind = StructuralRayTracingHitAttributesKind(
                     group->getHitAttributesKind()->getValue());
+                auto payloadLocation = group->getPayloadLocation()->getValue();
+                SLANG_RELEASE_ASSERT(payloadLocation >= 0);
                 if (hitAttributesKind == StructuralRayTracingHitAttributesKind::Curve)
                 {
                     sink->diagnose(Diagnostics::StructuralRayTracingCurveRequiresMetal{
@@ -320,75 +1079,109 @@ void synthesizePortableStructuralRayTracingEntryPoints(
                     generated,
                     StructuralRayTracingStageKind::ClosestHit,
                     group->getClosestHitType(),
+                    group->getClosestHitSourceTypeName(),
+                    group->getClosestHitTypeIdentity(),
+                    group->getHasClosestHit()->getValue(),
                     group->getClosestHit(),
                     group->getContextType(),
                     group->getPayloadType(),
                     group->getRecordType(),
                     group->getHitAttributesType(),
-                    hitAttributesKind);
+                    hitAttributesKind,
+                    nullptr,
+                    group->getPayloadSemanticType(),
+                    payloadLocation,
+                    sink,
+                    operation);
                 _generateStructuralRayTracingEntryPoint(
                     module,
                     ioEntryPoints,
                     generated,
                     StructuralRayTracingStageKind::AnyHit,
                     group->getAnyHitType(),
+                    group->getAnyHitSourceTypeName(),
+                    group->getAnyHitTypeIdentity(),
+                    group->getHasAnyHit()->getValue(),
                     group->getAnyHit(),
                     group->getContextType(),
                     group->getPayloadType(),
                     group->getRecordType(),
                     group->getHitAttributesType(),
-                    hitAttributesKind);
+                    hitAttributesKind,
+                    nullptr,
+                    group->getPayloadSemanticType(),
+                    payloadLocation,
+                    sink,
+                    operation);
                 _generateStructuralRayTracingEntryPoint(
                     module,
                     ioEntryPoints,
                     generated,
                     StructuralRayTracingStageKind::Intersection,
                     group->getIntersectionType(),
+                    group->getIntersectionSourceTypeName(),
+                    group->getIntersectionTypeIdentity(),
+                    group->getHasIntersection()->getValue(),
                     group->getIntersection(),
                     group->getContextType(),
                     nullptr,
-                    group->getRecordType());
+                    group->getRecordType(),
+                    group->getHitAttributesType(),
+                    hitAttributesKind,
+                    nullptr,
+                    nullptr,
+                    -1,
+                    sink,
+                    operation);
             }
-            else if (auto group = as<IRStructuralRayTracingMissGroupInfoDecoration>(decoration))
+            else if (auto entry = as<IRStructuralRayTracingMissShaderInfoDecoration>(decoration))
             {
-                _validateStructuralRayTracingGroupSlot(
-                    operation,
-                    group->getSlotIndex(),
-                    "miss",
-                    missSlots,
-                    sink);
+                auto payloadLocation = entry->getPayloadLocation()->getValue();
+                SLANG_RELEASE_ASSERT(payloadLocation >= 0);
                 _generateStructuralRayTracingEntryPoint(
                     module,
                     ioEntryPoints,
                     generated,
                     StructuralRayTracingStageKind::Miss,
-                    group->getMissType(),
-                    group->getMiss(),
-                    group->getContextType(),
-                    group->getPayloadType(),
-                    group->getRecordType());
+                    entry->getMissType(),
+                    entry->getMissSourceTypeName(),
+                    entry->getMissTypeIdentity(),
+                    true,
+                    entry->getMiss(),
+                    entry->getContextType(),
+                    entry->getPayloadType(),
+                    entry->getRecordType(),
+                    nullptr,
+                    StructuralRayTracingHitAttributesKind::None,
+                    nullptr,
+                    entry->getPayloadSemanticType(),
+                    payloadLocation,
+                    sink,
+                    operation);
             }
-            else if (auto group = as<IRStructuralRayTracingCallableGroupInfoDecoration>(decoration))
+            else if (
+                auto entry = as<IRStructuralRayTracingCallableShaderInfoDecoration>(decoration))
             {
-                _validateStructuralRayTracingGroupSlot(
-                    operation,
-                    group->getSlotIndex(),
-                    "callable",
-                    callableSlots,
-                    sink);
                 _generateStructuralRayTracingEntryPoint(
                     module,
                     ioEntryPoints,
                     generated,
                     StructuralRayTracingStageKind::Callable,
-                    group->getCallableType(),
-                    group->getCallable(),
-                    group->getContextType(),
+                    entry->getCallableType(),
+                    entry->getCallableSourceTypeName(),
+                    entry->getCallableTypeIdentity(),
+                    true,
+                    entry->getCallable(),
+                    entry->getContextType(),
                     nullptr,
-                    group->getRecordType(),
+                    entry->getRecordType(),
                     nullptr,
                     StructuralRayTracingHitAttributesKind::None,
-                    group->getCallableDataType());
+                    entry->getCallableDataType(),
+                    nullptr,
+                    -1,
+                    sink,
+                    operation);
             }
         }
     }
@@ -777,6 +1570,16 @@ static StructuralRayTracingHitAttributesKind _getHitAttributesKind(
     return StructuralRayTracingHitAttributesKind(info->getHitAttributesKind()->getValue());
 }
 
+static void _addUniqueStructuralRayTracingPayloadType(
+    List<IRType*>& payloadTypes,
+    HashSet<IRType*>& seenPayloadTypes,
+    IRType* payloadType)
+{
+    if (as<IRVoidType>(payloadType) || !seenPayloadTypes.add(payloadType))
+        return;
+    payloadTypes.add(payloadType);
+}
+
 void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
 {
     List<IRInst*> operations;
@@ -784,13 +1587,15 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
     List<IRFunc*> structuralEntryPoints;
     _collectStructuralEntryPoints(module, structuralEntryPoints);
 
-    HashSet<IRType*> loweredPayloadTypes;
+    List<IRType*> loweredPayloadTypes;
+    HashSet<IRType*> seenPayloadTypes;
     for (auto entryPoint : structuralEntryPoints)
     {
         auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
-        auto payloadType = info->getPayloadType();
-        if (!as<IRVoidType>(payloadType))
-            loweredPayloadTypes.add(payloadType);
+        _addUniqueStructuralRayTracingPayloadType(
+            loweredPayloadTypes,
+            seenPayloadTypes,
+            info->getPayloadType());
     }
     for (auto operation : operations)
     {
@@ -799,8 +1604,25 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
 
         auto payloadPtrType = as<IRPtrTypeBase>(operation->getDataType());
         SLANG_ASSERT(payloadPtrType);
-        auto payloadType = payloadPtrType->getValueType();
-        loweredPayloadTypes.add(payloadType);
+        _addUniqueStructuralRayTracingPayloadType(
+            loweredPayloadTypes,
+            seenPayloadTypes,
+            payloadPtrType->getValueType());
+    }
+
+    for (auto entryPoint : structuralEntryPoints)
+    {
+        auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+        auto payloadType = info->getPayloadType();
+        if (as<IRVoidType>(payloadType))
+            continue;
+
+        auto location = info->getPayloadLocation()->getValue();
+        SLANG_RELEASE_ASSERT(location >= 0);
+        SLANG_RELEASE_ASSERT(
+            findStructuralRayTracingProgramPayloadLocation(
+                module->getModuleInst(),
+                info->getPayloadSemanticType()) == location);
     }
 
     for (auto payloadType : loweredPayloadTypes)
@@ -821,7 +1643,15 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
             auto info =
                 entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
             if (info->getPayloadType() == payloadType)
-                threader.findOrCreateParameter(entryPoint);
+            {
+                auto parameter = threader.findOrCreateParameter(entryPoint);
+                // Two semantic payloads can specialize to the same physical IR type. The helper
+                // parameter may therefore be shared by type, but each native entry point must use
+                // the location selected by its own semantic identity.
+                builder.addVulkanRayPayloadInDecoration(
+                    parameter,
+                    info->getPayloadLocation()->getValue());
+            }
         }
         for (auto candidate : operations)
         {
@@ -1041,33 +1871,38 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
         }
     }
 
+    // The type-specific threaders above remove the operations they lower. Recollect the surviving
+    // operations instead of walking the original list, which contains pointers to deallocated IR.
+    operations.clear();
+    _collectStageInputOperations(module->getModuleInst(), operations);
+
     IRBuilder builder(module);
     for (auto operation : operations)
     {
         auto stageInputOperation = cast<IRStructuralRayTracingStageInputOperation>(operation);
-        if (!stageInputOperation->hasFallback())
-            continue;
+        if (stageInputOperation->hasFallback())
+        {
+            builder.setInsertBefore(operation);
 
-        builder.setInsertBefore(operation);
+            List<IRInst*> arguments;
+            for (UInt i = 1; i < operation->getOperandCount(); ++i)
+                arguments.add(operation->getOperand(i));
 
-        List<IRInst*> arguments;
-        for (UInt i = 1; i < operation->getOperandCount(); ++i)
-            arguments.add(operation->getOperand(i));
-
-        auto call = builder.emitCallInst(
-            operation->getDataType(),
-            stageInputOperation->getFallback(),
-            arguments.getCount(),
-            arguments.getBuffer());
-        operation->replaceUsesWith(call);
+            auto call = builder.emitCallInst(
+                operation->getDataType(),
+                stageInputOperation->getFallback(),
+                arguments.getCount(),
+                arguments.getBuffer());
+            operation->replaceUsesWith(call);
+        }
+        else
+        {
+            // Every used operation without a source fallback must have been consumed by a
+            // type-specific lowering above. A surviving use indicates a missing ABI lowering and
+            // must not be silently discarded.
+            SLANG_RELEASE_ASSERT(!operation->hasUses());
+        }
         operation->removeAndDeallocate();
-    }
-
-    for (auto operation : operations)
-    {
-        auto stageInputOperation = cast<IRStructuralRayTracingStageInputOperation>(operation);
-        if (!stageInputOperation->hasFallback())
-            operation->removeAndDeallocate();
     }
 
     for (auto entryPoint : structuralEntryPoints)
@@ -1091,11 +1926,194 @@ static void _collectProgramOperations(IRInst* parent, List<IRInst*>& operations)
     }
 }
 
-void lowerPortableStructuralRayTracingOperations(IRModule* module)
+// Emit the standard-module fallback with the exact argument order retained by AST-to-IR lowering.
+// The producer stores those arguments in `MakeValuePack`. `lowerTuples`, which intentionally runs
+// before this target lowering, canonicalizes that container to `MakeStruct`; neither form denotes a
+// source pack argument, so the container operands become the individual call arguments here.
+static IRCall* _emitStructuralRayTracingFallbackCall(
+    IRBuilder& builder,
+    IRType* resultType,
+    IRInst* fallback,
+    IRInst* packedArguments)
+{
+    SLANG_RELEASE_ASSERT(as<IRMakeValuePack>(packedArguments) || as<IRMakeStruct>(packedArguments));
+    List<IRInst*> arguments;
+    for (UInt i = 0; i < packedArguments->getOperandCount(); ++i)
+        arguments.add(packedArguments->getOperand(i));
+    return builder.emitCallInst(resultType, fallback, arguments);
+}
+
+struct PortableStructuralRayTracingPayloadStorage
+{
+    IRType* payloadSemanticType;
+    IRType* payloadType;
+    IRIntegerValue location;
+    IRGlobalVar* variable;
+};
+
+struct PortableStructuralRayTracingTraceAdapter
+{
+    IRFunc* fallback;
+    IRType* payloadSemanticType;
+    IRFunc* adapter;
+};
+
+struct PortableStructuralRayTracingTraceLoweringContext
+{
+    IRModule* module;
+    TargetRequest* targetRequest;
+    List<PortableStructuralRayTracingPayloadStorage> payloadStorage;
+    List<PortableStructuralRayTracingTraceAdapter> adapters;
+
+    PortableStructuralRayTracingTraceLoweringContext(IRModule* module, TargetRequest* targetRequest)
+        : module(module), targetRequest(targetRequest)
+    {
+        SLANG_RELEASE_ASSERT(targetRequest);
+    }
+
+    /// Finds the compiler-owned Vulkan payload prototype referenced by `fallback`.
+    ///
+    /// The core `TraceRay` and `TraceMotionRay` implementations represent their outgoing Vulkan
+    /// payload with exactly one global carrying `[__vulkanRayPayload(-1)]`; `-1` is the existing IR
+    /// placeholder asking legalization to assign a location. Force-inlining those implementations
+    /// into the structural fallback makes the reference explicit. Walking only the fallback's
+    /// lexical instructions and inspecting their direct operands avoids the previous module-wide
+    /// global/use-list search and makes this producer/consumer contract local and checkable.
+    void findReferencedAutomaticVulkanPayloadImpl(IRInst* parent, IRGlobalVar*& ioResult)
+    {
+        for (auto inst = parent->getFirstChild(); inst; inst = inst->getNextInst())
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); ++i)
+            {
+                auto variable = as<IRGlobalVar>(inst->getOperand(i));
+                auto decoration =
+                    variable ? variable->findDecoration<IRVulkanRayPayloadDecoration>() : nullptr;
+                if (!decoration || cast<IRIntLit>(decoration->getOperand(0))->getValue() >= 0)
+                {
+                    continue;
+                }
+                SLANG_RELEASE_ASSERT(!ioResult || ioResult == variable);
+                ioResult = variable;
+            }
+            findReferencedAutomaticVulkanPayloadImpl(inst, ioResult);
+        }
+    }
+
+    IRGlobalVar* findReferencedAutomaticVulkanPayload(IRFunc* fallback)
+    {
+        IRGlobalVar* result = nullptr;
+        findReferencedAutomaticVulkanPayloadImpl(fallback, result);
+        return result;
+    }
+
+    IRGlobalVar* findOrCreatePayloadStorage(
+        IRGlobalVar* prototype,
+        IRType* payloadType,
+        IRType* payloadSemanticType,
+        IRIntegerValue location)
+    {
+        for (auto& item : payloadStorage)
+        {
+            if (item.payloadSemanticType != payloadSemanticType)
+                continue;
+
+            // Canonical aliases share an identity and therefore one native payload variable.
+            // Different realized types or locations for that identity would mean compiler-owned
+            // metadata became inconsistent after the linked-program assignment.
+            SLANG_RELEASE_ASSERT(item.payloadType == payloadType && item.location == location);
+            return item.variable;
+        }
+
+        IRBuilder builder(module);
+        builder.setInsertInto(module->getModuleInst());
+        IRCloneEnv cloneEnv;
+        auto variable = as<IRGlobalVar>(cloneInst(&cloneEnv, &builder, prototype));
+        SLANG_RELEASE_ASSERT(variable);
+        removeLinkageDecorations(variable);
+
+        auto decoration = variable->findDecoration<IRVulkanRayPayloadDecoration>();
+        auto pointerType = as<IRPtrTypeBase>(variable->getDataType());
+        SLANG_RELEASE_ASSERT(
+            decoration && cast<IRIntLit>(decoration->getOperand(0))->getValue() < 0 &&
+            pointerType && pointerType->getValueType() == payloadType);
+        decoration->setOperand(0, builder.getIntValue(builder.getIntType(), location));
+
+        payloadStorage.add({payloadSemanticType, payloadType, location, variable});
+        return variable;
+    }
+
+    IRFunc* findAdapter(IRFunc* fallback, IRType* payloadSemanticType)
+    {
+        for (auto& item : adapters)
+        {
+            if (item.fallback == fallback && item.payloadSemanticType == payloadSemanticType)
+            {
+                return item.adapter;
+            }
+        }
+        return nullptr;
+    }
+
+    IRFunc* getAdapter(IRStructuralRayTracingTrace* traceOperation)
+    {
+        auto fallback = as<IRFunc>(traceOperation->getFallback());
+        SLANG_RELEASE_ASSERT(fallback);
+        if (auto adapter = findAdapter(fallback, traceOperation->getPayloadSemanticType()))
+            return adapter;
+
+        // The portable standard-module fallback is `[ForceInline]` and calls the core `TraceRay`
+        // helper, which owns Vulkan's outgoing payload variable. Inline that helper now so this
+        // schema operation can bind the variable to its semantic payload identity before the
+        // ordinary module-wide force-inlining pass erases the call boundary.
+        performForceInlining(fallback);
+
+        auto automaticPayloadVariable = findReferencedAutomaticVulkanPayload(fallback);
+        if (!isKhronosTarget(targetRequest))
+        {
+            // HLSL and CUDA use their native TraceRay payload ABI and must not accidentally retain
+            // the Vulkan-only prototype after target-switch specialization.
+            SLANG_RELEASE_ASSERT(!automaticPayloadVariable);
+            adapters.add({fallback, traceOperation->getPayloadSemanticType(), fallback});
+            return fallback;
+        }
+
+        // Every Khronos structural trace is lowered through the core Vulkan payload placeholder.
+        // Missing storage here is a broken standard-module/compiler contract, not a request for a
+        // late best-effort location allocation.
+        SLANG_RELEASE_ASSERT(automaticPayloadVariable);
+        auto pointerType = as<IRPtrTypeBase>(automaticPayloadVariable->getDataType());
+        SLANG_RELEASE_ASSERT(
+            pointerType && pointerType->getValueType() == traceOperation->getPayloadType());
+
+        auto location = findStructuralRayTracingProgramPayloadLocation(
+            traceOperation,
+            traceOperation->getPayloadSemanticType());
+        SLANG_RELEASE_ASSERT(location >= 0);
+
+        IRCloneEnv cloneEnv;
+        auto variable = findOrCreatePayloadStorage(
+            automaticPayloadVariable,
+            traceOperation->getPayloadType(),
+            traceOperation->getPayloadSemanticType(),
+            location);
+        cloneEnv.mapOldValToNew.add(automaticPayloadVariable, variable);
+
+        IRBuilder builder(module);
+        builder.setInsertInto(module->getModuleInst());
+        auto adapter = as<IRFunc>(cloneInst(&cloneEnv, &builder, fallback));
+        SLANG_RELEASE_ASSERT(adapter);
+        removeLinkageDecorations(adapter);
+        adapters.add({fallback, traceOperation->getPayloadSemanticType(), adapter});
+        return adapter;
+    }
+};
+
+void lowerPortableStructuralRayTracingOperations(IRModule* module, TargetRequest* targetRequest)
 {
     List<IRInst*> operations;
     _collectProgramOperations(module->getModuleInst(), operations);
 
+    PortableStructuralRayTracingTraceLoweringContext traceLoweringContext(module, targetRequest);
     IRBuilder builder(module);
     for (auto operation : operations)
     {
@@ -1103,33 +2121,20 @@ void lowerPortableStructuralRayTracingOperations(IRModule* module)
         IRInst* call = nullptr;
         if (auto traceOperation = as<IRStructuralRayTracingTrace>(operation))
         {
-            IRInst* arguments[] = {
-                traceOperation->getTracer(),
-                traceOperation->getDesc(),
-                traceOperation->getAccelerationStructure(),
-                traceOperation->getDescriptor(),
-                traceOperation->getPayload(),
-            };
-            call = builder.emitCallInst(
+            call = _emitStructuralRayTracingFallbackCall(
+                builder,
                 traceOperation->getDataType(),
-                traceOperation->getFallback(),
-                SLANG_COUNT_OF(arguments),
-                arguments);
+                traceLoweringContext.getAdapter(traceOperation),
+                traceOperation->getFallbackArguments());
         }
         else
         {
             auto callOperation = cast<IRStructuralRayTracingCallShader>(operation);
-            IRInst* arguments[] = {
-                callOperation->getTracer(),
-                callOperation->getCallableIndex(),
-                callOperation->getDescriptor(),
-                callOperation->getData(),
-            };
-            call = builder.emitCallInst(
+            call = _emitStructuralRayTracingFallbackCall(
+                builder,
                 callOperation->getDataType(),
                 callOperation->getFallback(),
-                SLANG_COUNT_OF(arguments),
-                arguments);
+                callOperation->getFallbackArguments());
         }
         operation->replaceUsesWith(call);
         operation->removeAndDeallocate();

@@ -1,5 +1,7 @@
 #include "metal-test-scenes.h"
 
+#include "slang.h"
+
 #include <simd/simd.h>
 
 namespace
@@ -193,6 +195,10 @@ bool buildMetalBoundingBoxScene(
     geometry.boundingBoxStride = sizeof(MTLAxisAlignedBoundingBox);
     geometry.boundingBoxCount = 1;
     geometry.opaque = NO;
+    // Structural reflection fixes the schema-wide IFT geometry order to triangle, bounding box,
+    // then curve. The instance contributes no additional offset, so the geometry carries its
+    // reflected fixed index directly.
+    geometry.intersectionFunctionTableOffset = SLANG_STRUCTURAL_RAY_TRACING_GEOMETRY_BOUNDING_BOX;
 
     auto primitiveDescriptor = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
     primitiveDescriptor.geometryDescriptors = @[ geometry ];
@@ -255,6 +261,7 @@ bool buildMetalCurveScene(
     geometry.curveBasis = MTLCurveBasisLinear;
     geometry.curveEndCaps = MTLCurveEndCapsSphere;
     geometry.opaque = NO;
+    geometry.intersectionFunctionTableOffset = SLANG_STRUCTURAL_RAY_TRACING_GEOMETRY_CURVE;
 
     auto primitiveDescriptor = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
     primitiveDescriptor.geometryDescriptors = @[ geometry ];

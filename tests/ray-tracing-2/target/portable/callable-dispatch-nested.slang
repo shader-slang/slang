@@ -11,7 +11,6 @@ struct TestPayload
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -28,7 +27,7 @@ struct TestCallableRecord
     uint value;
 }
 
-struct TestCallableContext : rt::ICallableGroupContext
+struct TestCallableContext : rt::ICallableContext
 {
     typealias TraceContext = TestTraceContext;
     typealias CallableData = TestCallableData;
@@ -58,27 +57,13 @@ struct SecondCallable : rt::ICallableShader
     }
 }
 
-struct FirstCallableGroup : rt::ICallableGroup
-{
-    typealias Slot = rt::CallableSlot<0>;
-    typealias Context = TestCallableContext;
-    typealias Callable = FirstCallable;
-}
-
-struct SecondCallableGroup : rt::ICallableGroup
-{
-    typealias Slot = rt::CallableSlot<1>;
-    typealias Context = TestCallableContext;
-    typealias Callable = SecondCallable;
-}
-
 struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups = rt::NoHitGroups<TestTraceContext>;
-    typealias MissGroups = rt::NoMissGroups<TestTraceContext>;
-    typealias CallableGroups =
-        rt::CallableGroupList<TestTraceContext, FirstCallableGroup, SecondCallableGroup>;
+    typealias HitGroups = rt::NoHitGroups;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders =
+        rt::CallableShaderList<FirstCallable, SecondCallable>;
 }
 
 rt::TraceProgramDescriptor<TestSchema> program;

@@ -7,16 +7,16 @@ struct Record {}
 
 struct TraceContext : rt::ITraceContext
 {
-    typealias Payload = Payload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
 
 struct HitContext : rt::IHitContext
 {
-    typealias TraceContext = TraceContext;
+    typealias TraceContext = ::TraceContext;
+    typealias Payload = ::Payload;
     typealias Primitive = rt::TrianglePrimitive;
-    typealias Record = Record;
+    typealias Record = ::Record;
 }
 
 struct BadClosestHit : rt::IClosestHitShader

@@ -11,7 +11,8 @@ namespace rt
 [require(structural_raytracing_closesthit)]
 public interface IClosestHitShader
 {
-    associatedtype Context : IHitContext;
+    associatedtype Context;
+    __constraint Context : IHitContext;
     void invoke(ClosestHitInput<Context> input);
 }
 
@@ -23,7 +24,8 @@ public interface IClosestHitShader
 [require(structural_raytracing_anyhit)]
 public interface IAnyHitShader
 {
-    associatedtype Context : IHitContext;
+    associatedtype Context;
+    __constraint Context : IHitContext;
     void invoke(AnyHitInput<Context> input);
 }
 
@@ -35,8 +37,8 @@ public interface IAnyHitShader
 [sealed]
 public interface IIntersectionStage
 {
-    associatedtype Context : IHitContext;
-    void invoke(IntersectionInput<Context> input);
+    associatedtype Context;
+    __constraint Context : IHitContext;
 }
 
 /// Represents the source implementation of a procedural-primitive intersection stage.
@@ -47,6 +49,7 @@ public interface IIntersectionStage
 public interface IIntersectionShader : IIntersectionStage
 {
     __constraint Context.Primitive : ICustomIntersectionPrimitive;
+    void invoke(IntersectionInput<Context> input);
 }
 
 /// Represents the source implementation of a miss stage.
@@ -56,7 +59,8 @@ public interface IIntersectionShader : IIntersectionStage
 [require(structural_raytracing_miss)]
 public interface IMissShader
 {
-    associatedtype Context : IMissGroupContext;
+    associatedtype Context;
+    __constraint Context : IPayloadContext;
     void invoke(MissInput<Context> input);
 }
 
@@ -67,7 +71,8 @@ public interface IMissShader
 [require(structural_raytracing_callable)]
 public interface ICallableShader
 {
-    associatedtype Context : ICallableGroupContext;
+    associatedtype Context;
+    __constraint Context : ICallableContext;
     void invoke(CallableInput<Context> input);
 }
 
@@ -95,13 +100,12 @@ public struct NoAnyHit<C> : IAnyHitShader
 
 /// Selects hardware intersection instead of a user intersection stage.
 ///
-/// Its empty `invoke` satisfies the common stage contract; structural lowering recognizes this
-/// exact standard-module type and omits a procedural intersection entry point.
+/// Structural lowering recognizes this exact standard-module type and omits a procedural
+/// intersection entry point. Unlike a real `IIntersectionShader`, the placeholder has no `invoke`.
 public struct NoIntersection<C> : IIntersectionStage
     where C : IHitContext
 {
     public typealias Context = C;
-    public void invoke(IntersectionInput<C> input) {}
 }
 
 } // namespace rt

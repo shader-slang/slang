@@ -2,21 +2,36 @@
 
 import slang.raytracing;
 
-struct TestPayload {}
+struct TestPayload
+{
+    uint value;
+}
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::MultiLevelAccelerationStructure<1>;
     typealias Motion = rt::InstanceMotion;
+}
+
+struct MissContext : rt::IPayloadContext
+{
+    typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
+    typealias Record = void;
+}
+
+struct Miss : rt::IMissShader
+{
+    typealias Context = MissContext;
+    void invoke(rt::MissInput<MissContext> input) {}
 }
 
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups = rt::NoHitGroups<TestTraceContext>;
-    typealias MissGroups = rt::NoMissGroups<TestTraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<TestTraceContext>;
+    typealias HitGroups = rt::NoHitGroups;
+    typealias MissShaders = rt::MissShaderList<Miss>;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 rt::MultiLevelAccelerationStructure<1> scene;

@@ -35,10 +35,17 @@ struct StructuralRayTracingRecursiveResult
     uint32_t dispatchWidth;
 };
 
-struct StructuralRayTracingMultipleSlotsResult
+struct StructuralRayTracingRepeatedRecordResult
 {
     uint32_t stage;
     uint32_t recordValue;
+    uint32_t dispatchWidth;
+};
+
+struct StructuralRayTracingMultiplePayloadResult
+{
+    uint32_t stage;
+    uint32_t value;
     uint32_t dispatchWidth;
 };
 
@@ -81,7 +88,8 @@ void runStructuralRayTracingTriangleHitMiss(rhi::IDevice* device);
 void runStructuralRayTracingProceduralHitFilter(rhi::IDevice* device);
 void runStructuralRayTracingCallableRecord(rhi::IDevice* device);
 void runStructuralRayTracingRecursiveTrace(rhi::IDevice* device);
-void runStructuralRayTracingMultipleSlots(rhi::IDevice* device);
+void runStructuralRayTracingRepeatedRecords(rhi::IDevice* device);
+void runStructuralRayTracingMultiplePayloads(rhi::IDevice* device);
 void runStructuralRayTracingTriangleAttributesFlags(rhi::IDevice* device);
 void runStructuralRayTracingStageInputState(rhi::IDevice* device);
 
