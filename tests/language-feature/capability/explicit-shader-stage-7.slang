@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_PASS): -target spirv -entry main -allow-glsl -profile sm_5_0
-//TEST:SIMPLE(filecheck=CHECK_WARN): -target spirv -entry main -allow-glsl -profile sm_5_0 -DWARN
+//TEST:SIMPLE(filecheck=CHECK_PASS): -target spirv -entry main -profile sm_5_0
+//TEST:SIMPLE(filecheck=CHECK_WARN): -target spirv -entry main -profile sm_5_0 -DWARN
 
 // Our code will stillwarn about spirv version being below 'spirv 1.3'. This is Because we are still using `Profile` internally.
 // 'Profile' is an issue which needs to be refactored out since it only stores the info in a single integer through 'profileRaw'

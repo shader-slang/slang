@@ -1,11 +1,11 @@
-// The builtin-operator fast path must be *disabled* in GLSL-compatibility scope, where some
-// operators have different semantics owned by the `glsl` module's overloads: `mat * mat` is an
-// algebraic matrix product (not component-wise) and `vec == vec` yields a scalar `bool`
-// (all-components-equal). This test pins those semantics so a future change that re-enables the
-// fast path under GLSL scope would be caught.
+// Importing the `glsl` module into Slang source retains one legacy dialect behavior: the
+// builtin-operator fast path must be disabled because some operators have different semantics
+// owned by the module's overloads. `mat * mat` is an algebraic matrix product (not component-wise)
+// and `vec == vec` yields a scalar `bool` (all-components-equal). The import does not otherwise
+// turn this Slang source into GLSL.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -allow-glsl -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -allow-glsl -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
 import glsl;
 

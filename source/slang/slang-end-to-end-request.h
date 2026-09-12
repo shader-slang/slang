@@ -167,6 +167,16 @@ public:
         int slotIndex,
         char const* typeName) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL setAllowGLSLInput(bool value) SLANG_OVERRIDE;
+
+    /// Record whether this compile request uses the deprecated request-wide GLSL-input mode.
+    ///
+    /// This state intentionally does not live in the linkage option set. A linkage is also used to
+    /// load imported modules, while this compatibility option applies only to translation units
+    /// supplied directly to the compile request.
+    void setLegacyAllowGLSLInput(bool value) { m_legacyAllowGLSLInput = value; }
+
+    /// Return whether the deprecated request-wide GLSL-input mode is enabled on this request.
+    bool getLegacyAllowGLSLInput() const { return m_legacyAllowGLSLInput; }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW char const* SLANG_MCALL getDiagnosticOutput() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDiagnosticOutputBlob(ISlangBlob** outBlob)
@@ -381,6 +391,9 @@ public:
     CompilerOptionSet& getOptionSet() { return m_linkage->m_optionSet; }
 
 private:
+    /// Request-local storage for `-allow-glsl` and `setAllowGLSLInput()`.
+    bool m_legacyAllowGLSLInput = false;
+
     struct ExistingOutputArtifact
     {
         TargetProgram* targetProgram = nullptr;

@@ -1826,6 +1826,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         sink->diagnose(Diagnostics::EntryPointHasNoStage{
             .entryPoint = entryPointName->text,
             .location = entryPointFuncDecl->loc});
+
+        // The remaining entry-point contract cannot be validated without a concrete stage.
+        // In particular, system-semantic accessor resolution maps this value through
+        // `getAtomFromStage()`, where `Stage::Unknown` is an internal error, while later parameter
+        // classification and profile validation also use the stage to select their rules. Stop
+        // after the prerequisite diagnostic instead of emitting secondary diagnostics from an
+        // invented stage or entering those out-of-contract paths.
+        return;
     }
 
     if (stage == Stage::Hull)

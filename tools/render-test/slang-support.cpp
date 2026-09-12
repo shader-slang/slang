@@ -158,6 +158,20 @@ static SlangResult _compileProgramImpl(
         }
     }
 
+    if (options.sourceLanguage != SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    {
+        // `-source-language` describes how render-test's primary source file must be parsed, not
+        // merely which language-specific preprocessor macro to define. The deprecated compile
+        // request API accepted this value when it created the translation unit. Preserve that
+        // contract with the module API by carrying the explicit selection into the session that
+        // loads the primary module.
+        slang::CompilerOptionEntry entry;
+        entry.name = slang::CompilerOptionName::Language;
+        entry.value.kind = slang::CompilerOptionValueKind::Int;
+        entry.value.intValue0 = int(input.sourceLanguage);
+        sessionOptionEntries.add(entry);
+    }
+
     List<slang::PreprocessorMacroDesc> macros;
 
     // Define a macro so that shader code in a test can detect what language we

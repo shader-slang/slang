@@ -382,6 +382,7 @@ static String _scrubName(const String& in)
         dst->optimizationLevel = linkage->m_optionSet.getOptimizationLevel();
         dst->containerFormat = request->m_containerFormat;
         dst->passThroughMode = request->m_passThrough;
+        dst->legacyAllowGLSLInput = request->getLegacyAllowGLSLInput();
 
         dst->useUnknownImageFormatAsDefault =
             linkage->m_optionSet.getBoolOption(CompilerOptionName::DefaultImageFormatUnknown);
@@ -548,6 +549,8 @@ static String _scrubName(const String& in)
             TranslationUnitRequestState& dstTranslationUnit = base[dstTranslationUnits[i]];
 
             dstTranslationUnit.language = srcTranslationUnit->sourceLanguage;
+            dstTranslationUnit.sourceLanguageExplicitlyRequested =
+                srcTranslationUnit->sourceLanguageExplicitlyRequested;
             dstTranslationUnit.moduleName = moduleName;
             dstTranslationUnit.sourceFiles = dstSourceFiles;
             dstTranslationUnit.preprocessorDefinitions = defines;
@@ -984,6 +987,7 @@ struct LoadContext
         externalRequest->setOutputContainerFormat(
             SlangContainerFormat(requestState->containerFormat));
         externalRequest->setPassThrough(SlangPassThrough(request->m_passThrough));
+        request->setLegacyAllowGLSLInput(requestState->legacyAllowGLSLInput);
 
         linkage->m_optionSet.set(
             CompilerOptionName::DefaultImageFormatUnknown,
@@ -1074,6 +1078,8 @@ struct LoadContext
             SLANG_ASSERT(index == i);
 
             TranslationUnitRequest* dstTranslationUnit = dstTranslationUnits[i];
+            dstTranslationUnit->sourceLanguageExplicitlyRequested =
+                srcTranslationUnit.sourceLanguageExplicitlyRequested;
 
             context.loadDefines(
                 srcTranslationUnit.preprocessorDefinitions,
@@ -1632,8 +1638,17 @@ static SlangResult _calcCommandLine(
 
     _calcPreprocessorDefines(base, requestState->preprocessorDefinitions, cmd);
 
+    if (requestState->legacyAllowGLSLInput)
+    {
+        // The compatibility state is request-local and is therefore absent from the serialized
+        // linkage options above. Preserve it explicitly in an extracted command line just as the
+        // binary replay path does.
+        cmd.addArg("-allow-glsl");
+    }
+
     {
         const auto& srcTranslationUnits = requestState->translationUnits;
+        SourceLanguage commandLineLanguage = SourceLanguage::Unknown;
 
         for (Index i = 0; i < srcTranslationUnits.getCount(); ++i)
         {
@@ -1641,6 +1656,38 @@ static SlangResult _calcCommandLine(
 
             _calcPreprocessorDefines(base, srcTranslationUnit.preprocessorDefinitions, cmd);
 
+            SourceLanguage languageToWrite = SourceLanguage::Unknown;
+            if (!requestState->legacyAllowGLSLInput)
+            {
+                languageToWrite = srcTranslationUnit.sourceLanguageExplicitlyRequested;
+
+                // `-lang` remains active for later command-line inputs. If an explicitly selected
+                // translation unit precedes an inferred one, write the latter's effective language
+                // to prevent the earlier selection from changing its parser mode. This necessarily
+                // makes that one extracted-command-line input explicit; the binary repro retains
+                // the original provenance exactly.
+                if (languageToWrite == SourceLanguage::Unknown &&
+                    commandLineLanguage != SourceLanguage::Unknown)
+                {
+                    languageToWrite = srcTranslationUnit.language;
+                }
+            }
+
+            if (languageToWrite != SourceLanguage::Unknown)
+            {
+                auto languageName = NameValueUtil::findName(
+                    TypeTextUtil::getLanguageInfos(),
+                    ValueInt(languageToWrite));
+                SLANG_RELEASE_ASSERT(languageName.getLength() != 0);
+
+                // Keep `-lang` adjacent to this translation unit's source paths. The command-line
+                // parser consumes those paths as explicit-language inputs, which reproduces a
+                // request such as `-lang glsl shader.slang` instead of re-inferring Slang from the
+                // serialized path.
+                cmd.addArg("-lang");
+                cmd.addArg(languageName);
+                commandLineLanguage = languageToWrite;
+            }
 
 #if 0
             if (srcTranslationUnit.moduleName)

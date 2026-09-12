@@ -116,7 +116,16 @@ struct ReproUtil
     // spAddTranslationUnit
     struct TranslationUnitRequestState
     {
+        /// The resolved effective language used to parse the translation unit.
         SourceLanguage language;
+
+        /// The caller-selected language that command-line extraction must reproduce.
+        ///
+        /// This field is `Unknown` when the effective language was inferred from source paths or
+        /// source directives. Command-line extraction normally omits `-lang` in that case, but may
+        /// write the effective language to reset a preceding translation unit's persistent
+        /// command-line selection; binary replay preserves this provenance exactly.
+        SourceLanguage sourceLanguageExplicitlyRequested;
 
         Offset32Ptr<OffsetString> moduleName;
 
@@ -157,6 +166,13 @@ struct ReproUtil
         ContainerFormat containerFormat;
         // spSetPassThrough
         PassThroughMode passThroughMode;
+
+        /// Whether the deprecated request-wide GLSL-input compatibility mode is enabled.
+        ///
+        /// This state belongs to the compile request rather than its linkage options, so repro
+        /// storage must preserve it explicitly even when the request is saved before compilation
+        /// has normalized its translation units.
+        bool legacyAllowGLSLInput = false;
 
         // spAddSearchPath
         Offset32Array<Offset32Ptr<OffsetString>> searchPaths;

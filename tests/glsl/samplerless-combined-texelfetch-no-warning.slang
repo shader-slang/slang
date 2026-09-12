@@ -10,22 +10,24 @@
 // extension is still added at emit time, for the bare case only, by `_Texture.Load`.
 
 // texelFetch on a combined 2D sampler: no warning, no `#extension` (uses `texelFetch(sampler2D)`).
-//TEST:SIMPLE(filecheck=TF2D): -allow-glsl -target glsl -profile glsl_450 -stage fragment -entry tf2d
+//TEST:SIMPLE(filecheck=TF2D): -target glsl -profile glsl_450 -stage fragment -entry tf2d
 // TF2D-NOT: warning[E41012]
 // TF2D-NOT: GL_EXT_samplerless_texture_functions
 // TF2D: texelFetch
 
 // texelFetch on a combined multisample sampler (hits the `case glsl:` intrinsic path).
-//TEST:SIMPLE(filecheck=TF2DMS): -allow-glsl -target glsl -profile glsl_450 -stage fragment -entry tf2dms
+//TEST:SIMPLE(filecheck=TF2DMS): -target glsl -profile glsl_450 -stage fragment -entry tf2dms
 // TF2DMS-NOT: warning[E41012]
 // TF2DMS-NOT: GL_EXT_samplerless_texture_functions
 // TF2DMS: texelFetch
 
 // texelFetchOffset on a combined 2D sampler.
-//TEST:SIMPLE(filecheck=TFO2D): -allow-glsl -target glsl -profile glsl_450 -stage fragment -entry tfo2d
+//TEST:SIMPLE(filecheck=TFO2D): -target glsl -profile glsl_450 -stage fragment -entry tfo2d
 // TFO2D-NOT: warning[E41012]
 // TFO2D-NOT: GL_EXT_samplerless_texture_functions
 // TFO2D: texelFetch
+
+import glsl;
 
 uniform sampler2D s2d;
 uniform sampler2DMS s2dms;

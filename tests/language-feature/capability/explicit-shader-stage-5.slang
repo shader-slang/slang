@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -allow-glsl -profile sm_6_5
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -profile sm_6_5
 
 // Our code compiles here since we specify profile sm_6_5 (supports raytracing)
 //CHECK: warning[E36113]

@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_HLSL_VS): -target hlsl -stage vertex -entry main -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK_HLSL_FS): -target hlsl -stage fragment -entry main -allow-glsl
+//TEST:SIMPLE(filecheck=CHECK_HLSL_VS): -target hlsl -stage vertex -entry main
+//TEST:SIMPLE(filecheck=CHECK_HLSL_FS): -target hlsl -stage fragment -entry main
 
 // Test that GLSL shader inputs/outputs get HLSL semantics when compiling to HLSL/DXIL.
 // This test verifies that struct field semantics are properly emitted from layout information.

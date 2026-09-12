@@ -1,6 +1,6 @@
 // Test that arrays and StructuredBuffers of nested structs with unbounded arrays are not allowed
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -allow-glsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -stage compute -entry computeMain
 // Using non-exhaustive because there are many cascading duplicate errors
 
 // Struct containing unbounded array (must be last member)

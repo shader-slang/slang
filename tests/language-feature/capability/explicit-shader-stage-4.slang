@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -allow-glsl -profile sm_5_0
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -profile sm_5_0
 
 // We do not error since `shader("raygeneration")` implicitly adds raytracing capabilities to our compile
 //CHECK: main
