@@ -106,9 +106,8 @@ static bool caseBlocksFallThroughTo(
         if (!block)
             continue;
 
-        if (visited.contains(block))
+        if (!visited.add(block))
             continue;
-        visited.add(block);
 
         // Don't follow branches to the break label
         if (block == breakLabel)

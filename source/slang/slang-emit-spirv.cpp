@@ -10230,10 +10230,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         TypeNeedsStorageFlags& found,
         HashSet<IRType*>& visited)
     {
-        if (visited.contains(type))
+        if (!visited.add(type))
             return false; // Cycle detected, break recursion
-
-        visited.add(type);
 
         switch (type->getOp())
         {

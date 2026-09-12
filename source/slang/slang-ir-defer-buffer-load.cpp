@@ -133,10 +133,8 @@ bool isMemoryLocationUnmodifiedBetweenLoadAndUser(
         // of 'loadInst', 'loadInst' must dominate 'userInst'. It therefore
         // follows that all blocks that can run between 'loadInst' and
         // 'userInst' must also be dominated by 'loadInst'.
-        if (!dom->dominates(rootBlock, block) || searchBlocks.contains(block))
+        if (!dom->dominates(rootBlock, block) || !searchBlocks.add(block))
             continue;
-
-        searchBlocks.add(block);
 
         // We do not care about the predecessors of the root block; they cannot
         // possibly modify the value of the load, because they occur before the

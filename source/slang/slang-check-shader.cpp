@@ -394,9 +394,8 @@ static void validateNoPerPrimitiveSemanticsInType(
 {
     if (!type)
         return;
-    if (seenTypes.contains(type))
+    if (!seenTypes.add(type))
         return;
-    seenTypes.add(type);
 
     auto declRefType = as<DeclRefType>(type);
     if (!declRefType)
@@ -1454,9 +1453,8 @@ static bool validateVaryingType(VaryingTypeValidationContext& ctx, Type* type)
         auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
         if (structDeclRef)
         {
-            if (ctx.seenTypes.contains(type))
+            if (!ctx.seenTypes.add(type))
                 return false;
-            ctx.seenTypes.add(type);
 
             bool foundError = false;
             // Iterate the struct's fields through the DeclRef so that generic
@@ -1563,9 +1561,8 @@ static bool _typeHasSemanticImpl(
     type = unwrapConditionalType(type);
     if (!type)
         return false;
-    if (seenTypes.contains(type))
+    if (!seenTypes.add(type))
         return false;
-    seenTypes.add(type);
 
     const auto next = recursionDepth + 1;
 
@@ -2903,9 +2900,8 @@ void Module::_collectShaderParams(DiagnosticSink* sink)
                 // from this module to another module.
                 //
                 auto importedModule = getModule(importDecl->importedModuleDecl);
-                if (!requiredModuleSet.contains(importedModule))
+                if (requiredModuleSet.add(importedModule))
                 {
-                    requiredModuleSet.add(importedModule);
                     m_requirements.add(importedModule);
                 }
             }

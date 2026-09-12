@@ -29,11 +29,10 @@ struct VectorTypeLoweringContext
                 return;
         }
 
-        if (workListSet.contains(inst))
+        if (!workListSet.add(inst))
             return;
 
         workList.add(inst);
-        workListSet.add(inst);
     }
 
     bool is1Vector(IRType* t)

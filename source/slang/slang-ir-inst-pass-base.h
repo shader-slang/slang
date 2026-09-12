@@ -18,11 +18,10 @@ protected:
     void addToWorkList(IRInst* inst)
     {
         SLANG_ASSERT(inst);
-        if (workListSet.contains(inst))
+        if (!workListSet.add(inst))
             return;
 
         workList.add(inst);
-        workListSet.add(inst);
     }
 
     IRInst* pop(bool removeFromSet = true)
