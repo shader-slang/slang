@@ -1,6 +1,7 @@
 // Unit tests for Source classification, run against the reconcile copy INLINED
-// in pr-board-sync.yml and extracted at run time. The opened/reopened copies are
-// extracted separately and required to contain byte-identical functions.
+// in pr-board-sync.yml and extracted at run time. The opened/reopened copies and
+// the issue-onboard copies are extracted separately and required to contain
+// byte-identical functions.
 // No deps; run with: node .github/scripts/pr-classify.test.js
 "use strict";
 
@@ -55,15 +56,35 @@ function assertByteIdentical(label, a, b) {
     assert.strictEqual(
       a[name].toString(),
       b[name].toString(),
-      `${label}: ${name} differs between onboarding and reconcile`,
+      `${label}: ${name} differs`,
     );
   }
 }
+
+const issueWorkflow = ".github/workflows/issue-board-onboard.yml";
+const issueClassify = extractor.load({
+  workflow: issueWorkflow,
+  block: "classify",
+});
+const issueRoster = extractor.load({
+  workflow: issueWorkflow,
+  block: "team-roster",
+});
+const issueIndex = extractor.load({
+  workflow: issueWorkflow,
+  block: "source-internal-index",
+});
 
 test("onboarding and reconcile helpers are byte-identical", () => {
   assertByteIdentical("classify", onboarding, reconcile);
   assertByteIdentical("team-roster", onboardingRoster, reconcileRoster);
   assertByteIdentical("source-internal-index", onboardingIndex, reconcileIndex);
+});
+
+test("issue-onboard helpers are byte-identical to PR reconcile", () => {
+  assertByteIdentical("issue classify", issueClassify, reconcile);
+  assertByteIdentical("issue team-roster", issueRoster, reconcileRoster);
+  assertByteIdentical("issue source-internal-index", issueIndex, reconcileIndex);
 });
 
 test("isInternalLogin: exact match", () => {

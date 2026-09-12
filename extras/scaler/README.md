@@ -182,18 +182,68 @@ GOOS=linux GOARCH=amd64 go build -o scaler-linux ./cmd/scaler
 ./deploy/update-scaler.sh
 ```
 
+### Automated Merged Updates
+
+Scaler changes are validated and published by
+`.github/workflows/scaler-release.yml`:
+
+- Pull requests that touch `extras/scaler/**` run Go formatting checks,
+  `go test ./...`, `go vet ./...`, and ShellCheck for the scaler shell scripts.
+- Pushes to `master` build the Linux amd64 scaler binary and upload a GitHub
+  Actions artifact named `scaler-linux-master`.
+- The artifact contains `scaler-linux`, `manifest.json`,
+  `scaler-linux.md5`, and `scaler-linux.sha256`. The manifest records the
+  source commit plus both MD5 and SHA-256 digests of the binary.
+
+Production deployment is pulled from the scaler host rather than pushed over
+SSH from GitHub Actions. Install the host-side timer once:
+
+```bash
+cd extras/scaler
+./deploy/install-auto-update.sh
+```
+
+That installs `/opt/scaler/update-scaler-from-github-artifact.sh` plus
+`scaler-auto-update.{service,timer}` on `gpu-scaler-host`. The timer polls the
+latest successful `master` run of `scaler-release.yml` every 10 minutes. When a
+non-expired `scaler-linux-master` artifact is available, it downloads the zip,
+extracts the manifest and binary, verifies the MD5 and SHA-256 digests, and
+compares the manifest MD5 against the installed `/opt/scaler/scaler`. If the MD5
+already matches, no services are drained or restarted. MD5 is only the cheap
+change-detection key; SHA-256 still validates the downloaded binary before use.
+
+If the binary changed, the updater drains all enabled scaler services, swaps
+`/opt/scaler/scaler`, records the deployed commit and digests under
+`/var/lib/scaler/`, and restarts the services. The updater uses `GITHUB_TOKEN`,
+`GH_TOKEN`, or the existing `SCALER_TOKEN` from `/opt/scaler/scaler.env` when
+one is available; unauthenticated API reads are sufficient for public artifacts
+but have a lower rate limit. If no non-expired artifact exists (for example,
+before the first `master` publish or after the retention window), the timer logs
+that there is nothing to deploy and exits without changing services.
+
+Unattended updates are deliberately non-forcing: if any service does not drain
+within `DRAIN_TIMEOUT_SECONDS` (default 1500s), the updater leaves production on
+the old binary and exits successfully so the timer can retry later. Use
+`deploy/update-scaler.sh` manually when an emergency deploy must override that
+policy.
+
 **Files:**
-| File | Purpose |
-|------|---------|
-| `deploy/setup-scaler-host.sh` | One-command deploy: creates VM, uploads binary, installs services |
-| `deploy/update-scaler.sh` | Update binary on existing host |
-| `deploy/scaler-windows.service` | systemd unit for Windows GPU scaler |
-| `deploy/scaler-windows-build.service` | systemd unit for Windows build scaler (no GPU) |
-| `deploy/scaler-linux.service` | systemd unit for Linux GPU scaler |
-| `deploy/scaler-linux-sm80plus.service` | systemd unit for Linux SM80Plus scaler |
-| `deploy/scaler-linux-build.service` | systemd unit for Linux build scaler (no GPU) |
-| `deploy/scaler-linux-analytics.service` | systemd unit for Linux analytics scaler (no GPU, tiny VM) |
-| `deploy/scaler.env.example` | Template for GitHub credentials |
+
+| File                                           | Purpose                                                                      |
+| ---------------------------------------------- | ---------------------------------------------------------------------------- |
+| `deploy/setup-scaler-host.sh`                  | One-command deploy: creates VM, uploads binary, installs services            |
+| `deploy/update-scaler.sh`                      | Update binary on existing host                                               |
+| `deploy/install-auto-update.sh`                | Installs the host-side artifact auto-update timer                            |
+| `deploy/update-scaler-from-github-artifact.sh` | Pulls the latest published scaler artifact from GitHub and deploys it safely |
+| `deploy/scaler-auto-update.service`            | systemd oneshot that runs the artifact updater                               |
+| `deploy/scaler-auto-update.timer`              | systemd timer that polls the scaler artifact                                 |
+| `deploy/scaler-windows.service`                | systemd unit for Windows GPU scaler                                          |
+| `deploy/scaler-windows-build.service`          | systemd unit for Windows build scaler (no GPU)                               |
+| `deploy/scaler-linux.service`                  | systemd unit for Linux GPU scaler                                            |
+| `deploy/scaler-linux-sm80plus.service`         | systemd unit for Linux SM80Plus scaler                                       |
+| `deploy/scaler-linux-build.service`            | systemd unit for Linux build scaler (no GPU)                                 |
+| `deploy/scaler-linux-analytics.service`        | systemd unit for Linux analytics scaler (no GPU, tiny VM)                    |
+| `deploy/scaler.env.example`                    | Template for GitHub credentials                                              |
 
 ## How It Works
 

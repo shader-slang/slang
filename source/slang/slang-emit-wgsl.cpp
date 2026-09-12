@@ -1758,12 +1758,20 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto opType = inst->getOperand(0)->getDataType();
             if (as<IRMatrixType>(opType) || as<IRVectorType>(opType))
             {
-                // WGSL does not support negate operator on matrices and vectors,
-                // we should emit "(type(0) - op0)" instead.
+                // Lower every vector/matrix negation uniformly to "(type(0) - op0)". (WGSL has a
+                // native unary '-' only for signed float/int vectors; matrices and unsigned
+                // vectors have none, and the subtraction matches '-x' for the signed cases too.)
+                // The explicit parentheses wrap the whole subtraction, so its outer context is
+                // effectively lowest-precedence: pass EmitOp::General (not the incoming outerPrec)
+                // and emit op0 as the subtraction's right-hand side. This wraps an operand that
+                // binds no tighter than '-' -- the additive "a + b" (its left-associative RHS, at
+                // equal precedence) -- but not a multiplicative "a * b" or an atomic.
                 m_writer->emit("(");
                 emitType(inst->getDataType());
                 m_writer->emit("(0) - ");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitOperand(
+                    inst->getOperand(0),
+                    rightSide(getInfo(EmitOp::General), getInfo(EmitOp::Sub)));
                 m_writer->emit(")");
                 return true;
             }
