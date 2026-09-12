@@ -15,6 +15,41 @@ section says otherwise.
 
 ---
 
+## Status
+
+Phase 1 of the commit stack below is landed, as seven commits on top of master
+(deliberately underneath the multi-backend commit, so that they rebase before
+it). Nothing in phase 2 or later has been started.
+
+| Issue                      | State                                                                    |
+| -------------------------- | ------------------------------------------------------------------------ |
+| 04 Part A                  | done -- `contains`-then-`add` collapsed at 37 files' worth of call sites |
+| 04 Part B                  | done, **scoped down** -- see the note below                              |
+| 05                         | done -- insert helpers go through `try_emplace`                          |
+| 09 Step 1                  | done -- SPIR-V memoization double insert collapsed                       |
+| 10 Part A                  | done -- interim form (the key is built once, the second probe remains)   |
+| 11 Part A                  | done -- `IRDeduplicationContext::getReplacement`                         |
+| 02                         | done -- transparent text-key lookup, with a unit test                    |
+| 12, 13                     | done                                                                     |
+| 11 Part B                  | deferred to phase 4 after measuring; see the note in the stack below     |
+| 01, 03, 06, 07, 08, 14, 15 | not started                                                              |
+
+Measured effect of 02: a `Dictionary<String, int>` probed a thousand times with
+an `UnownedStringSlice` went from a thousand heap allocations to none. Same for
+`Dictionary<ImmutableHashedString, int>`.
+
+**04 Part B was scoped down deliberately.** The plan was `find` / `erase` /
+`tryEmplace`. Only `tryEmplace` was added, returning a `TValue*` rather than an
+iterator, because exposing an iterator exposes the backing map's iterator type
+-- and those differ in exactly the ways the shim layer exists to paper over
+(Abseil's `erase(iterator)` returns `void`, `tsl::robin_map` dereferences to a
+`const` pair). `tryEmplace` covered every call site that was doing a double
+probe, so the iterator API was not needed. The consequence is that
+`_removeGlobalNumberingEntry` still probes twice; it now hashes once, which was
+the expensive half.
+
+---
+
 ## Index, by how each relates to the benchmark matrix
 
 The categories below say _how each issue relates to the matrix_. For _when to
@@ -263,10 +298,6 @@ with no reference to the benchmark.
  7. 02          transparent heterogeneous lookup       both argument orders!
  8. 12          NamePool::getName                      needs 02
  9. 13          IR link mangled-name lookups           needs 02
-10. 11 Part B   probe without materialising the        needs 02; largest item
-                dummy IRInst                           here, safe to defer to
-                                                       phase 4 if you want
-                                                       phase 1 short
 
 === PHASE 2 — matrix prerequisites.  Neutral *as landed*, but each removes a ===
 ===           confound.  Land each as a unit and verify the ankerl row is   ===
@@ -293,7 +324,8 @@ with no reference to the benchmark.
 18. 09          SpvInstKey rest (cached hash, inline)  measure count distribution
 19. 10 Part B   cache the hash on IRInst               +8 B on every instruction
 20. 06 full     cached hash in StringRepresentation    +8 B on every string
-21. 11 Part B   if deferred from phase 1
+21. 11 Part B   probe without materialising the        small win, real risk;
+                dummy IRInst                           see note below
 ```
 
 #### Notes on the phase boundaries
@@ -324,6 +356,21 @@ removes the byte scan, which _lowers_ it again. Doing neither, or both, leaves
 the weighting roughly where it is today. If you do 02 without 06, be aware the
 matrix will slightly over-reward a fast string hash. The full 06 (changing
 `StringRepresentation`) stays in phase 4 because of its memory cost.
+
+**Why 11 Part B moved to phase 4.** It was originally the optional tail of
+phase 1, on the grounds that it only removes work and so cannot regress.
+Measuring the sizes made the likely payoff look too small to justify the risk.
+`sizeof(IRInst)` is 112 and `sizeof(IRUse)` is 32, so the dummy instruction is
+`112 + 32N` bytes; at the expected median of one operand that is 144 bytes
+zeroed and partly written per probe, against 8 bytes for a borrowed pointer
+array. But the arena is rewound to the same cursor on every deduplication hit,
+so the dummy is allocated at the _same address_ over and over and those three
+cache lines stay resident in L1 -- the memset is single-digit cycles, against an
+operation already dominated by the hash map's own cache misses. That is not
+enough to justify an L-sized change to the hash-consing key, which is the one
+place in this whole set where a subtle mistake produces a missed or incorrect
+deduplication rather than a slowdown. Revisit it only if a profile says the
+probe path is hot for a reason other than the map.
 
 **Why phase 4 is after the benchmark.** Every item there is matrix-neutral — it
 reduces work outside the map, or the number of map operations — so none of them
