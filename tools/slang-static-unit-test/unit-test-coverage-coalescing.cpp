@@ -143,10 +143,10 @@ SLANG_UNIT_TEST(coverageCoalescingSplitsAtMutuallyRecursiveCallEitherOrder)
     List<IRInst*> aThenB;
     aThenB.addRange(callsA);
     aThenB.addRange(callsB);
-    checkBothRegionsSplit(aThenB); // resolves `a` first
+    checkBothRegionsSplit(aThenB);
 
     List<IRInst*> bThenA;
     bThenA.addRange(callsB);
     bThenA.addRange(callsA);
-    checkBothRegionsSplit(bThenA); // resolves `b` first
+    checkBothRegionsSplit(bThenA);
 }

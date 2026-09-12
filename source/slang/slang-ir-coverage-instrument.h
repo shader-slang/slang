@@ -129,11 +129,14 @@ void finalizeCoverageInstrumentationMetadata(
 // guarantees (notably which marker of a coalesced region emits the probe;
 // see `outEmitsProbe` below).
 //
-// `markerOps` must be in the order `collectCoverageMarkerOps` produces:
-// grouped by function, then by block, then by instruction position within a
-// block, with the markers of any one block contiguous. Coalescing scans
-// forward from the previous marker to the current one, so an out-of-order or
-// interleaved list would violate that precondition (asserted in debug).
+// `markerOps` must list the markers of each basic block contiguously and in
+// instruction order: coalescing only ever joins two markers that share a
+// block, and it does so by scanning forward from the earlier one to the
+// later, so the later marker must be reachable by that scan (a violation is
+// asserted in debug). Markers of *different* blocks may appear in any relative
+// order — a cross-block pair never coalesces — so block and function groups
+// need not be globally sorted. `collectCoverageMarkerOps` produces markers
+// grouped by function, then block, then position, which satisfies this.
 //
 // Line markers in the same basic block, with nothing between them that can
 // abandon the invocation, all execute exactly the same number of times, so
