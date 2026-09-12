@@ -1,5 +1,5 @@
 // Regression test for issue #12405. The IR peephole arithmetic-identity folds that drop a
-// floating-point operand (`0 + x`, `x + 0`, `x - 0`, `x - x`, `x * 0`) are value-preserving only
+// floating-point operand (`0 + x`, `x + 0`, `x - 0`, `x - x`, `x * 0`, `0 / x`) are value-preserving only
 // under fast math: for float they discard the signed-zero / NaN / Inf distinctions IEEE keeps
 // (e.g. `0.0 + (-0.0)` is `+0.0`, `NaN - NaN` is `NaN`, not `0`). The effective mode is resolved
 // per instruction from the global `-fp-mode` option, overridden by a function's
@@ -31,6 +31,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     outputBuffer[2] = x - 0.0f;
     outputBuffer[3] = x - x;
     outputBuffer[4] = x * 0.0f;
+    outputBuffer[5] = 0.0f / x;
 
     // Integer control: the gate is unconditionally true for integral types, so this folds in every
     // mode (asserted by the OpISub absence checks below), guarding against a regression that
@@ -46,18 +47,21 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 //PRECISE-COUNT-2: OpFAdd
 //PRECISE-COUNT-2: OpFSub
 //PRECISE-COUNT-1: OpFMul
+//PRECISE-COUNT-1: OpFDiv
 //PRECISE-NOT: OpISub
 
 // Default mode is conservative like precise (the gate is `== Fast`), so all the float ops survive.
 //DEFAULT-COUNT-2: OpFAdd
 //DEFAULT-COUNT-2: OpFSub
 //DEFAULT-COUNT-1: OpFMul
+//DEFAULT-COUNT-1: OpFDiv
 //DEFAULT-NOT: OpISub
 
 // Fast mode: every float identity folds away, so none of these opcodes remain anywhere.
 //FAST-NOT: OpFAdd
 //FAST-NOT: OpFSub
 //FAST-NOT: OpFMul
+//FAST-NOT: OpFDiv
 //FAST-NOT: OpISub
 
 // `passthroughBefore` is undecorated, so under global precise it keeps the precise mode and its

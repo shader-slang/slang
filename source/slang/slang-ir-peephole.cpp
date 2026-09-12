@@ -163,9 +163,10 @@ struct PeepholeContext : InstPassBase
         }
     }
 
-    // Resolved per inst (rather than cached in a member) so a function-local
-    // `IRFloatingPointModeOverrideDecoration` cannot leak through this pass's module-wide context.
-    // Same resolution as `isFloatingPointModePrecise` (slang-emit-spirv.cpp).
+    // Return the floating-point mode in effect for `inst`: the global `-fp-mode` option, overridden
+    // by the enclosing function's `IRFloatingPointModeOverrideDecoration`. A function-local override
+    // applies only within that function, so the mode is resolved per inst. Same resolution as
+    // `isFloatingPointModePrecise` (slang-emit-spirv.cpp).
     FloatingPointMode getEffectiveFloatingPointMode(IRInst* inst)
     {
         FloatingPointMode mode = targetProgram
@@ -179,11 +180,11 @@ struct PeepholeContext : InstPassBase
 
     bool tryOptimizeArithmeticInst(IRInst* inst)
     {
-        // Arithmetic identity folds that drop a floating-point operand (`0 + x`, `x - 0`, `x - x`,
-        // `x * 0`, `0 / x`) are only value-preserving under fast math or for integers: for float
-        // they discard IEEE distinctions that precise mode must keep. `isZero` matches both `+0.0`
-        // and `-0.0`, so e.g. `0.0 + x` for `x == -0.0` yields `+0.0 != -0.0`, and `x - x` for a
-        // NaN/Inf `x` yields `NaN != 0`. Gate all such folds on this flag (issue #12405).
+        // Whether floating-point identity folds that drop an operand (`0 + x`, `x - 0`, `x - x`,
+        // `x * 0`, `0 / x`) are sound. For float they hold only under fast math: `isZero` matches
+        // both `+0.0` and `-0.0`, so `0.0 + x` for `x == -0.0` yields `+0.0 != -0.0`, and `x - x`
+        // for a NaN/Inf `x` yields `NaN != 0` -- precise/default mode must keep these distinctions.
+        // Integer arithmetic has no such traps. (issue #12405)
         bool allowUnsafeOptimizations =
             (getEffectiveFloatingPointMode(inst) == FloatingPointMode::Fast ||
              isIntegralScalarOrCompositeType(inst->getDataType()));
