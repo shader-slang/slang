@@ -104,6 +104,14 @@ template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = tsl::robin_map<TKey, TValue, Hash, KeyEqual>;
 constexpr const char* kName = "tsl::robin_map";
 
+// Caveat: `tsl::robin_map`'s iterators are not conforming forward iterators.
+// `[forward.iterators]` requires value-initialized iterators to compare equal to
+// one another, but `robin_iterator`'s default constructor is written
+// `robin_iterator() noexcept {}`, which leaves its `bucket_entry_ptr m_bucket`
+// uninitialised, so two default-constructed iterators compare on garbage.
+// Code that stores a map iterator and resets it to `{}` to mean "nowhere" works
+// against every other backend here and silently misbehaves against this one.
+
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_STD
 
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
@@ -180,34 +188,21 @@ template<typename TIterator>
 constexpr bool yieldsConstReference =
     std::is_const_v<std::remove_reference_t<decltype(*std::declval<const TIterator&>())>>;
 
-/// Lets an iterator whose `operator*` returns a temporary still support
-/// `it->second`, by keeping that temporary alive for the duration of the `->`
-/// expression and handing out a pointer to it.
-template<typename TValue>
-struct ArrowProxy
-{
-    TValue value;
-    TValue* operator->() { return std::addressof(value); }
-};
-
-/// Presents a `const`-dereferencing map iterator as one whose mapped value is
-/// mutable, by pairing the key from `operator->` with the mutable value from
-/// the iterator's own `value()` accessor.
+/// Presents a `const`-dereferencing map iterator as one whose entry is mutable.
 ///
-/// Only `tsl::robin_map` needs this; see `mutableIterator` below for why.
+/// Only `tsl::robin_map` needs this; see `mutableIterator` below for why, and
+/// for why casting the `const` away is sound.
 template<typename TIterator>
 class MutableValueIterator
 {
     using Pair = std::remove_cv_t<typename std::iterator_traits<TIterator>::value_type>;
-    using Key = typename Pair::first_type;
-    using Value = typename Pair::second_type;
 
     TIterator m_inner;
 
 public:
-    using value_type = std::pair<const Key&, Value&>;
-    using reference = value_type;
-    using pointer = ArrowProxy<value_type>;
+    using value_type = Pair;
+    using reference = Pair&;
+    using pointer = Pair*;
     using difference_type = typename std::iterator_traits<TIterator>::difference_type;
     using iterator_category = std::forward_iterator_tag;
 
@@ -217,8 +212,8 @@ public:
     {
     }
 
-    reference operator*() const { return reference(m_inner->first, m_inner.value()); }
-    pointer operator->() const { return pointer{**this}; }
+    reference operator*() const { return const_cast<reference>(*m_inner); }
+    pointer operator->() const { return std::addressof(**this); }
 
     MutableValueIterator& operator++()
     {
@@ -242,18 +237,29 @@ public:
 /// `value` whichever implementation is selected.
 ///
 /// Every implementation here except `tsl::robin_map` already dereferences to a
-/// `std::pair<const Key, T>&`, and for those this hands `it` straight back.
+/// mutable entry, and for those this hands `it` straight back.
 ///
-/// `tsl::robin_map` is the exception: it dereferences to a
-/// `const std::pair<Key, T>&`, so that the key cannot be modified behind the
-/// map's back, and offers the mutable mapped value only through a separate
-/// `value()` accessor. For that one this wraps `it` in an iterator that
-/// reassembles the entry from those two pieces, as a
-/// `std::pair<const Key&, T&>`.
+/// `tsl::robin_map` is the exception. It stores entries as `std::pair<Key, T>`
+/// -- exactly as the default `ankerl::unordered_dense::map` backend does -- but
+/// unlike ankerl it declares its iterator's `value_type` as *`const`*
+/// `std::pair<Key, T>`, so that the key cannot be modified behind the map's
+/// back, and offers the mutable mapped value only through a separate `value()`
+/// accessor. For that one this wraps `it` in an iterator that casts the `const`
+/// back off.
 ///
-/// That reassembled pair is a temporary, so iterating a Dictionary has to be
-/// spelled `for (auto&& [key, value] : dict)`: a plain `auto&` cannot bind to
-/// it. `const auto&` and by-value bindings are unaffected.
+/// The cast is well defined rather than merely convenient: the entry it refers
+/// to is a live element of the map's own bucket array, which is not a `const`
+/// object. A non-`const` `tsl::robin_map` iterator holds a non-`const`
+/// `bucket_iterator`, and the map itself writes through it (see
+/// `robin_iterator::value()`, which returns `std::pair<Key, T>&` from the same
+/// bucket). The `const` exists only on the iterator's declared `value_type`, as
+/// tsl's chosen way of discouraging key mutation.
+///
+/// What the cast gives up is that discouragement: under this backend `key` in
+/// the loop above is assignable, and assigning to it would leave the entry in
+/// the wrong bucket. That is not a new hazard, because the default
+/// `ankerl::unordered_dense::map` backend already exposes a mutable key the
+/// same way; code that mutates a key is already broken on the default build.
 template<typename TIterator>
 auto mutableIterator(TIterator it)
 {
