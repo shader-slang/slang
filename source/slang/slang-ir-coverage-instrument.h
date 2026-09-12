@@ -125,15 +125,15 @@ void finalizeCoverageInstrumentationMetadata(
 // markers that provably execute together. This is the coalescing core of
 // `instrumentCoverage`; it is declared here (rather than kept file-local) so
 // `slang-static-unit-test` can drive it directly on hand-built IR and assert
-// on the slot assignment — which is the only way to observe some of its
-// guarantees (notably which marker of a coalesced region emits the probe;
-// see `outEmitsProbe` below).
+// on the slot assignment — the precise, emission-independent way to observe
+// some of its guarantees (notably which marker of a coalesced region emits the
+// probe; see `outEmitsProbe` below).
 //
 // `markerOps` must list the markers of each basic block contiguously and in
 // instruction order: coalescing only ever joins two markers that share a
 // block, and it does so by scanning forward from the earlier one to the
-// later, so the later marker must be reachable by that scan (a violation is
-// asserted in debug). Markers of *different* blocks may appear in any relative
+// later, so the later marker must be reachable by that scan. Markers of
+// *different* blocks may appear in any relative
 // order — a cross-block pair never coalesces — so block and function groups
 // need not be globally sorted. `collectCoverageMarkerOps` produces markers
 // grouped by function, then block, then position, which satisfies this.
