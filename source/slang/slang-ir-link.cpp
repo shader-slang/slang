@@ -10,6 +10,7 @@
 #include "slang-ir-specialize-target-switch.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-string-hash.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-translate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
@@ -115,6 +116,7 @@ struct IRSpecContextBase
     HashSet<UnownedStringSlice> deferredWitnessTableEntryKeys;
     HashSet<IRInst*> globalsWithClonedAnnotations;
     List<RefPtr<WitnessTableCloneInfo>> witnessTables;
+    List<IRStructuralRayTracingOpenSectionDecoration*> structuralRayTracingOpenSections;
 
     IRSpecSymbol* findSymbols(UnownedStringSlice mangledName)
     {
@@ -170,6 +172,10 @@ void registerClonedValue(IRSpecContextBase* context, IRInst* clonedValue, IRInst
 
     switch (clonedValue->getOp())
     {
+    case kIROp_StructuralRayTracingOpenSectionDecoration:
+        context->structuralRayTracingOpenSections.add(
+            cast<IRStructuralRayTracingOpenSectionDecoration>(clonedValue));
+        break;
     case kIROp_LookupWitnessMethod:
         {
             // If `originalVal` represents a witness table entry key, add the key
@@ -335,6 +341,13 @@ IRType* cloneType(IRSpecContextBase* context, IRType* originalType);
 
 IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
 {
+    if (as<IRInterfaceType>(originalValue))
+    {
+        auto clonedInst = cloneGlobalValue(this, originalValue);
+        cloneAnnotations(this, clonedInst, originalValue);
+        return clonedInst;
+    }
+
     switch (originalValue->getOp())
     {
     case kIROp_StructType:
@@ -348,7 +361,6 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_InterfaceRequirementEntry:
     case kIROp_GlobalGenericParam:
     case kIROp_WitnessTable:
-    case kIROp_InterfaceType:
     case kIROp_EnumType:
     case kIROp_SymbolAlias:
         {
@@ -389,8 +401,11 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_PtrLit:
         {
             IRConstant* c = (IRConstant*)originalValue;
-            SLANG_RELEASE_ASSERT(c->value.ptrVal == nullptr);
-            return builder->getNullPtrValue(cloneType(this, c->getFullType()));
+            // Non-null pointer literals are used by front-end-only decorations to retain an AST
+            // declaration for diagnostics. Linking stays within the same compiler session, so the
+            // declaration remains valid and must be preserved until the mandatory passes consume
+            // it. Front-end-only instructions are stripped before target legalization and emit.
+            return builder->getPtrValue(cloneType(this, c->getFullType()), c->value.ptrVal);
         }
         break;
 
@@ -895,8 +910,10 @@ IRInterfaceType* cloneInterfaceTypeImpl(
     IRInterfaceType* originalInterface,
     IROriginalValuesForClone const& originalValues)
 {
-    auto clonedInterface =
-        builder->createInterfaceType(originalInterface->getOperandCount(), nullptr);
+    auto clonedInterface = builder->createInterfaceType(
+        originalInterface->getOp(),
+        originalInterface->getOperandCount(),
+        nullptr);
     registerClonedValue(context, clonedInterface, originalValues);
 
     for (UInt i = 0; i < originalInterface->getOperandCount(); i++)
@@ -1074,6 +1091,12 @@ void cloneFunctionCommon(
 ///
 static void maybeCopyLayoutInformationToParameters(IRFunc* func, IRBuilder* builder)
 {
+    // Structural ray-tracing `invoke` parameters are logical, compiler-owned views rather than
+    // physical entry-point parameters. Their native parameter layouts are created on the adapter
+    // synthesized after linking.
+    if (func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+        return;
+
     auto layoutDecor = func->findDecoration<IRLayoutDecoration>();
     if (!layoutDecor)
         return;
@@ -1109,11 +1132,230 @@ static void maybeCopyLayoutInformationToParameters(IRFunc* func, IRBuilder* buil
     }
 }
 
+struct StructuralRayTracingPayloadLocationAssignment
+{
+    IRType* payloadType;
+    IRType* payloadSemanticType;
+    IRIntegerValue location;
+};
+
+struct StructuralRayTracingProgramPayloadLocations
+{
+    List<StructuralRayTracingPayloadLocationAssignment> payloads;
+    HashSet<IRIntegerValue> usedLocations;
+    IRIntegerValue nextLocation = 0;
+
+    IRIntegerValue find(IRType* payloadSemanticType) const
+    {
+        for (auto& payload : payloads)
+        {
+            if (payload.payloadSemanticType == payloadSemanticType)
+                return payload.location;
+        }
+        return -1;
+    }
+
+    IRIntegerValue findOrAdd(IRType* payloadType, IRType* payloadSemanticType)
+    {
+        SLANG_RELEASE_ASSERT(payloadType && payloadSemanticType);
+        for (auto& payload : payloads)
+        {
+            if (payload.payloadSemanticType != payloadSemanticType)
+                continue;
+
+            // A semantic payload identity has one realized representation at this target/phase.
+            // Distinct nominal identities may still have the same physical layout, but they remain
+            // distinct IR types and receive independent mappings.
+            SLANG_RELEASE_ASSERT(payload.payloadType == payloadType);
+            return payload.location;
+        }
+
+        while (usedLocations.contains(nextLocation))
+            ++nextLocation;
+        auto location = nextLocation++;
+        payloads.add({payloadType, payloadSemanticType, location});
+        usedLocations.add(location);
+        return location;
+    }
+};
+
+/// Gets the payload representation and semantic identity carried by compiler-owned structural
+/// ray-tracing metadata.
+///
+/// Keeping this classification in one place makes the manifest collector and its activation check
+/// agree about the exact producers they recognize. Callable metadata is intentionally absent: its
+/// data parameter uses a different native storage class and does not participate in Vulkan's
+/// incoming/outgoing ray-payload `Location` contract.
+static bool _tryGetStructuralRayTracingPayloadTypes(
+    IRInst* inst,
+    IRType*& outPayloadType,
+    IRType*& outPayloadSemanticType)
+{
+    outPayloadType = nullptr;
+    outPayloadSemanticType = nullptr;
+    if (auto info = as<IRStructuralRayTracingEntryPointInfoDecoration>(inst))
+    {
+        outPayloadType = info->getPayloadType();
+        outPayloadSemanticType = info->getPayloadSemanticType();
+    }
+    else if (auto trace = as<IRStructuralRayTracingTrace>(inst))
+    {
+        outPayloadType = trace->getPayloadType();
+        outPayloadSemanticType = trace->getPayloadSemanticType();
+    }
+    else if (auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(inst))
+    {
+        outPayloadType = group->getPayloadType();
+        outPayloadSemanticType = group->getPayloadSemanticType();
+    }
+    else if (auto entry = as<IRStructuralRayTracingMissShaderInfoDecoration>(inst))
+    {
+        outPayloadType = entry->getPayloadType();
+        outPayloadSemanticType = entry->getPayloadSemanticType();
+    }
+    return outPayloadType && !as<IRVoidType>(outPayloadType);
+}
+
+static void _collectStructuralRayTracingPayloadSemanticTypes(
+    IRInst* root,
+    StructuralRayTracingProgramPayloadLocations& locations)
+{
+    // `specializeModule` materializes every reachable concrete instantiation at module scope while
+    // retaining the generic template for possible later uses. Metadata under the retained template
+    // still names a generic parameter such as `%Payload`; it is not a third payload identity and
+    // must not consume a location. This is an intentional IR boundary rather than a reconstruction
+    // heuristic: only realized instructions outside `IRGeneric` are executable program instances.
+    if (as<IRGeneric>(root))
+        return;
+
+    IRType* payloadType = nullptr;
+    IRType* payloadSemanticType = nullptr;
+    if (_tryGetStructuralRayTracingPayloadTypes(root, payloadType, payloadSemanticType))
+    {
+        SLANG_RELEASE_ASSERT(payloadSemanticType);
+        locations.findOrAdd(payloadType, payloadSemanticType);
+    }
+
+    for (auto child = root->getFirstDecorationOrChild(); child; child = child->getNextInst())
+        _collectStructuralRayTracingPayloadSemanticTypes(child, locations);
+}
+
+// Stamp the whole-program assignment onto every realized metadata consumer. Later per-entry
+// linking may clone and further simplify the manifest, but it never needs to compare payload types
+// again: the integer assignment follows the operation or stage entry that owns it.
+static void _stampStructuralRayTracingPayloadLocations(
+    IRInst* root,
+    const StructuralRayTracingProgramPayloadLocations& locations,
+    IRBuilder& builder)
+{
+    if (as<IRGeneric>(root))
+        return;
+
+    IRType* payloadType = nullptr;
+    IRType* payloadSemanticType = nullptr;
+    if (_tryGetStructuralRayTracingPayloadTypes(root, payloadType, payloadSemanticType))
+    {
+        auto location = locations.find(payloadSemanticType);
+        SLANG_RELEASE_ASSERT(location >= 0);
+        root->setOperand(
+            root->getOperandCount() - 1,
+            builder.getIntValue(builder.getIntType(), location));
+    }
+
+    for (auto child = root->getFirstDecorationOrChild(); child; child = child->getNextInst())
+        _stampStructuralRayTracingPayloadLocations(child, locations, builder);
+}
+
+static bool _containsStructuralRayTracingPayloadMetadata(IRInst* root)
+{
+    // Open callable-only schemas have no Vulkan payload metadata, but they still require the
+    // whole-component manifest so the linker can select tagged conformances before ordinary DCE.
+    // The request marker is emitted only for an exact compiler-owned open-list declaration.
+    if (as<IRStructuralRayTracingOpenSectionDecoration>(root))
+        return true;
+
+    IRType* payloadType = nullptr;
+    IRType* payloadSemanticType = nullptr;
+    if (_tryGetStructuralRayTracingPayloadTypes(root, payloadType, payloadSemanticType))
+        return true;
+
+    for (auto child = root->getFirstDecorationOrChild(); child; child = child->getNextInst())
+    {
+        if (_containsStructuralRayTracingPayloadMetadata(child))
+            return true;
+    }
+    return false;
+}
+
+static bool _containsStructuralRayTracingPayloadMetadata(ComponentType* program)
+{
+    bool result = false;
+    program->enumerateIRModules(
+        [&](IRModule* module)
+        {
+            if (!result && _containsStructuralRayTracingPayloadMetadata(module->getModuleInst()))
+            {
+                result = true;
+            }
+        });
+    return result;
+}
+
+// Assign one stable Vulkan payload location to each concrete semantic payload identity in the
+// specialized whole-component manifest.
+//
+// Consider an RHI program containing a ray-generation entry point followed by radiance and shadow
+// hit/miss stages. The RHI asks Slang for each native entry point separately, but Vulkan still
+// links every outgoing payload to its matching incoming payload by `Location`. Linking and
+// specializing all program entry points once exposes concrete instantiations such as
+// `tracePayload<RadiancePayload>` and `tracePayload<ShadowPayload>` independent of the order in
+// which the client asks for native entry points. Any explicit legacy locations are reserved first,
+// and the remaining identities receive dense locations in deterministic manifest IR order.
+static void _assignStructuralRayTracingProgramPayloadLocations(IRModule* module)
+{
+    StructuralRayTracingProgramPayloadLocations result;
+    collectUsedVulkanRayPayloadLocations(module->getModuleInst(), result.usedLocations);
+    _collectStructuralRayTracingPayloadSemanticTypes(module->getModuleInst(), result);
+
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+    for (auto& payload : result.payloads)
+    {
+        addStructuralRayTracingProgramPayloadLocation(
+            builder,
+            module->getModuleInst(),
+            payload.payloadType,
+            payload.payloadSemanticType,
+            payload.location);
+    }
+    _stampStructuralRayTracingPayloadLocations(module->getModuleInst(), result, builder);
+}
+
+static void _addStructuralRayTracingEntryPointInfo(
+    IRFunc* func,
+    EntryPoint* entryPoint,
+    bool assignPayloadLocation)
+{
+    if (!entryPoint->getStructuralRayTracingInvokeMethod())
+        return;
+
+    auto irInfo = func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+    // Front-end IR lowering is the sole producer of the stage's checked semantic metadata. The
+    // linker must preserve and specialize that representation rather than rebuilding it from AST
+    // declarations (which previously failed for scalar and vector payloads).
+    SLANG_RELEASE_ASSERT(irInfo);
+
+    IRIntegerValue payloadLocation = irInfo->getPayloadLocation()->getValue();
+    if (assignPayloadLocation && !as<IRVoidType>(irInfo->getPayloadType()))
+        SLANG_RELEASE_ASSERT(payloadLocation >= 0);
+}
+
 IRFunc* specializeIRForEntryPoint(
     IRSpecContext* context,
     String const& mangledName,
     EntryPoint* entryPoint,
-    UnownedStringSlice nameOverride)
+    UnownedStringSlice nameOverride,
+    bool assignStructuralPayloadLocation)
 {
     // We start by looking up the IR symbol that
     // matches the mangled name given to the
@@ -1242,6 +1484,8 @@ IRFunc* specializeIRForEntryPoint(
                 UnownedStringSlice(entryPoint->getModule()->getName()))};
         context->builder->addDecoration(clonedFunc, IROp::kIROp_EntryPointDecoration, operands, 3);
     }
+
+    _addStructuralRayTracingEntryPointInfo(clonedFunc, entryPoint, assignStructuralPayloadLocation);
 
     // We will also go on and attach layout information
     // to the function parameters, so that we have it
@@ -1415,6 +1659,11 @@ IRInst* cloneInst(
     SLANG_DEFER(_debugResetInstBeingCloned());
 #endif
 
+    if (auto originalInterface = as<IRInterfaceType>(originalInst))
+    {
+        return cloneInterfaceTypeImpl(context, builder, originalInterface, originalValues);
+    }
+
     switch (originalInst->getOp())
     {
         // We need to special-case any instruction that is not
@@ -1468,13 +1717,6 @@ IRInst* cloneInst(
 
     case kIROp_EnumType:
         return cloneEnumTypeImpl(context, builder, cast<IREnumType>(originalInst), originalValues);
-
-    case kIROp_InterfaceType:
-        return cloneInterfaceTypeImpl(
-            context,
-            builder,
-            cast<IRInterfaceType>(originalInst),
-            originalValues);
 
     case kIROp_Generic:
         return cloneGenericImpl(context, builder, cast<IRGeneric>(originalInst), originalValues);
@@ -2152,7 +2394,11 @@ void cloneUsedWitnessTableEntries(IRSpecContext* context)
     }
 }
 
-LinkedIR linkIR(CodeGenContext* codeGenContext)
+static LinkedIR _linkIR(
+    CodeGenContext* codeGenContext,
+    const CodeGenContext::EntryPointIndices& entryPointIndices,
+    IRModule* structuralRayTracingProgramManifest,
+    bool assignStructuralPayloadLocations)
 {
     SLANG_PROFILE;
 
@@ -2190,15 +2436,28 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     for (auto& m : globalSession->coreModules)
         builtinModules.add(m->getIRModule());
 
-    // Link modules in the program.
-    program->enumerateIRModules(
-        [&](IRModule* module)
-        {
-            if (module->getName() == globalSession->glslModuleName)
-                builtinModules.add(module);
-            else
-                irModules.add(module);
-        });
+    // A structural program is linked and specialized once for the complete target program. Every
+    // later native entry-point request must clone user IR from that same immutable manifest. In
+    // particular, a phantom generic argument can disappear from a specialized struct's runtime
+    // representation; independently specializing the original modules would then create a second
+    // anonymous IR type that cannot match the manifest's payload-location key.
+    if (structuralRayTracingProgramManifest)
+    {
+        irModules.add(structuralRayTracingProgramManifest);
+    }
+    else
+    {
+        // Ordinary programs, and the one-time construction of a structural manifest, retain the
+        // existing component-module linker path.
+        program->enumerateIRModules(
+            [&](IRModule* module)
+            {
+                if (module->getName() == globalSession->glslModuleName)
+                    builtinModules.add(module);
+                else
+                    irModules.add(module);
+            });
+    }
 
     // We will also consider the IR global symbols from the IR module
     // attached to the `TargetProgram`, since this module is
@@ -2267,7 +2526,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     initializeTranslationDictionary(context->getModule());
 
     List<IRFunc*> irEntryPoints;
-    for (auto entryPointIndex : codeGenContext->getEntryPointIndices())
+    for (auto entryPointIndex : entryPointIndices)
     {
         auto entryPointMangledName = program->getEntryPointMangledName(entryPointIndex);
         auto nameOverride = program->getEntryPointNameOverride(entryPointIndex);
@@ -2276,9 +2535,9 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
             context,
             entryPointMangledName,
             entryPoint,
-            nameOverride.getUnownedSlice()));
+            nameOverride.getUnownedSlice(),
+            assignStructuralPayloadLocations));
     }
-
     // Layout information for global shader parameters is also required,
     // and in particular every global parameter that is part of the layout
     // should be present in the initial IR module so that steps that
@@ -2353,6 +2612,33 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         }
     };
 
+    auto isRequestedStructuralRayTracingConformance = [&](IRInst* conformanceOwner)
+    {
+        for (auto decoration : conformanceOwner->getDecorations())
+        {
+            auto tagged = as<IRStructuralRayTracingTaggedConformanceDecoration>(decoration);
+            if (!tagged)
+                continue;
+
+            auto candidateKind = tagged->getSectionKind()->getValue();
+            // Clone only the tag's canonical type value. Imported and defining occurrences then
+            // resolve through the ordinary linker symbol table to the same output instruction;
+            // no source spelling is inspected or parsed.
+            auto candidateTag = cloneType(context, tagged->getTagType());
+            for (auto request : context->structuralRayTracingOpenSections)
+            {
+                if (!request->getIsValidTag()->getValue() ||
+                    request->getSectionKind()->getValue() != candidateKind)
+                {
+                    continue;
+                }
+                if (request->getTagType() == candidateTag)
+                    return true;
+            }
+        }
+        return false;
+    };
+
     for (IRModule* irModule : irModules)
     {
         auto linkingInfo = irModule->_getOrCreateLinkingInfo();
@@ -2362,6 +2648,24 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         // the entry-point clone graph.
         for (auto inst : linkingInfo->getHLSLExports())
             cloneAndKeepAlive(inst);
+
+        if (context->structuralRayTracingOpenSections.getCount() != 0)
+        {
+            for (auto conformanceOwner : linkingInfo->getStructuralRayTracingTaggedConformances())
+            {
+                if (isRequestedStructuralRayTracingConformance(conformanceOwner))
+                {
+                    // The front-end decoration on this canonical conformance value already
+                    // contains the projected entry metadata, including every invoke function.
+                    // Ordinary witness-entry deferral may therefore remain intact: link-time
+                    // completion consumes the producer record, not an inherited-witness operand
+                    // walk. Keep only the selected owner alive until specialization has
+                    // materialized any explicit conformance component and completion has copied
+                    // its record to the structural operation.
+                    cloneAndKeepAlive(conformanceOwner);
+                }
+            }
+        }
 
         if (shouldCopyGlobalParams)
         {
@@ -2460,6 +2764,73 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     return linkedIR;
 }
 
+static RefPtr<IRModule> _getOrCreateStructuralRayTracingProgramManifest(
+    CodeGenContext* codeGenContext)
+{
+    auto targetProgram = codeGenContext->getTargetProgram();
+    if (auto existing = targetProgram->getExistingStructuralRayTracingProgramManifest())
+    {
+        return existing;
+    }
+
+    // Build this target program's manifest from every declared entry point, even when the current
+    // API request selects only one. This makes allocation independent of request order. `_linkIR`
+    // is the ordinary linker implementation with two explicit controls: this call supplies all
+    // entry indices and disables payload-location lookup while the manifest itself is being built.
+    // It does not enter `emitEntryPoints`, target legalization, or source emission, so there is no
+    // recursive code-generation pipeline and no duplicated backend lowering.
+    CodeGenContext::EntryPointIndices allEntryPointIndices;
+    auto program = codeGenContext->getProgram();
+    allEntryPointIndices.setCount(program->getEntryPointCount());
+    for (Index i = 0; i < allEntryPointIndices.getCount(); ++i)
+        allEntryPointIndices[i] = i;
+
+    auto linked = _linkIR(codeGenContext, allEntryPointIndices, nullptr, false);
+
+    // A generic helper can contain `trace<Payload>` and be instantiated with several payload types
+    // by one entry point. Preserve the semantic IR type operand through linking, then use Slang's
+    // existing specialization pass to produce those concrete identities. This is deliberately not
+    // a syntax scan or a second implementation of generic substitution.
+    SpecializationOptions specializationOptions;
+    specializationOptions.lowerWitnessLookups = true;
+    specializeModule(
+        linked.module,
+        targetProgram,
+        codeGenContext->getSink(),
+        specializationOptions);
+
+    completeOpenStructuralRayTracingSchemas(linked.module, codeGenContext->getSink());
+    _assignStructuralRayTracingProgramPayloadLocations(linked.module);
+
+    // The front-end normally builds the mangled-name map after it finishes constructing a module.
+    // This manifest has the same lifecycle, except that specialization is its final producer and
+    // can introduce additional linked globals. Rebuild both module-owned lookup structures at the
+    // immutable publication boundary so later per-entry links see exactly that final IR.
+    linked.module->buildMangledNameToGlobalInstMap();
+    linked.module->_invalidateLinkingInfo();
+    linked.module->_ensureLinkingInfo();
+    return targetProgram->publishStructuralRayTracingProgramManifest(linked.module);
+}
+
+LinkedIR linkIR(CodeGenContext* codeGenContext)
+{
+    RefPtr<IRModule> structuralRayTracingProgramManifest;
+    if (_containsStructuralRayTracingPayloadMetadata(codeGenContext->getProgram()))
+    {
+        structuralRayTracingProgramManifest =
+            _getOrCreateStructuralRayTracingProgramManifest(codeGenContext);
+    }
+
+    // Programs without structural payload metadata take the original linker path. Structural
+    // programs use the immutable whole-component manifest as their only user-IR source, while the
+    // existing layout and builtin modules are still supplied by `_linkIR`.
+    return _linkIR(
+        codeGenContext,
+        codeGenContext->getEntryPointIndices(),
+        structuralRayTracingProgramManifest,
+        structuralRayTracingProgramManifest != nullptr);
+}
+
 
 struct IRPrelinkContext : IRSpecContext
 {
@@ -2529,6 +2900,12 @@ struct IRPrelinkContext : IRSpecContext
             builderForClone = &shared->builderStorage;
         }
         IRInst* clonedInst = nullptr;
+        if (as<IRInterfaceType>(originalVal))
+        {
+            return completeClonedInst(
+                cloneGlobalValueImpl(this, originalVal, IROriginalValuesForClone(originalVal)));
+        }
+
         switch (originalVal->getOp())
         {
         case kIROp_Generic:
@@ -2538,7 +2915,6 @@ struct IRPrelinkContext : IRSpecContext
         case kIROp_StructKey:
         case kIROp_InterfaceRequirementEntry:
         case kIROp_GlobalGenericParam:
-        case kIROp_InterfaceType:
             return completeClonedInst(
                 cloneGlobalValueImpl(this, originalVal, IROriginalValuesForClone(originalVal)));
         case kIROp_WitnessTable:

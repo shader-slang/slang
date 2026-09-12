@@ -1,0 +1,37 @@
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -no-codegen
+
+import slang.raytracing;
+
+struct TestPayload {}
+struct TestRecord {}
+
+struct TestTraceContext : rt::ITraceContext
+{
+    typealias AccelerationStructure = rt::AccelerationStructure;
+    typealias Motion = rt::NoMotion;
+}
+
+struct TestHitContext : rt::IHitContext
+{
+    typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
+    typealias Primitive = rt::TrianglePrimitive;
+    typealias Record = TestRecord;
+}
+
+[require(anyhit)]
+void invalidAnyHitHelper()
+{
+    IgnoreHit();
+}
+
+struct TestClosestHit : rt::IClosestHitShader
+{
+    typealias Context = TestHitContext;
+    void invoke(rt::ClosestHitInput<TestHitContext> input)
+//CHECK: ^^^^^^ dependencies not compatible on stage
+//CHECK: ^^^^^^ 'invoke' requires support for stage 'closesthit', but stage is unsupported.
+    {
+        invalidAnyHitHelper();
+    }
+}

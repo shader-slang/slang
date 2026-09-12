@@ -90,6 +90,8 @@ struct RequiredLoweringPassSet
     bool sumVectorMatrix;
     bool lateRequireCapability;
     bool unresolvedMatrixLayout;
+    bool structuralRayTracingStageInput;
+    bool structuralRayTracingTrace;
 };
 
 /// A context for code generation in the compiler back-end

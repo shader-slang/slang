@@ -1837,6 +1837,33 @@ struct IRAtomicOperation : IRInst
 };
 
 FIDDLE()
+struct IRStructuralRayTracingStageInputOperation : IRInst
+{
+    FIDDLE(baseInst())
+
+    bool hasFallback()
+    {
+        switch (getOp())
+        {
+        case kIROp_StructuralRayTracingGetPayload:
+        case kIROp_StructuralRayTracingGetCallableData:
+        case kIROp_StructuralRayTracingGetRecord:
+        case kIROp_StructuralRayTracingGetHitAttributes:
+        case kIROp_StructuralRayTracingGetTriangleBarycentricCoord:
+            return false;
+        default:
+            return true;
+        }
+    }
+    IRInst* getFallback()
+    {
+        SLANG_ASSERT(hasFallback());
+        return getOperand(0);
+    }
+    IRInst* getInput() { return getOperand(hasFallback() ? 1 : 0); }
+};
+
+FIDDLE()
 struct IRAtomicLoad : IRAtomicOperation
 {
     FIDDLE(leafInst())
@@ -4093,6 +4120,7 @@ $(type_info.return_type) $(type_info.method_name)(
 
     // Create an empty `interface` type.
     IRInterfaceType* createInterfaceType(UInt operandCount, IRInst* const* operands);
+    IRInterfaceType* createInterfaceType(IROp op, UInt operandCount, IRInst* const* operands);
 
     // Create a global "key" to use for indexing into a `struct` type.
     IRStructKey* createStructKey();

@@ -949,6 +949,55 @@ err(
 )
 
 err(
+    "compiler-owned-intrinsic-op",
+    20021,
+    "compiler-owned intrinsic operation",
+    span { loc = "location", message = "intrinsic operation '~operation' is reserved for compiler use" }
+)
+
+err(
+    "direct-structural-ray-tracing-stage-invoke",
+    20022,
+    "direct invocation of a structural ray-tracing stage",
+    span { loc = "location", message = "a structural ray-tracing stage method may only be invoked by compiler-generated dispatch" }
+)
+
+err(
+    "structural-ray-tracing-stage-runtime-value",
+    20023,
+    "runtime use of a structural ray-tracing stage type",
+    span { loc = "location", message = "structural ray-tracing stage type '~type:type' has no runtime representation" }
+)
+
+err(
+    "structural-ray-tracing-input-storage",
+    20024,
+    "storage of a structural ray-tracing stage input",
+    span { loc = "location", message = "ray-tracing stage input type '~type:type' is compiler-provided and may only be used as a value parameter" }
+)
+
+err(
+    "structural-ray-tracing-type-construction",
+    20025,
+    "construction of a structural ray-tracing type",
+    span { loc = "location", message = "structural ray-tracing type '~type:type' cannot be constructed by user code" }
+)
+
+err(
+    "structural-ray-tracing-metadata-runtime-value",
+    20026,
+    "runtime use of structural ray-tracing metadata",
+    span { loc = "location", message = "structural ray-tracing metadata type '~type:type' has no runtime representation" }
+)
+
+err(
+    "structural-ray-tracing-input-stage-mismatch",
+    20027,
+    "ray-tracing stage input used by the wrong stage",
+    span { loc = "location", message = "ray-tracing stage input type '~type:type' requires logical stage '~stage', but function '~function:Decl' is not restricted to that stage" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
@@ -4262,6 +4311,211 @@ err(
     38007,
     "no stage specified for entry point",
     span { loc = "location", message = "no stage specified for entry point '~entryPoint'; use either a '[shader(\"name\")]' function attribute or the '-stage <name>' command-line option to specify a stage" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-not-stage",
+    38053,
+    "invalid structural ray-tracing entry point",
+    span { loc = "stageType:Decl", message = "struct '~stageType' does not implement an executable structural ray-tracing stage interface" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-stage-mismatch",
+    38054,
+    "structural ray-tracing entry point stage mismatch",
+    span { loc = "stageType:Decl", message = "struct '~stageType' does not implement the selected '~stage' stage" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-ambiguous-stage",
+    38055,
+    "ambiguous structural ray-tracing entry point stage",
+    span { loc = "stageType:Decl", message = "struct '~stageType' implements more than one executable ray-tracing stage; use '-stage <name>' to select one" }
+)
+
+err(
+    "structural-ray-tracing-stage-instance-field",
+    38056,
+    "stateful structural ray-tracing stage",
+    span { loc = "field:Decl", message = "instance field '~field' is not allowed because structural ray-tracing stage implementations are compiler-created" }
+)
+
+err(
+    "mixed-ray-tracing-apis",
+    38057,
+    "cannot mix legacy and structural ray-tracing APIs in one module",
+    span { loc = "currentDecl:Decl", message = "this declaration uses the ~currentAPI API" },
+    note { message = "the same module also uses the ~otherAPI API", span { loc = "otherDecl:Decl" } }
+)
+
+err(
+    "structural-ray-tracing-curve-requires-metal",
+    38060,
+    "structural ray-tracing curve primitives require Metal",
+    span { loc = "location", message = "'CurvePrimitive' is only supported when compiling the structural ray-tracing API for Metal" }
+)
+
+err(
+    "structural-ray-tracing-callable-data-mismatch",
+    38061,
+    "incompatible structural ray-tracing callable data",
+    span { loc = "location", message = "callable shader '~shader:IRInst' uses data type '~actualType:IRInst', which does not match the required callable data type '~expectedType:IRInst'" }
+)
+
+err(
+    "structural-ray-tracing-call-without-shaders",
+    38062,
+    "structural callable dispatch requires a callable shader",
+    span { loc = "location", message = "this trace program schema has no callable shaders to dispatch" }
+)
+
+err(
+    "structural-ray-tracing-callable-stage-mismatch",
+    38063,
+    "callable dispatch is not available from this ray-tracing stage",
+    span { loc = "location", message = "'callShader' cannot be reached from structural ~stage logic" }
+)
+
+err(
+    "invalid-structural-ray-tracing-max-level-count",
+    38064,
+    "invalid structural ray-tracing acceleration-structure depth",
+    span { loc = "location", message = "multi-level acceleration-structure depth ~levelCount:Int is outside Metal's supported range of 1 through 32" }
+)
+
+err(
+    "invalid-structural-ray-tracing-motion",
+    38065,
+    "invalid structural ray-tracing motion configuration",
+    span { loc = "location", message = "the trace context must use one of the motion configurations provided by 'slang.raytracing'" }
+)
+
+err(
+    "structural-ray-tracing-instance-motion-requires-instancing",
+    38066,
+    "structural ray-tracing instance motion requires instancing",
+    span { loc = "location", message = "instance motion cannot be used with a direct primitive acceleration structure" }
+)
+
+err(
+    "structural-ray-tracing-acceleration-structure-motion-conflict",
+    38067,
+    "conflicting structural ray-tracing acceleration-structure requirements",
+    span { loc = "location", message = "the same acceleration-structure value is used by trace contexts with incompatible topology or motion requirements" }
+)
+
+err(
+    "structural-ray-tracing-multilevel-requires-metallib-3-1",
+    38068,
+    "structural ray-tracing multilevel traversal requires MetalLib 3.1",
+    span { loc = "location", message = "multi-level acceleration structures with two or more levels require the 'metallib_3_1' capability" }
+)
+
+err(
+    "structural-ray-tracing-curve-requires-metallib-3-1",
+    38069,
+    "structural ray-tracing curve primitives require MetalLib 3.1",
+    span { loc = "location", message = "curve primitives require the 'metallib_3_1' capability" }
+)
+
+err(
+    "mixed-ray-tracing-apis-in-program",
+    38070,
+    "cannot mix legacy and structural ray-tracing APIs in one linked program",
+    span { loc = "currentDecl:Decl", message = "this selected entry point uses the ~currentAPI API" },
+    note { message = "another selected entry point uses the ~otherAPI API", span { loc = "otherDecl:Decl" } }
+)
+
+err(
+    "structural-ray-tracing-metal-candidate-global-parameter",
+    38071,
+    "global parameter is unavailable from a Metal intersection function",
+    span { loc = "location", message = "structural intersection and any-hit logic cannot reference global shader parameters in the first-version Metal lowering" }
+)
+
+err(
+    "structural-ray-tracing-entry-trace-context-mismatch",
+    38072,
+    "structural ray-tracing entry uses a different trace context",
+    span { loc = "location", message = "entry '~entry:IRInst' uses trace context '~actualType:IRInst', but schema '~schema:IRInst' requires '~expectedType:IRInst'" }
+)
+
+err(
+    "structural-ray-tracing-payload-not-served",
+    38073,
+    "structural ray-tracing schema does not serve this payload",
+    span { loc = "location", message = "schema '~schema:IRInst' has no hit group or miss shader for payload type '~payloadType:IRInst'" }
+)
+
+err(
+    "duplicate-structural-ray-tracing-entry",
+    38074,
+    "duplicate structural ray-tracing entry",
+    span { loc = "location", message = "~section entry '~entry:IRInst' is listed more than once in schema '~schema:IRInst'" }
+)
+
+err(
+    "structural-ray-tracing-empty-payload-value",
+    38075,
+    "an empty structural ray-tracing payload has no explicit value",
+    span { loc = "location", message = "empty payload type '~payloadType:Type' is represented implicitly; omit the payload argument to 'trace' and do not access 'input.payload'" }
+)
+
+err(
+    "structural-ray-tracing-empty-payload-not-found",
+    38076,
+    "structural ray-tracing schema has no empty payload",
+    span { loc = "location", message = "schema '~schemaType:Type' has no concrete empty payload served by a hit group or miss shader" }
+)
+
+err(
+    "structural-ray-tracing-ambiguous-empty-payload",
+    38077,
+    "structural ray-tracing schema has multiple empty payloads",
+    span { loc = "location", message = "schema '~schemaType:Type' serves distinct empty payload types '~firstPayloadType:Type' and '~secondPayloadType:Type'; the three-argument 'trace' overload cannot choose between them" }
+)
+
+err(
+    "structural-ray-tracing-schema-not-closed",
+    38078,
+    "structural ray-tracing schema is not concrete and closed",
+    span { loc = "location", message = "the three-argument 'trace' overload requires a concrete closed schema, but schema '~schemaType:Type' has an unresolved hit-group or miss-shader payload type" }
+)
+
+err(
+    "structural-ray-tracing-record-not-plain-data",
+    38079,
+    "structural ray-tracing ABI data is not portable plain data",
+    span { loc = "location", message = "type '~type:IRInst' is used as structural ray-tracing ~role data but does not have a fixed-size, copyable plain-data representation" }
+)
+
+err(
+    "structural-ray-tracing-empty-payload-value-ir",
+    38081,
+    "an empty structural ray-tracing payload has no explicit value",
+    span { loc = "location", message = "empty payload type '~payloadType:IRInst' is represented implicitly; omit the payload argument to 'trace' and do not access 'input.payload'" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-name-collision",
+    38082,
+    "conflicting structural ray-tracing entry-point name",
+    span { loc = "location", message = "physical entry-point name '~physicalName:String' is requested by distinct structural stages '~firstStage:String' and '~secondStage:String'" }
+)
+
+err(
+    "structural-ray-tracing-open-tag-not-entry-interface",
+    38083,
+    "invalid structural ray-tracing open-section tag",
+    span { loc = "location", message = "open ~section tag '~tag:IRInst' must be an interface inheriting '~entryInterface:String'" }
+)
+
+err(
+    "structural-ray-tracing-void-abi-data",
+    38080,
+    "structural ray-tracing ABI data cannot be void",
+    span { loc = "location", message = "'void' cannot be used as structural ray-tracing ~role data; use a concrete plain-data type" }
 )
 
 err(

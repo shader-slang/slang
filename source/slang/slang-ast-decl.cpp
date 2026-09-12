@@ -63,6 +63,68 @@ bool isGenericConstraintParameterDecl(Decl* decl)
     return false;
 }
 
+Index getGenericParamIndex(Decl* genericParamDecl)
+{
+    if (auto typeParamDecl = as<GenericTypeParamDeclBase>(genericParamDecl))
+        return typeParamDecl->parameterIndex;
+    if (auto valuePackParamDecl = as<GenericValuePackParamDecl>(genericParamDecl))
+        return valuePackParamDecl->parameterIndex;
+    if (auto valueParamDecl = as<GenericValueParamDecl>(genericParamDecl))
+        return valueParamDecl->parameterIndex;
+    return -1;
+}
+
+Index getGenericArgumentCount(GenericDecl* genericDecl)
+{
+    if (!genericDecl)
+        return 0;
+
+    // `getDefaultSubstitutionArgs()` produces one operand for every ordinary parameter and then
+    // one witness for every signature constraint. Consumers that allocate or validate a
+    // `GenericAppDeclRef` argument list must use the same declaration classification so adding a
+    // value parameter or reordering constraints cannot split producer and consumer layouts.
+    Index result = 0;
+    for (auto member : genericDecl->getDirectMemberDecls())
+    {
+        if (isGenericParam(member) || isGenericConstraintParameterDecl(member))
+            ++result;
+    }
+    return result;
+}
+
+Index getGenericArgumentIndex(GenericDecl* genericDecl, Decl* argumentDecl)
+{
+    // Consider `f<T, let N>() where T : IFoo where N == 4`. The generic application producer
+    // serializes `[T, N, witness(T : IFoo), witness(N == 4)]`: ordinary declarations already own
+    // indices 0 and 1, while constraint witnesses follow them in source constraint order. Both the
+    // constraint solver that writes this array and semantic registries that later read it use this
+    // helper, so neither side can silently invent a different witness offset.
+    if (!genericDecl || !argumentDecl || argumentDecl->parentDecl != genericDecl)
+        return -1;
+
+    Index parameterIndex = getGenericParamIndex(argumentDecl);
+    if (parameterIndex >= 0)
+        return parameterIndex;
+    if (!isGenericConstraintParameterDecl(argumentDecl))
+        return -1;
+
+    Index argumentIndex = 0;
+    for (auto member : genericDecl->getDirectMemberDecls())
+    {
+        if (isGenericParam(member))
+            ++argumentIndex;
+    }
+    for (auto member : genericDecl->getDirectMemberDecls())
+    {
+        if (!isGenericConstraintParameterDecl(member))
+            continue;
+        if (member == argumentDecl)
+            return argumentIndex;
+        ++argumentIndex;
+    }
+    return -1;
+}
+
 bool isInterfaceRequirement(Decl* decl)
 {
     // A generic signature constraint belongs to the generic requirement it parameterizes:

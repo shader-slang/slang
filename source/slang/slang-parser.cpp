@@ -5,6 +5,7 @@
 #include "slang-ast-decl.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
 #include "slang-rich-diagnostics.h"
@@ -10081,21 +10082,21 @@ static void addSimpleModifierSyntax(Session* session, Scope* scope, char const* 
 
 static IROp parseIROp(Parser* parser, Token& outToken)
 {
+    IROp op;
     if (AdvanceIf(parser, TokenType::OpSub))
     {
         outToken = parser->ReadToken();
-        return IROp(-stringToInt(outToken.getContent()));
+        op = IROp(-stringToInt(outToken.getContent()));
     }
     else if (parser->LookAheadToken(TokenType::IntegerLiteral))
     {
         outToken = parser->ReadToken();
-        return IROp(stringToInt(outToken.getContent()));
+        op = IROp(stringToInt(outToken.getContent()));
     }
     else
     {
         outToken = parser->ReadToken(TokenType::Identifier);
-        ;
-        auto op = findIROp(outToken.getContent());
+        op = findIROp(outToken.getContent());
 
         if (op == kIROp_Invalid)
         {
@@ -10103,8 +10104,20 @@ static IROp parseIROp(Parser* parser, Token& outToken)
                 .feature = "unknown intrinsic op",
                 .location = outToken.loc});
         }
-        return op;
     }
+
+    // The core module is compiler-owned source and defines the trusted HLSL wrappers for the
+    // Metal-only dispatch-system-value operations. User modules must not spell any structural
+    // ray-tracing IR operation directly; their source-level access is provided exclusively by the
+    // registered `slang.raytracing` contracts.
+    if (!parser->options.isCoreModule && isCompilerOwnedStructuralRayTracingIROp(op))
+    {
+        parser->sink->diagnose(Diagnostics::CompilerOwnedIntrinsicOp{
+            .operation = outToken.getContent(),
+            .location = outToken.loc});
+        return kIROp_Invalid;
+    }
+    return op;
 }
 
 static NodeBase* parseIntrinsicOpModifier(Parser* parser, void* /*userData*/)

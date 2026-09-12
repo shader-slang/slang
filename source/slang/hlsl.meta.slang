@@ -20017,7 +20017,7 @@ void __traceMotionRay(
 /// @remarks Extended version of TraceRay with motion blur support
 /// @category raytracing
 [ForceInline]
-[require(glsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
+[require(cuda_glsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
 __generic<payload_t>
 void TraceMotionRay(
     RaytracingAccelerationStructure AccelerationStructure,
@@ -20032,6 +20032,7 @@ void TraceMotionRay(
 {
     __target_switch
     {
+    case cuda: __intrinsic_asm "optixTrace";
     case glsl:
     {
         [__vulkanRayPayload]
@@ -20197,12 +20198,19 @@ void AcceptHitAndEndSearch()
 
 // 10.4.1 - Ray Dispatch System Values
 
+__intrinsic_op($(kIROp_MetalStructuralRayTracingDispatchRaysIndex))
+internal uint3 __metalStructuralRayTracingDispatchRaysIndex();
+
+__intrinsic_op($(kIROp_MetalStructuralRayTracingDispatchRaysDimensions))
+internal uint3 __metalStructuralRayTracingDispatchRaysDimensions();
+
 /// Returns the current ray dispatch coordinates.
 /// @return 3D index of the current ray being processed
 /// @remarks Available in all ray tracing shader stages
 /// @category raytracing
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
+[ForceInline]
+[require(structural_raytracing_dispatch_system_values)]
 uint3 DispatchRaysIndex()
 {
     __target_switch
@@ -20210,6 +20218,7 @@ uint3 DispatchRaysIndex()
     case hlsl: __intrinsic_asm "DispatchRaysIndex";
     case glsl: __intrinsic_asm "(gl_LaunchIDEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchIndex";
+    case metal: return __metalStructuralRayTracingDispatchRaysIndex();
     case spirv:
         return spirv_asm
         {
@@ -20222,7 +20231,8 @@ uint3 DispatchRaysIndex()
 /// @return 3D dimensions of the ray dispatch grid
 /// @remarks Available in all ray tracing shader stages
 /// @category raytracing
-[require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
+[ForceInline]
+[require(structural_raytracing_dispatch_system_values)]
 uint3 DispatchRaysDimensions()
 {
     __target_switch
@@ -20230,6 +20240,7 @@ uint3 DispatchRaysDimensions()
     case hlsl:  __intrinsic_asm "DispatchRaysDimensions";
     case glsl: __intrinsic_asm "(gl_LaunchSizeEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchDimensions";
+    case metal: return __metalStructuralRayTracingDispatchRaysDimensions();
     case spirv:
         return spirv_asm
         {
@@ -20556,17 +20567,18 @@ float4x3 WorldToObject4x3()
 
 /// Returns the current time value for motion blur.
 /// @return Time value between 0 and 1 for motion blur interpolation
-/// @remarks Available when motion blur extension is enabled
+/// @remarks Available when motion blur is enabled
 /// @category raytracing
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [NonUniformReturn]
-[require(glsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
+[require(cuda_glsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
 float RayCurrentTime()
 {
     __target_switch
     {
     case glsl:  __intrinsic_asm "(gl_CurrentRayTimeNV)";
+    case cuda: __intrinsic_asm "optixGetRayTime";
     case spirv:
         return spirv_asm
         {
@@ -21256,17 +21268,20 @@ extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback
 
 /// Returns the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader.
 /// @return Zero-based index of the geometry in the current instance
-/// @remarks Available in intersection, any-hit, and closest-hit shaders
+/// @remarks Available in intersection, any-hit, and closest-hit shaders. On CUDA this maps to
+/// `optixGetSbtGASIndex()`; callers using per-primitive SBT index offsets must account for that
+/// OptiX semantic.
 /// @category raytracing
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint GeometryIndex()
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "GeometryIndex";
     case glsl: __intrinsic_asm "(gl_GeometryIndexEXT)";
+    case cuda: __intrinsic_asm "optixGetSbtGASIndex";
     case spirv: return spirv_asm {
             result:$$uint = OpLoad builtin(RayGeometryIndexKHR:uint);
         };

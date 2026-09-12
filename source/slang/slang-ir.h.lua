@@ -354,7 +354,12 @@ local function getBasicTypesForBuilderMethods()
 	if type_insts then
 		walk_instructions(type_insts, function(key, value, struct_name, parent_struct)
 			-- Only process leaf instructions (not base classes) that are not excluded
-			if struct_name and value.is_leaf and not excluded_set[struct_name] then
+			if
+				struct_name
+				and value.is_leaf
+				and not value.global
+				and not excluded_set[struct_name]
+			then
 				-- Determine method name - always add "get" prefix
 				local method_name = "get" .. struct_name
 
