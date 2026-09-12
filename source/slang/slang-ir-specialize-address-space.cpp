@@ -17,6 +17,16 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     HashSet<IRFunc*> functionsToConsiderRemoving;
     DiagnosticSink* sink = nullptr;
 
+    // Reconciled contained address space of each local pointer slot (`Var`/`DebugVar`). A
+    // load of one slot stored into another resolves to the source slot's *reconciled* space
+    // (see `getStoredValueAddrSpace`), so the slot-reconciliation fixpoint converges
+    // regardless of the order slots are visited rather than depending on declaration order.
+    Dictionary<IRInst*, AddressSpace> reconciledSlotAddrSpace;
+
+    // Insts (a conflicting block parameter, or a local slot fed two different concrete
+    // address spaces) already reported, so the fixpoint diagnoses each exactly once.
+    HashSet<IRInst*> diagnosedAddrSpaceConflicts;
+
     AddressSpaceContext(
         IRModule* inModule,
         InitialAddressSpaceAssigner* inAddrSpaceAssigner,
@@ -133,6 +143,36 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         return getAddressSpaceFromVarType(funcType->getResultType());
     }
 
+    // Join the address spaces flowing into a phi (a non-entry block parameter) and, if two
+    // predecessors carry different concrete address spaces, diagnose an inconsistent pointer
+    // address space exactly once. Returns the joined concrete address space, or `Generic` if
+    // no predecessor has been resolved yet. This is the single place that classifies a phi's
+    // address space, called both when the phi is first resolved and when it is revisited, so
+    // that a predecessor resolved on a later fixpoint iteration is still checked for conflict.
+    AddressSpace resolvePhiAddrSpace(IRInst* param)
+    {
+        AddressSpace joined = AddressSpace::Generic;
+        for (auto arg : getPhiArgs(param))
+        {
+            auto argAddrSpace = getAddrSpace(arg);
+            if (argAddrSpace == AddressSpace::Generic)
+                continue;
+            if (joined != AddressSpace::Generic && joined != argAddrSpace)
+            {
+                // The block parameter merges pointer values from different concrete address
+                // spaces (e.g. a phi of a `StorageBuffer` and a `Device` pointer). A single
+                // pointer value cannot inhabit two storage classes, so diagnose rather than
+                // silently taking one arm.
+                if (sink && diagnosedAddrSpaceConflicts.add(param))
+                    sink->diagnose(Diagnostics::InconsistentPointerAddressSpace{
+                        .inst = param,
+                        .location = param->sourceLoc});
+            }
+            joined = argAddrSpace;
+        }
+        return joined;
+    }
+
     // Return true if the address space of the function return type is changed.
     bool processFunction(IRFunc* func)
     {
@@ -148,12 +188,26 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 for (auto inst : block->getChildren())
                 {
                     // If we have already assigned an address space to this instruction, then skip
-                    // it.
+                    // it -- except for a phi, whose predecessors may resolve on different fixpoint
+                    // iterations: re-check its arguments so a later-resolved predecessor carrying a
+                    // conflicting address space is still diagnosed.
                     if (mapInstToAddrSpace.containsKey(inst))
                     {
-                        // TODO: if the inst is a phi node, we need to check if the address space of
-                        // the phi arguments is consistent. If not, then we need to report an error.
-                        // For now, we just skip the checks.
+                        // A phi may have been mapped from its (possibly stale) declared type
+                        // before its predecessors resolved. Re-join its arguments; if they now
+                        // agree on a different concrete address space, adopt it and keep the
+                        // fixpoint going, so a consistent set of incoming values corrects the
+                        // mapping (and a later-resolved conflicting predecessor is diagnosed).
+                        if (inst->getOp() == kIROp_Param && !isFirstBlock)
+                        {
+                            auto joined = resolvePhiAddrSpace(inst);
+                            if (joined != AddressSpace::Generic &&
+                                mapInstToAddrSpace[inst] != joined)
+                            {
+                                mapInstToAddrSpace[inst] = joined;
+                                changed = true;
+                            }
+                        }
                         continue;
                     }
 
@@ -209,36 +263,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     case kIROp_Param:
                         if (!isFirstBlock)
                         {
-                            auto phiArgs = getPhiArgs(inst);
-                            AddressSpace addrSpace = AddressSpace::Generic;
-                            for (auto arg : phiArgs)
-                            {
-                                auto argAddrSpace = getAddrSpace(arg);
-                                if (argAddrSpace != AddressSpace::Generic)
-                                {
-                                    if (addrSpace != AddressSpace::Generic &&
-                                        addrSpace != argAddrSpace)
-                                    {
-                                        // The block parameter merges pointer values from
-                                        // different concrete address spaces (e.g. a phi of a
-                                        // `StorageBuffer` and a `Device` pointer). A single
-                                        // pointer value cannot inhabit two storage classes, so
-                                        // diagnose rather than silently taking one arm.
-                                        if (sink)
-                                            sink->diagnose(
-                                                Diagnostics::InconsistentPointerAddressSpace{
-                                                    .inst = inst,
-                                                    .location = inst->sourceLoc});
-                                    }
-                                    addrSpace = argAddrSpace;
-                                }
-                            }
+                            auto addrSpace = resolvePhiAddrSpace(inst);
                             if (addrSpace != AddressSpace::Generic)
                             {
                                 mapInstToAddrSpace[inst] = addrSpace;
                                 changed = true;
                             }
-                            break;
                         }
                         break;
                     case kIROp_Call:
@@ -383,6 +413,45 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         return AddressSpace::Generic;
     }
 
+    // Return the address space a *stored* pointer value contributes to the slot it is written
+    // into. A load of another local pointer slot contributes that source slot's reconciled
+    // address space (`Generic` until the source slot has itself been reconciled), rather than
+    // the load's stale surface-default pointee -- so `reconcilePointerSlots` reaches the same
+    // fixpoint whatever order it visits slots, and never mistakes an unresolved `Ptr<T>`
+    // default for a deliberate physical (`Device`) annotation. For any other value (a
+    // descriptor-backed element pointer, a physical pointer built by a cast, etc.) the value's
+    // own resolved address space is authoritative.
+    AddressSpace getStoredValueAddrSpace(IRInst* value)
+    {
+        if (auto load = as<IRLoad>(value))
+        {
+            auto ptr = load->getPtr();
+            if (ptr->getOp() == kIROp_Var || ptr->getOp() == kIROp_DebugVar)
+            {
+                if (auto slotAddrSpace = reconciledSlotAddrSpace.tryGetValue(ptr))
+                    return *slotAddrSpace;
+                return AddressSpace::Generic;
+            }
+        }
+        // An address-computation op (`p + 1`, `&p->field`, `&p[i]`) inherits its base pointer's
+        // address space, so resolve through to the base rather than reading the derived inst's
+        // own type. The derived inst is not retyped until `propagateAddressSpaceFromInsts` runs
+        // *after* this pre-pass, so its own type is still the stale surface default here;
+        // recursing lets a slot fed e.g. `s + 1` (where `s` is another slot whose load is not
+        // yet retyped) resolve to `s`'s reconciled space once the fixpoint reaches it. A pointer
+        // bitcast is deliberately *not* resolved through: it reinterprets its operand, and its
+        // declared result type is authoritative (an `(int*)0x1000` physical pointer must stay
+        // physical; reinterpreting a logical pointer is unsupported by SPIR-V regardless).
+        switch (value->getOp())
+        {
+        case kIROp_GetOffsetPtr:
+        case kIROp_GetElementPtr:
+        case kIROp_FieldAddress:
+            return getStoredValueAddrSpace(value->getOperand(0));
+        }
+        return getPointerValueAddrSpace(value);
+    }
+
     // Reconcile a local pointer *slot* — an ordinary `Var` or a debug-only `DebugVar` — with
     // the pointer values written into it.
     //
@@ -402,22 +471,26 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // `Function` storage class is unchanged. Loads then yield the specialized value-type, and
     // the SPIR-V debug backing variable (which is omitted for a `StorageBuffer` pointee) no
     // longer emits a mismatched store. The address spaces of all writes are joined; a genuine
-    // conflict between two concrete address spaces is left unchanged (it is unrepresentable
-    // in a single slot and surfaces downstream rather than being silently coerced here).
-    void reconcilePointerSlotWithStoredValue(IRInst* slot, List<IRInst*>& reconciledLoads)
+    // conflict between two concrete address spaces is diagnosed rather than silently coerced.
+    //
+    // Returns true if this call made progress (recorded the slot's address space for the
+    // first time, or specialized the slot's contained type), so `reconcilePointerSlots` can
+    // iterate to a fixpoint: a slot fed from another slot's load only becomes known once that
+    // source slot is reconciled, and slots may be visited in any order.
+    bool reconcilePointerSlotWithStoredValue(IRInst* slot, List<IRInst*>& reconciledLoads)
     {
         auto slotPtrType = as<IRPtrTypeBase>(slot->getFullType());
         if (!slotPtrType)
-            return;
+            return false;
         auto contained = as<IRPtrTypeBase>(slotPtrType->getValueType());
         if (!contained)
-            return;
+            return false;
 
         AddressSpace storedAddrSpace = AddressSpace::Generic;
         bool conflict = false;
         auto consider = [&](IRInst* value)
         {
-            auto valueAddrSpace = getPointerValueAddrSpace(value);
+            auto valueAddrSpace = getStoredValueAddrSpace(value);
             if (valueAddrSpace == AddressSpace::Generic)
                 return;
             if (storedAddrSpace == AddressSpace::Generic)
@@ -445,20 +518,33 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             // a single slot cannot hold both, so diagnose rather than silently picking one.
             // Only the real variable is diagnosed: a `DebugVar` mirrors that same variable, so
             // diagnosing it too would double-report, and a debug slot must never be the thing
-            // that rejects an otherwise valid program.
-            if (sink && slot->getOp() == kIROp_Var)
+            // that rejects an otherwise valid program. The fixpoint may revisit the slot, so
+            // report each conflicting slot exactly once.
+            if (sink && slot->getOp() == kIROp_Var && diagnosedAddrSpaceConflicts.add(slot))
                 sink->diagnose(Diagnostics::InconsistentPointerAddressSpace{
                     .inst = slot,
                     .location = slot->sourceLoc});
-            return;
+            return false;
         }
         if (storedAddrSpace == AddressSpace::Generic)
-            return;
+            return false;
+
+        // Record the slot's resolved address space so a load of it stored into another slot
+        // resolves correctly regardless of visitation order. Recording (or refining) it is
+        // itself progress, because it can unblock a slot fed from this one; the value only
+        // moves toward a concrete address space (never oscillates), so the fixpoint is finite.
+        bool madeProgress = false;
+        auto recorded = reconciledSlotAddrSpace.tryGetValue(slot);
+        if (!recorded || *recorded != storedAddrSpace)
+        {
+            reconciledSlotAddrSpace[slot] = storedAddrSpace;
+            madeProgress = true;
+        }
 
         auto containedAddrSpace =
             contained->hasAddressSpace() ? contained->getAddressSpace() : AddressSpace::Generic;
         if (containedAddrSpace == storedAddrSpace)
-            return;
+            return madeProgress;
 
         IRBuilder builder(slot);
         auto newContained = builder.getPtrType(
@@ -472,7 +558,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // Loads of the slot now yield the specialized pointer value-type. Record them so the
         // new address space is propagated on to their derived pointer users (`GetOffsetPtr`,
         // `GetElementPtr`, `FieldAddress`, phi/block parameters), which were lowered with the
-        // stale `Device` type and are otherwise pinned to it.
+        // stale `Device` type and are otherwise pinned to it. (Re-collecting a load after a
+        // later refinement is harmless: propagation just re-applies the now-correct type.)
         for (auto use = slot->firstUse; use; use = use->nextUse)
         {
             if (auto load = as<IRLoad>(use->getUser()))
@@ -482,27 +569,49 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     reconciledLoads.add(load);
                 }
         }
+        return true;
     }
 
     void reconcilePointerSlots()
     {
-        List<IRInst*> reconciledLoads;
-        for (auto globalInst : module->getGlobalInsts())
+        // Outer fixpoint. Reconciling slots retypes their loads; propagating those retyped
+        // loads may in turn retype the derived pointer ops and block parameters that feed
+        // *other* slots, which must then be reconciled (e.g. a pointer flowing through a
+        // block parameter and stored back into a slot). Both steps only move address spaces
+        // toward a concrete value -- each slot refines a bounded number of times and each inst
+        // is retyped at most once -- so the combined loop terminates.
+        for (;;)
         {
-            auto func = as<IRFunc>(globalInst);
-            if (!func)
-                continue;
-            for (auto block : func->getBlocks())
+            List<IRInst*> reconciledLoads;
+            // Inner fixpoint over the slots: a slot fed from another slot's load resolves only
+            // after that source slot has, and slots are visited in IR order, so a single pass
+            // would be order-dependent.
+            bool changed = true;
+            while (changed)
             {
-                for (auto inst : block->getChildren())
+                changed = false;
+                for (auto globalInst : module->getGlobalInsts())
                 {
-                    if (inst->getOp() == kIROp_Var || inst->getOp() == kIROp_DebugVar)
-                        reconcilePointerSlotWithStoredValue(inst, reconciledLoads);
+                    auto func = as<IRFunc>(globalInst);
+                    if (!func)
+                        continue;
+                    for (auto block : func->getBlocks())
+                    {
+                        for (auto inst : block->getChildren())
+                        {
+                            if (inst->getOp() == kIROp_Var || inst->getOp() == kIROp_DebugVar)
+                                if (reconcilePointerSlotWithStoredValue(inst, reconciledLoads))
+                                    changed = true;
+                        }
+                    }
                 }
             }
-        }
-        if (reconciledLoads.getCount())
+            // No slot was (re)specialized this round, so no new address spaces can flow to
+            // other slots; the fixpoint has converged.
+            if (!reconciledLoads.getCount())
+                break;
             propagateAddressSpaceFromInsts(_Move(reconciledLoads));
+        }
     }
 
     void processModule()

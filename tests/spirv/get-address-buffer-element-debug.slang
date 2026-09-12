@@ -40,4 +40,28 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // A derived pointer op on the surviving (non-SSA) slot value must inherit the specialized
     // StorageBuffer address space too.
     outputBuffer[1] = p[2];
+
+    // A pointer *derived* from a surviving slot must also become StorageBuffer. Here a
+    // conditional reassignment forces `s` to survive as a slot, and `d` is derived from a load
+    // of that slot (`s + 1`). The specialization must resolve the derived pointer through to
+    // its base slot; otherwise the debug backing variable for `d` keeps a physical (Device)
+    // pointee while the value stored is a StorageBuffer pointer, and the -g2 run fails
+    // validation with `OpStore ... type does not match Object` — the same failure class this
+    // fix addresses, reached via a derived pointer rather than a direct one.
+    int* s = &dataBuffer[2];
+    int* alt = &dataBuffer[3];
+    if (tid.x == 1)
+        s = alt;
+    int* d = s + 1;
+    outputBuffer[2] = *d;
+
+    // A control-flow-merged pointer stored into a *further* slot must resolve too: `m` is fed
+    // by `p` on one path and the derived `d` on the other. The reconcile/propagate fixpoint
+    // must carry the StorageBuffer space through the merge into `m`.
+    int* m;
+    if (tid.x < 2)
+        m = p;
+    else
+        m = d;
+    outputBuffer[4] = *m;
 }

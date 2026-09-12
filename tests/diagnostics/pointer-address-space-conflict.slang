@@ -1,12 +1,16 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -entry computeMain -stage compute -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -entry computeMain -stage compute -emit-spirv-directly -O0
 
 // A single pointer local cannot hold values from two different concrete address spaces. Here a
 // descriptor-backed StorageBuffer element pointer (&buf[0]) and a physical Device pointer built
 // from an integer address are stored into the same int* slot across control flow. The address-
-// space specialization pass diagnoses this rather than silently choosing one, matching the
-// existing phi-argument behavior (shader-slang/slang#12581). non-exhaustive: the diagnostic is
-// raised during SPIR-V legalization, after source locations have been dropped, so it carries no
-// line to annotate.
+// space specialization pass diagnoses this rather than silently choosing one
+// (shader-slang/slang#12581). Both runs exercise the slot-write join: phis are eliminated
+// before direct SPIR-V legalization, so the merged pointer local reaches this pass as a
+// variable-backed slot in either case; the two optimization levels cover the surviving-slot
+// shapes. (The phi-argument path in the pass -- resolvePhiAddrSpace -- serves the pass's other,
+// pre-phi-elimination callers.) non-exhaustive: the diagnostic is raised during SPIR-V
+// legalization, after source locations have been dropped, so it carries no line to annotate.
 
 //CHECK: use of pointer with inconsistent address space
 
