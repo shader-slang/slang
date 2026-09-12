@@ -5259,13 +5259,21 @@ IRGlobalParam* IRBuilder::createGlobalParam(IRType* valueType)
     return inst;
 }
 
-IRWitnessTable* IRBuilder::createWitnessTable(IRType* baseType, IRType* subType)
+IRWitnessTable* IRBuilder::createWitnessTable(
+    IRType* baseType,
+    IRType* subType,
+    IRInst* conformanceIdentity)
 {
+    // Operand 0 is the concrete (conforming) type; the optional operand 1 is the conformance
+    // identity that keeps distinct conformances of the same concrete type from de-duplicating
+    // (see IRWitnessTable::getConformanceIdentity).
+    IRInst* operands[] = {subType, conformanceIdentity};
     IRWitnessTable* witnessTable = createInst<IRWitnessTable>(
         this,
         kIROp_WitnessTable,
         getWitnessTableType(baseType),
-        subType);
+        conformanceIdentity ? 2 : 1,
+        operands);
     addGlobalValue(this, witnessTable);
     return witnessTable;
 }
