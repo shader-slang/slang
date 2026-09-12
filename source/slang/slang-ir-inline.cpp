@@ -1345,9 +1345,12 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
         if (!returnInst)
             return false;
 
-        // If a function body has only asm blocks + trivial insts (load/store),
-        // this is considered as a pure asm function, and we can inline it.
-        bool hasSpvAsm = false;
+        // A function body of only target-primitive insts (inline spirv_asm or a backend-emitted
+        // SPIR-V subgroup op) plus trivial insts (load/store/swizzle) is a pure intrinsic leaf and
+        // is inlined here. These leaves must inline before SPIR-V legalization so that its
+        // same-block passes -- e.g. the ballot dedup in slang-ir-spirv-legalize.cpp -- see the
+        // primitive ops together in their using block rather than hidden behind a call.
+        bool hasIntrinsic = false;
         for (auto inst = func->getFirstBlock()->getFirstOrdinaryInst(); inst != returnInst;
              inst = inst->getNextInst())
         {
@@ -1355,7 +1358,9 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
             {
             case kIROp_SPIRVAsmOperandInst:
             case kIROp_SPIRVAsm:
-                hasSpvAsm = true;
+            case kIROp_SPIRVGroupNonUniformBallot:
+            case kIROp_SPIRVGroupNonUniformBallotBitCount:
+                hasIntrinsic = true;
                 continue;
             case kIROp_Load:
             case kIROp_LoadFromUninitializedMemory:
@@ -1366,7 +1371,7 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
                 return false;
             }
         }
-        return hasSpvAsm;
+        return hasIntrinsic;
     }
 };
 

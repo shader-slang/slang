@@ -27,6 +27,7 @@
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 #include "slang-rich-diagnostics.h"
+#include "spirv/unified1/spirv.h"
 
 namespace Slang
 {
@@ -3349,6 +3350,84 @@ static void removeUnreachableCodeAfterDiscardForOpKill(
     }
 }
 
+namespace
+{
+
+// Same-block subgroup-ballot deduplication.
+//
+// WaveActiveCountBits(p) and WavePrefixCountBits(p) both build their subgroup lane mask with a
+// `SPIRVGroupNonUniformBallot`, so the same predicate can produce two identical ballots in one
+// basic block. This pass scans each block in order, keeping a per-block list of the ballots seen so
+// far; a later ballot equal to an earlier one is replaced with that earlier result. The list is
+// cleared at any instruction that could change which lanes participate, so a reused ballot is
+// always still valid at the point it is reused -- the load-bearing safety invariant.
+
+// Whether `inst` might change which lanes participate in a subgroup operation, so a ballot after it
+// may differ from one before it. Fail-closed: a call is fenced unconditionally, because a
+// side-effect-free / `[__readNone]` call (or one carrying IRIgnoreSideEffectsDecoration) reports no
+// side effects yet its callee could still demote or terminate a lane; every other side-effecting
+// instruction -- discard/terminate/kill, barriers, atomics, and any opaque spirv_asm -- fences via
+// mightHaveSideEffects(), while pure instructions cannot change participation. The intervening
+// `SPIRVGroupNonUniformBallotBitCount` is classified side-effect-free (see
+// IRInst::mightHaveSideEffects), so it does not fence the two ballots it sits between.
+bool mayChangeSubgroupParticipation(IRInst* inst)
+{
+    if (inst->getOp() == kIROp_Call)
+        return true;
+    return inst->mightHaveSideEffects();
+}
+
+// Two ballots are equal when they have the same result type and the same predicate operand; after
+// simplification the shared predicate is a single SSA value, so a pointer-identity comparison of
+// the predicate operand is the exact, fail-safe equivalence test.
+void mergeDuplicateBallotsInBlock(IRBlock* block)
+{
+    List<IRInst*> candidates;
+    for (auto inst : block->getModifiableChildren())
+    {
+        if (inst->getOp() == kIROp_SPIRVGroupNonUniformBallot)
+        {
+            IRInst* match = nullptr;
+            for (auto candidate : candidates)
+            {
+                if (candidate->getFullType() == inst->getFullType() &&
+                    candidate->getOperand(0) == inst->getOperand(0))
+                {
+                    match = candidate;
+                    break;
+                }
+            }
+            if (match)
+            {
+                inst->replaceUsesWith(match);
+                inst->removeAndDeallocate();
+            }
+            else
+            {
+                candidates.add(inst);
+            }
+            continue;
+        }
+        // Any participation-changing instruction fences the pending ballots.
+        if (mayChangeSubgroupParticipation(inst))
+            candidates.clear();
+    }
+}
+
+void mergeDuplicateBallots(IRModule* module)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto code = as<IRGlobalValueWithCode>(globalInst);
+        if (!code)
+            continue;
+        for (auto block : code->getBlocks())
+            mergeDuplicateBallotsInBlock(block);
+    }
+}
+
+} // namespace
+
 void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
@@ -3358,6 +3437,10 @@ void legalizeIRForSPIRV(
     SLANG_UNUSED(entryPoints);
     legalizeSPIRV(context, module, codeGenContext);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
+
+    // Run after simplification, which deduplicates the shared predicate into one SSA value -- the
+    // operand identity the ballot dedup below compares on.
+    mergeDuplicateBallots(module);
 
     // Remove unreachable code after discard for SPIRV versions that emit OpKill.
     // This is necessary because OpKill is a terminator and cannot have instructions

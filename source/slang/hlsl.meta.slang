@@ -17335,6 +17335,21 @@ uint4 __metal_simd_vote_mask_to_uint4(uint64_t mask)
     return uint4(uint(mask & 0xFFFFFFFF), uint(mask >> 32), 0, 0);
 }
 
+// SPIR-V subgroup-ballot primitives, emitted directly by the backend (see
+// `SPIRVGroupNonUniformBallot` / `SPIRVGroupNonUniformBallotBitCount` in slang-emit-spirv.cpp).
+// Modeling them as first-class IR ops lets the SPIR-V legalization pass dedup identical ballots by
+// matching the opcode and comparing operands. `subgroup_ballot` already implies SPIR-V 1.3, so no
+// `__spirv_version(1.3)` is needed here.
+__intrinsic_op($(kIROp_SPIRVGroupNonUniformBallot))
+[require(spirv, subgroup_ballot)]
+uint4 __spirvGroupNonUniformBallot(bool predicate);
+
+// `groupOp` is a compile-time `SpvGroupOperation` literal: 0 = Reduce (count over all active
+// lanes), 2 = ExclusiveScan (count over lanes preceding this one).
+__intrinsic_op($(kIROp_SPIRVGroupNonUniformBallotBitCount))
+[require(spirv, subgroup_ballot)]
+uint __spirvGroupNonUniformBallotBitCount(int groupOp, uint4 mask);
+
 //@public:
 
 /// @category wave
@@ -17354,11 +17369,7 @@ uint4 WaveActiveBallot(bool condition)
         __intrinsic_asm "WaveActiveBallot";
     case metal: return __metal_simd_vote_mask_to_uint4(__metal_simd_ballot(condition));
     case spirv:
-        return spirv_asm
-        {
-            OpCapability GroupNonUniformBallot;
-            OpGroupNonUniformBallot $$uint4 result Subgroup $condition
-        };
+        return __spirvGroupNonUniformBallot(condition);
     default:
         return WaveMaskBallot(WaveGetActiveMask(), condition);
     }
@@ -17762,18 +17773,14 @@ bool WaveIsFirstLane()
 // It's useful to have a wave uint4 version of countbits, because some wave functions return uint4.
 // This implementation tries to limit the amount of work required by the actual lane count.
 /// @category wave
-__spirv_version(1.3)
 [require(cpp_cuda_glsl_hlsl_metal_spirv, subgroup_basic_ballot)]
 uint _WaveCountBits(uint4 value)
 {
     __target_switch
     {
     case spirv:
-        return spirv_asm
-        {
-            OpCapability GroupNonUniformBallot;
-            OpGroupNonUniformBallotBitCount $$uint result Subgroup Reduce $value
-        };
+        // Reduce = 0: count the ballot's set bits over all active lanes.
+        return __spirvGroupNonUniformBallotBitCount(0, value);
     default:
         // Assume since WaveGetLaneCount should be known at compile time, the branches will hopefully boil away
         const uint waveLaneCount = WaveGetLaneCount();
@@ -17786,6 +17793,16 @@ uint _WaveCountBits(uint4 value)
             case 3: return countbits(value.x) + countbits(value.y) + countbits(value.z) + countbits(value.w);
         }
     }
+}
+
+// Counts a subgroup ballot's set bits over the lanes preceding the current one (an exclusive prefix
+// scan), as opposed to `_WaveCountBits`, which reduces over all lanes.
+/// @category wave
+[require(spirv, subgroup_ballot)]
+uint _WavePrefixCountBits(uint4 value)
+{
+    // ExclusiveScan = 2: count the ballot's set bits over the lanes preceding this one.
+    return __spirvGroupNonUniformBallotBitCount(2, value);
 }
 
 // Prefix
@@ -18553,12 +18570,7 @@ uint WavePrefixCountBits(bool value)
         __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($0))";
     case hlsl: __intrinsic_asm "WavePrefixCountBits($0)";
     case spirv:
-        return spirv_asm
-        {
-            OpCapability GroupNonUniformBallot;
-            %__mask:$$uint4 = OpGroupNonUniformBallot Subgroup $value;
-            OpGroupNonUniformBallotBitCount $$uint result Subgroup 2 %__mask
-        };
+        return _WavePrefixCountBits(WaveActiveBallot(value));
     default:
         return WaveMaskPrefixCountBits(WaveGetActiveMask(), value);
     }
