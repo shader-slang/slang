@@ -111,6 +111,10 @@ static StdinSourceReadResult _readStdinSource(FILE* input, Index maxBytes, List<
 // All of the options are given an unique enum
 typedef CompilerOptionName OptionKind;
 
+// This option expands a file into `Include` entries while parsing the command line. It is not a
+// `CompilerOptionName` because a stored compiler option cannot own or report errors from the file.
+static constexpr OptionKind kSearchPathListOption = OptionKind::CountOf;
+
 struct Option
 {
     OptionKind optionKind;
@@ -493,6 +497,10 @@ void initCommandOptions(CommandOptions& options)
          "-I<path>, -I <path>",
          "Add a path to be used in resolving '#include' "
          "and 'import' operations."},
+        {kSearchPathListOption,
+         "-search-path-list",
+         "-search-path-list <path>",
+         "Add every search path listed in a text file."},
         {OptionKind::Language,
          "-lang",
          "-lang <language>",
@@ -3564,6 +3572,39 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
 
                 m_compileRequest->addSearchPath(String(slice).getBuffer());
+                break;
+            }
+        case kSearchPathListOption:
+            {
+                CommandLineArg fileName;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
+
+                const char* const* searchPaths = nullptr;
+                SlangInt searchPathCount = 0;
+                ComPtr<ISlangUnknown> allocation;
+                ComPtr<ISlangBlob> diagnostics;
+                SlangResult result = slang_readSearchPathsFile(
+                    fileName.value.getBuffer(),
+                    nullptr,
+                    &searchPaths,
+                    &searchPathCount,
+                    allocation.writeRef(),
+                    diagnostics.writeRef());
+                if (SLANG_FAILED(result))
+                {
+                    if (diagnostics)
+                    {
+                        m_sink->diagnose(Diagnostics::CannotLoadSearchPathList{
+                            .reason = String(UnownedStringSlice(
+                                static_cast<const char*>(diagnostics->getBufferPointer()),
+                                diagnostics->getBufferSize())),
+                            .location = fileName.loc});
+                    }
+                    return result;
+                }
+
+                for (SlangInt i = 0; i < searchPathCount; ++i)
+                    m_compileRequest->addSearchPath(searchPaths[i]);
                 break;
             }
         case OptionKind::TypeConformance:
