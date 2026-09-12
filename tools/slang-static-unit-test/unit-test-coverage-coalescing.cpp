@@ -19,9 +19,11 @@
 //      normally" depending on which one the traversal reached first.
 //
 // Property 2 is the sharpest case for a direct test: first- and last-marker
-// placement emit the same *number* of probes, so an end-to-end test cannot
-// observe the difference at all — only the per-marker `outEmitsProbe` output
-// can. The other three are reachable in principle from source (`sqrt`/`dot`
+// placement emit the same *number* of probes and produce identical coverage
+// totals, so a count- or result-based end-to-end test cannot distinguish them;
+// the per-marker `outEmitsProbe` output is the precise, emission-independent
+// way to observe the placement. The other three are reachable in principle
+// from source (`sqrt`/`dot`
 // lower through `GenericAsm`, `abort()` lowers to `Abort`, and recursion
 // survives to this pass), but pinning them end-to-end would mean building whole
 // instrumentable modules and asserting on emitted probe instructions, which
@@ -37,7 +39,7 @@ using namespace Slang;
 // Property 2: a straight-line run of markers coalesces onto one counter, with
 // the single probe on the *last* marker. Probe count alone cannot tell first-
 // from last-marker placement apart, so this asserts the per-marker
-// `outEmitsProbe` flags — the only observation that can.
+// `outEmitsProbe` flags — the emission-independent observation that can.
 SLANG_UNIT_TEST(coverageCoalescingPlacesProbeAtLastMarkerOfRegion)
 {
     StaticUnitTestEnv env(unitTestContext);
