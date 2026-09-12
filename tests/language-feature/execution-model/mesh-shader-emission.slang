@@ -24,7 +24,7 @@ struct MeshPrim
 };
 
 [shader("mesh")]
-[outputtopology("triangle")]
+[OutputTopology("triangle")]
 [numthreads(3, 1, 1)]
 void meshMain(
     uint tid : SV_DispatchThreadID,

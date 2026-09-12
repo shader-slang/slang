@@ -15,7 +15,7 @@
 // surfaces the `SubpassInputType` opcode on a `global_param` in the IR
 // dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -stage fragment -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -stage fragment -entry main -dump-ir -o -
 
 [[vk::input_attachment_index(0)]] SubpassInput<float4> inputColor;
 

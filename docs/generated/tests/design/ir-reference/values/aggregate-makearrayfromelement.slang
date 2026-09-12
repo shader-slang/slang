@@ -18,7 +18,7 @@
 // this opcode from `makeArray`, which would carry four. A later element
 // write and a runtime-indexed read keep the array alive past DCE.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

@@ -16,7 +16,7 @@
 // `castFloatToInt(%a)`; `float(i)` lowers to `castIntToFloat(%i)`.
 // Use constructor-style casts (per `_common.md`), not C-style.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;

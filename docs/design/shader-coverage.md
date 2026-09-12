@@ -418,10 +418,18 @@ category. Per-test attribution and source-region coverage are the
 highest-leverage near-term picks.
 
 `ICoverageTracingMetadata` is intentionally source-entry based rather
-than LCOV-line-only. Today line, function, and branch coverage emit one
-entry per counter, with `counterMode == Count` and `counterIndex`
-pointing at the runtime counter slot. This is an implementation detail
-of the current producers, not a permanent metadata contract. The same
+than LCOV-line-only. Every marker emits one entry, with
+`counterMode` reporting the selected recording mode (`Count` by
+default, `Boolean` under `-trace-coverage-boolean`) and `counterIndex`
+pointing at the runtime counter slot, but entries and counters are not
+one-to-one: line
+coverage coalesces the entries of a straight-line region onto a shared
+counter, so `getCounterCount()` is never larger than the entry count,
+and smaller whenever a straight-line region is coalesced. A compile that
+enables only function and/or branch coverage leaves the two equal.
+Function and branch entries keep dedicated counters. Which entries
+share a counter is an implementation detail of the current producers,
+not a permanent metadata contract. The same
 object already has room for future lower-density region entries:
 source ranges, function names, and branch site/arm ids live on
 `CoverageEntryInfo`, while `getCounterCount()` continues to describe

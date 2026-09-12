@@ -13,7 +13,7 @@
 // `int8_t` as the scalar element type of a `global_param`.
 // `uniform` defeats constant folding so the load survives to IR.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int8_t a;
 uniform RWStructuredBuffer<int> buf;

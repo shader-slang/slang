@@ -13,7 +13,7 @@
 // nothing is dead-stripped before the dump. The CHECK asserts the inst takes
 // the binding index as a literal operand and produces an array of the
 // requested descriptor type rather than a single descriptor.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int inVal;
 uniform RWStructuredBuffer<int> buf;

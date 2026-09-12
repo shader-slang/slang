@@ -15,7 +15,7 @@
 // carries the selected Int as a block `param` — and no `select`
 // pure-value inst may stand in for it in the lowered body.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform int b;

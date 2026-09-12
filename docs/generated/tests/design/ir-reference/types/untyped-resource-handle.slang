@@ -18,7 +18,7 @@
 // call, and for the concrete buffer type appearing only on the following
 // conversion — the handle type itself never names an element type.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o -
 
 uniform uint heapIndex;
 RWStructuredBuffer<uint> outputBuffer;

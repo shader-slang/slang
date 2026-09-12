@@ -13,7 +13,7 @@
 // through the same `castIntToFloat` opcode used for explicit
 // constructor-style casts.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int ia;
 uniform half ha;

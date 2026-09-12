@@ -11,7 +11,7 @@
 // Verifies the value projection. Calling a method through an interface-typed
 // local requires recovering the packed receiver first; the CHECK pins the
 // single-operand `extractExistentialValue` naming that local.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

@@ -56,6 +56,10 @@ The system-value semantics are translated to the following WGSL code.
 | SV_VulkanSamplePosition | *Not supported* |
 | SV_VulkanVertexID | `@builtin(vertex_index)` |
 
+_Note_ that `@builtin(instance_index)` counts from `firstInstance`, so `SV_InstanceID` includes the
+base instance on WGSL, unlike on D3D, SPIR-V and Metal. WGSL has no base-instance builtin to
+subtract, and `SV_StartInstanceLocation` is not supported.
+
 
 Supported HLSL features when targeting WGSL
 -------------------------------------------

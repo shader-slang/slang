@@ -14,7 +14,7 @@
 // tail) would fail the match, and each captured operand is then shown to be
 // defined by a `varLayout` -- the documented parameters/result pair.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

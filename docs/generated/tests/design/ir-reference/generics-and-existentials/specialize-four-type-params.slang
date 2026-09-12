@@ -11,7 +11,7 @@
 // Boundary at a wider arity than the two-parameter case, with a repeated type
 // (`Int` in both first and last position) so the CHECK also confirms that the
 // argument tail is positional rather than de-duplicated by value.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform float b;

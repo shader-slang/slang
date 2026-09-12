@@ -14,7 +14,7 @@
 // witness-table-typed generic parameter, the `GetSequentialID` whose result is
 // a `UInt`, and the inequality against the all-ones sentinel that encodes
 // "no conformance".
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

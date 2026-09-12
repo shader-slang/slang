@@ -15,7 +15,7 @@
 // each is a `size` whose leading operand is a different kind enumerator, which
 // is only readable if the kind is operand 0.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 struct Params
 {

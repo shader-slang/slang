@@ -15,7 +15,7 @@
 // `RaytracingAccelerationStructure` as the IR type of the
 // `global_param`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RaytracingAccelerationStructure accel;
 uniform RWStructuredBuffer<uint> outBuffer;

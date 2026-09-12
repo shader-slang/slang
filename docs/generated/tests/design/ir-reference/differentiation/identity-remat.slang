@@ -17,7 +17,7 @@
 // requires `remat` to be `IdentityRemat` over that same value, with a signature
 // whose full-context and minimal-context parameters are the same user type.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -experimental-feature
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -experimental-feature
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;

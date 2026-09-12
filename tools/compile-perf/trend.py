@@ -16,7 +16,7 @@ This catches the gradual drift a per-PR step gate structurally misses.
 Absolute compile times are runner-specific, so comparisons are restricted to
 points sharing the current point's runner fingerprint. If the latest point ran on
 a different runner than the release history was built on, the history is stale for
-this machine — re-run compile-perf-release-sweep (force=true); trend.py warns and
+this machine — re-run perf-compile-release-sweep (force=true); trend.py warns and
 compares only against same-runner points.
 
     python3 trend.py --results <perf-results>        # after track.py rebuild
@@ -239,7 +239,7 @@ def main():
     if hist_runner and cur_runner and cur_runner != hist_runner:
         msg = (f"latest point ran on runner '{cur_runner}' but the release history "
                f"was built on '{hist_runner}'. Comparing against same-runner points "
-               f"only; re-run compile-perf-release-sweep (force=true) to resync the "
+               f"only; re-run perf-compile-release-sweep (force=true) to resync the "
                f"history to this machine.")
         print(f"WARNING: {msg}")
         emit_gha_command(f"::warning title=Perf runner mismatch::{msg}")

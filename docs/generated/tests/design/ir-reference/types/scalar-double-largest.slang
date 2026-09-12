@@ -13,7 +13,7 @@
 // global_param's IR type. A single `uniform double` exercises the
 // largest-edge floating-point boundary.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform double v;
 uniform RWStructuredBuffer<float> buf;

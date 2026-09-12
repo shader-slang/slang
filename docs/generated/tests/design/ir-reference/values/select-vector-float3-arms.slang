@@ -13,7 +13,7 @@
 // type pair. Vector operands surface the same opcode shape as
 // scalar operands.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform bool c;
 uniform float3 a;

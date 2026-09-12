@@ -12,7 +12,7 @@
 // same key a witness row will pair against, and carries the requirement's type
 // rather than any implementation; the CHECK pins the key operand followed by
 // the start of the `Func(...)` type.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

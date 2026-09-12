@@ -15,7 +15,7 @@
 // float2(fa, fa)`) lowers to `swizzledStore(%dst, ..., 0 : Int,
 // 1 : Int)` in the IR.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float4 v;
 uniform float fa;

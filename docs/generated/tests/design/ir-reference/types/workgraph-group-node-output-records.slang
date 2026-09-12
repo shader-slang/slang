@@ -17,7 +17,7 @@
 // the local holding the allocation, which distinguishes the group-side
 // opcode from the thread-side one exercised by the node-output-array test.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -dump-ir -o -
 
 import experimental.workgraph;
 

@@ -13,7 +13,7 @@
 // Non-constant operands are required because constant folding
 // collapses literal arithmetic before lowering can dump it.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform int b;

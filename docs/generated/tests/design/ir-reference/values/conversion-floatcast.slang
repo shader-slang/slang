@@ -13,7 +13,7 @@
 // operator. Casting a `float` to a `half` (narrowing) or to a
 // `double` (widening) surfaces it.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform RWStructuredBuffer<half> hbuf;

@@ -11,7 +11,7 @@
 
 // Boundary: storage axis — array of 64-bit unsigned ints.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint64_t arr[2];
 uniform RWStructuredBuffer<uint> buf;

@@ -67,6 +67,12 @@ tools/gfx-unit-test/test-tmp-*
 /tests/**/*.metal
 /tests/**/*.wgsl
 
+# tests/spvdb vendors spvdb's own source and test suite, which legitimately
+# contains checked-in .cpp and .spv files (not test-runner output); undo the
+# generated-output ignore rules above for that subtree.
+!tests/spvdb/**/*.cpp
+!tests/spvdb/**/*.spv
+
 # Intermediate source files generated during build process
 /source/slang/slang-generated-*.h
 /source/slang/slang-lookup-*.cpp

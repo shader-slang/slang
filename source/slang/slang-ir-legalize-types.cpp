@@ -1563,6 +1563,16 @@ static LegalVal legalizeGetElement(
             return LegalVal::tuple(resTupleInfo);
         }
 
+    case LegalVal::Flavor::implicitDeref:
+        {
+            // Index the backing value and restore the `implicitDeref` so the element's logical
+            // level of indirection is preserved. Mirrors the same case in `legalizeGetElementPtr`.
+            auto valueType = getPointedToType(context, type);
+            auto implicitDerefVal = legalPtrOperand.getImplicitDeref();
+            return LegalVal::implicitDeref(
+                legalizeGetElement(context, valueType, implicitDerefVal, indexOperand));
+        }
+
     default:
         SLANG_UNEXPECTED("unhandled");
         UNREACHABLE_RETURN(LegalVal());
