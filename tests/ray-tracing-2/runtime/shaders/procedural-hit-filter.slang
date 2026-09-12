@@ -24,8 +24,8 @@
 // METAL-DAG: candidateDistance_0 = 1.0f;
 // METAL-DAG: candidateDistance_0 = 200.0f;
 // METAL-DAG: candidateDistance_0 = 1.5f;
-// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_
-// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_
+// METAL-DAG: {{\[\[visible\]\]}} void _slang_structural_rt_
+// METAL-DAG: {{\[\[visible\]\]}} void _slang_structural_rt_
 
 import slang.raytracing;
 

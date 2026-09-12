@@ -1,8 +1,11 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
 
 import slang.raytracing;
 
-extern static const int payloadElementCount;
+// A specialization constant has a default value, but its final value is selected after Slang has
+// fixed the native payload ABI. It therefore cannot determine a structural payload's array size.
+[vk::constant_id(0)]
+const int payloadElementCount = 4;
 
 struct SymbolicSizePayload
 {

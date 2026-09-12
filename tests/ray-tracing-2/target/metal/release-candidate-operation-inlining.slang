@@ -61,5 +61,5 @@ void main()
     tracer.trace(desc, scene, program, payload);
 }
 
-// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(
+// METAL: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(
 // METAL: ->value_0 = 7U;

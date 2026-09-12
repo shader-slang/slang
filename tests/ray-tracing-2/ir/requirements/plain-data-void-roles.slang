@@ -65,8 +65,8 @@ void main()
     Payload payload = {};
     rt::RayTracer<Schema> tracer;
     tracer.trace({}, scene, program, payload);
-//CHECK-DAG:    ^ structural ray-tracing ABI data cannot be void
-//CHECK-DAG:    ^ 'void' cannot be used as structural ray-tracing callable data; use a concrete plain-data type
-//CHECK-DAG:    ^ structural ray-tracing ABI data cannot be void
-//CHECK-DAG:    ^ 'void' cannot be used as structural ray-tracing intersection-attribute data; use a concrete plain-data type
+//CHECK:        ^ structural ray-tracing ABI data cannot be void
+//CHECK:        ^ 'void' cannot be used as structural ray-tracing callable data; use a concrete plain-data type
+//CHECK:        ^ structural ray-tracing ABI data cannot be void
+//CHECK:        ^ 'void' cannot be used as structural ray-tracing intersection-attribute data; use a concrete plain-data type
 }

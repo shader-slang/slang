@@ -209,23 +209,23 @@ void main()
 // records and fail these checks.
 
 // Candidate and visible-function adapters may only exchange their own payload's ray-data type.
-// METAL-LABEL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_payload1_rayData_0 thread*
-// METAL: radiance_0
-// METAL-NOT: visibility_0
-// METAL-LABEL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_payload1_rayData_0 thread*
-// METAL: radiance_0
-// METAL-NOT: visibility_0
-// METAL-LABEL: {{\[\[}}intersection(triangle, metal::raytracing::instancing)]]
-// METAL-SAME: ray_data Schema_payload1_rayData_0&
-// METAL: radiance_0
-// METAL-NOT: visibility_0
-// METAL-LABEL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_payload0_rayData_0 thread*
+// METAL-LABEL: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(Schema_payload0_rayData_0 thread*
 // METAL: visibility_0
 // METAL-NOT: radiance_0
-// METAL-LABEL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_payload0_rayData_0 thread*
+// METAL-LABEL: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(Schema_payload0_rayData_0 thread*
 // METAL: visibility_0
 // METAL-NOT: radiance_0
 // METAL-LABEL: {{\[\[}}intersection(triangle, metal::raytracing::instancing, metal::raytracing::triangle_data)]]
 // METAL-SAME: ray_data Schema_payload0_rayData_0&
 // METAL: visibility_0
 // METAL-NOT: radiance_0
+// METAL-LABEL: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(Schema_payload1_rayData_0 thread*
+// METAL: radiance_0
+// METAL-NOT: visibility_0
+// METAL-LABEL: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(Schema_payload1_rayData_0 thread*
+// METAL: radiance_0
+// METAL-NOT: visibility_0
+// METAL-LABEL: {{\[\[}}intersection(triangle, metal::raytracing::instancing)]]
+// METAL-SAME: ray_data Schema_payload1_rayData_0&
+// METAL: radiance_0
+// METAL-NOT: visibility_0

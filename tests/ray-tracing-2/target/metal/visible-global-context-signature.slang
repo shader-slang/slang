@@ -2,8 +2,8 @@
 
 // METAL: metal::visible_function_table<void(Schema_rayData_0 thread*, uchar thread*)> closestHitFunctions_0;
 // METAL: ](&rayData_{{[0-9]+}}, (thread uchar*)&kernelContext_0);
-// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
-// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
+// METAL-DAG: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(Schema_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
+// METAL-DAG: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(Schema_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
 
 import slang.raytracing;
 

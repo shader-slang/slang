@@ -192,5 +192,5 @@ void main()
 // METAL-DAG: {{\[\[}}intersection(triangle, metal::raytracing::instancing, metal::raytracing::triangle_data){{\]\]}}
 // METAL-DAG: force_opacity
 // METAL-DAG: set_triangle_cull_mode
-// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_
-// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_
+// METAL-DAG: {{\[\[visible\]\]}} void _slang_structural_rt_
+// METAL-DAG: {{\[\[visible\]\]}} void _slang_structural_rt_
