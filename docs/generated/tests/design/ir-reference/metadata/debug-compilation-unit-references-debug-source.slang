@@ -14,7 +14,7 @@
 // the match, and the captured id is then required to be defined by a
 // `DebugSource` -- the link the doc describes.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g
 
 uniform RWStructuredBuffer<int> buf;
 

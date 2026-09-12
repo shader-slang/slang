@@ -15,7 +15,7 @@
 // Int)` value — confirming the large-element vector arithmetic
 // preserves shape and element type at the IR level.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform double3 a;
 uniform double3 b;

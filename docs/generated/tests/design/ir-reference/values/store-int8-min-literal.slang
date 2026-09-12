@@ -12,7 +12,7 @@
 // Lower edge of the signed-8 range. The literal payload appears
 // as `-128 : Int8` directly on the `store` of the narrow integer.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int8_t> buf;
 

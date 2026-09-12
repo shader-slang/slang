@@ -14,7 +14,7 @@
 // "case-value/case-block operand pairs and a merge operand". With
 // one case, exactly one `(k, block)` pair appears after the default.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int sel;
 uniform RWStructuredBuffer<int> buf;

@@ -16,7 +16,7 @@
 // `witness_table_entry` into a FileCheck variable and requires a later entry —
 // necessarily in the other table — to name the identical inst.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float u;
 uniform RWStructuredBuffer<float> buf;

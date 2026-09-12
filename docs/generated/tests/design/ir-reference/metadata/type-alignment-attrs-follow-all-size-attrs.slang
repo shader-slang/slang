@@ -16,7 +16,7 @@
 // resolves them: interleaving the alignment between the two sizes would put a
 // `TypeAlignment` in the second slot and fail the match.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 struct Params
 {

@@ -16,7 +16,7 @@
 // memory-order operand of the documented `ptr, val, memoryOrder`
 // shape.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 groupshared Atomic<int> gsa;
 uniform RWStructuredBuffer<int> rwbuf;

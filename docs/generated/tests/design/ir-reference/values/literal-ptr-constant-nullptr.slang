@@ -17,7 +17,7 @@
 // two of them in operand position at once, so CHECK can assert the
 // exact rendered form `cmpEQ(<ptr>, <ptr>)` inside `main`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

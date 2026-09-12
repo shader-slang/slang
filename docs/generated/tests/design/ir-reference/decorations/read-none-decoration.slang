@@ -15,7 +15,7 @@
 // the two rows. The user-visible spelling is `[__readNone]`; the doc's
 // `[__readNone]` naming is what this test exercises.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

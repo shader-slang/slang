@@ -11,7 +11,7 @@
 
 // Boundary probe: byte offset 0, the lower edge.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform ByteAddressBuffer babuf;
 uniform RWStructuredBuffer<uint> rwbuf;

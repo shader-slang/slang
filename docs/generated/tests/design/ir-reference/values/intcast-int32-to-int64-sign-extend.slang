@@ -13,7 +13,7 @@
 // test flipped signedness. Complement to the uint to int64
 // counterpart in the existing tests.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int64_t> buf;

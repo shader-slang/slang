@@ -14,7 +14,7 @@
 // distinguish the index operand from the default that an omitted argument
 // would produce.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -dump-ir -o -
 
 import experimental.workgraph;
 

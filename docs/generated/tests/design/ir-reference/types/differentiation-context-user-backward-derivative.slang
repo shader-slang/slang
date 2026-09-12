@@ -19,7 +19,7 @@
 // this trio pins the pair, not one entry. One test per row of the attribute
 // table, because the rows are separate checker arms rather than one rule.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 RWStructuredBuffer<float> outBuf;
 

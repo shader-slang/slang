@@ -13,7 +13,7 @@
 // IRAdd / IRMul / IREq as examples; IRSub is the documented `-`
 // counterpart. Both operands are `uniform` to defeat constant folding.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform int b;

@@ -17,7 +17,7 @@
 // among the fields of the parameter struct layout -- so the `out` parameter is
 // demonstrably on the parameters side, not the result side.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage fragment
 
 float4 main(float2 uv : TEXCOORD0, out float depth : SV_Depth) : SV_Target
 {

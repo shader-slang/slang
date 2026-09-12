@@ -14,7 +14,7 @@
 // the entry block; the IRFunc's function type carries them as
 // trailing operands in `Func(Int, Int, Int, ...)`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int x;
 uniform RWStructuredBuffer<int> buf;

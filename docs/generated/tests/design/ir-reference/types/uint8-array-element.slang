@@ -12,7 +12,7 @@
 // Array of UInt8 elements surfaces Array(UInt8, N : Int) in the IR
 // dump. A `uint8_t[8]` global_param surfaces `Array(UInt8, 8 : Int)`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint8_t v[8];
 uniform RWStructuredBuffer<uint> buf;

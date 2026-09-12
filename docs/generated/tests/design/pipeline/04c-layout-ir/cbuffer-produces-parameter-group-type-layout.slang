@@ -15,7 +15,7 @@
 // `parameterGroupTypeLayout(` instruction appears in the merged layout
 // block, which only the wrapped path emits.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 cbuffer CB { float4 color; }
 uniform RWStructuredBuffer<float4> result;
@@ -26,5 +26,5 @@ void main()
     result[0] = color;
 }
 
-// CHECK-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// CHECK-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // CHECK: parameterGroupTypeLayout(

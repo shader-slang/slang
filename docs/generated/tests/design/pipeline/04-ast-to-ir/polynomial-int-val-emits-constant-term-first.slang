@@ -18,7 +18,7 @@
 // polynomial path from the `BuiltinOperationIntVal` path, which would have
 // preserved source order the way `constexprDiv(%N, 2 : Int)` does.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 

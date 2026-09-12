@@ -16,7 +16,7 @@
 // pins the scrutinee to the synthesized current-stage query, which is what
 // distinguishes this lowering from a runtime switch on a program value.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;

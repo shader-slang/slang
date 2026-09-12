@@ -13,7 +13,7 @@
 // opcode lives in the library `RWByteAddressBuffer.Store` body
 // pulled into the IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWByteAddressBuffer rwbabuf;
 uniform RWStructuredBuffer<uint> rwbuf;

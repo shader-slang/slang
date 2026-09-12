@@ -583,6 +583,9 @@ void CompilerOptionSet::addCapabilityAtom(CapabilityName cap)
     add(CompilerOptionName::Capability, cap);
 }
 
+// Return the downstream-tool arguments for `downstreamToolName`, concatenating the serialized
+// argument list of every stored `DownstreamArgs` entry that targets that tool, in the order the
+// entries appear.
 List<String> CompilerOptionSet::getDownstreamArgs(String downstreamToolName)
 {
     List<String> result;
@@ -595,7 +598,6 @@ List<String> CompilerOptionSet::getDownstreamArgs(String downstreamToolName)
             args.deserialize(argSet.stringValue2);
             for (auto arg : args.m_args)
                 result.add(arg.value);
-            break;
         }
     }
     return result;
