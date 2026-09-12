@@ -149,6 +149,48 @@ public:
     /// `[OptimizableType]` so `trimOptimizableTypes` will consider it.
     IRStructType* addOptimizableStructWithUnusedField(const char* name);
 
+    /// Add a top-level `void()` function whose single block holds `markerCount`
+    /// line-coverage markers (`IncrementCoverageCounter`) in a row with nothing
+    /// between them, then a return. Returns the markers in the order they appear
+    /// — the order `assignCoverageCounterSlots` requires. A straight-line run
+    /// like this is the shape that must coalesce onto one slot, with the probe
+    /// placed on the last marker.
+    List<IRInst*> addStraightLineMarkerRun(const char* name, Index markerCount);
+
+    /// Add a top-level `void()` function whose single block is two line markers
+    /// separated by a call to `callee`, then a return. Returns the two markers.
+    /// Whether they coalesce depends entirely on whether `callee` can abandon
+    /// the invocation, so this is the fixture for exercising the exit analysis:
+    /// pair it with a callee that returns (the markers share a slot) or one that
+    /// may not (the markers split).
+    List<IRInst*> addMarkerRunAroundCall(const char* name, IRFunc* callee);
+
+    /// Add a top-level `void()` function whose single block is two line markers
+    /// separated by an `Abort`, then a return. Returns the two markers. `Abort`
+    /// abandons the invocation, so the markers must not coalesce. No `.slang`
+    /// source produces a bare `Abort` mid-block, which is why this needs a
+    /// hand-built fixture.
+    List<IRInst*> addMarkerRunSplitByAbort(const char* name);
+
+    /// Add a top-level `void()` function whose single block is terminated by a
+    /// `GenericAsm` instead of a `Return`. `GenericAsm` is how `__intrinsic_asm`
+    /// lowers and it carries return semantics, so the exit analysis must treat
+    /// this function as returning normally. A `.slang` intrinsic that lowers to
+    /// `GenericAsm` also contains a real `return`, so only a hand-built function
+    /// isolates the `GenericAsm`-as-normal-exit rule.
+    IRFunc* addFunctionEndingInGenericAsm(const char* name);
+
+    /// Add two mutually recursive top-level `void()` functions: the one returned
+    /// in `outA` calls the one in `outB` and vice versa, each then returning.
+    /// Neither can reach a non-recursive exit, so the exit analysis must break
+    /// the cycle conservatively and report both as possibly-not-returning,
+    /// independent of which one it happens to visit first.
+    void addMutuallyRecursiveFunctions(
+        const char* aName,
+        const char* bName,
+        IRFunc*& outA,
+        IRFunc*& outB);
+
     IRModule* getModule() const { return m_module.get(); }
 
     /// Count the direct children of the module inst whose opcode is `op`.

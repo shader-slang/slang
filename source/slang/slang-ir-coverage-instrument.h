@@ -1,6 +1,8 @@
 #ifndef SLANG_IR_COVERAGE_INSTRUMENT_H
 #define SLANG_IR_COVERAGE_INSTRUMENT_H
 
+#include "slang-ir-insts.h"
+
 namespace Slang
 {
 struct IRModule;
@@ -118,6 +120,32 @@ void finalizeCoverageInstrumentationMetadata(
     IRVarLayout* globalScopeVarLayout,
     TargetRequest* targetRequest,
     ArtifactPostEmitMetadata& outMetadata);
+
+// Assign a counter slot to every collected marker op, coalescing line
+// markers that provably execute together. This is the coalescing core of
+// `instrumentCoverage`; it is declared here (rather than kept file-local)
+// so `slang-static-unit-test` can drive it directly on hand-built IR,
+// including cases that no `.slang` source can express — a `GenericAsm`-only
+// exit, an `Abort` mid-block, or a mutually recursive call pair.
+//
+// Line markers in the same basic block, with nothing between them that can
+// abandon the invocation, all execute exactly the same number of times, so
+// they can share one counter and one runtime probe. That sharing is what
+// shrinks emitted shader code: probe count, not counter width, is what
+// scales SPIR-V size.
+//
+// `outSlots[i]` is the counter index assigned to `markerOps[i]`.
+// `outEmitsProbe[i]` selects the single marker per group that emits the
+// runtime counter update; it is placed at the *last* marker of the group so
+// that reaching it proves every earlier marker in the group executed
+// (placing it first would over-report a group entered but abandoned
+// partway). `outCounterCount` is the number of distinct slots assigned.
+// Function and branch markers always take a dedicated slot.
+void assignCoverageCounterSlots(
+    List<IRInst*> const& markerOps,
+    List<UInt>& outSlots,
+    List<bool>& outEmitsProbe,
+    UInt& outCounterCount);
 
 } // namespace Slang
 
