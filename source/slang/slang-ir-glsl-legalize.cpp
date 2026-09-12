@@ -4300,33 +4300,59 @@ void legalizeEntryPointParameterForGLSL(
             stage,
             pp);
 
-        // Now we need to iterate over all the blocks in the function looking
-        // for any `return*` instructions, so that we can write to the output variable
-        for (auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock())
+        // Write directly into the output when it is a single addressable location
+        // of the local temp's type, so partial writes leave untouched elements
+        // unwritten instead of copying the whole (partly undefined) aggregate back
+        // at each return. `replaceUsesWith` re-roots the parameter's reads as well
+        // as its writes onto the output variable; this is sound only because a pure
+        // `out` has no defined value on entry, so reading the equally-undefined
+        // output global is equivalent to reading the uninitialized local temp. That
+        // is exactly why `in out`, whose copy-in (`assign(localVal, globalInputVal)`
+        // above) gives it a defined incoming value, must keep the temp path.
+        // Outputs whose type legalization reshapes (e.g. a Hull `VaryingOutput`
+        // wrapped in a control-point array by the declarator in
+        // `createGLSLGlobalVaryings`) have a pointee that differs from the local
+        // temp, so the pointee-equality check below routes them to copy-back too.
+        IRPtrTypeBase* outputPtrType = nullptr;
+        if (globalOutputVal.flavor == ScalarizedVal::Flavor::address)
+            outputPtrType = as<IRPtrTypeBase>(globalOutputVal.irValue->getDataType());
+        if (!as<IRBorrowInOutParamType>(paramType) && outputPtrType &&
+            isTypeEqual(outputPtrType->getValueType(), valueType))
         {
-            auto terminatorInst = bb->getLastInst();
-            if (!terminatorInst)
-                continue;
-
-            switch (terminatorInst->getOp())
+            localVariable->replaceUsesWith(globalOutputVal.irValue);
+            localVariable->removeAndDeallocate();
+        }
+        else
+        {
+            // Now we need to iterate over all the blocks in the function looking
+            // for any `return*` instructions, so that we can write to the output
+            // variable
+            for (auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock())
             {
-            default:
-                continue;
+                auto terminatorInst = bb->getLastInst();
+                if (!terminatorInst)
+                    continue;
 
-            case kIROp_Return:
-                break;
+                switch (terminatorInst->getOp())
+                {
+                default:
+                    continue;
+
+                case kIROp_Return:
+                    break;
+                }
+
+                // We dont' re-use `builder` here because we don't want to
+                // disrupt the source location it is using for inserting
+                // temporary variables at the top of the function.
+                //
+                IRBuilder terminatorBuilder(func);
+                terminatorBuilder.setInsertBefore(terminatorInst);
+
+                // Assign from the local variabel to the global output
+                // variable before the actual `return` takes place.
+                assign(&terminatorBuilder, globalOutputVal, localVal);
             }
-
-            // We dont' re-use `builder` here because we don't want to
-            // disrupt the source location it is using for inserting
-            // temporary variables at the top of the function.
-            //
-            IRBuilder terminatorBuilder(func);
-            terminatorBuilder.setInsertBefore(terminatorInst);
-
-            // Assign from the local variabel to the global output
-            // variable before the actual `return` takes place.
-            assign(&terminatorBuilder, globalOutputVal, localVal);
         }
     }
     else if (auto ptrType = as<IRPtrTypeBase>(paramType))
