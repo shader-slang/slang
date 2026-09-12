@@ -3414,6 +3414,12 @@ public:
 
         // Full list of all candidates being considered, in the ambiguous case
         List<OverloadCandidate> bestCandidates;
+
+        // Generic candidates whose recorded inference failure is a constraint failure (an
+        // unsatisfied interface conformance or `where`-clause). Status-based pruning usually keeps
+        // them out of `bestCandidates`, so they are retained here purely to render notes on the "no
+        // overload applicable" error (issue #12965); this list never participates in selection.
+        List<OverloadCandidate> constraintFailedGenericCandidates;
     };
 
     struct ParamCounts
