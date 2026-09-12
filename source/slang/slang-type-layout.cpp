@@ -3574,8 +3574,17 @@ static void maybePromoteDescriptorHandleCapability(TargetRequest* targetReq)
     }
     if (!specificProfileRequested && !specificCapabilityRequested)
     {
+        // Add the atom with `join`, not `addUnexpandedCapabilites`. `descriptor_handle` names
+        // no target of its own, and `addUnexpandedCapabilites` expands such an atom into one
+        // conjunction per target, which is what we want when building a set from scratch but
+        // not when adding to a set that already stands for a single chosen target: it would
+        // turn the SPIR-V target's capabilities into "SPIR-V or HLSL or GLSL or CPU or CUDA or
+        // Metal or WGSL". Code that later asks which of two candidates is better for the target
+        // (`CapabilitySet::isBetterForTarget`) then has seven targets to weigh up instead of
+        // one. `join` instead keeps the targets this set already has and drops any the atom is
+        // incompatible with.
         auto targetCaps = targetReq->getTargetCaps();
-        targetCaps.addUnexpandedCapabilites(CapabilityName::descriptor_handle);
+        targetCaps.join(CapabilitySet(CapabilityName::descriptor_handle));
         targetReq->setTargetCaps(targetCaps);
     }
 }
