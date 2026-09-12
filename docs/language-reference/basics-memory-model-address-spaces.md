@@ -44,7 +44,7 @@ The following address spaces are defined:
 </tr>
 <tr>
   <td>Group-shared</td>
-  <td><code>static groupshared</code> (global scope)</td>
+  <td><code>static groupshared</code> (global scope), or a <code>groupshared</code> function parameter (a by-reference view of a group-shared variable).</td>
   <td>Thread group</td>
   <td>Group-shared variable instances are shared by a thread group.</td>
 </tr>
@@ -94,6 +94,7 @@ The following address spaces are defined:
 
 > 📝 **Remark 2:** A pointer to memory in one address space is generally not interchangeable with a pointer to
 > memory in another address space. In particular, pointers to group-shared memory are not interchangeable
-> between thread groups.
+> between thread groups. A `groupshared` function parameter is likewise a reference into the group-shared
+> address space, not a per-invocation copy.
 
 > 📝 **Remark 3:** Address spaces in Slang are roughly equivalent to SPIR-V storage classes.
