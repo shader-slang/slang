@@ -128,6 +128,11 @@ public:
     Scope* currentScope = nullptr; // Scope where new decl definitions should be inserted into.
     ModuleDecl* currentModule = nullptr;
 
+    // Language version to assume while parsing when there is no owning module (the reflection /
+    // string-parse path); set from the session's configured version. When `currentModule` is
+    // set (the normal source path) its own version is used instead.
+    SlangLanguageVersion defaultLanguageVersion = SLANG_LANGUAGE_VERSION_DEFAULT;
+
     bool hasSeenCompletionToken = false;
 
     TokenReader tokenReader;
@@ -177,6 +182,25 @@ public:
     ParsingStage getStage() { return options.stage; }
 
     ModuleDecl* getCurrentModuleDecl() { return currentModule; }
+
+    // Returns the language version to use while parsing: the owning module's version when a module
+    // is being parsed, otherwise `defaultLanguageVersion`. On the module-less string-parse path
+    // (getTypeFromString / parseExprFromString) there is no single owning module, so
+    // `currentModule` is null and the session-configured version threaded in by the caller is used
+    // instead of dereferencing a null `currentModule` for version-gated parsing (e.g. tuple vs
+    // comma disambiguation, `volatile`/bracket-attribute deprecation).
+    //
+    // INVARIANT: any version-comparison gate (`>= SLANG_LANGUAGE_VERSION_*`) reachable from
+    // `parseTermFromSourceFile` (the module-less term/reflection entry, via ParseExpression/
+    // ParseType) MUST read the version through this accessor. The bare
+    // `currentModule->languageVersion` reads that remain are out of scope for this rule: they are
+    // on the declaration path (`parseSourceFile`, which always runs with `currentModule` set), or
+    // are already null-safe behind a `getCurrentModuleDecl()` check and feed a version *upgrade*
+    // rather than a comparison gate.
+    SlangLanguageVersion getCurrentLanguageVersion()
+    {
+        return currentModule ? currentModule->languageVersion : defaultLanguageVersion;
+    }
 
     Parser(
         ASTBuilder* inAstBuilder,
@@ -1581,7 +1605,12 @@ static void AddMember(ContainerDecl* container, Decl* member)
 
 static void AddMember(Scope* scope, Decl* member)
 {
-    if (scope)
+    // On the module-less string-parse path (reflection / specialization arguments) the synthetic
+    // lookup scope has no `containerDecl`, so an inline `struct`/`class`/`enum` decl parsed there
+    // has no container to join; guard the null rather than dereferencing it (see #13015). All
+    // current non-synthetic callers push the scope with a real `containerDecl`, so the guard only
+    // diverts this synthetic-scope case and never silently drops a member that had a container.
+    if (scope && scope->containerDecl)
     {
         scope->containerDecl->addMember(member);
     }
@@ -3494,7 +3523,13 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         Token typeName = parser->ReadToken(TokenType::Identifier);
 
         auto basicType = parser->astBuilder->create<VarExpr>();
-        if (inGlobalScope)
+        // The module-less string-parse path (reflection / specialization arguments) has no owning
+        // module, so `currentModule` is null and there is no module scope for a leading `::` to
+        // anchor to. Guard the deref and fall back to `currentLookupScope` — the scope the non-`::`
+        // case already uses — so a leading `::` resolves from the current lookup scope instead of
+        // dereferencing a null module. This makes such inputs parse to a clean result rather than
+        // crash; it does not implement leading-`::` resolution on this path.
+        if (inGlobalScope && parser->currentModule)
             basicType->scope = parser->currentModule->ownedScope;
         else
             basicType->scope = parser->currentLookupScope;
@@ -6381,12 +6416,12 @@ Decl* Parser::ParseStruct()
 
     if (LookAheadToken(TokenType::LBracket))
     {
-        if (currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+        if (getCurrentLanguageVersion() >= SLANG_LANGUAGE_VERSION_2026)
         {
             sink->diagnose(
                 Diagnostics::InvalidBracketAttributesPlacement{.location = tokenReader.peekLoc()});
         }
-        else if (currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025)
+        else if (getCurrentLanguageVersion() >= SLANG_LANGUAGE_VERSION_2025)
         {
             sink->diagnose(Diagnostics::DeprecatedBracketAttributesPlacement{
                 .location = tokenReader.peekLoc()});
@@ -8868,7 +8903,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                 Expr* base = nullptr;
                 if (parser->LookAheadToken(TokenType::RParent))
                 {
-                    if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+                    if (parser->getCurrentLanguageVersion() >= SLANG_LANGUAGE_VERSION_2026)
                     {
                         // We support empty parentheses `()` as a valid expression to construct an
                         // empty tuple in Slang 2026.
@@ -8893,7 +8928,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                     //
                     Precedence exprLevel = Precedence::Comma;
                     if (parser->sourceLanguage == SourceLanguage::Slang &&
-                        parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+                        parser->getCurrentLanguageVersion() >= SLANG_LANGUAGE_VERSION_2026)
                     {
                         // Setting exprLevel to Assignment here will allow the following
                         // tryParseExpression call to parse the expression until the next `)` or
@@ -9961,13 +9996,17 @@ Expr* parseTermFromSourceFile(
     DiagnosticSink* sink,
     Scope* outerScope,
     NamePool* namePool,
-    SourceLanguage sourceLanguage)
+    SourceLanguage sourceLanguage,
+    SlangLanguageVersion languageVersion)
 {
     ParserOptions options;
     options.allowGLSLInput = sourceLanguage == SourceLanguage::GLSL;
     options.stage = ParsingStage::Body;
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.currentScope = outerScope;
+    // This path has no owning module, so parse using the caller-supplied (session) language version
+    // rather than reading it from `currentModule`, which is null here.
+    parser.defaultLanguageVersion = languageVersion;
     parser.namePool = namePool;
     parser.sourceLanguage = sourceLanguage;
     return parser.ParseExpression();
@@ -10306,7 +10345,7 @@ static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
 static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
 {
     if ((!parser->options.allowGLSLInput) &&
-        (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026))
+        (parser->getCurrentLanguageVersion() >= SLANG_LANGUAGE_VERSION_2026))
     {
         parser->sink->diagnose(Diagnostics::RemovedModifierUsage{
             .modifierName = "volatile",
@@ -10315,7 +10354,7 @@ static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
     }
     else if (
         (!parser->options.allowGLSLInput) &&
-        (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025))
+        (parser->getCurrentLanguageVersion() >= SLANG_LANGUAGE_VERSION_2025))
     {
         parser->sink->diagnose(Diagnostics::DeprecatedModifierUsage{
             .modifierName = "volatile",

@@ -825,11 +825,15 @@ Expr* ComponentType::parseExprFromString(String exprStr, DiagnosticSink* sink)
 
 Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* sink)
 {
-    // If we've looked up this type name before,
-    // then we can re-use it.
-    //
+    auto linkage = getLinkage();
+
+    // The parsed+checked result depends on the language version (see `ReflectionStringCacheKey`),
+    // which a legacy compile request can change via `-std` after reflection has started, so key the
+    // cache on it too. A version-blind key would return a type resolved under a stale version.
+    ReflectionStringCacheKey cacheKey{typeStr, linkage->m_optionSet.getLanguageVersion()};
+
     Type* type = nullptr;
-    if (m_types.tryGetValue(typeStr, type))
+    if (m_types.tryGetValue(cacheKey, type))
         return type;
 
     auto astBuilder = getLinkage()->getASTBuilder();
@@ -839,8 +843,6 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
     // indirectly referenced.
     //
     Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
-
-    auto linkage = getLinkage();
 
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
 
@@ -857,7 +859,7 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
 
     if (type)
     {
-        m_types[typeStr] = type;
+        m_types[cacheKey] = type;
     }
     return type;
 }
@@ -941,11 +943,16 @@ static Expr* maybeSimplifyExprForReflectionAPIUsage(Expr* originalExpr, ASTBuild
 
 Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink)
 {
-    // If we've looked up this type name before,
-    // then we can re-use it.
-    //
+    auto linkage = getLinkage();
+
+    // The parsed+checked result depends on the language version (see `ReflectionStringCacheKey`) —
+    // a lookup name can carry version-sensitive grammar in a generic argument, e.g. `pick<(a, b)>`
+    // names `pick<b>` in legacy, but in Slang 2026 `(a, b)` parses as a tuple, so the same spelling
+    // no longer names that specialization — so key the cache on it too.
+    ReflectionStringCacheKey cacheKey{name, linkage->m_optionSet.getLanguageVersion()};
+
     Expr* result = nullptr;
-    if (m_decls.tryGetValue(name, result))
+    if (m_decls.tryGetValue(cacheKey, result))
         return result;
 
 
@@ -963,8 +970,6 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
     // indirectly referenced.
     //
     Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
-
-    auto linkage = getLinkage();
 
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
 
@@ -985,7 +990,7 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
     }
     result = maybeSimplifyExprForReflectionAPIUsage(checkedExpr, astBuilder);
 
-    m_decls[name] = result;
+    m_decls[cacheKey] = result;
     return result;
 }
 

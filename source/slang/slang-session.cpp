@@ -1100,7 +1100,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         &sink,
         scope,
         getNamePool(),
-        sourceLanguage);
+        sourceLanguage,
+        languageVersion);
 }
 
 UInt Linkage::addTarget(CodeGenTarget target)

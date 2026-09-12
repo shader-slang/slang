@@ -422,14 +422,27 @@ protected:
     // Cache of target-specific programs for each target.
     Dictionary<TargetRequest*, RefPtr<TargetProgram>> m_targetPrograms;
 
+    // Key for the string-lookup caches below. A `getTypeFromString`/`findDeclFromString` result
+    // depends on the language version it was parsed and checked under — e.g. `(a, b)` is a comma
+    // expression whose type is `b` in legacy but a tuple type in Slang 2026, and a lookup name can
+    // carry that grammar in a generic argument (`pick<(a, b)>`) — so the version is part of the
+    // cache identity, not just the string.
+    struct ReflectionStringCacheKey
+    {
+        String string;
+        SlangLanguageVersion languageVersion;
+        SLANG_COMPONENTWISE_HASHABLE_2;
+        SLANG_COMPONENTWISE_EQUALITY_2(ReflectionStringCacheKey);
+    };
+
     // Any types looked up dynamically using `getTypeFromString`
     //
     // TODO: Remove this. Type lookup should only be supported on `Module`s.
     //
-    Dictionary<String, Type*> m_types;
+    Dictionary<ReflectionStringCacheKey, Type*> m_types;
 
     // Any decls looked up dynamically using `findDeclFromString`.
-    Dictionary<String, Expr*> m_decls;
+    Dictionary<ReflectionStringCacheKey, Expr*> m_decls;
 
     Scope* m_lookupScope = nullptr;
     std::unique_ptr<Dictionary<String, IntVal*>> m_mapMangledNameToIntVal;
