@@ -9,14 +9,14 @@ public struct GenericPayload<T>
 
 public struct GenericTraceContext<T> : rt::ITraceContext
 {
-    typealias Payload = GenericPayload<T>;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
 
-public struct GenericMissContext<T> : rt::IMissGroupContext
+public struct GenericMissContext<T> : rt::IPayloadContext
 {
     typealias TraceContext = GenericTraceContext<T>;
+    typealias Payload = GenericPayload<T>;
     typealias Record = void;
 }
 
@@ -29,17 +29,10 @@ public struct GenericMiss<T> : rt::IMissShader
     }
 }
 
-public struct GenericMissGroup<T> : rt::IMissGroup
-{
-    typealias Slot = rt::MissSlot<0>;
-    typealias Context = GenericMissContext<T>;
-    typealias Miss = GenericMiss<T>;
-}
-
 public struct GenericSchema<T> : rt::ITraceProgramSchema
 {
     typealias TraceContext = GenericTraceContext<T>;
-    typealias HitGroups = rt::NoHitGroups<GenericTraceContext<T>>;
-    typealias MissGroups = rt::MissGroupList<GenericTraceContext<T>, GenericMissGroup<T>>;
-    typealias CallableGroups = rt::NoCallableGroups<GenericTraceContext<T>>;
+    typealias HitGroups = rt::NoHitGroups;
+    typealias MissShaders = rt::MissShaderList<GenericMiss<T>>;
+    typealias CallableShaders = rt::NoCallableShaders;
 }

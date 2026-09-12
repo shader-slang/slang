@@ -121,8 +121,8 @@
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
-#include "slang-ir-thread-switch-on-constant-phi.h"
 #include "slang-ir-synthesize-structural-ray-tracing.h"
+#include "slang-ir-thread-switch-on-constant-phi.h"
 #include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
 #include "slang-ir-translate.h"
@@ -1567,7 +1567,11 @@ Result linkAndOptimizeIR(
         SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
     }
 
-    if (requiredLoweringPassSet.structuralRayTracingTrace &&
+    // A standalone structural stage has no trace operation, but it still needs post-specialization
+    // contract validation and adapter synthesis. Stage-input IR marks that path independently from
+    // a schema-driven trace or callable operation.
+    if ((requiredLoweringPassSet.structuralRayTracingTrace ||
+         requiredLoweringPassSet.structuralRayTracingStageInput) &&
         (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
          isCUDATarget(targetRequest)))
     {
@@ -1866,7 +1870,7 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.structuralRayTracingTrace &&
         (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
          isCUDATarget(targetRequest)))
-        SLANG_PASS(lowerPortableStructuralRayTracingOperations);
+        SLANG_PASS(lowerPortableStructuralRayTracingOperations, targetRequest);
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     SLANG_PASS(performForceInlining);

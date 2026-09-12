@@ -944,25 +944,6 @@ SemanticsVisitor::SolverConstraint::OrdinaryArgMergeMode getOrdinaryArgMergeMode
     return SemanticsVisitor::SolverConstraint::OrdinaryArgMergeMode::TypeJoin;
 }
 
-// Return the argument index for an ordinary generic parameter.
-Index getGenericParamIndex(Decl* genericParamDecl)
-{
-    // Type parameters, type-pack parameters, value parameters, and value-pack
-    // parameters all share the ordinary-argument index space assigned by their
-    // declarations.
-    if (auto typeParamDecl = as<GenericTypeParamDeclBase>(genericParamDecl))
-        return typeParamDecl->parameterIndex;
-    if (auto valuePackParamDecl = as<GenericValuePackParamDecl>(genericParamDecl))
-        return valuePackParamDecl->parameterIndex;
-    if (auto valueParamDecl = as<GenericValueParamDecl>(genericParamDecl))
-        return valueParamDecl->parameterIndex;
-
-    // Witness arguments deliberately have no index here; they are serialized
-    // after ordinary arguments and are found by scanning source generic
-    // constraint declarations.
-    return -1;
-}
-
 static bool isDeferredValidationWitness(Val* witness)
 {
     // These witness values do not contribute ordinary-argument inference facts
@@ -2741,43 +2722,8 @@ private:
     // Return the serialized index for an ordinary or witness argument declaration.
     Index getSerializedArgIndex(Decl* argDecl)
     {
-        // Ordinary arguments already carry their index on the parameter
-        // declaration.
-        Index paramIndex = getGenericParamIndex(argDecl);
-        if (paramIndex >= 0)
-            return paramIndex;
-
-        // Witness arguments are only meaningful for source generic constraints
-        // owned by a generic declaration.
         auto genericDecl = as<GenericDecl>(argDecl->parentDecl);
-        if (!genericDecl || !isGenericConstraintDecl(argDecl))
-            return -1;
-
-        // Count ordinary arguments first because generic applications serialize
-        // all type/value parameters before any witness arguments.
-        Index argIndex = 0;
-        for (auto member : genericDecl->getDirectMemberDecls())
-        {
-            if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member) ||
-                as<GenericValuePackParamDecl>(member))
-            {
-                argIndex++;
-            }
-        }
-
-        // Then scan source generic constraints in declaration order. The target
-        // constraint's position after the ordinary prefix is its witness
-        // argument index.
-        for (auto member : genericDecl->getDirectMemberDecls())
-        {
-            if (!isGenericConstraintDecl(member))
-                continue;
-            if (member == argDecl)
-                return argIndex;
-            argIndex++;
-        }
-
-        return -1;
+        return getGenericArgumentIndex(genericDecl, argDecl);
     }
 
     // Return true if the final argument arrays contain all required arguments.

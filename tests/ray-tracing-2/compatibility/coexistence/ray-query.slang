@@ -10,7 +10,6 @@ struct Payload
 
 struct TraceContext : rt::ITraceContext
 {
-    typealias Payload = ::Payload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -18,6 +17,7 @@ struct TraceContext : rt::ITraceContext
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = ::TraceContext;
+    typealias Payload = ::Payload;
     typealias Primitive = rt::TrianglePrimitive;
     typealias Record = void;
 }

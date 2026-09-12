@@ -3,21 +3,35 @@
 import slang.raytracing;
 
 struct TestPayload
-{}
+{
+    uint value;
+}
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
+}
+
+struct MissContext : rt::IPayloadContext
+{
+    typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
+    typealias Record = void;
+}
+
+struct Miss : rt::IMissShader
+{
+    typealias Context = MissContext;
+    void invoke(rt::MissInput<MissContext> input) {}
 }
 
 struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups = rt::NoHitGroups<TestTraceContext>;
-    typealias MissGroups = rt::NoMissGroups<TestTraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<TestTraceContext>;
+    typealias HitGroups = rt::NoHitGroups;
+    typealias MissShaders = rt::MissShaderList<Miss>;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 rt::AccelerationStructure scene;
@@ -33,4 +47,5 @@ void main()
 }
 
 // IR: struct [[PROGRAM_SCHEMA:%TestSchema]] : Type
-// IR: structuralRayTracingTrace({{.*}}, [[PROGRAM_SCHEMA]],
+// IR: structuralRayTracingTrace({{.*}}, [[PROGRAM_SCHEMA]], "TestSchema", %TestTraceContext,
+// IR-SAME: %TestPayload,

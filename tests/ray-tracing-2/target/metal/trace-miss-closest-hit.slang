@@ -9,7 +9,6 @@ struct TestPayload
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -19,6 +18,7 @@ struct HitRecord {}
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::TrianglePrimitive;
     typealias Record = HitRecord;
 }
@@ -34,7 +34,6 @@ struct TestClosestHit : rt::IClosestHitShader
 
 struct HitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = HitContext;
     typealias ClosestHit = TestClosestHit;
     typealias AnyHit = rt::NoAnyHit<HitContext>;
@@ -43,9 +42,10 @@ struct HitGroup : rt::IHitGroup
 
 struct MissRecord {}
 
-struct MissContext : rt::IMissGroupContext
+struct MissContext : rt::IPayloadContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Record = MissRecord;
 }
 
@@ -58,19 +58,12 @@ struct TestMiss : rt::IMissShader
     }
 }
 
-struct MissGroup : rt::IMissGroup
-{
-    typealias Slot = rt::MissSlot<0>;
-    typealias Context = MissContext;
-    typealias Miss = TestMiss;
-}
-
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups = rt::HitGroupList<TestTraceContext, HitGroup>;
-    typealias MissGroups = rt::MissGroupList<TestTraceContext, MissGroup>;
-    typealias CallableGroups = rt::NoCallableGroups<TestTraceContext>;
+    typealias HitGroups = rt::HitGroupList<HitGroup>;
+    typealias MissShaders = rt::MissShaderList<TestMiss>;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 rt::AccelerationStructure scene;
@@ -110,9 +103,8 @@ void main()
 // METAL-NOT: intersectionFunctions
 // METAL: scene_1, desc_0.instanceMask_0);
 // METAL: _S{{[0-9]+}}[desc_0.missIndex_0](&rayData_{{[0-9]+}});
-// METAL: uint _slang_hit_slot = _S{{[0-9]+}}[_S{{[0-9]+}}[0] + _slang_result.instance_id]
-// METAL: _S{{[0-9]+}}[_slang_hit_slot](&rayData_{{[0-9]+}});
-// METAL: {{\[\[visible\]\]}} void TestMiss_0(Schema_rayData_0 thread* [[MISS_DATA:rayData_[0-9]+]])
+// METAL: ](&rayData_{{[0-9]+}});
+// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread* [[MISS_DATA:rayData_[0-9]+]])
 // METAL: (&[[MISS_DATA]]->payload_{{[0-9]+}})->value_0 = 2U;
-// METAL: {{\[\[visible\]\]}} void TestClosestHit_0(Schema_rayData_0 thread* [[HIT_DATA:rayData_[0-9]+]])
+// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread* [[HIT_DATA:rayData_[0-9]+]])
 // METAL: (&[[HIT_DATA]]->payload_{{[0-9]+}})->value_0 = 1U;

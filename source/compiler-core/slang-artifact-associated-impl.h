@@ -209,6 +209,19 @@ struct SyntheticResourceRecord
     int32_t bindlessIndex = -1;
 };
 
+/// Final target-ABI requirements for one structural ray-tracing payload partition.
+///
+/// Metal lowering writes this record to the target IR after it has normalized all reachable trace
+/// requirements for the schema. The post-emit metadata collector merely preserves that result; it
+/// must not attempt to reconstruct Metal tags from frontend reflection.
+struct StructuralRayTracingMetalPayloadRecord
+{
+    String schemaName;
+    uint32_t payloadIndex = 0;
+    slang::MetalIntersectionFunctionSignature intersectionFunctionSignature =
+        slang::MetalIntersectionFunctionSignature::None;
+};
+
 // Internal registry for stable synthetic resource ids. Public API
 // exposes ids as opaque non-zero values, but compiler features still
 // need one shared allocation point so independently-added synthetic
@@ -222,6 +235,7 @@ enum class SyntheticResourceKnownID : uint32_t
 class ArtifactPostEmitMetadata : public ComBaseObject,
                                  public IArtifactPostEmitMetadata,
                                  public slang::IBindlessResourceMetadata,
+                                 public slang::IStructuralRayTracingMetadata,
                                  public slang::ICoverageTracingMetadata,
                                  public slang::ISyntheticResourceMetadata,
                                  public slang::ICooperativeTypesMetadata
@@ -253,6 +267,12 @@ public:
 
     // IBindlessResourceMetadata
     SLANG_NO_THROW virtual bool SLANG_MCALL usesBindlessResourceHeap() SLANG_OVERRIDE;
+
+    // IStructuralRayTracingMetadata
+    SLANG_NO_THROW virtual uint32_t SLANG_MCALL getMetalPayloadInfoCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getMetalPayloadInfo(
+        uint32_t index,
+        slang::StructuralRayTracingMetalPayloadInfo* outInfo) SLANG_OVERRIDE;
 
     // ICoverageTracingMetadata
     SLANG_NO_THROW virtual uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE;
@@ -305,6 +325,9 @@ public:
     List<slang::CooperativeVectorCombination> m_cooperativeVectorCombinations;
     String m_debugBuildIdentifier;
     bool m_usesBindlessResourceHeap = false;
+
+    // Structural ray-tracing target ABI data. This list is empty for non-Metal targets.
+    List<StructuralRayTracingMetalPayloadRecord> m_structuralRayTracingMetalPayloads;
 
     // Coverage tracing data, populated by `instrumentCoverage` when
     // `-trace-coverage` is active. Empty otherwise.

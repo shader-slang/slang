@@ -70,20 +70,41 @@ SLANG_UNIT_TEST(structuralRayTracingRecursiveTraceVulkan)
     runRecursiveTrace(unitTestContext, DeviceType::Vulkan);
 }
 
-static void runMultipleSlots(UnitTestContext* context, DeviceType deviceType)
+static void runRepeatedRecords(UnitTestContext* context, DeviceType deviceType)
 {
     auto device = createStructuralRayTracingTestDevice(context, deviceType);
-    runStructuralRayTracingMultipleSlots(device);
+    runStructuralRayTracingRepeatedRecords(device);
 }
 
-SLANG_UNIT_TEST(structuralRayTracingMultipleSlotsD3D12)
+SLANG_UNIT_TEST(structuralRayTracingRepeatedRecordsD3D12)
 {
-    runMultipleSlots(unitTestContext, DeviceType::D3D12);
+    runRepeatedRecords(unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(structuralRayTracingMultipleSlotsVulkan)
+SLANG_UNIT_TEST(structuralRayTracingRepeatedRecordsVulkan)
 {
-    runMultipleSlots(unitTestContext, DeviceType::Vulkan);
+    runRepeatedRecords(unitTestContext, DeviceType::Vulkan);
+}
+
+static void runMultiplePayloads(UnitTestContext* context, DeviceType deviceType)
+{
+    auto device = createStructuralRayTracingTestDevice(context, deviceType);
+    runStructuralRayTracingMultiplePayloads(device);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingMultiplePayloadsD3D12)
+{
+    runMultiplePayloads(unitTestContext, DeviceType::D3D12);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingMultiplePayloadsVulkan)
+{
+    runMultiplePayloads(unitTestContext, DeviceType::Vulkan);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingMultiplePayloadsOptiX)
+{
+    runMultiplePayloads(unitTestContext, DeviceType::CUDA);
 }
 
 static void runTriangleAttributesFlags(UnitTestContext* context, DeviceType deviceType)

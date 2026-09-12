@@ -27,7 +27,6 @@ struct VendorPayload
 
 struct VendorTraceContext : rt::ITraceContext
 {
-    typealias Payload = VendorPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -37,6 +36,7 @@ struct VendorRecord {}
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = VendorTraceContext;
+    typealias Payload = VendorPayload;
     typealias Primitive = rt::TrianglePrimitive;
     typealias Record = VendorRecord;
 }

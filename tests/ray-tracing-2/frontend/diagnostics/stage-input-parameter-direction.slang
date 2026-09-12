@@ -8,7 +8,6 @@ struct Record {}
 
 struct MyTraceContext : rt::ITraceContext
 {
-    typealias Payload = PayloadData;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -16,6 +15,7 @@ struct MyTraceContext : rt::ITraceContext
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = MyTraceContext;
+    typealias Payload = PayloadData;
     typealias Primitive = rt::TrianglePrimitive;
     typealias Record = Record;
 }

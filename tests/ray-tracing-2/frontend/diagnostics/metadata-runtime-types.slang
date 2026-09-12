@@ -7,7 +7,6 @@ struct TestRecord {}
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -15,6 +14,7 @@ struct TestTraceContext : rt::ITraceContext
 struct TestHitContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::TrianglePrimitive;
     typealias Record = TestRecord;
 }
@@ -27,7 +27,6 @@ struct TestClosestHit : rt::IClosestHitShader
 
 struct TestHitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = TestHitContext;
     typealias ClosestHit = TestClosestHit;
     typealias AnyHit = rt::NoAnyHit<TestHitContext>;
@@ -37,21 +36,24 @@ struct TestHitGroup : rt::IHitGroup
 struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups = rt::HitGroupList<TraceContext, TestHitGroup>;
-    typealias MissGroups = rt::NoMissGroups<TraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<TraceContext>;
+    typealias HitGroups = rt::HitGroupList<TestHitGroup>;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 void invalidMetadataValues(
-    rt::HitGroupSlot<0> slot,
-//CHECK:                ^^^^ runtime use of structural ray-tracing metadata
-//CHECK:                ^^^^ structural ray-tracing metadata type 'rt.ShaderGroupSlot<0>' has no runtime representation
     TestHitGroup group,
 //CHECK:         ^^^^^ runtime use of structural ray-tracing metadata
 //CHECK:         ^^^^^ structural ray-tracing metadata type 'TestHitGroup' has no runtime representation
-    rt::HitGroupList<TestTraceContext, TestHitGroup> list,
-//CHECK:                                             ^^^^ runtime use of structural ray-tracing metadata
-//CHECK:                                             ^^^^ structural ray-tracing metadata type 'rt.HitGroupList<TestTraceContext, TestHitGroup>' has no runtime representation
+    rt::HitGroupList<TestHitGroup> hitGroups,
+//CHECK:                           ^^^^^^^^^ runtime use of structural ray-tracing metadata
+//CHECK:                           ^^^^^^^^^ structural ray-tracing metadata type 'rt.HitGroupList<TestHitGroup>' has no runtime representation
+    rt::NoMissShaders missShaders,
+//CHECK:              ^^^^^^^^^^^ runtime use of structural ray-tracing metadata
+//CHECK:              ^^^^^^^^^^^ structural ray-tracing metadata type 'rt.NoMissShaders' has no runtime representation
+    rt::NoCallableShaders callableShaders,
+//CHECK:                  ^^^^^^^^^^^^^^^ runtime use of structural ray-tracing metadata
+//CHECK:                  ^^^^^^^^^^^^^^^ structural ray-tracing metadata type 'rt.NoCallableShaders' has no runtime representation
     TestSchema schema,
 //CHECK:       ^^^^^^ runtime use of structural ray-tracing metadata
 //CHECK:       ^^^^^^ structural ray-tracing metadata type 'TestSchema' has no runtime representation

@@ -6,6 +6,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-specialize.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-translate.h"
 #include "slang-ir-typeflow-set.h"
 #include "slang-ir-util.h"
@@ -1635,18 +1636,25 @@ struct TypeFlowSpecializationContext
             }
             else if (auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(user))
             {
-                if (group->getClosestHit() == func || group->getAnyHit() == func ||
-                    group->getIntersection() == func)
+                if (getStructuralRayTracingHitGroupStageInvoke(
+                        group,
+                        StructuralRayTracingStageKind::ClosestHit) == func ||
+                    getStructuralRayTracingHitGroupStageInvoke(
+                        group,
+                        StructuralRayTracingStageKind::AnyHit) == func ||
+                    getStructuralRayTracingHitGroupStageInvoke(
+                        group,
+                        StructuralRayTracingStageKind::Intersection) == func)
                     return true;
             }
-            else if (auto group = as<IRStructuralRayTracingMissGroupInfoDecoration>(user))
+            else if (auto entry = as<IRStructuralRayTracingMissShaderInfoDecoration>(user))
             {
-                if (group->getMiss() == func)
+                if (entry->getMiss() == func)
                     return true;
             }
-            else if (auto group = as<IRStructuralRayTracingCallableGroupInfoDecoration>(user))
+            else if (auto entry = as<IRStructuralRayTracingCallableShaderInfoDecoration>(user))
             {
-                if (group->getCallable() == func)
+                if (entry->getCallable() == func)
                     return true;
             }
         }

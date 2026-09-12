@@ -2,11 +2,13 @@
 
 import slang.raytracing;
 
-struct TestPayload {}
+struct TestPayload
+{
+    uint value;
+}
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -14,13 +16,13 @@ struct TestTraceContext : rt::ITraceContext
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::CurvePrimitive;
     typealias Record = void;
 }
 
 struct HitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = HitContext;
     typealias ClosestHit = rt::NoClosestHit<HitContext>;
     typealias AnyHit = rt::NoAnyHit<HitContext>;
@@ -30,9 +32,9 @@ struct HitGroup : rt::IHitGroup
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups = rt::HitGroupList<TestTraceContext, HitGroup>;
-    typealias MissGroups = rt::NoMissGroups<TestTraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<TestTraceContext>;
+    typealias HitGroups = rt::HitGroupList<HitGroup>;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 rt::AccelerationStructure scene;

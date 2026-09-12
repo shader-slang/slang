@@ -9,7 +9,6 @@ struct RuntimePayload
 
 struct RuntimeTraceContext : rt::ITraceContext
 {
-    typealias Payload = RuntimePayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -17,6 +16,7 @@ struct RuntimeTraceContext : rt::ITraceContext
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = RuntimeTraceContext;
+    typealias Payload = RuntimePayload;
     typealias Primitive = rt::TrianglePrimitive;
     typealias Record = void;
 }
@@ -34,7 +34,6 @@ struct RuntimeAnyHit : rt::IAnyHitShader
 
 struct HitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = HitContext;
     typealias ClosestHit = rt::NoClosestHit<HitContext>;
     typealias AnyHit = RuntimeAnyHit;
@@ -44,9 +43,9 @@ struct HitGroup : rt::IHitGroup
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = RuntimeTraceContext;
-    typealias HitGroups = rt::HitGroupList<RuntimeTraceContext, HitGroup>;
-    typealias MissGroups = rt::NoMissGroups<RuntimeTraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<RuntimeTraceContext>;
+    typealias HitGroups = rt::HitGroupList<HitGroup>;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 rt::AccelerationStructure scene;

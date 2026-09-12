@@ -899,8 +899,8 @@ return {
 	["Decoration.structuralRayTracingEntryPointInfo"] = 923,
 	["StructuralRayTracingStageInputOperation.structuralRayTracingGetCallableData"] = 924,
 	["Decoration.structuralRayTracingHitGroupInfo"] = 925,
-	["Decoration.structuralRayTracingMissGroupInfo"] = 926,
-	["Decoration.structuralRayTracingCallableGroupInfo"] = 927,
+	["Decoration.structuralRayTracingMissShaderInfo"] = 926,
+	["Decoration.structuralRayTracingCallableShaderInfo"] = 927,
 	["Type.UntypedBufferResourceType.MetalIntersectionFunctionTable"] = 928,
 	["Type.UntypedBufferResourceType.MetalVisibleFunctionTable"] = 929,
 	["Decoration.metalVisibleFunction"] = 930,
@@ -921,5 +921,8 @@ return {
 	["metalStructuralRayTracingDispatchRaysIndex"] = 945,
 	["metalStructuralRayTracingDispatchRaysDimensions"] = 946,
 	["StructuralRayTracingStageInputOperation.structuralRayTracingGetRayTime"] = 947,
-	["Decoration.explicitGlobalContext"] = 948
+	["Decoration.explicitGlobalContext"] = 948,
+	["Decoration.structuralRayTracingProgramPayloadLocation"] = 949,
+	["Decoration.structuralRayTracingSemanticallyEmptyPayload"] = 950,
+	["Decoration.structuralRayTracingMetalPayloadMetadata"] = 951
 }

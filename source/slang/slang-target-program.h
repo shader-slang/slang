@@ -103,6 +103,20 @@ public:
 
     RefPtr<IRModule> getExistingIRModuleForLayout() { return m_irModuleForLayout; }
 
+    /// Gets the immutable, target-specific structural ray-tracing program manifest.
+    ///
+    /// Entry-point code can be requested independently and in any order. Structural requests use
+    /// this one linked and specialized program as their user-IR source, so compiler-owned schema
+    /// identities and payload locations cannot diverge between separate native entry points.
+    /// Ordinary programs never create this manifest.
+    RefPtr<IRModule> getExistingStructuralRayTracingProgramManifest();
+
+    /// Publishes a completed structural ray-tracing program manifest.
+    ///
+    /// Manifest construction happens outside the cache lock. If another worker publishes first,
+    /// this method returns that worker's immutable module and discards `candidate`.
+    RefPtr<IRModule> publishStructuralRayTracingProgramManifest(IRModule* candidate);
+
     CompilerOptionSet& getOptionSet() { return m_optionSet; }
 
     HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions()
@@ -138,6 +152,10 @@ private:
     List<ComPtr<IArtifact>> m_entryPointResults;
 
     RefPtr<IRModule> m_irModuleForLayout;
+
+    // Structural entry points are all linked and specialized into this target-specific module.
+    // It is never mutated after publication; per-entry compilation clones from it.
+    RefPtr<IRModule> m_structuralRayTracingProgramManifest;
 };
 
 /// Given a target request returns which (if any) intermediate source language is required

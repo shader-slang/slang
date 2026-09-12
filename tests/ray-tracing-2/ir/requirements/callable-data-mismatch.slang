@@ -2,14 +2,8 @@
 
 import slang.raytracing;
 
-struct Payload
-{
-    uint value;
-}
-
 struct TraceContext : rt::ITraceContext
 {
-    typealias Payload = ::Payload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -29,14 +23,14 @@ struct DataB
     uint value;
 }
 
-struct ContextA : rt::ICallableGroupContext
+struct ContextA : rt::ICallableContext
 {
     typealias TraceContext = ::TraceContext;
     typealias CallableData = DataA;
     typealias Record = ::Record;
 }
 
-struct ContextB : rt::ICallableGroupContext
+struct ContextB : rt::ICallableContext
 {
     typealias TraceContext = ::TraceContext;
     typealias CallableData = DataB;
@@ -55,26 +49,12 @@ struct CallableB : rt::ICallableShader
     void invoke(rt::CallableInput<ContextB> input) {}
 }
 
-struct GroupA : rt::ICallableGroup
-{
-    typealias Slot = rt::CallableSlot<0>;
-    typealias Context = ContextA;
-    typealias Callable = CallableA;
-}
-
-struct GroupB : rt::ICallableGroup
-{
-    typealias Slot = rt::CallableSlot<1>;
-    typealias Context = ContextB;
-    typealias Callable = CallableB;
-}
-
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
-    typealias HitGroups = rt::NoHitGroups<::TraceContext>;
-    typealias MissGroups = rt::NoMissGroups<::TraceContext>;
-    typealias CallableGroups = rt::CallableGroupList<::TraceContext, GroupA, GroupB>;
+    typealias HitGroups = rt::NoHitGroups;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::CallableShaderList<CallableA, CallableB>;
 }
 
 rt::TraceProgramDescriptor<Schema> program;
@@ -86,5 +66,5 @@ void main()
     DataA data = {};
     tracer.callShader<ContextA>(0, program, data);
 //CHECK:                       ^ incompatible structural ray-tracing callable data
-//CHECK:                       ^ callable group slot 1 uses data type 'DataB', but this call expects 'DataA'
+//CHECK:                       ^ callable shader 'CallableB' uses data type 'DataB', which does not match the required callable data type 'DataA'
 }

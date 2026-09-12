@@ -1270,7 +1270,7 @@ public:
     /// >= 0 means a stable space was allocated; it does not by itself prove post-lowering heap use.
     Int bindlessSpaceIndex = -1;
 
-    /// Lazily constructed logical SBT layouts requested through reflection.
+    /// Lazily constructed structural ray-tracing schemas requested through reflection.
     RefPtr<RefObject> structuralRayTracingReflectionData;
 };
 

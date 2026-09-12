@@ -451,15 +451,27 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         auto callableFunctionsField = cast<IRStructField>(callShader->getCallableFunctionsField());
         auto descriptorResourcesType =
             cast<IRUniformParameterGroupType>(callShader->getDescriptorResourcesType());
+        m_writer->emit("{\n");
+        m_writer->indent();
+        m_writer->emit("device uchar* _slang_callable_record = (device uchar*)(");
+        emitOperand(callShader->getRecords(), getInfo(EmitOp::General));
+        m_writer->emit(") + ");
+        emitOperand(callShader->getRecords(), getInfo(EmitOp::Postfix));
+        m_writer->emit("[3] + ");
+        emitOperand(callShader->getCallableIndex(), getInfo(EmitOp::General));
+        m_writer->emit(" * ");
+        emitOperand(callShader->getCallableRecordStride(), getInfo(EmitOp::General));
+        m_writer->emit(";\nuint _slang_callable_function_index = *((device uint*)"
+                       "_slang_callable_record);\n");
+        m_writer->emit("if (_slang_callable_function_index != 0xffffffffU)\n{\n");
+        m_writer->indent();
         m_writer->emit("((");
         emitType(descriptorResourcesType->getElementType());
         m_writer->emit(" constant*)(");
         emitOperand(callShader->getDescriptorResources(), getInfo(EmitOp::General));
         m_writer->emit("))->");
         m_writer->emit(getName(callableFunctionsField->getKey()));
-        m_writer->emit("[");
-        emitOperand(callShader->getCallableIndex(), getInfo(EmitOp::General));
-        m_writer->emit("](");
+        m_writer->emit("[_slang_callable_function_index](");
         emitOperand(callShader->getData(), getInfo(EmitOp::General));
         if (cast<IRBoolLit>(callShader->getHasDispatchRaysIndex())->getValue())
         {
@@ -471,6 +483,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", ");
             emitOperand(callShader->getDispatchRaysDimensions(), getInfo(EmitOp::General));
         }
+        if (callShader->getHasRecord()->getValue())
+            m_writer->emit(", _slang_callable_record + 16");
         m_writer->emit(", ");
         m_writer->emit("(constant uint*)(");
         emitOperand(callShader->getDescriptorResources(), getInfo(EmitOp::General));
@@ -483,6 +497,10 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             emitOperand(callShader->getGlobalContext(), getInfo(EmitOp::General));
         }
         m_writer->emit(");\n");
+        m_writer->dedent();
+        m_writer->emit("}\n");
+        m_writer->dedent();
+        m_writer->emit("}\n");
         return true;
     }
     if (auto trace = as<IRMetalStructuralRayTracingTrace>(inst))
@@ -597,10 +615,20 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         m_writer->indent();
         if (cast<IRBoolLit>(trace->getHasMissFunctions())->getValue())
         {
-            emitOperand(trace->getMissFunctions(), getInfo(EmitOp::Postfix));
-            m_writer->emit("[");
+            m_writer->emit("device uchar* _slang_miss_record = (device uchar*)(");
+            emitOperand(trace->getRecords(), getInfo(EmitOp::General));
+            m_writer->emit(") + ");
+            emitOperand(trace->getRecords(), getInfo(EmitOp::Postfix));
+            m_writer->emit("[2] + ");
             emitOperand(trace->getMissIndex(), getInfo(EmitOp::General));
-            m_writer->emit("](");
+            m_writer->emit(" * ");
+            emitOperand(trace->getMissRecordStride(), getInfo(EmitOp::General));
+            m_writer->emit(";\nuint _slang_miss_function_index = *((device uint*)"
+                           "_slang_miss_record);\n");
+            m_writer->emit("if (_slang_miss_function_index != 0xffffffffU)\n{\n");
+            m_writer->indent();
+            emitOperand(trace->getMissFunctions(), getInfo(EmitOp::Postfix));
+            m_writer->emit("[_slang_miss_function_index](");
             emitOperand(trace->getRayData(), getInfo(EmitOp::General));
             if (hasRequirement(
                     missRequirements,
@@ -623,6 +651,10 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 m_writer->emit(", ");
                 emitOperand(trace->getDirection(), getInfo(EmitOp::General));
             }
+            if (hasRequirement(missRequirements, MetalStructuralRayTracingStageRequirement::Record))
+            {
+                m_writer->emit(", _slang_miss_record + 16");
+            }
             if (hasRequirement(
                     missRequirements,
                     MetalStructuralRayTracingStageRequirement::CallableDispatch))
@@ -638,6 +670,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 emitOperand(trace->getGlobalContext(), getInfo(EmitOp::General));
             }
             m_writer->emit(");\n");
+            m_writer->dedent();
+            m_writer->emit("}\n");
         }
         m_writer->dedent();
         m_writer->emit("}\nelse\n{\n");
@@ -648,24 +682,34 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             emitOperand(trace->getRayFlags(), getInfo(EmitOp::General));
             m_writer->emit(") & 0x08U) == 0)\n{\n");
             m_writer->indent();
-            m_writer->emit("uint _slang_hit_slot = ");
-            emitOperand(trace->getRecords(), getInfo(EmitOp::Postfix));
-            m_writer->emit("[");
-            emitOperand(trace->getRecords(), getInfo(EmitOp::Postfix));
-            m_writer->emit("[0]");
+            m_writer->emit("uint _slang_hit_record_index = ");
             if (hasInstancing)
             {
-                m_writer->emit(" + _slang_result.instance_id");
+                emitOperand(trace->getRecords(), getInfo(EmitOp::Postfix));
+                m_writer->emit("[(");
+                emitOperand(trace->getRecords(), getInfo(EmitOp::Postfix));
+                m_writer->emit("[0] >> 2) + _slang_result.instance_id");
                 if (maxLevels > 0)
                     m_writer->emit("[_slang_result.instance_count - 1]");
+                m_writer->emit("] + ");
             }
-            m_writer->emit("] + _slang_result.geometry_id * ");
+            m_writer->emit("_slang_result.geometry_id * ");
             emitOperand(trace->getSbtStride(), getInfo(EmitOp::General));
             m_writer->emit(" + ");
             emitOperand(trace->getSbtOffset(), getInfo(EmitOp::General));
             m_writer->emit(";\n");
+            m_writer->emit("device uchar* _slang_hit_record = (device uchar*)(");
+            emitOperand(trace->getRecords(), getInfo(EmitOp::General));
+            m_writer->emit(") + ");
+            emitOperand(trace->getRecords(), getInfo(EmitOp::Postfix));
+            m_writer->emit("[1] + _slang_hit_record_index * ");
+            emitOperand(trace->getHitRecordStride(), getInfo(EmitOp::General));
+            m_writer->emit(";\nuint _slang_hit_function_index = *((device uint*)"
+                           "_slang_hit_record);\n");
+            m_writer->emit("if (_slang_hit_function_index != 0xffffffffU)\n{\n");
+            m_writer->indent();
             emitOperand(trace->getClosestHitFunctions(), getInfo(EmitOp::Postfix));
-            m_writer->emit("[_slang_hit_slot](");
+            m_writer->emit("[_slang_hit_function_index](");
             emitOperand(trace->getRayData(), getInfo(EmitOp::General));
             if (hasRequirement(
                     closestHitRequirements,
@@ -775,6 +819,12 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             }
             if (hasRequirement(
                     closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::Record))
+            {
+                m_writer->emit(", _slang_hit_record + 16");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
                     MetalStructuralRayTracingStageRequirement::CallableDispatch))
             {
                 m_writer->emit(", ");
@@ -788,6 +838,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 emitOperand(trace->getGlobalContext(), getInfo(EmitOp::General));
             }
             m_writer->emit(");\n");
+            m_writer->dedent();
+            m_writer->emit("}\n");
             m_writer->dedent();
             m_writer->emit("}\n");
         }

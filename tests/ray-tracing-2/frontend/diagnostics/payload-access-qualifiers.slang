@@ -12,7 +12,13 @@ struct InvalidPayload
 
 struct TraceContext : rt::ITraceContext
 {
-    typealias Payload = InvalidPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
+}
+
+struct PayloadContext : rt::IPayloadContext
+{
+    typealias TraceContext = ::TraceContext;
+    typealias Payload = InvalidPayload;
+    typealias Record = void;
 }

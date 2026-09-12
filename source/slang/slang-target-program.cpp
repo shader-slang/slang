@@ -20,6 +20,21 @@ TargetProgram::TargetProgram(ComponentType* componentType, TargetRequest* target
     m_optionSet.inheritFrom(targetReq->getOptionSet());
 }
 
+RefPtr<IRModule> TargetProgram::getExistingStructuralRayTracingProgramManifest()
+{
+    std::lock_guard<std::mutex> lock(m_resultCacheMutex);
+    return m_structuralRayTracingProgramManifest;
+}
+
+RefPtr<IRModule> TargetProgram::publishStructuralRayTracingProgramManifest(IRModule* candidate)
+{
+    SLANG_RELEASE_ASSERT(candidate);
+    std::lock_guard<std::mutex> lock(m_resultCacheMutex);
+    if (!m_structuralRayTracingProgramManifest)
+        m_structuralRayTracingProgramManifest = candidate;
+    return m_structuralRayTracingProgramManifest;
+}
+
 IArtifact* TargetProgram::_createWholeProgramResult(
     DiagnosticSink* sink,
     EndToEndCompileRequest* endToEndReq)

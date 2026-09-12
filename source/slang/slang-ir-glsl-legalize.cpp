@@ -3008,6 +3008,12 @@ void handleSingleParam(
     builder->addLayoutDecoration(globalParam, paramLayout);
     if (auto nameDecor = pp->findDecoration<IRNameHintDecoration>())
         builder->addNameHintDecoration(globalParam, nameDecor->getName());
+    // Structural ray-tracing lowering puts the payload-partition location on its synthesized
+    // entry-point parameter. Preserve that location when GLSL legalization replaces the parameter
+    // with the native incoming-payload global; Vulkan pairs it with the outgoing trace payload by
+    // this decoration.
+    if (auto payloadDecoration = pp->findDecoration<IRVulkanRayPayloadInDecoration>())
+        cloneDecoration(payloadDecoration, globalParam);
     moveValueBefore(globalParam, builder->getFunc());
     pp->replaceUsesWith(globalParam);
 

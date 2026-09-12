@@ -1089,6 +1089,18 @@ public:
         InheritanceCircularityInfo* circularityInfo = nullptr,
         HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet = nullptr);
 
+    /// Project a checked `Self : Base` witness through `Base`'s interface inheritance.
+    ///
+    /// Consider a generic function that knows `T : IDerived`, where `IDerived : IBase`, while
+    /// the concrete `T` also has another direct `IBase` conformance. A fresh subtype query for
+    /// `T : IBase` is allowed to select that direct conformance. This operation instead preserves
+    /// the caller's supplied `T : IDerived` path and returns its corresponding `T : IBase`
+    /// witness. It returns null when the supplied witness is not rooted in an interface or the
+    /// target is not one of that interface's bases.
+    SubtypeWitness* tryProjectInterfaceSubtypeWitness(
+        SubtypeWitness* selfIsSubtypeOfBase,
+        Type* targetInterfaceType);
+
     /// Prevent an unsupported case of
     /// ```
     ///     extension<T:IFoo> : IBar{};
@@ -2699,6 +2711,8 @@ public:
     bool diagnoseInvalidStructuralRayTracingConstruction(InvokeExpr* invoke);
     bool diagnoseInvalidStructuralRayTracingInvokeResult(InvokeExpr* invoke);
     bool diagnoseInvalidStructuralRayTracingGenericArguments(InvokeExpr* invoke);
+    bool diagnoseInvalidStructuralRayTracingEmptyPayloadArgument(InvokeExpr* invoke);
+    bool diagnoseInvalidStructuralRayTracingEmptyPayloadAccess(DeclRefExpr* propertyExpr);
 
     void _checkDifferentialConformance(
         ConformanceCheckingContext* context,

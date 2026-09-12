@@ -10,19 +10,13 @@
 // SPIRV-DAG: OpEntryPoint CallableKHR {{.*}} "RuntimeCallable"
 // SPIRV: OpExecuteCallableKHR %uint_0
 // METAL-DAG: metal::visible_function_table<void(RuntimeCallableData_0 thread*, uint3, uint3, uint constant*, uint device*)> callableFunctions_0;
-// METAL-DAG: {{\[\[visible\]\]}} void RuntimeCallable_0(
+// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(
 // METAL_CALLABLE: void RuntimeCallable_invoke_0(RuntimeCallableRecord_0 thread* record_0, RuntimeCallableData_0 thread* data_0)
 
 import slang.raytracing;
 
-struct RuntimePayload
-{
-    uint value;
-}
-
 struct RuntimeTraceContext : rt::ITraceContext
 {
-    typealias Payload = RuntimePayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -39,7 +33,7 @@ struct RuntimeCallableRecord
     uint factor;
 }
 
-struct RuntimeCallableContext : rt::ICallableGroupContext
+struct RuntimeCallableContext : rt::ICallableContext
 {
     typealias TraceContext = RuntimeTraceContext;
     typealias CallableData = RuntimeCallableData;
@@ -57,19 +51,12 @@ struct RuntimeCallable : rt::ICallableShader
     }
 }
 
-struct CallableGroup : rt::ICallableGroup
-{
-    typealias Slot = rt::CallableSlot<0>;
-    typealias Context = RuntimeCallableContext;
-    typealias Callable = RuntimeCallable;
-}
-
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = RuntimeTraceContext;
-    typealias HitGroups = rt::NoHitGroups<RuntimeTraceContext>;
-    typealias MissGroups = rt::NoMissGroups<RuntimeTraceContext>;
-    typealias CallableGroups = rt::CallableGroupList<RuntimeTraceContext, CallableGroup>;
+    typealias HitGroups = rt::NoHitGroups;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::CallableShaderList<RuntimeCallable>;
 }
 
 struct RuntimeResult

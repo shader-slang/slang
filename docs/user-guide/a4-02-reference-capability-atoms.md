@@ -1526,6 +1526,10 @@ Compound Capabilities
 > Ray-dispatch system values used by native ray-tracing stages or by logical structural
 > ray-tracing stages whose Metal implementation is synthesized by the compiler.
 
+`structural_raytracing_instance_motion`
+> Instance motion available to the structural ray-tracing API. Metal encodes the requirement on
+> its intersector type, while Vulkan and OptiX pass a ray time to their native trace operation.
+
 `structural_raytracing_intersection`
 > Logical intersection role used by the structural ray-tracing API.
 

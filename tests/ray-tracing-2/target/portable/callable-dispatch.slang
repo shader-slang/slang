@@ -13,7 +13,6 @@ struct TestPayload
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -30,7 +29,7 @@ struct TestCallableRecord
     uint value;
 }
 
-struct TestCallableContext : rt::ICallableGroupContext
+struct TestCallableContext : rt::ICallableContext
 {
     typealias TraceContext = TestTraceContext;
     typealias CallableData = TestCallableData;
@@ -50,19 +49,12 @@ struct TestCallable : rt::ICallableShader
     }
 }
 
-struct TestCallableGroup : rt::ICallableGroup
-{
-    typealias Slot = rt::CallableSlot<0>;
-    typealias Context = TestCallableContext;
-    typealias Callable = TestCallable;
-}
-
 struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups = rt::NoHitGroups<TestTraceContext>;
-    typealias MissGroups = rt::NoMissGroups<TestTraceContext>;
-    typealias CallableGroups = rt::CallableGroupList<TestTraceContext, TestCallableGroup>;
+    typealias HitGroups = rt::NoHitGroups;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::CallableShaderList<TestCallable>;
 }
 
 rt::TraceProgramDescriptor<TestSchema> program;
@@ -76,8 +68,8 @@ void main()
     output[0] = data.value;
 }
 
-// IR: structuralRayTracingCallShader({{.*}}, %TestSchema, %TestTraceContext,
-// IR-SAME: %rtx5FCallableGroupList, TypePack(%TestCallableGroup), %TestCallableContext,
+// IR: structuralRayTracingCallShader({{.*}}, %TestSchema, "TestSchema", %TestTraceContext,
+// IR-SAME: {{.*}}%rtx5FCallableShaderList, TypePack(%TestCallable), %TestCallableContext,
 // IR-SAME: %TestCallableData,
 
 // HLSL-DAG: CallShader(0U,

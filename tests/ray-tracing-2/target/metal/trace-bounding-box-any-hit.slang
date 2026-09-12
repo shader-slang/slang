@@ -10,7 +10,6 @@ struct TestPayload
 
 struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
@@ -25,6 +24,7 @@ struct HitRecord {}
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
     typealias Primitive = rt::BoundingBoxPrimitive<HitAttributes>;
     typealias Record = HitRecord;
 }
@@ -58,7 +58,6 @@ struct TestAnyHit : rt::IAnyHitShader
 
 struct HitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<0>;
     typealias Context = HitContext;
     typealias ClosestHit = rt::NoClosestHit<HitContext>;
     typealias AnyHit = TestAnyHit;
@@ -68,9 +67,9 @@ struct HitGroup : rt::IHitGroup
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups = rt::HitGroupList<TestTraceContext, HitGroup>;
-    typealias MissGroups = rt::NoMissGroups<TestTraceContext>;
-    typealias CallableGroups = rt::NoCallableGroups<TestTraceContext>;
+    typealias HitGroups = rt::HitGroupList<HitGroup>;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 rt::AccelerationStructure scene;
