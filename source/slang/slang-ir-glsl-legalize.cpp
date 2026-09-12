@@ -7,6 +7,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-single-return.h"
 #include "slang-ir-specialize-function-call.h"
+#include "slang-ir-ssa.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
@@ -2517,6 +2518,60 @@ ScalarizedVal adaptType(
     }
 }
 
+// Return true when the `key`-keyed field of local `var` is provably never
+// written (any non-read use conservatively returns false). A sibling field's
+// address is skipped without inspecting its uses: distinct struct fields do
+// not alias, so a write through it cannot reach `key`.
+static bool isVarFieldNeverWritten(IRVar* var, IRStructKey* key)
+{
+    for (auto use = var->firstUse; use; use = use->nextUse)
+    {
+        IRInst* user = use->getUser();
+        switch (user->getOp())
+        {
+        case kIROp_Load:
+            break;
+        case kIROp_FieldAddress:
+            {
+                auto fieldAddr = as<IRFieldAddress>(user);
+                if (fieldAddr->getField() != key)
+                    break; // sibling field: cannot alias `key`
+                if (!allUsesLeadToLoads(fieldAddr))
+                    return false; // target field's address has a non-load use
+                break;
+            }
+        default:
+            return false;
+        }
+    }
+    return true;
+}
+
+// If `value` is `fieldExtract(load(var), key)` where `var` is a local whose
+// `key` field is provably never written, return that field's type; else null.
+// This is the shape an unwritten-field read takes when the local is not
+// SSA-promoted (per-field address stores mixed with a whole-struct load block
+// promotion), so it is not folded to an `IRUndefined` an emitter guard would
+// catch (shader-slang/slang#12756).
+static IRType* findNeverWrittenFieldReadType(IRInst* value)
+{
+    auto fieldExtract = as<IRFieldExtract>(value);
+    if (!fieldExtract)
+        return nullptr;
+    auto load = as<IRLoad>(fieldExtract->getBase());
+    if (!load)
+        return nullptr;
+    auto var = as<IRVar>(load->getPtr());
+    if (!var)
+        return nullptr;
+    auto key = as<IRStructKey>(fieldExtract->getField());
+    if (!key)
+        return nullptr;
+    if (!isVarFieldNeverWritten(var, key))
+        return nullptr;
+    return fieldExtract->getFullType();
+}
+
 void assign(
     IRBuilder* builder,
     ScalarizedVal const& left,
@@ -2550,15 +2605,25 @@ void assign(
             {
             case ScalarizedVal::Flavor::value:
                 {
+                    auto valueToStore = right.irValue;
+
+                    // Substitute an undef for a read of a never-written field
+                    // (shader-slang/slang#12756), keeping the store: peephole
+                    // preserves a store of `LoadFromUninitializedMemory`, so a
+                    // varying-output destination keeps a use and stays in the
+                    // entry-point interface.
+                    if (auto fieldType = findNeverWrittenFieldReadType(valueToStore))
+                        valueToStore = builder->emitLoadFromUninitializedMemory(fieldType);
+
                     auto address = left.irValue;
                     if (index)
                     {
                         address = builder->emitElementAddress(
-                            builder->getPtrType(right.irValue->getFullType()),
+                            builder->getPtrType(valueToStore->getFullType()),
                             left.irValue,
                             index);
                     }
-                    builder->emitStore(address, right.irValue);
+                    builder->emitStore(address, valueToStore);
                     break;
                 }
             case ScalarizedVal::Flavor::tuple:
