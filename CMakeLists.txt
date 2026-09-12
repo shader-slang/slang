@@ -721,12 +721,11 @@ if(
     )
 endif()
 
-# The MIT/Apache-2.0 counterpart to the BSD-family notices above. Inclusion rule
-# for this third-party-notices set: ship a notice for every vendored dep whose
-# code is compiled into a shipped binary -- object code or instantiated
-# templates. That is why the header-only unordered_dense is included (its
-# templates compile into the shipped libraries), while vendored deps that
-# contribute no compiled code get none.
+# The MIT/Apache-2.0 counterpart to the BSD-family notices above, for the four
+# confirmed statically-linked deps. unordered_dense is header-only but included
+# because its template instantiations still compile into the shipped libraries
+# (so "statically linked" here covers compiled-in templates, not just object
+# archives).
 if(NOT SLANG_USE_SYSTEM_MINIZ AND NOT SLANG_OVERRIDE_MINIZ_PATH)
     install(
         FILES "${slang_SOURCE_DIR}/external/miniz/LICENSE"
