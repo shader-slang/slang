@@ -156,6 +156,20 @@ option(
 )
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(
+    SLANG_ENABLE_CONTAINER_STATS
+    "Record per-declaration-site container size and operation statistics (SLOW!)"
+    OFF
+)
+if(SLANG_ENABLE_CONTAINER_STATS)
+    # This must apply to the whole build rather than to individual targets. It adds a member to
+    # `Dictionary`, `List`, the `Short*` variants and `ImmutableHashedString`, which are
+    # header-only types appearing in the layout of objects passed across every target boundary, so
+    # a target compiled without it would disagree about their size -- an ODR violation rather than
+    # a mere feature difference. Anything linking against these libraries, including slang-rt, must
+    # be built with the same setting.
+    add_compile_definitions(SLANG_ENABLE_CONTAINER_STATS=1)
+endif()
+option(
     SLANG_IGNORE_ABORT_MSG
     "Ignore the system modal assert dialog while running build tools to help LLM workflow."
     OFF

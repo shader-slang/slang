@@ -3,6 +3,7 @@
 
 #include "slang-allocator.h"
 #include "slang-array-view.h"
+#include "slang-container-stats.h"
 #include "slang-math.h"
 #include "slang.h"
 
@@ -16,24 +17,49 @@ private:
     typedef ShortList<T, shortListSize, TAllocator> ThisType;
 
 public:
-    ShortList()
-        : m_buffer(nullptr), m_count(0), m_capacity(0)
+    ShortList(SLANG_CONTAINER_STATS_SITE_PARAM)
+        : m_buffer(nullptr)
+        , m_count(0)
+        , m_capacity(0) SLANG_CONTAINER_STATS_INIT_SHORT_NEXT(
+              ThisType,
+              T,
+              ContainerStatsNoValue,
+              shortListSize)
     {
     }
     template<typename... Args>
-    ShortList(const T& val, Args... args)
+    ShortList(const T& val, Args... args) SLANG_CONTAINER_STATS_INIT_UNATTRIBUTED_ONLY(
+        ThisType,
+        T,
+        ContainerStatsNoValue,
+        shortListSize)
     {
         _init(val, args...);
     }
-    ShortList(const ThisType& list)
-        : m_buffer(nullptr), m_count(0), m_capacity(0)
+    ShortList(const ThisType& list SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : m_buffer(nullptr)
+        , m_count(0)
+        , m_capacity(0) SLANG_CONTAINER_STATS_INIT_SHORT_NEXT(
+              ThisType,
+              T,
+              ContainerStatsNoValue,
+              shortListSize)
     {
         this->operator=(list);
     }
-    ShortList(ThisType&& list)
-        : m_buffer(nullptr), m_count(0), m_capacity(0)
+    ShortList(ThisType&& list SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : m_buffer(nullptr)
+        , m_count(0)
+        , m_capacity(0) SLANG_CONTAINER_STATS_INIT_SHORT_NEXT(
+              ThisType,
+              T,
+              ContainerStatsNoValue,
+              shortListSize)
     {
         this->operator=(static_cast<ThisType&&>(list));
+        // See the matching comment in `List`: move construction continues one logical container's
+        // life at a new address, so the statistics move with it.
+        SLANG_CONTAINER_STATS_TAKE_FROM(list.m_containerStatsProbe);
     }
     ~ShortList() { _deallocateBuffer(); }
     template<int _otherShortListSize, typename TOtherAllocator>
@@ -48,6 +74,7 @@ public:
     {
         clearAndDeallocate();
         addRange(other);
+        SLANG_CONTAINER_STATS_NOTE_OP(CopyAssign);
         return *this;
     }
 
@@ -65,6 +92,8 @@ public:
 
         for (Index i = 0; i < Math::Min((Index)shortListSize, m_count); i++)
             m_shortBuffer[i] = _Move(list.m_shortBuffer[i]);
+        SLANG_CONTAINER_STATS_NOTE_OP(MoveAssign);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
         return *this;
     }
 
@@ -160,6 +189,7 @@ public:
     void removeLast()
     {
         SLANG_ASSERT(m_count > 0);
+        SLANG_CONTAINER_STATS_NOTE_OP(RemoveRange);
         m_count--;
     }
 
@@ -187,6 +217,9 @@ public:
     };
     inline GetArrayViewResult getArrayView() const
     {
+        // Unlike `List::getArrayView` this is not free: when the list has spilled past its inline
+        // storage it has to allocate and copy in order to present one contiguous range.
+        SLANG_CONTAINER_STATS_NOTE_OP(ContiguousBuffer);
         GetArrayViewResult result;
         if (m_count > shortListSize)
         {
@@ -209,6 +242,7 @@ public:
     inline GetArrayViewResult getArrayView(Index start, Index count) const
     {
         SLANG_ASSERT(start >= 0 && count >= 0 && start + count <= m_count);
+        SLANG_CONTAINER_STATS_NOTE_OP(ContiguousBuffer);
         GetArrayViewResult result;
         if (start < shortListSize && start + count > shortListSize)
         {
@@ -255,11 +289,15 @@ public:
         {
             m_shortBuffer[m_count] = static_cast<T&&>(obj);
             m_count++;
+            SLANG_CONTAINER_STATS_NOTE_INSERT();
+            SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
             return;
         }
         _maybeReserveForAdd();
         m_buffer[m_count - shortListSize] = static_cast<T&&>(obj);
         m_count++;
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
     }
 
     void add(const T& obj)
@@ -268,11 +306,15 @@ public:
         {
             m_shortBuffer[m_count] = obj;
             m_count++;
+            SLANG_CONTAINER_STATS_NOTE_INSERT();
+            SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
             return;
         }
         _maybeReserveForAdd();
         m_buffer[m_count - shortListSize] = obj;
         m_count++;
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
     }
 
     Index getCount() const { return m_count; }
@@ -296,6 +338,7 @@ public:
 
     void fastRemove(const T& val)
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Remove);
         Index idx = indexOf(val);
         if (idx >= 0)
         {
@@ -306,6 +349,7 @@ public:
     void fastRemoveAt(Index idx)
     {
         SLANG_ASSERT(idx >= 0 && idx < m_count);
+        SLANG_CONTAINER_STATS_NOTE_OP(RemoveRange);
 
         if (idx != m_count - 1)
         {
@@ -314,16 +358,22 @@ public:
         m_count--;
     }
 
-    void clear() { m_count = 0; }
+    void clear()
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(Clear);
+        m_count = 0;
+    }
 
     void clearAndDeallocate()
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(ClearAndDeallocate);
         _deallocateBuffer();
         m_count = m_capacity = 0;
     }
 
     void reserveOverflowBuffer(Index size)
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Reserve);
         if (size > m_capacity)
         {
             T* newBuffer = _allocate(size);
@@ -346,15 +396,22 @@ public:
 
     void setCount(Index count)
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(SetCount);
         if (count > shortListSize)
             reserveOverflowBuffer(count - shortListSize);
         m_count = count;
+        SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
     }
 
-    void unsafeShrinkToCount(Index count) { m_count = count; }
+    void unsafeShrinkToCount(Index count)
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(SetCount);
+        m_count = count;
+    }
 
     void compress()
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Reserve);
         if (m_capacity > m_count - shortListSize && m_count > shortListSize)
         {
             T* newBuffer = nullptr;
@@ -385,6 +442,7 @@ public:
     template<typename Func>
     Index findFirstIndex(const Func& predicate) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         for (Index i = 0; i < Math::Min(m_count, (Index)shortListSize); i++)
         {
             if (predicate(m_shortBuffer[i]))
@@ -401,6 +459,7 @@ public:
     template<typename T2>
     Index indexOf(const T2& val) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         for (Index i = 0; i < Math::Min(m_count, (Index)shortListSize); i++)
         {
             if (m_shortBuffer[i] == val)
@@ -417,6 +476,7 @@ public:
     template<typename Func>
     Index findLastIndex(const Func& predicate) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         for (Index i = m_count - 1; i >= shortListSize; i--)
         {
             if (predicate(m_buffer[i - shortListSize]))
@@ -433,6 +493,7 @@ public:
     template<typename T2>
     Index lastIndexOf(const T2& val) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         for (Index i = m_count - 1; i >= shortListSize; i--)
         {
             if (m_buffer[i - shortListSize] == val)
@@ -461,6 +522,7 @@ private:
     Index m_capacity = 0;  ///< The total capacity of elements in m_buffer
     Index m_count = 0;     ///< The amount of elements
     T m_shortBuffer[shortListSize];
+    SLANG_CONTAINER_STATS_MEMBER
 
     void _deallocateBuffer()
     {

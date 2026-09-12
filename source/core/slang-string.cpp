@@ -409,8 +409,13 @@ void String::ensureUniqueStorageWithCapacity(Index requiredCapacity)
     }
 
     Index length = getLength();
-    StringRepresentation* newRepresentation =
-        StringRepresentation::createWithCapacityAndLength(newCapacity, length);
+    // This is where a string both acquires its first buffer and, later, replaces one it has
+    // outgrown or has to stop sharing, so which of those it is has to be passed explicitly.
+    StringRepresentation* newRepresentation = StringRepresentation::createWithCapacityAndLength(
+        newCapacity,
+        length SLANG_CONTAINER_STATS_STRING_ALLOC_AT_TRAILING(
+            m_buffer != nullptr,
+            requiredCapacity));
 
     if (m_buffer)
     {
@@ -485,8 +490,11 @@ void String::reduceLength(Index newLength)
 
             // We'll just go with capacity enough for the new length
             const Index newCapacity = newLength;
+            // A copy-on-write shrink: the new buffer replaces one this string was sharing.
             StringRepresentation* newRepresentation =
-                StringRepresentation::createWithCapacityAndLength(newCapacity, newLength);
+                StringRepresentation::createWithCapacityAndLength(
+                    newCapacity,
+                    newLength SLANG_CONTAINER_STATS_STRING_ALLOC_AT_TRAILING(true, newLength));
 
             // Copy
             char* dst = newRepresentation->getData();
