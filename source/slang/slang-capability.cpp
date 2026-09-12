@@ -1420,14 +1420,14 @@ bool CapabilitySet::isBetterForTarget(
                     return false;
 
                 auto thisSetElements = thisSet.getElements<CapabilityAtom>();
-                auto thatSetElements = thisSet.getElements<CapabilityAtom>();
+                auto thatSetElements = thatSet.getElements<CapabilityAtom>();
                 auto shaderStageSetWeNeedElements =
                     shaderStageSetWeNeed.getElements<CapabilityAtom>();
 
                 auto thisDiffScore =
                     _calcAtomListDifferenceScore(thisSetElements, shaderStageSetWeNeedElements);
                 auto thatDiffScore =
-                    _calcAtomListDifferenceScore(thisSetElements, shaderStageSetWeNeedElements);
+                    _calcAtomListDifferenceScore(thatSetElements, shaderStageSetWeNeedElements);
 
                 return thisDiffScore < thatDiffScore;
             }
