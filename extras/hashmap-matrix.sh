@@ -77,13 +77,11 @@ default_hash=WYHASH
 # combinations are only built, not run.
 read -ra test_filters <<<"${SLANG_HASHMAP_MATRIX_TEST:-}"
 
-# How many tests sti runs at once. It defaults to one worker per core, but a
-# test is not a single process -- slang-test spawns compilers and test servers
-# of its own -- so at that setting the machine is oversubscribed and tests start
-# failing on timeouts and resource contention rather than on their own merits.
-# That noise is particularly unwelcome here, where the whole point is to compare
-# one combination's failures against another's.
-test_jobs=${SLANG_HASHMAP_MATRIX_TEST_JOBS:-20}
+# How many tests sti runs at once. Above roughly ten, runs start reporting
+# failures and segfaults that do not reproduce when the same tests are rerun on
+# their own. That noise is particularly unwelcome here, where the whole point is
+# to compare one combination's failures against another's.
+test_jobs=${SLANG_HASHMAP_MATRIX_TEST_JOBS:-10}
 
 # A nix devShell exports the flags this checkout is normally configured with
 # (system LLVM, system DXC, ...). Honour them so these builds match the
