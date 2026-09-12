@@ -2796,7 +2796,11 @@ FIDDLE()
 struct IRDebugNoScope : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getScope() { return getOperand(0); }
+    // The scope operand is optional: with none this clears the active scope, and with one it names
+    // a scope to restore, which the inliner and SPIR-V emitter read as a DebugScope carrying only
+    // that scope.
+    IRInst* getScope() { return operandCount >= 1 ? getOperand(0) : nullptr; }
+    bool isScopePresent() { return operandCount >= 1; }
 };
 
 FIDDLE()
@@ -3681,7 +3685,7 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* outerInlinedAt);
     IRInst* emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt);
     IRInst* emitDebugScope(IRInst* scope, IRInst* inlinedAt);
-    IRInst* emitDebugNoScope();
+    IRInst* emitDebugNoScope(IRInst* scope);
     IRInst* emitDebugFunction(
         IRInst* name,
         IRInst* line,
