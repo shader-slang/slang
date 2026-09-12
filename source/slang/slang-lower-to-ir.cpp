@@ -12046,8 +12046,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // For debug builds, still create debug information for let variables
                 // even though we're not creating an actual variable
                 // Requires Standard level or higher for variable debug info
+                // Immutable `let` aliases lower to the initializer's SSA value with no backing
+                // IRVar, so this is the only site that can attach debug info to them. Opaque
+                // resource handles are eligible via isDebugVarEligibleType (see its definition in
+                // slang-ir-insert-debug-value-store.cpp for the leaf-resource rule and the
+                // target-independence caveat); the debug var is bound to the handle SSA value via
+                // DebugValue with no backing OpVariable.
                 if (context->debugInfoLevel >= DebugInfoLevel::Standard && decl->loc.isValid() &&
-                    context->shared->debugValueContext.isDebuggableType(initVal.val->getDataType()))
+                    context->shared->debugValueContext.isDebugVarEligibleType(
+                        initVal.val->getDataType()))
                 {
                     // Create a debug variable for this let declaration
                     auto builder = context->irBuilder;

@@ -2344,8 +2344,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             return;
         }
 
-        // Unsupported type, remove the DebugValue.
-        if (!isSimpleDataType(valueType))
+        // Remove the DebugValue for a type we cannot represent in debug info. Leaf resource
+        // handle values are the exception and are retained: a local alias of a
+        // Texture2D/SamplerState loaded to an SSA handle keeps its DebugValue, so the handle
+        // stays bound to its DebugLocalVariable (which the emitter gives no backing OpVariable).
+        if (!isSimpleDataType(valueType) && !isResourceType(valueType))
             inst->removeAndDeallocate();
     }
 

@@ -103,6 +103,26 @@ bool DebugValueStoreContext::isDebuggableType(IRType* type)
     return debuggable;
 }
 
+// Returns true if a function local or parameter of `type` should be given a source-level debug
+// variable (a DebugVar plus a DebugValue). This extends isDebuggableType — which covers scalars,
+// vectors, matrices, and aggregates of those — to also admit leaf opaque resource/handle types.
+//
+// isResourceType matches textures, samplers, subpass inputs, pointer-like and untyped-buffer
+// resources, and unwraps arrays (so an array of handles is admitted); it never recurses into
+// struct fields, so a struct that merely contains a handle stays excluded. A handle has no legal
+// Function-storage OpVariable, so on the SPIR-V path emitDebugVarDeclaration emits an
+// OpDebugLocalVariable with no backing OpVariable/OpDebugDeclare (isAllowedDebugVarType rejects
+// the handle type), and the loaded SSA handle is bound to it by a separate OpDebugValue.
+//
+// This eligibility test is target-independent: the DebugVar/DebugValue records are created at
+// debug level >= Standard regardless of target, so every debug consumer must tolerate a
+// handle-typed DebugVar (the text emitters discard debug insts; the LLVM/CPU debug-info emitter
+// has a fallback type for unrecognized types).
+bool DebugValueStoreContext::isDebugVarEligibleType(IRType* type)
+{
+    return isDebuggableType(type) || isResourceType(type);
+}
+
 void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
 {
     IRBuilder builder(func);
@@ -134,7 +154,7 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             isRefParam = true;
             paramType = ptrType->getValueType();
         }
-        if (!isDebuggableType(paramType))
+        if (!isDebugVarEligibleType(paramType))
             continue;
         auto debugVar = builder.emitDebugVar(
             paramType,
@@ -189,7 +209,7 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
                 {
                     auto varType = tryGetPointedToType(&builder, varInst->getDataType());
                     builder.setInsertBefore(varInst);
-                    if (!isDebuggableType(varType))
+                    if (!isDebugVarEligibleType(varType))
                         continue;
                     auto debugVar = builder.emitDebugVar(
                         varType,
