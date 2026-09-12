@@ -1,4 +1,5 @@
 // slang-check-decl.cpp
+#include "core/slang-math.h"
 #include "slang-ast-clone.h"
 #include "slang-ast-modifier.h"
 #include "slang-ast-support-types.h"
@@ -12077,6 +12078,20 @@ bool SemanticsVisitor::isValidCompileTimeConstantType(Type* type)
     return isScalarIntegerType(type) || isEnumType(type);
 }
 
+// Return true iff `value` is exactly representable in `half` (IEEE binary16),
+// i.e. it round-trips through half unchanged. The intermediate narrowing to
+// `float` is lossless for every value that could matter: any half-representable
+// integer lies in [-65504, 65504], well inside float's exact-integer range
+// (2^24), so the narrowing can never fabricate a false "representable" verdict.
+// Comparing the round-trip in floating point is deliberate: a large-magnitude
+// value rounds to an infinity in half, and casting an infinite half back to an
+// integer is undefined behavior, whereas the floating-point compare is
+// well-defined for every input.
+static bool isIntExactlyRepresentableInHalf(IntegerLiteralValue value)
+{
+    return (double)HalfToFloat(FloatToHalf((float)value)) == (double)value;
+}
+
 bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* type)
 {
     auto basicType = as<BasicExpressionType>(type);
@@ -12112,7 +12127,7 @@ bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* 
                value <= std::numeric_limits<int64_t>::max();
 
     case BaseType::Half:
-        return value >= -2048 && value <= 2048;
+        return isIntExactlyRepresentableInHalf(value);
     default:
         return false;
     }
