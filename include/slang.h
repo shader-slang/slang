@@ -5902,6 +5902,30 @@ struct SlangGlobalSessionDesc
  */
 SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t size);
 
+/** Read compiler search paths from a text file.
+ *
+ * The file contains one path per line. Empty lines are ignored and all other bytes are preserved,
+ * so paths may contain spaces. Both LF and CRLF line endings are accepted.
+ *
+ * @param path Path to the search path list.
+ * @param fileSystem File system used to read `path`, or null to use the operating-system file
+ *                   system.
+ * @param outSearchPaths (out) The loaded search paths.
+ * @param outSearchPathCount (out) The number of loaded search paths.
+ * @param outAllocation (out) Storage that owns the returned array and strings. Caller releases
+ *                            after `IGlobalSession::createSession` returns.
+ * @param outDiagnostics (out, optional) A diagnostic message when loading fails.
+ * @return `SLANG_OK` on success, `SLANG_E_INVALID_ARG` for null required arguments, or
+ *         `SLANG_FAIL` when the file cannot be read or contains an embedded null byte.
+ */
+SLANG_EXTERN_C SLANG_API SlangResult slang_readSearchPathsFile(
+    const char* path,
+    ISlangFileSystem* fileSystem,
+    const char* const** outSearchPaths,
+    SlangInt* outSearchPathCount,
+    ISlangUnknown** outAllocation,
+    ISlangBlob** outDiagnostics = nullptr);
+
 /* Serialize coverage metadata into the canonical
  * `.coverage-manifest.json` shape. Same bytes that `slangc` writes
  * alongside compiled output when `-trace-coverage` is on, available

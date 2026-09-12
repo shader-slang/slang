@@ -77,6 +77,10 @@ __include "c.slang"; // Pulls in file c, specifying the full file name.
 void test() { f_a(); f_b(); f_c(); }
 ```
 
+When modules live in a source package, put companions in a directory named after the primary and
+`__include` them with that directory prefix so lookup stays next to the including file. See
+[Writing Module Files, Import, and Include](module-files).
+
 Note that `module`, `implementing`, and `__include` all support two flavors of syntax to refer to a module or a file: either via
 normal identifier tokens or via string literals. For example, the following flavors are equivalent and will resolve to the same file:
 ```
