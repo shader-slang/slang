@@ -136,9 +136,11 @@ The Slang code itself is under the Apache 2.0 with LLVM Exception license (see [
 Builds of the core Slang tools depend on the following projects, either automatically or optionally, which may have their own licenses:
 
 - [`ankerl::unordered_dense::{map, set}`](https://github.com/martinus/unordered_dense) (MIT)
+- [`cmark-gfm`](https://github.com/swiftlang/swift-cmark) (BSD 2-Clause and MIT)
 - [`fast_float`](https://github.com/fastfloat/fast_float) (Apache 2.0 / MIT / Boost)
 - [`glslang`](https://github.com/KhronosGroup/glslang) (BSD)
 - [`lz4`](https://github.com/lz4/lz4) (BSD)
+- [`mimalloc`](https://github.com/microsoft/mimalloc) (MIT)
 - [`miniz`](https://github.com/richgel999/miniz) (MIT)
 - [`spirv-headers`](https://github.com/KhronosGroup/SPIRV-Headers) (Modified MIT)
 - [`spirv-tools`](https://github.com/KhronosGroup/SPIRV-Tools) (Apache 2.0)
