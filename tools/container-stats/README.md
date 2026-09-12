@@ -403,6 +403,11 @@ is understated. Expect a larger ratio in an optimized build.
 actually showed, together with what to distrust in those numbers and what the instrumentation
 does not measure.
 
+`findings-falcor.md` repeats the exercise against a real application embedding Slang, which is 128
+times the test suite by event count. It confirms most of `findings.md`, overturns its largest
+recommendation, and finds the one class of result a self-compile cannot show: what happens when the
+host keeps the compiler alive between compiles.
+
 ## Status
 
 All of `Dictionary`, `HashSet`, `List`, `ShortList`, `ShortDictionary`, `OrderedDictionary`,

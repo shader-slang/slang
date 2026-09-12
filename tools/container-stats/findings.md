@@ -15,6 +15,10 @@ Results from two profiles taken with `SLANG_ENABLE_CONTAINER_STATS=ON`, a Debug 
 Both are reproduced by the commands in `README.md`. Every figure below is from one of these two
 and is labelled with which; where they disagree, that disagreement is usually the finding.
 
+> Both profiles are Slang compiling Slang. `findings-falcor.md` repeats the exercise against a real
+> application embedding Slang and revisits every conclusion below. Most hold. Finding 1 does not:
+> at embedder scale its memory cost is measured in gigabytes rather than megabytes.
+
 ## The opportunity is concentrated, not spread out
 
 Converting every eligible site at its recommended capacity:
