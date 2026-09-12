@@ -1,12 +1,10 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry csMain<W> -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry csMain<W> -allow-glsl -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry csMain<W> -allow-glsl -emit-spirv-via-glsl
 
 // Regression test for https://github.com/shader-slang/slang/issues/13037:
-// a standalone GLSL `layout(local_size_...) in;` was silently ignored for a
-// *specialized generic* compute entry point, emitting LocalSize 1 1 1 instead of
-// the requested dimensions. The local_size lift scanned the raw parent decl (the
-// GenericDecl wrapper of the inner entry function) rather than the module scope
-// that actually holds the layout declaration, so it found no layout sibling.
+// a module-scope GLSL `layout(local_size_...) in;` must apply to a specialized
+// generic compute entry point, not only to a non-generic one. The first run uses
+// the default direct SPIR-V backend; the second uses the glslang backend.
 
 // CHECK: OpExecutionMode %{{.*}} LocalSize 8 4 2
 layout(local_size_x = 8, local_size_y = 4, local_size_z = 2) in;
