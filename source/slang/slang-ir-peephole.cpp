@@ -18,7 +18,6 @@ struct PeepholeContext : InstPassBase
     }
 
     bool changed = false;
-    FloatingPointMode floatingPointMode = FloatingPointMode::Precise;
     bool removeOldInst = true;
     bool isInGeneric = false;
     bool isPrelinking = false;
@@ -164,10 +163,30 @@ struct PeepholeContext : InstPassBase
         }
     }
 
+    // Return the floating-point mode in effect for `inst`: the global `-fp-mode` option, overridden
+    // by the enclosing function's `IRFloatingPointModeOverrideDecoration`. A function-local
+    // override applies only within that function, so the mode is resolved per inst. Same resolution
+    // as `isFloatingPointModePrecise` (slang-emit-spirv.cpp).
+    FloatingPointMode getEffectiveFloatingPointMode(IRInst* inst)
+    {
+        FloatingPointMode mode = targetProgram
+                                     ? targetProgram->getOptionSet().getFloatingPointMode()
+                                     : FloatingPointMode::Precise;
+        if (auto func = getParentFunc(inst))
+            if (auto fpModeDecor = func->findDecoration<IRFloatingPointModeOverrideDecoration>())
+                mode = fpModeDecor->getFloatingPointMode();
+        return mode;
+    }
+
     bool tryOptimizeArithmeticInst(IRInst* inst)
     {
+        // Whether floating-point identity folds that drop an operand (`0 + x`, `x - 0`, `x - x`,
+        // `x * 0`, `0 / x`) are sound. For float they hold only under fast math: `isZero` matches
+        // both `+0.0` and `-0.0`, so `0.0 + x` for `x == -0.0` yields `+0.0 != -0.0`, and `x - x`
+        // for a NaN/Inf `x` yields `NaN != 0` -- precise/default mode must keep these distinctions.
+        // Integer arithmetic has no such traps. (issue #12405)
         bool allowUnsafeOptimizations =
-            (floatingPointMode == FloatingPointMode::Fast ||
+            (getEffectiveFloatingPointMode(inst) == FloatingPointMode::Fast ||
              isIntegralScalarOrCompositeType(inst->getDataType()));
 
         auto tryReplace = [&](IRInst* replacement) -> bool
@@ -202,22 +221,22 @@ struct PeepholeContext : InstPassBase
         {
         case kIROp_Add:
         case kIROp_ConstexprAdd:
-            if (isZero(inst->getOperand(0)))
+            if (allowUnsafeOptimizations && isZero(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(1));
             }
-            else if (isZero(inst->getOperand(1)))
+            else if (allowUnsafeOptimizations && isZero(inst->getOperand(1)))
             {
                 return tryReplace(inst->getOperand(0));
             }
             break;
         case kIROp_Sub:
         case kIROp_ConstexprSub:
-            if (isZero(inst->getOperand(1)))
+            if (allowUnsafeOptimizations && isZero(inst->getOperand(1)))
             {
                 return tryReplace(inst->getOperand(0));
             }
-            else if (inst->getOperand(0) == inst->getOperand(1))
+            else if (allowUnsafeOptimizations && inst->getOperand(0) == inst->getOperand(1))
             {
                 IRBuilder builder(inst);
                 IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
@@ -299,12 +318,6 @@ struct PeepholeContext : InstPassBase
 
     void processInst(IRInst* inst)
     {
-        if (as<IRGlobalValueWithCode>(inst))
-        {
-            if (auto fpModeDecor = inst->findDecoration<IRFloatingPointModeOverrideDecoration>())
-                floatingPointMode = fpModeDecor->getFloatingPointMode();
-        }
-
         switch (inst->getOp())
         {
         case kIROp_AlignOf:
