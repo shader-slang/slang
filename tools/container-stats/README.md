@@ -42,6 +42,52 @@ python3 tools/container-stats/analyze.py '/tmp/cstats-run/perf.*.json' --top 20
 processing. `Slang::dumpContainerStats(path)` is also callable directly, for embedders and for
 dumping at a point other than exit.
 
+## Collecting from an application that embeds Slang
+
+Nothing needs to change in the host application. Only Slang itself is rebuilt; the statistics are
+written by the library at process exit when an environment variable names a destination.
+
+```bash
+# 1. Build Slang with the option on, in its own directory.
+cmake -S . -B build-cstats -G "Ninja Multi-Config" -DSLANG_ENABLE_CONTAINER_STATS=ON
+cmake --build build-cstats --config Debug --parallel
+
+# 2. Confirm the resulting library really is instrumented.
+strings build-cstats/Debug/lib/libslang-compiler.so | grep -q '^SLANG_CONTAINER_STATS$' \
+    && echo instrumented
+
+# 3. Point the application at that library and give it somewhere to write.
+LD_LIBRARY_PATH=$PWD/build-cstats/Debug/lib \
+SLANG_CONTAINER_STATS=/tmp/mystats/run \
+    ./my-application
+
+# 4. Merge and rank. One file is written per process, so pass a glob.
+python3 tools/container-stats/analyze.py '/tmp/mystats/run.*.json'
+```
+
+The host application does **not** need to be recompiled, and does not need the option defined. The
+public API in `include/slang.h` is a COM-style interface that does not include any of the
+instrumented container headers, so enabling the option changes nothing about the types an embedder
+sees. The one exception is an embedder that includes Slang's internal headers directly or links
+Slang statically into its own objects: that is the ODR hazard described against the CMake option,
+and such a build has to define `SLANG_ENABLE_CONTAINER_STATS=1` throughout, exactly as Slang's own
+build does.
+
+`dlopen`/`dlclose` works as well as linking directly; the dump is written when the library is
+unloaded rather than at process exit.
+
+Things worth knowing before reading the output:
+
+- **One file per process**, named `<path>.<pid>.json`, so the destination directory must exist and
+  the same `SLANG_CONTAINER_STATS` value can be used for a whole run of many processes. Distinct
+  processes cannot overwrite one another unless the operating system recycles a pid within the run.
+- **The process must exit normally.** A crash or a kill leaves no file, or an empty one; `analyze.py`
+  reports and skips those rather than failing.
+- **Symbolizing the sampled backtraces needs debug info** in the same build, and `addr2line` on the
+  path. Without it the report still ranks sites correctly but cannot name the calling function, so
+  `RelWithDebInfo` is the better configuration for a large collection.
+- Expect roughly **1.07x** on compile time and a few megabytes per process on disk.
+
 ## What is instrumented
 
 | Family                                | What a record is                              | What the report asks                                    |
