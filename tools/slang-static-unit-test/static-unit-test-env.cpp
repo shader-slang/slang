@@ -122,9 +122,9 @@ IRFunc* IRFixtureBuilder::addVoidFunction(const char* name, bool keepAlive)
     return func;
 }
 
-IRFunc* IRFixtureBuilder::addVoidFunctionCalling(const char* name, bool keepAlive, IRFunc* callee)
+void IRFixtureBuilder::assertVoidCallableInModule(IRFunc* callee)
 {
-    // The call emitted below is only well-formed if `callee` is a `void()` function
+    // A well-formed nullary void call requires `callee` to be a `void()` function
     // belonging to this module. Getting that wrong produces malformed IR that fails
     // somewhere inside a later pass, which reads as a bug in the pass under test rather
     // than a bad fixture, so check it here where the caller's mistake is still visible.
@@ -134,6 +134,11 @@ IRFunc* IRFixtureBuilder::addVoidFunctionCalling(const char* name, bool keepAliv
     SLANG_RELEASE_ASSERT(calleeType);
     SLANG_RELEASE_ASSERT(calleeType->getParamCount() == 0);
     SLANG_RELEASE_ASSERT(calleeType->getResultType()->getOp() == kIROp_VoidType);
+}
+
+IRFunc* IRFixtureBuilder::addVoidFunctionCalling(const char* name, bool keepAlive, IRFunc* callee)
+{
+    assertVoidCallableInModule(callee);
 
     IRFunc* func = beginVoidFunction(name);
     m_builder.emitCallInst(m_builder.getVoidType(), callee, 0, nullptr);
@@ -243,16 +248,7 @@ List<IRInst*> IRFixtureBuilder::addStraightLineMarkerRun(const char* name, Index
 
 List<IRInst*> IRFixtureBuilder::addMarkerRunAroundCall(const char* name, IRFunc* callee)
 {
-    // The call emitted below is only well-formed for a `void()` callee in this
-    // module, the same precondition `addVoidFunctionCalling` checks; validate it
-    // here where the caller's mistake is still visible rather than let a later
-    // pass trip over the malformed IR.
-    SLANG_RELEASE_ASSERT(callee);
-    SLANG_RELEASE_ASSERT(callee->getParent() == m_module->getModuleInst());
-    auto calleeType = as<IRFuncType>(callee->getFullType());
-    SLANG_RELEASE_ASSERT(calleeType);
-    SLANG_RELEASE_ASSERT(calleeType->getParamCount() == 0);
-    SLANG_RELEASE_ASSERT(calleeType->getResultType()->getOp() == kIROp_VoidType);
+    assertVoidCallableInModule(callee);
 
     IRFunc* func = beginVoidFunction(name);
 
@@ -301,12 +297,12 @@ void IRFixtureBuilder::addMutuallyRecursiveFunctions(
     outA = beginVoidFunction(aName);
     outB = beginVoidFunction(bName);
 
-    // The pair is deliberately asymmetric: `a` calls `b` and then unconditionally
-    // abandons (`Abort`), so `a` may-not-return on its own; `b` calls `a` and then
-    // returns, so `b` may-not-return only *through* the recursion into `a`. That
-    // asymmetry is what exposes an order-dependent cycle break: analyzing `a`
-    // first can memoize `b` from the in-progress guess for `a`, whereas analyzing
-    // `b` first cannot. A conservative break gives the same answer either way.
+    // Asymmetric pair; the header doc explains why. `a` = call `b`, `Abort`,
+    // `Return`. The trailing `Return` is load-bearing: `Abort` is a mid-block
+    // instruction, not a terminator, so the block still needs one — which also
+    // means `everyReachablePathCanExit(a)` is true and `a`'s may-not-return
+    // verdict rests entirely on the mid-block `Abort`, not on reachability. `b` =
+    // call `a`, `Return`.
     IRInst* abortFormat = m_builder.getStringValue(UnownedStringSlice("coverage-unit-test"));
 
     m_builder.setInsertInto(outA->getFirstBlock());
@@ -317,6 +313,23 @@ void IRFixtureBuilder::addMutuallyRecursiveFunctions(
     m_builder.setInsertInto(outB->getFirstBlock());
     m_builder.emitCallInst(m_builder.getVoidType(), outA, 0, nullptr);
     m_builder.emitReturn();
+}
+
+List<IRInst*> IRFixtureBuilder::addLineMarkersAroundFunctionMarker(const char* name)
+{
+    IRFunc* func = beginVoidFunction(name);
+
+    // A line marker, a function-entry marker, then a line marker. The function
+    // marker's name operands are irrelevant to slot assignment, so reuse `name`.
+    List<IRInst*> markers;
+    markers.add(m_builder.emitIncrementCoverageCounter());
+    markers.add(m_builder.emitIncrementFunctionCoverageCounter(
+        UnownedStringSlice(name),
+        UnownedStringSlice(name)));
+    markers.add(m_builder.emitIncrementCoverageCounter());
+
+    endVoidFunction(func, /* keepAlive: */ false);
+    return markers;
 }
 
 IRGlobalParam* IRFixtureBuilder::addGlobalParam(const char* name)

@@ -195,6 +195,14 @@ public:
         IRFunc*& outA,
         IRFunc*& outB);
 
+    /// Add a top-level `void()` function whose single block is a line marker, a
+    /// function-entry marker (`IncrementFunctionCoverageCounter`), and another
+    /// line marker, then a return. Returns the three markers in order. This pins
+    /// two guarantees at once: a function/branch marker takes a dedicated slot,
+    /// and — since it is not a line marker — it neither opens nor breaks a line
+    /// run, so the two line markers on either side still coalesce across it.
+    List<IRInst*> addLineMarkersAroundFunctionMarker(const char* name);
+
     IRModule* getModule() const { return m_module.get(); }
 
     /// Count the direct children of the module inst whose opcode is `op`.
@@ -227,6 +235,11 @@ private:
 
     /// Terminate the block opened by `beginVoidFunction` and apply `keepAlive`.
     void endVoidFunction(IRFunc* func, bool keepAlive);
+
+    /// Assert `callee` is a `void()` function belonging to this module — the
+    /// precondition for emitting a well-formed nullary void call to it. Shared by
+    /// the fixtures that emit such a call.
+    void assertVoidCallableInModule(IRFunc* callee);
 
     // Declaration order matters: the constructor initializes `m_builder` from
     // `m_module.get()`, and members are initialized in declaration order rather

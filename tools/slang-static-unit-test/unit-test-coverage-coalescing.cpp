@@ -23,12 +23,14 @@
 // totals, so a count- or result-based end-to-end test cannot distinguish them;
 // the per-marker `outEmitsProbe` output is the precise, emission-independent
 // way to observe the placement. The other three are reachable in principle
-// from source (`sqrt`/`dot`
-// lower through `GenericAsm`, `abort()` lowers to `Abort`, and recursion
-// survives to this pass), but pinning them end-to-end would mean building whole
-// instrumentable modules and asserting on emitted probe instructions, which
-// cannot isolate the specific classification the way a direct assertion on the
-// slot assignment does.
+// from source (a builtin like `sqrt`, whose CPU body is a bare `GenericAsm`,
+// lowers through one; `abort()` lowers to `Abort`; recursion survives to this
+// pass), but pinning them end-to-end would mean building whole instrumentable
+// modules and asserting on emitted probe instructions, which cannot isolate the
+// specific classification the way a direct assertion on the slot assignment
+// does. (`dot`/`lerp` are the opposite case — they dispatch through a witness
+// table unresolved at this point and split conservatively, so they cannot
+// stand in for the no-split property 1.)
 
 #include "slang/slang-ir-coverage-instrument.h"
 #include "static-unit-test-env.h"
@@ -36,10 +38,9 @@
 
 using namespace Slang;
 
-// Property 2: a straight-line run of markers coalesces onto one counter, with
-// the single probe on the *last* marker. Probe count alone cannot tell first-
-// from last-marker placement apart, so this asserts the per-marker
-// `outEmitsProbe` flags — the emission-independent observation that can.
+// Property 2: a straight-line run coalesces onto one counter with the single
+// probe on the *last* marker (see the file header for why only a direct
+// `outEmitsProbe` assertion observes this).
 SLANG_UNIT_TEST(coverageCoalescingPlacesProbeAtLastMarkerOfRegion)
 {
     StaticUnitTestEnv env(unitTestContext);
@@ -105,18 +106,13 @@ SLANG_UNIT_TEST(coverageCoalescingSplitsRegionAtAbort)
     SLANG_CHECK(emitsProbe[1]);
 }
 
-// Property 4: mutual recursion is broken conservatively, and the answer does
-// not depend on which partner the analysis reaches first. The pair is
-// asymmetric: `a` calls `b` then abandons via `Abort` (may-not-return on its
-// own), while `b` calls `a` then returns (may-not-return only through the
-// recursion into `a`). Both a call to `a` and a call to `b` must therefore
-// split their region.
-//
-// The two regions are analyzed in one `assignCoverageCounterSlots` call, so the
-// may-not-return cache built resolving the first region's call carries into the
-// second. Reversing which region comes first is what pins order-independence:
-// an unsound optimistic cycle-break memoizes `b` as returning-normally when `a`
-// is resolved first, coalescing the `b` region in that order only.
+// Property 4: mutual recursion is broken conservatively and order-independently.
+// `addMutuallyRecursiveFunctions` documents why the pair is asymmetric; the test
+// analyzes both caller regions in ONE `assignCoverageCounterSlots` pass (so the
+// may-not-return cache carries between them), then again with the order reversed.
+// Requiring both regions to split in both orders is what pins order-independence:
+// an unsound optimistic cycle-break coalesces the `b` region only when `a` is
+// resolved first.
 SLANG_UNIT_TEST(coverageCoalescingSplitsAtMutuallyRecursiveCallEitherOrder)
 {
     StaticUnitTestEnv env(unitTestContext);
@@ -151,4 +147,34 @@ SLANG_UNIT_TEST(coverageCoalescingSplitsAtMutuallyRecursiveCallEitherOrder)
     bThenA.addRange(callsB);
     bThenA.addRange(callsA);
     checkBothRegionsSplit(bThenA);
+}
+
+// The contract states function/branch markers always take a dedicated slot. A
+// function marker between two line markers is not an `IncrementCoverageCounter`,
+// so it takes its own slot and neither opens nor breaks a line run — the two
+// line markers around it still coalesce across it. One fixture pins both halves.
+SLANG_UNIT_TEST(coverageCoalescingGivesFunctionMarkerADedicatedSlotWithoutBreakingTheRun)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSessionImpl());
+
+    // markers[0] = line, markers[1] = function-entry marker, markers[2] = line.
+    List<IRInst*> markers = builder.addLineMarkersAroundFunctionMarker("funcMarkerRun");
+    SLANG_CHECK_ABORT(markers.getCount() == 3);
+
+    List<UInt> slots;
+    List<bool> emitsProbe;
+    UInt counterCount = 0;
+    assignCoverageCounterSlots(markers, slots, emitsProbe, counterCount);
+
+    // One slot shared by the two line markers, a separate dedicated slot for the
+    // function marker.
+    SLANG_CHECK(counterCount == 2);
+    SLANG_CHECK(slots[0] == slots[2]);
+    SLANG_CHECK(slots[0] != slots[1]);
+    // The line run's probe still lands on its last line marker; the function
+    // marker carries its own.
+    SLANG_CHECK(!emitsProbe[0]);
+    SLANG_CHECK(emitsProbe[1]);
+    SLANG_CHECK(emitsProbe[2]);
 }
