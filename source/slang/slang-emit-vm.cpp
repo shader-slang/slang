@@ -984,6 +984,12 @@ public:
 
                 auto baseOperand = ensureInst(base);
                 baseOperand.offset += (uint32_t)offset;
+                IRSizeAndAlignment fieldSizeAlignment = {};
+                getNaturalSizeAndAlignment(
+                    codeGenContext->getTargetReq(),
+                    field->getFieldType(),
+                    &fieldSizeAlignment);
+                baseOperand.size = (uint32_t)fieldSizeAlignment.size;
                 mapInstToOperand[inst] = baseOperand;
             }
             break;
@@ -1003,6 +1009,7 @@ public:
                 if (as<IRIntLit>(index))
                 {
                     baseOperand.offset += (uint32_t)(stride * getIntVal(index));
+                    baseOperand.size = (uint32_t)sizeAlignment.size;
                     mapInstToOperand[inst] = baseOperand;
                     break;
                 }
