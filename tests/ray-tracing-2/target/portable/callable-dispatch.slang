@@ -86,9 +86,11 @@ void main()
 // SPIRV-DAG: BuiltIn LaunchSizeKHR
 // SPIRV: OpExecuteCallableKHR %uint_0
 
-// METAL: metal::visible_function_table<void(TestCallableData_0 thread*, uint3, uint3, uint constant*, uint device*)> callableFunctions_0;
-// METAL: ((rt_TraceProgramDescriptorResources_default_0 constant*)(program_resources_{{[0-9]+}}))->callableFunctions_0[0U](&data_{{[0-9]+}}, dispatchRaysIndex_{{[0-9]+}}, dispatchRaysDimensions_{{[0-9]+}}, (constant uint*)(program_resources_{{[0-9]+}}), program_resources_{{[0-9]+}}->records_0);
-// METAL: {{\[\[visible\]\]}} void TestCallable_0(TestCallableData_0 thread* [[DATA:data_[0-9]+]], uint3 dispatchRaysIndex_{{[0-9]+}}, uint3 dispatchRaysDimensions_{{[0-9]+}}, uint constant* descriptorResources_{{[0-9]+}}, uint device* [[RECORDS:descriptorData_[0-9]+]])
+// METAL: metal::visible_function_table<void(TestCallableData_0 thread*, uint3, uint3, uchar device*, uint constant*, uint device*)> callableFunctions_0;
+// METAL: device uchar* [[CALLABLE_RECORD:_slang_callable_record]] =
+// METAL: uint [[FUNCTION_INDEX:_slang_callable_function_index]] =
+// METAL: callableFunctions_0{{\[}}[[FUNCTION_INDEX]]{{\]}}(&data_{{[0-9]+}}, dispatchRaysIndex_{{[0-9]+}}, dispatchRaysDimensions_{{[0-9]+}}, [[CALLABLE_RECORD]] + 16,
+// METAL: {{\[\[visible\]\]}} void {{.*}}(TestCallableData_0 thread* [[DATA:data_[0-9]+]], uint3 dispatchRaysIndex_{{[0-9]+}}, uint3 dispatchRaysDimensions_{{[0-9]+}}, uchar device* [[RECORD_DATA:recordData_[0-9]+]], uint constant* descriptorResources_{{[0-9]+}}, uint device* descriptorData_{{[0-9]+}})
 // METAL: [[DATA]]->value_{{[0-9]+}} = [[DATA]]->value_{{[0-9]+}} +
 // METAL-SAME: (*(TestCallableRecord_0 device*)
-// METAL-SAME: [[RECORDS]]
+// METAL-SAME: [[RECORD_DATA]]

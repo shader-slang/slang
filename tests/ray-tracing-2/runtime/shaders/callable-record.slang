@@ -9,7 +9,7 @@
 // SPIRV-DAG: OpEntryPoint RayGenerationKHR {{.*}} "main"
 // SPIRV-DAG: OpEntryPoint CallableKHR {{.*}} "RuntimeCallable"
 // SPIRV: OpExecuteCallableKHR %uint_0
-// METAL-DAG: metal::visible_function_table<void(RuntimeCallableData_0 thread*, uint3, uint3, uint constant*, uint device*)> callableFunctions_0;
+// METAL-DAG: metal::visible_function_table<void(RuntimeCallableData_0 thread*, uint3, uint3, uchar device*, uint constant*, uint device*)> callableFunctions_0;
 // METAL-DAG: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(
 // METAL_CALLABLE: void RuntimeCallable_invoke_0(RuntimeCallableRecord_0 thread* record_0, RuntimeCallableData_0 thread* data_0)
 

@@ -5276,8 +5276,51 @@ void prepareMetalStructuralRayTracing(
         _createMetalCandidateResultType(module, "StructuralRayTracingFilterResult", false);
     auto proceduralResultInfo =
         _createMetalCandidateResultType(module, "StructuralRayTracingIntersectionResult", true);
-    for (auto operation : validOperations)
+    // Materializing a stage adapter can clone a structural trace or callable dispatch from the
+    // stage body. For example, inlining a helper called by one callable can expose a dispatch to a
+    // second callable inside the generated visible function. Grow this work list whenever the
+    // current round is exhausted so no structural marker reaches type legalization.
+    for (Index operationIndex = 0;; ++operationIndex)
     {
+        if (operationIndex == validOperations.getCount())
+        {
+            // All original operations have been removed or lowered at this point, so any raw
+            // structural operations still in the module were introduced by adapter synthesis.
+            // Such an operation is a clone of source IR that contributed to descriptor
+            // physicalization; its schema must therefore already have one canonical descriptor
+            // layout. A schema invented here would make layout depend on synthesis order.
+            List<IRInst*> generatedOperations;
+            _collectStructuralProgramOperations(module->getModuleInst(), generatedOperations);
+            for (auto generatedOperation : generatedOperations)
+            {
+                if (!validateStructuralRayTracingSchemaOperation(generatedOperation, sink))
+                {
+                    generatedOperation->removeAndDeallocate();
+                    continue;
+                }
+
+                MetalTraceContextRequirements requirements;
+                if (!_tryGetMetalTraceContextRequirements(
+                        generatedOperation,
+                        targetRequest,
+                        sink,
+                        requirements))
+                {
+                    generatedOperation->removeAndDeallocate();
+                    continue;
+                }
+
+                auto programLayout = _getStructuralRayTracingProgramLayout(generatedOperation);
+                SLANG_RELEASE_ASSERT(programDescriptorInfos.containsKey(programLayout));
+                traceContextRequirements.add(generatedOperation, requirements);
+                validOperations.add(generatedOperation);
+            }
+
+            if (operationIndex == validOperations.getCount())
+                break;
+        }
+
+        auto operation = validOperations[operationIndex];
         auto programLayout =
             as<IRStructuralRayTracingTrace>(operation)
                 ? cast<IRStructuralRayTracingTrace>(operation)->getProgramLayout()
