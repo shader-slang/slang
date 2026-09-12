@@ -105,6 +105,6 @@ void main()
 // METAL-DAG: float rayTime_{{[0-9]+}};
 // METAL-DAG: (&{{rayData_[0-9]+}})->rayTime_{{[0-9]+}} = {{desc_[0-9]+}}.time_{{[0-9]+}};
 // METAL-DAG: {{\[\[intersection\(bounding_box,}}
-// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_
-// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_
+// METAL-DAG: {{\[\[visible\]\]}} void _slang_structural_rt_
+// METAL-DAG: {{\[\[visible\]\]}} void _slang_structural_rt_
 // METAL-NOT: structuralRayTracingGetRayTime

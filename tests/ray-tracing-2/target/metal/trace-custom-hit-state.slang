@@ -85,19 +85,20 @@ void main()
 // METAL: SphereAttributes_0 HitGroup_attributes_{{[0-9]+}};
 // METAL: uint device* descriptorData_{{[0-9]+}};
 // METAL: uint customHitKind_{{[0-9]+}};
-// METAL: visible_function_table<void(Schema_rayData_0 thread*, float, uint, float3, float3)>
-// METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing)]]
-// METAL-SAME: ray_data Schema_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
-// METAL: HitGroup_attributes_{{[0-9]+}} =
-// METAL: customHitKind_{{[0-9]+}} = 17U;
-// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(
+// METAL: visible_function_table<void(Schema_rayData_0 thread*, float, uint, float3, float3, uchar device*)>
+// METAL: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(
 // METAL-SAME: Schema_rayData_0 thread* rayData_{{[0-9]+}},
 // METAL-SAME: float distance_{{[0-9]+}},
 // METAL-SAME: uint hitKind_{{[0-9]+}},
 // METAL-SAME: float3 worldSpaceOrigin_{{[0-9]+}},
-// METAL-SAME: float3 worldSpaceDirection_{{[0-9]+}})
+// METAL-SAME: float3 worldSpaceDirection_{{[0-9]+}},
+// METAL-SAME: uchar device* recordData_{{[0-9]+}})
 // METAL: HitGroup_attributes_{{[0-9]+}}.normal_{{[0-9]+}}.x
 // METAL: customHitKind_{{[0-9]+}}
 // METAL: TestRecord_0 device*
-// METAL: descriptorData_{{[0-9]+}} + int(1)
+// METAL: recordData_{{[0-9]+}}
 // METAL: .bias_{{[0-9]+}}
+// METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing)]]
+// METAL-SAME: ray_data Schema_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
+// METAL: HitGroup_attributes_{{[0-9]+}} =
+// METAL: customHitKind_{{[0-9]+}} = 17U;

@@ -102,9 +102,14 @@ void main()
 // METAL: _slang_intersector.intersect(
 // METAL-NOT: intersectionFunctions
 // METAL: scene_1, desc_0.instanceMask_0);
-// METAL: _S{{[0-9]+}}[desc_0.missIndex_0](&rayData_{{[0-9]+}});
-// METAL: ](&rayData_{{[0-9]+}});
-// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread* [[MISS_DATA:rayData_[0-9]+]])
+// METAL: _slang_miss_record = {{.*}}desc_0.missIndex_0 * int(16)
+// METAL: _slang_miss_function_index = *((device uint*)_slang_miss_record)
+// METAL: [_slang_miss_function_index](&rayData_{{[0-9]+}});
+// METAL: _slang_hit_record_index = {{.*}}desc_0.sbtStride_0 + desc_0.sbtOffset_0
+// METAL: _slang_hit_record = {{.*}}_slang_hit_record_index * int(16)
+// METAL: _slang_hit_function_index = *((device uint*)_slang_hit_record)
+// METAL: [_slang_hit_function_index](&rayData_{{[0-9]+}});
+// METAL: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(Schema_rayData_0 thread* [[MISS_DATA:rayData_[0-9]+]])
 // METAL: (&[[MISS_DATA]]->payload_{{[0-9]+}})->value_0 = 2U;
-// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread* [[HIT_DATA:rayData_[0-9]+]])
+// METAL: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(Schema_rayData_0 thread* [[HIT_DATA:rayData_[0-9]+]])
 // METAL: (&[[HIT_DATA]]->payload_{{[0-9]+}})->value_0 = 1U;

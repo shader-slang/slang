@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal -profile metal_3_1
+//TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal -capability metallib_3_1
 
 import slang.raytracing;
 
@@ -55,7 +55,7 @@ struct BoundingBoxClosestHit : rt::IClosestHitShader
 
     void invoke(rt::ClosestHitInput<Context> input)
     {
-        input.payload.value = input.hitAttributes.value;
+        input.payload.value = input.attributes.value;
     }
 }
 
@@ -139,5 +139,7 @@ void main()
 // The exported bounding-box dispatcher occupies fixed IFT index one, so the generated table type
 // is large enough to preserve triangle index zero and curve index two on the host.
 // METAL: intersection_function_table<metal::raytracing::instancing{{.*}}>
+// The visible functions comprise one miss adapter, the real bounding-box closest-hit adapter, and
+// two closest-hit placeholders that keep all three reflected hit-group indices addressable.
+// METAL-COUNT-4: {{\[\[visible\]\]}} void _slang_structural_rt_
 // METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing{{.*}})]]
-// METAL-COUNT-3: {{\[\[visible\]\]}} void __slang_structural_rt_

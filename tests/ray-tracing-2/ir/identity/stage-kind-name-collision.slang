@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive): -experimental-feature -target hlsl -profile sm_6_5 -entry main -stage raygeneration
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -target hlsl -profile sm_6_5 -entry main -stage raygeneration
 
 import slang.raytracing;
 
@@ -57,7 +57,7 @@ void main()
     rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
     /*CHECK:
-           ^ conflicting structural ray-tracing entry-point name
-           ^ physical entry-point name 'MultiStage' is requested by distinct structural stages
+                ^ conflicting structural ray-tracing entry-point name
+                ^ physical entry-point name 'MultiStage' is requested by distinct structural stages
     */
 }

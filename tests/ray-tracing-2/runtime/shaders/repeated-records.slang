@@ -125,5 +125,5 @@ void main()
 // METAL: _slang_hit_record = {{.*}}_slang_hit_record_index * int(32)
 // METAL: _slang_hit_function_index = *((device uint*)_slang_hit_record)
 // METAL: [_slang_hit_function_index]({{.*}}, _slang_hit_record + 16)
-// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_
-// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_
+// METAL-DAG: {{\[\[visible\]\]}} void _slang_structural_rt_
+// METAL-DAG: {{\[\[visible\]\]}} void _slang_structural_rt_
