@@ -6727,7 +6727,10 @@ struct TypeFlowSpecializationContext
         if (dispatchFuncType == nullptr)
             return nullptr;
 
-        auto dispatchFunc = createDispatchFunc(dispatchFuncType, elements);
+        auto dispatchFunc = createDispatchFunc(
+            dispatchFuncType,
+            elements,
+            translationContext.getTargetProgram()->getTargetReq());
 
         // Add a name hint based on the actions.
         {

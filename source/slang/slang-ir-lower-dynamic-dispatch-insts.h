@@ -6,6 +6,7 @@ namespace Slang
 {
 class Linkage;
 class TargetProgram;
+class TargetRequest;
 
 // Lower `UntaggedUnionType` types.
 void lowerUntaggedUnionTypes(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
@@ -46,10 +47,14 @@ void lowerGetDispatcher(
     List<IRInst*>& newCallees);
 
 // Create a dispatch function that switches on a tag (first parameter) to call
-// one of the functions in the mapping.
+// one of the functions in the mapping. `targetReq` is used only to decide
+// whether the synthesized wrapper/dispatch functions should be force-inlined
+// (see the force-inline decoration comment at this function's definition);
+// pass nullptr to skip that decision entirely and never force-inline.
 IRFunc* createDispatchFunc(
     IRFuncType* dispatchFuncType,
-    Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping);
+    Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping,
+    TargetRequest* targetReq);
 
 // Report diagnostic information about a dynamic dispatch site.
 void reportDispatchLocation(
