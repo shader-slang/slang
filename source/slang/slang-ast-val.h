@@ -1090,6 +1090,32 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+/// A witness that the existential-box type `dyn IFoo` conforms to `IBar`, on the grounds that the
+/// interface `IFoo` refines `IBar`. It stores the underlying `IFoo : IBar` refinement witness, but
+/// is a *distinct* witness whose `sub` is the box type `dyn IFoo` (not `IFoo`), so it is never
+/// confused with an actual conformance of the interface `IFoo` itself.
+///
+/// This is currently manufactured only when the front-end checks whether an existential-box type is
+/// differentiable (see `SemanticsVisitor::isTypeDifferentiable`), so that the box's
+/// differentiable-type classification and registration match those of its interface. It lowers to
+/// the same IR as its stored underlying witness.
+FIDDLE()
+class ExistentialBoxConformanceWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    ExistentialBoxConformanceWitness(Type* sub, Type* sup, SubtypeWitness* interfaceWitness)
+    {
+        setOperands(sub, sup, interfaceWitness);
+    }
+
+    // Witness that the boxed interface refines `sup` (i.e. `IFoo : IBar`).
+    SubtypeWitness* getInterfaceWitness() { return as<SubtypeWitness>(getOperand(2)); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 /// A witness of the fact that a user provided "__Dynamic" type argument is a
 /// subtype to the existential type parameter.
 FIDDLE()

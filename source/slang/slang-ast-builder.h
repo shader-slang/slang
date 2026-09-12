@@ -713,6 +713,9 @@ public:
 
     Type* getAndType(Type* left, Type* right);
 
+    /// Get the existential type `dyn interfaceType` for an interface (or interface conjunction).
+    Type* getExistentialType(Type* interfaceType);
+
     Type* getModifiedType(Type* base, Count modifierCount, Val* const* modifiers);
     Type* getModifiedType(Type* base, List<Val*> const& modifiers)
     {
@@ -803,6 +806,11 @@ public:
         Type* subType,
         Type* superType,
         SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getExistentialBoxConformanceWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* interfaceWitness);
 
     SubtypeWitness* getFirstSubtypeWitness(
         Type* subType,

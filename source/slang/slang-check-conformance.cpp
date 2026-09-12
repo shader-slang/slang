@@ -167,6 +167,10 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
         if (!witness)
             witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableRefInterfaceType());
 
+        // Do not synthesize an existential-box witness here: `DiffTypeInfoWitness` needs a
+        // runtime-usable conformance witness for the parameter, whereas the box witness only
+        // encodes static interface refinement, which dynamic-dispatch backward-diff lowering cannot
+        // consume as a witness table.
         return witness;
     };
 
@@ -262,6 +266,14 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     // tangling convertibility into it.
 
     SubtypeWitness* failureWitness = nullptr;
+
+    // An existential type is only reflexively a subtype of itself. In particular `dyn IFoo`
+    // does not conform to `IFoo`, and no concrete type is a subtype of `dyn IFoo`; any such
+    // relation produces no witness. (Equal existential types fall through to the self-facet
+    // path below, which supplies the reflexive witness.)
+    if ((as<ExistentialType>(subType) || as<ExistentialType>(superType)) &&
+        !subType->equals(superType))
+        return failureWitness;
 
     // In the common case, we can use the pre-computed inheritance information for `subType`
     // to enumerate all the types it transitively inherits from.
@@ -416,6 +428,38 @@ bool SemanticsVisitor::isValidGenericConstraintType(Type* type)
     return isInterfaceType(type);
 }
 
+Type* SemanticsVisitor::maybeFormExistentialType(Type* type)
+{
+    // An interface (or conjunction of interfaces) named in a data-type context denotes the
+    // existential type `dyn IFoo`, not the interface itself. `isValidGenericConstraintType`
+    // already recognizes exactly the "interface or conjunction of interfaces" shape, so we
+    // reuse it. Anything else (concrete types, `ExtractExistentialType`, an already-formed
+    // `ExistentialType`) is returned unchanged.
+    if (!type || as<ExistentialType>(type))
+        return type;
+    if (isValidGenericConstraintType(type))
+        return m_astBuilder->getExistentialType(type);
+    return type;
+}
+
+SubtypeWitness* SemanticsVisitor::tryGetExistentialBoxConformanceWitness(
+    Type* type,
+    Type* superType)
+{
+    // Match only an unmodified existential-box type. In particular we must NOT look through a
+    // `ModifiedType` here (as `getExistentialInterfaceType` would): a `no_diff dyn IFoo` parameter
+    // must stay non-differentiable, or an explicit `no_diff` would be silently defeated.
+    auto existentialType = as<ExistentialType>(type);
+    if (!existentialType)
+        return nullptr;
+    auto interfaceType = existentialType->getInterfaceType();
+    auto interfaceWitness =
+        as<SubtypeWitness>(tryGetInterfaceConformanceWitness(interfaceType, superType));
+    if (!interfaceWitness)
+        return nullptr;
+    return m_astBuilder->getExistentialBoxConformanceWitness(type, superType, interfaceWitness);
+}
+
 SubtypeWitness* SemanticsVisitor::isTypeDifferentiable(Type* type)
 {
     if (auto valueWitness =
@@ -427,6 +471,14 @@ SubtypeWitness* SemanticsVisitor::isTypeDifferentiable(Type* type)
             m_astBuilder->getDifferentiableRefInterfaceType(),
             IsSubTypeOptions::None))
         return ptrWitness;
+
+    // An existential-box type `dyn IFoo` does not itself conform to the differentiable interface,
+    // but we report it as differentiable when its interface `IFoo` refines the differentiable value
+    // interface, so that box-typed values participate in differentiation. The manufactured witness
+    // is distinct from the interface's refinement witness (its `sub` is the box type). See #12430.
+    if (auto boxWitness =
+            tryGetExistentialBoxConformanceWitness(type, m_astBuilder->getDiffInterfaceType()))
+        return boxWitness;
 
     return nullptr;
 }
@@ -440,6 +492,11 @@ bool SemanticsVisitor::doesTypeHaveTag(Type* type, TypeTag tag)
     if (auto modifiedType = as<ModifiedType>(type))
     {
         return doesTypeHaveTag(modifiedType->getBase(), tag);
+    }
+    if (auto existentialInterfaceType = getExistentialInterfaceType(type))
+    {
+        // An existential box `dyn IFoo` carries the same type tags as its interface `IFoo`.
+        return doesTypeHaveTag(existentialInterfaceType, tag);
     }
     if (auto declRefType = as<DeclRefType>(type))
     {
@@ -479,6 +536,12 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
     if (auto modifiedType = as<ModifiedType>(type))
     {
         return getTypeTags(modifiedType->getBase());
+    }
+    if (auto existentialInterfaceType = getExistentialInterfaceType(type))
+    {
+        // An existential box `dyn IFoo` carries the same type tags as its interface `IFoo` (so, for
+        // example, an interface value is still recognized as non-C-style under lang 2026).
+        return getTypeTags(existentialInterfaceType);
     }
     if (as<ParameterBlockType>(type))
     {

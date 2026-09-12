@@ -40,7 +40,15 @@ struct IRModuleInfo
     // IRModuleInst or IRConstants.
     // If we want to support back compat we'll need to change this to a list of
     // accepted values, and branch on that later down.
-    const static UInt64 kSupportedSerializationVersion = 1;
+    //
+    // This value stamps the whole serialized-module container, so it must also
+    // be bumped whenever the *AST* serialization changes in a
+    // backward-incompatible way: AST nodes are serialized by their positional
+    // `ASTNodeType` tag with no stable-name indirection (unlike IR opcodes), so
+    // inserting a node type mid-hierarchy shifts every later tag and would make a
+    // module written by an older compiler decode incorrectly instead of being
+    // rejected.
+    const static UInt64 kSupportedSerializationVersion = 2;
     FIDDLE() UInt64 serializationVersion = kSupportedSerializationVersion;
     // Include the specific compiler version in serialized output, in case we
     // ever need to do any version specific workarounds.
@@ -785,6 +793,30 @@ Result readSerializedModuleInfo(
     return SLANG_OK;
 }
 
+UInt64 getSupportedModuleSerializationVersion()
+{
+    return IRModuleInfo::kSupportedSerializationVersion;
+}
+
+Result readSerializedModuleSerializationVersion(RIFF::Chunk const* chunk, UInt64& outVersion)
+{
+    auto dataChunk = as<RIFF::DataChunk>(chunk);
+    if (!dataChunk)
+        return SLANG_FAIL;
+
+    Fossil::AnyValPtr rootValPtr =
+        Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
+    if (!rootValPtr)
+        return SLANG_FAIL;
+
+    // `serializationVersion` is the first field of `IRModuleInfo` and has been
+    // present since the first fossil version, so reading it is safe for any
+    // module the compiler has ever written.
+    Fossilized<IRModuleInfo>* fossilizedModuleInfo = cast<Fossilized<IRModuleInfo>>(rootValPtr);
+    outVersion = fossilizedModuleInfo->serializationVersion;
+    return SLANG_OK;
+}
+
 // A helper to make profiling the actual deserialization work
 // easier.
 [[nodiscard]] static Result readSerializedModuleIR_(
@@ -808,9 +840,14 @@ Result readSerializedModuleInfo(
 
     Fossilized<IRModuleInfo>* fossilizedModuleInfo = cast<Fossilized<IRModuleInfo>>(rootValPtr);
 
-    // Only one version supported so far, if we had multiple versions to
-    // support this is where we might branch
-    if (fossilizedModuleInfo->serializationVersion != IRModuleInfo::kSupportedSerializationVersion)
+    // IR-decode-time backstop for the version check, sharing the one accepted
+    // version via `getSupportedModuleSerializationVersion()`. The primary
+    // enforcement is the early gate in `Linkage::loadSerializedModuleContents` /
+    // `Session::_readBuiltinModule`, which rejects an incompatible module before
+    // its AST is decoded (AST node tags are positional); this check covers any
+    // IR-only read path. If we ever support a back-compat window this becomes a
+    // list of accepted versions.
+    if (fossilizedModuleInfo->serializationVersion != getSupportedModuleSerializationVersion())
         return SLANG_FAIL;
 
     IRModuleInfo info;

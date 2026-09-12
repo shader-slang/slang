@@ -435,6 +435,12 @@ err(
 
 err("riff-hash-mismatch", 91, "riff hash mismatch - incompatible riff")
 
+err(
+    "incompatible-serialized-module-version",
+    88,
+    "the serialized module '~path' was built with an incompatible serialization format version (~foundVersion); this compiler reads serialized modules of version ~expectedVersion, so the module must be recompiled from source"
+)
+
 err("unable-to-create-directory", 92, "unable to create directory '~path'")
 
 err("unable-to-extract-repro-to-directory", 93, "unable to extract repro to directory '~path'")
@@ -1631,6 +1637,13 @@ err(
     30304,
     "'is'/'as' on unrelated concrete types",
     span { loc = "expr:Expr", message = "'is'/'as' on unrelated concrete types will never succeed. Use an interface-typed expression for runtime type checks." }
+)
+
+err(
+    "expected-interface-or-conjunction-type",
+    30307,
+    "expected an interface or a conjunction of interfaces",
+    span { loc = "expr:Expr", message = "expected an interface or a conjunction of interfaces, got '~type:Type'" }
 )
 
 err(
