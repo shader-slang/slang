@@ -498,12 +498,16 @@ Type* ASTBuilder::getBwdCallableBaseType(Type* baseType, Witness* typeInfoWitnes
 Type* ASTBuilder::getMagicEnumType(const char* magicEnumName)
 {
     auto& cache = getSharedASTBuilder()->m_magicEnumTypes;
-    Type* res = nullptr;
-    if (!cache.tryGetValue(magicEnumName, res))
-    {
-        res = getSpecializedBuiltinType({}, magicEnumName);
-        cache.add(magicEnumName, res);
-    }
+
+    // Probe with a slice rather than letting `magicEnumName` convert to a
+    // `String`, which would heap-allocate a copy of the name on every call
+    // just to hash it. Only a miss needs the owned copy, for the key.
+    const UnownedStringSlice name(magicEnumName);
+    if (auto found = cache.tryGetValue(name))
+        return *found;
+
+    Type* res = getSpecializedBuiltinType({}, magicEnumName);
+    cache.add(String(name), res);
     return res;
 }
 
