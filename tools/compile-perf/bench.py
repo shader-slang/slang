@@ -606,6 +606,11 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
 
     benign = (_BENIGN_DOWNSTREAM_REQUIRED
               if getattr(spec, "downstream_required", False) else _BENIGN)
+    # A workload that is SUPPOSED to emit diagnostics (see
+    # WorkloadSpec.expected_diagnostics) declares their codes, which both stops
+    # them failing the run and — below — makes their disappearance fail it.
+    expected_diags = list(getattr(spec, "expected_diagnostics", []) or [])
+    benign = tuple(benign) + tuple(expected_diags)
 
     timed = cmds["timed"]
     for _ in range(warmup):
@@ -632,7 +637,17 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         # such as 0xC0000005 to signed int: -1073741819). Exit code 2+ from usage errors
         # won't occur here because the bench harness always builds valid invocations.
         # Exclude crashed samples from timing stats; their wall time is meaningless.
-        if rc > 1 or rc < 0:
+        # A workload that declares expected_diagnostics is SUPPOSED to fail the
+        # compile, and slangc's failure exit code is not portable: it is 1 on
+        # some platforms and 255 (i.e. -1 truncated) on macOS, which the crash
+        # rule above would otherwise discard along with the timers we came for.
+        # Decide from the output instead of the code — every expected
+        # diagnostic present, and no unexpected error — which holds whatever
+        # the platform returns.
+        expected_failure = bool(expected_diags) and \
+            all(c in text for c in expected_diags) and \
+            real_error(text, benign) is None
+        if (rc > 1 or rc < 0) and not expected_failure:
             crash_codes.append(rc)
             sample_ok.append(False)
             continue
@@ -647,6 +662,30 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
             per_mem.setdefault(name, []).append(kb)
 
     err = real_error(last_text, benign)
+
+    # The other half of the expected_diagnostics contract. Tolerating a code
+    # without requiring it is how `diagnostics_clean` rotted: it was built to
+    # measure diagnostic production, quietly stopped emitting any, and went on
+    # reporting a healthy green number that measured something else entirely.
+    # A workload that declares it emits E30019 and stops doing so is broken,
+    # not passing.
+    missing_diags = [c for c in expected_diags if c not in last_text]
+    if missing_diags:
+        # Takes priority over whatever else the compile said. If the declared
+        # diagnostic is gone, every other symptom (a stray error, no timers,
+        # a non-zero exit) is downstream of that, and reporting one of those
+        # instead sends the reader looking in the wrong place.
+        err = ("expected diagnostics absent: " + ", ".join(missing_diags) +
+               " - the workload no longer exercises what it claims to")
+
+    # Every declared primary timer should be a counter the compiler actually
+    # emits. `serialize` declared `writeSerializedModuleIR` for months while
+    # that function had no SLANG_PROFILE, so its headline could not respond to
+    # the regression it existed to catch. Reported rather than fatal: a release
+    # sweep measures old binaries that legitimately predate a newer timer.
+    missing_timers = [t for t in spec.primary_timers
+                      if t != "compileInner" and t not in per_timer]
+
     got_timers = bool(per_timer)
     # A run that produced no timers and no recognizable diagnostic would report
     # a bare "no timers" with the actual output lost — surface the first output
@@ -654,7 +693,8 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
     # debuggable from results.json alone.
     if err is None and not got_timers:
         err = next((ln.strip()[:200] for ln in last_text.splitlines() if ln.strip()), None)
-    ok = setup_ok and got_timers and all(sample_ok) and not crash_codes
+    ok = (setup_ok and got_timers and all(sample_ok) and not crash_codes
+          and not missing_diags)
 
     return {
         "workload": spec.name,
@@ -664,6 +704,7 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         "ok": ok,
         "setup_ok": setup_ok,
         "got_timers": got_timers,
+        "missing_primary_timers": missing_timers,
         "samples": samples,
         "warmup": warmup,
         "wall_ms": stats(walls),
@@ -676,6 +717,55 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         "error": err,
         "crash_codes": crash_codes or None,
     }
+
+
+# A workload's own cost has to clear the per-compile floor by enough that a
+# single perturbed sample cannot carry its median past the trend gate. The
+# suite's one false alarm in 73 nights (diagnostics_clean, 2026-09-10) was
+# exactly this: 23 ms total with ~9 ms of floor underneath it, so an absolute
+# excursion that is invisible on a 300 ms workload was 23% there. Reported
+# rather than fatal — the floor is machine-dependent, and a contributor
+# spot-checking one workload should not be failed for it.
+SIGNAL_FLOOR_RATIO = 3.0
+
+
+def report_suite_health(runs):
+    """Print the two checks that would have caught the SUITE-AUDIT.md findings
+    when the workloads were added, rather than months later."""
+    notes = []
+
+    for r in runs:
+        if r.get("missing_primary_timers"):
+            notes.append(
+                f"  {r['workload']}: declares primary timer(s) the compiler did not "
+                f"emit: {', '.join(r['missing_primary_timers'])}")
+
+    # Signal-vs-floor, which needs `minimal` measured in the same run.
+    floor = next((r["timers"]["compileInner"]["median"] for r in runs
+                  if r["workload"] == "minimal" and r["ok"]
+                  and r["timers"].get("compileInner")), None)
+    if floor:
+        for r in runs:
+            spec = manifest.BY_NAME.get(r["workload"])
+            if not r["ok"] or not spec or spec.mode == "api":
+                continue
+            if r["workload"] == "minimal":
+                continue  # minimal IS the floor; it cannot clear a multiple of itself
+            if r["size"] != spec.default_size:
+                continue  # only the tracked point has to clear the bar
+            st = r["timers"].get("compileInner")
+            if not st:
+                continue
+            if st["median"] < floor * SIGNAL_FLOOR_RATIO:
+                notes.append(
+                    f"  {r['workload']}: {st['median']:.1f} ms is under "
+                    f"{SIGNAL_FLOOR_RATIO:g}x the {floor:.1f} ms per-compile floor — "
+                    f"too little signal to survive the trend gate; raise default_size")
+
+    if notes:
+        print("\n[suite health] issues that make a workload unable to do its job:")
+        for n in notes:
+            print(n)
 
 
 def main():
@@ -911,6 +1001,8 @@ def main():
     # tree was passed in precisely so its contents survive for inspection.
     for d in scratch_roots:
         shutil.rmtree(d, ignore_errors=True)
+
+    report_suite_health(this_run)
 
     n_ok = sum(1 for r in this_run if r["ok"])
     print(f"\n{n_ok}/{len(this_run)} runs ok")
