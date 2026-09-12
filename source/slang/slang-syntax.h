@@ -420,11 +420,13 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
 ///
 /// The actual mode to use takes into account both the explicit
 /// modifiers on the declaration, as well as the declared type
-/// of the parameter. In cases where the parameter's type
-/// is not copyable, the mode implied by its declaration may be
-/// adjusted to something else.
+/// of the parameter. In cases where the parameter's type is not
+/// copyable, or transitively contains a non-copyable field, the
+/// mode implied by its declaration may be adjusted to something else.
+/// `astBuilder` is used to apply generic substitutions when inspecting
+/// field types.
 ///
-ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
+ParamPassingMode getParamPassingMode(DeclRef<ParamDecl> paramDeclRef, ASTBuilder* astBuilder);
 
 /// Returns true if `type` or one of its modified-type bases carries `no_diff`.
 bool doesTypeHaveNoDiffModifier(Type* type);
