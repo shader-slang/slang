@@ -732,6 +732,8 @@ void writeSerializedModuleIR(
     IRModule* irModule,
     SerialSourceLocWriter* sourceLocWriter)
 {
+    SLANG_PROFILE;
+
     // The flow here is very similar to writeSerializedModuleAST which is very
     // well documented.
 
