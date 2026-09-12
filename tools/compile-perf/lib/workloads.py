@@ -706,12 +706,94 @@ def gen_codegen(n):
     s.append('[shader("compute")]\n[numthreads(64,1,1)]\n')
     s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
     s.append("    float x = outBuf[tid.x];\n    float acc = x;\n")
+    # Transcendental-free by design. `sin`/`cos` are a single builtin op on the
+    # GPU-language targets, but on CUDA they lower to libdevice's software
+    # `::sinf`/`::cosf`, which expand to roughly 135 PTX instructions apiece --
+    # enough that the emitted PTX for `codegen_ptx` is prelude expansion rather
+    # than the shader this workload exists to scale (shader-slang/slang#12621).
+    # `fma` is one hardware instruction on CUDA and has a native arm on every
+    # target this generator feeds (`hlsl.meta.slang`, `T fma(T,T,T)`).
+    #
+    # Two properties of the original body are deliberately preserved. The
+    # retained `sqrt(abs(acc))` keeps the recurrence non-affine, so the O(n)
+    # chain cannot fold to a closed form; and the subtraction keeps the linear
+    # coefficient below 1 (1.0009 - 0.125), so `acc` stays polynomial in `i` as
+    # it was before rather than compounding geometrically.
     for i in range(n):
         s.append(
-            f"    acc = acc * 1.0009 + sin(acc + {i}.0) * 0.5 - cos(acc * 0.5) * 0.25 + sqrt(abs(acc) + {i + 1}.0);\n"
+            f"    acc = fma(acc, 1.0009, {i}.0) - fma(acc, 0.5, {i + 1}.0) * 0.25 + sqrt(abs(acc) + {i + 1}.0);\n"
         )
     s.append("    outBuf[tid.x] = acc;\n}\n")
     return {"codegen.slang": "".join(s)}
+
+
+# gen_codegen feeds eight nightly-only workload specs, so a re-introduced
+# transcendental would surface as a quietly mis-attributed data point rather than
+# a failure. Pin the property that matters -- no `sin`/`cos` in the emitted body --
+# and not the formula text, which must stay free to be retuned.
+_cg_src = gen_codegen(1)["codegen.slang"]
+assert "sin(" not in _cg_src and "cos(" not in _cg_src, \
+    "gen_codegen must stay transcendental-free: sin/cos expand to ~135 PTX " \
+    "instructions each on CUDA and swamp the emitted downstream output (#12621)"
+del _cg_src
+
+
+def gen_vector_ops(n):
+    """Dense fixed-width vector operator traffic, deliberately free of
+    transcendentals.
+
+    ``gen_codegen`` above is now transcendental-free too, which stops its
+    emitted PTX from being libdevice expansion (#12621). That makes its
+    downstream number attributable, but it does not make it a signal for the
+    prelude's operator definitions: its body is scalar `float` math, so almost
+    none of the fixed-width vector operator surface is instantiated by it.
+
+    This one uses only vector arithmetic, comparison and selection, so its
+    downstream cost *is* the prelude's fixed-width operator definitions and
+    their instantiations. That makes it a usable signal for changes to those
+    operators -- the case `gen_codegen` cannot cover no matter what filler it
+    uses.
+
+    The body cycles through six operator families, so that the workload stays a
+    signal for the whole surface rather than one corner of it. In `i % 6` order:
+    float4 arithmetic, float3 arithmetic with a divide, int4 bitwise and shift,
+    float4 comparison with `select`, float3 comparison with `select`, and int4
+    modulo. The prelude defines binary, comparison and unary operators
+    separately and per element type, so exercising only one family would leave
+    most of it unmeasured.
+
+    Scaling null: n scales operator instantiations and the emitted output is
+    O(n); ideal cost is O(n).
+    """
+    s = [_HEADER, _buf()]
+    s.append("StructuredBuffer<float4> inBuf;\n")
+    s.append('[shader("compute")]\n[numthreads(64,1,1)]\n')
+    s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
+    s.append("    float4 a = inBuf[tid.x];\n")
+    s.append("    float4 b = inBuf[tid.x + 1];\n")
+    s.append("    float3 c = a.xyz;\n    float3 d = b.xyz;\n")
+    s.append("    int4 ia = int4(a);\n    int4 ib = int4(b);\n")
+    s.append("    float4 acc = a;\n    int4 iacc = ia;\n")
+    for i in range(n):
+        k = i % 6
+        if k == 0:
+            s.append(f"    acc = (acc + b) * (a - b) + {float(i) + 1.0}f;\n")
+        elif k == 1:
+            s.append(f"    c = (c * d) - (d / (abs(c) + {float(i) + 1.0}f));\n")
+        elif k == 2:
+            s.append(f"    iacc = (iacc + ib) ^ (ia & ib) | (ib >> 1);\n")
+        elif k == 3:
+            s.append(f"    bool4 m{i} = acc < b;\n    acc = select(m{i}, acc, b);\n")
+        elif k == 4:
+            s.append(f"    bool3 n{i} = c >= d;\n    c = select(n{i}, c, d);\n")
+        else:
+            # The addend varies the divisor per iteration so the modulo is not a
+            # repeated identical expression. Nothing here is executed -- this is
+            # compile-only -- so it is not a divide-by-zero guard; it exists to
+            # keep each instantiation distinct rather than CSE-able.
+            s.append(f"    iacc = iacc % (ib + int4({i % 7 + 1}));\n")
+    s.append("    outBuf[tid.x] = acc.x + c.x + float(iacc.x);\n}\n")
+    return {"vector_ops.slang": "".join(s)}
 
 
 def gen_module_link(n):
