@@ -6865,6 +6865,45 @@ static bool peekTypeName(Parser* parser)
     return isTypeName(parser, name);
 }
 
+// Checks that the statement type is valid for a substatement of another
+// statement (except block statement). If the statement is not allowed, an error
+// is diagnosed.
+//
+// Substatement examples:
+//
+// - if (cond) substmt else substmt
+// - while (cond) substmt
+// - do substmt while (cond);
+// - defer substmt
+//
+// Currently, in Slang 202c and previous, the only statement type that is not
+// allowed as a substatement is the declaration statement. However, this may
+// change in a future Slang version. (See GitHub issue #12296)
+static void checkForValidSubstatementType(Parser* parser, Stmt* substmt)
+{
+    // We're actually interested in the nested statement, not the label
+    // statement per se.
+    while (auto labelStmt = as<LabelStmt>(substmt))
+        substmt = labelStmt->innerStmt;
+
+    // Declaration statements are never allowed as substatements
+    if (auto declStmt = as<DeclStmt>(substmt))
+    {
+        StringBuilder sb;
+        DeclBase* decl = declStmt->decl;
+
+        // If this is a group declaration (e.g., "uint a, b, c;"), diagnose the
+        // first member declaration for better clarity
+        if (auto declGroup = as<DeclGroup>(decl))
+            if (declGroup->decls.getCount() > 0)
+                decl = declGroup->decls.getFirst();
+
+        printDiagnosticArg(sb, decl->astNodeType);
+        parser->sink->diagnose(
+            Diagnostics::DeclNotAllowed{.declType = sb.produceString(), .location = decl->loc});
+    }
+}
+
 Stmt* parseCompileTimeForStmt(Parser* parser)
 {
     ScopeDecl* scopeDecl = parser->astBuilder->create<ScopeDecl>();
@@ -6905,6 +6944,7 @@ Stmt* parseCompileTimeForStmt(Parser* parser)
     AddMember(parser->currentScope, varDecl);
 
     stmt->body = parser->ParseStatement();
+    checkForValidSubstatementType(parser, stmt->body);
 
     parser->PopScope();
 
@@ -7364,12 +7404,14 @@ Stmt* Parser::parseIfLetStatement()
 
     // Now parse the body with the variable in scope
     ifStatement->positiveStatement = ParseStatement(ifStatement);
+    checkForValidSubstatementType(this, ifStatement->positiveStatement);
     PopScope();
 
     if (LookAheadToken("else"))
     {
         ReadToken("else");
         ifStatement->negativeStatement = ParseStatement(ifStatement);
+        checkForValidSubstatementType(this, ifStatement->negativeStatement);
     }
 
     if (ifStatement->positiveStatement)
@@ -7403,10 +7445,12 @@ IfStmt* Parser::parseIfStatement()
     ifStatement->predicate = ParseExpression();
     ReadToken(TokenType::RParent);
     ifStatement->positiveStatement = ParseStatement(ifStatement);
+    checkForValidSubstatementType(this, ifStatement->positiveStatement);
     if (LookAheadToken("else"))
     {
         ReadToken("else");
         ifStatement->negativeStatement = ParseStatement(ifStatement);
+        checkForValidSubstatementType(this, ifStatement->negativeStatement);
     }
     ifStatement->afterLoc = tokenReader.peekLoc();
 
@@ -7471,6 +7515,7 @@ ForStmt* Parser::ParseForStatement()
         stmt->sideEffectExpression = ParseExpression();
     ReadToken(TokenType::RParent);
     stmt->statement = ParseStatement();
+    checkForValidSubstatementType(this, stmt->statement);
 
     if (!brokenScoping)
         PopScope();
@@ -7487,6 +7532,7 @@ WhileStmt* Parser::ParseWhileStatement()
     whileStatement->predicate = ParseExpression();
     ReadToken(TokenType::RParent);
     whileStatement->statement = ParseStatement();
+    checkForValidSubstatementType(this, whileStatement->statement);
     return whileStatement;
 }
 
@@ -7526,6 +7572,7 @@ CatchStmt* Parser::ParseDoCatchStatement(Stmt* body)
 
         catchStatement->tryBody = body;
         catchStatement->handleBody = ParseStatement();
+        checkForValidSubstatementType(this, catchStatement->handleBody);
 
         PopScope();
 
@@ -7542,6 +7589,7 @@ Stmt* Parser::ParseDoStatement()
     SourceLoc position = tokenReader.peekLoc();
     ReadToken("do");
     Stmt* statement = ParseStatement();
+    checkForValidSubstatementType(this, statement);
     if (LookAheadToken("while"))
     {
         Stmt* whileStatement = ParseDoWhileStatement(statement);
@@ -7598,6 +7646,7 @@ DeferStmt* Parser::ParseDeferStatement()
     FillPosition(deferStatement);
     ReadToken("defer");
     deferStatement->statement = ParseStatement();
+    checkForValidSubstatementType(this, deferStatement->statement);
     return deferStatement;
 }
 
