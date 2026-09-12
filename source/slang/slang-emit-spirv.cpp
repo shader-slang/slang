@@ -11379,8 +11379,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         SpvInst* last = nullptr;
 
-        // This keeps track of the named IDs used in the asm block
-        Dictionary<UnownedStringSlice, SpvWord> idMap;
+        // This keeps track of the named IDs used in the asm block.
+        //
+        // It is an `OrderedDictionary` because we walk it at the end of this function to emit an
+        // `OpName` for each named ID, and so its iteration order is the order those names appear
+        // in the debug-names section of the SPIR-V we produce. Iterating a plain `Dictionary`
+        // would make that order a function of where the names happened to land in the hash
+        // table; keeping insertion order means the names come out in the order they are written
+        // in the `spirv_asm` block.
+        OrderedDictionary<UnownedStringSlice, SpvWord> idMap;
 
         for (const auto spvInst : inst->getInsts())
         {
@@ -11494,7 +11501,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         if (!idMap.tryGetValue(idName, id))
                         {
                             id = freshID();
-                            idMap.set(idName, id);
+                            idMap[idName] = id;
                         }
                         emitOperand(id);
                         break;
