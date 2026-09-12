@@ -83,4 +83,12 @@ bool identifyStructuralRayTracingStageInterfaces(
     const StructuralRayTracingDeclRegistry& registry,
     StructuralRayTracingStageKind* outMissingStage = nullptr);
 
+/// Completes every reachable open schema operation from retained linked conformance tables.
+///
+/// The linker calls this after ordinary IR specialization and before payload-location assignment
+/// or target synthesis. Listed metadata remains in source order; matching linked entries are
+/// deduplicated by their canonical semantic type identity, sorted by qualified source name, and
+/// appended with dense indices. Returns false after emitting any invalid-tag diagnostic.
+bool completeOpenStructuralRayTracingSchemas(IRModule* module, DiagnosticSink* sink);
+
 } // namespace Slang

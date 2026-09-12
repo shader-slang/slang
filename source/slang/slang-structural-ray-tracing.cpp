@@ -398,6 +398,54 @@ static const char* _getMetadataInterfaceName(StructuralRayTracingMetadataKind ki
     }
 }
 
+static const char* _getOpenSectionTypeName(StructuralRayTracingSectionKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingSectionKind::HitGroups:
+        return "OpenHitGroups";
+    case StructuralRayTracingSectionKind::MissShaders:
+        return "OpenMissShaders";
+    case StructuralRayTracingSectionKind::CallableShaders:
+        return "OpenCallableShaders";
+    default:
+        return nullptr;
+    }
+}
+
+/// Finds the ordinary type parameter that supplies an open section's tag.
+///
+/// Consider `OpenHitGroups<Tag, each Group>`. The checked generic declaration also contains the
+/// pack's conformance constraint and compiler-generated pack-count constraints. The tag role is
+/// the unique non-pack type parameter, not whichever serialized argument happens to come first.
+static GenericTypeParamDecl* _findOpenSectionTagParameter(AggTypeDecl* sectionType)
+{
+    auto genericDecl = as<GenericDecl>(sectionType ? sectionType->parentDecl : nullptr);
+    if (!genericDecl || genericDecl->inner != sectionType)
+        return nullptr;
+
+    GenericTypeParamDecl* tagParameter = nullptr;
+    Index packParameterCount = 0;
+    for (auto member : genericDecl->getDirectMemberDecls())
+    {
+        if (auto parameter = as<GenericTypeParamDecl>(member))
+        {
+            if (tagParameter)
+                return nullptr;
+            tagParameter = parameter;
+        }
+        else if (as<GenericTypePackParamDecl>(member))
+        {
+            ++packParameterCount;
+        }
+        else if (isGenericParam(member) && !isGenericConstraintParameterDecl(member))
+        {
+            return nullptr;
+        }
+    }
+    return tagParameter && packParameterCount == 1 ? tagParameter : nullptr;
+}
+
 static Decl* _findNamedDeclInContainer(
     ContainerDecl* container,
     Name* rtName,
@@ -1783,6 +1831,18 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
         m_metadataInterfaces[i] =
             as<InterfaceDecl>(_findNamedDecl(module, _getMetadataInterfaceName(kind)));
     }
+    for (int i = 0; i < int(StructuralRayTracingSectionKind::Count); ++i)
+    {
+        auto kind = StructuralRayTracingSectionKind(i);
+        auto sectionType = as<AggTypeDecl>(_findNamedDecl(module, _getOpenSectionTypeName(kind)));
+        auto tagParameter = _findOpenSectionTagParameter(sectionType);
+        // The open-list declarations are part of the same trusted contract as the trace overloads.
+        // A compiler/module mismatch is not recoverable user input, so reject it at the one
+        // registration boundary instead of making every lowering consumer guess at the shape.
+        SLANG_RELEASE_ASSERT(sectionType && tagParameter);
+        m_openSectionTypes[i] = sectionType;
+        m_openSectionTagParameters[i] = tagParameter;
+    }
     return true;
 }
 
@@ -2041,6 +2101,145 @@ InterfaceDecl* StructuralRayTracingDeclRegistry::getMetadataInterface(
     if (index < 0 || index >= int(StructuralRayTracingMetadataKind::Count))
         return nullptr;
     return m_metadataInterfaces[index];
+}
+
+AggTypeDecl* StructuralRayTracingDeclRegistry::getOpenSectionType(
+    StructuralRayTracingSectionKind kind) const
+{
+    auto index = int(kind);
+    if (index < 0 || index >= int(StructuralRayTracingSectionKind::Count))
+        return nullptr;
+    return m_openSectionTypes[index];
+}
+
+InterfaceDecl* StructuralRayTracingDeclRegistry::getSectionEntryInterface(
+    StructuralRayTracingSectionKind kind) const
+{
+    switch (kind)
+    {
+    case StructuralRayTracingSectionKind::HitGroups:
+        return getMetadataInterface(StructuralRayTracingMetadataKind::HitGroup);
+    case StructuralRayTracingSectionKind::MissShaders:
+        return getStageInterface(StructuralRayTracingStageKind::Miss);
+    case StructuralRayTracingSectionKind::CallableShaders:
+        return getStageInterface(StructuralRayTracingStageKind::Callable);
+    default:
+        return nullptr;
+    }
+}
+
+bool StructuralRayTracingDeclRegistry::tryGetOpenSectionInfo(
+    ASTBuilder* astBuilder,
+    Type* sectionType,
+    StructuralRayTracingSectionKind expectedKind,
+    StructuralRayTracingOpenSectionInfo& outInfo) const
+{
+    outInfo = {};
+    auto index = int(expectedKind);
+    if (!astBuilder || index < 0 || index >= int(StructuralRayTracingSectionKind::Count))
+        return false;
+
+    sectionType = sectionType ? as<Type>(sectionType->resolve()) : nullptr;
+    auto sectionDeclRefType = as<DeclRefType>(sectionType);
+    auto sectionDeclRef = sectionDeclRefType ? sectionDeclRefType->getDeclRef() : DeclRef<Decl>();
+    if (!sectionDeclRef || sectionDeclRef.getDecl() != m_openSectionTypes[index])
+        return false;
+
+    auto sectionGeneric = as<GenericDecl>(m_openSectionTypes[index]->parentDecl);
+    auto application = SubstitutionSet(sectionDeclRef).findGenericAppDeclRef(sectionGeneric);
+    auto tagParameter = m_openSectionTagParameters[index];
+    auto tagArgumentIndex = getGenericArgumentIndex(sectionGeneric, tagParameter);
+    if (!application || tagArgumentIndex < 0 || tagArgumentIndex >= application->getArgCount())
+        return false;
+
+    // Read the tag through the declaration-derived generic role. The listed pack is decoded by
+    // semantic value kind, using the same checked representation consumed by closed lists.
+    outInfo.tagType = as<Type>(application->getArg(tagArgumentIndex)->resolve());
+    outInfo.listedEntries = getStructuralRayTracingEntryPack(astBuilder, sectionType);
+    SLANG_RELEASE_ASSERT(outInfo.tagType);
+    return true;
+}
+
+bool StructuralRayTracingDeclRegistry::isValidOpenSectionTag(
+    ASTBuilder* astBuilder,
+    Type* tagType,
+    StructuralRayTracingSectionKind kind) const
+{
+    auto tagDeclRefType = as<DeclRefType>(tagType ? tagType->resolve() : nullptr);
+    if (!astBuilder || !tagDeclRefType || !tagDeclRefType->getDeclRef().as<InterfaceDecl>())
+        return false;
+
+    auto entryInterface = getSectionEntryInterface(kind);
+    if (!entryInterface)
+        return false;
+    auto entryInterfaceType = DeclRefType::create(astBuilder, makeDeclRef(entryInterface));
+    auto trustedModule = m_trustedModuleDecl ? m_trustedModuleDecl->module : nullptr;
+    auto sharedSemantics =
+        trustedModule ? trustedModule->getLinkage()->getSemanticsForReflection() : nullptr;
+    if (!sharedSemantics)
+        return false;
+
+    SemanticsContext semanticsContext(sharedSemantics);
+    SemanticsVisitor visitor(semanticsContext);
+    return visitor.tryGetInterfaceConformanceWitness(tagType, entryInterfaceType) != nullptr;
+}
+
+void StructuralRayTracingDeclRegistry::collectOpenSectionTags(
+    ASTBuilder* astBuilder,
+    Type* declaredTagType,
+    StructuralRayTracingSectionKind kind,
+    List<Type*>& outTagTypes) const
+{
+    auto trustedModule = m_trustedModuleDecl ? m_trustedModuleDecl->module : nullptr;
+    auto sharedSemantics =
+        trustedModule ? trustedModule->getLinkage()->getSemanticsForReflection() : nullptr;
+    if (!astBuilder || !sharedSemantics || !declaredTagType)
+        return;
+
+    HashSet<Type*> seenTags;
+    auto addTag = [&](Type* tagType)
+    {
+        tagType = tagType ? tagType->getCanonicalType() : nullptr;
+        auto tagDeclRefType = as<DeclRefType>(tagType);
+        if (!tagDeclRefType || !tagDeclRefType->getDeclRef().as<InterfaceDecl>() ||
+            !isValidOpenSectionTag(astBuilder, tagType, kind) || !seenTags.add(tagType))
+        {
+            return;
+        }
+        outTagTypes.add(tagType);
+    };
+
+    // Consider this checked hierarchy:
+    //
+    //     interface IBaseHit : rt::IHitGroup {}
+    //     interface IDerivedHit : IBaseHit {}
+    //     struct Glass : IDerivedHit { ... }
+    //
+    // Normal conformance semantics make `Glass` a member of `OpenHitGroups<IBaseHit>`. The
+    // flattened inheritance facets are the semantic source of truth for every specialized
+    // ancestor interface of `IDerivedHit`; catalog those exact types on Glass's canonical witness
+    // table now. Linked completion can then compare opaque IR type identities directly, without
+    // reconstructing or walking an interface hierarchy after AST information is gone.
+    declaredTagType = declaredTagType->getCanonicalType();
+    addTag(declaredTagType);
+    for (auto facet : sharedSemantics->getInheritanceInfo(declaredTagType).facets)
+        addTag(facet->getType());
+}
+
+SubtypeWitness* StructuralRayTracingDeclRegistry::projectOpenSectionEntryWitness(
+    ASTBuilder* astBuilder,
+    SubtypeWitness* tagWitness,
+    StructuralRayTracingSectionKind kind) const
+{
+    auto entryInterface = getSectionEntryInterface(kind);
+    auto trustedModule = m_trustedModuleDecl ? m_trustedModuleDecl->module : nullptr;
+    auto sharedSemantics =
+        trustedModule ? trustedModule->getLinkage()->getSemanticsForReflection() : nullptr;
+    return _projectStructuralRayTracingWitnessToInterface(
+        astBuilder,
+        sharedSemantics,
+        tagWitness,
+        entryInterface);
 }
 
 StructuralRayTracingStageInputOperationKind StructuralRayTracingDeclRegistry::

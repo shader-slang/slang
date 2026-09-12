@@ -2330,11 +2330,31 @@ local insts = {
 				},
 			},
 			{
+				structuralRayTracingOpenSection = {
+					struct_name = "StructuralRayTracingOpenSectionDecoration",
+					operands = {
+						{ "sectionKind", "IRIntLit" },
+						{ "tagType", "IRType" },
+						{ "isValidTag", "IRBoolLit" },
+					},
+				},
+			},
+			{
+				structuralRayTracingTaggedConformance = {
+					struct_name = "StructuralRayTracingTaggedConformanceDecoration",
+					operands = {
+						{ "sectionKind", "IRIntLit" },
+						{ "tagType", "IRType" },
+					},
+				},
+			},
+			{
 				structuralRayTracingHitGroupInfo = {
 					struct_name = "StructuralRayTracingHitGroupInfoDecoration",
 					operands = {
 						{ "groupType", "IRType" },
 						{ "groupSourceTypeName", "IRStringLit" },
+						{ "groupTypeIdentity", "IRStringLit" },
 						{ "functionIndex", "IRIntLit" },
 						{ "contextType", "IRType" },
 						{ "traceContextType", "IRType" },
@@ -2359,6 +2379,7 @@ local insts = {
 						{ "intersectionTypeIdentity", "IRStringLit" },
 						{ "hasIntersection", "IRBoolLit" },
 						{ "intersection" },
+						{ "isLinked", "IRBoolLit" },
 						{ "payloadLocation", "IRIntLit" },
 					},
 				},
@@ -2377,6 +2398,7 @@ local insts = {
 						{ "missSourceTypeName", "IRStringLit" },
 						{ "missTypeIdentity", "IRStringLit" },
 						{ "miss" },
+						{ "isLinked", "IRBoolLit" },
 						{ "payloadLocation", "IRIntLit" },
 					},
 				},
@@ -2394,6 +2416,7 @@ local insts = {
 						{ "callableSourceTypeName", "IRStringLit" },
 						{ "callableTypeIdentity", "IRStringLit" },
 						{ "callable" },
+						{ "isLinked", "IRBoolLit" },
 					},
 				},
 			},

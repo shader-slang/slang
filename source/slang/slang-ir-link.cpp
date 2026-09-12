@@ -116,6 +116,7 @@ struct IRSpecContextBase
     HashSet<UnownedStringSlice> deferredWitnessTableEntryKeys;
     HashSet<IRInst*> globalsWithClonedAnnotations;
     List<RefPtr<WitnessTableCloneInfo>> witnessTables;
+    List<IRStructuralRayTracingOpenSectionDecoration*> structuralRayTracingOpenSections;
 
     IRSpecSymbol* findSymbols(UnownedStringSlice mangledName)
     {
@@ -171,6 +172,10 @@ void registerClonedValue(IRSpecContextBase* context, IRInst* clonedValue, IRInst
 
     switch (clonedValue->getOp())
     {
+    case kIROp_StructuralRayTracingOpenSectionDecoration:
+        context->structuralRayTracingOpenSections.add(
+            cast<IRStructuralRayTracingOpenSectionDecoration>(clonedValue));
+        break;
     case kIROp_LookupWitnessMethod:
         {
             // If `originalVal` represents a witness table entry key, add the key
@@ -1263,6 +1268,12 @@ static void _stampStructuralRayTracingPayloadLocations(
 
 static bool _containsStructuralRayTracingPayloadMetadata(IRInst* root)
 {
+    // Open callable-only schemas have no Vulkan payload metadata, but they still require the
+    // whole-component manifest so the linker can select tagged conformances before ordinary DCE.
+    // The request marker is emitted only for an exact compiler-owned open-list declaration.
+    if (as<IRStructuralRayTracingOpenSectionDecoration>(root))
+        return true;
+
     IRType* payloadType = nullptr;
     IRType* payloadSemanticType = nullptr;
     if (_tryGetStructuralRayTracingPayloadTypes(root, payloadType, payloadSemanticType))
@@ -2601,6 +2612,33 @@ static LinkedIR _linkIR(
         }
     };
 
+    auto isRequestedStructuralRayTracingConformance = [&](IRInst* conformanceOwner)
+    {
+        for (auto decoration : conformanceOwner->getDecorations())
+        {
+            auto tagged = as<IRStructuralRayTracingTaggedConformanceDecoration>(decoration);
+            if (!tagged)
+                continue;
+
+            auto candidateKind = tagged->getSectionKind()->getValue();
+            // Clone only the tag's canonical type value. Imported and defining occurrences then
+            // resolve through the ordinary linker symbol table to the same output instruction;
+            // no source spelling is inspected or parsed.
+            auto candidateTag = cloneType(context, tagged->getTagType());
+            for (auto request : context->structuralRayTracingOpenSections)
+            {
+                if (!request->getIsValidTag()->getValue() ||
+                    request->getSectionKind()->getValue() != candidateKind)
+                {
+                    continue;
+                }
+                if (request->getTagType() == candidateTag)
+                    return true;
+            }
+        }
+        return false;
+    };
+
     for (IRModule* irModule : irModules)
     {
         auto linkingInfo = irModule->_getOrCreateLinkingInfo();
@@ -2610,6 +2648,24 @@ static LinkedIR _linkIR(
         // the entry-point clone graph.
         for (auto inst : linkingInfo->getHLSLExports())
             cloneAndKeepAlive(inst);
+
+        if (context->structuralRayTracingOpenSections.getCount() != 0)
+        {
+            for (auto conformanceOwner : linkingInfo->getStructuralRayTracingTaggedConformances())
+            {
+                if (isRequestedStructuralRayTracingConformance(conformanceOwner))
+                {
+                    // The front-end decoration on this canonical conformance value already
+                    // contains the projected entry metadata, including every invoke function.
+                    // Ordinary witness-entry deferral may therefore remain intact: link-time
+                    // completion consumes the producer record, not an inherited-witness operand
+                    // walk. Keep only the selected owner alive until specialization has
+                    // materialized any explicit conformance component and completion has copied
+                    // its record to the structural operation.
+                    cloneAndKeepAlive(conformanceOwner);
+                }
+            }
+        }
 
         if (shouldCopyGlobalParams)
         {
@@ -2743,6 +2799,7 @@ static RefPtr<IRModule> _getOrCreateStructuralRayTracingProgramManifest(
         codeGenContext->getSink(),
         specializationOptions);
 
+    completeOpenStructuralRayTracingSchemas(linked.module, codeGenContext->getSink());
     _assignStructuralRayTracingProgramPayloadLocations(linked.module);
 
     // The front-end normally builds the mangled-name map after it finishes constructing a module.

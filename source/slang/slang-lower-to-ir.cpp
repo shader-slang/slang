@@ -1205,6 +1205,81 @@ struct StructuralRayTracingFunctionIndexAllocator
     Index allocateCallableIndex() { return nextCallableIndex++; }
 };
 
+static void _addStructuralRayTracingHitGroupEntryInfo(
+    IRGenContext* context,
+    IRInst* owner,
+    Type* groupType,
+    SubtypeWitness* groupWitness,
+    Index functionIndex,
+    bool isLinked)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto contextType = registry.resolveAssociatedType(
+        context->astBuilder,
+        groupWitness,
+        StructuralRayTracingAssociatedTypeKind::HitGroupContext);
+    SLANG_ASSERT(groupType && groupWitness && contextType);
+    auto contextInfo = _getStructuralRayTracingHitContextInfo(context, groupWitness);
+
+    auto closestHit = _lowerStructuralRayTracingAssociatedStageReference(
+        context,
+        groupWitness,
+        StructuralRayTracingAssociatedTypeKind::HitGroupClosestHit,
+        StructuralRayTracingStageKind::ClosestHit);
+    auto anyHit = _lowerStructuralRayTracingAssociatedStageReference(
+        context,
+        groupWitness,
+        StructuralRayTracingAssociatedTypeKind::HitGroupAnyHit,
+        StructuralRayTracingStageKind::AnyHit);
+    auto intersection = _lowerStructuralRayTracingAssociatedStageReference(
+        context,
+        groupWitness,
+        StructuralRayTracingAssociatedTypeKind::HitGroupIntersection,
+        StructuralRayTracingStageKind::Intersection);
+    auto irPayloadType = lowerType(context, contextInfo.payloadType);
+
+    IRInst* operands[] = {
+        lowerType(context, groupType),
+        _lowerStructuralRayTracingSourceTypeName(context, groupType),
+        _lowerStructuralRayTracingCanonicalTypeIdentity(context, groupType),
+        context->irBuilder->getIntValue(
+            context->irBuilder->getIntType(),
+            IRIntegerValue(functionIndex)),
+        lowerType(context, contextType),
+        lowerType(context, contextInfo.traceContextType),
+        lowerType(context, contextInfo.primitiveType),
+        irPayloadType,
+        irPayloadType,
+        lowerType(context, contextInfo.recordType),
+        lowerType(context, contextInfo.hitAttributesType),
+        context->irBuilder->getIntValue(
+            context->irBuilder->getIntType(),
+            IRIntegerValue(contextInfo.hitAttributesKind)),
+        closestHit.type,
+        closestHit.sourceTypeName,
+        closestHit.typeIdentity,
+        context->irBuilder->getBoolValue(closestHit.isPresent),
+        closestHit.invoke,
+        anyHit.type,
+        anyHit.sourceTypeName,
+        anyHit.typeIdentity,
+        context->irBuilder->getBoolValue(anyHit.isPresent),
+        anyHit.invoke,
+        intersection.type,
+        intersection.sourceTypeName,
+        intersection.typeIdentity,
+        context->irBuilder->getBoolValue(intersection.isPresent),
+        intersection.invoke,
+        context->irBuilder->getBoolValue(isLinked),
+        context->irBuilder->getIntValue(context->irBuilder->getIntType(), -1),
+    };
+    context->irBuilder->addDecoration(
+        owner,
+        kIROp_StructuralRayTracingHitGroupInfoDecoration,
+        operands,
+        SLANG_COUNT_OF(operands));
+}
+
 static void _addStructuralRayTracingHitGroupInfo(
     IRGenContext* context,
     IRInst* traceOperation,
@@ -1214,75 +1289,80 @@ static void _addStructuralRayTracingHitGroupInfo(
     if (!groups.witnesses)
         return;
 
-    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
     for (Index i = 0; i < groups.types->getTypeCount(); ++i)
     {
         auto groupType = groups.types->getElementType(i);
         auto groupWitness = groups.witnesses->getWitness(i);
-        auto contextType = registry.resolveAssociatedType(
-            context->astBuilder,
-            groupWitness,
-            StructuralRayTracingAssociatedTypeKind::HitGroupContext);
-        SLANG_ASSERT(contextType);
         auto contextInfo = _getStructuralRayTracingHitContextInfo(context, groupWitness);
-        auto functionIndex = functionIndices.allocateHitIndex(contextInfo.payloadType);
-
-        auto closestHit = _lowerStructuralRayTracingAssociatedStageReference(
+        _addStructuralRayTracingHitGroupEntryInfo(
             context,
-            groupWitness,
-            StructuralRayTracingAssociatedTypeKind::HitGroupClosestHit,
-            StructuralRayTracingStageKind::ClosestHit);
-        auto anyHit = _lowerStructuralRayTracingAssociatedStageReference(
-            context,
-            groupWitness,
-            StructuralRayTracingAssociatedTypeKind::HitGroupAnyHit,
-            StructuralRayTracingStageKind::AnyHit);
-        auto intersection = _lowerStructuralRayTracingAssociatedStageReference(
-            context,
-            groupWitness,
-            StructuralRayTracingAssociatedTypeKind::HitGroupIntersection,
-            StructuralRayTracingStageKind::Intersection);
-        auto irPayloadType = lowerType(context, contextInfo.payloadType);
-
-        IRInst* operands[] = {
-            lowerType(context, groupType),
-            _lowerStructuralRayTracingSourceTypeName(context, groupType),
-            context->irBuilder->getIntValue(
-                context->irBuilder->getIntType(),
-                IRIntegerValue(functionIndex)),
-            lowerType(context, contextType),
-            lowerType(context, contextInfo.traceContextType),
-            lowerType(context, contextInfo.primitiveType),
-            irPayloadType,
-            irPayloadType,
-            lowerType(context, contextInfo.recordType),
-            lowerType(context, contextInfo.hitAttributesType),
-            context->irBuilder->getIntValue(
-                context->irBuilder->getIntType(),
-                IRIntegerValue(contextInfo.hitAttributesKind)),
-            closestHit.type,
-            closestHit.sourceTypeName,
-            closestHit.typeIdentity,
-            context->irBuilder->getBoolValue(closestHit.isPresent),
-            closestHit.invoke,
-            anyHit.type,
-            anyHit.sourceTypeName,
-            anyHit.typeIdentity,
-            context->irBuilder->getBoolValue(anyHit.isPresent),
-            anyHit.invoke,
-            intersection.type,
-            intersection.sourceTypeName,
-            intersection.typeIdentity,
-            context->irBuilder->getBoolValue(intersection.isPresent),
-            intersection.invoke,
-            context->irBuilder->getIntValue(context->irBuilder->getIntType(), -1),
-        };
-        context->irBuilder->addDecoration(
             traceOperation,
-            kIROp_StructuralRayTracingHitGroupInfoDecoration,
-            operands,
-            SLANG_COUNT_OF(operands));
+            groupType,
+            groupWitness,
+            functionIndices.allocateHitIndex(contextInfo.payloadType),
+            false);
     }
+}
+
+static void _addStructuralRayTracingMissShaderEntryInfo(
+    IRGenContext* context,
+    IRInst* owner,
+    Type* shaderType,
+    SubtypeWitness* shaderWitness,
+    Index functionIndex,
+    bool isLinked)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto contextType = _getStructuralRayTracingStageContextType(
+        context,
+        shaderWitness,
+        StructuralRayTracingStageKind::Miss);
+    auto contextWitness = _getStructuralRayTracingStageContextWitness(
+        context,
+        shaderWitness,
+        StructuralRayTracingStageKind::Miss);
+    auto miss = _lowerStructuralRayTracingStageReference(
+        context,
+        shaderType,
+        shaderWitness,
+        StructuralRayTracingStageKind::Miss);
+    SLANG_ASSERT(shaderType && shaderWitness && contextType && contextWitness);
+    auto traceContextType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::StageTraceContext);
+    auto payloadType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::PayloadContextPayload);
+    auto recordType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::StageRecord);
+    SLANG_ASSERT(traceContextType && payloadType && recordType);
+    auto irPayloadType = lowerType(context, payloadType);
+
+    IRInst* operands[] = {
+        context->irBuilder->getIntValue(
+            context->irBuilder->getIntType(),
+            IRIntegerValue(functionIndex)),
+        lowerType(context, contextType),
+        lowerType(context, traceContextType),
+        irPayloadType,
+        irPayloadType,
+        lowerType(context, recordType),
+        miss.type,
+        miss.sourceTypeName,
+        miss.typeIdentity,
+        miss.invoke,
+        context->irBuilder->getBoolValue(isLinked),
+        context->irBuilder->getIntValue(context->irBuilder->getIntType(), -1),
+    };
+    context->irBuilder->addDecoration(
+        owner,
+        kIROp_StructuralRayTracingMissShaderInfoDecoration,
+        operands,
+        SLANG_COUNT_OF(operands));
 }
 
 static void _addStructuralRayTracingMissShaderInfo(
@@ -1299,57 +1379,81 @@ static void _addStructuralRayTracingMissShaderInfo(
     {
         auto shaderType = shaders.types->getElementType(i);
         auto shaderWitness = shaders.witnesses->getWitness(i);
-        auto contextType = _getStructuralRayTracingStageContextType(
-            context,
-            shaderWitness,
-            StructuralRayTracingStageKind::Miss);
         auto contextWitness = _getStructuralRayTracingStageContextWitness(
             context,
             shaderWitness,
             StructuralRayTracingStageKind::Miss);
-        auto miss = _lowerStructuralRayTracingStageReference(
-            context,
-            shaderType,
-            shaderWitness,
-            StructuralRayTracingStageKind::Miss);
-        SLANG_ASSERT(contextType && contextWitness);
-        auto traceContextType = registry.resolveAssociatedType(
-            context->astBuilder,
-            contextWitness,
-            StructuralRayTracingAssociatedTypeKind::StageTraceContext);
         auto payloadType = registry.resolveAssociatedType(
             context->astBuilder,
             contextWitness,
             StructuralRayTracingAssociatedTypeKind::PayloadContextPayload);
-        auto recordType = registry.resolveAssociatedType(
-            context->astBuilder,
-            contextWitness,
-            StructuralRayTracingAssociatedTypeKind::StageRecord);
-        SLANG_ASSERT(traceContextType && payloadType && recordType);
-        auto functionIndex = functionIndices.allocateMissIndex(payloadType);
-        auto irPayloadType = lowerType(context, payloadType);
-
-        IRInst* operands[] = {
-            context->irBuilder->getIntValue(
-                context->irBuilder->getIntType(),
-                IRIntegerValue(functionIndex)),
-            lowerType(context, contextType),
-            lowerType(context, traceContextType),
-            irPayloadType,
-            irPayloadType,
-            lowerType(context, recordType),
-            miss.type,
-            miss.sourceTypeName,
-            miss.typeIdentity,
-            miss.invoke,
-            context->irBuilder->getIntValue(context->irBuilder->getIntType(), -1),
-        };
-        context->irBuilder->addDecoration(
+        SLANG_ASSERT(payloadType);
+        _addStructuralRayTracingMissShaderEntryInfo(
+            context,
             traceOperation,
-            kIROp_StructuralRayTracingMissShaderInfoDecoration,
-            operands,
-            SLANG_COUNT_OF(operands));
+            shaderType,
+            shaderWitness,
+            functionIndices.allocateMissIndex(payloadType),
+            false);
     }
+}
+
+static void _addStructuralRayTracingCallableShaderEntryInfo(
+    IRGenContext* context,
+    IRInst* owner,
+    Type* shaderType,
+    SubtypeWitness* shaderWitness,
+    Index functionIndex,
+    bool isLinked)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto contextType = _getStructuralRayTracingStageContextType(
+        context,
+        shaderWitness,
+        StructuralRayTracingStageKind::Callable);
+    auto contextWitness = _getStructuralRayTracingStageContextWitness(
+        context,
+        shaderWitness,
+        StructuralRayTracingStageKind::Callable);
+    auto callable = _lowerStructuralRayTracingStageReference(
+        context,
+        shaderType,
+        shaderWitness,
+        StructuralRayTracingStageKind::Callable);
+    SLANG_ASSERT(shaderType && shaderWitness && contextType && contextWitness);
+    auto traceContextType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::StageTraceContext);
+    auto callableDataType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::CallableData);
+    auto recordType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::StageRecord);
+    SLANG_ASSERT(traceContextType && callableDataType && recordType);
+
+    IRInst* operands[] = {
+        context->irBuilder->getIntValue(
+            context->irBuilder->getIntType(),
+            IRIntegerValue(functionIndex)),
+        lowerType(context, contextType),
+        lowerType(context, traceContextType),
+        lowerType(context, callableDataType),
+        lowerType(context, recordType),
+        callable.type,
+        callable.sourceTypeName,
+        callable.typeIdentity,
+        callable.invoke,
+        context->irBuilder->getBoolValue(isLinked),
+    };
+    context->irBuilder->addDecoration(
+        owner,
+        kIROp_StructuralRayTracingCallableShaderInfoDecoration,
+        operands,
+        SLANG_COUNT_OF(operands));
 }
 
 static void _addStructuralRayTracingCallableShaderInfo(
@@ -1361,58 +1465,133 @@ static void _addStructuralRayTracingCallableShaderInfo(
     if (!shaders.witnesses)
         return;
 
-    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
     for (Index i = 0; i < shaders.types->getTypeCount(); ++i)
     {
-        auto shaderType = shaders.types->getElementType(i);
-        auto shaderWitness = shaders.witnesses->getWitness(i);
-        auto contextType = _getStructuralRayTracingStageContextType(
+        _addStructuralRayTracingCallableShaderEntryInfo(
             context,
-            shaderWitness,
-            StructuralRayTracingStageKind::Callable);
-        auto contextWitness = _getStructuralRayTracingStageContextWitness(
-            context,
-            shaderWitness,
-            StructuralRayTracingStageKind::Callable);
-        auto callable = _lowerStructuralRayTracingStageReference(
-            context,
-            shaderType,
-            shaderWitness,
-            StructuralRayTracingStageKind::Callable);
-        SLANG_ASSERT(contextType && contextWitness);
-        auto traceContextType = registry.resolveAssociatedType(
-            context->astBuilder,
-            contextWitness,
-            StructuralRayTracingAssociatedTypeKind::StageTraceContext);
-        auto callableDataType = registry.resolveAssociatedType(
-            context->astBuilder,
-            contextWitness,
-            StructuralRayTracingAssociatedTypeKind::CallableData);
-        auto recordType = registry.resolveAssociatedType(
-            context->astBuilder,
-            contextWitness,
-            StructuralRayTracingAssociatedTypeKind::StageRecord);
-        SLANG_ASSERT(traceContextType && callableDataType && recordType);
-        auto functionIndex = functionIndices.allocateCallableIndex();
-
-        IRInst* operands[] = {
-            context->irBuilder->getIntValue(
-                context->irBuilder->getIntType(),
-                IRIntegerValue(functionIndex)),
-            lowerType(context, contextType),
-            lowerType(context, traceContextType),
-            lowerType(context, callableDataType),
-            lowerType(context, recordType),
-            callable.type,
-            callable.sourceTypeName,
-            callable.typeIdentity,
-            callable.invoke,
-        };
-        context->irBuilder->addDecoration(
             traceOperation,
-            kIROp_StructuralRayTracingCallableShaderInfoDecoration,
-            operands,
-            SLANG_COUNT_OF(operands));
+            shaders.types->getElementType(i),
+            shaders.witnesses->getWitness(i),
+            functionIndices.allocateCallableIndex(),
+            false);
+    }
+}
+
+static void _addStructuralRayTracingOpenSectionInfo(
+    IRGenContext* context,
+    IRInst* operation,
+    const StructuralRayTracingOpenSectionInfo& info,
+    StructuralRayTracingSectionKind sectionKind)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+
+    // This marker is the complete request consumed by the demand-driven linker. The public open
+    // aggregate was recognized by its trusted declaration identity when layout was decoded. Its
+    // ordinary generic constraint proves conformance to the entry contract; the extra check here
+    // proves that the tag itself is an interface while its checked semantic type is still
+    // available. Linked IR never guesses either role from a source spelling.
+    IRInst* operands[] = {
+        context->irBuilder->getIntValue(
+            context->irBuilder->getIntType(),
+            IRIntegerValue(sectionKind)),
+        lowerType(context, info.tagType),
+        context->irBuilder->getBoolValue(
+            registry.isValidOpenSectionTag(context->astBuilder, info.tagType, sectionKind)),
+    };
+    context->irBuilder->addDecoration(
+        operation,
+        kIROp_StructuralRayTracingOpenSectionDecoration,
+        operands,
+        SLANG_COUNT_OF(operands));
+}
+
+static void _addStructuralRayTracingTaggedConformanceInfo(
+    IRGenContext* context,
+    IRInst* conformanceOwner,
+    Type* concreteType,
+    Type* tagType,
+    SubtypeWitness* tagWitness)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    if (!registry.isInitialized() || !conformanceOwner || !concreteType || !tagType || !tagWitness)
+        return;
+    // A tag interface describes the open family; it is not itself an entry and its associated
+    // requirements need not be concrete. Only a concrete conformer can provide stage metadata.
+    if (isDeclRefTypeOf<InterfaceDecl>(concreteType))
+        return;
+
+    for (int i = 0; i < int(StructuralRayTracingSectionKind::Count); ++i)
+    {
+        auto sectionKind = StructuralRayTracingSectionKind(i);
+        List<Type*> matchingTagTypes;
+        registry
+            .collectOpenSectionTags(context->astBuilder, tagType, sectionKind, matchingTagTypes);
+        if (matchingTagTypes.getCount() == 0)
+            continue;
+
+        // Consider this separately compiled declaration:
+        //
+        //     interface IMaterialHit : rt::IHitGroup {}
+        //     struct Glass : IMaterialHit { ... }
+        //
+        // `Glass : IMaterialHit` is the conformance an open schema selects. Project that exact
+        // checked witness to `IHitGroup` now, while the front end still owns requirement identity,
+        // and serialize the complete entry metadata on the same canonical conformance value. That
+        // value is normally the witness table and is the exact `IRSpecialize` owned by an explicit
+        // concrete conformance component. Link-time completion can then read one producer-owned
+        // record; it never walks inherited witness operands or rediscovers associated requirements
+        // by name or position.
+        auto entryWitness =
+            registry.projectOpenSectionEntryWitness(context->astBuilder, tagWitness, sectionKind);
+        SLANG_RELEASE_ASSERT(entryWitness);
+
+        for (auto matchingTagType : matchingTagTypes)
+        {
+            IRInst* tagOperands[] = {
+                context->irBuilder->getIntValue(
+                    context->irBuilder->getIntType(),
+                    IRIntegerValue(sectionKind)),
+                lowerType(context, matchingTagType),
+            };
+            context->irBuilder->addDecoration(
+                conformanceOwner,
+                kIROp_StructuralRayTracingTaggedConformanceDecoration,
+                tagOperands,
+                SLANG_COUNT_OF(tagOperands));
+        }
+
+        switch (sectionKind)
+        {
+        case StructuralRayTracingSectionKind::HitGroups:
+            _addStructuralRayTracingHitGroupEntryInfo(
+                context,
+                conformanceOwner,
+                concreteType,
+                entryWitness,
+                -1,
+                true);
+            break;
+        case StructuralRayTracingSectionKind::MissShaders:
+            _addStructuralRayTracingMissShaderEntryInfo(
+                context,
+                conformanceOwner,
+                concreteType,
+                entryWitness,
+                -1,
+                true);
+            break;
+        case StructuralRayTracingSectionKind::CallableShaders:
+            _addStructuralRayTracingCallableShaderEntryInfo(
+                context,
+                conformanceOwner,
+                concreteType,
+                entryWitness,
+                -1,
+                true);
+            break;
+        default:
+            SLANG_UNEXPECTED("invalid structural ray-tracing open section kind");
+        }
     }
 }
 
@@ -1430,6 +1609,12 @@ struct StructuralRayTracingProgramLayoutInfo
     StructuralRayTracingEntryPack hitGroupEntries;
     StructuralRayTracingEntryPack missShaderEntries;
     StructuralRayTracingEntryPack callableShaderEntries;
+    StructuralRayTracingOpenSectionInfo openHitGroups;
+    StructuralRayTracingOpenSectionInfo openMissShaders;
+    StructuralRayTracingOpenSectionInfo openCallableShaders;
+    bool hasOpenHitGroups = false;
+    bool hasOpenMissShaders = false;
+    bool hasOpenCallableShaders = false;
 
     bool isComplete() const
     {
@@ -1507,18 +1692,39 @@ static StructuralRayTracingProgramLayoutInfo _getStructuralRayTracingProgramLayo
 
     if (result.hitGroupsType)
     {
+        result.hasOpenHitGroups = registry.tryGetOpenSectionInfo(
+            context->astBuilder,
+            result.hitGroupsType,
+            StructuralRayTracingSectionKind::HitGroups,
+            result.openHitGroups);
         result.hitGroupEntries =
-            getStructuralRayTracingEntryPack(context->astBuilder, result.hitGroupsType);
+            result.hasOpenHitGroups
+                ? result.openHitGroups.listedEntries
+                : getStructuralRayTracingEntryPack(context->astBuilder, result.hitGroupsType);
     }
     if (result.missShadersType)
     {
+        result.hasOpenMissShaders = registry.tryGetOpenSectionInfo(
+            context->astBuilder,
+            result.missShadersType,
+            StructuralRayTracingSectionKind::MissShaders,
+            result.openMissShaders);
         result.missShaderEntries =
-            getStructuralRayTracingEntryPack(context->astBuilder, result.missShadersType);
+            result.hasOpenMissShaders
+                ? result.openMissShaders.listedEntries
+                : getStructuralRayTracingEntryPack(context->astBuilder, result.missShadersType);
     }
     if (result.callableShadersType)
     {
+        result.hasOpenCallableShaders = registry.tryGetOpenSectionInfo(
+            context->astBuilder,
+            result.callableShadersType,
+            StructuralRayTracingSectionKind::CallableShaders,
+            result.openCallableShaders);
         result.callableShaderEntries =
-            getStructuralRayTracingEntryPack(context->astBuilder, result.callableShadersType);
+            result.hasOpenCallableShaders
+                ? result.openCallableShaders.listedEntries
+                : getStructuralRayTracingEntryPack(context->astBuilder, result.callableShadersType);
     }
     return result;
 }
@@ -2017,6 +2223,30 @@ LoweredValInfo emitCallToDeclRef(
                     traceOperation,
                     layout.callableShaderEntries,
                     functionIndices);
+                if (layout.hasOpenHitGroups)
+                {
+                    _addStructuralRayTracingOpenSectionInfo(
+                        context,
+                        traceOperation,
+                        layout.openHitGroups,
+                        StructuralRayTracingSectionKind::HitGroups);
+                }
+                if (layout.hasOpenMissShaders)
+                {
+                    _addStructuralRayTracingOpenSectionInfo(
+                        context,
+                        traceOperation,
+                        layout.openMissShaders,
+                        StructuralRayTracingSectionKind::MissShaders);
+                }
+                if (layout.hasOpenCallableShaders)
+                {
+                    _addStructuralRayTracingOpenSectionInfo(
+                        context,
+                        traceOperation,
+                        layout.openCallableShaders,
+                        StructuralRayTracingSectionKind::CallableShaders);
+                }
                 return LoweredValInfo::simple(traceOperation);
             }
             if (structuralRayTracingRegistry.isCallShaderMethod(functionDecl))
@@ -2087,6 +2317,30 @@ LoweredValInfo emitCallToDeclRef(
                     callOperation,
                     layout.callableShaderEntries,
                     functionIndices);
+                if (layout.hasOpenHitGroups)
+                {
+                    _addStructuralRayTracingOpenSectionInfo(
+                        context,
+                        callOperation,
+                        layout.openHitGroups,
+                        StructuralRayTracingSectionKind::HitGroups);
+                }
+                if (layout.hasOpenMissShaders)
+                {
+                    _addStructuralRayTracingOpenSectionInfo(
+                        context,
+                        callOperation,
+                        layout.openMissShaders,
+                        StructuralRayTracingSectionKind::MissShaders);
+                }
+                if (layout.hasOpenCallableShaders)
+                {
+                    _addStructuralRayTracingOpenSectionInfo(
+                        context,
+                        callOperation,
+                        layout.openCallableShaders,
+                        StructuralRayTracingSectionKind::CallableShaders);
+                }
                 return LoweredValInfo::simple(callOperation);
             }
             auto operationKind =
@@ -12692,6 +12946,27 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     cast<IRWitnessTable>(irWitnessTable),
                     getWitnessTableBaseDeclRef(subContext, inheritanceDeclRef));
                 subContext->mapASTWitnessTableToIRWitnessTable = oldWitnessTableMap;
+
+                if (_isConcreteStructuralRayTracingNominalType(subContext, subType))
+                {
+                    // Build open-section metadata at the concrete conformance construction
+                    // boundary. The declared witness is the same checked proof used to populate
+                    // this table; using it here preserves interface projection without rebuilding
+                    // anything from the lowered operand graph. A generic declaration's symbolic
+                    // `Entry<T>` table is deliberately excluded: it denotes an unbounded family,
+                    // and an explicitly composed TypeConformance component catalogs each finite
+                    // `Entry<int>` specialization instead.
+                    auto tagWitness = context->astBuilder->getDeclaredSubtypeWitness(
+                        subType,
+                        superType,
+                        inheritanceDeclRef);
+                    _addStructuralRayTracingTaggedConformanceInfo(
+                        subContext,
+                        cast<IRWitnessTable>(irWitnessTable),
+                        subType,
+                        superType,
+                        tagWitness);
+                }
             }
 
             irWitnessTable->moveToEnd();
@@ -17528,7 +17803,23 @@ struct TypeConformanceIRGenContext
 
         context->irBuilder = builder;
 
-        auto witness = lowerSimpleVal(context, typeConformance->getSubtypeWitness());
+        auto subtypeWitness = typeConformance->getSubtypeWitness();
+        auto witness = lowerSimpleVal(context, subtypeWitness);
+
+        // Consider an explicitly composed conformance component for
+        // `GenericHitGroup<uint> : IMaterialHit`. Its exact lowered witness is an
+        // `IRSpecialize`, not a direct `IRWitnessTable`, so the declaration-module producer cannot
+        // catalog this finite specialization. Attach the same semantic metadata to the component's
+        // canonical witness value while its exact AST `SubtypeWitness` still owns both types.
+        // `specializeModule` copies decorations from the `IRSpecialize` to the resulting witness
+        // table, giving linked completion the same final representation as a nongeneric
+        // declaration without inspecting specialization operands.
+        _addStructuralRayTracingTaggedConformanceInfo(
+            context,
+            witness,
+            subtypeWitness->getSub(),
+            subtypeWitness->getSup(),
+            subtypeWitness);
         builder->addKeepAliveDecoration(witness);
         builder->addHLSLExportDecoration(witness);
         builder->addDynamicDispatchWitnessDecoration(witness);
