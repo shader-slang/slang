@@ -4,7 +4,7 @@ import slang.raytracing;
 
 struct PayloadA {}
 struct PayloadB {}
-struct Record {}
+struct MaterialRecord {}
 
 struct TraceContextA : rt::ITraceContext
 {
@@ -23,7 +23,7 @@ struct HitContextA : rt::IHitContext
     typealias TraceContext = TraceContextA;
     typealias Payload = PayloadA;
     typealias Primitive = rt::TrianglePrimitive;
-    typealias Record = Record;
+    typealias Record = MaterialRecord;
 }
 
 struct HitContextB : rt::IHitContext
@@ -31,7 +31,7 @@ struct HitContextB : rt::IHitContext
     typealias TraceContext = TraceContextB;
     typealias Payload = PayloadB;
     typealias Primitive = rt::TrianglePrimitive;
-    typealias Record = Record;
+    typealias Record = MaterialRecord;
 }
 
 struct ClosestHitB : rt::IClosestHitShader
