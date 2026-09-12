@@ -297,35 +297,55 @@ struct SpecializationContext
     //
     // `workListSet` tracks which insts are *currently queued*, and the popped inst is removed from
     // it in the drain loop, so it dedups the drain queue but does not record that an inst's use
-    // closure was already walked. `expanded` is that separate memo: an inst is added the first time
-    // its forward use closure is walked, and (unlike `workListSet`) is not removed on pop, so
-    // re-reaching an inst does not re-walk its closure. It is reset per drain in
-    // `processSpecializationWorkListFromRoot`, which is what lets an on-demand subtree seed still
-    // get a full first walk of its closure.
+    // closure was already walked. `expanded` is that separate memo, used *only* by the ordinary
+    // seeding walk (`forceSeed == false`): an inst is added the first time its forward use closure
+    // is walked and, unlike `workListSet`, is not removed on pop, so re-reaching an already-walked
+    // inst while nothing has changed does not redundantly re-walk its closure — the redundant
+    // re-walk that issue #12604 is about. It is reset per drain in
+    // `processSpecializationWorkListFromRoot`. The mutation walk (`forceSeed == true`) deliberately
+    // does *not* consult `expanded`; see `expandUseClosure`.
     HashSet<IRInst*>& expanded;
     // Scratch stack for the iterative closure walk in `expandUseClosure` (transient per call).
     List<IRInst*>& workListStack;
 
-    // Schedule `inst` on the drain queue if it is not already queued. Does not walk its use closure
-    // (that is `expandUseClosure`'s job); the two are kept separate so the queue-dedup memo
-    // (`workListSet`) and the closure-walk memo (`expanded`) can have independent lifetimes.
-    void enqueue(IRInst* inst)
+    // Schedule `inst` on the drain queue if it is not already queued, and report whether this call
+    // was the one that queued it. Does not walk its use closure (that is `expandUseClosure`'s job);
+    // the two are kept separate so the queue-dedup memo (`workListSet`) and the seeding-walk memo
+    // (`expanded`) can have independent lifetimes. The "newly queued" result is what the mutation
+    // walk uses to decide how far to descend (see `expandUseClosure`).
+    bool enqueue(IRInst* inst)
     {
         if (workListSet.add(inst))
+        {
             workList.add(inst);
+            return true;
+        }
+        return false;
     }
 
     // Enqueue every instruction reachable by following use edges forward from `seed` (its users,
     // their users, and so on) — because specializing an inst may unblock specialization of the
-    // things that use it. `seed` itself is never enqueued here. Except for a force-seeded `seed`
-    // (below), each inst's user list is enumerated at most once per drain, deduped by `expanded`.
-    // The walk uses an explicit stack so its depth is independent of the use-chain length; a long
-    // use chain must not overflow the call stack.
+    // things that use it. `seed` itself is never enqueued here. The walk uses an explicit stack so
+    // its depth is independent of the use-chain length; a long use chain must not overflow the call
+    // stack (the reason this replaced the former mutual recursion between `addToWorkList` and
+    // `addUsersToWorkList`).
     //
-    // `forceSeed` re-enumerates `seed`'s direct users even if `seed` is already in `expanded`,
-    // which the mutation call sites require (see `addUsersToWorkList`). This is why the "at most
-    // once per drain" bound has that one exception: a force-seeded seed's user list is walked on
-    // every such call.
+    // The descent condition depends on `forceSeed`, and the two modes are intentionally different:
+    //
+    //  - Seeding walk (`forceSeed == false`, from `addToWorkList`): descend into a user the first
+    //    time it is seen this drain, deduped by `expanded`. Nothing has changed since an earlier
+    //    walk of that user this drain, so re-walking it would only re-discover the same users; the
+    //    memo skips that redundant work.
+    //
+    //  - Mutation walk (`forceSeed == true`, from `addUsersToWorkList`): descend into every user
+    //    that was not already queued, exactly as the former mutual recursion did (it recursed into
+    //    a user iff `workListSet.add(user)` succeeded). This re-walks the changed inst's
+    //    *transitive* forward closure, so a downstream `specialize` reached only through a no-op
+    //    wrapper intermediate — e.g. `%A = specialize(H, …)`, `%arg = PtrType(%A)`, `%C =
+    //    specialize(G, %arg)`, where reprocessing the `PtrType` is not itself a change and so never
+    //    re-seeds `%C` — is still re-reached in the same drain once `%A` concretizes. The mutation
+    //    walk does not consult `expanded`: a mutation is precisely the event after which an
+    //    already-walked closure must be reconsidered.
     //
     // Not re-entrant: nothing it does (enqueue, set/list operations, walking uses) calls back into
     // the work-list helpers, so the single shared `workListStack` is safe to reuse.
@@ -349,9 +369,22 @@ struct SpecializationContext
             for (auto use = inst->firstUse; use; use = use->nextUse)
             {
                 auto user = use->getUser();
-                enqueue(user);
-                if (expanded.add(user))
+                bool newlyQueued = enqueue(user);
+                if (forceSeed)
+                {
+                    // Transitive re-walk bounded by the queue: descend into a user only if this
+                    // call queued it, which also terminates the walk on use cycles (a second visit
+                    // finds it already queued). This mirrors the old mutual recursion exactly.
+                    if (newlyQueued)
+                    {
+                        expanded.add(user);
+                        workListStack.add(user);
+                    }
+                }
+                else if (expanded.add(user))
+                {
                     workListStack.add(user);
+                }
             }
         }
     }
@@ -443,25 +476,13 @@ struct SpecializationContext
 
     // When a transformation makes a change to an instruction, we may need to re-consider
     // transformations for instructions that use its value. Callers invoke this at the point of
-    // mutation on the instruction being modified or replaced, so `inst`'s direct users are
-    // re-enqueued (force-seeded) even if `inst`'s use closure was already walked earlier this
-    // drain.
-    //
-    // Load-bearing invariant (this is what makes the `expanded` memo safe): "a changed
-    // instruction's users get reconsidered." A force-seed re-enqueues `inst`'s DIRECT users, but if
-    // a direct user is already in `expanded` its transitive descendants are NOT re-enqueued by this
-    // call. That is still complete *by induction within a fixpoint*: a descendant `%D` is
-    // reconsidered when the user `%U` between it and `inst` itself changes and force-seeds its own
-    // users. The base case is that a user only becomes ready to specialize once the change reaches
-    // it, at which point specializing it is itself a mutation that force-seeds `%D`.
-    //
-    // The one shape where a single drain does not close this induction is a NO-OP intermediate: a
-    // wrapper type (`PtrType`/`ArrayType`/... ) has no case in `maybeSpecializeInst`, so
-    // reprocessing it never counts as a change and never force-seeds its users — yet
-    // `isInstFullySpecialized` recurses THROUGH the wrapper into its operands, so a wrapped
-    // `specialize` user's readiness can flip when a grand-operand concretizes without the wrapper
-    // "changing." The fixpoint loops (`processModule`'s inner `for(;;)`, and the matching loop in
-    // `specializeChildInsts`) close that gap by re-draining with a fresh `expanded`.
+    // mutation on the instruction being modified or replaced. It re-walks `inst`'s *transitive*
+    // forward use closure (a force-seeded `expandUseClosure`), so that a change reaches not only
+    // `inst`'s direct users but any downstream user reachable through no-op wrapper intermediates
+    // (e.g. a `PtrType`/`ArrayType` around a now-concrete type). This is the same reconsideration
+    // the former mutual recursion performed; only its call-stack depth changed (see
+    // `expandUseClosure`). It is deliberately *not* gated by the `expanded` seeding memo — a
+    // mutation is exactly the event after which an already-walked closure must be revisited.
     void addUsersToWorkList(IRInst* inst) { expandUseClosure(inst, /*forceSeed*/ true); }
 
     // Of course, somewhere along the way we expect
@@ -1079,7 +1100,13 @@ struct SpecializationContext
                                                                        : packBranch->getOperand(2);
         packBranch->replaceUsesWith(replacement);
         packBranch->removeAndDeallocate();
-        addToWorkList(replacement);
+        // Resolving the pack branch is a mutation, so reconsider `replacement` and its users with
+        // the same transitive re-walk any mutation site gives. Use `enqueue` (not `addToWorkList`)
+        // before `addUsersToWorkList`: `addToWorkList` would run the seeding walk first, queuing
+        // `replacement`'s users into `workListSet`; the forced walk only descends into users that
+        // are newly queued, so it would find them already queued and stop -- missing a `specialize`
+        // reachable only through a no-op wrapper past a user.
+        enqueue(replacement);
         addUsersToWorkList(replacement);
         return true;
     }
@@ -1336,10 +1363,20 @@ struct SpecializationContext
         auto firstUse = inst->firstUse;
         bool instChanged = peepholeOptimizeInst(targetProgram, module, inst);
 
-        for (auto use = firstUse; use; use = use->nextUse)
+        // Only a fold that rewrote `inst` needs to re-notify its users. Reconsider the users
+        // captured before the fold (the rewrite may have emptied `inst`'s use list). The
+        // `enqueue` + `addUsersToWorkList` pairing is deliberate: a plain `addToWorkList` would run
+        // the seeding walk first, queuing the user's own users into `workListSet`; the forced walk
+        // only descends into newly-queued users, so it would find them already queued and stop --
+        // missing a `specialize` reachable only through a no-op wrapper past a user.
+        if (instChanged)
         {
-            auto user = use->getUser();
-            addToWorkList(user);
+            for (auto use = firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                enqueue(user);
+                addUsersToWorkList(user);
+            }
         }
         return instChanged;
     }
@@ -1917,7 +1954,7 @@ struct SpecializationContext
         if (!rootInst)
             return false;
 
-        // Reset the closure-walk memo for each drain. On-demand callers (`specializeChildInsts`)
+        // Reset the seeding-walk memo for each drain. On-demand callers (`specializeChildInsts`)
         // seed only a subtree root, which may be an instruction whose closure was already walked
         // in an earlier drain; its forward use closure is the only way to reach users outside the
         // subtree, so it must be walked afresh here rather than suppressed by a stale entry.
@@ -1929,15 +1966,13 @@ struct SpecializationContext
 
     bool specializeChildInsts(IRInst* rootInst)
     {
-        // Drive the subtree to a fixpoint, matching the inner `for(;;)` loop the module pass uses
-        // (`processModule`). A single drain is not sufficient on its own: `expanded` dedups the
-        // forward-use-closure walk per drain, and reprocessing a wrapper-type intermediate
-        // (`PtrType`/`ArrayType`/... — no case in `maybeSpecializeInst`, so a no-op) does not
-        // re-seed its users. So when a *grand-operand* concretizes after its wrapped `specialize`
-        // user was already popped, the user is not re-reached within the same drain. The module
-        // pass recovers via its outer re-drain; on-demand callers must do the same here, and since
-        // `expanded` is cleared per drain (see `processSpecializationWorkListFromRoot`) each
-        // re-drain gets a fresh full first walk.
+        // Drive the subtree to a fixpoint. A single drain is not order-complete: the iterative
+        // `expandUseClosure` enqueues the forward-use closure in a different order than the former
+        // recursion, and the forced walk descends only into a not-yet-queued user, so a no-op
+        // wrapper still queued when its grand-operand specializes can shadow an already-popped
+        // `specialize` user. Re-draining with a fresh `expanded` (cleared per drain in
+        // `processSpecializationWorkListFromRoot`) recovers such a user independent of enqueue
+        // order. Terminates once a drain reports no change.
         bool anyChange = false;
         while (processSpecializationWorkListFromRoot(rootInst))
             anyChange = true;

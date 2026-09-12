@@ -1,16 +1,9 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 
-// Regression guard for shader-slang/slang#12604 (on-demand single-drain completeness). The fix
-// memoizes the specialization work-list's forward-use-closure walk per drain; a no-op wrapper-type
-// intermediate (e.g. a `Ptr`/array/vector wrapping a nested `specialize`) can otherwise block
-// re-propagation of a grand-operand's specialization to its wrapped `specialize` user within a
-// single drain. `specializeChildInsts` (the on-demand path used by the autodiff/translate flow)
-// runs such a drain, so this test drives a nested generic-in-generic shape through `__fwd_diff` to
-// exercise that path and confirm it still fully specializes (correct output).
-//
-// Note on discriminating power: this PR is output-neutral by design, so this test guards that the
-// on-demand path produces correct output; it is coverage of the changed path, not a value that
-// differs between master and the fix.
+// Regression guard for shader-slang/slang#12604 (on-demand specialization path). Drives a nested
+// generic-in-generic shape (`scaledSquare<Wrap<Doubler>>`) through `__fwd_diff`, which specializes
+// via `specializeChildInsts` (the on-demand path used by the autodiff/translate flow), and checks
+// it fully specializes to the correct numeric result. Output-neutral coverage of that path.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
