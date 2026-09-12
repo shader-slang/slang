@@ -963,6 +963,7 @@ void outputExceptionDiagnostic(
     DiagnosticSink& sink,
     slang::IBlob** outDiagnostics)
 {
+#if SLANG_HAS_EXCEPTIONS
     try
     {
         sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
@@ -972,11 +973,17 @@ void outputExceptionDiagnostic(
         // Catch and ignore the AbortCompilationException that diagnoseRaw throws
         // for Internal severity to prevent exception leak from loadModule
     }
+#else
+    // With exceptions disabled diagnoseRaw cannot throw: for Internal severity it
+    // routes through the signal path (SLANG_ABORT_COMPILATION), so there is nothing to catch.
+    sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
+#endif
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
 void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics)
 {
+#if SLANG_HAS_EXCEPTIONS
     try
     {
         sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
@@ -986,6 +993,11 @@ void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnosti
         // Catch and ignore the AbortCompilationException that diagnoseRaw throws
         // for Fatal severity to prevent exception leak from loadModule
     }
+#else
+    // With exceptions disabled diagnoseRaw cannot throw: for Fatal severity it
+    // routes through the signal path (SLANG_ABORT_COMPILATION), so there is nothing to catch.
+    sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
+#endif
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
