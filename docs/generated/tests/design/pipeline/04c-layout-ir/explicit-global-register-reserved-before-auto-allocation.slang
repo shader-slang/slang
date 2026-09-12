@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#parameter-binding-producing-the-programlayout
-//META: doc_section_digest=348d5eaac4aa640cf158cb5593bb78caaddc2578aca135953a4794838df0cba1
+//META: doc_section_digest=1cf458647e364667b9c7dbe354a14c1c9442e2ba186e31802c3b86dd3cf2a00b
 //META: purpose=An explicit HLSL register annotation on a global parameter is likewise reserved before automatic allocation of the remaining globals.
 //META: intent=functional
 //META: pipeline_stage=layout

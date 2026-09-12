@@ -97,10 +97,10 @@
       "watched_paths_digest": "6b62ab489b8588366ff25a322f007d3bcd3d102617b9da98cfe118c89e50a57e"
     },
     "glossary.md": {
-      "generated_at": "2026-09-11T12:57:14+00:00",
+      "generated_at": "2026-09-12T07:07:50+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "bae895251b3106e15916b42965c0c503d5cfbfd673f03819aa78209b6ce07073"
+      "source_commit": "2094af503348384f42f81337791d59c3b5e5b6ee",
+      "watched_paths_digest": "61ffea6c38472e843c19fc2b6ed36a41ba779ffce9c70eb8e09f62e30ba50562"
     },
     "ir-reference/control-flow.md": {
       "generated_at": "2026-09-11T12:29:27+00:00",
@@ -229,9 +229,9 @@
       "watched_paths_digest": "bacba2986b0463d7f151bb550e996caeb1476af530ba42c256881fbc105a4c5d"
     },
     "pipeline/04c-layout-ir.md": {
-      "generated_at": "2026-09-11T12:47:36+00:00",
+      "generated_at": "2026-09-12T07:07:23+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
+      "source_commit": "2094af503348384f42f81337791d59c3b5e5b6ee",
       "watched_paths_digest": "644cdf1c439a7cef9f26cfee202fa4cf0a250918079a2cdb1f7124bcea8090f8"
     },
     "pipeline/05-ir-passes.md": {

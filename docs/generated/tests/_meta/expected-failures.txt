@@ -178,18 +178,6 @@ docs/generated/tests/design/ast-reference/declarations/classdecl-reference-type.
 
 # Surfaced on nightly run 34310111817:
 # https://github.com/shader-slang/slang/actions/runs/34310111817
-# Obsolete test. https://github.com/shader-slang/slang/pull/12182 added
-# CUDA/OptiX callable support, so
-# `CUDALayoutRulesFamilyImpl::getCallablePayloadParameterRules()` returns
-# real rules and the `E39032` rejection this test asserts no longer happens;
-# the entry point now emits as `__direct_callable__main_0`. The doc the test
-# is anchored to went stale the same way — docs/generated/design/pipeline/
-# 04c-layout-ir.md still lists CUDA as returning `nullptr` from that
-# accessor. Remove once that doc and this bundle are regenerated.
-docs/generated/tests/design/pipeline/04c-layout-ir/raytracing-callable-payload-rejected-on-cuda.slang
-
-# Surfaced on nightly run 34310111817:
-# https://github.com/shader-slang/slang/actions/runs/34310111817
 # Diagnostic text drift rather than a compiler bug.
 # https://github.com/shader-slang/slang/pull/12616 merges type-flow sets
 # directly instead of through an intermediate hash set, so `E50102` now

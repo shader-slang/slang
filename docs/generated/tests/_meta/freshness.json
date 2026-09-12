@@ -298,10 +298,10 @@
       "watched_paths_digest": "9435dca8b5ef4a18864c8e899ca75d0ad07a5a9723bdc0513c8ec876cd8b24dd"
     },
     "design/pipeline/04c-layout-ir": {
-      "generated_at": "2026-09-11T14:31:19+00:00",
+      "generated_at": "2026-09-12T07:07:23+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
-      "source_doc_digest": "3b675acb364ed98850021a68a9589fd779e8c5e76f4bfec28447e3a6fe21d161",
+      "source_commit": "2094af503348384f42f81337791d59c3b5e5b6ee",
+      "source_doc_digest": "4f0de1ca84e30c5ff41ef6a98ba7bf37e445560f3a0b234dfc979924968add0a",
       "watched_paths_digest": "87e9e0a0e1e824b00a4fade43a72d2b503c876dc891f0447067c52e5c0282cbb"
     },
     "design/pipeline/05-ir-passes": {
