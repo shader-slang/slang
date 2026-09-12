@@ -1393,7 +1393,18 @@ struct ForwardDiffTranslationContext
 
             auto [originalParamPassingMode, originalParamBaseType] =
                 splitParameterDirectionAndType(originalParamType);
-            if (diffTypeContext.isDifferentiableType(originalParamBaseType))
+            auto [diffParamPassingMode, diffParamBaseType] =
+                splitParameterDirectionAndType(diffCalleeType->getParamType(ii));
+            SLANG_RELEASE_ASSERT(diffParamPassingMode.kind == originalParamPassingMode.kind);
+
+            // An accessor reached through an opened existential can have a function-local `this`
+            // type that has not acquired its differentiability annotation yet. The resolved
+            // derivative signature is nevertheless explicit: its corresponding parameter is a
+            // DifferentialPair<OpenedType>. Treat that signature as the source of truth so calls
+            // such as `fwd_diff(valueHolder[index])` pass both the opened primal and differential,
+            // rather than passing only the primal to a pair-typed parameter.
+            auto expectedPairType = as<IRDifferentialPairTypeBase>(diffParamBaseType);
+            if (diffTypeContext.isDifferentiableType(originalParamBaseType) || expectedPairType)
             {
                 switch (originalParamPassingMode.kind)
                 {
@@ -1417,8 +1428,14 @@ struct ForwardDiffTranslationContext
                             //
                             if (!pairType)
                                 pairType =
-                                    diffTypeContext.tryGetDiffPairType(originalParamBaseType);
+                                    expectedPairType
+                                        ? (IRType*)expectedPairType
+                                        : diffTypeContext.tryGetDiffPairType(originalParamBaseType);
                         }
+
+                        if (!pairType)
+                            pairType = (IRType*)expectedPairType;
+                        SLANG_RELEASE_ASSERT(pairType);
 
                         auto diffPair = emitMakeDiffPair(&argBuilder, pairType, primalArg, diffArg);
 
@@ -1434,6 +1451,9 @@ struct ForwardDiffTranslationContext
                         SLANG_ASSERT(as<IRPtrTypeBase>(primalType));
                         auto primalValType = as<IRPtrTypeBase>(primalType)->getValueType();
                         auto basePairType = diffTypeContext.tryGetDiffPairType(primalValType);
+                        if (!basePairType)
+                            basePairType = (IRType*)expectedPairType;
+                        SLANG_RELEASE_ASSERT(basePairType);
 
                         auto srcVar = argBuilder.emitVar(basePairType);
                         diffTypeContext.markDiffPairTypeInst(
@@ -3100,6 +3120,20 @@ struct ForwardDiffTranslationContext
         auto primalType = lookupPrimalInst(builder, originalType, originalType);
         SLANG_RELEASE_ASSERT(primalType);
 
+        if (as<IRInterfaceType>(primalType))
+        {
+            // An existential pair does not use its nominal witness operand: type flow discovers
+            // the concrete primal and differential representations from the values that enter the
+            // pair. Rebuild the pair with the same module-scope poison witness used by front-end
+            // lowering. In particular, higher-order differentiation must not reuse a pair type
+            // annotation whose witness lookup belongs to the previously generated derivative
+            // function; doing so leaves the new MakeDiffPair with a cross-function (and eventually
+            // orphaned) type.
+            IRBuilder moduleBuilder(builder->getModule());
+            auto poisonWitness = getUnitPoisonVal(&moduleBuilder);
+            return builder->getDifferentialPairType((IRType*)primalType, poisonWitness);
+        }
+
         auto diffValuePairType = (IRType*)diffTypeContext.tryGetAssociationOfKind(
             primalType,
             AnnotationKind::DifferentialPairType);
@@ -3485,6 +3519,11 @@ struct ForwardDiffTranslationContext
     {
         if (isNoDiffType(origType))
             return nullptr;
+
+        // Differential type annotations can refer to function-local instructions, such as the
+        // type produced by opening an existential. Perform the lookup on the translated primal
+        // type so the resulting differential type belongs to the derivative function.
+        origType = (IRType*)findOrTranslatePrimalInst(builder, origType);
 
         if (auto origPtrType = asRelevantPtrType(origType))
         {
