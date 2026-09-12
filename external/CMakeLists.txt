@@ -80,6 +80,111 @@ if(NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     endif()
 endif()
 
+# Hash map and hash function backing Slang::Dictionary and Slang::Hash.
+#
+# Both are chosen at build time (SLANG_HASHMAP, SLANG_HASH) so that they can be
+# compared against each other on real compiler workloads, and they are
+# independent of each other, so any of the 8x4 combinations is valid. The
+# `slang-hashmap` interface target below is the single place that gathers
+# whatever the selected pair needs -- headers, link libraries and the two
+# preprocessor definitions that source/core/slang-hashmap-impl.h and
+# source/core/slang-hash-impl.h switch on -- and `core` links it publicly, so
+# that every translation unit sees the same Dictionary layout.
+add_library(slang-hashmap INTERFACE)
+
+# unordered_dense is a dependency of every configuration, not just
+# SLANG_HASHMAP=UNORDERED_DENSE: slang-hash-impl.h uses its `is_avalanching`
+# marker as the (implementation-independent) definition of which types get a
+# library-provided hash rather than a Slang-defined getHashCode().
+target_link_libraries(slang-hashmap INTERFACE unordered_dense::unordered_dense)
+
+if(SLANG_HASHMAP MATCHES "^BOOST_" OR SLANG_HASH STREQUAL "BOOST")
+    # Boost.Unordered and Boost.ContainerHash are header-only, so we add the
+    # modular boostorg repositories' include directories directly instead of
+    # using their CMakeLists, which are written to be driven by the Boost
+    # superproject and would pull in its whole build machinery.
+    add_library(slang-boost-headers INTERFACE)
+    foreach(
+        boost_module
+        IN
+        ITEMS
+            assert
+            config
+            container_hash
+            core
+            describe
+            mp11
+            predef
+            throw_exception
+            unordered
+    )
+        set(boost_module_include
+            "${CMAKE_CURRENT_LIST_DIR}/boost/${boost_module}/include"
+        )
+        if(NOT EXISTS "${boost_module_include}")
+            message(
+                FATAL_ERROR
+                "${boost_module_include} is missing. Run: git submodule update --init external/boost/${boost_module}"
+            )
+        endif()
+        target_include_directories(
+            slang-boost-headers
+            ${system}
+            INTERFACE "${boost_module_include}"
+        )
+    endforeach()
+    target_link_libraries(slang-hashmap INTERFACE slang-boost-headers)
+endif()
+
+if(SLANG_HASHMAP MATCHES "^ABSL_" OR SLANG_HASH STREQUAL "ABSL")
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/abseil-cpp/CMakeLists.txt")
+        message(
+            FATAL_ERROR
+            "external/abseil-cpp is missing. Run: git submodule update --init external/abseil-cpp"
+        )
+    endif()
+    set(ABSL_PROPAGATE_CXX_STD ON)
+    set(ABSL_ENABLE_INSTALL OFF)
+    set(ABSL_BUILD_TESTING OFF)
+    # `core` is a static library that ends up inside the shared slang-compiler
+    # library, so anything it links has to be position independent too.
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    add_subdirectory(abseil-cpp EXCLUDE_FROM_ALL ${system})
+endif()
+
+if(SLANG_HASHMAP STREQUAL "ABSL_FLAT")
+    target_link_libraries(slang-hashmap INTERFACE absl::flat_hash_map)
+elseif(SLANG_HASHMAP STREQUAL "ABSL_NODE")
+    target_link_libraries(slang-hashmap INTERFACE absl::node_hash_map)
+elseif(SLANG_HASHMAP STREQUAL "TSL_ROBIN")
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/robin-map/CMakeLists.txt")
+        message(
+            FATAL_ERROR
+            "external/robin-map is missing. Run: git submodule update --init external/robin-map"
+        )
+    endif()
+    add_subdirectory(robin-map EXCLUDE_FROM_ALL ${system})
+    target_link_libraries(slang-hashmap INTERFACE tsl::robin_map)
+endif()
+
+if(SLANG_HASH STREQUAL "ABSL")
+    target_link_libraries(slang-hashmap INTERFACE absl::hash)
+endif()
+
+# enum_option has already checked that these name one of the implementations
+# enumerated in slang-hashmap-impl.h / slang-hash-impl.h.
+target_compile_definitions(
+    slang-hashmap
+    INTERFACE
+        SLANG_HASHMAP_IMPL=SLANG_HASHMAP_${SLANG_HASHMAP}
+        SLANG_HASH_IMPL=SLANG_HASH_${SLANG_HASH}
+)
+
+message(
+    STATUS
+    "Slang::Dictionary will use SLANG_HASHMAP=${SLANG_HASHMAP} with SLANG_HASH=${SLANG_HASH}"
+)
+
 # Miniz
 if(NOT ${SLANG_USE_SYSTEM_MINIZ})
     if(NOT SLANG_OVERRIDE_MINIZ_PATH)

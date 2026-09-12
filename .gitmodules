@@ -80,3 +80,36 @@
 [submodule "external/replxx"]
 	path = external/replxx
 	url = https://github.com/AmokHuginnsson/replxx
+[submodule "external/boost/assert"]
+	path = external/boost/assert
+	url = https://github.com/boostorg/assert.git
+[submodule "external/boost/config"]
+	path = external/boost/config
+	url = https://github.com/boostorg/config.git
+[submodule "external/boost/container_hash"]
+	path = external/boost/container_hash
+	url = https://github.com/boostorg/container_hash.git
+[submodule "external/boost/core"]
+	path = external/boost/core
+	url = https://github.com/boostorg/core.git
+[submodule "external/boost/describe"]
+	path = external/boost/describe
+	url = https://github.com/boostorg/describe.git
+[submodule "external/boost/mp11"]
+	path = external/boost/mp11
+	url = https://github.com/boostorg/mp11.git
+[submodule "external/boost/predef"]
+	path = external/boost/predef
+	url = https://github.com/boostorg/predef.git
+[submodule "external/boost/throw_exception"]
+	path = external/boost/throw_exception
+	url = https://github.com/boostorg/throw_exception.git
+[submodule "external/boost/unordered"]
+	path = external/boost/unordered
+	url = https://github.com/boostorg/unordered.git
+[submodule "external/robin-map"]
+	path = external/robin-map
+	url = https://github.com/Tessil/robin-map.git
+[submodule "external/abseil-cpp"]
+	path = external/abseil-cpp
+	url = https://github.com/abseil/abseil-cpp.git

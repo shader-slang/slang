@@ -1,10 +1,10 @@
 #ifndef SLANG_CORE_HASH_H
 #define SLANG_CORE_HASH_H
 
+#include "slang-hash-impl.h"
 #include "slang-math.h"
 #include "slang.h"
 
-#include <ankerl/unordered_dense.h>
 #include <cstring>
 #include <type_traits>
 
@@ -37,12 +37,10 @@ constexpr static bool HasSlangHash<
         std::is_convertible_v<decltype((std::declval<const T&>()).getHashCode()), HashCode64>>> =
     true;
 
-// Does the hashmap implementation provide a uniform hash for this type.
-template<typename T, typename = void>
-constexpr static bool HasWyhash = false;
+// Does the selected hash implementation (see slang-hash-impl.h) provide a hash
+// for this type, so that we don't need a Slang-defined one.
 template<typename T>
-constexpr static bool HasWyhash<T, typename ankerl::unordered_dense::hash<T>::is_avalanching> =
-    true;
+constexpr static bool HasLibraryHash = HashImpl::isLibraryHashable<T>;
 
 // We want to have an associated type 'is_avalanching = void' iff we have a
 // hash with good uniformity, the two specializations here add that member
@@ -53,7 +51,9 @@ struct DetectAvalanchingHash
 {
 };
 template<typename T>
-struct DetectAvalanchingHash<T, std::enable_if_t<HasWyhash<T>>>
+struct DetectAvalanchingHash<
+    T,
+    std::enable_if_t<HasLibraryHash<T> && HashImpl::kIsAvalanching>>
 {
     using is_avalanching = void;
 };
@@ -97,10 +97,10 @@ struct Hash : DetectAvalanchingHash<T>
         // Our preference is for any hash we've defined ourselves
         if constexpr (HasSlangHash<T>)
             return t.getHashCode();
-        // Otherwise fall back to any good hash provided by the hashmap
+        // Otherwise fall back to the hash provided by the selected hash
         // library
-        else if constexpr (HasWyhash<T>)
-            return ankerl::unordered_dense::hash<T>{}(t);
+        else if constexpr (HasLibraryHash<T>)
+            return HashImpl::LibraryHash<T>{}(t);
         // Otherwise fail
         else
         {
@@ -135,7 +135,7 @@ auto getHashCode(const TKey& key)
 
 inline HashCode64 getHashCode(const char* buffer, std::size_t len)
 {
-    return ankerl::unordered_dense::detail::wyhash::hash(buffer, len);
+    return HashImpl::hashBytes(buffer, len);
 }
 
 template<typename T>
@@ -156,15 +156,27 @@ HashCode64 hashObjectBytes(const T& t)
         return ::Slang::hashObjectBytes(*this);   \
     }
 
-#define SLANG_COMPONENTWISE_HASHABLE_1 \
-    auto getHashCode() const           \
-    {                                  \
-        const auto& [m1] = *this;      \
-        return Slang::getHashCode(m1); \
+// These spell the return type out as HashCode64 rather than deducing it with
+// `auto`. A deduced return type is only known once the function body has been
+// parsed, and the body of a member function of a nested class is not parsed
+// until the *enclosing* class is complete. So with `auto`, HasSlangHash<T> is
+// false for any such nested type while the enclosing class is still being
+// defined, and Hash<T> silently falls through to "No hash implementation found
+// for this type". Nothing normally asks the question that early, but
+// std::unordered_map does: it instantiates __is_fast_hash<Hash> and
+// __is_nothrow_invocable<Hash> as part of instantiating the map class itself,
+// which happens at the point where the map is declared as a member. See for
+// example SPIRVCoreGrammarInfo, which declares Dictionary members keyed by its
+// own nested QualifiedEnumName.
+#define SLANG_COMPONENTWISE_HASHABLE_1        \
+    ::Slang::HashCode64 getHashCode() const   \
+    {                                         \
+        const auto& [m1] = *this;             \
+        return ::Slang::getHashCode(m1);      \
     }
 
 #define SLANG_COMPONENTWISE_HASHABLE_2                                          \
-    auto getHashCode() const                                                    \
+    ::Slang::HashCode64 getHashCode() const                                     \
     {                                                                           \
         const auto& [m1, m2] = *this;                                           \
         return combineHash(::Slang::getHashCode(m1), ::Slang::getHashCode(m2)); \

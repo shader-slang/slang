@@ -408,6 +408,73 @@ error if they can't be found.
 | `SLANG_EXCLUDE_TINT`                | `FALSE`                              | Exclude slang-tint from the build (only relevant on Windows x64)                                                            |
 | `SLANG_ENABLE_TIME_TRACE`           | `FALSE`                              | Enable Clang time trace profiling for build analysis (Clang only)                                                           |
 
+### Hash map and hash function selection
+
+`Slang::Dictionary` and `Slang::HashSet` are thin wrappers around a third-party
+hash map, and `Slang::Hash` falls back to a third-party hash function for types
+that don't define their own `getHashCode()`. Both choices are made at build time
+and are independent of each other, so any map can be paired with any hash. This
+exists so that the alternatives can be benchmarked against each other on real
+compiler workloads.
+
+| Option          | Default           | Description                                                          |
+| --------------- | ----------------- | -------------------------------------------------------------------- |
+| `SLANG_HASHMAP` | `UNORDERED_DENSE` | Which hash map backs `Slang::Dictionary` and `Slang::HashSet`         |
+| `SLANG_HASH`    | `WYHASH`          | Which hash function `Slang::Hash` uses when a type has no `getHashCode()` |
+
+`SLANG_HASHMAP` accepts:
+
+| Value             | Implementation                    |
+| ----------------- | --------------------------------- |
+| `UNORDERED_DENSE` | `ankerl::unordered_dense::map`    |
+| `BOOST_FLAT`      | `boost::unordered_flat_map`       |
+| `BOOST_NODE`      | `boost::unordered_node_map`       |
+| `BOOST_UNORDERED` | `boost::unordered_map`            |
+| `ABSL_FLAT`       | `absl::flat_hash_map`             |
+| `ABSL_NODE`       | `absl::node_hash_map`             |
+| `TSL_ROBIN`       | `tsl::robin_map`                  |
+| `STD`             | `std::unordered_map`              |
+
+`SLANG_HASH` accepts:
+
+| Value    | Implementation                                   |
+| -------- | ------------------------------------------------ |
+| `WYHASH` | `ankerl::unordered_dense::hash`, i.e. wyhash     |
+| `BOOST`  | `boost::hash`                                    |
+| `ABSL`   | `absl::Hash`                                     |
+| `STD`    | `std::hash`                                      |
+
+For example, to build with Abseil's flat map and Boost's hash:
+
+```bash
+cmake --preset default -DSLANG_HASHMAP=ABSL_FLAT -DSLANG_HASH=BOOST
+```
+
+To build several combinations at once, each into its own `build-<hash>-<map>`
+directory, use [extras/hashmap-matrix.sh](../extras/hashmap-matrix.sh).
+
+All of these libraries are vendored as submodules under
+[./external](./external), so `git submodule update --init --recursive` is enough
+to make every combination available. Boost is vendored as the handful of
+individual [modular boostorg
+repositories](https://github.com/boostorg/unordered) that `boost::unordered`
+needs, under `external/boost/`.
+
+Two caveats when changing these away from the defaults:
+
+- Iteration order over a `Dictionary` differs between implementations. Slang
+  should not depend on it, but a change here can surface a latent ordering
+  dependency as a changed diagnostic order or a changed generated-code layout.
+- `absl::Hash` is deliberately not stable across processes — it is seeded per
+  run. Any hash value that escapes the process (for example into a serialized
+  module) must not come from `SLANG_HASH=ABSL`.
+
+The selection is implemented in
+[source/core/slang-hashmap-impl.h](../source/core/slang-hashmap-impl.h) and
+[source/core/slang-hash-impl.h](../source/core/slang-hash-impl.h); the CMake side
+lives in the `slang-hashmap` interface target in
+[external/CMakeLists.txt](../external/CMakeLists.txt).
+
 ### LLVM Support
 
 There are several options for getting llvm-support:
