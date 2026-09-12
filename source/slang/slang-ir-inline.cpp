@@ -1189,7 +1189,7 @@ struct ForceInliningPass : InliningPassBase
                     if (!cur || !seen.add(cur))
                         continue;
                     if (auto call = as<IRCall>(cur))
-                        addFunc(as<IRFunc>(getResolvedInstForDecorations(call->getCallee())));
+                        addFunc(resolveCallee(call->getCallee()));
                     for (UInt i = 0; i < cur->getOperandCount(); i++)
                         stack.add(cur->getOperand(i));
                 }
@@ -1198,6 +1198,19 @@ struct ForceInliningPass : InliningPassBase
             {
                 if (func && reached.add(func))
                     workList.add(func);
+            }
+            // Resolve a call's callee to the concrete `IRFunc` it targets. Resolve a
+            // witness-method lookup first (mirroring the base inliner's `canInline`), then strip
+            // any `specialize`/generic wrapper, so a callee that is still an
+            // `IRLookupWitnessMethod` or `IRSpecialize` resolves rather than yielding null and
+            // slipping past the never-defer guard. `specializeModule` runs before
+            // `performForceInlining` (see `linkAndOptimizeIR`), so in practice a
+            // static_assert-condition callee is already concrete here — resolving explicitly does
+            // not rely on that ordering and keeps the guard correct if it ever changes.
+            static IRFunc* resolveCallee(IRInst* callee)
+            {
+                return as<IRFunc>(
+                    getResolvedInstForDecorations(InliningPassBase::resolveLookups(callee)));
             }
         } walker{workList, m_staticAssertReachableFuncs};
 
@@ -1230,7 +1243,7 @@ struct ForceInliningPass : InliningPassBase
                 auto inst = body.getLast();
                 body.removeLast();
                 if (auto call = as<IRCall>(inst))
-                    walker.addFunc(as<IRFunc>(getResolvedInstForDecorations(call->getCallee())));
+                    walker.addFunc(Walker::resolveCallee(call->getCallee()));
                 for (auto child : inst->getChildren())
                     body.add(child);
             }
