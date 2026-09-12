@@ -721,18 +721,10 @@ if(
     )
 endif()
 
-# The MIT/Apache-2.0 counterparts to the BSD-family notices above (issue
-# #13023, the follow-up to #13021). These vendored deps are likewise statically
-# linked into the shipped libraries -- miniz, unordered_dense, and mimalloc are
-# MIT; spirv-tools is Apache-2.0 -- so binary redistribution must reproduce
-# their copyright notices too. As above, each condition mirrors the source
-# selection in external/CMakeLists.txt so a notice ships only when the vendored
-# submodule (not a system copy or an override path) is the source we build
-# against, and a missing notice file then fails the install loudly rather than
-# silently shipping a non-compliant package. spirv-tools ships a LICENSE only
-# (no upstream NOTICE file exists), so there is no Apache-2.0 section 4(d)
-# NOTICE to carry: reproducing its LICENSE satisfies the attribution
-# requirement.
+# The MIT/Apache-2.0 statically-linked deps, given the same per-dep notice
+# treatment as the BSD-family deps above. spirv-tools ships a LICENSE only (no
+# upstream NOTICE file), so there is no Apache-2.0 section 4(d) NOTICE to carry:
+# its LICENSE is the notice.
 if(NOT SLANG_USE_SYSTEM_MINIZ AND NOT SLANG_OVERRIDE_MINIZ_PATH)
     install(
         FILES "${slang_SOURCE_DIR}/external/miniz/LICENSE"
