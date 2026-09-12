@@ -721,6 +721,76 @@ if(
     )
 endif()
 
+# The MIT/Apache-2.0 counterpart to the BSD-family notices above, for the four
+# confirmed statically-linked deps. unordered_dense is header-only but included
+# because its template instantiations still compile into the shipped libraries
+# (so "statically linked" here covers compiled-in templates, not just object
+# archives).
+if(NOT SLANG_USE_SYSTEM_MINIZ AND NOT SLANG_OVERRIDE_MINIZ_PATH)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/miniz/LICENSE"
+        DESTINATION third-party-notices
+        RENAME miniz-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+if(
+    NOT SLANG_USE_SYSTEM_UNORDERED_DENSE
+    AND NOT SLANG_OVERRIDE_UNORDERED_DENSE_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/unordered_dense/LICENSE"
+        DESTINATION third-party-notices
+        RENAME unordered_dense-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+# mimalloc is statically linked either into the Slang libraries
+# (SLANG_ENABLE_MIMALLOC) or into SPIRV-Tools and thus slang-glslang
+# (SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC, default on for Windows). This condition
+# mirrors SLANG_BUILD_MIMALLOC in external/CMakeLists.txt so the notice ships
+# whenever mimalloc's code lands in a shipped binary, including the
+# SPIRV-Tools-only case where SLANG_ENABLE_MIMALLOC is off. SLANG_BUILD_MIMALLOC
+# is set() there without PARENT_SCOPE, so it is not visible at this top-level
+# scope: this inline copy is deliberate -- do not collapse it to reference the
+# variable, which would be silently false and stop the notice shipping.
+if(
+    (
+        SLANG_ENABLE_MIMALLOC
+        OR (
+            SLANG_ENABLE_SLANG_GLSLANG
+            AND NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
+            AND SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
+        )
+    )
+    AND NOT SLANG_OVERRIDE_MIMALLOC_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/mimalloc/LICENSE"
+        DESTINATION third-party-notices
+        RENAME mimalloc-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+# spirv-tools is Apache-2.0 and ships a LICENSE only (no upstream NOTICE file),
+# so there is no section 4(d) NOTICE to carry; only its LICENSE is installed.
+if(
+    SLANG_ENABLE_SLANG_GLSLANG
+    AND NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
+    AND NOT SLANG_OVERRIDE_SPIRV_TOOLS_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/spirv-tools/LICENSE"
+        DESTINATION third-party-notices
+        RENAME spirv-tools-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+
 install(
     DIRECTORY "${slang_SOURCE_DIR}/docs/"
     DESTINATION share/doc/slang
