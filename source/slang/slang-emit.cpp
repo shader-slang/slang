@@ -290,7 +290,7 @@ static void reportCheckpointIntermediates(
     }
 
     int nonEmptyFuncs = 0;
-    for (auto& [originalFunc, entries] : funcToEntries)
+    for (const auto& [originalFunc, entries] : funcToEntries)
     {
         IRSizeAndAlignment totalSize = {};
         List<CheckpointEntry> nonZeroEntries;
