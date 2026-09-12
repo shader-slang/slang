@@ -672,6 +672,17 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     auto astBuilder = _getASTBuilder();
     auto& arena = astBuilder->getArena();
     SemanticsVisitor visitor(this);
+
+    // An enum's `__EnumType` conformance is not written in source; it is synthesized in
+    // `SemanticsDeclBasesVisitor::visitEnumDecl` when the enum reaches `ReadyForLookup`. Its
+    // base list is therefore incomplete until then, so force that state before linearizing to
+    // avoid caching a spurious non-conforming result. Restricted to enums: `visitEnumDecl` does
+    // not directly query the enum's own inheritance, so this cannot recurse here, whereas driving
+    // a general aggregate to `ReadyForLookup` from this path can re-enter -- e.g. a struct's
+    // `IDefaultInitializable` synthesis under `-zero-initialize` queries `isSubtype(self, ...)`.
+    if (auto enumDeclRef = declRef.as<EnumDecl>())
+        visitor.ensureDecl(enumDeclRef.getDecl(), DeclCheckState::ReadyForLookup);
+
     if (auto extensionDeclRef = declRef.as<ExtensionDecl>())
     {
         auto extendedType = getTargetType(astBuilder, extensionDeclRef);
