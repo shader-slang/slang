@@ -1570,6 +1570,19 @@ static StructuralRayTracingHitAttributesKind _getHitAttributesKind(
     return StructuralRayTracingHitAttributesKind(info->getHitAttributesKind()->getValue());
 }
 
+// Returns whether the native stage receives intersection attributes from traversal.
+//
+// An intersection shader produces custom attributes through ReportHit; it does not receive those
+// attributes as an entry-point parameter. The accepted candidate is passed to closest-hit or
+// any-hit instead, so only those two stages use the native SV_IntersectionAttributes input.
+static bool _stageReceivesStructuralRayTracingHitAttributes(
+    IRStructuralRayTracingEntryPointInfoDecoration* info)
+{
+    auto stageKind = StructuralRayTracingStageKind(info->getStageKind()->getValue());
+    return stageKind == StructuralRayTracingStageKind::ClosestHit ||
+           stageKind == StructuralRayTracingStageKind::AnyHit;
+}
+
 static void _addUniqueStructuralRayTracingPayloadType(
     List<IRType*>& payloadTypes,
     HashSet<IRType*>& seenPayloadTypes,
@@ -1803,7 +1816,8 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
         {
             auto info =
                 entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
-            if (_getHitAttributesKind(info) == StructuralRayTracingHitAttributesKind::Custom &&
+            if (_stageReceivesStructuralRayTracingHitAttributes(info) &&
+                _getHitAttributesKind(info) == StructuralRayTracingHitAttributesKind::Custom &&
                 info->getHitAttributesType() == attributeType)
             {
                 threader.findOrCreateParameter(entryPoint);
@@ -1858,7 +1872,8 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
         {
             auto info =
                 entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
-            if (_getHitAttributesKind(info) == StructuralRayTracingHitAttributesKind::Triangle)
+            if (_stageReceivesStructuralRayTracingHitAttributes(info) &&
+                _getHitAttributesKind(info) == StructuralRayTracingHitAttributesKind::Triangle)
                 threader.findOrCreateParameter(entryPoint);
         }
         for (auto candidate : operations)
