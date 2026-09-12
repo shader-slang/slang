@@ -314,6 +314,8 @@ public:
     /// or one of the specialized cases `loadSourceModuleImpl`
     /// and `loadBinaryModuleImpl`.
     ///
+    /// For IR modules, `isSpeculativeLoad` warns on an incompatible version so an import
+    /// search can continue to source. Non-speculative loads report an error instead.
     RefPtr<Module> loadModuleImpl(
         Name* name,
         const PathInfo& filePathInfo,
@@ -321,7 +323,8 @@ public:
         SourceLoc const& loc,
         DiagnosticSink* sink,
         const LoadedModuleDictionary* additionalLoadedModules,
-        ModuleBlobType blobType);
+        ModuleBlobType blobType,
+        bool isSpeculativeLoad = false);
 
     RefPtr<Module> loadSourceModuleImpl(
         Name* name,
@@ -336,7 +339,8 @@ public:
         const PathInfo& filePathInfo,
         ISlangBlob* fileContentsBlob,
         SourceLoc const& loc,
-        DiagnosticSink* sink);
+        DiagnosticSink* sink,
+        bool isSpeculativeLoad);
 
     /// Either finds a previously-loaded module matching what
     /// was serialized into `moduleChunk`, or else attempts

@@ -2261,6 +2261,12 @@ public:
     const static UInt k_maxSupportedModuleVersion = 28;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
+    /// Returns whether `version` is in the inclusive range this compiler can load.
+    static bool isModuleVersionSupported(UInt64 version)
+    {
+        return version >= k_minSupportedModuleVersion && version <= k_maxSupportedModuleVersion;
+    }
+
 private:
     friend struct IRSerialReadContext;
     friend struct IRSerialWriteContext;
