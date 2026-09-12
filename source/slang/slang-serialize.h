@@ -940,8 +940,16 @@ SLANG_FORCE_INLINE void serialize(S const& serializer, Dictionary<K, V>& value)
     SLANG_SCOPED_SERIALIZER_DICTIONARY(serializer);
     if (isWriting(serializer))
     {
-        for (auto pair : value)
+        // Copied into a KeyValuePair, mirroring the read path below, rather
+        // than serializing the dictionary's own entry type. Several of the hash
+        // maps Dictionary can be built on store an entry as
+        // `std::pair<const K, V>`, and `serialize` needs a mutable key. Both
+        // spellings write the same tuple of key followed by value.
+        for (const auto& entry : value)
+        {
+            KeyValuePair<K, V> pair{entry.first, entry.second};
             serialize(serializer, pair);
+        }
     }
     else
     {

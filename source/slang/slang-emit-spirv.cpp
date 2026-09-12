@@ -1932,7 +1932,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return instWords == other.instWords && extraKeyData == other.extraKeyData;
         }
         const static bool kHasUniformHash = true;
-        auto getHashCode() const
+        // Spelled out rather than deduced with `auto`, because this is a nested
+        // class: see the comment on SLANG_COMPONENTWISE_HASHABLE_1 in
+        // slang-hash.h for why a deduced return type here would make
+        // HasSlangHash<SpvInstKey> false at the point m_memoizedSpvInsts below
+        // is declared.
+        HashCode64 getHashCode() const
         {
             const auto instWordsHash = Slang::getHashCode(
                 reinterpret_cast<const char*>(instWords.getBuffer()),
