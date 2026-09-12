@@ -33,6 +33,10 @@
 # to sti as filter regexes, so a subset can be picked:
 #
 #   SLANG_HASHMAP_MATRIX_TEST='^tests/compute' extras/hashmap-matrix.sh
+#
+# A fourth caps how many tests sti runs at once:
+#
+#   SLANG_HASHMAP_MATRIX_TEST_JOBS=N  run at most N tests concurrently
 
 set -u
 
@@ -72,6 +76,14 @@ default_hash=WYHASH
 # Tests to run against each combination, as sti filter regexes. Empty means the
 # combinations are only built, not run.
 read -ra test_filters <<<"${SLANG_HASHMAP_MATRIX_TEST:-}"
+
+# How many tests sti runs at once. It defaults to one worker per core, but a
+# test is not a single process -- slang-test spawns compilers and test servers
+# of its own -- so at that setting the machine is oversubscribed and tests start
+# failing on timeouts and resource contention rather than on their own merits.
+# That noise is particularly unwelcome here, where the whole point is to compare
+# one combination's failures against another's.
+test_jobs=${SLANG_HASHMAP_MATRIX_TEST_JOBS:-20}
 
 # A nix devShell exports the flags this checkout is normally configured with
 # (system LLVM, system DXC, ...). Honour them so these builds match the
@@ -223,7 +235,7 @@ test_one() {
   # passes on retry is reported as passing, so an *intermittent* crash caused
   # by the hash map under test would be hidden. Re-run a suspect combination
   # without this flag before concluding it is clean.
-  if sti --retry-crashes --slang-test "$dir/Debug/bin/slang-test" \
+  if sti --retry-crashes -j "$test_jobs" --slang-test "$dir/Debug/bin/slang-test" \
     "${test_filters[@]}" >"$log" 2>&1; then
     echo "$map/$hash: TESTS PASSED ($dir)"
     return 0
