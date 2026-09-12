@@ -564,6 +564,20 @@ extern "C"
     SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getContainerVarLayout(
         SlangReflectionTypeLayout* type);
 
+    /** Get the variable layout for the "content" of a container-like type layout.
+     *
+     * The "content" is what a container holds, as opposed to the container ("wrapper") itself: the
+     * single element for a constant buffer / parameter block / texture buffer, and the sequence of
+     * elements for a structured buffer. For a constant buffer / parameter block / texture buffer
+     * this returns the element variable layout, whose offsets are relative to the container (they
+     * account for the container's own resource usage). For a structured buffer this returns a
+     * variable layout over an (unbounded) array of the element type at offset zero, so element
+     * stride and element type can be queried through the normal array-layout accessors. Returns
+     * null for type layouts that are not container-like.
+     */
+    SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetContentVarLayout(
+        SlangReflectionTypeLayout* type);
+
     SLANG_API SlangParameterCategory
     spReflectionTypeLayout_GetParameterCategory(SlangReflectionTypeLayout* type);
 
