@@ -301,8 +301,17 @@ void IRFixtureBuilder::addMutuallyRecursiveFunctions(
     outA = beginVoidFunction(aName);
     outB = beginVoidFunction(bName);
 
+    // The pair is deliberately asymmetric: `a` calls `b` and then unconditionally
+    // abandons (`Abort`), so `a` may-not-return on its own; `b` calls `a` and then
+    // returns, so `b` may-not-return only *through* the recursion into `a`. That
+    // asymmetry is what exposes an order-dependent cycle break: analyzing `a`
+    // first can memoize `b` from the in-progress guess for `a`, whereas analyzing
+    // `b` first cannot. A conservative break gives the same answer either way.
+    IRInst* abortFormat = m_builder.getStringValue(UnownedStringSlice("coverage-unit-test"));
+
     m_builder.setInsertInto(outA->getFirstBlock());
     m_builder.emitCallInst(m_builder.getVoidType(), outB, 0, nullptr);
+    m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_Abort, 1, &abortFormat);
     m_builder.emitReturn();
 
     m_builder.setInsertInto(outB->getFirstBlock());

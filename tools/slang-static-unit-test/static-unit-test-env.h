@@ -167,24 +167,28 @@ public:
 
     /// Add a top-level `void()` function whose single block is two line markers
     /// separated by an `Abort`, then a return. Returns the two markers. `Abort`
-    /// abandons the invocation, so the markers must not coalesce. No `.slang`
-    /// source produces a bare `Abort` mid-block, which is why this needs a
-    /// hand-built fixture.
+    /// abandons the invocation, so the markers must not coalesce. Building the
+    /// block by hand puts the `Abort` directly between the two markers, so the
+    /// split is asserted on the slot assignment rather than inferred from emitted
+    /// code.
     List<IRInst*> addMarkerRunSplitByAbort(const char* name);
 
     /// Add a top-level `void()` function whose single block is terminated by a
     /// `GenericAsm` instead of a `Return`. `GenericAsm` is how `__intrinsic_asm`
     /// lowers and it carries return semantics, so the exit analysis must treat
-    /// this function as returning normally. A `.slang` intrinsic that lowers to
-    /// `GenericAsm` also contains a real `return`, so only a hand-built function
-    /// isolates the `GenericAsm`-as-normal-exit rule.
+    /// this function as returning normally. A function whose *sole* exit is a
+    /// `GenericAsm` is the shape that isolates that rule, and it is simplest to
+    /// build directly.
     IRFunc* addFunctionEndingInGenericAsm(const char* name);
 
-    /// Add two mutually recursive top-level `void()` functions: the one returned
-    /// in `outA` calls the one in `outB` and vice versa, each then returning.
-    /// Neither can reach a non-recursive exit, so the exit analysis must break
-    /// the cycle conservatively and report both as possibly-not-returning,
-    /// independent of which one it happens to visit first.
+    /// Add two mutually recursive top-level `void()` functions, deliberately
+    /// asymmetric: `outA` calls `outB` and then unconditionally abandons
+    /// (`Abort`), so it may-not-return on its own; `outB` calls `outA` and then
+    /// returns, so it may-not-return only *through* the recursion into `outA`.
+    /// That asymmetry is what exposes an order-dependent cycle break — analyzing
+    /// `outA` first can taint `outB`'s memoized result while analyzing `outB`
+    /// first cannot — so a conservative break must report both as
+    /// possibly-not-returning regardless of visit order.
     void addMutuallyRecursiveFunctions(
         const char* aName,
         const char* bName,

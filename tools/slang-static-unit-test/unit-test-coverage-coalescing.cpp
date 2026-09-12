@@ -6,25 +6,27 @@
 //
 // Coalescing merges the line-coverage markers of one straight-line region onto
 // a single counter and a single runtime probe. Its correctness rests on four
-// properties, and three of them cannot be written in `.slang` source at all:
+// properties. Driving the analysis on hand-built IR lets each be asserted
+// directly on the slot assignment, which an end-to-end `.slang` test cannot do
+// cleanly:
 //
 //   1. A `GenericAsm` terminator counts as a normal exit, so a call to an
-//      intrinsic-backed helper does not split a region. Every `.slang`
-//      intrinsic that lowers to `GenericAsm` also contains a real `return`, so
-//      source can never isolate the `GenericAsm` clause.
-//   2. The probe sits at the *last* marker of a region. In a straight-line
-//      block first- and last-marker placement produce the same probe *count*,
-//      so an end-to-end test cannot tell a regression that moves it — only the
-//      per-marker `outEmitsProbe` flag can.
-//   3. A mid-region `Abort` splits the region. `Abort` is not reachable on its
-//      own from source.
+//      intrinsic-backed helper does not split a region.
+//   2. The probe sits at the *last* marker of a region.
+//   3. A mid-region `Abort` splits the region.
 //   4. Mutual recursion is broken conservatively and order-independently: an
 //      optimistic cycle-break would let one partner be memoized as "returns
-//      normally" depending on traversal order.
+//      normally" depending on which one the traversal reached first.
 //
-// Building the IR by hand is what makes these directly assertable: place the
-// markers and the abandoning instructions, run the analysis, and assert on the
-// resulting slot assignment and probe placement.
+// Property 2 is the sharpest case for a direct test: first- and last-marker
+// placement emit the same *number* of probes, so an end-to-end test cannot
+// observe the difference at all — only the per-marker `outEmitsProbe` output
+// can. The other three are reachable in principle from source (`sqrt`/`dot`
+// lower through `GenericAsm`, `abort()` lowers to `Abort`, and recursion
+// survives to this pass), but pinning them end-to-end would mean building whole
+// instrumentable modules and asserting on emitted probe instructions, which
+// cannot isolate the specific classification the way a direct assertion on the
+// slot assignment does.
 
 #include "slang/slang-ir-coverage-instrument.h"
 #include "static-unit-test-env.h"
@@ -32,10 +34,10 @@
 
 using namespace Slang;
 
-// Property 2: a straight-line run of markers coalesces onto one counter, and
-// the single probe is placed on the *last* marker of the run. Probe count alone
-// cannot distinguish first- from last-marker placement, so this asserts the
-// per-marker `outEmitsProbe` flags, which is the only observation that can.
+// Property 2: a straight-line run of markers coalesces onto one counter, with
+// the single probe on the *last* marker. Probe count alone cannot tell first-
+// from last-marker placement apart, so this asserts the per-marker
+// `outEmitsProbe` flags — the only observation that can.
 SLANG_UNIT_TEST(coverageCoalescingPlacesProbeAtLastMarkerOfRegion)
 {
     StaticUnitTestEnv env(unitTestContext);
@@ -49,12 +51,9 @@ SLANG_UNIT_TEST(coverageCoalescingPlacesProbeAtLastMarkerOfRegion)
     UInt counterCount = 0;
     assignCoverageCounterSlots(markers, slots, emitsProbe, counterCount);
 
-    // All three markers share one counter.
     SLANG_CHECK(counterCount == 1);
     SLANG_CHECK(slots[0] == slots[1]);
     SLANG_CHECK(slots[1] == slots[2]);
-
-    // Exactly the last marker emits the probe.
     SLANG_CHECK(!emitsProbe[0]);
     SLANG_CHECK(!emitsProbe[1]);
     SLANG_CHECK(emitsProbe[2]);
@@ -77,8 +76,6 @@ SLANG_UNIT_TEST(coverageCoalescingTreatsGenericAsmExitAsReturning)
     UInt counterCount = 0;
     assignCoverageCounterSlots(markers, slots, emitsProbe, counterCount);
 
-    // The call did not split the run: both markers share one counter, probe on
-    // the last.
     SLANG_CHECK(counterCount == 1);
     SLANG_CHECK(slots[0] == slots[1]);
     SLANG_CHECK(!emitsProbe[0]);
@@ -100,7 +97,6 @@ SLANG_UNIT_TEST(coverageCoalescingSplitsRegionAtAbort)
     UInt counterCount = 0;
     assignCoverageCounterSlots(markers, slots, emitsProbe, counterCount);
 
-    // Two separate regions: distinct counters, each its own probe.
     SLANG_CHECK(counterCount == 2);
     SLANG_CHECK(slots[0] != slots[1]);
     SLANG_CHECK(emitsProbe[0]);
@@ -108,13 +104,17 @@ SLANG_UNIT_TEST(coverageCoalescingSplitsRegionAtAbort)
 }
 
 // Property 4: mutual recursion is broken conservatively, and the answer does
-// not depend on which partner the analysis reaches first. A pair `a`/`b` that
-// only ever calls back and forth never reaches a non-recursive exit, so a call
-// to either must split the surrounding region. The two calls below run through
-// a fresh `CoverageFunctionExitAnalysis` each (one is created per
-// `assignCoverageCounterSlots` call), so asserting both split is what pins the
-// order-independence: an optimistic cycle-break would memoize one partner as
-// returning-normally and let at least one order coalesce.
+// not depend on which partner the analysis reaches first. The pair is
+// asymmetric: `a` calls `b` then abandons via `Abort` (may-not-return on its
+// own), while `b` calls `a` then returns (may-not-return only through the
+// recursion into `a`). Both a call to `a` and a call to `b` must therefore
+// split their region.
+//
+// The two regions are analyzed in one `assignCoverageCounterSlots` call, so the
+// may-not-return cache built resolving the first region's call carries into the
+// second. Reversing which region comes first is what pins order-independence:
+// an unsound optimistic cycle-break memoizes `b` as returning-normally when `a`
+// is resolved first, coalescing the `b` region in that order only.
 SLANG_UNIT_TEST(coverageCoalescingSplitsAtMutuallyRecursiveCallEitherOrder)
 {
     StaticUnitTestEnv env(unitTestContext);
@@ -124,28 +124,29 @@ SLANG_UNIT_TEST(coverageCoalescingSplitsAtMutuallyRecursiveCallEitherOrder)
     IRFunc* b = nullptr;
     builder.addMutuallyRecursiveFunctions("a", "b", a, b);
 
-    List<IRInst*> aFirst = builder.addMarkerRunAroundCall("callsA", a);
-    List<IRInst*> bFirst = builder.addMarkerRunAroundCall("callsB", b);
-    SLANG_CHECK_ABORT(aFirst.getCount() == 2);
-    SLANG_CHECK_ABORT(bFirst.getCount() == 2);
+    List<IRInst*> callsA = builder.addMarkerRunAroundCall("callsA", a);
+    List<IRInst*> callsB = builder.addMarkerRunAroundCall("callsB", b);
+    SLANG_CHECK_ABORT(callsA.getCount() == 2);
+    SLANG_CHECK_ABORT(callsB.getCount() == 2);
 
-    // Reaching `a` first.
+    auto checkBothRegionsSplit = [&](List<IRInst*> const& markers)
     {
         List<UInt> slots;
         List<bool> emitsProbe;
         UInt counterCount = 0;
-        assignCoverageCounterSlots(aFirst, slots, emitsProbe, counterCount);
-        SLANG_CHECK(counterCount == 2);
+        assignCoverageCounterSlots(markers, slots, emitsProbe, counterCount);
+        SLANG_CHECK(counterCount == 4);
         SLANG_CHECK(slots[0] != slots[1]);
-    }
+        SLANG_CHECK(slots[2] != slots[3]);
+    };
 
-    // Reaching `b` first, with a fresh analysis.
-    {
-        List<UInt> slots;
-        List<bool> emitsProbe;
-        UInt counterCount = 0;
-        assignCoverageCounterSlots(bFirst, slots, emitsProbe, counterCount);
-        SLANG_CHECK(counterCount == 2);
-        SLANG_CHECK(slots[0] != slots[1]);
-    }
+    List<IRInst*> aThenB;
+    aThenB.addRange(callsA);
+    aThenB.addRange(callsB);
+    checkBothRegionsSplit(aThenB); // resolves `a` first
+
+    List<IRInst*> bThenA;
+    bThenA.addRange(callsB);
+    bThenA.addRange(callsA);
+    checkBothRegionsSplit(bThenA); // resolves `b` first
 }

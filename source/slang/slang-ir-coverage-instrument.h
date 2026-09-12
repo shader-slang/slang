@@ -123,10 +123,17 @@ void finalizeCoverageInstrumentationMetadata(
 
 // Assign a counter slot to every collected marker op, coalescing line
 // markers that provably execute together. This is the coalescing core of
-// `instrumentCoverage`; it is declared here (rather than kept file-local)
-// so `slang-static-unit-test` can drive it directly on hand-built IR,
-// including cases that no `.slang` source can express — a `GenericAsm`-only
-// exit, an `Abort` mid-block, or a mutually recursive call pair.
+// `instrumentCoverage`; it is declared here (rather than kept file-local) so
+// `slang-static-unit-test` can drive it directly on hand-built IR and assert
+// on the slot assignment — which is the only way to observe some of its
+// guarantees (notably which marker of a coalesced region emits the probe;
+// see `outEmitsProbe` below).
+//
+// `markerOps` must be in the order `collectCoverageMarkerOps` produces:
+// grouped by function, then by block, then by instruction position within a
+// block, with the markers of any one block contiguous. Coalescing scans
+// forward from the previous marker to the current one, so an out-of-order or
+// interleaved list would violate that precondition (asserted in debug).
 //
 // Line markers in the same basic block, with nothing between them that can
 // abandon the invocation, all execute exactly the same number of times, so
