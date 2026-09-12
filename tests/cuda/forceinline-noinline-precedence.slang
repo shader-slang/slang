@@ -7,8 +7,9 @@
 
 RWStructuredBuffer<int> outputBuffer;
 
-// The combined function is emitted with `__forceinline__` and no `__noinline__`.
-// CHECK-DAG: {{^}}__forceinline__ __device__ int combinedHelper
+// The combined function is emitted with `__forceinline__` and no `__noinline__`. (`static ` is the
+// internal-linkage prefix for a non-exported device definition, orthogonal to this test.)
+// CHECK-DAG: {{^}}static __forceinline__ __device__ int combinedHelper
 // CHECK-NOT: __noinline__ int combinedHelper
 [ForceInline]
 [noinline]
@@ -18,7 +19,7 @@ int combinedHelper(int x)
 }
 
 // A plain `[noinline]` function is unaffected: it still gets `__noinline__` and no forceinline.
-// CHECK-DAG: {{^}}__device__ __noinline__ int noinlineHelper
+// CHECK-DAG: {{^}}static __device__ __noinline__ int noinlineHelper
 [noinline]
 int noinlineHelper(int x)
 {
