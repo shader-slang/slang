@@ -13068,139 +13068,103 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return Slang::maybeGetConstExprType(getBuilder(), type, decl);
     }
 
-    /// Emit appropriate generic parameters for a constraint, and return the value of that
-    /// constraint.
+    /// Creates a hidden generic parameter and makes it visible before its type is lowered.
     ///
-    /// The `supType` paramete represents the super-type that a parameter is constrained to.
-    IRInst* emitGenericConstraintValue(
-        IRGenContext* subContext,
-        DeclRef<GenericTypeConstraintDecl> constraintDeclRef,
-        IRType* supType)
+    /// The null type is temporary: `emitGenericDecl` completes every placeholder before it emits
+    /// the generic body or returns the generic. IR parameter cloning uses the same two-pass form
+    /// because parameter types may refer to parameters declared later in the block.
+    void predeclareGenericConstraintDecl(IRGenContext* subContext, Decl* constraintDecl)
     {
-        auto constraintDecl = constraintDeclRef.getDecl();
-
-        auto subBuilder = subContext->irBuilder;
-
-        // There are two cases we care about here.
-        //
-        if (auto andType = as<IRConjunctionType>(supType))
-        {
-            // The non-trivial case is when the constraint on a generic parameter
-            // was of the form `T : A & B`. In this case, we really want to
-            // emit the function with parameters for each of the two independent
-            // constraints `T : A` and `T : B`.
-            //
-            // We will loop over the "cases" of the conjunction (since
-            // the `IRConunctionType` can support more than just binary
-            // conjunctions) and recursively add constraints for each.
-            //
-            List<IRInst*> caseVals;
-            auto caseCount = andType->getCaseCount();
-            for (Int i = 0; i < caseCount; ++i)
-            {
-                auto caseType = andType->getCaseType(i);
-                auto caseVal = emitGenericConstraintValue(subContext, constraintDecl, caseType);
-                caseVals.add(caseVal);
-            }
-
-            return subBuilder->emitMakeTuple(caseVals);
-        }
-        else
-        {
-            // The case case is any other type being used as the constraint.
-            //
-            // The constraint will then map to a single generic parameter passing
-            // a witness table for conformance to the given `supType`.
-            //
-            auto param = subBuilder->emitParam(subBuilder->getWitnessTableType(supType));
-            addNameHint(context, param, constraintDecl);
-
-            // In order to support some of the "any-value" work in dynamic dispatch
-            // we have to attach the interface that was used as a constraint onto the
-            // type that is being constrained (which we expect to be a generic type
-            // parameter).
-            //
-            // TODO: It feels a bit gross to be doing this here; perhaps the front-end
-            // should handle propgation of value-size information from constraints
-            // back to generic parameters?
-            //
-            if (auto genParamDeclRef = isDeclRefTypeOf<GenericTypeParamDeclBase>(
-                    getSub(subContext->astBuilder, constraintDeclRef)))
-            {
-                auto typeParamDeclVal = subContext->findLoweredDecl(genParamDeclRef.getDecl());
-                SLANG_ASSERT(typeParamDeclVal && typeParamDeclVal->val);
-                subBuilder->addTypeConstraintDecoration(typeParamDeclVal->val, supType);
-            }
-
-            return param;
-        }
+        auto param = subContext->irBuilder->emitParam(nullptr);
+        addNameHint(context, param, constraintDecl);
+        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
     }
 
-    void emitGenericConstraintDecl(
+    /// Returns the placeholder created for a checked generic constraint.
+    IRParam* getPredeclaredGenericConstraintParam(IRGenContext* subContext, Decl* constraintDecl)
+    {
+        auto value = subContext->findLoweredDecl(constraintDecl);
+        SLANG_RELEASE_ASSERT(value && value->val);
+        auto param = as<IRParam>(value->val);
+        SLANG_RELEASE_ASSERT(param);
+        return param;
+    }
+
+    void completeGenericConstraintDecl(
         IRGenContext* subContext,
         DeclRef<GenericTypeConstraintDecl> constraintDeclRef)
     {
         auto supType = lowerType(subContext, getSup(subContext->astBuilder, constraintDeclRef));
-        auto value = emitGenericConstraintValue(subContext, constraintDeclRef, supType);
-        subContext->setValue(constraintDeclRef.getDecl(), LoweredValInfo::simple(value));
+        // `SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl` recursively splits every
+        // valid `T : A & B` constraint into one declaration per leaf. Equality constraints are not
+        // split, but their two operands must both be proper constrainee types and therefore cannot
+        // be conjunctions. Thus each checked constraint maps to exactly one hidden IR parameter.
+        SLANG_RELEASE_ASSERT(!as<IRConjunctionType>(supType));
+        auto constraintDecl = constraintDeclRef.getDecl();
+        auto param = getPredeclaredGenericConstraintParam(subContext, constraintDecl);
+        param->setFullType(subContext->irBuilder->getWitnessTableType(supType));
+
+        // In order to support some of the "any-value" work in dynamic dispatch, attach the
+        // interface used as a constraint to the constrained generic type parameter.
+        //
+        // TODO: The front end should probably propagate value-size information from constraints
+        // back to generic parameters instead of having IR lowering do it here.
+        if (auto genParamDeclRef = isDeclRefTypeOf<GenericTypeParamDeclBase>(
+                getSub(subContext->astBuilder, constraintDeclRef)))
+        {
+            auto typeParamDeclVal = subContext->findLoweredDecl(genParamDeclRef.getDecl());
+            SLANG_ASSERT(typeParamDeclVal && typeParamDeclVal->val);
+            subContext->irBuilder->addTypeConstraintDecoration(typeParamDeclVal->val, supType);
+        }
     }
 
-    void emitGenericConstraintDecl(
+    void completeGenericConstraintDecl(
         IRGenContext* subContext,
         DeclRef<TypeCoercionConstraintDecl> constraintDeclRef)
     {
         auto constraintDecl = constraintDeclRef.getDecl();
-        auto subBuilder = subContext->irBuilder;
         auto fromType =
             lowerType(subContext, getFromType(subContext->astBuilder, constraintDeclRef));
         auto toType = lowerType(subContext, getToType(subContext->astBuilder, constraintDeclRef));
-        auto funcType = subBuilder->getFuncType(1, &fromType, toType);
-        auto param = subBuilder->emitParam(funcType);
-        addNameHint(context, param, constraintDecl);
-        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
+        auto param = getPredeclaredGenericConstraintParam(subContext, constraintDecl);
+        param->setFullType(subContext->irBuilder->getFuncType(1, &fromType, toType));
     }
 
-    void emitGenericConstraintDecl(
+    void completeGenericConstraintDecl(
         IRGenContext* subContext,
         DeclRef<NonEmptyPackConstraintDecl> constraintDeclRef)
     {
         auto constraintDecl = constraintDeclRef.getDecl();
+        auto param = getPredeclaredGenericConstraintParam(subContext, constraintDecl);
         auto subBuilder = subContext->irBuilder;
-        auto witnessType = subBuilder->getWitnessTableType(subBuilder->getVoidType());
-        auto param = subBuilder->emitParam(witnessType);
-        addNameHint(context, param, constraintDecl);
-        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
+        param->setFullType(subBuilder->getWitnessTableType(subBuilder->getVoidType()));
     }
 
-    void emitGenericConstraintDecl(
+    void completeGenericConstraintDecl(
         IRGenContext* subContext,
         DeclRef<GenericVariadicPackCountConstraintDecl> constraintDeclRef)
     {
         auto constraintDecl = constraintDeclRef.getDecl();
-        auto subBuilder = subContext->irBuilder;
         // Generic lowering turns each source generic constraint into a hidden
         // parameter. The checker has already validated `countof(Pack) == Count`,
         // so lowering only needs a proof value with the same witness-table
         // representation consumed by `visitDeclaredVariadicPackCountWitness`.
-        auto witnessType = subBuilder->getWitnessTableType(subBuilder->getVoidType());
-        auto param = subBuilder->emitParam(witnessType);
-        addNameHint(context, param, constraintDecl);
-        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
+        auto param = getPredeclaredGenericConstraintParam(subContext, constraintDecl);
+        auto subBuilder = subContext->irBuilder;
+        param->setFullType(subBuilder->getWitnessTableType(subBuilder->getVoidType()));
     }
 
-    void emitGenericConstraintDecl(
+    void completeGenericConstraintDecl(
         IRGenContext* subContext,
         DeclRef<HasDiffTypeInfoConstraintDecl> constraintDeclRef)
     {
         auto constraintDecl = constraintDeclRef.getDecl();
-        auto subBuilder = subContext->irBuilder;
-        auto param = subBuilder->emitParam(subBuilder->getVoidType());
-        addNameHint(context, param, constraintDecl);
-        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
+        auto param = getPredeclaredGenericConstraintParam(subContext, constraintDecl);
+        param->setFullType(subContext->irBuilder->getVoidType());
     }
 
     template<typename T>
-    void emitGenericConstraintDecl(
+    void completeGenericConstraintDecl(
         IRGenContext* subContext,
         DeclRef<GenericDecl> genericDeclRef,
         T* constraintDecl)
@@ -13208,7 +13172,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto constraintDeclRef =
             subContext->astBuilder->getMemberDeclRef(genericDeclRef, constraintDecl)
                 .template as<T>();
-        emitGenericConstraintDecl(subContext, constraintDeclRef);
+        completeGenericConstraintDecl(subContext, constraintDeclRef);
     }
 
     IRGeneric* emitGenericDecl(IRGenContext* subContext, DeclRef<GenericDecl> genericDeclRef)
@@ -13260,14 +13224,29 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 subContext->setValue(valDecl, LoweredValInfo::simple(param));
             }
         }
-        // Then we emit constraint parameters, again in
-        // declaration order.
+        // Consider this example:
+        //
+        //     void use<Element, Storage>()
+        //         where Storage : IStorage<Element>
+        //         where Element : __BuiltinFloatingPointType;
+        //
+        // Lowering `IStorage<Element>` consumes the witness for the later `Element` constraint.
+        // Declare every hidden parameter in source order first so that the complete checked
+        // constraint environment is available when the next pass lowers parameter types.
+        for (auto constraintDecl : genericDecl->getDirectMemberDecls())
+        {
+            if (isGenericConstraintParameterDecl(constraintDecl))
+                predeclareGenericConstraintDecl(subContext, constraintDecl);
+        }
+
+        // Now that every constraint has an IR value, lower the parameter types in declaration
+        // order. IR parameters intentionally permit forward references in their types.
         for (auto constraintDecl : genericDecl->getDirectMemberDecls())
         {
             if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
             {
                 if (isGenericConstraintParameterDecl(genericTypeConstraintDecl))
-                    emitGenericConstraintDecl(
+                    completeGenericConstraintDecl(
                         subContext,
                         genericDeclRef,
                         genericTypeConstraintDecl);
@@ -13276,7 +13255,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
             {
                 if (isGenericConstraintParameterDecl(typeCoercionConstraintDecl))
-                    emitGenericConstraintDecl(
+                    completeGenericConstraintDecl(
                         subContext,
                         genericDeclRef,
                         typeCoercionConstraintDecl);
@@ -13284,21 +13263,27 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
             {
                 if (isGenericConstraintParameterDecl(nonEmptyConstraintDecl))
-                    emitGenericConstraintDecl(subContext, genericDeclRef, nonEmptyConstraintDecl);
+                    completeGenericConstraintDecl(
+                        subContext,
+                        genericDeclRef,
+                        nonEmptyConstraintDecl);
             }
             else if (
                 auto packCountConstraintDecl =
                     as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
             {
                 if (isGenericConstraintParameterDecl(packCountConstraintDecl))
-                    emitGenericConstraintDecl(subContext, genericDeclRef, packCountConstraintDecl);
+                    completeGenericConstraintDecl(
+                        subContext,
+                        genericDeclRef,
+                        packCountConstraintDecl);
             }
             else if (
                 auto hasDiffTypeInfoConstraintDecl =
                     as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
             {
                 if (isGenericConstraintParameterDecl(hasDiffTypeInfoConstraintDecl))
-                    emitGenericConstraintDecl(
+                    completeGenericConstraintDecl(
                         subContext,
                         genericDeclRef,
                         hasDiffTypeInfoConstraintDecl);
