@@ -45,6 +45,18 @@ enum class StructuralRayTracingMetadataKind
     Count,
 };
 
+/// Identifies one independently openable entry section of a trace program schema.
+///
+/// This enum is serialized into compiler-owned IR metadata. It deliberately describes semantic
+/// entry roles rather than the physical order of associated types or generic arguments.
+enum class StructuralRayTracingSectionKind
+{
+    HitGroups,
+    MissShaders,
+    CallableShaders,
+    Count,
+};
+
 enum class StructuralRayTracingStageInputOperationKind
 {
     Payload,
@@ -281,6 +293,12 @@ struct StructuralRayTracingEntryPack
     TypePackSubtypeWitness* witnesses = nullptr;
 };
 
+struct StructuralRayTracingOpenSectionInfo
+{
+    Type* tagType = nullptr;
+    StructuralRayTracingEntryPack listedEntries;
+};
+
 StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     ASTBuilder* astBuilder,
     Type* entryListType);
@@ -300,6 +318,26 @@ public:
     StructuralRayTracingStageKind getStageInputKind(AggTypeDecl* typeDecl) const;
     StructuralRayTracingMetadataKind getMetadataKind(InterfaceDecl* interfaceDecl) const;
     InterfaceDecl* getMetadataInterface(StructuralRayTracingMetadataKind kind) const;
+    AggTypeDecl* getOpenSectionType(StructuralRayTracingSectionKind kind) const;
+    InterfaceDecl* getSectionEntryInterface(StructuralRayTracingSectionKind kind) const;
+    bool tryGetOpenSectionInfo(
+        ASTBuilder* astBuilder,
+        Type* sectionType,
+        StructuralRayTracingSectionKind expectedKind,
+        StructuralRayTracingOpenSectionInfo& outInfo) const;
+    bool isValidOpenSectionTag(
+        ASTBuilder* astBuilder,
+        Type* tagType,
+        StructuralRayTracingSectionKind kind) const;
+    void collectOpenSectionTags(
+        ASTBuilder* astBuilder,
+        Type* declaredTagType,
+        StructuralRayTracingSectionKind kind,
+        List<Type*>& outTagTypes) const;
+    SubtypeWitness* projectOpenSectionEntryWitness(
+        ASTBuilder* astBuilder,
+        SubtypeWitness* tagWitness,
+        StructuralRayTracingSectionKind kind) const;
     StructuralRayTracingStageInputOperationKind getStageInputOperationKind(
         FunctionDeclBase* functionDecl) const;
     StructuralRayTracingTraceMethodKind getTraceMethodKind(FunctionDeclBase* functionDecl) const;
@@ -353,6 +391,9 @@ private:
     AggTypeDecl* m_stageInputTypes[int(StructuralRayTracingStageKind::Count)] = {};
     FunctionDeclBase* m_stageInvokeRequirements[int(StructuralRayTracingStageKind::Count)] = {};
     InterfaceDecl* m_metadataInterfaces[int(StructuralRayTracingMetadataKind::Count)] = {};
+    AggTypeDecl* m_openSectionTypes[int(StructuralRayTracingSectionKind::Count)] = {};
+    GenericTypeParamDecl* m_openSectionTagParameters[int(StructuralRayTracingSectionKind::Count)] =
+        {};
     AssocTypeDecl*
         m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::Count)] = {};
     GenericTypeConstraintDecl* m_associatedTypeConstraintRequirements[int(

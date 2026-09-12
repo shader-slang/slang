@@ -146,25 +146,26 @@ void main()
 // IR: func %TestClosestHitx5Finvoke
 // IR: [structuralRayTracingCallableShaderInfo(0 : Int, %TestCallableContext,
 // IR-SAME: %TestTraceContext, %TestCallableData, %TestRecord, %TestCallable,
-// IR-SAME: "TestCallable", {{.*}}, %TestCallablex5Finvoke)]
+// IR-SAME: "TestCallable", {{.*}}, %TestCallablex5Finvoke, false)]
 // IR: [structuralRayTracingMissShaderInfo(0 : Int, %TestMissContext,
 // IR-SAME: %TestTraceContext, %TestPayload, %TestPayload, %TestRecord, %TestMiss,
-// IR-SAME: "TestMiss", {{.*}}, %TestMissx5Finvoke, 0 : Int)]
+// IR-SAME: "TestMiss", {{.*}}, %TestMissx5Finvoke, false, 0 : Int)]
 // IR: [structuralRayTracingHitGroupInfo(%TestProceduralHitGroup,
-// IR-SAME: "TestProceduralHitGroup", 1 : Int, %TestProceduralHitContext, %TestTraceContext,
+// IR-SAME: "TestProceduralHitGroup", {{.*}}, 1 : Int,
+// IR-SAME: %TestProceduralHitContext, %TestTraceContext,
 // IR-SAME: %rtx5FBoundingBoxPrimitive, %TestPayload, %TestPayload, %TestRecord,
 // IR-SAME: %TestAttributes, 3 : Int, %TestProceduralClosestHit,
 // IR-SAME: "TestProceduralClosestHit", {{.*}}, true, %TestProceduralClosestHitx5Finvoke,
 // IR-SAME: %TestAnyHit, "TestAnyHit", {{.*}}, true, %TestAnyHitx5Finvoke,
 // IR-SAME: %TestIntersection, "TestIntersection", {{.*}}, true, %TestIntersectionx5Finvoke,
-// IR-SAME: 0 : Int)]
+// IR-SAME: false, 0 : Int)]
 // IR: [structuralRayTracingHitGroupInfo(%TestHitGroup,
-// IR-SAME: "TestHitGroup", 0 : Int, %TestHitContext, %TestTraceContext,
+// IR-SAME: "TestHitGroup", {{.*}}, 0 : Int, %TestHitContext, %TestTraceContext,
 // IR-SAME: %rtx5FTrianglePrimitive,
 // IR-SAME: %TestPayload, %TestPayload, %TestRecord, %rtx5FTriangleData,
 // IR-SAME: 1 : Int, %TestClosestHit, "TestClosestHit", {{.*}}, true,
 // IR-SAME: %TestClosestHitx5Finvoke, Void, "", "", false, void_constant,
-// IR-SAME: Void, "", "", false, void_constant, 0 : Int)]
+// IR-SAME: Void, "", "", false, void_constant, false, 0 : Int)]
 // IR: structuralRayTracingTrace({{.*}}, %TestSchema, "TestSchema", %TestTraceContext, %TestPayload,
 // IR-SAME: %TestPayload, 1 : Int, 0 : Int,
 // IR-SAME: %rtx5FHitGroupList, TypePack(%TestHitGroup, %TestProceduralHitGroup),

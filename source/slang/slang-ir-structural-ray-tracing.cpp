@@ -1,5 +1,6 @@
 #include "slang-ir-structural-ray-tracing.h"
 
+#include "slang-diagnostics.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -112,6 +113,8 @@ bool isCompilerOwnedStructuralRayTracingIROp(IROp op)
     case kIROp_StructuralRayTracingProgramPayloadLocationDecoration:
     case kIROp_StructuralRayTracingSemanticallyEmptyPayloadDecoration:
     case kIROp_StructuralRayTracingMetalPayloadMetadataDecoration:
+    case kIROp_StructuralRayTracingOpenSectionDecoration:
+    case kIROp_StructuralRayTracingTaggedConformanceDecoration:
     case kIROp_StructuralRayTracingHitGroupInfoDecoration:
     case kIROp_StructuralRayTracingMissShaderInfoDecoration:
     case kIROp_StructuralRayTracingCallableShaderInfoDecoration:
@@ -341,6 +344,424 @@ bool identifyStructuralRayTracingStageInterfaces(
         }
     }
     return true;
+}
+
+struct _StructuralRayTracingLinkedEntryCandidate
+{
+    IRDecoration* entryInfo = nullptr;
+    IRStringLit* sourceTypeName = nullptr;
+    IRStringLit* typeIdentity = nullptr;
+};
+
+static const char* _getStructuralRayTracingSectionDiagnosticName(
+    StructuralRayTracingSectionKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingSectionKind::HitGroups:
+        return "hit-group";
+    case StructuralRayTracingSectionKind::MissShaders:
+        return "miss-shader";
+    case StructuralRayTracingSectionKind::CallableShaders:
+        return "callable-shader";
+    default:
+        SLANG_UNEXPECTED("invalid structural ray-tracing section kind");
+    }
+}
+
+static const char* _getStructuralRayTracingSectionEntryInterfaceName(
+    StructuralRayTracingSectionKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingSectionKind::HitGroups:
+        return "IHitGroup";
+    case StructuralRayTracingSectionKind::MissShaders:
+        return "IMissShader";
+    case StructuralRayTracingSectionKind::CallableShaders:
+        return "ICallableShader";
+    default:
+        SLANG_UNEXPECTED("invalid structural ray-tracing section kind");
+    }
+}
+
+static void _collectStructuralRayTracingOpenSections(
+    IRInst* root,
+    List<IRStructuralRayTracingOpenSectionDecoration*>& outSections)
+{
+    for (auto inst = root->getFirstDecorationOrChild(); inst; inst = inst->getNextInst())
+    {
+        if (auto section = as<IRStructuralRayTracingOpenSectionDecoration>(inst))
+            outSections.add(section);
+        _collectStructuralRayTracingOpenSections(inst, outSections);
+    }
+}
+
+static IRDecoration* _findStructuralRayTracingEntryInfo(
+    IRWitnessTable* witnessTable,
+    StructuralRayTracingSectionKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingSectionKind::HitGroups:
+        return witnessTable->findDecoration<IRStructuralRayTracingHitGroupInfoDecoration>();
+    case StructuralRayTracingSectionKind::MissShaders:
+        return witnessTable->findDecoration<IRStructuralRayTracingMissShaderInfoDecoration>();
+    case StructuralRayTracingSectionKind::CallableShaders:
+        return witnessTable->findDecoration<IRStructuralRayTracingCallableShaderInfoDecoration>();
+    default:
+        SLANG_UNEXPECTED("invalid structural ray-tracing section kind");
+    }
+}
+
+static _StructuralRayTracingLinkedEntryCandidate _getStructuralRayTracingLinkedEntryCandidate(
+    IRWitnessTable* witnessTable,
+    StructuralRayTracingSectionKind kind)
+{
+    _StructuralRayTracingLinkedEntryCandidate result;
+    result.entryInfo = _findStructuralRayTracingEntryInfo(witnessTable, kind);
+    SLANG_RELEASE_ASSERT(result.entryInfo);
+    IRType* entryType = nullptr;
+
+    switch (kind)
+    {
+    case StructuralRayTracingSectionKind::HitGroups:
+        {
+            auto info = cast<IRStructuralRayTracingHitGroupInfoDecoration>(result.entryInfo);
+            entryType = info->getGroupType();
+            result.sourceTypeName = info->getGroupSourceTypeName();
+            result.typeIdentity = info->getGroupTypeIdentity();
+            SLANG_RELEASE_ASSERT(info->getIsLinked()->getValue());
+            break;
+        }
+    case StructuralRayTracingSectionKind::MissShaders:
+        {
+            auto info = cast<IRStructuralRayTracingMissShaderInfoDecoration>(result.entryInfo);
+            entryType = info->getMissType();
+            result.sourceTypeName = info->getMissSourceTypeName();
+            result.typeIdentity = info->getMissTypeIdentity();
+            SLANG_RELEASE_ASSERT(info->getIsLinked()->getValue());
+            break;
+        }
+    case StructuralRayTracingSectionKind::CallableShaders:
+        {
+            auto info = cast<IRStructuralRayTracingCallableShaderInfoDecoration>(result.entryInfo);
+            entryType = info->getCallableType();
+            result.sourceTypeName = info->getCallableSourceTypeName();
+            result.typeIdentity = info->getCallableTypeIdentity();
+            SLANG_RELEASE_ASSERT(info->getIsLinked()->getValue());
+            break;
+        }
+    default:
+        SLANG_UNEXPECTED("invalid structural ray-tracing section kind");
+    }
+    SLANG_RELEASE_ASSERT(
+        entryType && result.sourceTypeName && result.typeIdentity &&
+        result.sourceTypeName->getStringSlice().getLength() != 0 &&
+        result.typeIdentity->getStringSlice().getLength() != 0);
+    return result;
+}
+
+static IRStructuralRayTracingHitGroupInfoDecoration* _appendStructuralRayTracingLinkedHitGroup(
+    IRBuilder& builder,
+    IRInst* operation,
+    IRStructuralRayTracingHitGroupInfoDecoration* source,
+    Index functionIndex)
+{
+    // Copy by semantic field, not physical operand position. The only rewritten facts are the
+    // program-local dense index and linked origin; payload location is assigned in the following
+    // whole-program pass together with listed entries.
+    IRInst* operands[] = {
+        source->getGroupType(),
+        source->getGroupSourceTypeName(),
+        source->getGroupTypeIdentity(),
+        builder.getIntValue(builder.getIntType(), functionIndex),
+        source->getContextType(),
+        source->getTraceContextType(),
+        source->getPrimitiveType(),
+        source->getPayloadType(),
+        source->getPayloadSemanticType(),
+        source->getRecordType(),
+        source->getHitAttributesType(),
+        source->getHitAttributesKind(),
+        source->getClosestHitType(),
+        source->getClosestHitSourceTypeName(),
+        source->getClosestHitTypeIdentity(),
+        source->getHasClosestHit(),
+        source->getClosestHit(),
+        source->getAnyHitType(),
+        source->getAnyHitSourceTypeName(),
+        source->getAnyHitTypeIdentity(),
+        source->getHasAnyHit(),
+        source->getAnyHit(),
+        source->getIntersectionType(),
+        source->getIntersectionSourceTypeName(),
+        source->getIntersectionTypeIdentity(),
+        source->getHasIntersection(),
+        source->getIntersection(),
+        builder.getBoolValue(true),
+        source->getPayloadLocation(),
+    };
+    auto result = cast<IRStructuralRayTracingHitGroupInfoDecoration>(builder.addDecoration(
+        operation,
+        kIROp_StructuralRayTracingHitGroupInfoDecoration,
+        operands,
+        SLANG_COUNT_OF(operands)));
+    result->sourceLoc = source->sourceLoc;
+    return result;
+}
+
+static IRStructuralRayTracingMissShaderInfoDecoration* _appendStructuralRayTracingLinkedMissShader(
+    IRBuilder& builder,
+    IRInst* operation,
+    IRStructuralRayTracingMissShaderInfoDecoration* source,
+    Index functionIndex)
+{
+    IRInst* operands[] = {
+        builder.getIntValue(builder.getIntType(), functionIndex),
+        source->getContextType(),
+        source->getTraceContextType(),
+        source->getPayloadType(),
+        source->getPayloadSemanticType(),
+        source->getRecordType(),
+        source->getMissType(),
+        source->getMissSourceTypeName(),
+        source->getMissTypeIdentity(),
+        source->getMiss(),
+        builder.getBoolValue(true),
+        source->getPayloadLocation(),
+    };
+    auto result = cast<IRStructuralRayTracingMissShaderInfoDecoration>(builder.addDecoration(
+        operation,
+        kIROp_StructuralRayTracingMissShaderInfoDecoration,
+        operands,
+        SLANG_COUNT_OF(operands)));
+    result->sourceLoc = source->sourceLoc;
+    return result;
+}
+
+static IRStructuralRayTracingCallableShaderInfoDecoration*
+_appendStructuralRayTracingLinkedCallableShader(
+    IRBuilder& builder,
+    IRInst* operation,
+    IRStructuralRayTracingCallableShaderInfoDecoration* source,
+    Index functionIndex)
+{
+    IRInst* operands[] = {
+        builder.getIntValue(builder.getIntType(), functionIndex),
+        source->getContextType(),
+        source->getTraceContextType(),
+        source->getCallableDataType(),
+        source->getRecordType(),
+        source->getCallableType(),
+        source->getCallableSourceTypeName(),
+        source->getCallableTypeIdentity(),
+        source->getCallable(),
+        builder.getBoolValue(true),
+    };
+    auto result = cast<IRStructuralRayTracingCallableShaderInfoDecoration>(builder.addDecoration(
+        operation,
+        kIROp_StructuralRayTracingCallableShaderInfoDecoration,
+        operands,
+        SLANG_COUNT_OF(operands)));
+    result->sourceLoc = source->sourceLoc;
+    return result;
+}
+
+static void _collectStructuralRayTracingListedEntryState(
+    IRInst* operation,
+    StructuralRayTracingSectionKind kind,
+    HashSet<UnownedStringSlice>& typeIdentities,
+    Dictionary<IRType*, Index>& nextIndicesByPayload,
+    Index& nextCallableIndex)
+{
+    for (auto decoration : operation->getDecorations())
+    {
+        switch (kind)
+        {
+        case StructuralRayTracingSectionKind::HitGroups:
+            {
+                auto info = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration);
+                if (!info)
+                    break;
+                typeIdentities.add(info->getGroupTypeIdentity()->getStringSlice());
+                auto& nextIndex =
+                    nextIndicesByPayload.getOrAddValue(info->getPayloadSemanticType(), 0);
+                nextIndex = Math::Max(nextIndex, Index(info->getFunctionIndex()->getValue() + 1));
+                break;
+            }
+        case StructuralRayTracingSectionKind::MissShaders:
+            {
+                auto info = as<IRStructuralRayTracingMissShaderInfoDecoration>(decoration);
+                if (!info)
+                    break;
+                typeIdentities.add(info->getMissTypeIdentity()->getStringSlice());
+                auto& nextIndex =
+                    nextIndicesByPayload.getOrAddValue(info->getPayloadSemanticType(), 0);
+                nextIndex = Math::Max(nextIndex, Index(info->getFunctionIndex()->getValue() + 1));
+                break;
+            }
+        case StructuralRayTracingSectionKind::CallableShaders:
+            {
+                auto info = as<IRStructuralRayTracingCallableShaderInfoDecoration>(decoration);
+                if (!info)
+                    break;
+                typeIdentities.add(info->getCallableTypeIdentity()->getStringSlice());
+                nextCallableIndex =
+                    Math::Max(nextCallableIndex, Index(info->getFunctionIndex()->getValue() + 1));
+                break;
+            }
+        default:
+            SLANG_UNEXPECTED("invalid structural ray-tracing section kind");
+        }
+    }
+}
+
+bool completeOpenStructuralRayTracingSchemas(IRModule* module, DiagnosticSink* sink)
+{
+    List<IRStructuralRayTracingOpenSectionDecoration*> openSections;
+    _collectStructuralRayTracingOpenSections(module->getModuleInst(), openSections);
+    if (openSections.getCount() == 0)
+        return true;
+
+    // Selected tables are ordinary global witness tables. The linker has already filtered the
+    // input-module conformance index by exact requested tag, so this lexical global enumeration is
+    // the canonical linked set; it neither follows arbitrary operand graphs nor scans names.
+    List<IRWitnessTable*> taggedWitnessTables;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto table = as<IRWitnessTable>(inst))
+        {
+            if (table->findDecoration<IRStructuralRayTracingTaggedConformanceDecoration>())
+                taggedWitnessTables.add(table);
+        }
+    }
+
+    Dictionary<IRType*, UInt> diagnosedInvalidTagKinds;
+    bool isValid = true;
+    IRBuilder builder(module);
+    for (auto request : openSections)
+    {
+        auto operation = request->getParent();
+        SLANG_RELEASE_ASSERT(
+            as<IRStructuralRayTracingTrace>(operation) ||
+            as<IRStructuralRayTracingCallShader>(operation));
+        auto kindValue = request->getSectionKind()->getValue();
+        SLANG_RELEASE_ASSERT(
+            kindValue >= 0 && kindValue < IRIntegerValue(StructuralRayTracingSectionKind::Count));
+        auto kind = StructuralRayTracingSectionKind(kindValue);
+
+        if (!request->getIsValidTag()->getValue())
+        {
+            auto kindBit = UInt(1) << UInt(kind);
+            auto& diagnosedKinds = diagnosedInvalidTagKinds.getOrAddValue(request->getTagType(), 0);
+            if ((diagnosedKinds & kindBit) == 0)
+            {
+                diagnosedKinds |= kindBit;
+                sink->diagnose(Diagnostics::StructuralRayTracingOpenTagNotEntryInterface{
+                    .section = _getStructuralRayTracingSectionDiagnosticName(kind),
+                    .tag = request->getTagType(),
+                    .entryInterface = _getStructuralRayTracingSectionEntryInterfaceName(kind),
+                    .location = operation->sourceLoc});
+            }
+            isValid = false;
+            request->removeAndDeallocate();
+            continue;
+        }
+
+        List<_StructuralRayTracingLinkedEntryCandidate> candidates;
+        for (auto table : taggedWitnessTables)
+        {
+            for (auto decoration : table->getDecorations())
+            {
+                auto tagged = as<IRStructuralRayTracingTaggedConformanceDecoration>(decoration);
+                if (!tagged || tagged->getSectionKind()->getValue() != kindValue ||
+                    tagged->getTagType() != request->getTagType())
+                {
+                    continue;
+                }
+                candidates.add(_getStructuralRayTracingLinkedEntryCandidate(table, kind));
+            }
+        }
+        candidates.sort(
+            [](const _StructuralRayTracingLinkedEntryCandidate& left,
+               const _StructuralRayTracingLinkedEntryCandidate& right)
+            {
+                auto sourceNameOrder = compare(
+                    left.sourceTypeName->getStringSlice(),
+                    right.sourceTypeName->getStringSlice());
+                if (sourceNameOrder != 0)
+                    return sourceNameOrder < 0;
+                // Qualified names are the specified public order. The opaque canonical identity
+                // is only an injective tie-breaker for same-spelled declarations from distinct
+                // modules or generic specializations; it is never parsed to recover semantics.
+                return compare(
+                           left.typeIdentity->getStringSlice(),
+                           right.typeIdentity->getStringSlice()) < 0;
+            });
+
+        HashSet<UnownedStringSlice> typeIdentities;
+        Dictionary<IRType*, Index> nextIndicesByPayload;
+        Index nextCallableIndex = 0;
+        _collectStructuralRayTracingListedEntryState(
+            operation,
+            kind,
+            typeIdentities,
+            nextIndicesByPayload,
+            nextCallableIndex);
+
+        builder.setInsertInto(operation);
+        for (auto candidate : candidates)
+        {
+            if (!typeIdentities.add(candidate.typeIdentity->getStringSlice()))
+                continue;
+
+            switch (kind)
+            {
+            case StructuralRayTracingSectionKind::HitGroups:
+                {
+                    auto source =
+                        cast<IRStructuralRayTracingHitGroupInfoDecoration>(candidate.entryInfo);
+                    auto& nextIndex =
+                        nextIndicesByPayload.getOrAddValue(source->getPayloadSemanticType(), 0);
+                    _appendStructuralRayTracingLinkedHitGroup(
+                        builder,
+                        operation,
+                        source,
+                        nextIndex++);
+                    break;
+                }
+            case StructuralRayTracingSectionKind::MissShaders:
+                {
+                    auto source =
+                        cast<IRStructuralRayTracingMissShaderInfoDecoration>(candidate.entryInfo);
+                    auto& nextIndex =
+                        nextIndicesByPayload.getOrAddValue(source->getPayloadSemanticType(), 0);
+                    _appendStructuralRayTracingLinkedMissShader(
+                        builder,
+                        operation,
+                        source,
+                        nextIndex++);
+                    break;
+                }
+            case StructuralRayTracingSectionKind::CallableShaders:
+                _appendStructuralRayTracingLinkedCallableShader(
+                    builder,
+                    operation,
+                    cast<IRStructuralRayTracingCallableShaderInfoDecoration>(candidate.entryInfo),
+                    nextCallableIndex++);
+                break;
+            default:
+                SLANG_UNEXPECTED("invalid structural ray-tracing section kind");
+            }
+        }
+
+        // The request marker has served its only liveness purpose. The complete operation metadata
+        // now roots every selected stage directly, so later per-entry linking and DCE need not
+        // retain or rediscover the contributing witness tables.
+        request->removeAndDeallocate();
+    }
+    return isValid;
 }
 
 } // namespace Slang

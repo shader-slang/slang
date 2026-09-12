@@ -2109,6 +2109,18 @@ struct ModuleLinkingInfo : RefObject
     /// The result is only valid while the module is unchanged from when this info was built.
     ArrayView<IRInst*> getHLSLExports() { return m_hlslExports.getArrayView(); }
 
+    /// Query concrete conformance values carrying compiler-produced open-section metadata.
+    ///
+    /// Most values are direct witness tables. An explicitly composed concrete specialization can
+    /// instead be an `IRSpecialize`; `specializeModule` turns that owner into the same final table
+    /// shape. Merely indexing these values does not root them. The final linker consults this list
+    /// only after a reachable structural operation requests an exact open tag, which keeps closed
+    /// schemas on the ordinary no-retention path.
+    ArrayView<IRInst*> getStructuralRayTracingTaggedConformances()
+    {
+        return m_structuralRayTracingTaggedConformances.getArrayView();
+    }
+
     /// Query the acceleration cache for global shader parameters.
     /// The result is only valid while the module is unchanged from when this info was built.
     ArrayView<IRInst*> getGlobalParams() { return m_globalParams.getArrayView(); }
@@ -2132,6 +2144,7 @@ private:
 
     // Acceleration caches for linker decisions that previously scanned all global instructions.
     List<IRInst*> m_hlslExports;
+    List<IRInst*> m_structuralRayTracingTaggedConformances;
     List<IRInst*> m_globalParams;
     List<IRInst*> m_knownBuiltins;
 

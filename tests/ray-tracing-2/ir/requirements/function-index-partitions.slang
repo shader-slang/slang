@@ -112,9 +112,9 @@ void main()
 
 // Function indices are dense within a payload partition. Hit and miss sections use independent
 // index spaces, so PayloadA and PayloadB both start at zero in each section.
-// IR-DAG: [structuralRayTracingHitGroupInfo(%HitGroupA0_, "HitGroupA0", 0 : Int
-// IR-DAG: [structuralRayTracingHitGroupInfo(%HitGroupB0_, "HitGroupB0", 0 : Int
-// IR-DAG: [structuralRayTracingHitGroupInfo(%HitGroupA1_, "HitGroupA1", 1 : Int
+// IR-DAG: [structuralRayTracingHitGroupInfo(%HitGroupA0_, "HitGroupA0", {{.*}}, 0 : Int
+// IR-DAG: [structuralRayTracingHitGroupInfo(%HitGroupB0_, "HitGroupB0", {{.*}}, 0 : Int
+// IR-DAG: [structuralRayTracingHitGroupInfo(%HitGroupA1_, "HitGroupA1", {{.*}}, 1 : Int
 // IR-DAG: [structuralRayTracingMissShaderInfo(0 : Int, %MissContextA{{.*}}%MissA0_,
 // IR-DAG: [structuralRayTracingMissShaderInfo(0 : Int, %MissContextB{{.*}}%MissB0_,
 // IR-DAG: [structuralRayTracingMissShaderInfo(1 : Int, %MissContextA{{.*}}%MissA1_,

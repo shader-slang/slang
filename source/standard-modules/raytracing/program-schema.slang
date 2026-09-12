@@ -71,6 +71,42 @@ public struct CallableShaderList<each Shader> : ICallableShaderList
     public static const int count = countof(Shader);
 }
 
+/// Selects a hit-group section that is completed when separately compiled modules are linked.
+///
+/// `Group` names entries that are known by the schema's module. Every concrete type in the linked
+/// program that conforms to `Tag` joins the same section. The generic constraint states the entry
+/// contract, and the compiler additionally requires `Tag` itself to be an interface so a concrete
+/// entry type cannot accidentally stand in for a tag.
+public struct OpenHitGroups<Tag, each Group> : IHitGroupList
+    where Tag : IHitGroup
+    where expand each Group : IHitGroup
+{
+    public static const int knownCount = countof(Group);
+}
+
+/// Selects a miss-shader section that is completed when separately compiled modules are linked.
+///
+/// Listed shaders retain declaration order. Linked shaders conforming to `Tag` follow them in
+/// qualified-type-name order within each payload partition.
+public struct OpenMissShaders<Tag, each Shader> : IMissShaderList
+    where Tag : IMissShader
+    where expand each Shader : IMissShader
+{
+    public static const int knownCount = countof(Shader);
+}
+
+/// Selects a callable-shader section completed from conformances in the linked program.
+///
+/// The generic constraint states the callable contract, and the compiler additionally requires
+/// `Tag` itself to be an interface. Linked callables follow the listed shaders in
+/// qualified-type-name order in the program-wide callable table.
+public struct OpenCallableShaders<Tag, each Shader> : ICallableShaderList
+    where Tag : ICallableShader
+    where expand each Shader : ICallableShader
+{
+    public static const int knownCount = countof(Shader);
+}
+
 /// Selects an empty hit-group section.
 public struct NoHitGroups : IHitGroupList
 {}
