@@ -333,16 +333,6 @@ ConversionCost SemanticsVisitor::getImplicitConversionCost(Decl* decl)
     return kConversionCost_Explicit;
 }
 
-BuiltinConversionKind SemanticsVisitor::getImplicitConversionBuiltinKind(Decl* decl)
-{
-    if (auto modifier = decl->findModifier<ImplicitConversionModifier>())
-    {
-        return modifier->builtinConversionKind;
-    }
-
-    return kBuiltinConversion_Unknown;
-}
-
 bool SemanticsVisitor::isEffectivelyScalarForInitializerLists(Type* type)
 {
     if (as<CoopVectorExpressionType>(type))
@@ -1698,6 +1688,41 @@ ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
     return candidateCost;
 }
 
+// Return true if implicitly converting `fromType` to `toType` widens `float` to `double`
+// element-wise with matching shape: a scalar `float`->`double`, a `vector<float,N>`->
+// `vector<double,N>`, or a `matrix<float,R,C>`->`matrix<double,R,C>`. Differently-shaped
+// conversions such as a scalar `float` splatted to a `double` vector are excluded, so a splat is
+// not reported.
+static bool isImplicitFloatToDoubleConversion(Type* fromType, Type* toType)
+{
+    Type* fromElement = fromType;
+    Type* toElement = toType;
+    if (auto fromVector = as<VectorExpressionType>(fromType))
+    {
+        auto toVector = as<VectorExpressionType>(toType);
+        if (!toVector || !fromVector->getElementCount()->equals(toVector->getElementCount()))
+            return false;
+        fromElement = fromVector->getElementType();
+        toElement = toVector->getElementType();
+    }
+    else if (auto fromMatrix = as<MatrixExpressionType>(fromType))
+    {
+        auto toMatrix = as<MatrixExpressionType>(toType);
+        if (!toMatrix || !fromMatrix->getRowCount()->equals(toMatrix->getRowCount()) ||
+            !fromMatrix->getColumnCount()->equals(toMatrix->getColumnCount()))
+            return false;
+        fromElement = fromMatrix->getElementType();
+        toElement = toMatrix->getElementType();
+    }
+
+    auto fromBasic = as<BasicExpressionType>(fromElement);
+    auto toBasic = as<BasicExpressionType>(toElement);
+    if (!fromBasic || !toBasic)
+        return false;
+    return fromBasic->getBaseType() == BaseType::Float &&
+           toBasic->getBaseType() == BaseType::Double;
+}
+
 bool SemanticsVisitor::_coerce(
     CoercionSite site,
     Type* toType,
@@ -2880,14 +2905,17 @@ bool SemanticsVisitor::_coerce(
                 }
             }
 
-            if (site == CoercionSite::Argument && sink)
+            // Warn about implicit float->double widening passed as an argument. A conversion whose
+            // cost reaches kConversionCost_Explicit was already rejected as a TypeMismatch above,
+            // so it is not an implicit conversion and warning here would contradict that rejection
+            // -- hence the cost < Explicit gate. Float literals are exempt because widening a
+            // literal is a compile-time constant, not a runtime cost.
+            if (site == CoercionSite::Argument && sink && cost < kConversionCost_Explicit)
             {
-                auto builtinConversionKind = getImplicitConversionBuiltinKind(
-                    overloadContext.bestCandidate->item.declRef.getDecl());
-                if (builtinConversionKind == kBuiltinConversion_FloatToDouble)
+                if (!as<FloatingPointLiteralExpr>(fromExpr) &&
+                    isImplicitFloatToDoubleConversion(fromType.type, toType))
                 {
-                    if (!as<FloatingPointLiteralExpr>(fromExpr))
-                        sink->diagnose(Diagnostics::ImplicitConversionToDouble{.expr = fromExpr});
+                    sink->diagnose(Diagnostics::ImplicitConversionToDouble{.expr = fromExpr});
                 }
             }
         }
