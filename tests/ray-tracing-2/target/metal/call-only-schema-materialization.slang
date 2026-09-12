@@ -89,10 +89,10 @@ void main()
     tracer.callShader<CallableContext>(0, program, data);
 }
 
-// METAL: metal::intersection_function_table<
+// METAL: metal::raytracing::intersection_function_table<
 // METAL: metal::visible_function_table<{{.*}}> missFunctions
 // METAL: metal::visible_function_table<{{.*}}> closestHitFunctions
 // METAL: metal::visible_function_table<{{.*}}> callableFunctions
-// METAL: {{\[\[visible\]\]}} void ClosestHit
-// METAL: {{\[\[visible\]\]}} void Miss
-// METAL: {{\[\[visible\]\]}} void Callable
+// METAL: {{\[\[visible\]\]}} void {{.*}}(CallableData_0 thread*
+// METAL: {{\[\[visible\]\]}} void {{.*}}(Schema_rayData_0 thread*
+// METAL: {{\[\[visible\]\]}} void {{.*}}(Schema_rayData_0 thread*
