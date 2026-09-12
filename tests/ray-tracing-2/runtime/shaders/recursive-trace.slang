@@ -19,8 +19,8 @@
 // METAL: (thread uchar*)kernelContext
 // METAL: .intersect(
 // METAL: (thread uchar*)&kernelContext
-// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_
-// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_
+// METAL: {{\[\[visible\]\]}} void _slang_structural_rt_
+// METAL: {{\[\[visible\]\]}} void _slang_structural_rt_
 // METAL-SAME: uchar thread* kernelContext_
 
 import slang.raytracing;
