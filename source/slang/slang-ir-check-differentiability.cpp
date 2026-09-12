@@ -190,6 +190,64 @@ public:
         return false;
     }
 
+    // Returns true when every derivative variant associated with `callee` is
+    // `[__readNone]`. The autodiff transform emits the derivative variant (not
+    // the primary) at the call site, so a `[__readNone]` primary alone does not
+    // make the call carry-elidable: a variant with side effects on global or
+    // unknown memory must still force the call to carry. The audited built-in
+    // math derivatives in `diff.meta.slang` carry `[__readNone]`; the buffer
+    // accessors (`DiffTensorView`/`AtomicAdd`) do not, so they conservatively
+    // carry.
+    bool allAssociatedDerivativesReadNone(DifferentiableTypeConformanceContext& ctx, IRInst* callee)
+    {
+        // The derivative kinds whose association value is a *callee* that runs
+        // after the autodiff transform, and so can carry side effects.
+        //
+        // The other differentiability-related kinds are deliberately absent:
+        //
+        //  - `BackwardDerivativeContext` and `BackwardDerivativeMinimalContext`
+        //    associate a *type*, not a callee — the `BwdCallable` /
+        //    minimal-context types (see `slang-check-expr.cpp`'s
+        //    `BwdCallable` registration and the `_lookupWitness` calls in
+        //    `slang-ir-autodiff-fwd.cpp`). There is no body to be impure.
+        //  - `BackwardDerivativeContextRemat` associates a remat callee, but a
+        //    remat only reconstructs the context it is handed; it never runs the
+        //    user's derivative body. Note this holds semantically, not by
+        //    op-code: the legacy `kIROp_Backward*Remat*` ops are unconditionally
+        //    readNone in `isReadNoneCallee`, but a `__apply` extension
+        //    synthesizes `kIROp_IdentityRemat`, which is not among them.
+        //  - The remaining kinds describe differential types/witnesses
+        //    (`DifferentialPairType`, `DifferentialZero`, ...) or the fwd-diff
+        //    witness tables, none of which are callees.
+        //
+        // Omitting a kind that *should* be here suppresses an E41031 silently,
+        // so no test fails to report the mistake. Mirror the `cloneAnnotations`
+        // precedent in slang-ir-link.cpp and force the decision to be re-made.
+        static_assert(
+            int(AnnotationKind::CountOf) == 16,
+            "AnnotationKind changed: does the new kind associate a derivative "
+            "callee that can have side effects? If so, add it here.");
+        // `BackwardDerivativeApply` matters only for a custom `__apply`, whose
+        // `apply_bwd` is `FunctionCopy(userApplyFunc)` and so can be impure
+        // independently of the primary. The legacy shape,
+        // `BackwardPrimalFromLegacyBwdDiffFunc(primary, bwd_diff)`, unwraps to
+        // the already-checked primary and adds nothing.
+        static const AnnotationKind kDerivativeKinds[] = {
+            AnnotationKind::ForwardDerivative,
+            AnnotationKind::BackwardDerivativeApply,
+            AnnotationKind::BackwardDerivativePropagate,
+        };
+        for (auto kind : kDerivativeKinds)
+        {
+            auto deriv = ctx.tryGetAssociationOfKind(callee, kind);
+            if (!deriv)
+                continue;
+            if (!isReadNoneCallee(deriv))
+                return false;
+        }
+        return true;
+    }
+
     bool isInstInFunc(IRInst* inst, IRInst* func)
     {
         while (inst)
@@ -491,7 +549,16 @@ public:
                     // differentiable input. For non-readNone callees, fall
                     // back to the original conservative behavior of treating
                     // every differentiable-function call as carrying.
-                    if (!isReadNoneCallee(callee))
+                    //
+                    // The primary's readNone-ness alone is not enough: a
+                    // [__readNone] primary may have a user-defined
+                    // [ForwardDerivative] / [BackwardDerivative] variant
+                    // that writes to memory, and that variant is what the
+                    // autodiff transform actually emits at the call site. So
+                    // also require every associated derivative variant to be
+                    // readNone before treating the call as elidable (#11374).
+                    if (!isReadNoneCallee(callee) ||
+                        !allAssociatedDerivativesReadNone(diffTypeContext, callee))
                         return true;
 
                     // For readNone callees, a call carries a derivative only

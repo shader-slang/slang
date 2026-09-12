@@ -207,6 +207,21 @@ enum class AccessQualifier : uint64_t
     Immutable = 2,
 };
 
+// Controls what the compiler does when a `[PreferRecompute]` function is found
+// to have side effects. Keep these values in sync with the `SideEffectBehavior`
+// enum in core.meta.slang, which is the user-visible spelling; both the
+// front-end attribute (`PreferRecomputeAttribute`) and the IR consumers of
+// `IRPreferRecomputeDecoration` decode its operand against these values.
+enum class SideEffectBehavior
+{
+    // Warn if the decorated function is detected to have side effects.
+    Warn = 0,
+
+    // Suppress that warning — the author accepts that the side effects may run
+    // more than once, so the decoration is no longer a purity signal.
+    Allow = 1,
+};
+
 // NOTE: The IR linker assumes every `AnnotationKind` is differentiability-
 // related: `cloneAnnotations` in slang-ir-link.cpp skips cloning *all*
 // module-scope annotations into the final codegen link of a program that does
