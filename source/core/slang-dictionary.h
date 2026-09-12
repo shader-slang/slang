@@ -11,6 +11,7 @@
 
 #include <ankerl/unordered_dense.h>
 #include <initializer_list>
+#include <utility>
 
 namespace Slang
 {
@@ -269,20 +270,53 @@ public:
         const auto& [iterator, inserted] = map.insert(std::move(kvPair));
         return inserted ? nullptr : std::addressof(iterator->second);
     }
+    /// Looks `key` up and, if it is absent, inserts an entry whose value is
+    /// constructed in place from `args`. Returns a pointer to the mapped
+    /// value -- found or freshly inserted -- together with whether an
+    /// insertion took place.
+    ///
+    /// This costs a single hash and a single probe, and it does not construct
+    /// the value at all when the key is already present. Prefer it to
+    /// `tryGetValue` followed by `operator[]` or `add`, which hash and probe
+    /// the same key twice, and to the pair-taking overloads below, which build
+    /// a `value_type` before the map is consulted and so copy the key and the
+    /// value even on a lookup that hits.
+    ///
+    /// For example, memoizing an expensive-to-build value reads as:
+    ///
+    ///     auto [entry, inserted] = cache.tryEmplace(key, nullptr);
+    ///     if (inserted)
+    ///         *entry = buildTheThing();
+    ///     return *entry;
+    ///
+    template<typename... Args>
+    std::pair<TValue*, bool> tryEmplace(const TKey& key, Args&&... args)
+    {
+        auto [iterator, inserted] = map.try_emplace(key, std::forward<Args>(args)...);
+        return {std::addressof(iterator->second), inserted};
+    }
+    /// Overload of `tryEmplace` that moves the key when it has to be stored.
+    template<typename... Args>
+    std::pair<TValue*, bool> tryEmplace(TKey&& key, Args&&... args)
+    {
+        auto [iterator, inserted] = map.try_emplace(std::move(key), std::forward<Args>(args)...);
+        return {std::addressof(iterator->second), inserted};
+    }
+
     // Tries to insert the given element, if a value was already present at
     // the given key then returns a pointer to that element instead.
     // Returns nullptr if insertion was successful.
     TValue* tryGetValueOrAdd(const TKey& key, const TValue& value)
     {
-        return tryGetValueOrAdd({key, value});
+        const auto [valuePtr, inserted] = tryEmplace(key, value);
+        return inserted ? nullptr : valuePtr;
     }
 
     // Inserts the given value if it doesn't exist already
     // Return a reference to the (possibly new) value in the map
     TValue& getOrAddValue(const TKey& key, const TValue& defaultValue)
     {
-        auto [iterator, inserted] = map.insert({key, defaultValue});
-        return iterator->second;
+        return *tryEmplace(key, defaultValue).first;
     }
 
     // Returns a reference to the value at the specified key, default
@@ -310,12 +344,12 @@ public:
     }
     // Returns true if the value was inserted, returns false if the map
     // already has a value associated with this key
-    bool addIfNotExists(const TKey& k, const TValue& v) { return addIfNotExists({k, v}); }
+    bool addIfNotExists(const TKey& k, const TValue& v) { return tryEmplace(k, v).second; }
     // Returns true if the value was inserted, returns false if the map
     // already has a value associated with this key
     bool addIfNotExists(TKey&& k, TValue&& v)
     {
-        return addIfNotExists({std::move(k), std::move(v)});
+        return tryEmplace(std::move(k), std::move(v)).second;
     }
 
     // Asserts if the key already exists in the dictionary
@@ -331,9 +365,17 @@ public:
             SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
     }
     // Asserts if the key already exists in the dictionary
-    void add(const TKey& key, const TValue& value) { add({key, value}); }
+    void add(const TKey& key, const TValue& value)
+    {
+        if (!addIfNotExists(key, value))
+            SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
+    }
     // Asserts if the key already exists in the dictionary
-    void add(TKey&& key, TValue&& value) { add({std::move(key), std::move(value)}); }
+    void add(TKey&& key, TValue&& value)
+    {
+        if (!addIfNotExists(std::move(key), std::move(value)))
+            SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
+    }
 
     // Inserts into the dictionary or assigns if the key already exists
     void set(const TKey& key, const TValue& value) { map.insert_or_assign(key, value); }
