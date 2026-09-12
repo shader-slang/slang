@@ -22,11 +22,16 @@
 // (slang-test removes -g embedded source before FileCheck for SPIR-V targets, so the CHECK-NOT
 // does not self-match this comment.)
 
+// A `CHECK-NOT` only spans the gap to the next positive `CHECK`, so a second `CHECK-NOT` after
+// the positive line extends the "no physical pointer anywhere" assertion over the rest of the
+// output (a physical storage class emitted later would otherwise slip past).
 //CHECK-NOT: PhysicalStorageBuffer
 //CHECK: OpTypePointer StorageBuffer %int
+//CHECK-NOT: PhysicalStorageBuffer
 
 //CHECKDBG-NOT: PhysicalStorageBuffer
 //CHECKDBG: OpTypePointer StorageBuffer %int
+//CHECKDBG-NOT: PhysicalStorageBuffer
 
 RWStructuredBuffer<int> outputBuffer;
 RWStructuredBuffer<int> dataBuffer;

@@ -443,16 +443,24 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         case kIROp_FieldAddress:
             return getStoredValueAddrSpace(value->getOperand(0));
         case kIROp_Param:
-            // A block parameter (phi) contributes its address space only once the main fixpoint
-            // has resolved one (into `mapInstToAddrSpace`, read by `getPointerValueAddrSpace`
-            // below). Until then treat it as unknown rather than reading its stale surface type,
-            // so a slot fed both a reconciled slot-load (→ `StorageBuffer`) and a not-yet-resolved
-            // pointer phi (→ still `Device`) does not compute a spurious conflict — matching the
-            // load-of-an-unreconciled-slot case above and keeping convergence independent of when
-            // phis are resolved.
-            if (!mapInstToAddrSpace.containsKey(value))
-                return AddressSpace::Generic;
-            break;
+            {
+                // Distinguish a *phi* (a non-entry block parameter) from a *function* parameter.
+                // A phi may carry a stale declared type before the main fixpoint resolves one
+                // (into `mapInstToAddrSpace`, read by `getPointerValueAddrSpace` below), so until
+                // then treat it as unknown: a slot fed both a reconciled slot-load (→
+                // `StorageBuffer`) and a not-yet-resolved phi (→ still `Device`) must not compute
+                // a spurious conflict. A *function* parameter (entry-block parameter) instead has
+                // an authoritative declared address space (e.g. a physical `int*` argument), so
+                // fall through and read it — dropping it to `Generic` would miss a real conflict
+                // between such an argument and a descriptor-backed `StorageBuffer` value.
+                bool isPhi = false;
+                if (auto block = as<IRBlock>(value->getParent()))
+                    if (auto code = as<IRGlobalValueWithCode>(block->getParent()))
+                        isPhi = block != code->getFirstBlock();
+                if (isPhi && !mapInstToAddrSpace.containsKey(value))
+                    return AddressSpace::Generic;
+                break;
+            }
         }
         return getPointerValueAddrSpace(value);
     }
@@ -581,8 +589,10 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // Outer fixpoint: reconciling slots retypes their loads; propagating those loads can
         // retype derived ops / block parameters that feed *other* slots, which are then
         // reconciled on the next round (e.g. a pointer flowing through a block parameter and
-        // stored back into a slot). Terminates because address spaces only move toward a
-        // concrete value; see the PR's process report for the full argument.
+        // stored back into a slot). Terminates because a slot's address space only ever moves
+        // from `Generic` toward a single concrete value and never back, so each round can only
+        // add reconciliations; once a round reconciles nothing, no new address space can flow and
+        // the fixpoint has converged.
         for (;;)
         {
             List<IRInst*> reconciledLoads;
@@ -642,12 +652,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // existing machinery, rather than leaving stale `Device` types on the users.
         //
         // Gated to the SPIR-V path (the only caller that passes a `sink`). This pre-pass — and
-        // its `InconsistentPointerAddressSpace` conflict diagnostic — is the SPIR-V-specific fix
-        // for the logical-`StorageBuffer`-vs-physical-`Device` slot mismatch (#12581). The other
-        // callers (Metal/WGSL/GLSL legalization) pass no sink; running it there would silently
-        // change their slot types with no diagnostic on a genuine conflict, a behavior change
-        // this PR neither needs nor tests. Their address-space handling is intentionally left
-        // as-is.
+        // its `InconsistentPointerAddressSpace` conflict diagnostic — targets the logical-
+        // `StorageBuffer`-vs-physical-`Device` slot mismatch that only SPIR-V's split of logical
+        // and physical pointers makes ill-typed. The other callers (Metal/WGSL/GLSL legalization)
+        // pass no sink; their targets do not model that split, so retyping slots there would be a
+        // silent, undiagnosed change to their address-space handling with no correctness benefit.
+        // A caller that wants slot reconciliation (and the conflict diagnostic) must opt in with a
+        // sink.
         if (sink)
             reconcilePointerSlots();
 

@@ -7430,12 +7430,12 @@ static PtrType* getValidTypeForAddressOf(
 
         // Address of a mutable structured-buffer element: `buf[i]` where `buf` is an
         // `RWStructuredBuffer` or `RasterizerOrderedStructuredBuffer`. These two types are also
-        // accepted by `&buf[i]` via `operator&`, so produce the same pointer type `&buf[i]`
-        // does for this case (the pre-PR tests showed `&buf[i]` accepted but `__getAddress(buf[i])`
-        // rejected — this closes that gap). The AST pointer is typed `UserPointer` (==
-        // `AddressSpace.Device`) to match how `&buf[i]` is typed at the AST level; the SPIR-V
-        // address-space specialization pass later reconciles the surviving slot to the element's
-        // real logical `StorageBuffer` space. The layout is `DefaultDataLayout` to match
+        // addressable via `&buf[i]` through `operator&`, and `__getAddress(buf[i])` must be
+        // equivalent to `&buf[i]`, so it produces the same pointer type here. The AST pointer is
+        // typed `UserPointer` (== `AddressSpace.Device`) to match how `&buf[i]` is typed at the
+        // AST level; the SPIR-V address-space specialization pass later reconciles the surviving
+        // slot to the element's real logical `StorageBuffer` space. The layout is
+        // `DefaultDataLayout` to match
         // `&buf[i]` (the element offset is resolved from the buffer type's own layout at IR
         // generation, so this pointer's layout argument does not affect stride).
         if (isStructuredBufferElementPtrOp)

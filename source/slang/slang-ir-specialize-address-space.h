@@ -37,10 +37,10 @@ struct NoOpInitialAddressSpaceAssigner : public InitialAddressSpaceAssigner
 /// based on the address space of the arguments.
 ///
 /// When `sink` is non-null, additionally runs the local-pointer-slot reconciliation pre-pass and
-/// reports `inconsistent-pointer-address-space` if a pointer slot or block parameter merges two
-/// different concrete address spaces. Only the SPIR-V legalizer passes a sink; with the default
-/// `nullptr` the pre-pass and that diagnostic are skipped (the other backends' behavior is
-/// unchanged), so a caller that wants the diagnostic must supply a sink.
+/// reports `inconsistent-pointer-address-space` if a single local pointer slot is written pointer
+/// values in two different concrete address spaces. Only the SPIR-V legalizer passes a sink; with
+/// the default `nullptr` the pre-pass and that diagnostic are skipped (the other backends' behavior
+/// is unchanged), so a caller that wants the diagnostic must supply a sink.
 void specializeAddressSpace(
     IRModule* module,
     InitialAddressSpaceAssigner* addrSpaceAssigner,
