@@ -23,8 +23,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // regardless of the order slots are visited rather than depending on declaration order.
     Dictionary<IRInst*, AddressSpace> reconciledSlotAddrSpace;
 
-    // Insts (a conflicting block parameter, or a local slot fed two different concrete
-    // address spaces) already reported, so the fixpoint diagnoses each exactly once.
+    // Local pointer slots (`Var`) already reported for holding two different concrete address
+    // spaces, so the fixpoint diagnoses each exactly once.
     HashSet<IRInst*> diagnosedAddrSpaceConflicts;
 
     AddressSpaceContext(
@@ -443,24 +443,21 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         case kIROp_FieldAddress:
             return getStoredValueAddrSpace(value->getOperand(0));
         case kIROp_Param:
-            {
-                // Distinguish a *phi* (a non-entry block parameter) from a *function* parameter.
-                // A phi may carry a stale declared type before the main fixpoint resolves one
-                // (into `mapInstToAddrSpace`, read by `getPointerValueAddrSpace` below), so until
-                // then treat it as unknown: a slot fed both a reconciled slot-load (→
-                // `StorageBuffer`) and a not-yet-resolved phi (→ still `Device`) must not compute
-                // a spurious conflict. A *function* parameter (entry-block parameter) instead has
-                // an authoritative declared address space (e.g. a physical `int*` argument), so
-                // fall through and read it — dropping it to `Generic` would miss a real conflict
-                // between such an argument and a descriptor-backed `StorageBuffer` value.
-                bool isPhi = false;
-                if (auto block = as<IRBlock>(value->getParent()))
-                    if (auto code = as<IRGlobalValueWithCode>(block->getParent()))
-                        isPhi = block != code->getFirstBlock();
-                if (isPhi && !mapInstToAddrSpace.containsKey(value))
-                    return AddressSpace::Generic;
-                break;
-            }
+            // A parameter's contained address space is not yet known at this pre-pass. A *phi*
+            // (a non-entry block parameter) is resolved later by the propagation fixpoint; a
+            // *function* parameter (an entry-block parameter) is rewritten by `specializeFunc`
+            // from the actual argument's address space when its callers are specialized, which
+            // runs *after* this pre-pass. Its declared surface pointee (`int*` → `Device`) is
+            // therefore only provisional — reading it here would both miss real cases and, worse,
+            // wrongly reject valid ones (a helper whose `int*` argument is a descriptor-backed
+            // `StorageBuffer` element pointer would be specialized to `StorageBuffer`, so merging
+            // it with another such pointer is consistent, not a conflict). So treat any
+            // unresolved parameter as unknown; a slot's other, concrete writes still drive its
+            // reconciliation via the join. A genuine conflict against a physical parameter is left
+            // to surface downstream (see the parameter-reconciliation limitation in #13039).
+            if (!mapInstToAddrSpace.containsKey(value))
+                return AddressSpace::Generic;
+            break;
         }
         return getPointerValueAddrSpace(value);
     }
