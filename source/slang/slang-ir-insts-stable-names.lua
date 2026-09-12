@@ -927,5 +927,7 @@ return {
 	["Decoration.explicitGlobalContext"] = 951,
 	["Decoration.structuralRayTracingProgramPayloadLocation"] = 952,
 	["Decoration.structuralRayTracingSemanticallyEmptyPayload"] = 953,
-	["Decoration.structuralRayTracingMetalPayloadMetadata"] = 954
+	["Decoration.structuralRayTracingMetalPayloadMetadata"] = 954,
+	["Decoration.structuralRayTracingOpenSection"] = 955,
+	["Decoration.structuralRayTracingTaggedConformance"] = 956
 }

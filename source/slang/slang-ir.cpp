@@ -5111,6 +5111,11 @@ void ModuleLinkingInfo::_build(IRModule* module)
         if (as<IRGlobalParam>(inst))
             m_globalParams.add(inst);
 
+        if (inst->findDecoration<IRStructuralRayTracingTaggedConformanceDecoration>())
+        {
+            m_structuralRayTracingTaggedConformances.add(inst);
+        }
+
         bool isHLSLExported = false;
         bool isKnownBuiltin = false;
         for (auto decoration : inst->getDecorations())
