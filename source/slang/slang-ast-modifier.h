@@ -1201,6 +1201,14 @@ class GLSLLayoutDerivativeGroupLinearAttribute : public Attribute
     FIDDLE(...)
 };
 
+// GLSL `layout(early_fragment_tests) in;` marker; the checker lifts it to an
+// `EarlyDepthStencilAttribute` on the fragment entry point.
+FIDDLE()
+class GLSLLayoutEarlyFragmentTestsAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 // TODO: for attributes that take arguments, the syntax node
 // classes should provide accessors for the values of those arguments.
 
