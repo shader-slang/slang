@@ -453,8 +453,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             // `StorageBuffer` element pointer would be specialized to `StorageBuffer`, so merging
             // it with another such pointer is consistent, not a conflict). So treat any
             // unresolved parameter as unknown; a slot's other, concrete writes still drive its
-            // reconciliation via the join. A genuine conflict against a physical parameter is left
-            // to surface downstream (see the parameter-reconciliation limitation in #13039).
+            // reconciliation via the join. As a consequence the pre-pass does not reason about a
+            // parameter's address space at all: the cross-function parameter cases — a genuine
+            // conflict through a physical parameter, and a specialized pointer parameter's `-g`
+            // debug backing variable — are out of scope here and require reconciliation after call
+            // specialization (tracked in #13039); until then they can emit ill-typed SPIR-V that
+            // is only caught when validation is enabled.
             if (!mapInstToAddrSpace.containsKey(value))
                 return AddressSpace::Generic;
             break;

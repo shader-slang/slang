@@ -12,6 +12,10 @@
 // phi) and let the slot's concrete write (&buf[0], StorageBuffer) drive reconciliation, rather than
 // reading the provisional physical type and falsely reporting an inconsistent-address-space
 // conflict on this valid code. `[noinline]` keeps `ext` a real parameter through the pass.
+//
+// Non-debug runs only: under `-g`, a pointer parameter specialized from Device to StorageBuffer
+// leaves its debug backing variable with the old pointee -- a pre-existing cross-function debug-var
+// gap (reachable via `&buf[i]` too), out of scope here and deferred to #13039.
 
 // A front-end/legalization rejection would abort before emission, so forbid a diagnostic first,
 // then confirm emission reached the entry point and no physical pointer was produced (both merged
