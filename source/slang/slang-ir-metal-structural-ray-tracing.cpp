@@ -379,7 +379,8 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
     IRInst* schemaOperation,
     IRType* payloadType,
     Index payloadIndex,
-    bool hasMultiplePayloadPartitions)
+    bool hasMultiplePayloadPartitions,
+    TargetRequest* targetRequest)
 {
     IRBuilder builder(module);
     builder.setInsertInto(module->getModuleInst());
@@ -401,13 +402,18 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
     builder.addNameHintDecoration(result->payloadKey, UnownedTerminatedStringSlice("payload"));
     builder.createStructField(result->type, result->payloadKey, payloadType);
 
-    // Consider a trace whose only stage data is `struct EmptyPayload {}`. Metal visible
-    // functions still exchange the generated ray-data carrier by pointer, even though the payload
-    // field itself has no storage. Without a physical field, empty-type legalization removes the
-    // whole carrier and leaves `metalStructuralRayTracingTrace` without its required ray-data
-    // operand. Keep that compiler-private ABI carrier concrete; the sentinel is never exposed as
-    // part of the user's payload.
-    if (isSemanticallyEmptyStructuralRayTracingPayloadType(payloadType))
+    // Consider `struct Payload { Empty value; Empty values[2]; }`, where `Empty` has no fields.
+    // This is a non-empty source payload, but its target layout has no storage. Metal visible
+    // functions still exchange the generated ray-data carrier by pointer, so resource-type
+    // legalization must not remove that carrier along with its payload field. Keep the
+    // compiler-private ABI carrier concrete whenever the target payload size is zero; the sentinel
+    // is never exposed as part of the user's payload.
+    IRSizeAndAlignment payloadSizeAndAlignment;
+    SLANG_RELEASE_ASSERT(
+        SLANG_SUCCEEDED(
+            getNaturalSizeAndAlignment(targetRequest, payloadType, &payloadSizeAndAlignment)) &&
+        payloadSizeAndAlignment.size != IRSizeAndAlignment::kIndeterminateSize);
+    if (payloadSizeAndAlignment.size == 0)
     {
         auto sentinelKey = builder.createStructKey();
         builder.addNameHintDecoration(
@@ -5165,7 +5171,8 @@ static bool _prepareMetalProgramDescriptors(
                 info->representativeSchemaOperation,
                 partition.payloadType,
                 i,
-                info->payloadPartitions.getCount() > 1);
+                info->payloadPartitions.getCount() > 1,
+                targetRequest);
         }
     }
     return true;
