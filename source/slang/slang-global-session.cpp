@@ -110,7 +110,7 @@ void Session::init()
     glslLanguageScope->nextSibling = slangLanguageScope;
 
     glslModuleName = getNameObj("glsl");
-    neuralModuleName = getNameObj("neural");
+    autodiffModuleName = getNameObj(getBuiltinModuleNameStr(slang::BuiltinModuleName::Autodiff));
 
     {
         for (Index i = 0; i < Index(SourceLanguage::CountOf); ++i)
@@ -164,6 +164,51 @@ Module* Session::getBuiltinModule(slang::BuiltinModuleName name)
     if (builtinLinkage->mapNameToLoadedModules.tryGetValue(moduleNameObj, module))
         return module.get();
     return nullptr;
+}
+
+SlangResult Session::loadAutodiffModuleIfNeeded(Module*& outModule)
+{
+    outModule = nullptr;
+
+    if (auto alreadyLoaded = getBuiltinModule(slang::BuiltinModuleName::Autodiff))
+    {
+        outModule = alreadyLoaded;
+        return SLANG_OK;
+    }
+
+    // Loading the supplement while source-compiling either builtin module would recursively start
+    // another builtin compilation. The current compilation already sees and checks its own
+    // declarations; the caller therefore has no late-loaded module to merge in this case. This is
+    // the one path that reports success while leaving `outModule` null.
+    if (m_isCompilingBuiltinModule)
+        return SLANG_OK;
+
+    // Normal builds keep the serialized supplement in the library without deserializing it. A
+    // bootstrap/source-only build has no serialized blob, so compile the same source segment when
+    // it is first requested.
+    if (auto moduleBlob = slang_getEmbeddedAutodiffModule())
+    {
+        SLANG_RETURN_ON_FAIL(loadBuiltinModule(
+            slang::BuiltinModuleName::Autodiff,
+            moduleBlob->getBufferPointer(),
+            moduleBlob->getBufferSize()));
+    }
+    else
+    {
+        // Source-compile fallback, taken only in a `SLANG_EMBED_CORE_MODULE=OFF` build where
+        // `slang_getEmbeddedAutodiffModule()` is null. The standard test binaries embed the blob
+        // and take the branch above, so this runtime path has no automated regression test; it
+        // mirrors the eager core module's own source-only fallback and is exercised at build time
+        // when the no-embed bootstrap compiles the supplement.
+        SLANG_RETURN_ON_FAIL(compileBuiltinModule(slang::BuiltinModuleName::Autodiff, 0));
+    }
+
+    // Both load paths above register the module on this session, so a successful load must leave
+    // it retrievable. If that ever stops holding, failing here is better than handing the caller a
+    // silent null that it would merge as "nothing to do".
+    outModule = getBuiltinModule(slang::BuiltinModuleName::Autodiff);
+    SLANG_RELEASE_ASSERT(outModule);
+    return SLANG_OK;
 }
 
 void Session::_initCodeGenTransitionMap()
@@ -349,6 +394,9 @@ const char* getBuiltinModuleNameStr(slang::BuiltinModuleName name)
     case slang::BuiltinModuleName::GLSL:
         result = "glsl";
         break;
+    case slang::BuiltinModuleName::Autodiff:
+        result = "autodiff";
+        break;
     default:
         SLANG_UNEXPECTED("Unknown builtin module");
     }
@@ -375,10 +423,25 @@ Session::BuiltinModuleInfo Session::getBuiltinModuleInfo(slang::BuiltinModuleNam
         result.name = "glsl";
         result.languageScope = glslLanguageScope;
         break;
+    case slang::BuiltinModuleName::Autodiff:
+        result.languageScope = coreLanguageScope;
+        break;
     default:
         SLANG_UNEXPECTED("Unknown builtin module");
     }
     return result;
+}
+
+bool Session::belongsInCoreModulesList(slang::BuiltinModuleName name)
+{
+    switch (name)
+    {
+    case slang::BuiltinModuleName::Core:
+    case slang::BuiltinModuleName::Autodiff:
+        return true;
+    default:
+        return false;
+    }
 }
 
 SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlags)
@@ -393,10 +456,15 @@ void Session::getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName
     case slang::BuiltinModuleName::Core:
         sb << (const char*)getCoreLibraryCode()->getBufferPointer()
            << (const char*)getHLSLLibraryCode()->getBufferPointer()
-           << (const char*)getAutodiffLibraryCode()->getBufferPointer();
+           << (const char*)getAutodiffBaseLibraryCode()->getBufferPointer();
         break;
     case slang::BuiltinModuleName::GLSL:
         sb << (const char*)getGLSLLibraryCode()->getBufferPointer();
+        break;
+    case slang::BuiltinModuleName::Autodiff:
+        // The supplement is a module that depends on the base core. Every builtin declaration
+        // referenced by this source must therefore remain in one of the eager core segments above.
+        sb << (const char*)getAutodiffSupplementLibraryCode()->getBufferPointer();
         break;
     }
 }
@@ -407,9 +475,13 @@ SlangResult Session::compileBuiltinModule(
 {
     SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
 
+    const bool wasCompilingBuiltinModule = m_isCompilingBuiltinModule;
+    m_isCompilingBuiltinModule = true;
+    SLANG_DEFER(m_isCompilingBuiltinModule = wasCompilingBuiltinModule);
+
 #ifdef _DEBUG
     time_t beginTime = 0;
-    if (moduleName == slang::BuiltinModuleName::Core)
+    if (belongsInCoreModulesList(moduleName))
     {
         // Print a message in debug builds to notice the user that compiling the core module
         // can take a while.
@@ -437,7 +509,7 @@ SlangResult Session::compileBuiltinModule(
         moduleSrcBlob,
         compiledModule);
 
-    if (moduleName == slang::BuiltinModuleName::Core)
+    if (belongsInCoreModulesList(moduleName))
     {
         // We need to retain this AST so that we can use it in other code
         // (Note that the `Scope` type does not retain the AST it points to)
@@ -507,7 +579,7 @@ SlangResult Session::loadBuiltinModule(
         builtinModuleInfo.name,
         module));
 
-    if (moduleName == slang::BuiltinModuleName::Core)
+    if (belongsInCoreModulesList(moduleName))
     {
         // We need to retain this AST so that we can use it in other code
         // (Note that the `Scope` type does not retain the AST it points to)
