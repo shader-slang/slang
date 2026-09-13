@@ -101,6 +101,22 @@ SLANG_FORCE_INLINE const VALUE* getValue(const KeyValuePair<KEY, VALUE>* in)
 
 const float kMaxLoadFactor = 0.7f;
 
+/// Declares `is_avalanching` only when the selected hash implementation avalanches.
+///
+/// `is_avalanching` is a member type, so it cannot be switched on with a constant the way
+/// `kHasUniformHash` can; the declaration has to be inherited from a specialization instead.
+/// This is the same shape as `DetectAvalanchingHash` in slang-hash.h, keyed directly on the
+/// implementation rather than on a key type.
+template<bool avalanching>
+struct DeclareAvalanching
+{
+};
+template<>
+struct DeclareAvalanching<true>
+{
+    using is_avalanching = void;
+};
+
 /// Hashes any of the interchangeable text key types -- `UnownedStringSlice`,
 /// `String`, `ImmutableHashedString` -- so that a dictionary keyed by one of
 /// them can be probed with any of the others.
@@ -118,13 +134,13 @@ const float kMaxLoadFactor = 0.7f;
 /// those members is rejected at compile time rather than silently hashed some
 /// other way; in particular a bare `const char*` is not a text key, because
 /// hashing it would hash the pointer.
-struct TextKeyHash
+struct TextKeyHash : DeclareAvalanching<HashImpl::kIsAvalanching>
 {
     using is_transparent = void;
     /// All the text key types hash their bytes with the selected hash
-    /// function, so the result needs no further mixing by the map. This
-    /// matches the `kHasUniformHash` that the types themselves declare.
-    using is_avalanching = void;
+    /// function, so the result needs no further mixing by the map -- but only
+    /// when that function avalanches, which is what the base class above
+    /// checks. This matches the `kHasUniformHash` the types themselves declare.
 
     template<typename T, typename = typename T::IsTextKey>
     HashCode64 operator()(const T& key) const

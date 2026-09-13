@@ -205,7 +205,7 @@ public:
     /// Trims any horizontal whitespace from start and returns as a substring
     UnownedStringSlice trimStart() const;
 
-    static constexpr bool kHasUniformHash = true;
+    static constexpr bool kHasUniformHash = HashImpl::kIsAvalanching;
     HashCode64 getHashCode() const { return Slang::getHashCode(m_begin, size_t(m_end - m_begin)); }
 
     /// Marks this as one of the interchangeable text key types; see
@@ -788,7 +788,7 @@ public:
 
     bool contains(const String& str) const { return contains(str.begin()); }
 
-    static constexpr bool kHasUniformHash = true;
+    static constexpr bool kHasUniformHash = HashImpl::kIsAvalanching;
     HashCode64 getHashCode() const
     {
         return Slang::getHashCode(StringRepresentation::asSlice(m_buffer));
@@ -947,7 +947,7 @@ public:
     bool operator==(const String& other) const { return slice == other.getUnownedSlice(); }
     bool operator!=(const String& other) const { return slice != other.getUnownedSlice(); }
     bool operator==(const char* other) const { return slice == UnownedStringSlice(other); }
-    static constexpr bool kHasUniformHash = true;
+    static constexpr bool kHasUniformHash = HashImpl::kIsAvalanching;
     HashCode64 getHashCode() const { return hashCode; }
 
     /// Marks this as one of the interchangeable text key types; see
