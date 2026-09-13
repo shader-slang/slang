@@ -12,6 +12,7 @@
 #include "slang-uint-set.h"
 
 #include <initializer_list>
+#include <utility>
 
 namespace Slang
 {
@@ -100,11 +101,85 @@ SLANG_FORCE_INLINE const VALUE* getValue(const KeyValuePair<KEY, VALUE>* in)
 
 const float kMaxLoadFactor = 0.7f;
 
+/// Hashes any of the interchangeable text key types -- `UnownedStringSlice`,
+/// `String`, `ImmutableHashedString` -- so that a dictionary keyed by one of
+/// them can be probed with any of the others.
+///
+/// Without this, a `Dictionary<String, V>` probed with an `UnownedStringSlice`
+/// silently converts the slice to a `String` first, because the backing map
+/// only offers its heterogeneous `find` when both the hash and the comparator
+/// declare `is_transparent`. That conversion heap-allocates and copies the
+/// text on every lookup, hit or miss, and then throws the copy away.
+///
+/// The types opt in by declaring a member type `IsTextKey`, and in exchange
+/// must satisfy two things: `getHashCode()` must agree across the family (it
+/// does -- all three hash the same bytes with the same function), and
+/// `getUnownedSlice()` must yield the text being keyed on. Anything without
+/// those members is rejected at compile time rather than silently hashed some
+/// other way; in particular a bare `const char*` is not a text key, because
+/// hashing it would hash the pointer.
+struct TextKeyHash
+{
+    using is_transparent = void;
+    /// All the text key types hash their bytes with the selected hash
+    /// function, so the result needs no further mixing by the map. This
+    /// matches the `kHasUniformHash` that the types themselves declare.
+    using is_avalanching = void;
+
+    template<typename T, typename = typename T::IsTextKey>
+    HashCode64 operator()(const T& key) const
+    {
+        return key.getHashCode();
+    }
+};
+
+/// Compares any two of the interchangeable text key types; see `TextKeyHash`.
+///
+/// Both argument orders have to work, and which one a map uses is an
+/// unspecified implementation detail, so this compares the two slices rather
+/// than relying on a particular `operator==` overload existing between a
+/// specific pair of the types.
+struct TextKeyEqual
+{
+    using is_transparent = void;
+
+    template<
+        typename A,
+        typename B,
+        typename = typename A::IsTextKey,
+        typename = typename B::IsTextKey>
+    bool operator()(const A& a, const B& b) const
+    {
+        return a.getUnownedSlice() == b.getUnownedSlice();
+    }
+};
+
+namespace DictionaryDetail
+{
+/// Selects the hash and comparator a `Dictionary` uses by default for `TKey`.
+///
+/// Key types that declare `IsTextKey` get the transparent pair above, so that
+/// every `Dictionary<String, V>` in the codebase supports slice lookup without
+/// having to be redeclared. Everything else keeps the previous defaults.
+template<typename TKey, typename = void>
+struct KeyTraits
+{
+    using Hash = Slang::Hash<TKey>;
+    using KeyEqual = std::equal_to<TKey>;
+};
+template<typename TKey>
+struct KeyTraits<TKey, std::void_t<typename TKey::IsTextKey>>
+{
+    using Hash = TextKeyHash;
+    using KeyEqual = TextKeyEqual;
+};
+} // namespace DictionaryDetail
+
 template<
     typename TKey,
     typename TValue,
-    typename Hash = Slang::Hash<TKey>,
-    typename KeyEqual = std::equal_to<TKey>>
+    typename Hash = typename DictionaryDetail::KeyTraits<TKey>::Hash,
+    typename KeyEqual = typename DictionaryDetail::KeyTraits<TKey>::KeyEqual>
 class Dictionary
 {
     // Which hash map actually backs this is a build-time choice; see
@@ -369,22 +444,57 @@ public:
         SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
         return inserted ? nullptr : std::addressof(HashMapImpl::valueOf(iterator));
     }
+    /// Looks `key` up and, if it is absent, inserts an entry whose value is
+    /// constructed in place from `args`. Returns a pointer to the mapped
+    /// value -- found or freshly inserted -- together with whether an
+    /// insertion took place.
+    ///
+    /// This costs a single hash and a single probe, and it does not construct
+    /// the value at all when the key is already present. Prefer it to
+    /// `tryGetValue` followed by `operator[]` or `add`, which hash and probe
+    /// the same key twice, and to the pair-taking overloads below, which build
+    /// a `value_type` before the map is consulted and so copy the key and the
+    /// value even on a lookup that hits.
+    ///
+    /// For example, memoizing an expensive-to-build value reads as:
+    ///
+    ///     auto [entry, inserted] = cache.tryEmplace(key, nullptr);
+    ///     if (inserted)
+    ///         *entry = buildTheThing();
+    ///     return *entry;
+    ///
+    template<typename... Args>
+    std::pair<TValue*, bool> tryEmplace(const TKey& key, Args&&... args)
+    {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        auto [iterator, inserted] = map.try_emplace(key, std::forward<Args>(args)...);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
+        return {std::addressof(HashMapImpl::valueOf(iterator)), inserted};
+    }
+    /// Overload of `tryEmplace` that moves the key when it has to be stored.
+    template<typename... Args>
+    std::pair<TValue*, bool> tryEmplace(TKey&& key, Args&&... args)
+    {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        auto [iterator, inserted] = map.try_emplace(std::move(key), std::forward<Args>(args)...);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
+        return {std::addressof(HashMapImpl::valueOf(iterator)), inserted};
+    }
+
     // Tries to insert the given element, if a value was already present at
     // the given key then returns a pointer to that element instead.
     // Returns nullptr if insertion was successful.
     TValue* tryGetValueOrAdd(const TKey& key, const TValue& value)
     {
-        return tryGetValueOrAdd({key, value});
+        const auto [valuePtr, inserted] = tryEmplace(key, value);
+        return inserted ? nullptr : valuePtr;
     }
 
     // Inserts the given value if it doesn't exist already
     // Return a reference to the (possibly new) value in the map
     TValue& getOrAddValue(const TKey& key, const TValue& defaultValue)
     {
-        SLANG_CONTAINER_STATS_NOTE_INSERT();
-        auto [iterator, inserted] = map.insert({key, defaultValue});
-        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
-        return HashMapImpl::valueOf(iterator);
+        return *tryEmplace(key, defaultValue).first;
     }
 
     // Returns a reference to the value at the specified key, default
@@ -428,12 +538,12 @@ public:
     }
     // Returns true if the value was inserted, returns false if the map
     // already has a value associated with this key
-    bool addIfNotExists(const TKey& k, const TValue& v) { return addIfNotExists({k, v}); }
+    bool addIfNotExists(const TKey& k, const TValue& v) { return tryEmplace(k, v).second; }
     // Returns true if the value was inserted, returns false if the map
     // already has a value associated with this key
     bool addIfNotExists(TKey&& k, TValue&& v)
     {
-        return addIfNotExists({std::move(k), std::move(v)});
+        return tryEmplace(std::move(k), std::move(v)).second;
     }
 
     // Asserts if the key already exists in the dictionary
@@ -449,9 +559,17 @@ public:
             SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
     }
     // Asserts if the key already exists in the dictionary
-    void add(const TKey& key, const TValue& value) { add({key, value}); }
+    void add(const TKey& key, const TValue& value)
+    {
+        if (!addIfNotExists(key, value))
+            SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
+    }
     // Asserts if the key already exists in the dictionary
-    void add(TKey&& key, TValue&& value) { add({std::move(key), std::move(value)}); }
+    void add(TKey&& key, TValue&& value)
+    {
+        if (!addIfNotExists(std::move(key), std::move(value)))
+            SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
+    }
 
     // Inserts into the dictionary or assigns if the key already exists
     void set(const TKey& key, const TValue& value)

@@ -12262,7 +12262,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             return false;
 
         String mangledName = getMangledName(context->astBuilder, decl);
-        auto symbols = owningIRModule->findSymbolByMangledName(mangledName);
+        auto symbols = owningIRModule->findSymbolByMangledName(mangledName.getUnownedSlice());
 
         // Search the list rather than taking the first entry: a mangled name maps
         // to a *list* of symbols, and only one of them is the interface. Finding
@@ -14115,7 +14115,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto irModule = importedModule->getIRModule();
             SLANG_ASSERT(irModule && "Module containing imported decl does not have an IRModule.");
             String mangledName = getMangledName(context->astBuilder, decl);
-            auto importedFunc = irModule->findSymbolByMangledName(mangledName);
+            auto importedFunc = irModule->findSymbolByMangledName(mangledName.getUnownedSlice());
             SLANG_ASSERT(importedFunc.getCount() > 0);
             subContext->shared->externalSymbolsToPrelink.add(importedFunc[0]);
         }

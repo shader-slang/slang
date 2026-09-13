@@ -90,11 +90,10 @@ protected:
 
     void addToWorkList(IRInst* inst)
     {
-        if (workListSet.contains(inst))
+        if (!workListSet.add(inst))
             return;
 
         workList.add(inst);
-        workListSet.add(inst);
     }
 
     void processWorkList()
@@ -125,11 +124,10 @@ protected:
 
     void addToBeDeleted(IRInst* inst)
     {
-        if (toBeDeletedSet.contains(inst))
+        if (!toBeDeletedSet.add(inst))
             return;
 
         toBeDeleted.add(inst);
-        toBeDeletedSet.add(inst);
     }
 
     void processDeletions()

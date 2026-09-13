@@ -13,7 +13,7 @@ struct LValueCastLoweringContext
 {
     void _addToWorkList(IRInst* inst)
     {
-        if (!findOuterGeneric(inst) && !m_workList.contains(inst))
+        if (!findOuterGeneric(inst))
         {
             m_workList.add(inst);
         }

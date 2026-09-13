@@ -79,6 +79,7 @@ struct ContainerTypeKey
     {
         return elementType == other.elementType && containerType == other.containerType;
     }
+    static constexpr bool kHasUniformHash = true;
     Slang::HashCode getHashCode() const
     {
         return Slang::combineHash(

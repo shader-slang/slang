@@ -304,10 +304,9 @@ void markConstExpr(PropagateConstExprContext* context, IRInst* value)
 
 void maybeAddToWorkList(PropagateConstExprContext* context, IRInst* gv)
 {
-    if (!context->onWorkList.contains(gv))
+    if (context->onWorkList.add(gv))
     {
         context->workList.add(gv);
-        context->onWorkList.add(gv);
     }
 }
 

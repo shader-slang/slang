@@ -93,17 +93,20 @@ struct TestOptions
     // Small helper to help consistently interrogating for filecheck usage
     bool getFileCheckPrefix(String& prefix) const
     {
-        return commandOptions.tryGetValue("filecheck", prefix);
+        return commandOptions.tryGetValue(toSlice("filecheck"), prefix);
     }
     bool getFileCheckBufferPrefix(String& prefix) const
     {
-        return commandOptions.tryGetValue("filecheck-buffer", prefix);
+        return commandOptions.tryGetValue(toSlice("filecheck-buffer"), prefix);
     }
     bool getDiagTestPrefix(String& prefix) const
     {
-        return commandOptions.tryGetValue("diag", prefix);
+        return commandOptions.tryGetValue(toSlice("diag"), prefix);
     }
-    bool isNonExhaustiveDiagTest() const { return commandOptions.containsKey("non-exhaustive"); }
+    bool isNonExhaustiveDiagTest() const
+    {
+        return commandOptions.containsKey(toSlice("non-exhaustive"));
+    }
 
     Type type = Type::Normal;
 

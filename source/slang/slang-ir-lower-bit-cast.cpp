@@ -26,9 +26,6 @@ struct BitCastLoweringContext
                 return;
         }
 
-        if (workList.contains(inst))
-            return;
-
         workList.add(inst);
     }
 

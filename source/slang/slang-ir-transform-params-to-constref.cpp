@@ -371,10 +371,8 @@ struct TransformParamsToConstRefContext
         HashSet<IRFunc*>& visitedCandidates)
     {
         // We added 'root' already, leave
-        if (visitedCandidates.contains(root))
+        if (!visitedCandidates.add(root))
             return;
-
-        visitedCandidates.add(root);
 
         for (auto block : root->getBlocks())
         {

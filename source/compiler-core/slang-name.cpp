@@ -23,15 +23,17 @@ const char* getCstr(Name* name)
 
 Name* NamePool::getName(UnownedStringSlice text)
 {
-    RefPtr<Name> name;
-    if (names.tryGetValue(text, name))
-        return name;
+    // This runs for every identifier the lexer produces, so the hit path is
+    // kept free of allocation: `text` is used to probe the map directly rather
+    // than being converted to a `String` first.
+    if (const auto name = names.tryGetValue(text))
+        return *name;
 
-    name = new Name();
+    RefPtr<Name> name = new Name();
     name->text = text;
-    // Key the map on the `Name`'s own string rather than on `text` again. `String` is
-    // reference-counted, so this shares one buffer between the map and the `Name` instead of
-    // copying the characters a second time.
+    // Key the entry on the characters the `Name` itself now owns. Copying a
+    // `String` shares its representation, so the pool ends up holding one copy
+    // of the text rather than two.
     names.add(name->text, name);
     return name;
 }

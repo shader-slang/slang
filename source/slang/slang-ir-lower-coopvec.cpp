@@ -64,11 +64,10 @@ struct CoopVecLoweringContext
                 return;
         }
 
-        if (workListSet.contains(inst))
+        if (!workListSet.add(inst))
             return;
 
         workList.add(inst);
-        workListSet.add(inst);
     }
 
     void processMakeCoopVec(IRInst* inst)

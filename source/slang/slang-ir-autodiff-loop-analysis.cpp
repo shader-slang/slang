@@ -888,6 +888,7 @@ struct Edge
         return predecessor == other.predecessor && successor == other.successor;
     }
 
+    static constexpr bool kHasUniformHash = true;
     UInt64 getHashCode() const
     {
         UInt64 predHash = Slang::getHashCode(predecessor);

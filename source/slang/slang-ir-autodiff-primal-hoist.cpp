@@ -496,10 +496,8 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
             auto use = workList.getLast();
             workList.removeLast();
 
-            if (processedUses.contains(use))
+            if (!processedUses.add(use))
                 continue;
-
-            processedUses.add(use);
 
             HoistResult result = HoistResult::none();
 
@@ -1507,9 +1505,8 @@ void applyCheckpointSet(
             HashSet<IRBlock*> predecessorSet;
             for (auto predecessor : block->getPredecessors())
             {
-                if (predecessorSet.contains(predecessor))
+                if (!predecessorSet.add(predecessor))
                     continue;
-                predecessorSet.add(predecessor);
 
                 auto primalPhiArg =
                     as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii);

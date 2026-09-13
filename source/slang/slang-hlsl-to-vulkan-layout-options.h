@@ -100,6 +100,7 @@ public:
         bool operator==(const ThisType& rhs) const { return kind == rhs.kind && set == rhs.set; }
         bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
+        static constexpr bool kHasUniformHash = true;
         HashCode getHashCode() const
         {
             return combineHash(Slang::getHashCode(kind), Slang::getHashCode(set));

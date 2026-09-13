@@ -15,6 +15,103 @@ section says otherwise.
 
 ---
 
+## Status
+
+Phases 1 and 2 of the commit stack below are landed, as nine commits on top of
+master, deliberately underneath the multi-backend commit so that they rebase
+before it. Issue 03 is the only phase-2 item not done.
+
+| Issue                   | State                                                          |
+| ----------------------- | -------------------------------------------------------------- |
+| 01                      | done -- `combineHash` folds with MUM; see below                |
+| 02                      | done -- transparent text-key lookup, with unit tests           |
+| 04 Part A               | done -- `contains`-then-`add` collapsed across 37 files        |
+| 04 Part B               | done, **scoped down** -- `tryEmplace` only, see the note below |
+| 05                      | done -- insert helpers go through `try_emplace`                |
+| 09 Step 1               | done -- SPIR-V memoization double insert collapsed             |
+| 10 Part A               | done -- interim form (key built once, second probe remains)    |
+| 11 Part A               | done -- `IRDeduplicationContext::getReplacement`               |
+| 12, 13                  | done                                                           |
+| 14                      | **partly** done -- see "still to do in the go-wide tree" below |
+| 03                      | **not started** -- the last phase-2 item                       |
+| 11 Part B               | deferred to phase 4 after measuring                            |
+| 06, 07, 08, 09 rest, 15 | not started                                                    |
+
+Measured effects:
+
+- **02**: a `Dictionary<String, int>` probed a thousand times with an
+  `UnownedStringSlice` went from a thousand heap allocations to none.
+- **01**: on the `ValNodeDesc` shape, the old fold reached 8 of 64 buckets
+  (chi-squared 448,092 against an ideal of ~63). It now reaches all 64, at 53.
+
+Two notes on how those landed, because both differ from what the issues say.
+
+**04 Part B was scoped down deliberately.** The plan was `find` / `erase` /
+`tryEmplace`. Only `tryEmplace` was added, returning a `TValue*` rather than an
+iterator, because exposing an iterator exposes the backing map's iterator type
+-- and those differ in exactly the ways the shim layer exists to paper over.
+`tryEmplace` covered every double-probe call site, so the iterator API was not
+needed. `_removeGlobalNumberingEntry` therefore still probes twice; it now
+hashes once, which was the expensive half.
+
+**01 ended up using wyhash's MUM rather than a hand-rolled mixer**, spelled out
+in `slang-hash.h` rather than called through a hash map library, since which
+library is linked is a build-time choice. Two hand-rolled attempts were wrong
+first: `(h ^ m) * K` is commutative, so `TypePair{a,b}` hashed the same as
+`{b,a}`; the fix for that still left a flip of an operand's top bit reaching the
+bucket index 0% of the time. Worth knowing that `ankerl`'s own tuple combiner,
+`mix(h + m, k)`, has the commutativity problem too -- hence the rotate. The
+quality bar used was wyhash's own integer hash, which every pointer-keyed
+dictionary already relies on: its worst input bit changes the bucket index 35%
+of the time, and `foldHashStep` now manages 89%.
+
+## Merging this into the go-wide branch
+
+**One change is required or the build breaks.** `Dictionary::tryEmplace` ends
+both overloads with
+
+```cpp
+return {std::addressof(iterator->second), inserted};
+```
+
+which does not compile under `SLANG_HASHMAP=TSL_ROBIN`, because
+`tsl::robin_map` dereferences to a `const` pair. Route it through the shim, as
+go-wide already does elsewhere:
+
+```cpp
+return {std::addressof(HashMapImpl::valueOf(iterator)), inserted};
+```
+
+That is the whole of the `slang-dictionary.h` conflict. Go-wide's hunks for
+`tryGetValueOrAdd` and `getOrAddValue` should be dropped rather than merged --
+those functions no longer touch `iterator->second`, they call `tryEmplace` --
+and its `valueOf` applied inside `tryEmplace` instead.
+
+`slang-hash.h` should merge cleanly: go-wide's hunks there stop at line 170 and
+`combineHash` starts after it. The one overlap is the doc comment added to
+`DetectAvalanchingHash`.
+
+Compile all eight `SLANG_HASHMAP` values once before running a matrix.
+`try_emplace` and the transparent-lookup functors were verified by reading the
+backend headers, but only ever compiled against `ankerl::unordered_dense`.
+
+### Still to do in the go-wide tree, before trusting particular rows
+
+- **Before the `BOOST` and `STD` hash rows mean anything**, finish issue 14.
+  `String` and `UnownedStringSlice` declare `kHasUniformHash = true`
+  unconditionally, and `TextKeyHash` declares `is_avalanching`, but
+  `slang-hash-impl.h` says `kIsAvalanching = false` for those two
+  implementations. Make both conditional on `HashImpl::kIsAvalanching`. This
+  does _not_ affect the 33 composite key types marked in phase 2 -- their
+  hashes go through `combineHash`, which is avalanching whichever `SLANG_HASH`
+  is selected.
+- **Before trusting a close flat-vs-node comparison**, do issue 03. Entry size
+  is a first-order input to it and `HashSet<IRInst*>` is still 16 bytes per
+  entry rather than 8.
+- Issue 15's scope comment in `slang-hash-impl.h`.
+
+---
+
 ## Index, by how each relates to the benchmark matrix
 
 The categories below say _how each issue relates to the matrix_. For _when to
@@ -263,10 +360,6 @@ with no reference to the benchmark.
  7. 02          transparent heterogeneous lookup       both argument orders!
  8. 12          NamePool::getName                      needs 02
  9. 13          IR link mangled-name lookups           needs 02
-10. 11 Part B   probe without materialising the        needs 02; largest item
-                dummy IRInst                           here, safe to defer to
-                                                       phase 4 if you want
-                                                       phase 1 short
 
 === PHASE 2 — matrix prerequisites.  Neutral *as landed*, but each removes a ===
 ===           confound.  Land each as a unit and verify the ankerl row is   ===
@@ -293,7 +386,8 @@ with no reference to the benchmark.
 18. 09          SpvInstKey rest (cached hash, inline)  measure count distribution
 19. 10 Part B   cache the hash on IRInst               +8 B on every instruction
 20. 06 full     cached hash in StringRepresentation    +8 B on every string
-21. 11 Part B   if deferred from phase 1
+21. 11 Part B   probe without materialising the        small win, real risk;
+                dummy IRInst                           see note below
 ```
 
 #### Notes on the phase boundaries
@@ -324,6 +418,21 @@ removes the byte scan, which _lowers_ it again. Doing neither, or both, leaves
 the weighting roughly where it is today. If you do 02 without 06, be aware the
 matrix will slightly over-reward a fast string hash. The full 06 (changing
 `StringRepresentation`) stays in phase 4 because of its memory cost.
+
+**Why 11 Part B moved to phase 4.** It was originally the optional tail of
+phase 1, on the grounds that it only removes work and so cannot regress.
+Measuring the sizes made the likely payoff look too small to justify the risk.
+`sizeof(IRInst)` is 112 and `sizeof(IRUse)` is 32, so the dummy instruction is
+`112 + 32N` bytes; at the expected median of one operand that is 144 bytes
+zeroed and partly written per probe, against 8 bytes for a borrowed pointer
+array. But the arena is rewound to the same cursor on every deduplication hit,
+so the dummy is allocated at the _same address_ over and over and those three
+cache lines stay resident in L1 -- the memset is single-digit cycles, against an
+operation already dominated by the hash map's own cache misses. That is not
+enough to justify an L-sized change to the hash-consing key, which is the one
+place in this whole set where a subtle mistake produces a missed or incorrect
+deduplication rather than a slowdown. Revisit it only if a profile says the
+probe path is hot for a reason other than the map.
 
 **Why phase 4 is after the benchmark.** Every item there is matrix-neutral — it
 reduces work outside the map, or the number of map operations — so none of them

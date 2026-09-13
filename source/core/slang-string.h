@@ -208,6 +208,11 @@ public:
     static constexpr bool kHasUniformHash = true;
     HashCode64 getHashCode() const { return Slang::getHashCode(m_begin, size_t(m_end - m_begin)); }
 
+    /// Marks this as one of the interchangeable text key types; see
+    /// `Slang::TextKeyHash` in slang-dictionary.h for the contract.
+    using IsTextKey = void;
+    UnownedStringSlice getUnownedSlice() const { return *this; }
+
     template<size_t SIZE>
     SLANG_FORCE_INLINE static UnownedStringSlice fromLiteral(const char (&in)[SIZE])
     {
@@ -790,6 +795,10 @@ public:
     }
 
     UnownedStringSlice getUnownedSlice() const { return StringRepresentation::asSlice(m_buffer); }
+
+    /// Marks this as one of the interchangeable text key types; see
+    /// `Slang::TextKeyHash` in slang-dictionary.h for the contract.
+    using IsTextKey = void;
 };
 
 /// Hash and equality functors that let a dictionary keyed on `String` be probed with an
@@ -938,7 +947,13 @@ public:
     bool operator==(const String& other) const { return slice == other.getUnownedSlice(); }
     bool operator!=(const String& other) const { return slice != other.getUnownedSlice(); }
     bool operator==(const char* other) const { return slice == UnownedStringSlice(other); }
+    static constexpr bool kHasUniformHash = true;
     HashCode64 getHashCode() const { return hashCode; }
+
+    /// Marks this as one of the interchangeable text key types; see
+    /// `Slang::TextKeyHash` in slang-dictionary.h for the contract.
+    using IsTextKey = void;
+    UnownedStringSlice getUnownedSlice() const { return slice.getUnownedSlice(); }
 };
 
 class SLANG_RT_API StringBuilder : public String

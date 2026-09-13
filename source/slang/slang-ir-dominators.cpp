@@ -282,11 +282,10 @@ struct DepthFirstSearchContext
             bool pushedChild = false;
             for (auto succ : getSuccessors(curNode))
             {
-                if (!visited.contains(succ))
+                if (visited.add(succ))
                 {
                     pushedChild = true;
                     nodeStack.add(succ);
-                    visited.add(succ);
 
                     preVisit(succ);
                     break;

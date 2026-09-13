@@ -280,6 +280,7 @@ private:
         bool operator==(LayoutObjKey const& that) const;
         bool operator!=(LayoutObjKey const& that) const;
 
+        static constexpr bool kHasUniformHash = true;
         HashCode64 getHashCode() const;
         void hashInto(Hasher& hasher) const;
     };

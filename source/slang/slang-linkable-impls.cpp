@@ -91,9 +91,8 @@ CompositeComponentType::CompositeComponentType(
         for (Index rr = 0; rr < childRequirementCount; ++rr)
         {
             auto childRequirement = child->getRequirement(rr);
-            if (!requirementsSet.contains(childRequirement))
+            if (requirementsSet.add(childRequirement))
             {
-                requirementsSet.add(childRequirement);
                 m_requirements.add(childRequirement);
             }
         }
@@ -474,9 +473,8 @@ SpecializedComponentType::SpecializedComponentType(
         //
         for (SourceFile* sourceFile : module->getFileDependencies())
         {
-            if (fileDependencySet.contains(sourceFile))
+            if (!fileDependencySet.add(sourceFile))
                 continue;
-            fileDependencySet.add(sourceFile);
             m_fileDependencies.add(sourceFile);
         }
 

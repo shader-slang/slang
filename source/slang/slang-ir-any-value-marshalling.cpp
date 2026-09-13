@@ -59,11 +59,10 @@ struct AnyValueMarshallingContext
                 return;
         }
 
-        if (workListSet.contains(inst))
+        if (!workListSet.add(inst))
             return;
 
         workList.add(inst);
-        workListSet.add(inst);
     }
 
     // Stores information about generated `AnyValue` struct types.
@@ -83,6 +82,7 @@ struct AnyValueMarshallingContext
         {
             return originalType == other.originalType && anyValueSize == other.anyValueSize;
         }
+        static constexpr bool kHasUniformHash = true;
         HashCode getHashCode() const
         {
             return combineHash(Slang::getHashCode(originalType), Slang::getHashCode(anyValueSize));

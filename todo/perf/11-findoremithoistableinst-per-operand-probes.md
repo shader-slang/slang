@@ -265,6 +265,21 @@ Behaviour-preserving and trivially reviewable.
 
 ### Part B — avoid materialising the dummy instruction on the probe
 
+**Measured, and deferred.** `sizeof(IRInst)` is 112 and `sizeof(IRUse)` is 32,
+so the dummy costs `112 + 32N` bytes; at the expected median of one operand that
+is 144 bytes zeroed and partly written per probe, against 8 bytes for a borrowed
+pointer array. That ratio looks compelling until you notice that the arena is
+rewound to the same cursor on every deduplication hit, so the dummy lands at the
+_same address_ every time and its three cache lines stay resident in L1. The
+memset is then single-digit cycles, against a probe already dominated by the
+hash map's own cache misses.
+
+So the payoff is small, while the risk is not: this is the hash-consing key, and
+a subtle disagreement between the transparent comparator and
+`IRInstKey::operator==` produces a missed or incorrect deduplication rather than
+a slowdown. Do this only if a profile shows the probe path hot for a reason
+other than the map itself. The design below is kept for whoever revisits it.
+
 Introduce a description type and a transparent hash/equality pair, exactly as
 the AST side already does:
 
