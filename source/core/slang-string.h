@@ -387,8 +387,11 @@ public:
         // `required` rather than `newCapacity`: the doubling above exists only because there is
         // no inline buffer, so charging it to the histogram would hide exactly the strings such a
         // buffer would have held.
+        //
+        // The site is forwarded rather than taken here, so that the allocation is attributed to
+        // whoever asked the string to hold more, not to this line.
         return cloneWithCapacity(
-            newCapacity SLANG_CONTAINER_STATS_STRING_ALLOC_AT_TRAILING(true, required));
+            newCapacity SLANG_CONTAINER_STATS_STRING_ALLOC_FORWARD_AT_TRAILING(true, required));
     }
 
     /// Overload delete to silence ASAN new-delete-type-mismatch errors.
