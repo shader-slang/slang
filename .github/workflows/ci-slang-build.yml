@@ -282,8 +282,14 @@ jobs:
           # RENAME, or guard is caught on every PR rather than at a release tag.
           # The notices are configuration-independent files, so installing the
           # Release config is valid regardless of which config was built.
+          # mimalloc-LICENSE is intentionally excluded here: SLANG_ENABLE_MIMALLOC
+          # and SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC both default OFF on Linux
+          # (CMakeLists.txt), so the default config used by this job does not
+          # install it. The other five notices below are all installed by
+          # default (miniz/unordered_dense unconditionally; glslang/spirv-tools
+          # under the default-ON SLANG_ENABLE_SLANG_GLSLANG).
           cmake --install build --config Release --component metadata --prefix install-metadata
-          for f in cmark-COPYING lz4-LICENSE glslang-LICENSE.txt; do
+          for f in cmark-COPYING lz4-LICENSE glslang-LICENSE.txt miniz-LICENSE unordered_dense-LICENSE spirv-tools-LICENSE; do
             test -f "install-metadata/third-party-notices/$f" || {
               echo "::error::third-party notice missing from metadata component: $f"
               exit 1
