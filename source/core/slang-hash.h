@@ -64,6 +64,19 @@ struct DetectAvalanchingHash<T, std::enable_if_t<HasWyhash<T>>>
     using is_avalanching = void;
 };
 // Have we marked 'getHashCode' as having good uniformity properties.
+//
+// Declaring `static constexpr bool kHasUniformHash = true` is a promise to the
+// hash map that this type's `getHashCode` is already well distributed in every
+// bit, and the map responds by skipping the mixing step it would otherwise
+// apply. Make that promise when the hash is built out of `combineHash`,
+// `Hasher`, `hashObjectBytes` or `hashBytes`, all of which mix thoroughly, or
+// when it simply forwards to a hash that does.
+//
+// Do not make it for a hash that merely combines its inputs by hand.
+// `UIntSet::getHashCode`, for instance, xors its elements together and returns
+// a signed `int`; it is not used as a dictionary key, and it must not be
+// marked if it ever becomes one. A wrong promise here is invisible -- nothing
+// fails, the map just clusters.
 template<typename T>
 struct DetectAvalanchingHash<T, std::enable_if_t<T::kHasUniformHash>>
 {

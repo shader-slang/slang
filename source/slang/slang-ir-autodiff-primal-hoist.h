@@ -292,6 +292,7 @@ struct UseOrPseudoUse
         usedVal = inUsedVal;
         ;
     }
+    static constexpr bool kHasUniformHash = true;
     HashCode getHashCode() const
     {
         return combineHash(Slang::getHashCode(user), Slang::getHashCode(usedVal));

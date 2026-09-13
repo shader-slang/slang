@@ -167,6 +167,7 @@ struct ValKey
     }
     bool operator==(const ValNodeDesc& desc) const
     {
+        static constexpr bool kHasUniformHash = true;
         if (hashCode != desc.getHashCode())
             return false;
         if (val->getClass() != desc.type)

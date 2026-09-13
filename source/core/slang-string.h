@@ -860,6 +860,7 @@ public:
     bool operator==(const String& other) const { return slice == other.getUnownedSlice(); }
     bool operator!=(const String& other) const { return slice != other.getUnownedSlice(); }
     bool operator==(const char* other) const { return slice == UnownedStringSlice(other); }
+    static constexpr bool kHasUniformHash = true;
     HashCode64 getHashCode() const { return hashCode; }
 
     /// Marks this as one of the interchangeable text key types; see

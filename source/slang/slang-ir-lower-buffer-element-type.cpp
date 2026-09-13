@@ -282,6 +282,7 @@ struct TypeLoweringConfig
         return addressSpace == other.addressSpace && layoutRuleName == other.layoutRuleName &&
                lowerToPhysicalType == other.lowerToPhysicalType;
     }
+    static constexpr bool kHasUniformHash = true;
     HashCode getHashCode() const
     {
         return combineHash(
@@ -478,6 +479,7 @@ struct LoweredElementTypeContext
         {
             return toType == other.toType && fromType == other.fromType;
         }
+        static constexpr bool kHasUniformHash = true;
         HashCode64 getHashCode() const
         {
             return combineHash(Slang::getHashCode(toType), Slang::getHashCode(fromType));
@@ -507,6 +509,7 @@ struct LoweredElementTypeContext
         {
             return (callee == other.callee && specializedFuncType == other.specializedFuncType);
         }
+        static constexpr bool kHasUniformHash = true;
         HashCode64 getHashCode() const
         {
             return combineHash(Slang::getHashCode(callee), Slang::getHashCode(specializedFuncType));

@@ -169,6 +169,7 @@ struct IRSimpleSpecializationKey
     // and `operator==` defined for `List<T>`.
 
     bool operator==(IRSimpleSpecializationKey const& other) const;
+    static constexpr bool kHasUniformHash = true;
     HashCode getHashCode() const;
 };
 

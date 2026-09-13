@@ -40,6 +40,7 @@ struct CommandOptions
             return kind == rhs.kind && nameIndex == rhs.nameIndex;
         }
         SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+        static constexpr bool kHasUniformHash = true;
         HashCode getHashCode() const
         {
             return combineHash(Slang::getHashCode(kind), Slang::getHashCode(nameIndex));
@@ -317,6 +318,7 @@ protected:
             return kind == rhs.kind && userValue == rhs.userValue;
         }
         SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+        static constexpr bool kHasUniformHash = true;
         HashCode getHashCode() const
         {
             return combineHash(Slang::getHashCode(kind), Slang::getHashCode(userValue));

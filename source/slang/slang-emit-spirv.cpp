@@ -1941,7 +1941,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             return instWords == other.instWords && extraKeyData == other.extraKeyData;
         }
-        const static bool kHasUniformHash = true;
+        static constexpr bool kHasUniformHash = true;
         auto getHashCode() const
         {
             const auto instWordsHash = Slang::getHashCode(
@@ -7229,6 +7229,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return builtinName == other.builtinName && storageClass == other.storageClass &&
                    flat == other.flat && pointeeType == other.pointeeType;
         }
+        static constexpr bool kHasUniformHash = true;
         HashCode getHashCode() const
         {
             return combineHash(
@@ -7250,6 +7251,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                    arrayStride == other.arrayStride;
         }
 
+        static constexpr bool kHasUniformHash = true;
         HashCode getHashCode() const
         {
             return combineHash(

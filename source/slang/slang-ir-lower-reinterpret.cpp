@@ -21,6 +21,7 @@ struct ReinterpretOptionalKey
         return srcType == other.srcType && destType == other.destType;
     }
 
+    static constexpr bool kHasUniformHash = true;
     HashCode getHashCode() const
     {
         return combineHash(Slang::getHashCode(srcType), Slang::getHashCode(destType));

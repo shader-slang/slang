@@ -201,6 +201,7 @@ public:
     /// Make an invalid capability set (such that no target could ever support it)
     static CapabilitySet makeInvalid();
 
+    static constexpr bool kHasUniformHash = true;
     HashCode64 getHashCode() const;
 
     /// Is this capability set empty (such that any target supports it)?

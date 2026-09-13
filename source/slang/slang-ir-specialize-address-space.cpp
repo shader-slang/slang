@@ -57,6 +57,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             : func(func), argAddrSpaces(argAddrSpaces)
         {
             Hasher hasher;
+            static constexpr bool kHasUniformHash = true;
             hasher.addHash(Slang::getHashCode(func));
             for (auto addrSpace : argAddrSpaces)
             {

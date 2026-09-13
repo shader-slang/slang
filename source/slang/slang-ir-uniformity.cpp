@@ -39,6 +39,7 @@ struct ValidateUniformityContext
         {
             return func == other.func && nonUniformParams == other.nonUniformParams;
         }
+        static constexpr bool kHasUniformHash = true;
         HashCode getHashCode() const
         {
             return combineHash(Slang::getHashCode(func), nonUniformParams.getHashCode());
