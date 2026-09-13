@@ -17,8 +17,10 @@ if [[ ! -f "$CMAKE_CACHE" ]]; then
   exit 0
 fi
 
-# Extract compiler path from CMakeCache.txt
-COMPILER_PATH=$(grep "^CMAKE_CXX_COMPILER:FILEPATH=" "$CMAKE_CACHE" | cut -d'=' -f2)
+# Extract compiler path from CMakeCache.txt. `|| true` (here and on the version
+# probes below) makes these best-effort detections warn via the guards below rather
+# than abort under `set -euo pipefail` when a probe exits non-zero. See #13041.
+COMPILER_PATH=$(grep "^CMAKE_CXX_COMPILER:FILEPATH=" "$CMAKE_CACHE" | cut -d'=' -f2) || true
 
 if [[ -z "$COMPILER_PATH" ]]; then
   echo "::warning::Could not find CMAKE_CXX_COMPILER in CMakeCache.txt"
@@ -33,16 +35,16 @@ COMPILER_TYPE=""
 if [[ "$COMPILER_NAME" =~ ^g\+\+|^gcc ]]; then
   COMPILER_TYPE="GCC"
   # Get GCC version (e.g., "gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0")
-  COMPILER_VERSION=$("$COMPILER_PATH" --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  COMPILER_VERSION=$("$COMPILER_PATH" --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) || true
 elif [[ "$COMPILER_NAME" =~ ^clang\+\+|^clang ]]; then
   COMPILER_TYPE="Clang"
   # Get Clang version (e.g., "Ubuntu clang version 15.0.7")
-  COMPILER_VERSION=$("$COMPILER_PATH" --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  COMPILER_VERSION=$("$COMPILER_PATH" --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) || true
 elif [[ "$COMPILER_NAME" =~ ^cl\.exe|^cl$ ]]; then
   COMPILER_TYPE="MSVC"
   # MSVC version is more complex, extract major version
   # MSVC outputs version like "19.29.30133" where 19 is the major version
-  COMPILER_VERSION=$("$COMPILER_PATH" 2>&1 | grep -oE 'Version [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | head -1)
+  COMPILER_VERSION=$("$COMPILER_PATH" 2>&1 | grep -oE 'Version [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | head -1) || true
 else
   echo "::warning::Unknown compiler type: $COMPILER_NAME"
   exit 0
@@ -90,14 +92,14 @@ VERSION_FOUND=false
 
 case "$COMPILER_TYPE" in
 "GCC")
-  DOC_LINE=$(grep -E "^_GCC_ .+ (are|is) tested in CI" "$DOCS_FILE" | head -1)
+  DOC_LINE=$(grep -E "^_GCC_ .+ (are|is) tested in CI" "$DOCS_FILE" | head -1) || true
   if [[ -n "$DOC_LINE" ]]; then
     # shellcheck disable=SC2207
     EXPECTED_VERSIONS=($(extract_versions "$DOC_LINE" "false"))
   fi
   ;;
 "Clang")
-  DOC_LINE=$(grep -E "^_Clang_ .+ (are|is) tested in CI" "$DOCS_FILE" | head -1)
+  DOC_LINE=$(grep -E "^_Clang_ .+ (are|is) tested in CI" "$DOCS_FILE" | head -1) || true
   if [[ -n "$DOC_LINE" ]]; then
     # shellcheck disable=SC2207
     EXPECTED_VERSIONS=($(extract_versions "$DOC_LINE" "false"))
@@ -105,7 +107,7 @@ case "$COMPILER_TYPE" in
   ;;
 "MSVC")
   # For MSVC, we only compare major version
-  DOC_LINE=$(grep -E "^_MSVC_ .+ (are|is) tested in CI" "$DOCS_FILE" | head -1)
+  DOC_LINE=$(grep -E "^_MSVC_ .+ (are|is) tested in CI" "$DOCS_FILE" | head -1) || true
   if [[ -n "$DOC_LINE" ]]; then
     # shellcheck disable=SC2207
     EXPECTED_VERSIONS=($(extract_versions "$DOC_LINE" "true"))
