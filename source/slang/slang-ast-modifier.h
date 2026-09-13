@@ -822,6 +822,15 @@ class UncheckedAttribute : public AttributeBase
     FIDDLE(...)
 
     Scope* scope = nullptr;
+
+    // The attribute name as written, as an expression: a `VarExpr` for an unqualified `[Name]` or a
+    // `StaticMemberExpr` chain for a qualified `[a::b::Name]`. The checker resolves this through
+    // the normal name-resolution path so that a qualified name (including a user-defined attribute
+    // declared in a namespace) is looked up the same way as any other qualified reference. Like
+    // `scope`, it lives only on the unchecked attribute: it is consumed during `checkModifier` and
+    // never read off the checked `Attribute`. Null for an attribute not produced from a parsed name
+    // (e.g. a completion request, or a GLSL layout qualifier).
+    FIDDLE() Expr* attributeNameExpr = nullptr;
 };
 
 // A GLSL layout qualifier whose value has not yet been resolved or validated.

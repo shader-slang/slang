@@ -160,7 +160,134 @@ static bool _isDeclAllowedAsAttribute(DeclRef<Decl> declRef)
     return true;
 }
 
-AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope* scope)
+// Return the `AttributeDecl` defined by a user-defined attribute `struct` (i.e. `struct
+// NameAttribute` marked `[__AttributeUsage(...)]`), or null if `structDecl` does not carry
+// `[__AttributeUsage]` and so may not be used as an attribute.
+static AttributeDecl* _getAttributeDeclFromUserDefinedAttributeStruct(
+    SemanticsVisitor* visitor,
+    StructDecl* structDecl)
+{
+    if (!structDecl)
+        return nullptr;
+
+    ensureDecl(visitor, structDecl, DeclCheckState::ModifiersChecked);
+    auto attrUsageAttr = structDecl->findModifier<AttributeUsageAttribute>();
+    if (!attrUsageAttr)
+        return nullptr;
+
+    return attrUsageAttr->attributeDecl;
+}
+
+// Return the `AttributeDecl` that a resolved attribute-name declaration denotes: the decl itself
+// when it is already an `AttributeDecl`, or the attribute synthesized from a user-defined attribute
+// `struct` (a `struct` marked `[__AttributeUsage]`). Returns null for any other decl, so a caller
+// that resolves several candidate spellings can keep looking.
+static AttributeDecl* _getAttributeDeclFromResolvedNameDecl(SemanticsVisitor* visitor, Decl* decl)
+{
+    if (auto attributeDecl = as<AttributeDecl>(decl))
+        return attributeDecl;
+    if (auto structDecl = as<StructDecl>(decl))
+        return _getAttributeDeclFromUserDefinedAttributeStruct(visitor, structDecl);
+    return nullptr;
+}
+
+AttributeDecl* SemanticsVisitor::lookUpAttributeDeclFromNameExpr(Expr* attributeNameExpr)
+{
+    // Resolve the attribute name written inside `[...]` using ordinary name resolution, so that a
+    // qualified name — including a user-defined attribute declared in a namespace, e.g.
+    // `[my_namespace::Example(...)]` — is looked up exactly as any other `my_namespace::Example`
+    // reference would be. `attributeNameExpr` is a `VarExpr` for an unqualified `[Name]` or a
+    // `StaticMemberExpr` chain for a qualified `[a::b::Name]`; both resolve through `CheckTerm`,
+    // which already performs merged-namespace-across-modules member lookup, so no bespoke qualifier
+    // walking is needed here.
+    if (!attributeNameExpr)
+        return nullptr;
+
+    // Resolve one spelling of the name quietly. A miss must not surface a diagnostic, because the
+    // caller falls back to the legacy flat lookup; so checking runs on a sub-visitor with a muting
+    // sink and a non-zero error count is treated as "not found". `suffix` is appended to the final
+    // identifier to try the `Foo` -> `FooAttribute` user-defined-attribute naming convention.
+    // Returns the resolved decl, or null on a miss or an ambiguous (overloaded) result.
+    auto resolveSpelling = [&](String const& suffix) -> Decl*
+    {
+        Expr* nameExpr = attributeNameExpr;
+        if (suffix.getLength())
+        {
+            // Rebuild only the final segment with the suffixed name, reusing the already-parsed
+            // qualifier (`baseExpression`) so the qualifier is resolved just once.
+            if (auto memberExpr = as<StaticMemberExpr>(attributeNameExpr))
+            {
+                auto suffixed = m_astBuilder->create<StaticMemberExpr>();
+                suffixed->scope = memberExpr->scope;
+                suffixed->loc = memberExpr->loc;
+                suffixed->baseExpression = memberExpr->baseExpression;
+                suffixed->memberOperatorLoc = memberExpr->memberOperatorLoc;
+                suffixed->name = getName(memberExpr->name->text + suffix);
+                nameExpr = suffixed;
+            }
+            else if (auto varExpr = as<VarExpr>(attributeNameExpr))
+            {
+                auto suffixed = m_astBuilder->create<VarExpr>();
+                suffixed->scope = varExpr->scope;
+                suffixed->loc = varExpr->loc;
+                suffixed->name = getName(varExpr->name->text + suffix);
+                nameExpr = suffixed;
+            }
+            else
+            {
+                // `attributeNameExpr` is always a `VarExpr` or a `StaticMemberExpr` chain — its
+                // sole producer is `parseAttributeName` — so any other kind is a broken invariant.
+                SLANG_UNEXPECTED("unexpected attribute-name expression kind");
+            }
+        }
+
+        // Resolve under a muting sink: a miss (unknown name or ambiguity) then produces no
+        // user-visible diagnostic, so the caller can fall back to the legacy lookup. Other effects
+        // of `CheckTerm` are safe to perform speculatively — it caches its result on the node and
+        // is idempotent on an already-checked one, and any decl-check state it advances is
+        // monotonic — so reusing `baseExpression` across the two spellings resolves the qualifier
+        // at most once and leaves no partial state behind on a miss.
+        DiagnosticSink tempSink(getSourceManager(), nullptr, getSink());
+        SemanticsVisitor subVisitor(withSink(&tempSink));
+        Expr* checked = subVisitor.CheckTerm(nameExpr);
+        if (tempSink.getErrorCount() || IsErrorExpr(checked))
+            return nullptr;
+        // A single resolved reference is a `DeclRefExpr`; an ambiguous one is an `OverloadedExpr`,
+        // which we treat as "give up" rather than picking a candidate arbitrarily.
+        if (auto declRefExpr = as<DeclRefExpr>(checked))
+            return declRefExpr->declRef.getDecl();
+        return nullptr;
+    };
+
+    // First the name as written (a builtin `AttributeDecl`, or a `[__AttributeUsage]` struct named
+    // exactly as written), then the `Foo` -> `FooAttribute` convention.
+    if (auto decl = resolveSpelling(String()))
+    {
+        if (auto attributeDecl = _getAttributeDeclFromResolvedNameDecl(this, decl))
+            return attributeDecl;
+    }
+    if (auto decl = resolveSpelling(String("Attribute")))
+    {
+        if (auto attributeDecl = _getAttributeDeclFromResolvedNameDecl(this, decl))
+            return attributeDecl;
+    }
+    return nullptr;
+}
+
+// Resolve an attribute by its legacy flat, underscore-folded name (e.g. `[vk::binding]` is parsed
+// as the single name `vk_binding`). This is how builtin qualified attributes are registered, and it
+// is the fallback used when `lookUpAttributeDeclFromNameExpr` cannot resolve the name as an
+// ordinary (possibly qualified) reference.
+//
+// This underscore fold is legacy: it discards the qualifier structure of a `::`-qualified name and
+// so cannot find a user-defined attribute declared in a namespace. It is scheduled for
+// deprecation/removal in language version `SLANG_LANGUAGE_VERSION_202C` (see shader-slang/slang
+// issue #12668), once builtin qualified attributes are registered under real namespaces; until then
+// it remains active for all language versions because builtins such as `[vk::binding]` still rely
+// on the flat registration.
+AttributeDecl* SemanticsVisitor::lookUpLegacyUnderscoreConcatenatedAttributeDecl(
+    Name* attributeName,
+    Scope* scope)
 {
     if (!attributeName)
         return nullptr;
@@ -226,26 +353,21 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope*
     LookupResult lookupResult =
         lookUp(m_astBuilder, this, attributeDeclNameObj, scope, LookupMask::type);
     //
-    // If we didn't find a matching type name, then we give up.
+    // As with the direct-attribute lookup above, an overloaded flat name is ambiguous and terminal.
     //
-    if (!lookupResult.isValid() || lookupResult.isOverloaded())
+    if (lookupResult.isOverloaded())
         return nullptr;
-
-
-    // We only allow a `struct` type to be used as an attribute
-    // if the type itself has an `[AttributeUsage(...)]` attribute
-    // attached to it.
     //
-    auto structDecl = lookupResult.item.declRef.as<StructDecl>().getDecl();
-    if (!structDecl)
-        return nullptr;
+    // If we found a matching type name, use it if it is a valid user-defined attribute struct.
+    //
+    if (lookupResult.isValid())
+    {
+        auto structDecl = lookupResult.item.declRef.as<StructDecl>().getDecl();
+        if (auto attributeDecl = _getAttributeDeclFromUserDefinedAttributeStruct(this, structDecl))
+            return attributeDecl;
+    }
 
-    ensureDecl(structDecl, DeclCheckState::ModifiersChecked);
-    auto attrUsageAttr = structDecl->findModifier<AttributeUsageAttribute>();
-    if (!attrUsageAttr)
-        return nullptr;
-
-    return attrUsageAttr->attributeDecl;
+    return nullptr;
 }
 
 bool SemanticsVisitor::hasFloatArgs(Attribute* attr, int numArgs)
@@ -1428,7 +1550,18 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     }
 
     auto attrName = uncheckedAttr->getKeywordName();
-    auto attrDecl = lookUpAttributeDecl(attrName, uncheckedAttr->scope);
+
+    // Prefer resolving the attribute name as an ordinary (possibly qualified) reference, so a
+    // user-defined attribute declared in a namespace resolves the same way any other qualified name
+    // does. A completion request is left to the legacy path below, which populates the attribute
+    // completion suggestions. `keywordName` carries the legacy underscore-folded spelling that the
+    // fallback needs (e.g. `vk_binding` for `[vk::binding]`), so it stays the single source of that
+    // name rather than reconstructing it from `attributeNameExpr`.
+    AttributeDecl* attrDecl = nullptr;
+    if (attrName != getSession()->getCompletionRequestTokenName())
+        attrDecl = lookUpAttributeDeclFromNameExpr(uncheckedAttr->attributeNameExpr);
+    if (!attrDecl)
+        attrDecl = lookUpLegacyUnderscoreConcatenatedAttributeDecl(attrName, uncheckedAttr->scope);
 
     if (!attrDecl)
     {
