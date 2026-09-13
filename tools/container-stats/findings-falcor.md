@@ -33,8 +33,8 @@ one entirely new class of finding appears that Slang's own tests could not show.
 | --- | --- |
 | The opportunity is concentrated, not spread out | **Confirmed, and much more so** |
 | `Val::m_operands` is worth converting to `ShortList<_, 8>` | **Overturned** — at embedder scale the memory cost is gigabytes |
-| Existing `Short*` capacities are systematically too large | **Confirmed**, and the cause is now known: it is the library default |
-| `ShortDictionary` at `slang-ast-substitution.h:51` is too small | **Confirmed** a third time, with the same cross-validation |
+| Existing `Short*` capacities are systematically too large | **Confirmed**, and the cause is now known: it is the library default. But see the correction under finding 3 — lowering that default is _not_ the fix |
+| `ShortDictionary` at `slang-ast-substitution.h:51` is too small | **Overturned** — the promotions are real but cost less than the zeroing a larger capacity would add; see the correction under finding 4 |
 | An inline buffer on `ImmutableHashedString` is not indicated | **Confirmed**, more strongly |
 | Strings: `NamePool::getName` allocates to do a lookup | **Confirmed**, and it is now the single largest string caller |
 | — | **New**: two more allocate-to-look-up sites, and a generic-specialisation path, together 74M allocations |
@@ -146,15 +146,42 @@ is closer to right.
 | **total, 69 sites** | | | | | | **339,272MB** |
 
 339GB of inline slots constructed and never filled. That is not resident memory — it is object size
-paid on every construction, in stack frames, in `memset`/`memcpy` traffic and in cache. It is also
-the largest single number in this profile, and it is bought with a one-line change to a default.
+paid on every construction. bench confirms the ranking exactly, with the same sites in the same
+order, totalling 26,344MB.
 
-The right fix is at the library, not the 69 call sites: **lower `kInitialCount`**. The data says 4
-covers the overwhelming majority; the three `slang-check-constraint.cpp:4344`-`:4346` sites are empty
-in over 99% of 202 million instances each and want 2. A site that genuinely needs more can say so,
-which is what the capacity parameter is for.
+### Correction: what that 339GB is, and what it is not
 
-bench confirms the ranking exactly, with the same sites in the same order, totalling 26,344MB.
+The first version of this section concluded "lower `kInitialCount` from 16 to 4" and called it a
+one-line change worth 339GB. Trying to implement it showed the conclusion does not follow, for a
+reason that only appears in the container's source:
+
+```cpp
+T m_shortBuffer[shortListSize];    // slang-short-list.h:524 -- note: no `= {}`
+```
+
+The inline array is **default-initialised, not value-initialised**. For a `ShortList` of pointers
+that means no code at all: the capacity costs stack footprint and cache, and nothing is written.
+Only for an element type with a non-trivial default constructor does a slot cost real work. The
+339GB is a sum over both cases, and they are not comparable:
+
+| Defaulted sites | Constructions | Footprint at 16 | At 4 | Extra promotions at 4 |
+| --- | ---: | ---: | ---: | ---: |
+| 52 pointer-element | 1,768,962,932 | 211GB | 53GB | **+22,808,291** |
+| 11 class-element | 294,579,329 | 121GB | 30GB | +1,302,606 |
+
+So lowering the default globally would trade 158GB of stack space that is *never touched* for 22.8
+million real heap allocations. That is very likely a loss, and the recommendation is withdrawn.
+
+What survives is the class-element half, where a slot really is constructed. The largest is
+`slang-check-constraint.cpp:4344`: `FlattenedTypeRangePair` holds two `FlattenedTypeRange`s and each
+zeroes an index and a count, so sixteen slots is 512 bytes written on every one of 202 million
+constructions — and across this profile and bench, 220 million constructions between them, the list
+was empty 99.98% of the time and **never held more than one element**. That one declaration is
+84.5GB of the 121GB and is safe to pin at 2.
+
+The general lesson is that **a fit percentage alone cannot rank a `Short*` capacity.** What a slot
+costs depends on the element type and on whether the container initialises its inline storage, and
+`ShortList` and `ShortDictionary` differ on exactly that point — see the correction under finding 4.
 
 ## 4. The substitution cache, confirmed a third time
 
@@ -178,14 +205,45 @@ counts (537,093,597), and the `Dictionary`'s `everAllocated` is 26,275,248 again
 4.9% × 537,093,597 = 26.3 million. Two independently maintained counters agree to four significant
 figures. bench reproduces the same agreement at 45,446,497 and 2,207,026.
 
-**The action is unchanged: raise the capacity from 8 to 32**, which removes the promotions and the
-overflow dictionary allocations together. This is now backed by four profiles, and it remains the one
-`Short*` site in the codebase whose capacity is too small rather than too large.
-
-The trap `findings.md` warned about is also worth restating, because this profile makes it far more
+The trap `findings.md` warned about is worth restating, because this profile makes it far more
 tempting: the overflow `Dictionary` now appears as the **top `Dictionary` conversion candidate in the
 whole report**, worth 88% of all `Dictionary` benefit. "Convert it to a `ShortDictionary`" is not a
 coherent change — it already is the overflow of one.
+
+### Correction: 8 is already right; do not raise it
+
+The first version of this section said "the action is unchanged: raise the capacity from 8 to 32",
+carrying `findings.md`'s recommendation forward on the strength of 26.3 million promotions. That is
+wrong here, and the reason is again in the container's source — where, unlike `ShortList`,
+`ShortDictionary` **does** value-initialise:
+
+```cpp
+TKey m_inlineKeys[kInlineCapacity] = {};      // slang-short-dictionary.h:142
+TValue m_inlineValues[kInlineCapacity] = {};
+```
+
+So on this site every slot is 32 bytes actually written, on every one of 537 million constructions:
+
+| Capacity | Promotions | Inline bytes zeroed |
+| ---: | ---: | ---: |
+| 2 | 148,255,560 | 32GB |
+| 4 | 147,487,807 | 64GB |
+| **8 (current)** | **26,275,248** | **128GB** |
+| 16 | 4,829,030 | 256GB |
+| 32 | 300,865 | 512GB |
+
+Raising 8 → 32 spends **384GB of additional zeroing to avoid 26 million heap allocations**. At any
+plausible rate for `memset` against `malloc`/`free` that is an order of magnitude the wrong way
+round. Raising to 16 is the same trade at half scale and also loses.
+
+8 is at the knee of the distribution: the step from 4 to 8 buys 121 million fewer promotions for
+64GB, which is the one step that pays. **Leave it at 8.**
+
+This is the same error the report identifies for `Val::m_operands` in finding 2 — reading a
+promotion count without the per-construction cost beside it — made two sections later in the same
+document. The earlier profiles did not expose it because `tests` and `core` construct this cache
+290,886 and 2,210,382 times, three orders of magnitude below Falcor, so the per-construction term
+was genuinely negligible there. It is not negligible here.
 
 ## 5. Strings: a different population, and the largest free wins in the report
 
@@ -354,6 +412,16 @@ corpus:
 - **The per-process spread is wide.** One worker held 16.9 million live `Val`s; its siblings held
   1.6 to 8.2 million. Peak-memory conclusions rest on the worst process, which is the right one to
   plan for but is not typical.
+- **An inline capacity cannot be ranked from the fit percentage alone**, which is what
+  `analyze.py`'s `C` column and `wants` column both do. What a slot costs differs by container and
+  by element type: `ShortDictionary` value-initialises its inline arrays and `ShortList` does not,
+  and within `ShortList` a slot of pointers costs nothing to construct while a slot of a class with
+  a user-written default constructor costs real stores. Two of this report's first-version
+  recommendations were wrong for exactly this reason, and both are corrected in place above. Read a
+  `Short*` recommendation as "look at this site", never as "make this change".
+- **A `StringBuilder`'s recorded size is what it asked for, not what it held.** The constructor
+  requests `InitialSize` up front, so every one of these sites reports 1024 characters regardless of
+  its contents. That is why section 5f can say what the default costs but not what it should be.
 - **The event total double-counts string allocations.** Each one produces a per-line record and,
   one time in 64, a sampled stack record that is scaled back up, so both appear in the family table.
   153,037,280 is the true count; the family table's 278,631,179 is not. This inflates the headline
@@ -392,14 +460,24 @@ ln -s .../libslang-compiler.so.0.2026.17.1.dwarf /tmp/slangshim/libslang-compile
 
 ## What to do, in order of value per unit of risk
 
-1. **`ShortList`'s `kInitialCount`: 16 → 4.** One line, 339GB of unused object footprint across 69
-   sites, no behavioural change. The sites needing more already say so.
-2. **The three lookup-by-`String` sites (5a, 5b, 5c).** 58 million allocations per run, no memory
+This list has been revised after implementation; two entries in the first version were withdrawn,
+and the corrections under findings 3 and 4 say why.
+
+1. **The three allocate-to-look-up sites (5a, 5b, 5c).** 58 million allocations per run, no memory
    cost, no design question. Mechanical and independently verifiable.
-3. **`ShortDictionary` at `slang-ast-substitution.h:51`: 8 → 32.** 26 million promotions, backed by
-   four profiles.
-4. **`StringBuilder`'s `InitialSize`, and `digestToString`'s missing `reserve`.** ~31 million
-   kilobyte allocations and ~11 million regrowths respectively.
-5. **`DiagnosticSink` construction cost**, given that it happens once per overload resolution.
-6. **Leave `Val::m_operands` alone** until someone owns a memory budget for embedded use. This is a
+2. **`digestToString`'s missing `reserve`.** ~11 million regrowths, three lines.
+3. **The 1KB `StringBuilder`s on the specialisation path (5d).** Two of the three were removable
+   outright rather than resizable: one existed only to be appended to another, and one was
+   constructed per generic argument where a single reused buffer serves the loop.
+4. **`slang-check-constraint.cpp:4344`'s inline capacity: 16 → 2.** The one `ShortList` site where
+   the slots are genuinely constructed and genuinely unused — 512 bytes written per construction,
+   202 million times, for a list that never held more than one element.
+5. **`slang-ir-legalize-types.cpp`'s `LegalCallBuilder::m_args`: 16 → 32.** The only measured
+   `Short*` capacity that is too small rather than too large.
+6. **`DiagnosticSink` construction cost**, given that it happens once per overload resolution. Not
+   attempted: the right fix is to allocate its buffer lazily, not to resize it, and the profile
+   records what the buffer asks for rather than what it holds so it cannot size one.
+7. **Leave `Val::m_operands` alone** until someone owns a memory budget for embedded use. This is a
    decision, not an optimisation.
+8. **Leave `ShortList`'s `kInitialCount` and the substitution cache's capacity alone.** Both were
+   recommended in the first version of this report and both are withdrawn; see the corrections.
