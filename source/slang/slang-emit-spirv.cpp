@@ -1101,7 +1101,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         bool operator==(const ConstantValueKey& other) const
         {
-            return type == other.type && value == other.value;
+            // Compare the bits of `value` rather than using `==`.
+            //
+            // For a floating point constant those are different questions: `0.0 == -0.0` is
+            // true, but the two are not the same SPIR-V constant and must not be shared, since
+            // `1.0 / -0.0` is -inf where `1.0 / 0.0` is +inf. `Hash<double>` already keeps them
+            // apart on purpose, and a hash map may assume that keys comparing equal also hash
+            // equally -- abseil checks that assumption in its debug build, and aborted here.
+            return type == other.type &&
+                   ::memcmp(&value, &other.value, sizeof(value)) == 0;
         }
     };
     Dictionary<ConstantValueKey<IRIntegerValue>, SpvInst*> m_spvIntConstants;
