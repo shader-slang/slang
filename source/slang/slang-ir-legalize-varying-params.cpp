@@ -3422,8 +3422,13 @@ private:
         // Whom node maps to inside target flatStruct
         IRStructField* targetMapping;
 
-        auto begin() { return members.begin(); }
-        auto end() { return members.end(); }
+        // Return the mapping held for one field of the struct this node stands for, or null
+        // when that field has no mapping.
+        MapStructToFlatStruct* tryGetMember(IRStructField* member)
+        {
+            auto found = members.tryGetValue(member);
+            return found ? found->get() : nullptr;
+        }
 
         // Copies members of oldStruct to/from newFlatStruct. Assumes members of val1 maps to
         // members in val2 using `MapStructToFlatStruct`
@@ -3436,9 +3441,22 @@ private:
             IRStructType* type2,
             MapStructToFlatStruct& node)
         {
-            for (auto& field1Pair : node)
+            // Walk the fields of `type1` rather than iterating `node`'s map of them.
+            //
+            // The map is keyed on `IRStructField*`, so its iteration order is decided by where
+            // those pointers land in the hash table, and the addresses differ from one run of
+            // the compiler to the next. Iterating it therefore emitted these stores in a
+            // different order on each run, and the generated code for a fragment shader
+            // returning a nested struct varied run to run for the same input.
+            //
+            // The keys of that map are always fields of `type1`, so walking `type1` covers the
+            // same fields, in the order they are declared in the struct.
+            for (auto field : type1->getFields())
             {
-                auto& field1 = *field1Pair.second;
+                auto fieldMapping = node.tryGetMember(field);
+                if (!fieldMapping)
+                    continue;
+                auto& field1 = *fieldMapping;
 
                 // Get member of val1
                 IRInst* fieldAddr1 = nullptr;
