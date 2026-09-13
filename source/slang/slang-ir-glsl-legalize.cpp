@@ -1357,7 +1357,7 @@ void invokePathConstantFuncInHullShader(
 
     context->entryPointFunc = constantFunc;
     context->stage = Stage::Unknown;
-    legalizeEntryPointReturnValueForGLSL(
+    auto patchConstantFuncOutputVal = legalizeEntryPointReturnValueForGLSL(
         context,
         codeGenContext,
         builder,
@@ -1365,6 +1365,11 @@ void invokePathConstantFuncInHullShader(
         resultVarLayoutBuilder.build());
     context->entryPointFunc = entryPoint;
     context->stage = Stage::Hull;
+
+    for (auto leafAddr : patchConstantFuncOutputVal.leafAddresses())
+    {
+        builder.addGLSLPatchDecoration(leafAddr);
+    }
 
     fixUpFuncType(constantFunc);
 }
