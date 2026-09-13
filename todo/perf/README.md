@@ -17,36 +17,98 @@ section says otherwise.
 
 ## Status
 
-Phase 1 of the commit stack below is landed, as seven commits on top of master
-(deliberately underneath the multi-backend commit, so that they rebase before
-it). Nothing in phase 2 or later has been started.
+Phases 1 and 2 of the commit stack below are landed, as nine commits on top of
+master, deliberately underneath the multi-backend commit so that they rebase
+before it. Issue 03 is the only phase-2 item not done.
 
-| Issue                      | State                                                                    |
-| -------------------------- | ------------------------------------------------------------------------ |
-| 04 Part A                  | done -- `contains`-then-`add` collapsed at 37 files' worth of call sites |
-| 04 Part B                  | done, **scoped down** -- see the note below                              |
-| 05                         | done -- insert helpers go through `try_emplace`                          |
-| 09 Step 1                  | done -- SPIR-V memoization double insert collapsed                       |
-| 10 Part A                  | done -- interim form (the key is built once, the second probe remains)   |
-| 11 Part A                  | done -- `IRDeduplicationContext::getReplacement`                         |
-| 02                         | done -- transparent text-key lookup, with a unit test                    |
-| 12, 13                     | done                                                                     |
-| 11 Part B                  | deferred to phase 4 after measuring; see the note in the stack below     |
-| 01, 03, 06, 07, 08, 14, 15 | not started                                                              |
+| Issue                   | State                                                          |
+| ----------------------- | -------------------------------------------------------------- |
+| 01                      | done -- `combineHash` folds with MUM; see below                |
+| 02                      | done -- transparent text-key lookup, with unit tests           |
+| 04 Part A               | done -- `contains`-then-`add` collapsed across 37 files        |
+| 04 Part B               | done, **scoped down** -- `tryEmplace` only, see the note below |
+| 05                      | done -- insert helpers go through `try_emplace`                |
+| 09 Step 1               | done -- SPIR-V memoization double insert collapsed             |
+| 10 Part A               | done -- interim form (key built once, second probe remains)    |
+| 11 Part A               | done -- `IRDeduplicationContext::getReplacement`               |
+| 12, 13                  | done                                                           |
+| 14                      | **partly** done -- see "still to do in the go-wide tree" below |
+| 03                      | **not started** -- the last phase-2 item                       |
+| 11 Part B               | deferred to phase 4 after measuring                            |
+| 06, 07, 08, 09 rest, 15 | not started                                                    |
 
-Measured effect of 02: a `Dictionary<String, int>` probed a thousand times with
-an `UnownedStringSlice` went from a thousand heap allocations to none. Same for
-`Dictionary<ImmutableHashedString, int>`.
+Measured effects:
+
+- **02**: a `Dictionary<String, int>` probed a thousand times with an
+  `UnownedStringSlice` went from a thousand heap allocations to none.
+- **01**: on the `ValNodeDesc` shape, the old fold reached 8 of 64 buckets
+  (chi-squared 448,092 against an ideal of ~63). It now reaches all 64, at 53.
+
+Two notes on how those landed, because both differ from what the issues say.
 
 **04 Part B was scoped down deliberately.** The plan was `find` / `erase` /
 `tryEmplace`. Only `tryEmplace` was added, returning a `TValue*` rather than an
 iterator, because exposing an iterator exposes the backing map's iterator type
--- and those differ in exactly the ways the shim layer exists to paper over
-(Abseil's `erase(iterator)` returns `void`, `tsl::robin_map` dereferences to a
-`const` pair). `tryEmplace` covered every call site that was doing a double
-probe, so the iterator API was not needed. The consequence is that
-`_removeGlobalNumberingEntry` still probes twice; it now hashes once, which was
-the expensive half.
+-- and those differ in exactly the ways the shim layer exists to paper over.
+`tryEmplace` covered every double-probe call site, so the iterator API was not
+needed. `_removeGlobalNumberingEntry` therefore still probes twice; it now
+hashes once, which was the expensive half.
+
+**01 ended up using wyhash's MUM rather than a hand-rolled mixer**, spelled out
+in `slang-hash.h` rather than called through a hash map library, since which
+library is linked is a build-time choice. Two hand-rolled attempts were wrong
+first: `(h ^ m) * K` is commutative, so `TypePair{a,b}` hashed the same as
+`{b,a}`; the fix for that still left a flip of an operand's top bit reaching the
+bucket index 0% of the time. Worth knowing that `ankerl`'s own tuple combiner,
+`mix(h + m, k)`, has the commutativity problem too -- hence the rotate. The
+quality bar used was wyhash's own integer hash, which every pointer-keyed
+dictionary already relies on: its worst input bit changes the bucket index 35%
+of the time, and `foldHashStep` now manages 89%.
+
+## Merging this into the go-wide branch
+
+**One change is required or the build breaks.** `Dictionary::tryEmplace` ends
+both overloads with
+
+```cpp
+return {std::addressof(iterator->second), inserted};
+```
+
+which does not compile under `SLANG_HASHMAP=TSL_ROBIN`, because
+`tsl::robin_map` dereferences to a `const` pair. Route it through the shim, as
+go-wide already does elsewhere:
+
+```cpp
+return {std::addressof(HashMapImpl::valueOf(iterator)), inserted};
+```
+
+That is the whole of the `slang-dictionary.h` conflict. Go-wide's hunks for
+`tryGetValueOrAdd` and `getOrAddValue` should be dropped rather than merged --
+those functions no longer touch `iterator->second`, they call `tryEmplace` --
+and its `valueOf` applied inside `tryEmplace` instead.
+
+`slang-hash.h` should merge cleanly: go-wide's hunks there stop at line 170 and
+`combineHash` starts after it. The one overlap is the doc comment added to
+`DetectAvalanchingHash`.
+
+Compile all eight `SLANG_HASHMAP` values once before running a matrix.
+`try_emplace` and the transparent-lookup functors were verified by reading the
+backend headers, but only ever compiled against `ankerl::unordered_dense`.
+
+### Still to do in the go-wide tree, before trusting particular rows
+
+- **Before the `BOOST` and `STD` hash rows mean anything**, finish issue 14.
+  `String` and `UnownedStringSlice` declare `kHasUniformHash = true`
+  unconditionally, and `TextKeyHash` declares `is_avalanching`, but
+  `slang-hash-impl.h` says `kIsAvalanching = false` for those two
+  implementations. Make both conditional on `HashImpl::kIsAvalanching`. This
+  does _not_ affect the 33 composite key types marked in phase 2 -- their
+  hashes go through `combineHash`, which is avalanching whichever `SLANG_HASH`
+  is selected.
+- **Before trusting a close flat-vs-node comparison**, do issue 03. Entry size
+  is a first-order input to it and `HashSet<IRInst*>` is still 16 bytes per
+  entry rather than 8.
+- Issue 15's scope comment in `slang-hash-impl.h`.
 
 ---
 
