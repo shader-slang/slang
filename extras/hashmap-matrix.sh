@@ -206,6 +206,27 @@ build_one() {
   # which combinations are worth running.
   rm -f "$dir/hashmap-matrix.built"
 
+  # Drop any generated core module source that was left empty.
+  #
+  # These headers hold the text of the `.meta.slang` files and are compiled into
+  # `slang-bootstrap`, which compiles the core module from them. Killing a build
+  # while one is being written leaves a zero-length file whose timestamp is
+  # newer than its inputs, so the build system considers it up to date and never
+  # writes it again. Everything still builds; the compiler it produces is simply
+  # missing whichever part of the core module that file held, and says so much
+  # later as `undefined identifier 'diffPair'` or a failed lookup of a magic
+  # type. Deleting them is enough to have them regenerated.
+  local meta_dir="$dir/source/slang-core-module/core-module-meta"
+  if [ -d "$meta_dir" ]; then
+    local meta
+    for meta in "$meta_dir"/*.h; do
+      if [ -f "$meta" ] && [ ! -s "$meta" ]; then
+        echo "$map/$hash: regenerating empty $(basename "$meta")"
+        rm -f "$meta"
+      fi
+    done
+  fi
+
   if cmake --build "$dir" --config Debug --parallel "$cores_each" >>"$log" 2>&1; then
     : >"$dir/hashmap-matrix.built"
     echo "$map/$hash: OK ($dir)"
