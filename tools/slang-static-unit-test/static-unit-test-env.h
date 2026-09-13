@@ -198,7 +198,7 @@ public:
     /// Add a top-level `void()` function whose single block is a line marker, a
     /// function-entry marker (`IncrementFunctionCoverageCounter`), and another
     /// line marker, then a return. Returns the three markers in order. This pins
-    /// two guarantees at once: a function/branch marker takes a dedicated slot,
+    /// two guarantees at once: a function-entry marker takes a dedicated slot,
     /// and — since it is not a line marker — it neither opens nor breaks a line
     /// run, so the two line markers on either side still coalesce across it.
     List<IRInst*> addLineMarkersAroundFunctionMarker(const char* name);

@@ -319,8 +319,8 @@ List<IRInst*> IRFixtureBuilder::addLineMarkersAroundFunctionMarker(const char* n
 {
     IRFunc* func = beginVoidFunction(name);
 
-    // A line marker, a function-entry marker, then a line marker. The function
-    // marker's name operands are irrelevant to slot assignment, so reuse `name`.
+    // The function marker's name operands are irrelevant to slot assignment, so
+    // reuse `name`.
     List<IRInst*> markers;
     markers.add(m_builder.emitIncrementCoverageCounter());
     markers.add(m_builder.emitIncrementFunctionCoverageCounter(

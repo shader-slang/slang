@@ -149,10 +149,11 @@ SLANG_UNIT_TEST(coverageCoalescingSplitsAtMutuallyRecursiveCallEitherOrder)
     checkBothRegionsSplit(bThenA);
 }
 
-// The contract states function/branch markers always take a dedicated slot. A
-// function marker between two line markers is not an `IncrementCoverageCounter`,
-// so it takes its own slot and neither opens nor breaks a line run — the two
-// line markers around it still coalesce across it. One fixture pins both halves.
+// A function-entry marker between two line markers is not an
+// `IncrementCoverageCounter`, so it takes its own slot and neither opens nor
+// breaks a line run — the two line markers around it still coalesce across it.
+// One fixture pins both halves. (A branch marker takes the identical
+// non-`IncrementCoverageCounter` path; only the function-marker case is built.)
 SLANG_UNIT_TEST(coverageCoalescingGivesFunctionMarkerADedicatedSlotWithoutBreakingTheRun)
 {
     StaticUnitTestEnv env(unitTestContext);
@@ -167,13 +168,9 @@ SLANG_UNIT_TEST(coverageCoalescingGivesFunctionMarkerADedicatedSlotWithoutBreaki
     UInt counterCount = 0;
     assignCoverageCounterSlots(markers, slots, emitsProbe, counterCount);
 
-    // One slot shared by the two line markers, a separate dedicated slot for the
-    // function marker.
     SLANG_CHECK(counterCount == 2);
     SLANG_CHECK(slots[0] == slots[2]);
     SLANG_CHECK(slots[0] != slots[1]);
-    // The line run's probe still lands on its last line marker; the function
-    // marker carries its own.
     SLANG_CHECK(!emitsProbe[0]);
     SLANG_CHECK(emitsProbe[1]);
     SLANG_CHECK(emitsProbe[2]);
