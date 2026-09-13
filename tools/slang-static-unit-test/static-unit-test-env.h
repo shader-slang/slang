@@ -149,6 +149,60 @@ public:
     /// `[OptimizableType]` so `trimOptimizableTypes` will consider it.
     IRStructType* addOptimizableStructWithUnusedField(const char* name);
 
+    /// Add a top-level `void()` function whose single block holds `markerCount`
+    /// line-coverage markers (`IncrementCoverageCounter`) in a row with nothing
+    /// between them, then a return. Returns the markers in the order they appear
+    /// — the order `assignCoverageCounterSlots` requires. A straight-line run
+    /// like this is the shape that must coalesce onto one slot, with the probe
+    /// placed on the last marker.
+    List<IRInst*> addStraightLineMarkerRun(const char* name, Index markerCount);
+
+    /// Add a top-level `void()` function whose single block is two line markers
+    /// separated by a call to `callee`, then a return. Returns the two markers.
+    /// Whether they coalesce depends entirely on whether `callee` can abandon
+    /// the invocation, so this is the fixture for exercising the exit analysis:
+    /// pair it with a callee that returns (the markers share a slot) or one that
+    /// may not (the markers split).
+    List<IRInst*> addMarkerRunAroundCall(const char* name, IRFunc* callee);
+
+    /// Add a top-level `void()` function whose single block is two line markers
+    /// separated by an `Abort`, then a return. Returns the two markers. `Abort`
+    /// abandons the invocation, so the markers must not coalesce. Building the
+    /// block by hand puts the `Abort` directly between the two markers, so the
+    /// split is asserted on the slot assignment rather than inferred from emitted
+    /// code.
+    List<IRInst*> addMarkerRunSplitByAbort(const char* name);
+
+    /// Add a top-level `void()` function whose single block is terminated by a
+    /// `GenericAsm` instead of a `Return`. `GenericAsm` is how `__intrinsic_asm`
+    /// lowers and it carries return semantics, so the exit analysis must treat
+    /// this function as returning normally. A function whose *sole* exit is a
+    /// `GenericAsm` is the shape that isolates that rule, and it is simplest to
+    /// build directly.
+    IRFunc* addFunctionEndingInGenericAsm(const char* name);
+
+    /// Add two mutually recursive top-level `void()` functions, deliberately
+    /// asymmetric: `outA` calls `outB` and then unconditionally abandons
+    /// (`Abort`), so it may-not-return on its own; `outB` calls `outA` and then
+    /// returns, so it may-not-return only *through* the recursion into `outA`.
+    /// That asymmetry is what exposes an order-dependent cycle break — analyzing
+    /// `outA` first can taint `outB`'s memoized result while analyzing `outB`
+    /// first cannot — so a conservative break must report both as
+    /// possibly-not-returning regardless of visit order.
+    void addMutuallyRecursiveFunctions(
+        const char* aName,
+        const char* bName,
+        IRFunc*& outA,
+        IRFunc*& outB);
+
+    /// Add a top-level `void()` function whose single block is a line marker, a
+    /// function-entry marker (`IncrementFunctionCoverageCounter`), and another
+    /// line marker, then a return. Returns the three markers in order. This pins
+    /// two guarantees at once: a function-entry marker takes a dedicated slot,
+    /// and — since it is not a line marker — it neither opens nor breaks a line
+    /// run, so the two line markers on either side still coalesce across it.
+    List<IRInst*> addLineMarkersAroundFunctionMarker(const char* name);
+
     IRModule* getModule() const { return m_module.get(); }
 
     /// Count the direct children of the module inst whose opcode is `op`.
@@ -181,6 +235,11 @@ private:
 
     /// Terminate the block opened by `beginVoidFunction` and apply `keepAlive`.
     void endVoidFunction(IRFunc* func, bool keepAlive);
+
+    /// Assert `callee` is a `void()` function belonging to this module — the
+    /// precondition for emitting a well-formed nullary void call to it. Shared by
+    /// the fixtures that emit such a call.
+    void assertVoidCallableInModule(IRFunc* callee);
 
     // Declaration order matters: the constructor initializes `m_builder` from
     // `m_module.get()`, and members are initialized in declaration order rather
