@@ -29,7 +29,10 @@ Name* NamePool::getName(UnownedStringSlice text)
 
     name = new Name();
     name->text = text;
-    names.add(text, name);
+    // Key the map on the `Name`'s own string rather than on `text` again. `String` is
+    // reference-counted, so this shares one buffer between the map and the `Name` instead of
+    // copying the characters a second time.
+    names.add(name->text, name);
     return name;
 }
 

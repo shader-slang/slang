@@ -191,14 +191,18 @@ void SharedASTBuilder::registerMagicDecl(Decl* decl, MagicTypeModifier* modifier
     m_magicDecls[modifier->magicName] = declToRegister;
 }
 
-Decl* SharedASTBuilder::findMagicDecl(const String& name)
+Decl* SharedASTBuilder::findMagicDecl(const char* name)
 {
-    return m_magicDecls.getValue(name);
+    auto decl = tryFindMagicDecl(name);
+    // Every caller names a declaration the core module is required to define, so a miss here means
+    // the core module did not load rather than that the caller asked for something optional.
+    SLANG_RELEASE_ASSERT(decl);
+    return decl;
 }
 
-Decl* SharedASTBuilder::tryFindMagicDecl(const String& name)
+Decl* SharedASTBuilder::tryFindMagicDecl(const char* name)
 {
-    auto d = m_magicDecls.tryGetValue(name);
+    auto d = m_magicDecls.tryGetValue(UnownedStringSlice(name));
     return d ? *d : nullptr;
 }
 

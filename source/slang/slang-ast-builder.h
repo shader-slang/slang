@@ -53,10 +53,16 @@ public:
 
     SyntaxClass<NodeBase> findSyntaxClass(const UnownedStringSlice& slice);
 
-    // Look up a magic declaration by its name
-    Decl* findMagicDecl(String const& name);
+    // Look up a magic declaration by its name.
+    //
+    // The name is a `const char*` rather than a `String` because every caller has a literal --
+    // "DifferentiableType", "VectorExpressionType" -- as do `getBuiltinDeclRef` and
+    // `getSpecializedBuiltinType`, which are the two functions that reach here. Taking a
+    // `String const&` made each of those calls build a heap `String` for a compile-time constant
+    // and destroy it once the lookup returned.
+    Decl* findMagicDecl(const char* name);
 
-    Decl* tryFindMagicDecl(String const& name);
+    Decl* tryFindMagicDecl(const char* name);
 
     Decl* findBuiltinRequirementDecl(BuiltinRequirementKind kind)
     {
@@ -112,7 +118,9 @@ protected:
     Type* m_builtinTypes[Index(BaseType::CountOf)];
     Dictionary<String, Type*> m_magicEnumTypes;
 
-    Dictionary<String, Decl*> m_magicDecls;
+    // Keyed transparently so that `findMagicDecl` can probe it with a slice of the caller's string
+    // literal. Registration still stores an owned `String`, which is where the name has to live.
+    Dictionary<String, Decl*, StringSliceHash, StringSliceEqual> m_magicDecls;
     Dictionary<BuiltinRequirementKind, Decl*> m_builtinRequirementDecls;
 
     Dictionary<UnownedStringSlice, SyntaxClass<NodeBase>> m_sliceToTypeMap;

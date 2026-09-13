@@ -28,7 +28,13 @@ void emit(ManglingContext* context, UInt value)
     context->sb.append(value);
 }
 
-void emit(ManglingContext* context, String const& value)
+// Append already-mangled text to the name being built.
+//
+// This takes a slice rather than a `String` so that a caller holding a string literal cannot
+// silently allocate: passing a literal to a `String const&` parameter materialises a heap
+// `String` for a two-character constant, which is what this signature prevents. A caller with a
+// literal wants `emitRaw`, and a caller with a `String` passes `getUnownedSlice()`.
+void emit(ManglingContext* context, UnownedStringSlice value)
 {
     context->sb.append(value);
 }
@@ -551,25 +557,25 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
 
     if (declRef.getDecl()->hasModifier<ExternCppModifier>())
     {
-        emit(context, declRef.getDecl()->getName()->text);
+        emit(context, declRef.getDecl()->getName()->text.getUnownedSlice());
         return;
     }
 
     if (auto genTypeParamDecl = as<GenericTypeParamDeclBase>(declRef.getDecl()))
     {
-        emit(context, "GP");
+        emitRaw(context, "GP");
         emit(context, genTypeParamDecl->parameterIndex);
         return;
     }
     if (auto genValParamDecl = as<GenericValueParamDecl>(declRef.getDecl()))
     {
-        emit(context, "GP");
+        emitRaw(context, "GP");
         emit(context, genValParamDecl->parameterIndex);
         return;
     }
     if (auto genValPackParamDecl = as<GenericValuePackParamDecl>(declRef.getDecl()))
     {
-        emit(context, "GP");
+        emitRaw(context, "GP");
         emit(context, genValPackParamDecl->parameterIndex);
         return;
     }
@@ -597,12 +603,12 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
         // TODO: as a special case, an "unconditional" extension
         // that is in the same module as the type it extends should
         // be treated as equivalent to the type itself.
-        emit(context, "X");
+        emitRaw(context, "X");
         emitType(context, getTargetType(context->astBuilder, extensionDeclRef));
         for (auto inheritanceDecl :
              getMembersOfType<InheritanceDecl>(context->astBuilder, extensionDeclRef))
         {
-            emit(context, "I");
+            emitRaw(context, "I");
             emitType(context, getSup(context->astBuilder, inheritanceDecl));
         }
         // A non generic extension doesn't have a name worth
@@ -618,7 +624,7 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
     // that is doing the inheriting.
     else if (auto inheritanceDeclRef = declRef.as<TypeConstraintDecl>())
     {
-        emit(context, "I");
+        emitRaw(context, "I");
         emitType(context, getSup(context->astBuilder, inheritanceDeclRef));
 
         // An interface-level constraint that is a direct member of an interface
@@ -934,7 +940,7 @@ void mangleName(ManglingContext* context, DeclRef<Decl> declRef)
     // the given name.
     if (decl->hasModifier<ExternCppModifier>())
     {
-        emit(context, decl->getName()->text);
+        emit(context, decl->getName()->text.getUnownedSlice());
         return;
     }
 

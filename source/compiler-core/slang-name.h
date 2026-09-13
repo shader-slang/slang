@@ -58,7 +58,12 @@ struct NamePool
     Name* tryGetName(String const& text);
 
     // The mapping from text strings to the corresponding name.
-    Dictionary<String, RefPtr<Name>> names;
+    //
+    // Keyed transparently so that `getName(UnownedStringSlice)` -- which is how nearly every caller
+    // arrives here, holding a slice of a source file or of a `Name` that already exists -- can
+    // probe the map without first copying its characters into a heap `String` that is discarded as
+    // soon as the lookup returns.
+    Dictionary<String, RefPtr<Name>, StringSliceHash, StringSliceEqual> names;
 };
 
 } // namespace Slang
