@@ -211,7 +211,73 @@ if(SLANG_HASH STREQUAL "ABSL")
 elseif(SLANG_HASH STREQUAL "RAPIDHASH")
     slang_hashmap_use_header_only(rapidhash rapidhash.h)
 elseif(SLANG_HASH STREQUAL "KOMIHASH")
-    slang_hashmap_use_header_only(komihash komihash.h)
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/komihash/komihash.h")
+        message(
+            FATAL_ERROR
+            "external/komihash/komihash.h is missing. Run: git submodule update --init external/komihash"
+        )
+    endif()
+
+    # komihash declares every function KOMIHASH_INLINE, which expands to
+    # `static inline`, so calling it straight from Slang::HashImpl::hashBytes --
+    # an inline function with external linkage -- would name an internal-linkage
+    # entity from the body of an external-linkage inline function. That is
+    # ill-formed, no diagnostic required, and it is exactly the defect that made
+    # XXH3 miscompile at -O3 and produce a Dictionary that could not find keys it
+    # had just inserted.
+    #
+    # komihash.h has no macro to make its functions external -- KOMIHASH_STATIC
+    # is defined outright rather than behind an #ifndef -- so instead the header
+    # is compiled into one translation unit that exposes a single ordinary
+    # function for Slang to call.
+    #
+    # rapidhash needs none of this: in C++ its RAPIDHASH_INLINE expands to plain
+    # `inline` with no `static`, so its functions already have external linkage.
+    # Its secrets are namespace-scope constexpr, which an inline function may
+    # name across translation units because they are const objects of literal
+    # type initialized with constant expressions.
+    set(komihash_shim_dir "${CMAKE_CURRENT_BINARY_DIR}/slang-komihash-shim")
+    configure_file(
+        "${CMAKE_CURRENT_LIST_DIR}/komihash/komihash.h"
+        "${komihash_shim_dir}/slang-komihash-impl.h"
+        COPYONLY
+    )
+    file(
+        GENERATE
+        OUTPUT "${komihash_shim_dir}/slang-komihash.h"
+        CONTENT
+            "#pragma once\n#include <stddef.h>\n#include <stdint.h>\n#ifdef __cplusplus\nextern \"C\" {\n#endif\nuint64_t slangKomihash(const void* data, size_t size);\n#ifdef __cplusplus\n}\n#endif\n"
+    )
+    # Seed 0: komihash takes a seed so a caller can decorrelate two hashes of the
+    # same data, which Slang has no need of, and a fixed seed keeps the hash
+    # reproducible across runs for anything that reaches a serialized module.
+    file(
+        GENERATE
+        OUTPUT "${komihash_shim_dir}/slang-komihash.c"
+        CONTENT
+            "#include \"slang-komihash.h\"\n#include \"slang-komihash-impl.h\"\nuint64_t slangKomihash(const void* data, size_t size)\n{\n    return komihash(data, size, 0);\n}\n"
+    )
+
+    add_library(slang-komihash STATIC "${komihash_shim_dir}/slang-komihash.c")
+    target_include_directories(slang-komihash PUBLIC "${komihash_shim_dir}")
+    # `core` is a static library that ends up inside the shared slang-compiler
+    # library, so anything it links has to be position independent too.
+    set_target_properties(slang-komihash PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    if(SLANG_ENABLE_RELEASE_LTO)
+        set_target_properties(
+            slang-komihash
+            PROPERTIES
+                INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+                INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
+        )
+    endif()
+
+    target_link_libraries(slang-hashmap INTERFACE slang-komihash)
+    target_include_directories(
+        slang-hashmap
+        ${system}
+        INTERFACE "${komihash_shim_dir}"
+    )
 elseif(SLANG_HASH STREQUAL "XXH3")
     if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/xxHash/xxhash.h")
         message(
@@ -295,6 +361,18 @@ elseif(SLANG_HASH STREQUAL "XXH3")
     # `core` is a static library that ends up inside the shared slang-compiler
     # library, so anything it links has to be position independent too.
     set_target_properties(slang-xxhash PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    # With link-time optimization on, this recovers the cross-translation-unit
+    # inlining that XXH_INLINE_ALL used to provide, without the linkage that
+    # made it ill-formed. Slang's own targets get this from slang_add_target;
+    # this is a plain add_library, so it has to ask for it.
+    if(SLANG_ENABLE_RELEASE_LTO)
+        set_target_properties(
+            slang-xxhash
+            PROPERTIES
+                INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+                INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
+        )
+    endif()
 
     # XXH3's SSE2 kernels are marked always_inline, and GCC refuses to inline a
     # function carrying __target__("sse2") into a caller without it unless it is

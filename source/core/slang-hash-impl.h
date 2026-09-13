@@ -40,7 +40,12 @@
 #if SLANG_HASH_IMPL == SLANG_HASH_RAPIDHASH
 #include <rapidhash.h>
 #elif SLANG_HASH_IMPL == SLANG_HASH_KOMIHASH
-#include <komihash.h>
+// Not <komihash.h>: komihash ships as a header-only library whose functions are
+// `static`, which is normal and correct for it, but naming one from `hashBytes`
+// below -- an inline function with external linkage -- would be ill-formed.
+// This declares one ordinary function compiled from it instead. See the
+// KOMIHASH branch in external/CMakeLists.txt.
+#include <slang-komihash.h>
 #elif SLANG_HASH_IMPL == SLANG_HASH_XXH3
 // Not <xxhash.h>: lz4 exports a directory holding an older copy of that name,
 // which wins on this include path. See the XXH3 branch in external/CMakeLists.txt.
@@ -253,11 +258,10 @@ constexpr const char* kName = "komihash";
 
 inline uint64_t hashBytes(const char* buffer, std::size_t len)
 {
-    // Seed 0. komihash takes a seed so that a caller can decorrelate two hashes
-    // of the same data; we have no such need, and a fixed seed keeps the hash
-    // reproducible across runs, which anything reaching a serialized module
-    // requires.
-    return komihash(buffer, len, 0);
+    // The seed komihash takes is fixed at 0 inside slangKomihash; see the
+    // KOMIHASH branch in external/CMakeLists.txt for why the call goes through
+    // that rather than straight to komihash().
+    return slangKomihash(buffer, len);
 }
 
 #elif SLANG_HASH_IMPL == SLANG_HASH_XXH3
