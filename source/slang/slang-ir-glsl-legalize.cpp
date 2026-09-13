@@ -1179,13 +1179,15 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
                 createPatchConstantFuncResultTypeLayout(context, irBuilder, fieldType);
             IRVarLayout::Builder fieldVarLayoutBuilder(&irBuilder, fieldTypeLayout);
             auto decoration = field->getKey()->findDecoration<IRSemanticDecoration>();
-            if (decoration)
+            if (decoration && decoration->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
             {
-                if (decoration->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
-                    fieldVarLayoutBuilder.setSystemValueSemantic(decoration->getSemanticName(), 0);
+                fieldVarLayoutBuilder.setSystemValueSemantic(decoration->getSemanticName(), 0);
             }
             else
             {
+                // A field with a user semantic (non-sv_) is an ordinary varying output: give it a
+                // real location instead of leaving it at the default (which would collide with
+                // per-control-point outputs, see #12726).
                 auto varLayoutForKind =
                     fieldVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
 
@@ -1226,7 +1228,7 @@ ScalarizedVal legalizeEntryPointReturnValueForGLSL(
     IRFunc* func,
     IRVarLayout* resultLayout);
 
-void invokePathConstantFuncInHullShader(
+void invokePatchConstantFuncInHullShader(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
     ScalarizedVal outputPatchVal)
@@ -4918,7 +4920,7 @@ void legalizeEntryPointForGLSL(
     // at the end of the entrypoint now.
     if (stage == Stage::Hull)
     {
-        invokePathConstantFuncInHullShader(&context, codeGenContext, scalarizedGlobalOutput);
+        invokePatchConstantFuncInHullShader(&context, codeGenContext, scalarizedGlobalOutput);
     }
 
     // Special handling for ray tracing shaders
