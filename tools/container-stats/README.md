@@ -408,6 +408,10 @@ times the test suite by event count. It confirms most of `findings.md`, overturn
 recommendation, and finds the one class of result a self-compile cannot show: what happens when the
 host keeps the compiler alive between compiles.
 
+`optimisation-results.md` closes the loop: what the changes made on the strength of those findings
+are worth when measured, how that measurement was got wrong twice before it was got right, and why
+the compile-perf suite turns out to be a poor predictor of what a real application would see.
+
 ## Status
 
 All of `Dictionary`, `HashSet`, `List`, `ShortList`, `ShortDictionary`, `OrderedDictionary`,
