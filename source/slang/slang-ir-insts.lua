@@ -1956,6 +1956,7 @@ local insts = {
 			{
 				patchConstantFunc = { struct_name = "PatchConstantFuncDecoration", operands = { { "func", "IRInst" } } },
 			},
+			{ glslPatch = { struct_name = "GLSLPatchDecoration" } },
 			{
 				maxTessFactor = {
 					struct_name = "MaxTessFactorDecoration",
