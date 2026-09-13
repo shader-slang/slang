@@ -23,7 +23,10 @@ namespace Slang
 
     static const char* hex = "0123456789abcdef";
 
-    String str;
+    // Size the buffer for the whole digest up front. Appending one character at a time to an empty
+    // `String` starts at the 16-character minimum and doubles from there, so producing the 40
+    // characters of a SHA-1 digest this way would otherwise allocate three times instead of once.
+    StringBuilder str(UInt(digestSize * 2));
     const uint8_t* data = reinterpret_cast<const uint8_t*>(digest);
     for (SlangInt i = 0; i < digestSize; ++i)
     {
