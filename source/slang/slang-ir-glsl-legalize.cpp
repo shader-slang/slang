@@ -1370,7 +1370,7 @@ void invokePathConstantFuncInHullShader(
 
     context->entryPointFunc = constantFunc;
     context->stage = Stage::Unknown;
-    legalizeEntryPointReturnValueForGLSL(
+    auto patchConstantFuncOutputVal = legalizeEntryPointReturnValueForGLSL(
         context,
         codeGenContext,
         builder,
@@ -1378,6 +1378,18 @@ void invokePathConstantFuncInHullShader(
         resultVarLayoutBuilder.build());
     context->entryPointFunc = entryPoint;
     context->stage = Stage::Hull;
+
+    for (auto leafAddr : patchConstantFuncOutputVal.leafAddresses())
+    {
+        if (auto leafLayout = findVarLayout(leafAddr))
+        {
+            // system values (SV_TessFactor/SV_InsideTessFactor) are skipped as the emitter
+            // already adds Patch to them
+            if (leafLayout->findAttr<IRSystemValueSemanticAttr>())
+                continue;
+        }
+        builder.addGLSLPatchDecoration(leafAddr);
+    }
 
     fixUpFuncType(constantFunc);
 }
