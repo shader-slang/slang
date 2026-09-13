@@ -510,14 +510,6 @@ private:
 #define SLANG_CONTAINER_STATS_STRING_ALLOC_AT_TRAILING(isGrowth, requiredLength) \
     , {}, isGrowth, int64_t(requiredLength)
 
-/// Passes an explicit growth flag and required length while forwarding the site it was given.
-///
-/// For a helper that was handed a site to attribute to but works the other two out itself. Using
-/// the `AT` form there instead would resolve the site to the helper's own line, so every string
-/// that grew would be attributed to the growth code rather than to whoever asked for the string.
-#define SLANG_CONTAINER_STATS_STRING_ALLOC_FORWARD_AT_TRAILING(isGrowth, requiredLength) \
-    , slangContainerStatsSite, isGrowth, int64_t(requiredLength)
-
 /// Records a string-buffer allocation against the parameters declared above.
 #define SLANG_CONTAINER_STATS_NOTE_STRING_ALLOC(capacity)                                    \
     ::Slang::containerStatsNoteStringAllocation(                                             \
@@ -570,7 +562,6 @@ private:
 #define SLANG_CONTAINER_STATS_STRING_ALLOC_PARAMS_TRAILING
 #define SLANG_CONTAINER_STATS_STRING_ALLOC_FORWARD_TRAILING
 #define SLANG_CONTAINER_STATS_STRING_ALLOC_AT_TRAILING(isGrowth, requiredLength)
-#define SLANG_CONTAINER_STATS_STRING_ALLOC_FORWARD_AT_TRAILING(isGrowth, requiredLength)
 #define SLANG_CONTAINER_STATS_NOTE_STRING_ALLOC(capacity) \
     do                                                    \
     {                                                     \

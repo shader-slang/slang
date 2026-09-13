@@ -352,48 +352,6 @@ public:
     /// Same as create, but representation will have refcount of 1 (if not nullptr)
     static StringRepresentation* createWithReference(const UnownedStringSlice& slice);
 
-    StringRepresentation* cloneWithCapacity(
-        Index newCapacity SLANG_CONTAINER_STATS_STRING_ALLOC_PARAMS_TRAILING)
-    {
-        StringRepresentation* newObj = createWithCapacityAndLength(
-            newCapacity,
-            length SLANG_CONTAINER_STATS_STRING_ALLOC_FORWARD_TRAILING);
-        memcpy(getData(), newObj->getData(), length + 1);
-        return newObj;
-    }
-
-    StringRepresentation* clone()
-    {
-        // A growth, since the new buffer replaces this one, and the capacity is the length exactly.
-        return cloneWithCapacity(
-            length SLANG_CONTAINER_STATS_STRING_ALLOC_AT_TRAILING(true, length));
-    }
-
-    StringRepresentation* ensureCapacity(
-        Index required SLANG_CONTAINER_STATS_STRING_ALLOC_PARAMS_TRAILING)
-    {
-        if (capacity >= required)
-            return this;
-
-        Index newCapacity = capacity;
-        if (!newCapacity)
-            newCapacity = 16; // TODO: figure out good value for minimum capacity
-
-        while (newCapacity < required)
-        {
-            newCapacity = 2 * newCapacity;
-        }
-
-        // `required` rather than `newCapacity`: the doubling above exists only because there is
-        // no inline buffer, so charging it to the histogram would hide exactly the strings such a
-        // buffer would have held.
-        //
-        // The site is forwarded rather than taken here, so that the allocation is attributed to
-        // whoever asked the string to hold more, not to this line.
-        return cloneWithCapacity(
-            newCapacity SLANG_CONTAINER_STATS_STRING_ALLOC_FORWARD_AT_TRAILING(true, required));
-    }
-
     /// Overload delete to silence ASAN new-delete-type-mismatch errors.
     /// These occur because the allocation size of StringRepresentation
     /// does not match deallocation size (due variable sized string payload).
