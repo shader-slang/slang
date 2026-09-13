@@ -121,6 +121,12 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
 static void getSpecializedLinkageName(StringBuilder& strBuilder, IRSpecialize* specInst)
 {
     DigestBuilder<SHA1> digestBuilder;
+    // One buffer for the whole loop rather than one per argument. Each argument's name hint is
+    // consumed by `append` before the next iteration overwrites it, and `reduceLength` keeps the
+    // buffer while discarding its contents, so reusing it is equivalent and constructs a
+    // `StringBuilder` -- which allocates its initial kilobyte eagerly -- once per call instead of
+    // once per generic argument.
+    StringBuilder typeNameHint;
     for (UInt i = 0; i < specInst->getArgCount(); ++i)
     {
         auto arg = specInst->getArg(i);
@@ -130,7 +136,7 @@ static void getSpecializedLinkageName(StringBuilder& strBuilder, IRSpecialize* s
         }
         else
         {
-            StringBuilder typeNameHint;
+            typeNameHint.reduceLength(0);
             getTypeNameHint(typeNameHint, arg);
             digestBuilder.append(typeNameHint.getUnownedSlice());
         }
@@ -157,9 +163,10 @@ static void specializeLinkageDecoration(IRInst* target, IRSpecialize* oldInst, I
             {
                 specializationProvider = targetAsSpec;
             }
-            StringBuilder specLinkName;
-            getSpecializedLinkageName(specLinkName, specializationProvider);
-            sb.append(specLinkName);
+            // Append straight into `sb`: `getSpecializedLinkageName` only ever appends to the
+            // builder it is given, so routing it through a second one produced the same text at
+            // the cost of another `StringBuilder` and its eagerly allocated initial kilobyte.
+            getSpecializedLinkageName(sb, specializationProvider);
 
             if (auto previousLinkage = target->findDecoration<IRLinkageDecoration>())
             {
