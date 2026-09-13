@@ -831,6 +831,46 @@ public:
     UnownedStringSlice getUnownedSlice() const { return StringRepresentation::asSlice(m_buffer); }
 };
 
+/// Hash and equality functors that let a dictionary keyed on `String` be probed with an
+/// `UnownedStringSlice` without building a `String` for the lookup.
+///
+/// A `Dictionary`'s default `std::equal_to<String>` is not transparent, so a caller that passes a
+/// slice where a `String const&` is expected silently materialises a heap `String`, hashes it,
+/// compares it and then destroys it. Declaring `is_transparent` on both functors is what selects
+/// the heterogeneous overloads of the underlying map, which hash and compare the slice in place.
+///
+/// Use as `Dictionary<String, TValue, StringSliceHash, StringSliceEqual>`. Insertion still stores
+/// an owned `String`, as it must, so only lookups become free.
+///
+/// Correctness rests on these agreeing with `Hash<String>` and `String::operator==`: they do,
+/// because `String::getHashCode` hashes exactly the bytes of `getUnownedSlice()`, and `String`
+/// comparison is bytewise.
+struct StringSliceHash
+{
+    using is_transparent = void;
+    // Both `String` and `UnownedStringSlice` declare `kHasUniformHash`, so the map does not need to
+    // mix the result further.
+    using is_avalanching = void;
+
+    HashCode64 operator()(const UnownedStringSlice& slice) const { return slice.getHashCode(); }
+    HashCode64 operator()(const String& str) const { return str.getHashCode(); }
+};
+
+struct StringSliceEqual
+{
+    using is_transparent = void;
+
+    template<typename TLeft, typename TRight>
+    bool operator()(const TLeft& left, const TRight& right) const
+    {
+        return asSlice(left) == asSlice(right);
+    }
+
+private:
+    static UnownedStringSlice asSlice(const String& str) { return str.getUnownedSlice(); }
+    static UnownedStringSlice asSlice(const UnownedStringSlice& slice) { return slice; }
+};
+
 class ImmutableHashedString
 {
 public:
