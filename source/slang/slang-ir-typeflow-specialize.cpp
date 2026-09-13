@@ -602,9 +602,46 @@ bool isConcreteType(IRInst* inst)
     return true;
 }
 
+// True if `type` is one of the three refined "info" representations that `tryGetInfo` reuses
+// verbatim: `IRTaggedUnionType` (witness-table set + type set), `IRUntaggedUnionType` (a type set,
+// tag dropped), or `IRElementOfSetType`. This is not the full set of insts that participate in
+// type-flow propagation (e.g. `IRSetTagType`/`IROptionalNoneType` also do); this predicate
+// deliberately matches only that pre-existing `tryGetInfo` reuse set. Those three arise as this
+// pass refines existential values (e.g. `makeInfoForConcreteType`'s flat-union fallback, info-set
+// unions during propagation, and `makeElementOfSetType`); this predicate is their single
+// classifier. A producer must reuse an already-refined `type` as-is rather than re-lift it through
+// `makeInfoForConcreteType` (which double-wraps it into UntaggedUnion(TypeSet(TaggedUnion(...)))).
+// Note the extract-existential consumers are stricter than this set:
+// `analyzeExtractExistentialType`/`analyzeExtractExistentialWitnessTable` require a *bare*
+// `IRTaggedUnionType`, which is why that double-wrap is fatal (issue #13046).
+//
+bool isRefinedInfoType(IRInst* type)
+{
+    if (!type)
+        return false;
+    switch (type->getOp())
+    {
+    case kIROp_TaggedUnionType:
+    case kIROp_UntaggedUnionType:
+    case kIROp_ElementOfSetType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // Create info for a concrete type, using `paramType` as a union mask to determine
 // how much structural decomposition to perform.
 //
+// - If `type` is already a refined info type (see `isRefinedInfoType`), return it unchanged,
+//   ignoring `paramType`. This case takes precedence over the `paramType`-keyed cases below and
+//   is required because a refined info type still satisfies `isConcreteType` — so without it the
+//   "otherwise" case would re-wrap an already-refined `type` into a flat
+//   `UntaggedUnion(TypeSet(...))` (issue #13046). Ignoring `paramType` here is safe: `type` and
+//   `paramType` always describe the same structural position, differing only in refinement depth,
+//   so once `type` is refined there is no mask left to apply. The structural recursion below
+//   re-enters this function per sub-component, so refined info nested inside a structural `type`
+//   is preserved by this same case.
 // - If `paramType` is concrete, return the bare type (no wrapping needed).
 // - If `paramType` is structural and `type` matches the same structural form,
 //   recurse into sub-components using `paramType`'s sub-types as sub-masks.
@@ -612,8 +649,10 @@ bool isConcreteType(IRInst* inst)
 //
 IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramType)
 {
-    SLANG_ASSERT(isConcreteType(type));
     SLANG_ASSERT(paramType);
+    if (isRefinedInfoType(type))
+        return type;
+    SLANG_ASSERT(isConcreteType(type));
     IRBuilder builder(module);
 
     // If paramType is concrete, return the bare type directly.
@@ -702,6 +741,14 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramTyp
     }
 
     // Non-structural or mismatched structural paramType: produce a flat UntaggedUnion.
+    //
+    // Note: `isConcreteType` also recurses through `IRDifferentialPairType`/`IRConditionalType`,
+    // but the structural cases above do not decompose them, so a `DiffPair`/`Conditional` whose
+    // value type is an already-refined info type would be flat-wrapped here (the #13046 double-wrap
+    // class) rather than preserved. Current lift points are not known to produce such a shape (a
+    // `DifferentialPair` reaching here wraps a concrete value type; a `ConditionalType` does not
+    // reach here), so the matching recursion is deliberately omitted; add the two cases for
+    // symmetry with `isConcreteType` if such a shape is ever produced.
     return builder.getUntaggedUnionType(
         cast<IRTypeSet>(builder.getSingletonSet(kIROp_TypeSet, type)));
 }
@@ -1100,24 +1147,14 @@ struct TypeFlowSpecializationContext
     //
     IRInst* tryGetInfo(IRInst* context, IRInst* inst)
     {
-        if (inst->getDataType())
-        {
-            // If the data-type is already a tagged union or untagged union or
-            // element-of-set type, then the refinement occured during a previous phase.
-            //
-            // For now, we simply re-use that info directly.
-            //
-            // In the future, it makes sense to treat it as non-concrete and use
-            // them as an upper-bound for further refinement.
-            //
-            switch (inst->getDataType()->getOp())
-            {
-            case kIROp_TaggedUnionType:
-            case kIROp_UntaggedUnionType:
-            case kIROp_ElementOfSetType:
-                return inst->getDataType();
-            }
-        }
+        // If the data-type is already a refined info type (tagged union, untagged union, or
+        // element-of-set), the refinement occurred during a previous phase; re-use it directly.
+        //
+        // In the future, it makes sense to treat it as non-concrete and use them as an
+        // upper-bound for further refinement.
+        //
+        if (inst->getDataType() && isRefinedInfoType(inst->getDataType()))
+            return inst->getDataType();
 
         // A small check for de-allocated insts.
         if (!inst->getParent())
