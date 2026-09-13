@@ -971,6 +971,14 @@ static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken, Exp
     const Token firstIdentifier = parser->ReadToken(TokenType::Identifier);
     outOriginalLastToken = firstIdentifier;
 
+    // A malformed attribute name makes the identifier read above fail (e.g. `[]` or `[123]`),
+    // returning a non-identifier token. Do not synthesize a name expression from that error token:
+    // leave `outNameExpr` null so the checker uses the null-safe legacy lookup (which reports an
+    // unknown attribute) instead of type-checking a bogus `VarExpr` built from a token with no
+    // name.
+    if (firstIdentifier.type != TokenType::Identifier)
+        return firstIdentifier;
+
     // Build the leading `VarExpr` for the first segment. A leading `::` roots the name at the
     // module (global) scope, exactly as ordinary `::`-qualified name parsing does (see the basic-
     // type case), so a shadowing local does not capture `[::N::Foo]`. `currentModule` is null when
@@ -1006,6 +1014,11 @@ static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken, Exp
         const Token nextIdentifier(parser->ReadToken(TokenType::Identifier));
         outOriginalLastToken = nextIdentifier;
         scopedIdentifierBuilder.append(nextIdentifier.getContent());
+
+        // A malformed trailing segment (e.g. `[a::]`) makes this read fail; stop extending the name
+        // expression and keep the well-formed prefix rather than building a segment with no name.
+        if (nextIdentifier.type != TokenType::Identifier)
+            break;
 
         auto memberExpr = parser->astBuilder->create<StaticMemberExpr>();
         memberExpr->scope = parser->currentScope;
