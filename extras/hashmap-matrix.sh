@@ -45,15 +45,19 @@ cd "$repo_root" || exit 1
 
 maps=(
   UNORDERED_DENSE
+  UNORDERED_DENSE_SEGMENTED
   BOOST_FLAT
   BOOST_NODE
   BOOST_UNORDERED
   ABSL_FLAT
   ABSL_NODE
+  GTL_FLAT
   TSL_ROBIN
+  TSL_HOPSCOTCH
+  TSL_SPARSE
   STD
 )
-hashes=(WYHASH BOOST ABSL STD)
+hashes=(WYHASH RAPIDHASH KOMIHASH XXH3 BOOST ABSL STD)
 default_map=UNORDERED_DENSE
 default_hash=WYHASH
 
@@ -118,7 +122,7 @@ esac
 # Reorder the combinations so that a spanning subset comes first: every map and
 # every hash is exercised at least once before any pair is repeated. The two are
 # chosen independently and most compile failures are caused by one of them alone,
-# so this prefix -- eight or so builds out of the full thirty-two -- is where
+# so this prefix -- a dozen or so builds out of the full eighty-four -- is where
 # nearly all the information is. The remainder still runs, and confirms that no
 # failure needs a *particular* pairing, but it can be cut short with much less
 # lost.

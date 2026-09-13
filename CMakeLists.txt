@@ -393,6 +393,8 @@ enum_option(
     # Options
     UNORDERED_DENSE
     "ankerl::unordered_dense::map (default)"
+    UNORDERED_DENSE_SEGMENTED
+    "ankerl::unordered_dense::segmented_map"
     BOOST_FLAT
     "boost::unordered_flat_map"
     BOOST_NODE
@@ -403,8 +405,14 @@ enum_option(
     "absl::flat_hash_map"
     ABSL_NODE
     "absl::node_hash_map"
+    GTL_FLAT
+    "gtl::flat_hash_map"
     TSL_ROBIN
     "tsl::robin_map"
+    TSL_HOPSCOTCH
+    "tsl::hopscotch_map"
+    TSL_SPARSE
+    "tsl::sparse_map"
     STD
     "std::unordered_map"
 )
@@ -417,6 +425,12 @@ enum_option(
     # Options
     WYHASH
     "ankerl::unordered_dense::hash, i.e. wyhash (default)"
+    RAPIDHASH
+    "rapidhash, wyhash's successor"
+    KOMIHASH
+    "komihash"
+    XXH3
+    "xxHash's XXH3"
     BOOST
     "boost::hash"
     ABSL

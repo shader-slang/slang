@@ -7,11 +7,16 @@
 //
 // This exists so that the relative performance of the available hash maps can be
 // measured on real compiler workloads: build the compiler several times with
-// different values of the CMake option `SLANG_HASHMAP` and compare. Every
-// implementation listed here is a flat or node-based open/closed addressing map
-// with the same `Map<Key, Value, Hash, KeyEqual>` template signature, so the
-// choice is a single type alias plus a couple of shims for the places where the
-// libraries genuinely disagree (see `eraseAndAdvance` below).
+// different values of the CMake option `SLANG_HASHMAP` and compare. The set is
+// chosen to span the designs rather than to be exhaustive: bucket chaining
+// (`STD`, `BOOST_UNORDERED`), SIMD-metadata open addressing flat and node-based
+// (`ABSL_*`, `BOOST_FLAT`/`BOOST_NODE`, `GTL_FLAT`), robin-hood
+// (`TSL_ROBIN`), hopscotch (`TSL_HOPSCOTCH`), sparse-group storage
+// (`TSL_SPARSE`), and an index array over a dense value vector
+// (`UNORDERED_DENSE`, `UNORDERED_DENSE_SEGMENTED`). All of them present the
+// same `Map<Key, Value, Hash, KeyEqual>` template signature, so the choice is a
+// single type alias plus a couple of shims for the places where the libraries
+// genuinely disagree (see `eraseAndAdvance` below).
 //
 // The hash *function* is chosen independently, by `slang-hash-impl.h` and the
 // CMake option `SLANG_HASH`, so that map and hash can be varied as a cross
@@ -22,19 +27,24 @@
 // by the build system; it is not meant to be set per-file, because `Dictionary`
 // appears in the layout of types shared across every translation unit.
 #define SLANG_HASHMAP_UNORDERED_DENSE 1
-#define SLANG_HASHMAP_BOOST_FLAT 2
-#define SLANG_HASHMAP_BOOST_NODE 3
-#define SLANG_HASHMAP_BOOST_UNORDERED 4
-#define SLANG_HASHMAP_ABSL_FLAT 5
-#define SLANG_HASHMAP_ABSL_NODE 6
-#define SLANG_HASHMAP_TSL_ROBIN 7
-#define SLANG_HASHMAP_STD 8
+#define SLANG_HASHMAP_UNORDERED_DENSE_SEGMENTED 2
+#define SLANG_HASHMAP_BOOST_FLAT 3
+#define SLANG_HASHMAP_BOOST_NODE 4
+#define SLANG_HASHMAP_BOOST_UNORDERED 5
+#define SLANG_HASHMAP_ABSL_FLAT 6
+#define SLANG_HASHMAP_ABSL_NODE 7
+#define SLANG_HASHMAP_GTL_FLAT 8
+#define SLANG_HASHMAP_TSL_ROBIN 9
+#define SLANG_HASHMAP_TSL_HOPSCOTCH 10
+#define SLANG_HASHMAP_TSL_SPARSE 11
+#define SLANG_HASHMAP_STD 12
 
 #ifndef SLANG_HASHMAP_IMPL
 #define SLANG_HASHMAP_IMPL SLANG_HASHMAP_UNORDERED_DENSE
 #endif
 
-#if SLANG_HASHMAP_IMPL == SLANG_HASHMAP_UNORDERED_DENSE
+#if SLANG_HASHMAP_IMPL == SLANG_HASHMAP_UNORDERED_DENSE || \
+    SLANG_HASHMAP_IMPL == SLANG_HASHMAP_UNORDERED_DENSE_SEGMENTED
 #include <ankerl/unordered_dense.h>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_BOOST_FLAT
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -46,8 +56,14 @@
 #include <absl/container/flat_hash_map.h>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_ABSL_NODE
 #include <absl/container/node_hash_map.h>
+#elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_GTL_FLAT
+#include <gtl/phmap.hpp>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_TSL_ROBIN
 #include <tsl/robin_map.h>
+#elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_TSL_HOPSCOTCH
+#include <tsl/hopscotch_map.h>
+#elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_TSL_SPARSE
+#include <tsl/sparse_map.h>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_STD
 #include <unordered_map>
 #else
@@ -67,6 +83,19 @@ namespace HashMapImpl
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = ankerl::unordered_dense::map<TKey, TValue, Hash, KeyEqual>;
 constexpr const char* kName = "ankerl::unordered_dense::map";
+
+#elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_UNORDERED_DENSE_SEGMENTED
+
+// The same design as `UNORDERED_DENSE` -- a bucket array of indices into a
+// vector holding the entries themselves -- except that the entry vector is a
+// `segmented_vector`, a list of fixed-size blocks rather than one allocation.
+// Growing therefore appends a block instead of reallocating and moving every
+// entry, which bounds the latency spike when one of the long-lived
+// session-scope dictionaries doubles, at the cost of an extra indirection on
+// every access.
+template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
+using Map = ankerl::unordered_dense::segmented_map<TKey, TValue, Hash, KeyEqual>;
+constexpr const char* kName = "ankerl::unordered_dense::segmented_map";
 
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_BOOST_FLAT
 
@@ -98,19 +127,44 @@ template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = absl::node_hash_map<TKey, TValue, Hash, KeyEqual>;
 constexpr const char* kName = "absl::node_hash_map";
 
+#elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_GTL_FLAT
+
+// A reimplementation of Abseil's swisstable that does not depend on the rest of
+// Abseil. Worth measuring separately from `ABSL_FLAT` despite the shared
+// design, because it differs in the two respects that decide whether it could
+// become the default: it is header-only, so it does not add Abseil to the
+// build, and it does not seed itself per process, so unlike `SLANG_HASH=ABSL`
+// its hash values may escape into a serialized module.
+template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
+using Map = gtl::flat_hash_map<TKey, TValue, Hash, KeyEqual>;
+constexpr const char* kName = "gtl::flat_hash_map";
+
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_TSL_ROBIN
 
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = tsl::robin_map<TKey, TValue, Hash, KeyEqual>;
 constexpr const char* kName = "tsl::robin_map";
 
-// Caveat: `tsl::robin_map`'s iterators are not conforming forward iterators.
-// `[forward.iterators]` requires value-initialized iterators to compare equal to
-// one another, but `robin_iterator`'s default constructor is written
-// `robin_iterator() noexcept {}`, which leaves its `bucket_entry_ptr m_bucket`
-// uninitialised, so two default-constructed iterators compare on garbage.
-// Code that stores a map iterator and resets it to `{}` to mean "nowhere" works
-// against every other backend here and silently misbehaves against this one.
+#elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_TSL_HOPSCOTCH
+
+// Hopscotch hashing: every key is stored within a fixed-size neighbourhood of
+// its home bucket, and an insertion that finds the neighbourhood full displaces
+// an existing entry towards its own home rather than probing onwards. Lookups
+// therefore touch a bounded, contiguous run of buckets. This is the only
+// backend here using that strategy.
+template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
+using Map = tsl::hopscotch_map<TKey, TValue, Hash, KeyEqual>;
+constexpr const char* kName = "tsl::hopscotch_map";
+
+#elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_TSL_SPARSE
+
+// Sparse-group storage: buckets are held in groups of 64 with an occupancy
+// bitmap per group, and only the occupied slots are allocated. That trades
+// lookup speed for a much smaller footprint, so this is the backend to measure
+// when the question is peak memory rather than wall clock.
+template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
+using Map = tsl::sparse_map<TKey, TValue, Hash, KeyEqual>;
+constexpr const char* kName = "tsl::sparse_map";
 
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_STD
 
@@ -119,6 +173,14 @@ using Map = std::unordered_map<TKey, TValue, Hash, KeyEqual>;
 constexpr const char* kName = "std::unordered_map";
 
 #endif
+
+// Caveat, for all three of the tsl maps: their iterators are not conforming
+// forward iterators. `[forward.iterators]` requires value-initialized iterators
+// to compare equal to one another, but each of `robin_iterator`,
+// `hopscotch_iterator` and `sparse_iterator` has a default constructor written
+// `noexcept {}`, which leaves the bucket pointer it compares on uninitialised.
+// Code that stores a map iterator and resets it to `{}` to mean "nowhere" works
+// against every other backend here and silently misbehaves against these.
 
 /// Erases the entry `it` refers to and returns an iterator to the entry that
 /// follows it, so that a loop can keep iterating after erasing.
@@ -162,9 +224,9 @@ constexpr bool
 /// Returns a mutable reference to the mapped value that `it` refers to.
 ///
 /// Most of the implementations here let you write `it->second` and get a
-/// mutable `TValue&` back, but `tsl::robin_map` deliberately hands out a
+/// mutable `TValue&` back, but the tsl maps deliberately hand out a
 /// `const std::pair<Key, T>` through `operator*`/`operator->` so that the key
-/// cannot be modified behind the map's back, and exposes the mutable mapped
+/// cannot be modified behind the map's back, and expose the mutable mapped
 /// value through a separate `value()` accessor instead. Spelling mutable value
 /// access through this keeps that difference from leaking into `Dictionary`.
 template<typename TIterator>
@@ -190,8 +252,8 @@ constexpr bool yieldsConstReference =
 
 /// Presents a `const`-dereferencing map iterator as one whose entry is mutable.
 ///
-/// Only `tsl::robin_map` needs this; see `mutableIterator` below for why, and
-/// for why casting the `const` away is sound.
+/// Only the tsl maps need this; see `mutableIterator` below for why, and for
+/// why casting the `const` away is sound.
 template<typename TIterator>
 class MutableValueIterator
 {
@@ -236,26 +298,27 @@ public:
 /// assigned to, so that `for (auto& [key, value] : dictionary)` can modify
 /// `value` whichever implementation is selected.
 ///
-/// Every implementation here except `tsl::robin_map` already dereferences to a
+/// Every implementation here except the tsl maps already dereferences to a
 /// mutable entry, and for those this hands `it` straight back.
 ///
-/// `tsl::robin_map` is the exception. It stores entries as `std::pair<Key, T>`
-/// -- exactly as the default `ankerl::unordered_dense::map` backend does -- but
-/// unlike ankerl it declares its iterator's `value_type` as *`const`*
+/// `tsl::robin_map`, `tsl::hopscotch_map` and `tsl::sparse_map` are the
+/// exceptions. They store entries as `std::pair<Key, T>` -- exactly as the
+/// default `ankerl::unordered_dense::map` backend does -- but unlike ankerl
+/// they declare their iterator's `value_type` as *`const`*
 /// `std::pair<Key, T>`, so that the key cannot be modified behind the map's
-/// back, and offers the mutable mapped value only through a separate `value()`
-/// accessor. For that one this wraps `it` in an iterator that casts the `const`
+/// back, and offer the mutable mapped value only through a separate `value()`
+/// accessor. For those this wraps `it` in an iterator that casts the `const`
 /// back off.
 ///
 /// The cast is well defined rather than merely convenient: the entry it refers
 /// to is a live element of the map's own bucket array, which is not a `const`
-/// object. A non-`const` `tsl::robin_map` iterator holds a non-`const`
-/// `bucket_iterator`, and the map itself writes through it (see
-/// `robin_iterator::value()`, which returns `std::pair<Key, T>&` from the same
-/// bucket). The `const` exists only on the iterator's declared `value_type`, as
-/// tsl's chosen way of discouraging key mutation.
+/// object. A non-`const` tsl iterator holds a non-`const` `bucket_iterator`,
+/// and the map itself writes through it (see `robin_iterator::value()`, which
+/// returns `std::pair<Key, T>&` from the same bucket). The `const` exists only
+/// on the iterator's declared `value_type`, as tsl's chosen way of discouraging
+/// key mutation.
 ///
-/// What the cast gives up is that discouragement: under this backend `key` in
+/// What the cast gives up is that discouragement: under these backends `key` in
 /// the loop above is assignable, and assigning to it would leave the entry in
 /// the wrong bucket. That is not a new hazard, because the default
 /// `ankerl::unordered_dense::map` backend already exposes a mutable key the
