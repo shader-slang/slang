@@ -6443,7 +6443,8 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
 bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
     Type* satisfyingType,
     DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef,
-    RefPtr<WitnessTable> witnessTable)
+    RefPtr<WitnessTable> witnessTable,
+    Decl* satisfyingDecl)
 {
     if (auto declRefType = as<DeclRefType>(satisfyingType))
     {
@@ -6452,6 +6453,12 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
         if (declRefType->getDeclRef().getDecl()->hasModifier<ToBeSynthesizedModifier>())
             return false;
     }
+
+    diagnoseDuplicateStructuralRayTracingSchemaEntries(
+        satisfyingType,
+        requiredAssociatedTypeDeclRef.getDecl(),
+        witnessTable->witnessedType,
+        satisfyingDecl);
 
     // Register the satisfying type to the witness table. Any constraints
     // written on this associated type are sibling interface requirements, and
@@ -6564,7 +6571,8 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
             return doesTypeSatisfyAssociatedTypeRequirement(
                 satisfyingType,
                 requiredTypeDeclRef,
-                witnessTable);
+                witnessTable,
+                subAggTypeDeclRef.getDecl());
         }
     }
     else if (auto typedefDeclRef = memberDeclRef.as<TypeDefDecl>())
@@ -6579,7 +6587,8 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
             return doesTypeSatisfyAssociatedTypeRequirement(
                 satisfyingType,
                 requiredTypeDeclRef,
-                witnessTable);
+                witnessTable,
+                typedefDeclRef.getDecl());
         }
     }
     else if (auto propertyDeclRef = memberDeclRef.as<PropertyDecl>())

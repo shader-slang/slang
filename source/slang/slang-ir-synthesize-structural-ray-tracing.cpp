@@ -332,7 +332,7 @@ static bool _insertStructuralRayTracingEntry(
     if (entries.add(entry))
         return true;
 
-    sink->diagnose(Diagnostics::DuplicateStructuralRayTracingEntry{
+    sink->diagnose(Diagnostics::DuplicateStructuralRayTracingEntryIr{
         .section = section,
         .entry = entry,
         .schema = schema,
