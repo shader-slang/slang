@@ -4512,6 +4512,13 @@ err(
 )
 
 err(
+    "structural-ray-tracing-world-space-data-requires-instancing",
+    38084,
+    "structural ray-tracing world-space candidate data requires instancing",
+    span { loc = "location", message = "Metal cannot provide world-space data to intersection or any-hit logic when tracing a direct primitive acceleration structure" }
+)
+
+err(
     "structural-ray-tracing-void-abi-data",
     38080,
     "structural ray-tracing ABI data cannot be void",
