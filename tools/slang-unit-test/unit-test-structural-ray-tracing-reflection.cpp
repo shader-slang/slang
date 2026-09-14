@@ -524,6 +524,9 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
         fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
     SLANG_CHECK_ABORT(module != nullptr);
 
+    // Cache the ordinary module IR before selecting a structural stage below. The entry-point
+    // component then contributes the stage metadata as an alternate definition during linking;
+    // code generation must preserve it even when the cached module supplies the chosen body.
     auto reflectedProgram = module->getLayout();
     auto reflectedSchema = reflectedProgram->findTraceProgramSchema("StageNamespace.Schema");
     SLANG_CHECK_ABORT(reflectedSchema != nullptr);
@@ -587,6 +590,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
         fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
     SLANG_CHECK_ABORT(raygenModule != nullptr);
 
+    // Deliberately select this stage after `getLayout()` has cached the undecorated module body.
     ComPtr<slang::IEntryPoint> sourceEntryPoint;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
         "StageNamespace.TestMiss",
