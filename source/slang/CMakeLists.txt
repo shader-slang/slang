@@ -141,6 +141,7 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     FOLDER generated
 )
+slang_apply_disable_exceptions(slang-capability-lookup)
 
 #
 # generated lookup tables
@@ -208,6 +209,7 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     FOLDER generated
 )
+slang_apply_disable_exceptions(slang-lookup-tables)
 
 #
 # Generate the version header
