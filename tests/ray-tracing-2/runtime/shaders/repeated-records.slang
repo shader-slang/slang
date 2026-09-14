@@ -53,12 +53,32 @@ struct RuntimeClosestHit : rt::IClosestHitShader
     }
 }
 
+struct AlternateClosestHit : rt::IClosestHitShader
+{
+    typealias Context = HitContext;
+    void invoke(rt::ClosestHitInput<HitContext> input)
+    {
+        input.payload.stage = 11;
+        input.payload.recordValue = input.record.value;
+    }
+}
+
 struct RuntimeMiss : rt::IMissShader
 {
     typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input)
     {
         input.payload.stage = 20;
+        input.payload.recordValue = input.record.value;
+    }
+}
+
+struct AlternateMiss : rt::IMissShader
+{
+    typealias Context = MissContext;
+    void invoke(rt::MissInput<MissContext> input)
+    {
+        input.payload.stage = 21;
         input.payload.recordValue = input.record.value;
     }
 }
@@ -71,11 +91,19 @@ struct RuntimeHitGroup : rt::IHitGroup
     typealias Intersection = rt::NoIntersection<HitContext>;
 }
 
+struct AlternateHitGroup : rt::IHitGroup
+{
+    typealias Context = HitContext;
+    typealias ClosestHit = AlternateClosestHit;
+    typealias AnyHit = rt::NoAnyHit<HitContext>;
+    typealias Intersection = rt::NoIntersection<HitContext>;
+}
+
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = RuntimeTraceContext;
-    typealias HitGroups = rt::HitGroupList<RuntimeHitGroup>;
-    typealias MissShaders = rt::MissShaderList<RuntimeMiss>;
+    typealias HitGroups = rt::HitGroupList<RuntimeHitGroup, AlternateHitGroup>;
+    typealias MissShaders = rt::MissShaderList<RuntimeMiss, AlternateMiss>;
     typealias CallableShaders = rt::NoCallableShaders;
 }
 
@@ -113,17 +141,23 @@ void main()
 }
 
 // HLSL-DAG: [shader("closesthit")]void RuntimeClosestHit(
+// HLSL-DAG: [shader("closesthit")]void AlternateClosestHit(
 // HLSL-DAG: [shader("miss")]void RuntimeMiss(
+// HLSL-DAG: [shader("miss")]void AlternateMiss(
 // SPIRV-DAG: OpEntryPoint ClosestHitKHR {{.*}} "RuntimeClosestHit"
+// SPIRV-DAG: OpEntryPoint ClosestHitKHR {{.*}} "AlternateClosestHit"
 // SPIRV-DAG: OpEntryPoint MissKHR {{.*}} "RuntimeMiss"
+// SPIRV-DAG: OpEntryPoint MissKHR {{.*}} "AlternateMiss"
 // METAL-DAG: metal::visible_function_table<void(Schema_rayData_0 thread*, uchar device*)> missFunctions_0;
 // METAL-DAG: metal::visible_function_table<void(Schema_rayData_0 thread*, uchar device*)> closestHitFunctions_0;
 // METAL: _slang_miss_record = {{.*}}missIndex_0 * int(32)
 // METAL: _slang_miss_function_index = *((device uint*)_slang_miss_record)
+// METAL: if (_slang_miss_function_index != 0xffffffffU)
 // METAL: [_slang_miss_function_index]({{.*}}, _slang_miss_record + 16)
 // METAL: _slang_hit_record_index = {{.*}}sbtStride_0 + {{.*}}sbtOffset_0
 // METAL: _slang_hit_record = {{.*}}_slang_hit_record_index * int(32)
 // METAL: _slang_hit_function_index = *((device uint*)_slang_hit_record)
+// METAL: if (_slang_hit_function_index != 0xffffffffU)
 // METAL: [_slang_hit_function_index]({{.*}}, _slang_hit_record + 16)
 // METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_
 // METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_

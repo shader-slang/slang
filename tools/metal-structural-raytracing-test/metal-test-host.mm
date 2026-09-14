@@ -960,11 +960,144 @@ bool runRepeatedRecords(
     {
         return false;
     }
-    return validateResults(
-        "repeated-records",
+    if (!validateResults(
+            "repeated-records",
+            results,
+            kExpected,
+            uint32_t(SLANG_COUNT_OF(kExpected))))
+    {
+        return false;
+    }
+
+    // Rewrite only the records buffer and dispatch through the same pipeline, VFTs, IFTs, and
+    // descriptor-resource buffer. Record zero keeps its function but receives new data. Record one
+    // changes from the first reflected function to the second one. This is the central dynamic-SBT
+    // operation: a scene update changes the record-to-program mapping without rebuilding a Metal
+    // function table or recompiling the shader.
+    auto recordBytes = static_cast<uint8_t*>(records.contents);
+    auto recordHeader = reinterpret_cast<uint32_t*>(recordBytes);
+    auto hitSectionOffset = recordHeader[uint32_t(RecordSection::Hit) + 1];
+    auto missSectionOffset = recordHeader[uint32_t(RecordSection::Miss) + 1];
+    auto hitStride = program.schema->getHitRecordStride();
+    auto missStride = program.schema->getMissRecordStride();
+    const uint32_t replacementHitValue = 500;
+    const uint32_t replacementMissValue = 600;
+    const uint32_t alternateHitValue = 700;
+    const uint32_t alternateMissValue = 800;
+    auto payload = program.schema->getPayload(0);
+    auto reflectedHitFunctionIndex = payload->getHitGroup(1)->getFunctionIndex();
+    auto reflectedMissFunctionIndex = payload->getMissShader(1)->getFunctionIndex();
+    if (reflectedHitFunctionIndex < 0 || reflectedMissFunctionIndex < 0)
+        return fail(@"alternate repeated-records functions have invalid reflected indices");
+    const uint32_t alternateHitFunctionIndex = uint32_t(reflectedHitFunctionIndex);
+    const uint32_t alternateMissFunctionIndex = uint32_t(reflectedMissFunctionIndex);
+    std::memcpy(
+        recordBytes + hitSectionOffset + 16,
+        &replacementHitValue,
+        sizeof(replacementHitValue));
+    std::memcpy(
+        recordBytes + missSectionOffset + 16,
+        &replacementMissValue,
+        sizeof(replacementMissValue));
+    std::memcpy(
+        recordBytes + hitSectionOffset + hitStride,
+        &alternateHitFunctionIndex,
+        sizeof(alternateHitFunctionIndex));
+    std::memcpy(
+        recordBytes + missSectionOffset + missStride,
+        &alternateMissFunctionIndex,
+        sizeof(alternateMissFunctionIndex));
+    std::memcpy(
+        recordBytes + hitSectionOffset + hitStride + 16,
+        &alternateHitValue,
+        sizeof(alternateHitValue));
+    std::memcpy(
+        recordBytes + missSectionOffset + missStride + 16,
+        &alternateMissValue,
+        sizeof(alternateMissValue));
+
+    static const uint32_t kExpectedAfterReplacement[] = {
+        10,
+        500,
+        4,
+        11,
+        700,
+        4,
+        20,
+        600,
+        4,
+        21,
+        800,
+        4,
+    };
+    if (!dispatch(
+            device,
+            queue,
+            program,
+            scene.instanceAccelerationStructure,
+            programResources,
+            records,
+            results,
+            4,
+            false,
+            false))
+    {
+        return false;
+    }
+    if (!validateResults(
+        "repeated-records-after-replacement",
         results,
-        kExpected,
-        uint32_t(SLANG_COUNT_OF(kExpected)));
+        kExpectedAfterReplacement,
+        uint32_t(SLANG_COUNT_OF(kExpectedAfterReplacement))))
+    {
+        return false;
+    }
+
+    // The empty-record sentinel is another host-side record edit. A selected empty hit or miss
+    // record performs no dispatch and leaves the zero-initialized payload unchanged.
+    const uint32_t emptyRecordFunctionIndex = UINT32_MAX;
+    std::memcpy(
+        recordBytes + hitSectionOffset + hitStride,
+        &emptyRecordFunctionIndex,
+        sizeof(emptyRecordFunctionIndex));
+    std::memcpy(
+        recordBytes + missSectionOffset + missStride,
+        &emptyRecordFunctionIndex,
+        sizeof(emptyRecordFunctionIndex));
+
+    static const uint32_t kExpectedAfterEmptyReplacement[] = {
+        10,
+        500,
+        4,
+        0,
+        0,
+        4,
+        20,
+        600,
+        4,
+        0,
+        0,
+        4,
+    };
+    if (!dispatch(
+            device,
+            queue,
+            program,
+            scene.instanceAccelerationStructure,
+            programResources,
+            records,
+            results,
+            4,
+            false,
+            false))
+    {
+        return false;
+    }
+    return validateResults(
+        "repeated-records-after-empty-replacement",
+        results,
+        kExpectedAfterEmptyReplacement,
+        uint32_t(SLANG_COUNT_OF(kExpectedAfterEmptyReplacement)));
 }
 
 bool runSelectorAddressing(

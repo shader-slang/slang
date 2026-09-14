@@ -568,49 +568,64 @@ void runStructuralRayTracingRepeatedRecords(IDevice* device)
     SLANG_CHECK_ABORT(schema->getPayloadCount() == 1);
     auto payload = schema->getPayload(0);
     SLANG_CHECK_ABORT(payload != nullptr);
-    SLANG_CHECK_ABORT(payload->getHitGroupCount() == 1);
-    SLANG_CHECK_ABORT(payload->getMissShaderCount() == 1);
+    constexpr SlangUInt kFunctionCount = 2;
+    SLANG_CHECK_ABORT(payload->getHitGroupCount() == kFunctionCount);
+    SLANG_CHECK_ABORT(payload->getMissShaderCount() == kFunctionCount);
 
-    auto reflectedHitGroup = payload->getHitGroup(0);
-    auto reflectedMissShader = payload->getMissShader(0);
-    SLANG_CHECK_ABORT(reflectedHitGroup != nullptr);
-    SLANG_CHECK_ABORT(reflectedMissShader != nullptr);
-    auto reflectedClosestHit = reflectedHitGroup->getClosestHit();
-    auto reflectedMiss = reflectedMissShader->getMiss();
-    SLANG_CHECK_ABORT(reflectedClosestHit != nullptr);
-    SLANG_CHECK_ABORT(reflectedMiss != nullptr);
+    // Reflection is the source of truth for the catalogue-to-native mapping. Declaration order is
+    // not an SBT index, so populate these arrays by reflected function index. The native hit-group
+    // names are host-owned because D3D12, Vulkan, and OptiX require the application to name each
+    // pipeline hit group.
+    static const char* kReflectedHitGroupNames[] = {"hitFunction0", "hitFunction1"};
+    const char* closestHitEntryPointNames[kFunctionCount] = {};
+    const char* reflectedMissEntryPointNames[kFunctionCount] = {};
+    HitGroupDesc hitGroups[kFunctionCount] = {};
+    for (SlangUInt declarationIndex = 0; declarationIndex < kFunctionCount; ++declarationIndex)
+    {
+        auto reflectedHitGroup = payload->getHitGroup(declarationIndex);
+        auto reflectedMissShader = payload->getMissShader(declarationIndex);
+        SLANG_CHECK_ABORT(reflectedHitGroup != nullptr);
+        SLANG_CHECK_ABORT(reflectedMissShader != nullptr);
 
-    // Function indices identify structural functions, not physical SBT records. The host maps each
-    // reflected function to its native pipeline name and may then repeat that name in any number of
-    // physical records.
-    static const char* kReflectedHitGroupNames[] = {"hitFunction0"};
-    auto hitFunctionIndex = reflectedHitGroup->getFunctionIndex();
-    auto missFunctionIndex = reflectedMissShader->getFunctionIndex();
-    SLANG_CHECK_ABORT(hitFunctionIndex == 0);
-    SLANG_CHECK_ABORT(missFunctionIndex == 0);
-    const char* closestHitEntryPointName = reflectedClosestHit->getEntryPointName();
-    const char* missEntryPointName = reflectedMiss->getEntryPointName();
-    SLANG_CHECK_ABORT(closestHitEntryPointName != nullptr);
-    SLANG_CHECK_ABORT(missEntryPointName != nullptr);
-    const char* reflectedMissEntryPointNames[] = {missEntryPointName};
+        auto hitFunctionIndex = reflectedHitGroup->getFunctionIndex();
+        auto missFunctionIndex = reflectedMissShader->getFunctionIndex();
+        SLANG_CHECK_ABORT(
+            hitFunctionIndex >= 0 && hitFunctionIndex < SlangInt(kFunctionCount));
+        SLANG_CHECK_ABORT(
+            missFunctionIndex >= 0 && missFunctionIndex < SlangInt(kFunctionCount));
+        auto hitIndex = SlangUInt(hitFunctionIndex);
+        auto missIndex = SlangUInt(missFunctionIndex);
+        SLANG_CHECK_ABORT(closestHitEntryPointNames[hitIndex] == nullptr);
+        SLANG_CHECK_ABORT(reflectedMissEntryPointNames[missIndex] == nullptr);
+
+        auto reflectedClosestHit = reflectedHitGroup->getClosestHit();
+        auto reflectedMiss = reflectedMissShader->getMiss();
+        SLANG_CHECK_ABORT(reflectedClosestHit != nullptr);
+        SLANG_CHECK_ABORT(reflectedMiss != nullptr);
+        closestHitEntryPointNames[hitIndex] = reflectedClosestHit->getEntryPointName();
+        reflectedMissEntryPointNames[missIndex] = reflectedMiss->getEntryPointName();
+        SLANG_CHECK_ABORT(closestHitEntryPointNames[hitIndex] != nullptr);
+        SLANG_CHECK_ABORT(reflectedMissEntryPointNames[missIndex] != nullptr);
+
+        hitGroups[hitIndex].hitGroupName = kReflectedHitGroupNames[hitIndex];
+        hitGroups[hitIndex].closestHitEntryPoint = closestHitEntryPointNames[hitIndex];
+    }
 
     const EntryDesc kEntries[] = {
         {"main", SLANG_STAGE_RAY_GENERATION},
-        {closestHitEntryPointName, SLANG_STAGE_CLOSEST_HIT},
-        {missEntryPointName, SLANG_STAGE_MISS},
+        {closestHitEntryPointNames[0], SLANG_STAGE_CLOSEST_HIT},
+        {closestHitEntryPointNames[1], SLANG_STAGE_CLOSEST_HIT},
+        {reflectedMissEntryPointNames[0], SLANG_STAGE_MISS},
+        {reflectedMissEntryPointNames[1], SLANG_STAGE_MISS},
     };
     ComPtr<IShaderProgram> program;
     GFX_CHECK_CALL_ABORT(
         loadProgram(device, module, kEntries, SLANG_COUNT_OF(kEntries), program.writeRef()));
 
-    HitGroupDesc hitGroup = {};
-    hitGroup.hitGroupName = kReflectedHitGroupNames[hitFunctionIndex];
-    hitGroup.closestHitEntryPoint = closestHitEntryPointName;
-
     RayTracingPipelineDesc pipelineDesc = {};
     pipelineDesc.program = program;
-    pipelineDesc.hitGroups = &hitGroup;
-    pipelineDesc.hitGroupCount = 1;
+    pipelineDesc.hitGroups = hitGroups;
+    pipelineDesc.hitGroupCount = kFunctionCount;
     pipelineDesc.maxRecursion = 1;
     applyNativeRayTracingABISizes(schema, pipelineDesc);
 
@@ -619,12 +634,12 @@ void runStructuralRayTracingRepeatedRecords(IDevice* device)
 
     static const char* kRayGenerationNames[] = {"main"};
     const char* kHitGroupNames[] = {
-        kReflectedHitGroupNames[hitFunctionIndex],
-        kReflectedHitGroupNames[hitFunctionIndex],
+        kReflectedHitGroupNames[0],
+        kReflectedHitGroupNames[0],
     };
     const char* kMissNames[] = {
-        reflectedMissEntryPointNames[missFunctionIndex],
-        reflectedMissEntryPointNames[missFunctionIndex],
+        reflectedMissEntryPointNames[0],
+        reflectedMissEntryPointNames[0],
     };
     uint32_t hitRecordValues[2] = {};
     uint32_t missRecordValues[2] = {};
@@ -686,6 +701,68 @@ void runStructuralRayTracingRepeatedRecords(IDevice* device)
         SLANG_CHECK(actual[i].stage == kExpected[i].stage);
         SLANG_CHECK(actual[i].recordValue == kExpected[i].recordValue);
         SLANG_CHECK(actual[i].dispatchWidth == kExpected[i].dispatchWidth);
+    }
+
+    // Native shader tables are immutable after creation, so exercise the same dynamic remapping as
+    // the Metal records-buffer test by creating a replacement table. The pipeline and linked shader
+    // program stay unchanged: physical record zero keeps function zero with new data, while
+    // physical record one changes from function zero to function one. This verifies that reflected
+    // function indices describe a reusable shader catalogue rather than statically assigned slots.
+    const char* replacementHitGroupNames[] = {
+        kReflectedHitGroupNames[0],
+        kReflectedHitGroupNames[1],
+    };
+    const char* replacementMissNames[] = {
+        reflectedMissEntryPointNames[0],
+        reflectedMissEntryPointNames[1],
+    };
+    uint32_t replacementHitRecordValues[] = {500, 700};
+    uint32_t replacementMissRecordValues[] = {600, 800};
+    ShaderRecordData replacementHitRecords[] = {
+        {&replacementHitRecordValues[0], sizeof(replacementHitRecordValues[0])},
+        {&replacementHitRecordValues[1], sizeof(replacementHitRecordValues[1])},
+    };
+    ShaderRecordData replacementMissRecords[] = {
+        {&replacementMissRecordValues[0], sizeof(replacementMissRecordValues[0])},
+        {&replacementMissRecordValues[1], sizeof(replacementMissRecordValues[1])},
+    };
+
+    ShaderTableDesc replacementShaderTableDesc = shaderTableDesc;
+    replacementShaderTableDesc.hitGroupNames = replacementHitGroupNames;
+    replacementShaderTableDesc.hitGroupRecordData = replacementHitRecords;
+    replacementShaderTableDesc.missShaderEntryPointNames = replacementMissNames;
+    replacementShaderTableDesc.missShaderRecordData = replacementMissRecords;
+    ComPtr<IShaderTable> replacementShaderTable;
+    GFX_CHECK_CALL_ABORT(
+        device->createShaderTable(replacementShaderTableDesc, replacementShaderTable.writeRef()));
+
+    auto replacementCommandEncoder = queue->createCommandEncoder();
+    auto replacementPassEncoder = replacementCommandEncoder->beginRayTracingPass();
+    auto replacementRootObject =
+        replacementPassEncoder->bindPipeline(pipeline, replacementShaderTable);
+    ShaderCursor replacementRoot(replacementRootObject);
+    GFX_CHECK_CALL_ABORT(replacementRoot["scene"].setBinding(Binding(scene.topLevel)));
+    GFX_CHECK_CALL_ABORT(replacementRoot["results"].setBinding(Binding(results)));
+    replacementPassEncoder->dispatchRays(0, 4, 1, 1);
+    replacementPassEncoder->end();
+    GFX_CHECK_CALL_ABORT(queue->submit(replacementCommandEncoder->finish()));
+    GFX_CHECK_CALL_ABORT(queue->waitOnHost());
+
+    resultBlob.setNull();
+    GFX_CHECK_CALL_ABORT(device->readBuffer(results, 0, resultDesc.size, resultBlob.writeRef()));
+    actual = static_cast<const StructuralRayTracingRepeatedRecordResult*>(
+        resultBlob->getBufferPointer());
+    static const StructuralRayTracingRepeatedRecordResult kExpectedAfterReplacement[] = {
+        {10, 500, 4},
+        {11, 700, 4},
+        {20, 600, 4},
+        {21, 800, 4},
+    };
+    for (Index i = 0; i < SLANG_COUNT_OF(kExpectedAfterReplacement); ++i)
+    {
+        SLANG_CHECK(actual[i].stage == kExpectedAfterReplacement[i].stage);
+        SLANG_CHECK(actual[i].recordValue == kExpectedAfterReplacement[i].recordValue);
+        SLANG_CHECK(actual[i].dispatchWidth == kExpectedAfterReplacement[i].dispatchWidth);
     }
 }
 
