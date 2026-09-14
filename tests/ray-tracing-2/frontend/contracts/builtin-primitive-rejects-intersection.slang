@@ -24,8 +24,8 @@ struct HitContext : rt::IHitContext
 // Triangle intersection is supplied by the target. Adding a source intersection stage would
 // compete with that built-in primitive contract and must therefore fail at conformance checking.
 struct InvalidTriangleIntersection : rt::IIntersectionShader
-//CHECK:                             ^^^^^^^^^^^^^^^^^^^^^^^ type argument doesn't conform to interface
-//CHECK:                             ^^^^^^^^^^^^^^^^^^^^^^^ type argument 'rt.TrianglePrimitive' does not conform to the required interface 'rt.ICustomIntersectionPrimitive'
+//CHECK:                                 ^^^^^^^^^^^^^^^^^^^ type argument doesn't conform to interface
+//CHECK:                                 ^^^^^^^^^^^^^^^^^^^ type argument 'InvalidTriangleIntersection' does not conform to the required interface 'rt.IIntersectionShader'
 {
     typealias Context = HitContext;
 

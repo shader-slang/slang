@@ -90,8 +90,8 @@ void main()
 
 // OptiX uses its existing direct-call ABI. Structural lowering retains the context-typed data
 // pointer and emits the callable stage as an ordinary device function.
-// CUDA-DAG: optixDirectCall<void>(0U,
-// CUDA-DAG: extern "C" __device__ void __direct_callable__TestCallable(TestCallableData_0 *data_{{[0-9]+}})
+// CUDA-DAG: optixDirectCall<void>((0U),
+// CUDA-DAG: extern "C" __device__ void __direct_callable__TestCallable(TestCallableData_0 * data_{{[0-9]+}})
 // PTX-DAG: _optix_direct_call
 // PTX-DAG: __direct_callable__TestCallable
 
