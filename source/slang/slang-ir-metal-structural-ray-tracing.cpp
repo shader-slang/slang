@@ -53,6 +53,17 @@ static bool _supportsMetalLib31(TargetRequest* targetRequest)
     return targetRequest->getTargetCaps().implies(CapabilityAtom::metallib_3_1);
 }
 
+// Returns the target ABI type used to pass callable data through a Metal visible function table.
+// An empty source type has no value bits, but Metal still needs a concrete pointer in the VFT
+// signature and at every indirect-call site. Use a role-local scalar sentinel instead of adding a
+// field to the user's nominal type: that same type may also be used in a record or resource whose
+// zero-size layout must remain unchanged.
+static IRType* _getMetalCallableDataStorageType(IRBuilder& builder, IRType* sourceDataType)
+{
+    return isSemanticallyEmptyStructuralRayTracingPayloadType(sourceDataType) ? builder.getIntType()
+                                                                              : sourceDataType;
+}
+
 static void _collectStructuralProgramOperations(IRInst* parent, List<IRInst*>& operations)
 {
     for (auto child = parent->getFirstChild(); child; child = child->getNextInst())
@@ -1746,7 +1757,8 @@ static IRFunc* _generateCallableStageAdapter(
     builder.setInsertInto(module->getModuleInst());
     auto adapter = builder.createFunc();
     auto dataType = cast<IRType>(entry->getCallableDataType());
-    auto dataPointerType = builder.getPtrType(dataType, AddressSpace::ThreadLocal);
+    auto dataStorageType = _getMetalCallableDataStorageType(builder, dataType);
+    auto dataPointerType = builder.getPtrType(dataStorageType, AddressSpace::ThreadLocal);
     auto descriptorDataType = builder.getPtrType(builder.getUIntType(), AddressSpace::Global);
     auto requirements = _getMetalStageRequirements(invoke);
     auto uint3Type =
@@ -1835,11 +1847,32 @@ static IRFunc* _generateCallableStageAdapter(
     _rebindMetalCallableDispatches(adapter, descriptorResources, descriptorData);
     List<IRInst*> operations;
     _collectStageInputOperations(adapter, operations);
+    IRInst* emptySourceData = nullptr;
     for (auto operation : operations)
     {
         IRInst* replacement = nullptr;
         if (operation->getOp() == kIROp_StructuralRayTracingGetCallableData)
-            replacement = data;
+        {
+            if (dataStorageType == dataType)
+            {
+                replacement = data;
+            }
+            else
+            {
+                // The physical scalar is only a non-zero-size VFT sentinel; it does not represent
+                // a second semantic callable-data value. If inlined source code mentions the empty
+                // data property, retain its canonical pointer type in a role-local zero-bit
+                // temporary. Ordinary type legalization removes that temporary and its accesses.
+                if (!emptySourceData)
+                {
+                    // Put the temporary in the adapter entry block so it dominates data-property
+                    // uses that the inliner may have placed in different control-flow branches.
+                    builder.setInsertBefore(adapter->getFirstBlock()->getFirstOrdinaryInst());
+                    emptySourceData = builder.emitVar(dataType);
+                }
+                replacement = emptySourceData;
+            }
+        }
         else if (operation->getOp() == kIROp_StructuralRayTracingGetRecord)
             replacement = record;
         else if (operation->getOp() == kIROp_StructuralRayTracingGetDispatchRaysIndex)
@@ -4382,7 +4415,9 @@ static bool _prepareCallableDescriptor(
     MetalTraceDescriptorInfo& outInfo)
 {
     List<IRType*> parameterTypes;
-    parameterTypes.add(builder.getPtrType(dataType, AddressSpace::ThreadLocal));
+    parameterTypes.add(builder.getPtrType(
+        _getMetalCallableDataStorageType(builder, dataType),
+        AddressSpace::ThreadLocal));
     auto uint3Type =
         builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3));
     if (requirements.dispatchRaysIndex)
@@ -5065,9 +5100,19 @@ static bool _lowerCallableDispatch(
                                             0,
                                             nullptr)
                                       : zeroDispatchValue;
+    auto data = callOperation->getData();
+    auto dataStorageType = _getMetalCallableDataStorageType(builder, programInfo->callableDataType);
+    if (dataStorageType != programInfo->callableDataType)
+    {
+        // Empty source data has no bits to copy into or out of the call. Materialize only the
+        // concrete pointer required by Metal's indirect-call ABI; the user's nominal empty type
+        // and any unrelated layouts that use it remain untouched.
+        data = builder.emitVar(dataStorageType);
+        builder.emitStore(data, builder.emitDefaultConstruct(dataStorageType));
+    }
     IRInst* operands[] = {
         callOperation->getCallableIndex(),
-        callOperation->getData(),
+        data,
         dispatchRaysIndex,
         dispatchRaysDimensions,
         builder.getBoolValue(programInfo->callableRequirements.dispatchRaysIndex),
