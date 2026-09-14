@@ -999,6 +999,13 @@ static IRStringLit* _lowerStructuralRayTracingCanonicalTypeIdentity(
 // unobfuscated mangled name. Reflection can use that table to reconstruct the nominal type and
 // then verify it against the independently persisted canonical type identity. This key is opaque
 // compiler metadata; no consumer parses it or treats the user-facing source name as identity.
+//
+// The key intentionally identifies the declaration rather than trying to serialize generic
+// arguments a second time. An explicitly composed `GenericHitGroup<uint> : IMaterialHit`
+// conformance retains that exact semantic type in its `SubtypeWitness`; lowering the conformance
+// calls `_lowerStructuralRayTracingCanonicalTypeIdentity` and registers the specialization in the
+// receiving `Linkage`. Declaration lookup is therefore only the deserialization bridge for the
+// declaration-level entries that did not pass through a fresh semantic conformance producer.
 static IRStringLit* _lowerStructuralRayTracingDeclLookupName(IRGenContext* context, Type* type)
 {
     auto canonicalType = type ? type->getCanonicalType() : nullptr;

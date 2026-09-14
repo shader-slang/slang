@@ -1662,6 +1662,20 @@ SLANG_UNIT_TEST(structuralRayTracingSerializedOpenSchemaReflection)
             typealias AnyHit = rt::NoAnyHit<Context>;
             typealias Intersection = rt::NoIntersection<Context>;
         }
+
+        public struct GenericClosestHit<T> : rt::IClosestHitShader
+        {
+            typealias Context = HitContext;
+            void invoke(rt::ClosestHitInput<Context> input) {}
+        }
+
+        public struct GenericHitGroup<T> : IHitTag
+        {
+            typealias Context = HitContext;
+            typealias ClosestHit = GenericClosestHit<T>;
+            typealias AnyHit = rt::NoAnyHit<Context>;
+            typealias Intersection = rt::NoIntersection<Context>;
+        }
     )";
 
     ComPtr<slang::IGlobalSession> globalSession;
@@ -1741,7 +1755,30 @@ SLANG_UNIT_TEST(structuralRayTracingSerializedOpenSchemaReflection)
     auto pluginModule = loadSerialized("structural_serialized_reflection_plugin", pluginBlob);
     SLANG_CHECK_ABORT(pluginModule != nullptr);
 
-    slang::IComponentType* components[] = {schemaModule, pluginModule};
+    // A generic declaration is not an automatic member of an open section because it denotes an
+    // unbounded family. The host selects one finite specialization with an ordinary semantic
+    // TypeConformance component. Creating that component in this fresh session must retain the
+    // `uint` argument and register the exact type; declaration-key recovery deliberately does not
+    // reconstruct generic arguments from serialized IR.
+    auto pluginLayout = pluginModule->getLayout(0, nullptr);
+    auto contextLayout = contextModule->getLayout(0, nullptr);
+    SLANG_CHECK_ABORT(pluginLayout && contextLayout);
+    auto genericHitGroupType = pluginLayout->findTypeByName("GenericHitGroup<uint>");
+    auto hitTagType = contextLayout->findTypeByName("IHitTag");
+    SLANG_CHECK_ABORT(genericHitGroupType && hitTagType);
+    ComPtr<slang::ITypeConformance> genericHitGroupConformance;
+    ComPtr<slang::IBlob> conformanceDiagnostics;
+    auto conformanceResult = loadedSession->createTypeConformanceComponentType(
+        genericHitGroupType,
+        hitTagType,
+        genericHitGroupConformance.writeRef(),
+        -1,
+        conformanceDiagnostics.writeRef());
+    if (SLANG_FAILED(conformanceResult) && conformanceDiagnostics)
+        fprintf(stderr, "%s\n", (const char*)conformanceDiagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(conformanceResult));
+
+    slang::IComponentType* components[] = {schemaModule, pluginModule, genericHitGroupConformance};
     ComPtr<slang::IComponentType> program;
     ComPtr<slang::IBlob> diagnostics;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(loadedSession->createCompositeComponentType(
@@ -1763,10 +1800,18 @@ SLANG_UNIT_TEST(structuralRayTracingSerializedOpenSchemaReflection)
     SLANG_CHECK(schema->getPayloadCount() == 1);
     auto payload = schema->getPayload(0);
     SLANG_CHECK_ABORT(payload != nullptr);
-    SLANG_CHECK(payload->getHitGroupCount() == 1);
-    auto group = payload->getHitGroup(0);
-    SLANG_CHECK_ABORT(group != nullptr);
-    SLANG_CHECK(group->isLinked());
-    SLANG_CHECK(UnownedStringSlice(group->getType()->getName()) == "LinkedHitGroup");
-    SLANG_CHECK(group->getRecordTypeLayout() != nullptr);
+    SLANG_CHECK(payload->getHitGroupCount() == 2);
+    bool foundLinkedGroup = false;
+    bool foundGenericGroup = false;
+    for (SlangUInt i = 0; i < payload->getHitGroupCount(); ++i)
+    {
+        auto group = payload->getHitGroup(i);
+        SLANG_CHECK_ABORT(group != nullptr);
+        SLANG_CHECK(group->isLinked());
+        SLANG_CHECK(group->getRecordTypeLayout() != nullptr);
+        foundLinkedGroup |= UnownedStringSlice(group->getType()->getName()) == "LinkedHitGroup";
+        foundGenericGroup |= group->getType() == genericHitGroupType;
+    }
+    SLANG_CHECK(foundLinkedGroup);
+    SLANG_CHECK(foundGenericGroup);
 }
