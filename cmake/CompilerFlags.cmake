@@ -83,6 +83,25 @@ function(add_supported_cxx_linker_flags target)
 endfunction()
 
 #
+# Enforce the C++ no-exceptions compiler flag on `target` when the
+# SLANG_DISABLE_EXCEPTIONS option is enabled, so that `throw`/`try`/`catch` fail to
+# compile in the libraries that must be exception-free. The SLANG_DISABLE_EXCEPTIONS
+# macro itself is defined globally at the top-level CMakeLists.txt, so the in-source
+# `#if SLANG_HAS_EXCEPTIONS` guards already take the exception-free path; this only
+# adds the compiler enforcement. Flags are toolchain-probed, so it is a no-op on a
+# compiler that does not accept them.
+function(slang_apply_disable_exceptions target)
+    if(NOT SLANG_DISABLE_EXCEPTIONS)
+        return()
+    endif()
+    if(MSVC)
+        add_supported_cxx_flags(${target} PRIVATE /EHs-c-)
+    else()
+        add_supported_cxx_flags(${target} PRIVATE -fno-exceptions)
+    endif()
+endfunction()
+
+#
 # Add our default compiler flags to a target
 #
 # Pass USE_EXTRA_WARNINGS to enable -WExtra or /W3

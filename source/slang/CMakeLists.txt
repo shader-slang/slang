@@ -315,6 +315,7 @@ if(NOT SLANG_EMBED_CORE_MODULE)
         INSTALL_COMPONENT generators
     )
     add_library(slang-without-embedded-core-module ALIAS slang)
+    slang_apply_disable_exceptions(slang)
 else()
     # However if we're embedding core module, we need to make two different
     # libraries, one with the embedded core module and one without, so first define
@@ -327,6 +328,7 @@ else()
         TARGET_NAME slang-common-objects
         EXCLUDE_FROM_ALL
     )
+    slang_apply_disable_exceptions(slang-common-objects)
     slang_add_target(
         .
         ${SLANG_LIB_TYPE}

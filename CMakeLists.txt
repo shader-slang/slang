@@ -148,6 +148,20 @@ option(
 
 option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
+option(
+    SLANG_DISABLE_EXCEPTIONS
+    "Compile the exception-free libraries (core, compiler-core, slang-common-objects, slang-glsl-module) with C++ exceptions disabled"
+    OFF
+)
+if(SLANG_DISABLE_EXCEPTIONS)
+    # Define the macro globally so SLANG_HAS_EXCEPTIONS resolves to 0 in every
+    # translation unit's view of the shared inline headers, keeping their inline
+    # bodies ODR-consistent across all targets. The -fno-exceptions compiler flag
+    # is applied only to the libraries that are guaranteed exception-free, via
+    # slang_apply_disable_exceptions() (see cmake/CompilerFlags.cmake).
+    add_compile_definitions(SLANG_DISABLE_EXCEPTIONS=1)
+endif()
+
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_VALIDATION_VM_BYTECODE "Enable VM bytecode validation" ON)
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")

@@ -12,6 +12,7 @@ slang_add_target(
     PRECOMPILE_HEADERS
         ${CMAKE_CURRENT_SOURCE_DIR}/slang-basic.h
 )
+slang_apply_disable_exceptions(core)
 
 if(SLANG_ENABLE_MIMALLOC)
     if(NOT TARGET mimalloc-static)

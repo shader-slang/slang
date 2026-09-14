@@ -12,6 +12,7 @@ slang_add_target(
     PRECOMPILE_HEADERS
         ${slang_SOURCE_DIR}/source/core/slang-basic.h
 )
+slang_apply_disable_exceptions(compiler-core)
 if(NOT MSVC)
     # This is necessary to compile the DXC headers.
     # Also skip PCH for this file since -fms-extensions conflicts with PCH.
