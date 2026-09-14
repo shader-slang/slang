@@ -2831,7 +2831,7 @@ static RefPtr<IRModule> _getOrCreateStructuralRayTracingProgramManifest(
     // Do not short-circuit here. Open-section completion can diagnose one malformed linked entry
     // while another deferred trace still needs to be resolved or removed to leave this request's
     // candidate module internally safe.
-    if (!resolveDeferredStructuralRayTracingEmptyPayloads(linked.module, codeGenContext->getSink()))
+    if (!finalizeStructuralRayTracingSchemaPayloads(linked.module, codeGenContext->getSink()))
     {
         isValid = false;
     }

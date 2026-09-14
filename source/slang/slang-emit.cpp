@@ -434,6 +434,8 @@ void calcRequiredLoweringPassSet(
     if (inst->getOp() == kIROp_StructuralRayTracingTrace ||
         inst->getOp() == kIROp_StructuralRayTracingCallShader)
         result.structuralRayTracingTrace = true;
+    if (inst->getOp() == kIROp_StructuralRayTracingProgramDescriptorType)
+        result.structuralRayTracingProgramDescriptor = true;
     // no_diff is an attribute payload, not a distinct opcode, so it needs findAttr.
     if (auto attrType = as<IRAttributedType>(inst))
     {
@@ -1560,24 +1562,35 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
-    if (requiredLoweringPassSet.structuralRayTracingTrace ||
-        requiredLoweringPassSet.structuralRayTracingStageInput)
-    {
-        // Module-local semantic checking catches source modules that use both APIs. Perform the
-        // corresponding linked-IR check before specialization so a selected structural entry
-        // point cannot hide a legacy TraceRay/TraceMotionRay/CallShader call in a serialized
-        // helper module.
-        SLANG_PASS(diagnoseMixedRayTracingAPIsInReachableIR, irEntryPoints, sink);
-        if (sink->getErrorCount() != 0)
-            return SLANG_FAIL;
-    }
-
     if (!codeGenContext->isSpecializationDisabled())
     {
         SpecializationOptions specOptions;
         specOptions.lowerWitnessLookups = true;
         specOptions.reportDynamicDispatchSites = codeGenContext->shouldReportDynamicDispatchSites();
         SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
+    }
+
+    const bool hasStructuralRayTracing = requiredLoweringPassSet.structuralRayTracingTrace ||
+                                         requiredLoweringPassSet.structuralRayTracingStageInput;
+    if (requiredLoweringPassSet.higherOrderFunc && hasStructuralRayTracing)
+    {
+        // Structural reachability must see the executable callee selected for a function-valued
+        // argument. Defunctionalize before diagnosing mixed API use and before structural adapter
+        // synthesis; those passes introduce only direct calls and need no second run.
+        SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
+    }
+
+    if (hasStructuralRayTracing)
+    {
+        // Module-local semantic checking catches source modules that use both APIs. Perform the
+        // corresponding linked-IR check after generic and higher-order specialization so calls
+        // through interface constraints or function-valued parameters have become direct
+        // executable edges. Structural operations and their schema metadata still exist here, so
+        // a selected stage cannot hide a legacy TraceRay/TraceMotionRay/CallShader call in a
+        // serialized helper module.
+        SLANG_PASS(diagnoseMixedRayTracingAPIsInReachableIR, irEntryPoints, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
     }
 
     // A standalone structural stage has no trace operation, but it still needs post-specialization
@@ -1591,7 +1604,11 @@ Result linkAndOptimizeIR(
         SLANG_PASS(synthesizePortableStructuralRayTracingEntryPoints, irEntryPoints, sink);
         outLinkedIR.entryPoints = irEntryPoints;
     }
-    else if (target == CodeGenTarget::Metal)
+    else if (
+        target == CodeGenTarget::Metal &&
+        (requiredLoweringPassSet.structuralRayTracingTrace ||
+         requiredLoweringPassSet.structuralRayTracingStageInput ||
+         requiredLoweringPassSet.structuralRayTracingProgramDescriptor))
     {
         SLANG_PASS(prepareMetalStructuralRayTracing, irEntryPoints, targetRequest, sink);
     }
@@ -1599,8 +1616,10 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
-    if (requiredLoweringPassSet.higherOrderFunc)
+    if (requiredLoweringPassSet.higherOrderFunc && !hasStructuralRayTracing)
     {
+        // Preserve the established non-ray-tracing pass order. Only structural mixed-API
+        // reachability needs higher-order calls materialized before the checks above.
         SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
     }
 
@@ -1846,6 +1865,11 @@ Result linkAndOptimizeIR(
     // for host vm.
     if (target == CodeGenTarget::HostVM)
     {
+        if (requiredLoweringPassSet.structuralRayTracingProgramDescriptor)
+        {
+            Dictionary<IRType*, IRType*> noTargetDescriptorTypes;
+            SLANG_PASS(lowerStructuralRayTracingProgramDescriptorTypes, noTargetDescriptorTypes);
+        }
         SLANG_PASS(performForceInlining);
         // Autodiff can leave void differential parameters and matching call arguments, but the
         // bytecode constants section cannot represent void values. Remove them before emission,
@@ -1884,6 +1908,16 @@ Result linkAndOptimizeIR(
         (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
          isCUDATarget(targetRequest)))
         SLANG_PASS(lowerPortableStructuralRayTracingOperations, targetRequest);
+
+    if (target != CodeGenTarget::Metal &&
+        requiredLoweringPassSet.structuralRayTracingProgramDescriptor)
+    {
+        // The schema operand has served its target-independent specialization role. Portable
+        // targets retain the ParameterBlock-compatible source storage, while Metal replaces the
+        // same wrapper with a schema-specific physical descriptor during target preparation.
+        Dictionary<IRType*, IRType*> noTargetDescriptorTypes;
+        SLANG_PASS(lowerStructuralRayTracingProgramDescriptorTypes, noTargetDescriptorTypes);
+    }
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     SLANG_PASS(performForceInlining);

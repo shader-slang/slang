@@ -685,13 +685,30 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit("uint _slang_hit_record_index = ");
             if (hasInstancing)
             {
-                emitOperand(trace->getRecords(), getInfo(EmitOp::Postfix));
-                m_writer->emit("[(");
-                emitOperand(trace->getRecords(), getInfo(EmitOp::Postfix));
-                m_writer->emit("[0] >> 2) + _slang_result.instance_id");
+                // The generated helper is also called by intersection-function candidate
+                // dispatch. Calling it here keeps the record selected for the committed hit
+                // identical to the record whose AnyHit/Intersection logic saw that candidate.
+                auto instanceContributionLookup =
+                    as<IRFunc>(trace->getInstanceHitGroupContributionLookup());
+                SLANG_RELEASE_ASSERT(instanceContributionLookup);
+                emitOperand(instanceContributionLookup, getInfo(EmitOp::General));
+                m_writer->emit("(");
+                emitOperand(trace->getRecords(), getInfo(EmitOp::General));
+                m_writer->emit(", ");
                 if (maxLevels > 0)
-                    m_writer->emit("[_slang_result.instance_count - 1]");
-                m_writer->emit("] + ");
+                {
+                    // Metal exposes the committed multi-level path as a fixed-capacity array plus
+                    // its active count. Rebuild the same `array_ref` ABI that an intersection
+                    // function receives natively, without assigning meaning to user_instance_id.
+                    m_writer->emit("metal::array_ref<uint>("
+                                   "_slang_result.instance_id, "
+                                   "_slang_result.instance_count)");
+                }
+                else
+                {
+                    m_writer->emit("_slang_result.instance_id");
+                }
+                m_writer->emit(") + ");
             }
             m_writer->emit("_slang_result.geometry_id * ");
             emitOperand(trace->getSbtStride(), getInfo(EmitOp::General));

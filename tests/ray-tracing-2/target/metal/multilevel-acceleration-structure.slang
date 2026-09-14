@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
+//TEST:SIMPLE(filecheck=METAL,TRIE): -experimental-feature -entry main -stage raygeneration -target metal
 
 import slang.raytracing;
 
@@ -24,10 +24,7 @@ struct HitContext : rt::IHitContext
 struct TestClosestHit : rt::IClosestHitShader
 {
     typealias Context = HitContext;
-    void invoke(rt::ClosestHitInput<HitContext> input)
-    {
-        input.payload.value = 1;
-    }
+    void invoke(rt::ClosestHitInput<HitContext> input) { input.payload.value = 1; }
 }
 
 struct HitGroup : rt::IHitGroup
@@ -62,4 +59,14 @@ void main()
 // METAL: metal::raytracing::intersector<metal::raytracing::instancing, metal::raytracing::max_levels<3>> _slang_intersector;
 // METAL: metal::raytracing::intersection_result<metal::raytracing::instancing, metal::raytracing::max_levels<3>> _slang_result
 // METAL: scene_{{[0-9]+}}, {{.*}}.instanceMask_0);
-// METAL: _slang_result.instance_id[_slang_result.instance_count - 1]
+// METAL: _slang_result.instance_id
+
+// The committed-hit path passes every reported instance index to the shared record-contribution
+// lookup. Its loop follows each trie edge instead of reducing the path to the final index.
+// TRIE-LABEL: __slang_structural_rt_instance_contribution_
+// TRIE: .size()
+// TRIE: instancePath_{{[0-9]+}}{{.*}}[
+// TRIE: __slang_structural_rt_instance_contribution_
+// TRIE: metal::array_ref<uint>
+// TRIE: _slang_result.instance_id
+// TRIE: _slang_result.instance_count

@@ -1274,7 +1274,7 @@ static UInt _getSharedMetalTagMask(
 
 enum class MetalDescriptorDataSection : UInt
 {
-    InstanceHitGroupOffsets = 0,
+    InstanceHitGroupContributionTrie = 0,
     HitRecords = 1,
     MissRecords = 2,
     CallableRecords = 3,
@@ -1320,6 +1320,190 @@ static IRParam* _emitMetalSystemValueParam(
     builder.addTargetSystemValueDecoration(result, UnownedStringSlice(systemValue));
     return result;
 }
+
+// Metal changes the native type of the two instance-ID intersection-function attributes when an
+// intersector uses `max_levels<N>`. A single-level function receives one `uint`, while a
+// multi-level function receives `metal::array_ref<uint>` containing the active instance path.
+// Keep the native type and its path operations together so every candidate helper, dispatcher,
+// and committed-hit lookup uses exactly the same nominal IR type.
+struct MetalInstancePathABI
+{
+    IRType* parameterType = nullptr;
+    IRFunc* getCount = nullptr;
+    IRFunc* getElement = nullptr;
+
+    bool isMultiLevel() const { return getElement != nullptr; }
+};
+
+static MetalInstancePathABI _createMetalInstancePathABI(IRModule* module, bool isMultiLevel)
+{
+    IRBuilder builder(module);
+    if (!isMultiLevel)
+        return {builder.getUIntType(), nullptr, nullptr};
+
+    builder.setInsertInto(module->getModuleInst());
+
+    // This compiler-owned nominal type is emitted as Metal's native type, so it requires neither
+    // a source declaration nor a physical struct definition in generated MSL.
+    auto arrayRefType = builder.createStructType();
+    builder.addTargetIntrinsicDecoration(
+        arrayRefType,
+        CapabilitySet::makeEmpty(),
+        UnownedTerminatedStringSlice("metal::array_ref<uint>"));
+    // `array_ref` is a native value in an intersection-function signature. The generic aggregate
+    // parameter optimization must not reinterpret this nominal IR struct as `borrow in`.
+    builder.addDecoration(arrayRefType, kIROp_PreserveValueParameterABIDecoration);
+
+    auto getCount = builder.createFunc();
+    IRType* getCountParameters[] = {arrayRefType};
+    getCount->setFullType(builder.getFuncType(
+        SLANG_COUNT_OF(getCountParameters),
+        getCountParameters,
+        builder.getIntType()));
+    builder.addTargetIntrinsicDecoration(
+        getCount,
+        CapabilitySet::makeEmpty(),
+        UnownedTerminatedStringSlice("int(($0).size())"));
+
+    auto getElement = builder.createFunc();
+    IRType* getElementParameters[] = {arrayRefType, builder.getIntType()};
+    getElement->setFullType(builder.getFuncType(
+        SLANG_COUNT_OF(getElementParameters),
+        getElementParameters,
+        builder.getUIntType()));
+    builder.addTargetIntrinsicDecoration(
+        getElement,
+        CapabilitySet::makeEmpty(),
+        UnownedTerminatedStringSlice("($0)[$1]"));
+
+    return {arrayRefType, getCount, getElement};
+}
+
+// Builds the one lookup used by both candidate-stage and committed closest-hit dispatch.
+//
+// Consider two paths through a multi-level acceleration structure: `[0, 0]` and `[1, 0]`. The
+// innermost instance index is zero in both paths, but the two outer instances may contribute
+// different logical SBT offsets. The records buffer therefore stores a trie rather than a flat
+// table. `records[0]` is the byte offset of the trie root. Each non-leaf entry is a word offset
+// relative to that root, and the entry selected at the final path depth is the SBT contribution.
+// A single-level path still performs exactly the original flat-table lookup.
+static IRFunc* _generateMetalInstanceHitGroupContributionLookup(
+    IRModule* module,
+    const MetalInstancePathABI& abi)
+{
+    SLANG_RELEASE_ASSERT(abi.parameterType);
+
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+    auto result = builder.createFunc();
+    auto uintType = builder.getUIntType();
+    auto descriptorDataType = builder.getPtrType(uintType, AddressSpace::Global);
+    IRType* parameterTypes[] = {descriptorDataType, abi.parameterType};
+    result->setFullType(
+        builder.getFuncType(SLANG_COUNT_OF(parameterTypes), parameterTypes, uintType));
+    builder.addNameHintDecoration(
+        result,
+        UnownedTerminatedStringSlice("__slang_structural_rt_instance_contribution"));
+
+    builder.setInsertInto(result);
+    builder.emitBlock();
+    auto descriptorData = builder.emitParam(descriptorDataType);
+    auto instancePath = builder.emitParam(abi.parameterType);
+    builder.addNameHintDecoration(descriptorData, UnownedTerminatedStringSlice("descriptorData"));
+    builder.addNameHintDecoration(instancePath, UnownedTerminatedStringSlice("instancePath"));
+
+    auto rootByteOffset = builder.emitLoad(
+        builder.emitGetOffsetPtr(descriptorData, builder.getIntValue(uintType, 0)));
+    auto rootWordOffset =
+        builder.emitShr(uintType, rootByteOffset, builder.getIntValue(uintType, 2));
+    if (!abi.isMultiLevel())
+    {
+        auto entryIndex = builder.emitAdd(uintType, rootWordOffset, instancePath);
+        builder.emitReturn(builder.emitLoad(builder.emitGetOffsetPtr(descriptorData, entryIndex)));
+        return result;
+    }
+
+    IRInst* countArguments[] = {instancePath};
+    auto count = builder.emitCallInst(
+        builder.getIntType(),
+        abi.getCount,
+        SLANG_COUNT_OF(countArguments),
+        countArguments);
+    auto nodeOrContribution = builder.emitVar(uintType);
+    builder.addNameHintDecoration(
+        nodeOrContribution,
+        UnownedTerminatedStringSlice("nodeOrContribution"));
+    builder.emitStore(nodeOrContribution, builder.getIntValue(uintType, 0));
+
+    IRBlock* loopBody = nullptr;
+    IRBlock* loopBreak = nullptr;
+    auto depth = emitLoopBlocks(
+        &builder,
+        builder.getIntValue(builder.getIntType(), 0),
+        count,
+        loopBody,
+        loopBreak);
+
+    // Before the last iteration the variable names a child node relative to the trie root. The
+    // same load on the last iteration yields the final contribution, so no separate leaf layout or
+    // depth-dependent branch is needed.
+    builder.setInsertBefore(loopBody->getFirstOrdinaryInst());
+    IRInst* elementArguments[] = {instancePath, depth};
+    auto instanceIndex = builder.emitCallInst(
+        uintType,
+        abi.getElement,
+        SLANG_COUNT_OF(elementArguments),
+        elementArguments);
+    auto entryIndex = builder.emitAdd(
+        uintType,
+        builder.emitAdd(uintType, rootWordOffset, builder.emitLoad(nodeOrContribution)),
+        instanceIndex);
+    builder.emitStore(
+        nodeOrContribution,
+        builder.emitLoad(builder.emitGetOffsetPtr(descriptorData, entryIndex)));
+
+    builder.setInsertInto(loopBreak);
+    builder.emitReturn(builder.emitLoad(nodeOrContribution));
+    return result;
+}
+
+// Owns the two native instance-path ABIs for one target IR module.
+//
+// `max_levels<N>` changes the capacity carried by Metal's intersection result, but every
+// multi-level intersection-function parameter has the same native `metal::array_ref<uint>` type.
+// An IR struct is nominal, so independently creating that target-intrinsic type for two payload
+// partitions would incorrectly give the same native ABI two different IR identities. Keep one
+// module-wide multi-level identity and one lookup function for it. The scalar form already uses
+// canonical `uint`, but its lookup is cached here as well so all schemas share the same ABI helper.
+struct MetalInstancePathABICache
+{
+    MetalInstancePathABICache(IRModule* module)
+        : module(module)
+    {
+    }
+
+    const MetalInstancePathABI& getABI(IRIntegerValue maxLevels)
+    {
+        auto& abi = maxLevels > 0 ? multiLevelABI : singleLevelABI;
+        if (!abi.parameterType)
+            abi = _createMetalInstancePathABI(module, maxLevels > 0);
+        return abi;
+    }
+
+    IRFunc* getContributionLookup(IRIntegerValue maxLevels)
+    {
+        auto& lookup = maxLevels > 0 ? multiLevelLookup : singleLevelLookup;
+        if (!lookup)
+            lookup = _generateMetalInstanceHitGroupContributionLookup(module, getABI(maxLevels));
+        return lookup;
+    }
+
+    IRModule* module;
+    MetalInstancePathABI singleLevelABI;
+    MetalInstancePathABI multiLevelABI;
+    IRFunc* singleLevelLookup = nullptr;
+    IRFunc* multiLevelLookup = nullptr;
+};
 
 static IRMatrixType* _getFloat4x3Type(IRBuilder& builder)
 {
@@ -2294,6 +2478,7 @@ static IRFunc* _generateBuiltInCandidateAdapter(
     const MetalCandidateResultInfo& resultInfo,
     IRStructuralRayTracingHitGroupInfoDecoration* group,
     const MetalStageRequirements& signatureRequirements,
+    const MetalInstancePathABI& instanceABI,
     UInt tagMask,
     MetalRayDataInfo* rayDataInfo)
 {
@@ -2312,6 +2497,8 @@ static IRFunc* _generateBuiltInCandidateAdapter(
     auto hitAttributesKind =
         StructuralRayTracingHitAttributesKind(group->getHitAttributesKind()->getValue());
     auto requirements = _getMetalStageRequirements(invoke);
+    SLANG_RELEASE_ASSERT(!requirements.instanceIndex || !instanceABI.isMultiLevel());
+    SLANG_RELEASE_ASSERT(!signatureRequirements.instanceID || !instanceABI.isMultiLevel());
     List<IRType*> parameterTypes;
     if (signatureRequirements.distance || signatureRequirements.objectSpaceRay)
         parameterTypes.add(builder.getFloatType());
@@ -2334,7 +2521,7 @@ static IRFunc* _generateBuiltInCandidateAdapter(
     if (signatureRequirements.geometryIndex)
         parameterTypes.add(builder.getUIntType());
     if (signatureRequirements.instanceIndex)
-        parameterTypes.add(builder.getUIntType());
+        parameterTypes.add(instanceABI.parameterType);
     if (signatureRequirements.instanceID)
         parameterTypes.add(builder.getUIntType());
     if (signatureRequirements.objectSpaceRay)
@@ -2437,11 +2624,16 @@ static IRFunc* _generateBuiltInCandidateAdapter(
     }
     if (signatureRequirements.instanceIndex)
     {
-        inputs.instanceIndex = _emitMetalSystemValueParam(
+        auto nativeInstanceIndex = _emitMetalSystemValueParam(
             builder,
-            builder.getUIntType(),
+            instanceABI.parameterType,
             "instanceIndex",
             "instance_id");
+        // Multi-level instance paths are required internally for SBT lookup, but the public stage
+        // input deliberately has no scalar instance-index property for that topology. Preserve the
+        // native array_ref parameter for the dispatcher without inventing a user-visible scalar.
+        if (!instanceABI.isMultiLevel())
+            inputs.instanceIndex = nativeInstanceIndex;
     }
     if (signatureRequirements.instanceID)
     {
@@ -3160,6 +3352,7 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
     IRStructuralRayTracingHitGroupInfoDecoration* group,
     const MetalStageRequirements& signatureRequirements,
     bool signatureHasAnyHit,
+    const MetalInstancePathABI& instanceABI,
     UInt tagMask,
     MetalRayDataInfo* rayDataInfo)
 {
@@ -3183,6 +3376,8 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
         getStructuralRayTracingHitGroupStageInvoke(group, StructuralRayTracingStageKind::AnyHit));
     auto requirements =
         _combineMetalStageRequirements(intersectionRequirements, anyHitRequirements);
+    SLANG_RELEASE_ASSERT(!requirements.instanceIndex || !instanceABI.isMultiLevel());
+    SLANG_RELEASE_ASSERT(!signatureRequirements.instanceID || !instanceABI.isMultiLevel());
     List<IRType*> parameterTypes;
     parameterTypes.add(builder.getFloatType());
     parameterTypes.add(builder.getFloatType());
@@ -3200,7 +3395,7 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
     if (signatureRequirements.geometryIndex)
         parameterTypes.add(builder.getUIntType());
     if (signatureRequirements.instanceIndex)
-        parameterTypes.add(builder.getUIntType());
+        parameterTypes.add(instanceABI.parameterType);
     if (signatureRequirements.instanceID)
         parameterTypes.add(builder.getUIntType());
     if (signatureRequirements.worldSpaceOrigin)
@@ -3294,11 +3489,15 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
     }
     if (signatureRequirements.instanceIndex)
     {
-        instanceIndex = _emitMetalSystemValueParam(
+        auto nativeInstanceIndex = _emitMetalSystemValueParam(
             builder,
-            builder.getUIntType(),
+            instanceABI.parameterType,
             "instanceIndex",
             "instance_id");
+        // See the built-in candidate adapter above: the path is part of the native dispatch ABI,
+        // while a scalar source-stage property exists only for the single-level topology.
+        if (!instanceABI.isMultiLevel())
+            instanceIndex = nativeInstanceIndex;
     }
     if (signatureRequirements.instanceID)
     {
@@ -3516,6 +3715,7 @@ static IRFunc* _generateMetalCandidateDispatcher(
     MetalStructuralRayTracingGeometryKind geometryKind,
     UInt tagMask,
     IRIntegerValue maxLevels,
+    IRFunc* instanceHitGroupContributionLookup,
     IRIntegerValue hitRecordStride,
     MetalRayDataInfo* rayDataInfo,
     IRInst* schemaIdentity,
@@ -3626,14 +3826,13 @@ static IRFunc* _generateMetalCandidateDispatcher(
         builder.emitAdd(uintType, builder.emitMul(uintType, geometryIndex, sbtStride), sbtOffset);
     if ((tagMask & UInt(MetalStructuralRayTracingTag::Instancing)) != 0)
     {
-        SLANG_RELEASE_ASSERT(instanceIndex);
-        auto instanceTableByteOffset = builder.emitLoad(
-            builder.emitGetOffsetPtr(descriptorData, builder.getIntValue(uintType, 0)));
-        auto instanceTableWordOffset =
-            builder.emitShr(uintType, instanceTableByteOffset, builder.getIntValue(uintType, 2));
-        auto instanceTableIndex = builder.emitAdd(uintType, instanceTableWordOffset, instanceIndex);
-        auto instanceContribution =
-            builder.emitLoad(builder.emitGetOffsetPtr(descriptorData, instanceTableIndex));
+        SLANG_RELEASE_ASSERT(instanceIndex && instanceHitGroupContributionLookup);
+        IRInst* arguments[] = {descriptorData, instanceIndex};
+        auto instanceContribution = builder.emitCallInst(
+            uintType,
+            instanceHitGroupContributionLookup,
+            SLANG_COUNT_OF(arguments),
+            arguments);
         hitRecordIndex = builder.emitAdd(uintType, instanceContribution, hitRecordIndex);
     }
     auto hitRecordAddress = _emitMetalRecordAddress(
@@ -3788,6 +3987,12 @@ struct MetalPayloadPartitionDescriptorInfo
     MetalStageRequirements missRequirements;
     MetalStageRequirements closestHitRequirements;
     RefPtr<MetalRayDataInfo> rayDataInfo;
+    // These references select the module-owned scalar or multi-level ABI pair. Candidate
+    // dispatchers and post-trace closest-hit dispatch must share the selected lookup: resolving the
+    // same hit through two interpretations of Metal's instance path would select different logical
+    // SBT records.
+    MetalInstancePathABI instanceABI;
+    IRFunc* instanceHitGroupContributionLookup = nullptr;
     IRStructField* intersectionFunctionsField = nullptr;
     IRStructField* missFunctionsField = nullptr;
     IRStructField* closestHitFunctionsField = nullptr;
@@ -3828,12 +4033,6 @@ public:
     IRIntegerValue missRecordStride = 16;
     IRIntegerValue callableRecordStride = 16;
     List<IRInst*> operations;
-    List<IRInst*> descriptorValues;
-    HashSet<IRInst*> descriptorValueSet;
-    List<IRStructField*> storageFields;
-    HashSet<IRStructField*> storageFieldSet;
-    List<IRInst*> directStorageValues;
-    HashSet<IRInst*> directStorageValueSet;
     Dictionary<IRTypeLayout*, IRTypeLayout*> physicalDescriptorLayouts;
     List<MetalPayloadPartitionDescriptorInfo> payloadPartitions;
     HashSet<IRType*> payloadTypes;
@@ -3858,25 +4057,7 @@ public:
         payloadPartitions.add(partition);
     }
 
-    void addDescriptorValue(IRInst* value)
-    {
-        if (descriptorValueSet.add(value))
-            descriptorValues.add(value);
-    }
-
     void addOperation(IRInst* operation) { operations.add(operation); }
-
-    void addStorageField(IRStructField* field)
-    {
-        if (storageFieldSet.add(field))
-            storageFields.add(field);
-    }
-
-    void addDirectStorageValue(IRInst* value)
-    {
-        if (directStorageValueSet.add(value))
-            directStorageValues.add(value);
-    }
 };
 
 static IRStructFieldLayoutAttr* _findStructFieldLayout(IRStructTypeLayout* layout, IRInst* fieldKey)
@@ -4094,211 +4275,233 @@ static IRTypeLayout* _getMetalPhysicalDescriptorLayout(
     return physicalDescriptorLayout;
 }
 
-static void _retagMetalDescriptorValue(
-    IRBuilder& builder,
-    MetalProgramDescriptorInfo* info,
-    IRInst* value,
-    Dictionary<IRInst*, IRType*>& physicalTypesByValue);
-
-static void _retagMetalDescriptorPointer(
-    IRBuilder& builder,
-    MetalProgramDescriptorInfo* info,
-    IRInst* pointer,
-    Dictionary<IRInst*, IRType*>& physicalTypesByValue)
+// Returns the semantic value type for each canonical struct-layout field-key representation.
+// Nominal fields derive their specialized type from the concrete owner. Global collection records
+// the type explicitly when it substitutes an untyped layout-only key. A paired offset layout can
+// instead retain its original typed value or pointer key, whose IR data type is already
+// authoritative.
+struct MetalStructLayoutFieldInfo
 {
-    auto pointerType = as<IRPtrTypeBase>(pointer->getDataType());
-    SLANG_RELEASE_ASSERT(pointerType);
-    auto physicalPointerType =
-        builder.getPtrTypeWithAddressSpace(info->physicalDescriptorType, pointerType);
-    if (auto previousType = physicalTypesByValue.tryGetValue(pointer))
-    {
-        SLANG_RELEASE_ASSERT(*previousType == physicalPointerType);
-        return;
-    }
-    physicalTypesByValue.add(pointer, physicalPointerType);
-    pointer->setFullType(physicalPointerType);
+    IRInst* key = nullptr;
+    IRType* type = nullptr;
+};
 
-    if (auto fieldAddress = as<IRFieldAddress>(pointer))
+static MetalStructLayoutFieldInfo _getMetalStructLayoutFieldInfo(
+    IRBuilder& builder,
+    IRStructType* structType,
+    IRInst* fieldKey)
+{
+    SLANG_RELEASE_ASSERT(structType && fieldKey);
+
+    // A nominal field is the primary source of truth. In particular, generic struct
+    // specializations share a source key, while `structType` selects the field's concrete type.
+    if (auto structKey = as<IRStructKey>(fieldKey))
     {
-        auto storageField =
-            _findMetalStorageField(builder, fieldAddress->getBase(), fieldAddress->getField());
-        SLANG_RELEASE_ASSERT(storageField);
-        auto oldFieldType = storageField->getFieldType();
-        SLANG_RELEASE_ASSERT(
-            oldFieldType == info->sourceDescriptorType ||
-            oldFieldType == info->physicalDescriptorType);
-        storageField->setFieldType(info->physicalDescriptorType);
-        info->addStorageField(storageField);
-        return;
+        if (auto field = findStructField(structType, structKey))
+            return {fieldKey, field->getFieldType()};
     }
-    if (as<IRVar>(pointer))
+
+    // Global-parameter collection creates an untyped key for a resource or varying that remains
+    // outside the nominal `GlobalParams` struct. Its producer preserves the pre-replacement value
+    // type explicitly because the new key has no data type of its own.
+    if (auto typeDecoration = fieldKey->findDecoration<IRLayoutFieldTypeDecoration>())
+        return {fieldKey, typeDecoration->getFieldType()};
+
+    // A parameter group's offset-element layout can intentionally retain the original global
+    // layout key instead of the synthesized key used by its element layout. Such a key is already
+    // semantic IR: a load carries the value type directly, while a backing global variable carries
+    // a pointer to that value. Reading and, where needed, unwrapping that data type preserves the
+    // producer's representation; it does not search SSA uses or reconstruct a type from layout.
+    //
+    // A rebuilt layout must not retain that value as its key. Doing so would turn metadata into a
+    // live module-scope use of a global when explicit-global-context lowering processes the new
+    // layout. Replace it with a compiler-owned key carrying the same checked type. This is the same
+    // representation that global-parameter collection uses for the paired element layout.
+    if (auto keyType = fieldKey->getDataType())
     {
-        for (auto use = pointer->firstUse; use; use = use->nextUse)
-        {
-            if (auto store = as<IRStore>(use->getUser()))
-                _retagMetalDescriptorValue(builder, info, store->getVal(), physicalTypesByValue);
-        }
-        return;
+        auto valueType = tryGetPointedToType(&builder, keyType);
+        if (!valueType)
+            valueType = keyType;
+
+        auto metadataKey = builder.createStructKey();
+        copyNameHintAndDebugDecorations(metadataKey, fieldKey);
+        builder.addDecoration(metadataKey, kIROp_LayoutFieldTypeDecoration, valueType);
+        return {metadataKey, valueType};
     }
-    SLANG_RELEASE_ASSERT(as<IRParam>(pointer) || as<IRGlobalParam>(pointer));
+
+    // These are the three canonical field-key representations produced for a struct layout.
+    // Accepting an untyped key without a nominal field or explicit type would hide a malformed
+    // producer and could leave a nested descriptor layout stale.
+    SLANG_RELEASE_ASSERT(!"struct layout field key has no semantic value type");
+    return {};
 }
 
-// Give every descriptor value selected by a structural operation the target-specific nominal type
-// keyed by that operation's `programLayout`. The source generic's Schema argument is phantom and
-// has already been erased by specialization; preserving the ordinary shared source struct here
-// would make two schemas overwrite each other's table types.
-static void _retagMetalDescriptorValue(
-    IRBuilder& builder,
-    MetalProgramDescriptorInfo* info,
-    IRInst* value,
-    Dictionary<IRInst*, IRType*>& physicalTypesByValue)
+// Rebuilds descriptor-containing layouts by walking a concrete type and its layout together.
+//
+// A generic declaration contributes one `IRStructKey` to every specialized struct. Consequently a
+// key cannot identify which specialization owns a field layout. Consider this example:
+//
+//     struct Holder<Schema> { rt::TraceProgramDescriptor<Schema> program; }
+//     ParameterBlock<Holder<FirstSchema>> first;
+//     ParameterBlock<Holder<SecondSchema>> second;
+//
+// Both `program` fields use the same key, but their physical descriptor types and layouts differ.
+// Pairing each layout node with the concrete type reached from its decorated root preserves that
+// ownership. When the walk reaches a synthesized nominal descriptor type, that type directly
+// selects the one `MetalProgramDescriptorInfo` whose layout may replace the source placeholder.
+struct MetalProgramDescriptorLayoutPhysicalizationContext
 {
-    if (auto previousType = physicalTypesByValue.tryGetValue(value))
+    MetalProgramDescriptorLayoutPhysicalizationContext(
+        IRModule* module,
+        const List<RefPtr<MetalProgramDescriptorInfo>>& infos)
+        : builder(module)
     {
-        SLANG_RELEASE_ASSERT(*previousType == info->physicalDescriptorType);
-        return;
-    }
-    auto sourceType = value->getDataType();
-    physicalTypesByValue.add(value, info->physicalDescriptorType);
-    value->setFullType(info->physicalDescriptorType);
-
-    if (auto load = as<IRLoad>(value))
-    {
-        _retagMetalDescriptorPointer(builder, info, load->getPtr(), physicalTypesByValue);
-        return;
-    }
-    if (auto fieldExtract = as<IRFieldExtract>(value))
-    {
-        auto storageField =
-            _findMetalStorageField(builder, fieldExtract->getBase(), fieldExtract->getField());
-        SLANG_RELEASE_ASSERT(storageField);
-        SLANG_RELEASE_ASSERT(
-            storageField->getFieldType() == sourceType ||
-            storageField->getFieldType() == info->physicalDescriptorType);
-        storageField->setFieldType(info->physicalDescriptorType);
-        info->addStorageField(storageField);
-        return;
-    }
-    if (as<IRGlobalParam>(value))
-    {
-        info->addDirectStorageValue(value);
-        return;
-    }
-    if (auto param = as<IRParam>(value))
-    {
-        auto block = as<IRBlock>(param->getParent());
-        auto func = block ? as<IRFunc>(block->getParent()) : nullptr;
-        SLANG_RELEASE_ASSERT(func && block == func->getFirstBlock());
-        Index parameterIndex = 0;
-        for (auto candidate : func->getParams())
+        for (auto info : infos)
         {
-            if (candidate == param)
-                break;
-            ++parameterIndex;
+            SLANG_RELEASE_ASSERT(info->physicalDescriptorType);
+            infosByPhysicalType.add(info->physicalDescriptorType, info);
         }
-        SLANG_RELEASE_ASSERT(parameterIndex < Index(func->getParamCount()));
-        fixUpFuncType(func);
-
-        List<IRCall*> callSites;
-        for (auto use = func->firstUse; use; use = use->nextUse)
-        {
-            auto call = as<IRCall>(use->getUser());
-            if (call && call->getCallee() == func)
-                callSites.add(call);
-        }
-        for (auto call : callSites)
-        {
-            _retagMetalDescriptorValue(
-                builder,
-                info,
-                call->getArg(UInt(parameterIndex)),
-                physicalTypesByValue);
-        }
-        return;
     }
 
-    // Descriptor construction is unavailable to user code, so after specialization every
-    // structural operation must receive it from a parameter, a global parameter, or a load/extract
-    // rooted in one of those storage locations.
-    SLANG_RELEASE_ASSERT(!"unexpected structural ray-tracing descriptor producer");
-}
+    IRBuilder builder;
+    Dictionary<IRType*, MetalProgramDescriptorInfo*> infosByPhysicalType;
+    Dictionary<KeyValuePair<IRType*, IRTypeLayout*>, IRTypeLayout*> rewrittenTypeLayouts;
 
-static void _collectMetalStructTypeLayouts(IRInst* parent, List<IRStructTypeLayout*>& layouts)
+    IRVarLayout* rewriteVarLayout(IRType* type, IRVarLayout* oldLayout)
+    {
+        auto newTypeLayout = rewriteTypeLayout(type, oldLayout->getTypeLayout());
+        return newTypeLayout == oldLayout->getTypeLayout()
+                   ? oldLayout
+                   : _cloneMetalVarLayout(builder, oldLayout, newTypeLayout);
+    }
+
+    IRTypeLayout* rewriteTypeLayout(IRType* type, IRTypeLayout* oldLayout)
+    {
+        if (!type || !oldLayout)
+            return oldLayout;
+
+        KeyValuePair<IRType*, IRTypeLayout*> key(type, oldLayout);
+        if (auto found = rewrittenTypeLayouts.tryGetValue(key))
+            return *found;
+
+        IRTypeLayout* newLayout = oldLayout;
+        if (auto info = infosByPhysicalType.tryGetValue(type))
+        {
+            newLayout = _getMetalPhysicalDescriptorLayout(builder, *info, oldLayout);
+        }
+        else if (auto structType = as<IRStructType>(type))
+        {
+            if (auto structLayout = as<IRStructTypeLayout>(oldLayout))
+            {
+                IRStructTypeLayout::Builder layoutBuilder(&builder);
+                _copyMetalTypeLayoutAttributes(structLayout, layoutBuilder);
+                bool changed = false;
+                for (auto fieldLayout : structLayout->getFieldLayoutAttrs())
+                {
+                    auto fieldKey = fieldLayout->getFieldKey();
+                    auto fieldVarLayout = fieldLayout->getLayout();
+                    auto fieldInfo = _getMetalStructLayoutFieldInfo(builder, structType, fieldKey);
+                    auto newFieldVarLayout = rewriteVarLayout(fieldInfo.type, fieldVarLayout);
+                    changed |= newFieldVarLayout != fieldVarLayout;
+                    layoutBuilder.addField(fieldInfo.key, newFieldVarLayout);
+                }
+                if (changed)
+                    newLayout = layoutBuilder.build();
+            }
+        }
+        else if (auto tupleType = as<IRTupleType>(type))
+        {
+            // Tuple members have no source declarations, so their layout keys cannot be resolved
+            // through `findStructField`. The layout producer represents a tuple as an
+            // `IRStructTypeLayout`; preserve its positional correspondence with the tuple's value
+            // operands. The optional trailing `IRTupleNameType` operand has no value layout. Do not
+            // accept an `IRTupleTypeLayout` alternative here: no producer creates that shape, and a
+            // second representation would hide a producer/consumer invariant violation.
+            auto structLayout = as<IRStructTypeLayout>(oldLayout);
+            SLANG_RELEASE_ASSERT(structLayout);
+            IRStructTypeLayout::Builder layoutBuilder(&builder);
+            _copyMetalTypeLayoutAttributes(structLayout, layoutBuilder);
+            bool changed = false;
+            UInt fieldIndex = 0;
+            for (auto fieldLayout : structLayout->getFieldLayoutAttrs())
+            {
+                SLANG_RELEASE_ASSERT(fieldIndex < tupleType->getOperandCount());
+                auto fieldType = cast<IRType>(tupleType->getOperand(fieldIndex++));
+                auto fieldVarLayout = fieldLayout->getLayout();
+                auto newFieldVarLayout = rewriteVarLayout(fieldType, fieldVarLayout);
+                changed |= newFieldVarLayout != fieldVarLayout;
+                layoutBuilder.addField(fieldLayout->getFieldKey(), newFieldVarLayout);
+            }
+            if (changed)
+                newLayout = layoutBuilder.build();
+        }
+        else if (auto parameterGroupType = as<IRUniformParameterGroupType>(type))
+        {
+            if (auto parameterGroupLayout = as<IRParameterGroupTypeLayout>(oldLayout))
+            {
+                auto elementType = parameterGroupType->getElementType();
+                auto elementVarLayout = parameterGroupLayout->getElementVarLayout();
+                auto newElementVarLayout = rewriteVarLayout(elementType, elementVarLayout);
+                auto offsetElementTypeLayout = parameterGroupLayout->getOffsetElementTypeLayout();
+                auto newOffsetElementTypeLayout =
+                    rewriteTypeLayout(elementType, offsetElementTypeLayout);
+                if (newElementVarLayout != elementVarLayout ||
+                    newOffsetElementTypeLayout != offsetElementTypeLayout)
+                {
+                    IRParameterGroupTypeLayout::Builder layoutBuilder(&builder);
+                    _copyMetalTypeLayoutAttributes(parameterGroupLayout, layoutBuilder);
+                    layoutBuilder.setContainerVarLayout(
+                        parameterGroupLayout->getContainerVarLayout());
+                    layoutBuilder.setElementVarLayout(newElementVarLayout);
+                    layoutBuilder.setOffsetElementTypeLayout(newOffsetElementTypeLayout);
+                    newLayout = layoutBuilder.build();
+                }
+            }
+        }
+
+        rewrittenTypeLayouts.add(key, newLayout);
+        return newLayout;
+    }
+};
+
+static void _collectMetalVarLayoutDecorations(
+    IRInst* parent,
+    List<IRLayoutDecoration*>& decorations)
 {
-    for (auto child = parent->getFirstChild(); child; child = child->getNextInst())
+    // `getFirstChild()` deliberately skips decorations. Walk the combined list so the layout
+    // decoration attached to each parameter or field is observed, then recurse only through
+    // ordinary IR children because a decoration cannot own another decorated program value.
+    for (auto child = parent->getFirstDecorationOrChild(); child; child = child->getNextInst())
     {
-        _collectMetalStructTypeLayouts(child, layouts);
-        if (auto layout = as<IRStructTypeLayout>(child))
-            layouts.add(layout);
+        if (auto decoration = as<IRLayoutDecoration>(child))
+        {
+            if (as<IRVarLayout>(decoration->getLayout()))
+                decorations.add(decoration);
+        }
+        else if (!as<IRDecoration>(child))
+        {
+            _collectMetalVarLayoutDecorations(child, decorations);
+        }
     }
 }
 
 static void _replaceMetalDescriptorStorageLayouts(
     IRModule* module,
-    MetalProgramDescriptorInfo* info)
+    const List<RefPtr<MetalProgramDescriptorInfo>>& infos)
 {
-    IRBuilder builder(module);
-    for (auto storageValue : info->directStorageValues)
+    List<IRLayoutDecoration*> decorations;
+    _collectMetalVarLayoutDecorations(module->getModuleInst(), decorations);
+    MetalProgramDescriptorLayoutPhysicalizationContext context(module, infos);
+    for (auto decoration : decorations)
     {
-        auto layoutDecoration = storageValue->findDecoration<IRLayoutDecoration>();
-        if (!layoutDecoration)
+        auto owner = decoration->getParent();
+        auto ownerType = owner ? owner->getDataType() : nullptr;
+        auto oldLayout = as<IRVarLayout>(decoration->getLayout());
+        if (!ownerType || !oldLayout)
             continue;
-        auto sourceVarLayout = cast<IRVarLayout>(layoutDecoration->getLayout());
-        auto physicalTypeLayout =
-            _getMetalPhysicalDescriptorLayout(builder, info, sourceVarLayout->getTypeLayout());
-        layoutDecoration->setOperand(
-            0,
-            _cloneMetalVarLayout(builder, sourceVarLayout, physicalTypeLayout));
-    }
-
-    List<IRStructTypeLayout*> layouts;
-    _collectMetalStructTypeLayouts(module->getModuleInst(), layouts);
-    HashSet<IRInst*> storageFieldKeys;
-    for (auto storageField : info->storageFields)
-        storageFieldKeys.add(storageField->getKey());
-    for (auto oldLayout : layouts)
-    {
-        // Consider this example:
-        //
-        //     struct Frame
-        //     {
-        //         rt::TraceProgramDescriptor<Schema> firstProgram;
-        //         rt::TraceProgramDescriptor<Schema> secondProgram;
-        //     }
-        //
-        // Retagging the two descriptor values records both fields in `storageFields`. The
-        // containing `Frame` type nevertheless has one shared layout, so replacing that layout
-        // after finding only the first field would leave `secondProgram` pointing at the source
-        // placeholder layout. Rebuild the containing layout once and physicalize every matching
-        // field in that same rebuild. Each cloned variable layout preserves its field-specific
-        // outer offsets while replacing only the nested descriptor type layout.
-        bool hasMatchingStorageField = false;
-        for (auto fieldLayout : oldLayout->getFieldLayoutAttrs())
-        {
-            if (storageFieldKeys.contains(fieldLayout->getFieldKey()))
-            {
-                hasMatchingStorageField = true;
-                break;
-            }
-        }
-        if (!hasMatchingStorageField)
-            continue;
-
-        IRStructTypeLayout::Builder newLayoutBuilder(&builder);
-        _copyMetalTypeLayoutAttributes(oldLayout, newLayoutBuilder);
-        for (auto fieldLayout : oldLayout->getFieldLayoutAttrs())
-        {
-            auto varLayout = fieldLayout->getLayout();
-            if (storageFieldKeys.contains(fieldLayout->getFieldKey()))
-            {
-                varLayout = _cloneMetalVarLayout(
-                    builder,
-                    varLayout,
-                    _getMetalPhysicalDescriptorLayout(builder, info, varLayout->getTypeLayout()));
-            }
-            newLayoutBuilder.addField(fieldLayout->getFieldKey(), varLayout);
-        }
-        oldLayout->replaceUsesWith(newLayoutBuilder.build());
+        auto newLayout = context.rewriteVarLayout(ownerType, oldLayout);
+        if (newLayout != oldLayout)
+            decoration->setOperand(0, newLayout);
     }
 }
 
@@ -4319,31 +4522,26 @@ static IRStructField* _createMetalDescriptorResourceField(
 
 // Replace the fixed source placeholder with the target-specific `3 * payloadCount + 2` resource
 // struct. Payload partitions have already been collected in shader declaration order.
-static bool _synthesizeMetalProgramDescriptor(
-    IRModule* module,
-    MetalProgramDescriptorInfo* info,
-    Dictionary<IRInst*, IRType*>& physicalTypesByValue)
+static void _synthesizeMetalProgramDescriptor(IRModule* module, MetalProgramDescriptorInfo* info)
 {
-    auto descriptorType = as<IRStructType>(info->descriptor->getDataType());
-    if (!descriptorType)
-        return false;
-
+    auto descriptorWrapper =
+        as<IRStructuralRayTracingProgramDescriptorType>(info->descriptor->getDataType());
+    SLANG_RELEASE_ASSERT(
+        descriptorWrapper && descriptorWrapper->getSchemaType() == info->programLayout);
+    auto descriptorType = cast<IRStructType>(descriptorWrapper->getStorageType());
     List<IRStructField*> descriptorFields;
     _getStructFields(descriptorType, descriptorFields);
-    if (descriptorFields.getCount() != 1)
-        return false;
+    SLANG_RELEASE_ASSERT(descriptorFields.getCount() == 1);
 
     auto sourceParameterBlock =
         as<IRUniformParameterGroupType>(descriptorFields[0]->getFieldType());
     auto sourceResourcesType =
         sourceParameterBlock ? as<IRStructType>(sourceParameterBlock->getElementType()) : nullptr;
-    if (!sourceResourcesType)
-        return false;
+    SLANG_RELEASE_ASSERT(sourceResourcesType);
 
     List<IRStructField*> sourceFields;
     _getStructFields(sourceResourcesType, sourceFields);
-    if (sourceFields.getCount() != 5)
-        return false;
+    SLANG_RELEASE_ASSERT(sourceFields.getCount() == 5);
     info->sourceDescriptorType = descriptorType;
     info->sourceDescriptorResourcesField = descriptorFields[0];
     for (auto field : sourceFields)
@@ -4414,10 +4612,6 @@ static bool _synthesizeMetalProgramDescriptor(
 
     info->descriptorResourcesPointerType =
         builder.getPtrType(builder.getUIntType(), AddressSpace::Uniform);
-    for (auto descriptorValue : info->descriptorValues)
-        _retagMetalDescriptorValue(builder, info, descriptorValue, physicalTypesByValue);
-    _replaceMetalDescriptorStorageLayouts(module, info);
-    return true;
 }
 
 static IRFuncType* _getMetalVisibleFunctionSignature(
@@ -4794,6 +4988,8 @@ static bool _materializeMetalPayloadPartition(
     }
     const bool candidateUsesInstancing =
         (tagMask & UInt(MetalStructuralRayTracingTag::Instancing)) != 0;
+    const auto& candidateInstanceABI = payloadPartition->instanceABI;
+    SLANG_RELEASE_ASSERT(!hasCandidateLogic || candidateInstanceABI.parameterType);
     auto prepareCandidateSignature = [&](MetalStageRequirements& requirements)
     {
         requirements.record = true;
@@ -4905,6 +5101,7 @@ static bool _materializeMetalPayloadPartition(
                     filterResultInfo,
                     group,
                     signatureRequirements,
+                    candidateInstanceABI,
                     tagMask,
                     rayDataInfo))
             {
@@ -4925,6 +5122,7 @@ static bool _materializeMetalPayloadPartition(
                 geometryKind,
                 tagMask,
                 maxLevels,
+                payloadPartition->instanceHitGroupContributionLookup,
                 programInfo->hitRecordStride,
                 rayDataInfo,
                 programInfo->programLayout,
@@ -4966,6 +5164,7 @@ static bool _materializeMetalPayloadPartition(
                     group,
                     boundingBoxCandidateRequirements,
                     boundingBoxHasAnyHit,
+                    candidateInstanceABI,
                     tagMask,
                     rayDataInfo))
             {
@@ -4986,6 +5185,7 @@ static bool _materializeMetalPayloadPartition(
                 MetalStructuralRayTracingGeometryKind::BoundingBox,
                 tagMask,
                 maxLevels,
+                payloadPartition->instanceHitGroupContributionLookup,
                 programInfo->hitRecordStride,
                 rayDataInfo,
                 programInfo->programLayout,
@@ -5103,6 +5303,11 @@ static bool _materializeMetalPayloadPartition(
     }
 
     auto intType = builder.getIntType();
+    IRInst* instanceHitGroupContributionLookup =
+        payloadPartition->instanceHitGroupContributionLookup;
+    SLANG_RELEASE_ASSERT(!candidateUsesInstancing || instanceHitGroupContributionLookup);
+    if (!instanceHitGroupContributionLookup)
+        instanceHitGroupContributionLookup = builder.getIntValue(intType, 0);
     IRInst* operands[] = {
         builder.getIntValue(intType, IRIntegerValue(tagMask)),
         builder.getIntValue(intType, maxLevels),
@@ -5141,6 +5346,7 @@ static bool _materializeMetalPayloadPartition(
         builder.getBoolValue(false),
         builder.emitDefaultConstruct(
             builder.getPtrType(builder.getUIntType(), AddressSpace::ThreadLocal)),
+        instanceHitGroupContributionLookup,
     };
     builder.emitIntrinsicInst(
         builder.getVoidType(),
@@ -5531,16 +5737,22 @@ static MetalProgramDescriptorInfo* _findOrAddMetalProgramDescriptorInfo(
         descriptor = call->getDescriptor();
     }
 
+    auto descriptorType =
+        as<IRStructuralRayTracingProgramDescriptorType>(descriptor->getDataType());
+    // AST-to-IR lowering preserves the exact checked schema on the descriptor type. A mismatch
+    // here means specialization or linking broke a compiler-owned type invariant; it is not a
+    // recoverable user error.
+    SLANG_RELEASE_ASSERT(descriptorType && descriptorType->getSchemaType() == programLayout);
+
     if (auto found = infosByProgramLayout.tryGetValue(programLayout))
     {
         // One schema has one specialized `TraceProgramDescriptor<Schema>` representation. If two
         // operations disagree here, specialization produced a malformed semantic shape; silently
         // synthesizing two physical SBT descriptors would hide that producer defect.
-        SLANG_RELEASE_ASSERT((*found)->descriptor->getDataType() == descriptor->getDataType());
+        SLANG_RELEASE_ASSERT((*found)->descriptor->getDataType() == descriptorType);
         SLANG_RELEASE_ASSERT(
             (*found)->programLayoutSourceTypeName->getStringSlice() ==
             programLayoutSourceTypeName->getStringSlice());
-        (*found)->addDescriptorValue(descriptor);
         return found->Ptr();
     }
 
@@ -5548,7 +5760,6 @@ static MetalProgramDescriptorInfo* _findOrAddMetalProgramDescriptorInfo(
     info->programLayout = programLayout;
     info->programLayoutSourceTypeName = programLayoutSourceTypeName;
     info->descriptor = descriptor;
-    info->addDescriptorValue(descriptor);
     infosByProgramLayout.add(programLayout, info);
     orderedInfos.add(info);
     return info;
@@ -5732,7 +5943,7 @@ static void _addMetalPayloadMetadataDecorations(IRModule* module, MetalProgramDe
     }
 }
 
-static bool _prepareMetalProgramDescriptors(
+static void _prepareMetalProgramDescriptors(
     IRModule* module,
     const List<IRInst*>& operations,
     TargetRequest* targetRequest,
@@ -5741,7 +5952,6 @@ static bool _prepareMetalProgramDescriptors(
     Dictionary<IRInst*, RefPtr<MetalProgramDescriptorInfo>>& outInfos)
 {
     List<RefPtr<MetalProgramDescriptorInfo>> orderedInfos;
-    Dictionary<IRInst*, IRType*> physicalTypesByValue;
     for (auto operation : operations)
     {
         auto info = _findOrAddMetalProgramDescriptorInfo(operation, outInfos, orderedInfos);
@@ -5752,6 +5962,10 @@ static bool _prepareMetalProgramDescriptors(
         _collectMetalPayloadPartitions(operation, info);
     }
 
+    // All descriptor schemas in this target module select from the same two native instance-path
+    // ABIs. Keeping the cache outside both schema and payload loops is what makes target-intrinsic
+    // nominal identity independent of declaration order and payload partitioning.
+    MetalInstancePathABICache instancePathABICache(module);
     for (auto info : orderedInfos)
     {
         _calculateMetalRecordStrides(info, targetRequest);
@@ -5759,8 +5973,29 @@ static bool _prepareMetalProgramDescriptors(
             info,
             traceContextRequirements,
             capabilityTagMask);
-        if (!_synthesizeMetalProgramDescriptor(module, info, physicalTypesByValue))
-            return false;
+        _synthesizeMetalProgramDescriptor(module, info);
+    }
+
+    // Replace the canonical descriptor wrapper once per schema. `replaceUsesWith` recursively
+    // updates and deduplicates every hoistable dependent type, including helper signatures,
+    // pointers, tuples, and generic user structs. No SSA use-graph reconstruction is needed: the
+    // schema identity was preserved by the AST-to-IR producer before its source storage erased the
+    // phantom generic argument.
+    Dictionary<IRType*, IRType*> physicalTypesBySchema;
+    for (auto info : orderedInfos)
+    {
+        SLANG_RELEASE_ASSERT(info->programLayout && info->physicalDescriptorType);
+        physicalTypesBySchema.add(cast<IRType>(info->programLayout), info->physicalDescriptorType);
+    }
+    lowerStructuralRayTracingProgramDescriptorTypes(module, physicalTypesBySchema);
+
+    // Layouts are rebuilt after type replacement. One paired type/layout walk handles all schemas
+    // at once, so a field key shared by two generic struct specializations can never make one
+    // schema overwrite the other's layout.
+    _replaceMetalDescriptorStorageLayouts(module, orderedInfos);
+
+    for (auto info : orderedInfos)
+    {
         _addMetalPayloadMetadataDecorations(module, info);
         for (Index i = 0; i < info->payloadPartitions.getCount(); ++i)
         {
@@ -5773,9 +6008,14 @@ static bool _prepareMetalProgramDescriptors(
                 i,
                 info->payloadPartitions.getCount() > 1,
                 targetRequest);
+            partition.instanceABI = instancePathABICache.getABI(partition.maxLevels);
+            if ((partition.tagMask & UInt(MetalStructuralRayTracingTag::Instancing)) != 0)
+            {
+                partition.instanceHitGroupContributionLookup =
+                    instancePathABICache.getContributionLookup(partition.maxLevels);
+            }
         }
     }
-    return true;
 }
 
 void prepareMetalStructuralRayTracing(
@@ -5798,7 +6038,15 @@ void prepareMetalStructuralRayTracing(
         }
     }
     if (operations.getCount() == 0 && !hasStructuralEntryPoint)
+    {
+        // A descriptor type without a selected trace/callable operation has no executable schema
+        // metadata from which to derive Metal function-table signatures. Retain its documented
+        // ParameterBlock-compatible source storage rather than guessing a physical table shape,
+        // and ensure the compiler-only wrapper never reaches general Metal legalization.
+        Dictionary<IRType*, IRType*> noTargetDescriptorTypes;
+        lowerStructuralRayTracingProgramDescriptorTypes(module, noTargetDescriptorTypes);
         return;
+    }
     if (hasInvalidStructuralEntryPoint)
         return;
 
@@ -5841,13 +6089,13 @@ void prepareMetalStructuralRayTracing(
     validOperations = _Move(targetValidOperations);
 
     Dictionary<IRInst*, RefPtr<MetalProgramDescriptorInfo>> programDescriptorInfos;
-    SLANG_RELEASE_ASSERT(_prepareMetalProgramDescriptors(
+    _prepareMetalProgramDescriptors(
         module,
         validOperations,
         targetRequest,
         traceContextRequirements,
         capabilityTagMask,
-        programDescriptorInfos));
+        programDescriptorInfos);
 
     Dictionary<IRInst*, HashSet<IRFunc*>> referencingEntryPoints;
     buildEntryPointReferenceGraph(referencingEntryPoints, module);

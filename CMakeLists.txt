@@ -200,6 +200,11 @@ option(
     "Enable test targets, some tests may require SLANG_ENABLE_SLANG_RHI, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT"
     ON
 )
+if(APPLE AND SLANG_ENABLE_TESTS)
+    # The native Metal integration test is the only Objective-C++ target. Enable its language at
+    # the root so multi-configuration generators retain the compile rule during generation.
+    enable_language(OBJCXX)
+endif()
 option(
     SLANG_ENABLE_EXAMPLES
     "Enable example targets, requires SLANG_ENABLE_SLANG_RHI"

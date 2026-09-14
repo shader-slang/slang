@@ -4406,6 +4406,13 @@ err(
 )
 
 err(
+    "structural-ray-tracing-stage-implementation-must-be-struct",
+    38091,
+    "invalid structural ray-tracing stage implementation",
+    span { loc = "location", message = "structural ray-tracing stage implementation '~stageType:Type' must be declared as a struct" }
+)
+
+err(
     "structural-ray-tracing-multilevel-requires-metallib-3-1",
     38068,
     "structural ray-tracing multilevel traversal requires MetalLib 3.1",
@@ -4481,7 +4488,7 @@ err(
     "structural-ray-tracing-ambiguous-empty-payload",
     38077,
     "structural ray-tracing schema has multiple empty payloads",
-    span { loc = "location", message = "schema '~schemaType:Type' serves distinct empty payload types '~firstPayloadType:Type' and '~secondPayloadType:Type'; the three-argument 'trace' overload cannot choose between them" }
+    span { loc = "location", message = "schema '~schemaType:Type' serves distinct empty payload types '~firstPayloadType:Type' and '~secondPayloadType:Type'; a schema may serve at most one empty payload type" }
 )
 
 err(
@@ -4530,7 +4537,7 @@ err(
     "structural-ray-tracing-linked-ambiguous-empty-payload",
     38085,
     "linked structural ray-tracing schema has multiple empty payloads",
-    span { loc = "location", message = "schema '~schemaType:IRInst' serves distinct empty payload types '~firstPayloadType:IRInst' and '~secondPayloadType:IRInst' after its open sections are linked; the three-argument 'trace' overload cannot choose between them" }
+    span { loc = "location", message = "schema '~schemaType:IRInst' serves distinct empty payload types '~firstPayloadType:IRInst' and '~secondPayloadType:IRInst' after the program is linked; a schema may serve at most one empty payload type" }
 )
 
 err(

@@ -92,6 +92,8 @@ struct RequiredLoweringPassSet
     bool unresolvedMatrixLayout;
     bool structuralRayTracingStageInput;
     bool structuralRayTracingTrace;
+    // A descriptor-only program still needs the compiler wrapper erased before target emission.
+    bool structuralRayTracingProgramDescriptor;
 };
 
 /// A context for code generation in the compiler back-end

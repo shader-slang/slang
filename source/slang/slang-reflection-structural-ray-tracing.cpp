@@ -73,6 +73,26 @@ static StructuralRayTracingPayloadReflection* _findOrAddPayload(
     return payload;
 }
 
+// Checks the schema-wide empty-payload invariant from the checked AST entries already collected
+// for reflection. Closed schemas do not need a linked IR manifest merely to answer this question:
+// their sealed hit and miss lists are the complete source of payload identities. Open schemas are
+// still finalized through linked IR before their entries reach this catalogue.
+static bool _hasUnambiguousStructuralRayTracingEmptyPayload(
+    StructuralRayTracingProgramSchemaReflection* result,
+    ASTBuilder* astBuilder)
+{
+    Type* emptyPayloadType = nullptr;
+    for (auto payload : result->payloads)
+    {
+        if (!isSemanticallyEmptyStructuralRayTracingPayload(astBuilder, payload->payloadType))
+            continue;
+        if (emptyPayloadType && !emptyPayloadType->equals(payload->payloadType))
+            return false;
+        emptyPayloadType = payload->payloadType;
+    }
+    return true;
+}
+
 static bool _doesContextBelongToSchema(
     StructuralRayTracingProgramSchemaReflection* result,
     ASTBuilder* astBuilder,
@@ -1657,13 +1677,14 @@ StructuralRayTracingProgramSchemaReflection* findStructuralRayTracingProgramSche
     }
     else
     {
-        // Closed schemas still enumerate entries through their checked AST lists. A native ABI
-        // query may create a target manifest above, but that manifest supplies only the
-        // target-specialized types used for size calculation; it does not become a second source
-        // of list membership or function indices.
-        entriesAdded = _addHitGroups(result, astBuilder, registry, hitGroupsType) &&
+        // Closed schemas enumerate entries and validate source-level invariants directly from
+        // their checked, sealed AST lists. Native targets may also create a manifest for physical
+        // ABI sizes, but it does not become a second source of list membership or function indices.
+        entriesAdded = sink.getErrorCount() == 0 &&
+                       _addHitGroups(result, astBuilder, registry, hitGroupsType) &&
                        _addMissShaders(result, astBuilder, registry, missShadersType) &&
-                       _addCallableShaders(result, astBuilder, registry, callableShadersType);
+                       _addCallableShaders(result, astBuilder, registry, callableShadersType) &&
+                       _hasUnambiguousStructuralRayTracingEmptyPayload(result, astBuilder);
     }
 
     if (sink.getErrorCount() != 0 || !entriesAdded ||

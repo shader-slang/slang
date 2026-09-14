@@ -32,6 +32,107 @@ static FunctionDeclBase* _getStageImplementation(
     return as<FunctionDeclBase>(implementation);
 }
 
+// Diagnoses direct instance fields on one stage or base-struct declaration.
+static bool _validateStructuralRayTracingStageFields(
+    StructuralRayTracingDeclRegistry& registry,
+    AggTypeDecl* stageType,
+    DiagnosticSink* sink)
+{
+    const bool shouldDiagnose = registry.beginStageRepresentationDeclarationCheck(stageType);
+    bool isValid = true;
+    for (auto field : stageType->getFields())
+    {
+        if (isEffectivelyStatic(field))
+            continue;
+
+        isValid = false;
+        if (shouldDiagnose)
+            sink->diagnose(Diagnostics::StructuralRayTracingStageInstanceField{.field = field});
+    }
+    return isValid;
+}
+
+// Rejects storage on a concrete structural stage wherever its conformance is selected.
+//
+// Consider this example:
+//
+//     struct StatefulClosestHit : rt::IClosestHitShader
+//     {
+//         uint state;
+//         ...
+//     }
+//
+// A standalone `-entry StatefulClosestHit` request finds the struct by name, but a ray-generation
+// entry point reaches the same stage only through an `ITraceProgramSchema` witness. Both paths
+// later synthesize a receiver without a source value. Checking the concrete conformance keeps that
+// compiler-created receiver valid for closed schemas, open-section entries, and standalone stages.
+// The registry suppresses duplicate diagnostics per inspected declaration because conformance
+// checking may publish the same completed witness more than once, and several stages may share one
+// stateful base struct.
+static bool _validateStructuralRayTracingStageStorage(
+    StructuralRayTracingDeclRegistry& registry,
+    ASTBuilder* astBuilder,
+    Type* stageType,
+    SourceLoc conformanceLoc,
+    DiagnosticSink* sink)
+{
+    SLANG_RELEASE_ASSERT(stageType);
+    auto witnessedStageType = stageType;
+    auto resolvedStageType = as<Type>(stageType->resolve());
+    SLANG_RELEASE_ASSERT(resolvedStageType);
+
+    const bool hasNominalWitnessType = as<DeclRefType>(witnessedStageType) != nullptr;
+    auto stageDeclRef = isDeclRefTypeOf<AggTypeDecl>(resolvedStageType);
+    const bool isCompilerBuiltinType =
+        stageDeclRef && (stageDeclRef.getDecl()->findModifier<BuiltinTypeModifier>() ||
+                         stageDeclRef.getDecl()->findModifier<MagicTypeModifier>());
+
+    // A user-defined interface may inherit a stage contract to act as an open-section tag. It is
+    // not itself an executable implementation and therefore has no receiver to validate here.
+    if (stageDeclRef.as<InterfaceDecl>())
+        return true;
+
+    // Structural dispatch creates a stage value without a source object. Only a nominal struct has
+    // the representation that contract requires. A scalar such as `float` can resolve through its
+    // compiler-provided builtin struct declaration, but that declaration does not make the scalar
+    // a source struct. Extension conformances can also witness generic parameters that have no
+    // aggregate declaration. Treating either representation as an ordinary source struct would
+    // bypass this contract.
+    if (!hasNominalWitnessType || !stageDeclRef.as<StructDecl>() || isCompilerBuiltinType)
+    {
+        const bool hasSourceAggregateDeclaration =
+            hasNominalWitnessType && stageDeclRef && !isCompilerBuiltinType;
+        const bool shouldDiagnose =
+            hasSourceAggregateDeclaration
+                ? registry.beginStageRepresentationDeclarationCheck(stageDeclRef.getDecl())
+                : registry.beginStageRepresentationTypeCheck(witnessedStageType);
+        if (shouldDiagnose)
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingStageImplementationMustBeStruct{
+                .stageType = witnessedStageType,
+                .location =
+                    hasSourceAggregateDeclaration ? stageDeclRef.getDecl()->loc : conformanceLoc});
+        }
+        return false;
+    }
+
+    bool isValid = true;
+    auto structType = stageDeclRef.as<StructDecl>();
+    // A base struct contributes storage to the compiler-created stage value even though its
+    // fields are not direct members of the concrete implementation. Follow the checked base
+    // declaration references so generic base specializations use the same semantic inheritance
+    // path as ordinary struct layout.
+    for (auto currentType = structType; currentType;)
+    {
+        if (!_validateStructuralRayTracingStageFields(registry, currentType.getDecl(), sink))
+        {
+            isValid = false;
+        }
+        currentType = findBaseStructDeclRef(astBuilder, currentType);
+    }
+    return isValid;
+}
+
 static void _registerRayTracingAPIUse(
     Linkage* linkage,
     Module* module,
@@ -89,7 +190,8 @@ void registerRayTracingAPICall(
 
 void SemanticsVisitor::registerStructuralRayTracingStageConformance(
     DeclRef<InterfaceDecl> superInterfaceDeclRef,
-    WitnessTable* witnessTable)
+    WitnessTable* witnessTable,
+    SourceLoc conformanceLoc)
 {
     auto& registry = getLinkage()->getStructuralRayTracingDeclRegistry();
     auto stageKind = registry.getStageKind(superInterfaceDeclRef.getDecl());
@@ -99,8 +201,10 @@ void SemanticsVisitor::registerStructuralRayTracingStageConformance(
         !witnessTable)
         return;
 
-    auto witnessedType = as<DeclRefType>(witnessTable->witnessedType);
-    auto witnessedDecl = witnessedType ? witnessedType->getDeclRef().getDecl() : nullptr;
+    auto witnessedType = witnessTable->witnessedType;
+    auto witnessedDeclRef =
+        isDeclRefTypeOf<AggTypeDecl>(witnessedType ? as<Type>(witnessedType->resolve()) : nullptr);
+    auto witnessedDecl = witnessedDeclRef ? witnessedDeclRef.getDecl() : nullptr;
     if (witnessedDecl)
     {
         _registerRayTracingAPIUse(
@@ -113,6 +217,13 @@ void SemanticsVisitor::registerStructuralRayTracingStageConformance(
 
     if (stageKind == StructuralRayTracingStageKind::Count)
         return;
+
+    _validateStructuralRayTracingStageStorage(
+        registry,
+        getASTBuilder(),
+        witnessedType,
+        conformanceLoc,
+        getSink());
 
     registry.registerStageImplementation(
         _getStageImplementation(registry, stageKind, witnessTable),
@@ -438,13 +549,33 @@ static void _diagnoseInvalidStructuralStageCapabilities(
     }
 }
 
-static StructuralRayTracingStageKind _getRequiredStructuralStage(
+// Returns the native stage that constrains a function accepting a structural stage input.
+//
+// Consider this example:
+//
+//     [shader("anyhit")]
+//     void nativeAnyHit(rt::ClosestHitInput<C> input) { ... }
+//
+// `nativeAnyHit` is not an implementation of a structural stage interface, so it has no entry in
+// the structural-stage registry. Its checked `EntryPointAttribute` is nevertheless an explicit
+// any-hit contract and must win over the fallback that infers a stage from an otherwise-unannotated
+// helper's first stage-input parameter. Preserve the native `Stage` here: mapping a compute or miss
+// entry point to `StructuralRayTracingStageKind::Count` would make a known mismatched stage look
+// the same as an unconstrained helper.
+static Stage _getRequiredStageForStructuralInput(
     StructuralRayTracingDeclRegistry& registry,
     FunctionDeclBase* functionDecl)
 {
     auto stageKind = registry.getStageKind(functionDecl);
     if (stageKind != StructuralRayTracingStageKind::Count)
-        return stageKind;
+        return _getNativeStage(stageKind);
+
+    if (auto entryPointAttribute = functionDecl->findModifier<EntryPointAttribute>())
+    {
+        auto stageAtom = CapabilitySet{entryPointAttribute->capabilitySet}.getTargetStage();
+        if (stageAtom != CapabilityAtom::Invalid)
+            return getStageFromAtom(stageAtom);
+    }
 
     CapabilitySet declaredCapabilities;
     for (auto decl = static_cast<Decl*>(functionDecl); decl; decl = decl->parentDecl)
@@ -457,8 +588,8 @@ static StructuralRayTracingStageKind _getRequiredStructuralStage(
 
     auto stageAtom = declaredCapabilities.getUniquelyImpliedStageAtom();
     if (stageAtom == CapabilityAtom::Invalid)
-        return StructuralRayTracingStageKind::Count;
-    return _getStructuralStage(getStageFromAtom(stageAtom));
+        return Stage::Unknown;
+    return getStageFromAtom(stageAtom);
 }
 
 static void _diagnoseInvalidStructuralStageInputParameters(
@@ -474,26 +605,27 @@ static void _diagnoseInvalidStructuralStageInputParameters(
 
         if (auto functionDecl = as<FunctionDeclBase>(innerMember))
         {
-            auto functionStage = _getRequiredStructuralStage(registry, functionDecl);
+            auto functionStage = _getRequiredStageForStructuralInput(registry, functionDecl);
             for (auto parameter : functionDecl->getParameters())
             {
                 auto inputStage = _getDirectStageInputKind(registry, parameter->type.type);
                 if (inputStage == StructuralRayTracingStageKind::Count)
                     continue;
-                if (functionStage == StructuralRayTracingStageKind::Count)
+                auto requiredInputStage = _getNativeStage(inputStage);
+                if (functionStage == Stage::Unknown)
                 {
                     // A stage-input parameter implicitly restricts an otherwise-unannotated
                     // helper. Additional stage-input parameters must agree with that stage.
-                    functionStage = inputStage;
+                    functionStage = requiredInputStage;
                     continue;
                 }
-                if (inputStage == functionStage)
+                if (requiredInputStage == functionStage)
                     continue;
 
                 auto location = parameter->type.exp ? parameter->type.exp->loc : parameter->loc;
                 sink->diagnose(Diagnostics::StructuralRayTracingInputStageMismatch{
                     .type = parameter->type.type,
-                    .stage = getStageName(_getNativeStage(inputStage)),
+                    .stage = getStageName(requiredInputStage),
                     .function = functionDecl,
                     .location = location});
             }
@@ -804,16 +936,12 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
         return DeclRef<FuncDecl>();
     }
 
-    bool hasInstanceField = false;
-    for (auto field : stageTypeDeclRef.getDecl()->getFields())
-    {
-        if (!isEffectivelyStatic(field))
-        {
-            sink->diagnose(Diagnostics::StructuralRayTracingStageInstanceField{.field = field});
-            hasInstanceField = true;
-        }
-    }
-    if (hasInstanceField)
+    if (!_validateStructuralRayTracingStageStorage(
+            registry,
+            linkage->getASTBuilder(),
+            DeclRefType::create(linkage->getASTBuilder(), stageTypeDeclRef),
+            stageTypeDeclRef.getLoc(),
+            sink))
         return DeclRef<FuncDecl>();
 
     auto invokeMethod = as<FuncDecl>(stageImplementations[int(selectedStage)]);
@@ -1101,87 +1229,146 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingInvokeResult(InvokeExp
     return true;
 }
 
-static Type* _findStructuralStageInputInGenericArgument(
+// Returns a checked generic argument when it directly denotes a structural stage or stage-input
+// type. Type aliases are resolved first because they are alternate names for the same semantic
+// type. Callers exempt compiler-provided structural types whose own generic arguments form their
+// intended compile-time representation.
+static Type* _getDirectStructuralRuntimeGenericArgument(
     SemanticsVisitor* visitor,
-    Type* type,
-    HashSet<Type*>& seenTypes)
+    const StructuralRayTracingDeclRegistry& registry,
+    Val* argument,
+    StructuralRayTracingRuntimeTypeKind& outKind)
 {
-    type = type ? as<Type>(type->resolve()) : nullptr;
-    if (!type || !seenTypes.add(type))
-        return nullptr;
-
-    if (_findStructuralRuntimeType(visitor, type) ==
-        StructuralRayTracingRuntimeTypeKind::StageInput)
-    {
-        return type;
-    }
-
-    if (auto declRefType = as<DeclRefType>(type))
-    {
-        Type* result = nullptr;
-        SubstitutionSet(declRefType->getDeclRef())
-            .forEachGenericSubstitution(
-                [&](GenericDecl*, Val::OperandView<Val> arguments)
-                {
-                    for (auto argument : arguments)
-                    {
-                        auto argumentType = as<Type>(argument->resolve());
-                        if (!result && argumentType)
-                        {
-                            result = _findStructuralStageInputInGenericArgument(
-                                visitor,
-                                argumentType,
-                                seenTypes);
-                        }
-                    }
-                });
-        if (result)
-            return result;
-    }
-
-    if (auto typePack = as<ConcreteTypePack>(type))
+    // A variadic function receives its direct `each T` substitution as one concrete pack. Inspect
+    // those immediate elements just as non-variadic arguments are inspected, without following
+    // arbitrary substitution graphs or looking through ordinary user-defined containers.
+    if (auto typePack = as<ConcreteTypePack>(argument ? argument->resolve() : nullptr))
     {
         for (Index i = 0; i < typePack->getTypeCount(); ++i)
         {
-            if (auto result = _findStructuralStageInputInGenericArgument(
+            if (auto invalidType = _getDirectStructuralRuntimeGenericArgument(
                     visitor,
+                    registry,
                     typePack->getElementType(i),
-                    seenTypes))
+                    outKind))
             {
-                return result;
+                return invalidType;
             }
         }
+        return nullptr;
     }
-    return nullptr;
+
+    auto type = argument ? as<Type>(argument->resolve()) : nullptr;
+    if (!type)
+        return nullptr;
+
+    if (_getDirectStageInputKind(registry, type) != StructuralRayTracingStageKind::Count)
+    {
+        outKind = StructuralRayTracingRuntimeTypeKind::StageInput;
+        return type;
+    }
+
+    auto kind = _getDirectStructuralRuntimeTypeKind(visitor, registry, type);
+    if (kind != StructuralRayTracingRuntimeTypeKind::Stage)
+        return nullptr;
+    outKind = kind;
+    return type;
 }
 
 bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(InvokeExpr* invoke)
 {
+    auto& registry = getLinkage()->getStructuralRayTracingDeclRegistry();
+    if (!registry.isInitialized())
+        return false;
+
     auto functionDeclRef = as<DeclRefExpr>(invoke->functionExpr);
     if (!functionDeclRef)
         return false;
 
     Type* invalidType = nullptr;
-    HashSet<Type*> seenTypes;
+    auto invalidKind = StructuralRayTracingRuntimeTypeKind::None;
     SubstitutionSet(functionDeclRef->declRef)
         .forEachSubstitutionArg(
             [&](Val* argument)
             {
                 if (invalidType)
                     return;
-                auto type = as<Type>(argument->resolve());
-                if (type)
-                    invalidType = _findStructuralStageInputInGenericArgument(this, type, seenTypes);
+                invalidType = _getDirectStructuralRuntimeGenericArgument(
+                    this,
+                    registry,
+                    argument,
+                    invalidKind);
             });
     if (!invalidType)
         return false;
 
     _diagnoseInvalidStructuralRayTracingRuntimeType(
         this,
-        StructuralRayTracingRuntimeTypeKind::StageInput,
+        invalidKind,
         invalidType,
         invoke->functionExpr->loc);
     return true;
+}
+
+bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericTypeApplication(
+    GenericAppExpr* genericApplication,
+    Expr* checkedResult)
+{
+    auto& registry = getLinkage()->getStructuralRayTracingDeclRegistry();
+    if (!registry.isInitialized())
+        return false;
+
+    // Compiler-provided structural types own their generic arguments. For example,
+    // `ClosestHitInput<C>`, `NoAnyHit<C>`, and `MissShaderList<MyMiss>` must name their context or
+    // stage types so the contract and schema can be checked. Exempt those applications themselves;
+    // an ordinary outer container such as `Phantom<ClosestHitInput<C>>` is still diagnosed when its
+    // direct argument is checked.
+    auto applicationTypeType = checkedResult ? as<TypeType>(checkedResult->type) : nullptr;
+    auto applicationType = applicationTypeType ? applicationTypeType->getType() : nullptr;
+    if (applicationType && (_getDirectStageInputKind(registry, applicationType) !=
+                                StructuralRayTracingStageKind::Count ||
+                            _getDirectStructuralRuntimeTypeKind(this, registry, applicationType) !=
+                                StructuralRayTracingRuntimeTypeKind::None))
+    {
+        return false;
+    }
+
+    // Consider these declarations:
+    //
+    //     struct Phantom<T> {}
+    //     typealias Bad = Phantom<rt::ClosestHitInput<C>>;
+    //     ConstantBuffer<rt::ClosestHitInput<C>> buffer;
+    //
+    // Neither `Phantom` nor a resource wrapper physically stores a field that the ordinary
+    // runtime-type walk can inspect. The checked generic argument is the semantic source of truth,
+    // however: its `TypeType` already carries the resolved type, including type aliases. Nested
+    // applications are checked inside-out, so each one validates only its own direct arguments
+    // instead of walking arbitrary substitution graphs to rediscover a producer error. Metadata
+    // arguments remain legal because this check deliberately recognizes only compiler-provided
+    // stage and stage-input types.
+    for (auto argument : genericApplication->arguments)
+    {
+        auto argumentType = as<TypeType>(argument->type);
+        if (!argumentType)
+            continue;
+
+        auto invalidKind = StructuralRayTracingRuntimeTypeKind::None;
+        auto invalidType = _getDirectStructuralRuntimeGenericArgument(
+            this,
+            registry,
+            argumentType->getType(),
+            invalidKind);
+        if (!invalidType)
+            continue;
+
+        _diagnoseInvalidStructuralRayTracingRuntimeType(
+            this,
+            invalidKind,
+            invalidType,
+            argument->loc);
+        return true;
+    }
+    return false;
 }
 
 bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingEmptyPayloadArgument(InvokeExpr* invoke)

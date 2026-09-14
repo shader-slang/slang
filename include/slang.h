@@ -2414,8 +2414,8 @@ public:                                                              \
         SlangReflectionRayTracingHitGroup* group);
     /** Get the exact target symbol installed in this group's closest-hit table slot.
 
-    On Metal this also returns the synthesized no-op symbol for a `NoClosestHit` group when another
-    group in the payload partition requires a closest-hit table. It returns null when the target
+    Metal gives every reflected hit group a closest-hit table entry, so this also returns the
+    synthesized no-op symbol for every `NoClosestHit` group. It returns null when another target
     does not require a physical closest-hit function for this group.
     */
     SLANG_API char const* spReflectionRayTracingHitGroup_getClosestHitEntryPointName(
@@ -4119,7 +4119,8 @@ struct RayTracingHitGroupReflection
         return (TypeReflection*)spReflectionRayTracingHitGroup_getIntersectionAttributesType(
             (SlangReflectionRayTracingHitGroup*)this);
     }
-    /// Returns the exact target symbol installed in this group's closest-hit table slot.
+    /// Returns the exact target symbol installed in this group's closest-hit table slot, including
+    /// Metal's synthesized no-op symbol for a `NoClosestHit` group.
     char const* getClosestHitEntryPointName()
     {
         return spReflectionRayTracingHitGroup_getClosestHitEntryPointName(

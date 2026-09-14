@@ -36,3 +36,13 @@ public struct GenericSchema<T> : rt::ITraceProgramSchema
     typealias MissShaders = rt::MissShaderList<GenericMiss<T>>;
     typealias CallableShaders = rt::NoCallableShaders;
 }
+
+[noinline]
+public rt::TraceProgramDescriptor<GenericSchema<T>> preserveProgram<T>(
+    rt::TraceProgramDescriptor<GenericSchema<T>> program)
+{
+    // This generic helper is serialized before its schema argument is known. The compiler-owned
+    // descriptor type must retain that argument so importing code can specialize this one body for
+    // multiple schemas without merging their physical descriptor types.
+    return program;
+}

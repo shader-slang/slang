@@ -23,6 +23,22 @@ struct StructuralMiss : rt::IMissShader
     void invoke(rt::MissInput<MissContext> input) {}
 }
 
+RaytracingAccelerationStructure unusedLegacyScene;
+
+// A structural stage that is not selected by the schema is no more reachable than an ordinary
+// unused helper. The linked-program check must follow the schema metadata rather than every stage
+// conformance present in an imported or source module.
+struct UnlistedLegacyCallingMiss : rt::IMissShader
+{
+    typealias Context = MissContext;
+
+    void invoke(rt::MissInput<MissContext> input)
+    {
+        RayDesc ray = {};
+        legacyTrace(unusedLegacyScene, ray, input.payload);
+    }
+}
+
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;

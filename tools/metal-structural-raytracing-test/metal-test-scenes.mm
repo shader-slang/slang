@@ -359,7 +359,9 @@ bool buildMetalMultilevelScene(
     geometry.vertexBuffer = outScene.vertexBuffer;
     geometry.vertexStride = sizeof(simd_float3);
     geometry.triangleCount = 1;
-    geometry.opaque = YES;
+    // Candidate dispatch is part of this test: keep the triangle non-opaque so Metal invokes the
+    // generated max-levels intersection function before closest-hit dispatch.
+    geometry.opaque = NO;
 
     auto primitiveDescriptor = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
     primitiveDescriptor.geometryDescriptors = @[ geometry ];
@@ -368,40 +370,64 @@ bool buildMetalMultilevelScene(
     if (!outScene.primitiveAccelerationStructure)
         return false;
 
-    MTLAccelerationStructureUserIDInstanceDescriptor innerInstances[] = {
-        makeInstance(
-            0,
-            10,
-            MTLAccelerationStructureInstanceOptionOpaque,
-            makeTransform(5.0f, 0.0f, 0.0f)),
-        makeInstance(
-            0,
-            11,
-            MTLAccelerationStructureInstanceOptionOpaque,
-            makeTransform(0.0f, 0.0f, 0.0f)),
-    };
+    // Both inner acceleration structures deliberately contain their triangle at local instance
+    // index zero. A dispatch implementation that selects a record from only the innermost index
+    // therefore cannot distinguish the two complete paths through the outer structure.
+    auto firstLeafInstance = makeInstance(
+        0,
+        10,
+        MTLAccelerationStructureInstanceOptionNone,
+        makeTransform(0.0f, 0.0f, 0.0f));
     if (!buildInstanceAccelerationStructureLevel(
             device,
             queue,
-            innerInstances,
-            2,
+            &firstLeafInstance,
+            1,
             @[ outScene.primitiveAccelerationStructure ],
             outScene.innerInstanceDescriptorBuffer,
             outScene.innerInstanceAccelerationStructure,
             outError))
         return false;
 
-    auto outerInstance = makeInstance(
+    auto siblingLeafInstance = makeInstance(
         0,
-        20,
-        MTLAccelerationStructureInstanceOptionOpaque,
+        11,
+        MTLAccelerationStructureInstanceOptionNone,
         makeTransform(0.0f, 0.0f, 0.0f));
+    if (!buildInstanceAccelerationStructureLevel(
+            device,
+            queue,
+            &siblingLeafInstance,
+            1,
+            @[ outScene.primitiveAccelerationStructure ],
+            outScene.siblingInnerInstanceDescriptorBuffer,
+            outScene.siblingInnerInstanceAccelerationStructure,
+            outError))
+        return false;
+
+    // The outer transform places the sibling triangles apart so one ray can select each path.
+    // Their full native instance-index paths are [0, 0] and [1, 0].
+    MTLAccelerationStructureUserIDInstanceDescriptor outerInstances[] = {
+        makeInstance(
+            0,
+            20,
+            MTLAccelerationStructureInstanceOptionNone,
+            makeTransform(0.0f, 0.0f, 0.0f)),
+        makeInstance(
+            1,
+            21,
+            MTLAccelerationStructureInstanceOptionNone,
+            makeTransform(2.0f, 0.0f, 0.0f)),
+    };
     return buildInstanceAccelerationStructureLevel(
         device,
         queue,
-        &outerInstance,
-        1,
-        @[ outScene.innerInstanceAccelerationStructure ],
+        outerInstances,
+        SLANG_COUNT_OF(outerInstances),
+        @[
+            outScene.innerInstanceAccelerationStructure,
+            outScene.siblingInnerInstanceAccelerationStructure
+        ],
         outScene.instanceDescriptorBuffer,
         outScene.instanceAccelerationStructure,
         outError);

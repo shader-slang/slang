@@ -2710,7 +2710,8 @@ public:
 
     void registerStructuralRayTracingStageConformance(
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
-        WitnessTable* witnessTable);
+        WitnessTable* witnessTable,
+        SourceLoc conformanceLoc);
     void diagnoseInvalidStructuralRayTracingOpenSectionTag(
         Type* entryListType,
         AssocTypeDecl* associatedTypeRequirement,
@@ -2726,6 +2727,9 @@ public:
     bool diagnoseInvalidStructuralRayTracingConstruction(InvokeExpr* invoke);
     bool diagnoseInvalidStructuralRayTracingInvokeResult(InvokeExpr* invoke);
     bool diagnoseInvalidStructuralRayTracingGenericArguments(InvokeExpr* invoke);
+    bool diagnoseInvalidStructuralRayTracingGenericTypeApplication(
+        GenericAppExpr* genericApplication,
+        Expr* checkedResult);
     bool diagnoseInvalidStructuralRayTracingEmptyPayloadArgument(InvokeExpr* invoke);
     bool diagnoseInvalidStructuralRayTracingEmptyPayloadAccess(DeclRefExpr* propertyExpr);
 

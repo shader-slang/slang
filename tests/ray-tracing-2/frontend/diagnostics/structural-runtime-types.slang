@@ -32,30 +32,30 @@ struct Box<T>
 
 [require(closesthit)]
 void invalidStorage(
-    TestClosestHit stage,
-//CHECK:           ^^^^^ runtime use of a structural ray-tracing stage type
-//CHECK:           ^^^^^ structural ray-tracing stage type 'TestClosestHit' has no runtime representation
-    rt::ClosestHitInput<TestHitContext> input)
+        TestClosestHit stage,
+//CHECK:               ^^^^^ runtime use of a structural ray-tracing stage type
+//CHECK:               ^^^^^ structural ray-tracing stage type 'TestClosestHit' has no runtime representation
+        rt::ClosestHitInput<TestHitContext> input)
 {
     rt::ClosestHitInput<TestHitContext> localInput;
 //CHECK:                                ^^^^^^^^^^ storage of a structural ray-tracing stage input
 //CHECK:                                ^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' is compiler-provided and may only be used as a value parameter
 
     Box<rt::ClosestHitInput<TestHitContext>> wrappedInput;
-//CHECK:                                     ^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                                     ^^^^^^^^^^^^ ray-tracing stage input type 'Box<rt.ClosestHitInput<TestHitContext>>' is compiler-provided and may only be used as a value parameter
+//CHECK:    ^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
+//CHECK:    ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' is compiler-provided and may only be used as a value parameter
 
     Box<Box<rt::ClosestHitInput<TestHitContext>>> nestedWrappedInput;
-//CHECK:                                          ^^^^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                                          ^^^^^^^^^^^^^^^^^^ ray-tracing stage input type 'Box<Box<rt.ClosestHitInput<TestHitContext>>>' is compiler-provided and may only be used as a value parameter
+//CHECK:        ^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
+//CHECK:        ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' is compiler-provided and may only be used as a value parameter
 
     Box<TestClosestHit> wrappedStage;
-//CHECK:                ^^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
-//CHECK:                ^^^^^^^^^^^^ structural ray-tracing stage type 'Box<TestClosestHit>' has no runtime representation
+//CHECK:^^^^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
+//CHECK:^^^^^^^^^^^^^^ structural ray-tracing stage type 'TestClosestHit' has no runtime representation
 
     Box<Box<TestClosestHit>> nestedWrappedStage;
-//CHECK:                     ^^^^^^^^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
-//CHECK:                     ^^^^^^^^^^^^^^^^^^ structural ray-tracing stage type 'Box<Box<TestClosestHit>>' has no runtime representation
+//CHECK:    ^^^^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
+//CHECK:    ^^^^^^^^^^^^^^ structural ray-tracing stage type 'TestClosestHit' has no runtime representation
 
     TestClosestHit();
 /*CHECK:

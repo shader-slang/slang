@@ -37,14 +37,25 @@ IROp getStructuralRayTracingStageInputOperationOp(StructuralRayTracingStageInput
 /// metadata or target-only operations.
 bool isCompilerOwnedStructuralRayTracingIROp(IROp op);
 
+/// Lowers every schema-carrying program-descriptor type in `module`.
+///
+/// A schema found in `targetTypesBySchema` maps to its target-specific descriptor type. Every
+/// other descriptor maps back to its ordinary source storage representation, including retained
+/// generic templates that have no concrete target ABI.
+void lowerStructuralRayTracingProgramDescriptorTypes(
+    IRModule* module,
+    const Dictionary<IRType*, IRType*>& targetTypesBySchema);
+
 /// Diagnoses a selected entry point whose reachable IR combines structural operations with a
 /// call marked as a legacy pipeline operation during AST lowering.
 ///
 /// For example, a structural ray-generation entry point can call `RayTracer.trace` and then call an
 /// imported helper whose body calls legacy `TraceRay`. The helper's checked AST is not revisited
 /// when its serialized IR is linked into the program, so the source call carries an IR marker.
-/// This validation follows only direct IR calls and therefore consumes the same executable call
-/// graph that target synthesis will lower.
+/// This validation follows direct IR calls plus the runtime-dispatch edges that schema lowering
+/// records on structural trace and callable operations. It therefore consumes the same executable
+/// call graph that target synthesis will lower without treating unrelated imported definitions as
+/// reachable.
 void diagnoseMixedRayTracingAPIsInReachableIR(
     IRModule* module,
     List<IRFunc*> const& entryPoints,
@@ -130,11 +141,13 @@ bool identifyStructuralRayTracingStageInterfaces(
 /// appended with dense indices. Returns false after emitting any invalid-tag diagnostic.
 bool completeOpenStructuralRayTracingSchemas(IRModule* module, DiagnosticSink* sink);
 
-/// Resolves implicit-empty-payload traces whose hit or miss section was open at source lowering.
+/// Finalizes the empty-payload contract after open schema sections have been completed.
 ///
-/// Open-section completion must run first so each trace owns its final linked entry metadata. The
-/// resolver consumes only the producer-owned deferred record and those final entries; it never
-/// reconstructs an AST overload or interprets a generic/function signature by position.
-bool resolveDeferredStructuralRayTracingEmptyPayloads(IRModule* module, DiagnosticSink* sink);
+/// A finalized schema may serve at most one semantic empty-payload type, regardless of which trace
+/// overload happens to activate it. After checking that schema-wide invariant, this operation
+/// resolves implicit-empty-payload traces from their producer-owned deferred records and final
+/// linked entries. It never reconstructs an AST overload or interprets a generic/function
+/// signature by position.
+bool finalizeStructuralRayTracingSchemaPayloads(IRModule* module, DiagnosticSink* sink);
 
 } // namespace Slang

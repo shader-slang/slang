@@ -797,6 +797,20 @@ local insts = {
 					},
 				},
 			},
+			-- Preserves the schema argument of `TraceProgramDescriptor<Schema>` after the
+			-- descriptor's ordinary source storage type has erased that phantom parameter.
+			-- Target lowering replaces this wrapper with either the source storage type or a
+			-- target-specific physical descriptor type.
+			{
+				StructuralRayTracingProgramDescriptor = {
+					struct_name = "StructuralRayTracingProgramDescriptorType",
+					operands = {
+						{ "storageType", "IRType" },
+						{ "schemaType", "IRType" },
+					},
+					hoistable = true,
+				},
+			},
 			{
 				associated_type = {
 					struct_name = "AssociatedType",
@@ -1350,6 +1364,10 @@ local insts = {
 				{ "missHasGlobalContext" },
 				{ "closestHitHasGlobalContext" },
 				{ "globalContext" },
+				-- Candidate dispatch and committed closest-hit dispatch call this same helper so
+				-- both interpret a multi-level instance path through the records-buffer trie
+				-- identically. It is meaningful only when the tag mask contains instancing.
+				{ "instanceHitGroupContributionLookup" },
 			},
 		},
 	},
@@ -2039,6 +2057,15 @@ local insts = {
 				nameHint = { struct_name = "NameHintDecoration", operands = { { "nameOperand", "IRStringLit" } } },
 			},
 			{
+				layoutFieldType = {
+					-- Records the checked value type of a layout-only field key synthesized for
+					-- a global resource or varying that remains outside the nominal GlobalParams
+					-- struct.
+					struct_name = "LayoutFieldTypeDecoration",
+					operands = { { "fieldType", "IRType" } },
+				},
+			},
+			{
 				PhysicalType = {
 					struct_name = "PhysicalTypeDecoration",
 					min_operands = 1,
@@ -2055,6 +2082,14 @@ local insts = {
 					-- Marks a type as being used as binary interface (e.g. shader parameters).
 					-- This prevents the legalizeEmptyType() pass from eliminating it on C++/CUDA targets.
 					struct_name = "BinaryInterfaceTypeDecoration",
+				},
+			},
+			{
+				preserveValueParameterABI = {
+					-- Marks a compiler-created type whose target ABI requires value parameters to
+					-- remain values. `transformParamsToConstRef` must not turn such a parameter
+					-- into `borrow in`, even when the IR type is represented as a struct.
+					struct_name = "PreserveValueParameterABIDecoration",
 				},
 			},
 			{
