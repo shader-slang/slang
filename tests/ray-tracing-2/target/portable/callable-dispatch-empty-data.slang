@@ -11,7 +11,6 @@ import slang.raytracing;
 struct EmptyCallableData
 {}
 
-#ifdef METAL
 // Reuse the callable-data type in a layout-sensitive role. The Metal callable ABI must create its
 // own physical sentinel rather than adding storage to EmptyCallableData and shifting `value`.
 struct LayoutSensitiveRecord
@@ -22,7 +21,6 @@ struct LayoutSensitiveRecord
 
 ConstantBuffer<LayoutSensitiveRecord> layoutProbe;
 RWStructuredBuffer<int> layoutOutput;
-#endif
 
 struct TraceContext : rt::ITraceContext
 {
@@ -59,9 +57,7 @@ void main()
     EmptyCallableData data = {};
     rt::RayTracer<Schema> tracer;
     tracer.callShader<CallableContext>(0, program, data);
-#ifdef METAL
     layoutOutput[0] = layoutProbe.value;
-#endif
 }
 
 // HLSL-DAG: struct EmptyCallableData
@@ -75,8 +71,8 @@ void main()
 // bits. Their target adapters use role-local scalar backing storage; the source type stays empty.
 // SPIRV: OpEntryPoint CallableKHR {{.*}} "EmptyCallable"
 // SPIRV: OpExecuteCallableKHR
+// METAL: metal::visible_function_table<void(int thread*
 // METAL: struct LayoutSensitiveRecord
 // METAL-NOT: marker
 // METAL: int value{{.*}};
-// METAL: metal::visible_function_table<void(int thread*
 // METAL: {{\[\[visible\]\]}} void
