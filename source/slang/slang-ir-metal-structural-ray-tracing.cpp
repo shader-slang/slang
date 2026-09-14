@@ -713,6 +713,49 @@ static bool _addMetalMotionTags(IRInst* schemaOperation, DiagnosticSink* sink, U
     return true;
 }
 
+// Returns whether one hit group needs Metal's trace-wide `world_space_data` tag. Keep this
+// predicate shared with tag inference: a direct primitive-AS trace must be rejected exactly when
+// the same stage uses would otherwise produce an invalid Metal intersector type.
+static bool _doesMetalHitGroupRequireWorldSpaceData(
+    IRStructuralRayTracingHitGroupInfoDecoration* group)
+{
+    auto closestHit = _getMetalStageRequirements(getStructuralRayTracingHitGroupStageInvoke(
+        group,
+        StructuralRayTracingStageKind::ClosestHit));
+    auto anyHit = _getMetalStageRequirements(
+        getStructuralRayTracingHitGroupStageInvoke(group, StructuralRayTracingStageKind::AnyHit));
+    auto intersection = _getMetalStageRequirements(getStructuralRayTracingHitGroupStageInvoke(
+        group,
+        StructuralRayTracingStageKind::Intersection));
+    auto all = _combineMetalStageRequirements(
+        _combineMetalStageRequirements(closestHit, anyHit),
+        intersection);
+    return anyHit.worldSpaceOrigin || anyHit.worldSpaceDirection || intersection.worldSpaceOrigin ||
+           intersection.worldSpaceDirection || closestHit.objectSpaceRay || all.objectToWorld ||
+           all.worldToObject;
+}
+
+static bool _validateMetalWorldSpaceDataTopology(
+    IRInst* schemaOperation,
+    UInt topologyTagMask,
+    DiagnosticSink* sink)
+{
+    if ((topologyTagMask & UInt(MetalStructuralRayTracingTag::Instancing)) != 0)
+        return true;
+
+    for (auto decoration : schemaOperation->getDecorations())
+    {
+        auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration);
+        if (group && _doesMetalHitGroupRequireWorldSpaceData(group))
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingWorldSpaceDataRequiresInstancing{
+                .location = schemaOperation->sourceLoc});
+            return false;
+        }
+    }
+    return true;
+}
+
 struct MetalTraceContextRequirements
 {
     UInt tagMask = 0;
@@ -735,7 +778,8 @@ static bool _tryGetMetalTraceContextRequirements(
             outRequirements.tagMask,
             outRequirements.maxLevels) ||
         !_validateMetalCurveSupport(schemaOperation, targetRequest, sink) ||
-        !_addMetalMotionTags(schemaOperation, sink, outRequirements.tagMask))
+        !_addMetalMotionTags(schemaOperation, sink, outRequirements.tagMask) ||
+        !_validateMetalWorldSpaceDataTopology(schemaOperation, outRequirements.tagMask, sink))
     {
         return false;
     }
@@ -853,9 +897,7 @@ static UInt _getSharedMetalTagMask(
             result |= UInt(MetalStructuralRayTracingTag::TriangleData);
         if (all.curveParameter)
             result |= UInt(MetalStructuralRayTracingTag::CurveData);
-        if (anyHit.worldSpaceOrigin || anyHit.worldSpaceDirection ||
-            intersection.worldSpaceOrigin || intersection.worldSpaceDirection ||
-            closestHit.objectSpaceRay || all.objectToWorld || all.worldToObject)
+        if (_doesMetalHitGroupRequireWorldSpaceData(group))
         {
             result |= UInt(MetalStructuralRayTracingTag::WorldSpaceData);
         }
