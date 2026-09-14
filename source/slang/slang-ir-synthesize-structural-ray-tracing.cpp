@@ -1632,12 +1632,13 @@ static void _addUniqueStructuralRayTracingPayloadType(
     payloadTypes.add(payloadType);
 }
 
-// Lowers structural `IntersectionInput.reportHit` markers to the native OptiX operation.
+// Lowers structural stage-input markers that have an OptiX-native representation.
 //
-// The shared OptiX ABI helper owns aggregate-to-word transport. This context owns only the
-// target-specific call signature and caches one intrinsic declaration for each word count used by
-// the module.
-struct OptiXStructuralRayTracingReportHitLoweringContext
+// The portable stage-input pass runs after the ordinary OptiX entry-point-uniform collector. A
+// structural operation must therefore produce its native IR directly here when representing it as
+// a late uniform parameter would miss that collector. The shared OptiX ABI helper still owns
+// aggregate-to-word transport for report-intersection attributes.
+struct OptiXStructuralRayTracingStageInputLoweringContext
 {
     IRModule* module = nullptr;
     DiagnosticSink* sink = nullptr;
@@ -1678,7 +1679,7 @@ struct OptiXStructuralRayTracingReportHitLoweringContext
     }
 
     // Replaces one structural report-hit marker with a native OptiX call.
-    void lower(IRStructuralRayTracingStageInputOperation* operation)
+    void lowerReportHit(IRStructuralRayTracingStageInputOperation* operation)
     {
         const bool hasHitKind = operation->getOp() == kIROp_StructuralRayTracingReportHitWithKind;
         SLANG_RELEASE_ASSERT(
@@ -1727,20 +1728,51 @@ struct OptiXStructuralRayTracingReportHitLoweringContext
         operation->replaceUsesWith(call);
         operation->removeAndDeallocate();
     }
+
+    // Replaces one structural shader-record read with OptiX's native SBT-data pointer.
+    void lowerRecord(IRStructuralRayTracingStageInputOperation* operation)
+    {
+        SLANG_RELEASE_ASSERT(operation->getOp() == kIROp_StructuralRayTracingGetRecord);
+
+        // Consider a callable that reads `input.record.value`. AST-to-IR lowering leaves a
+        // `StructuralRayTracingGetRecord` in the source-stage helper, and structural entry-point
+        // synthesis calls that helper from the generated OptiX callable. The legacy OptiX path
+        // represents the same native value as a `GetOptiXSbtDataPtr`; use that existing IR source
+        // of truth instead of creating a late global constant buffer that CUDA emission would
+        // mistake for the module-wide `SLANG_globalParams` object.
+        IRBuilder builder(operation);
+        builder.setInsertBefore(operation);
+        auto recordBufferType = builder.getConstantBufferType(
+            operation->getDataType(),
+            builder.getType(kIROp_DefaultBufferLayoutType));
+        auto recordBuffer =
+            builder.emitIntrinsicInst(recordBufferType, kIROp_GetOptiXSbtDataPtr, 0, nullptr);
+        auto record = builder.emitLoad(recordBuffer);
+        record->sourceLoc = operation->sourceLoc;
+        operation->replaceUsesWith(record);
+        operation->removeAndDeallocate();
+    }
 };
 
-void lowerOptiXStructuralRayTracingReportHitOperations(IRModule* module, DiagnosticSink* sink)
+void lowerOptiXStructuralRayTracingStageInputOperations(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_RELEASE_ASSERT(module && sink);
     List<IRInst*> operations;
     _collectStageInputOperations(module->getModuleInst(), operations);
-    OptiXStructuralRayTracingReportHitLoweringContext context = {module, sink};
+    OptiXStructuralRayTracingStageInputLoweringContext context = {module, sink};
     for (auto operation : operations)
     {
-        if (operation->getOp() == kIROp_StructuralRayTracingReportHit ||
-            operation->getOp() == kIROp_StructuralRayTracingReportHitWithKind)
+        switch (operation->getOp())
         {
-            context.lower(cast<IRStructuralRayTracingStageInputOperation>(operation));
+        case kIROp_StructuralRayTracingGetRecord:
+            context.lowerRecord(cast<IRStructuralRayTracingStageInputOperation>(operation));
+            break;
+        case kIROp_StructuralRayTracingReportHit:
+        case kIROp_StructuralRayTracingReportHitWithKind:
+            context.lowerReportHit(cast<IRStructuralRayTracingStageInputOperation>(operation));
+            break;
+        default:
+            break;
         }
     }
 }
@@ -1830,13 +1862,11 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
     }
 
     HashSet<IRType*> loweredRecordTypes;
-    for (auto entryPoint : structuralEntryPoints)
-    {
-        auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
-        auto recordType = info->getRecordType();
-        if (!as<IRVoidType>(recordType))
-            loweredRecordTypes.add(recordType);
-    }
+    // A declared Record type describes the SBT schema, but it does not by itself require a native
+    // shader parameter. Collect only actual property reads that remain after target-specific
+    // lowering. D3D and Vulkan leave those markers here and receive a ShaderRecord parameter;
+    // OptiX has already replaced them with GetOptiXSbtDataPtr above. This also prevents an unused
+    // record declaration from changing an entry-point signature.
     for (auto operation : operations)
     {
         if (operation->getOp() == kIROp_StructuralRayTracingGetRecord)

@@ -88,11 +88,17 @@ void main()
 // SPIRV-DAG: BuiltIn LaunchSizeKHR
 // SPIRV: OpExecuteCallableKHR %uint_0
 
-// OptiX uses its existing direct-call ABI. Structural lowering retains the context-typed data
-// pointer and emits the callable stage as an ordinary device function.
+// OptiX uses its existing direct-call ABI. It keeps the ordinary program parameters in its one
+// constant symbol, but reads the callable's per-record data through the native SBT pointer. In
+// particular, the record must not become a second, type-incompatible declaration of
+// `SLANG_globalParams`.
+// CUDA: extern "C" __constant__ GlobalParams_0 SLANG_globalParams;
+// CUDA-NOT: extern "C" __constant__ TestCallableRecord_0 SLANG_globalParams;
+// CUDA-DAG: (*((TestCallableRecord_0*)optixGetSbtDataPointer())).value_{{[0-9]+}}
 // CUDA-DAG: optixDirectCall<void>((0U),
 // CUDA-DAG: extern "C" __device__ void __direct_callable__TestCallable(TestCallableData_0 * data_{{[0-9]+}})
-// PTX-DAG: _optix_direct_call
+// PTX-DAG: _optix_get_sbt_data_ptr
+// PTX-DAG: _optix_call_direct_callable
 // PTX-DAG: __direct_callable__TestCallable
 
 // METAL: metal::visible_function_table<void(TestCallableData_0 thread*, uint3, uint3, uchar device*, uint constant*, uint device*)> callableFunctions_0;
