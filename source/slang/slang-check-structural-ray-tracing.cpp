@@ -56,28 +56,6 @@ static void _registerRayTracingAPIUse(
         .otherDecl = otherDecl});
 }
 
-static bool _isCoreLegacyTraceMethod(FunctionDeclBase* functionDecl)
-{
-    if (!functionDecl || !functionDecl->getName())
-        return false;
-
-    auto name = functionDecl->getName()->text.getUnownedSlice();
-    if (name != "TraceRay" && name != "TraceMotionRay")
-        return false;
-
-    // Only the top-level core intrinsics define the legacy pipeline API. Methods such as
-    // RayQuery.TraceRayInline and HitObject.TraceRay are separate APIs that may coexist with a
-    // structural pipeline.
-    for (auto parent = functionDecl->parentDecl; parent; parent = parent->parentDecl)
-    {
-        if (as<AggTypeDecl>(parent))
-            return false;
-        if (auto moduleDecl = as<ModuleDecl>(parent))
-            return moduleDecl->hasModifier<FromCoreModuleModifier>();
-    }
-    return false;
-}
-
 void registerRayTracingAPICall(
     Linkage* linkage,
     FunctionDeclBase* caller,
@@ -103,7 +81,7 @@ void registerRayTracingAPICall(
             caller,
             sink);
     }
-    else if (_isCoreLegacyTraceMethod(callee))
+    else if (isCoreLegacyRayTracingPipelineMethod(callee))
     {
         _registerRayTracingAPIUse(linkage, callerModule, RayTracingAPIFamily::Legacy, caller, sink);
     }

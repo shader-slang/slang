@@ -53,6 +53,19 @@ IROp getStructuralRayTracingStageInputOperationOp(StructuralRayTracingStageInput
 /// metadata or target-only operations.
 bool isCompilerOwnedStructuralRayTracingIROp(IROp op);
 
+/// Diagnoses a selected entry point whose reachable IR combines structural operations with a
+/// call marked as a legacy pipeline operation during AST lowering.
+///
+/// For example, a structural ray-generation entry point can call `RayTracer.trace` and then call an
+/// imported helper whose body calls legacy `TraceRay`. The helper's checked AST is not revisited
+/// when its serialized IR is linked into the program, so the source call carries an IR marker.
+/// This validation follows only direct IR calls and therefore consumes the same executable call
+/// graph that target synthesis will lower.
+void diagnoseMixedRayTracingAPIsInReachableIR(
+    IRModule* module,
+    List<IRFunc*> const& entryPoints,
+    DiagnosticSink* sink);
+
 /// Returns the executable function for a hit-group stage, or null for its canonical placeholder.
 ///
 /// This is the single consumer-side check for the explicit presence bit carried by hit-group

@@ -2799,6 +2799,18 @@ LoweredValInfo emitCallToDeclRef(
     //
     LoweredValInfo funcVal = emitDeclRef(context, funcDeclRef, funcType);
     auto callInst = emitCallToVal(context, type, funcVal, argCount, args, tryEnv);
+    if (isCoreLegacyRayTracingPipelineMethod(as<FunctionDeclBase>(funcDecl)))
+    {
+        // A separately compiled helper retains only its serialized IR when it is linked into a
+        // later program. Mark the precise source call while its checked core declaration is still
+        // available, so linked-program validation never has to infer API identity from a mangled
+        // name or target-specific intrinsic spelling.
+        auto call = as<IRCall>(callInst.val);
+        SLANG_RELEASE_ASSERT(call);
+        auto decoration =
+            builder->addDecoration(call, kIROp_StructuralRayTracingLegacyAPIUseDecoration);
+        decoration->sourceLoc = call->sourceLoc;
+    }
     return callInst;
 }
 
