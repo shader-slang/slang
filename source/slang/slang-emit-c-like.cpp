@@ -3190,10 +3190,13 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
 void CLikeSourceEmitter::emitInst(IRInst* inst)
 {
+#if SLANG_HAS_EXCEPTIONS
     try
+#endif
     {
         _emitInst(inst);
     }
+#if SLANG_HAS_EXCEPTIONS
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
     catch (const AbortCompilationException&)
@@ -3205,6 +3208,7 @@ void CLikeSourceEmitter::emitInst(IRInst* inst)
         noteInternalErrorLoc(inst->sourceLoc);
         throw;
     }
+#endif
 }
 
 void CLikeSourceEmitter::_emitInst(IRInst* inst)

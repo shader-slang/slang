@@ -205,10 +205,13 @@ void checkTranslationUnit(
 void SemanticsVisitor::dispatchStmt(Stmt* stmt, SemanticsContext const& context)
 {
     SemanticsStmtVisitor visitor(context);
+#if SLANG_HAS_EXCEPTIONS
     try
+#endif
     {
         visitor.dispatch(stmt);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException&)
     {
         throw;
@@ -218,15 +221,19 @@ void SemanticsVisitor::dispatchStmt(Stmt* stmt, SemanticsContext const& context)
         getSink()->noteInternalErrorLoc(stmt->loc);
         throw;
     }
+#endif
 }
 
 Expr* SemanticsVisitor::dispatchExpr(Expr* expr, SemanticsContext const& context)
 {
     SemanticsExprVisitor visitor(context);
+#if SLANG_HAS_EXCEPTIONS
     try
+#endif
     {
         return visitor.dispatch(expr);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException&)
     {
         throw;
@@ -236,6 +243,7 @@ Expr* SemanticsVisitor::dispatchExpr(Expr* expr, SemanticsContext const& context
         getSink()->noteInternalErrorLoc(expr->loc);
         throw;
     }
+#endif
 }
 
 ASTBuilder* semanticsVisitorGetASTBuilder(SemanticsVisitor* sv)

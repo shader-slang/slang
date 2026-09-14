@@ -2851,7 +2851,9 @@ SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
 
 SlangResult LanguageServer::runCommand(Command& call)
 {
+#if SLANG_HAS_EXCEPTIONS
     try
+#endif
     {
         // Do different things
         if (call.method == DidOpenTextDocumentParams::methodName)
@@ -2872,12 +2874,16 @@ SlangResult LanguageServer::runCommand(Command& call)
             return SLANG_OK;
         }
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
         return SLANG_FAIL;
     }
+#endif
 
+#if SLANG_HAS_EXCEPTIONS
     try
+#endif
     {
         if (call.method == HoverParams::methodName)
         {
@@ -2935,12 +2941,14 @@ SlangResult LanguageServer::runCommand(Command& call)
             return SLANG_OK;
         }
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
         // If we encountered an internal compiler error, don't crash the language server.
         // Instead we just return a null response.
         return m_connection->sendResult(NullResponse::get(), call.id);
     }
+#endif
 
     return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);
 }

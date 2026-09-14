@@ -1919,11 +1919,14 @@ SlangResult EndToEndCompileRequest::compile()
     // TODO: Consider supporting Windows "Structured Exception Handling"
     // so that we can also recover from a wider class of crashes.
 
+#if SLANG_HAS_EXCEPTIONS
     try
+#endif
     {
         SLANG_PROFILE_SECTION(compileInner);
         res = executeActions();
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         // This situation indicates a fatal (but not necessarily internal) error
@@ -1956,6 +1959,7 @@ SlangResult EndToEndCompileRequest::compile()
         // and not some other component in their system.
         getSink()->diagnose(Diagnostics::CompilationAborted{});
     }
+#endif
     m_diagnosticOutput = getSink()->outputBuffer.produceString();
 
 #else
