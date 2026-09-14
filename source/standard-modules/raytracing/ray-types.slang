@@ -128,6 +128,7 @@ public struct TriangleData
             case hlsl:
             case glsl:
             case spirv:
+            case cuda:
                 return HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE;
             default:
                 return false;
@@ -155,19 +156,27 @@ public interface IIntersectionPrimitive
     associatedtype Attributes;
 }
 
+/// Marks primitives whose intersection is supplied by the target instead of a user shader.
+///
+/// The interface is sealed so `NoIntersection` can use it to admit exactly the built-in triangle
+/// and curve primitives. A procedural bounding box must instead provide an intersection shader
+/// that reports an actual hit.
+[sealed]
+public interface IBuiltinIntersectionPrimitive : IIntersectionPrimitive {}
+
 /// Marks procedural primitives whose intersection stage reports application-defined attributes.
 [sealed]
 public interface ICustomIntersectionPrimitive : IIntersectionPrimitive {}
 
 /// Selects hardware triangle intersection and the built-in `TriangleData` view.
-public struct TrianglePrimitive : IIntersectionPrimitive
+public struct TrianglePrimitive : IBuiltinIntersectionPrimitive
 {
     public typealias Attributes = TriangleData;
 }
 
 /// Selects Metal's built-in curve intersection and `CurveData` view.
 [require(metallib_3_1)]
-public struct CurvePrimitive : IIntersectionPrimitive
+public struct CurvePrimitive : IBuiltinIntersectionPrimitive
 {
     public typealias Attributes = CurveData;
 }

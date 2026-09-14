@@ -104,6 +104,7 @@ public struct NoAnyHit<C> : IAnyHitShader
 /// intersection entry point. Unlike a real `IIntersectionShader`, the placeholder has no `invoke`.
 public struct NoIntersection<C> : IIntersectionStage
     where C : IHitContext
+    where C.Primitive : IBuiltinIntersectionPrimitive
 {
     public typealias Context = C;
 }
