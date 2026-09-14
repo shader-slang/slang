@@ -130,12 +130,16 @@ Type* SharedASTBuilder::getDiffInterfaceType()
     return m_diffInterfaceType;
 }
 
-// Finds a top-level declaration of the core module named `name`, recursing into the `FileDecl`s
-// the eager core module source is organized into (core.meta.slang, hlsl.meta.slang,
-// autodiff-base.meta.slang all land in the same `Core` module; see
-// `Session::getBuiltinModuleSource`), the same way `Module::_collectShaderParams` walks a
-// module's members. Returns null before the core module has been compiled or loaded, which
-// callers must tolerate (see `SharedASTBuilder::getBuiltinIntegerType` and its siblings).
+// Finds a top-level interface declaration of the core module named `name`, recursing into both
+// the `FileDecl`s the eager core module source is organized into (core.meta.slang,
+// hlsl.meta.slang, autodiff-base.meta.slang all land in the same `Core` module; see
+// `Session::getBuiltinModuleSource`) and any `NamespaceDecl`s nested within them. Returns null
+// before the core module has been compiled or loaded, which callers must tolerate (see
+// `SharedASTBuilder::getBuiltinIntegerType` and its siblings). Asserts the found declaration is
+// actually an `InterfaceDecl`: the three names this is used for (see the accessors below) are
+// `[sealed]` interfaces declared once in the core module, so a name collision with some other
+// declaration kind would be a core-module authoring bug, not a shape this function should
+// silently tolerate and hand to `DeclRefType::create` regardless.
 static Decl* _findCoreModuleDeclByName(Session* session, Name* name)
 {
     auto coreModule = session->getBuiltinModule(slang::BuiltinModuleName::Core);
@@ -152,7 +156,10 @@ static Decl* _findCoreModuleDeclByName(Session* session, Name* name)
         for (auto member : workList[i]->getDirectMemberDecls())
         {
             if (member->getName() == name)
+            {
+                SLANG_RELEASE_ASSERT(as<InterfaceDecl>(member));
                 return member;
+            }
             if (auto fileDecl = as<FileDecl>(member))
                 workList.add(fileDecl);
             else if (auto namespaceDecl = as<NamespaceDecl>(member))

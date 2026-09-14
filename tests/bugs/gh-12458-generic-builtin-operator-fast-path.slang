@@ -70,6 +70,13 @@
 // conformance broadly, safe for `==`/`eqT` above but NOT for `!`). `notT<int>(5)` verifies the
 // result is `0` (5 is truthy, so `!5` is `false`, via normal overload resolution's int-to-bool
 // conversion), not a raw `Not` misapplied to the integer bit pattern.
+//
+// `vaddMat` and `bitNotT` cover the two remaining rewritten shapes with no test above them:
+// `matrix<T,R,C>` element classification (`convertToBuiltinArithmeticOp` unwraps a matrix operand
+// to its element type the same way it does a vector's, but nothing here exercised a matrix until
+// now), and unary `~` (bitwise-not) on a constrained generic (the unary path was rewritten to
+// route `-`/`~`/`!` uniformly through `classifyBuiltinArithmeticElementType`, but `negF` above
+// only covers `-`).
 
 //TEST:INTERPRET(filecheck=CHECK):
 
@@ -83,6 +90,11 @@ T negF<T : __BuiltinFloatingPointType>(T a) { return -a; }
 T vaddF<T : __BuiltinFloatingPointType>(vector<T, 3> a, vector<T, 3> b) { return (a + b).x; }
 T vmodI<T : __BuiltinIntegerType>(vector<T, 2> a, vector<T, 2> b) { return (a % b).y; }
 T notT<T : __BuiltinLogicalType>(T a) { return !a; }
+T vaddMat<T : __BuiltinFloatingPointType>(matrix<T, 2, 2> a, matrix<T, 2, 2> b)
+{
+    return (a + b)[0][0];
+}
+T bitNotT<T : __BuiltinIntegerType>(T a) { return ~a; }
 
 void main()
 {
@@ -106,4 +118,10 @@ void main()
     printf("%d\n", vmodI<int>(vector<int, 2>(7, 8), vector<int, 2>(3, 3)));
     // CHECK-NEXT: 0
     printf("%d\n", notT<int>(5));
+    // CHECK-NEXT: 3.000000
+    printf(
+        "%f\n",
+        vaddMat<float>(matrix<float, 2, 2>(1.0), matrix<float, 2, 2>(2.0)));
+    // CHECK-NEXT: -6
+    printf("%d\n", bitNotT<int>(5));
 }
