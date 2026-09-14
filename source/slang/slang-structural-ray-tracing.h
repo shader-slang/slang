@@ -389,9 +389,9 @@ public:
 
     /// Records the checked AST type represented by a compiler-produced opaque identity.
     ///
-    /// IR linking may preserve nominal identity after target specialization has erased the AST
-    /// declaration from the linked module. Reflection uses this producer-side bridge to recover
-    /// that already-checked type; it never parses the identity string as a source name.
+    /// Source lowering registers the type directly. Reflection of a serialized module registers
+    /// the same canonical type after resolving its separately persisted declaration lookup key and
+    /// verifying this identity. Neither path parses the identity string as a source name.
     void registerReflectionType(UnownedStringSlice identity, Type* type);
 
     /// Finds the checked AST type previously registered for an opaque compiler identity.

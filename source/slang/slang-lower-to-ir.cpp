@@ -990,6 +990,27 @@ static IRStringLit* _lowerStructuralRayTracingCanonicalTypeIdentity(
     return context->irBuilder->getStringValue(identity.getUnownedSlice());
 }
 
+// Preserves the module export-table key for a structural entry's nominal declaration.
+//
+// Consider a separately compiled plugin that contains `struct Glass : IMaterialHit`. Its IR keeps
+// the canonical type identity used to select `Glass`, but a fresh session loading the serialized
+// module has not run AST-to-IR lowering and therefore has not registered the corresponding AST
+// `Type*`. Module serialization already preserves an exact declaration table indexed by this
+// unobfuscated mangled name. Reflection can use that table to reconstruct the nominal type and
+// then verify it against the independently persisted canonical type identity. This key is opaque
+// compiler metadata; no consumer parses it or treats the user-facing source name as identity.
+static IRStringLit* _lowerStructuralRayTracingDeclLookupName(IRGenContext* context, Type* type)
+{
+    auto canonicalType = type ? type->getCanonicalType() : nullptr;
+    auto declRefType = as<DeclRefType>(canonicalType);
+    SLANG_RELEASE_ASSERT(declRefType);
+    auto decl = declRefType->getDeclRef().getDecl();
+    SLANG_RELEASE_ASSERT(decl);
+    auto lookupName = getMangledName(context->astBuilder, decl);
+    SLANG_RELEASE_ASSERT(lookupName.getLength() != 0);
+    return context->irBuilder->getStringValue(lookupName.getUnownedSlice());
+}
+
 struct StructuralRayTracingHitContextInfo
 {
     Type* traceContextType = nullptr;
@@ -1248,6 +1269,7 @@ static void _addStructuralRayTracingHitGroupEntryInfo(
         lowerType(context, groupType),
         _lowerStructuralRayTracingSourceTypeName(context, groupType),
         _lowerStructuralRayTracingCanonicalTypeIdentity(context, groupType),
+        _lowerStructuralRayTracingDeclLookupName(context, groupType),
         context->irBuilder->getIntValue(
             context->irBuilder->getIntType(),
             IRIntegerValue(functionIndex)),
@@ -1360,6 +1382,7 @@ static void _addStructuralRayTracingMissShaderEntryInfo(
         miss.type,
         miss.sourceTypeName,
         miss.typeIdentity,
+        _lowerStructuralRayTracingDeclLookupName(context, shaderType),
         miss.invoke,
         context->irBuilder->getBoolValue(isLinked),
         context->irBuilder->getIntValue(context->irBuilder->getIntType(), -1),
@@ -1452,6 +1475,7 @@ static void _addStructuralRayTracingCallableShaderEntryInfo(
         callable.type,
         callable.sourceTypeName,
         callable.typeIdentity,
+        _lowerStructuralRayTracingDeclLookupName(context, shaderType),
         callable.invoke,
         context->irBuilder->getBoolValue(isLinked),
     };

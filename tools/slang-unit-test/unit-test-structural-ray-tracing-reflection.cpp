@@ -1668,10 +1668,15 @@ SLANG_UNIT_TEST(structuralRayTracingSerializedOpenSchemaReflection)
     SLANG_CHECK_ABORT(
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
-    slang::CompilerOptionEntry experimentalOption = {};
-    experimentalOption.name = slang::CompilerOptionName::ExperimentalFeature;
-    experimentalOption.value.kind = slang::CompilerOptionValueKind::Int;
-    experimentalOption.value.intValue0 = 1;
+    slang::CompilerOptionEntry compilerOptions[2] = {};
+    compilerOptions[0].name = slang::CompilerOptionName::ExperimentalFeature;
+    compilerOptions[0].value.kind = slang::CompilerOptionValueKind::Int;
+    compilerOptions[0].value.intValue0 = 1;
+    // Obfuscation ensures that recovery cannot accidentally depend on an IR linkage decoration.
+    // The producer persists the original module export-table key in compiler-owned metadata.
+    compilerOptions[1].name = slang::CompilerOptionName::Obfuscate;
+    compilerOptions[1].value.kind = slang::CompilerOptionValueKind::Int;
+    compilerOptions[1].value.intValue0 = 1;
 
     slang::TargetDesc target = {};
     target.format = SLANG_HLSL;
@@ -1679,8 +1684,8 @@ SLANG_UNIT_TEST(structuralRayTracingSerializedOpenSchemaReflection)
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &target;
-    sessionDesc.compilerOptionEntryCount = 1;
-    sessionDesc.compilerOptionEntries = &experimentalOption;
+    sessionDesc.compilerOptionEntryCount = SLANG_COUNT_OF(compilerOptions);
+    sessionDesc.compilerOptionEntries = compilerOptions;
 
     ComPtr<slang::IBlob> contextBlob;
     ComPtr<slang::IBlob> schemaBlob;
