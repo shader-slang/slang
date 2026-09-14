@@ -2240,6 +2240,22 @@ public:                                                              \
     */
     SLANG_API size_t spReflectionTraceProgramSchema_getCallableRecordStride(
         SlangReflectionTraceProgramSchema* schema);
+    /** Get the maximum native hit-attribute ABI requirement, in bytes, for this schema.
+
+    D3D returns native DXIL aggregate allocation and Vulkan returns its scalar-aligned interface-
+    block size. OptiX returns four times the maximum attribute-register count selected by Slang's
+    native lowering, with the native two-register minimum. Targets without a corresponding host
+    pipeline setting return zero.
+    */
+    SLANG_API size_t spReflectionTraceProgramSchema_getMaxNativeHitAttributeSize(
+        SlangReflectionTraceProgramSchema* schema);
+    /** Get the compiler-owned Metal record-header size, in bytes.
+
+    This is the offset at which application record data begins in every structural Metal record.
+    Non-Metal targets return zero.
+    */
+    SLANG_API size_t spReflectionTraceProgramSchema_getMetalRecordHeaderSize(
+        SlangReflectionTraceProgramSchema* schema);
     /** Get Metal program-descriptor resources in their physical argument-buffer field order.
 
     Non-Metal targets return zero resources. Each hit/miss table has a non-negative payload index;
@@ -2265,6 +2281,16 @@ public:                                                              \
     /** Get the payload layout under the reflected target's ordinary data-layout rules. */
     SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingPayload_getTypeLayout(
         SlangReflectionRayTracingPayload* payload);
+    /** Get this payload partition's native host pipeline ABI requirement, in bytes.
+
+    D3D returns native DXIL aggregate allocation and Vulkan returns its scalar-aligned payload-
+    block size. OptiX returns four times the payload-register count selected by Slang lowering,
+    including the two-register representation used for an indirect payload. Targets without a
+    corresponding host pipeline setting return zero. This value is intentionally distinct from
+    `getTypeLayout`, whose ordinary reflected layout need not describe ray-tracing transport.
+    */
+    SLANG_API size_t
+    spReflectionRayTracingPayload_getNativePayloadSize(SlangReflectionRayTracingPayload* payload);
     /** Get hit groups in their dense function-index order for this payload. */
     SLANG_API SlangUInt
     spReflectionRayTracingPayload_getHitGroupCount(SlangReflectionRayTracingPayload* payload);
@@ -4178,6 +4204,12 @@ struct RayTracingPayloadReflection
         return (TypeLayoutReflection*)spReflectionRayTracingPayload_getTypeLayout(
             (SlangReflectionRayTracingPayload*)this);
     }
+    /// Returns the native host pipeline payload requirement in bytes for the reflected target.
+    size_t getNativePayloadSize()
+    {
+        return spReflectionRayTracingPayload_getNativePayloadSize(
+            (SlangReflectionRayTracingPayload*)this);
+    }
     SlangUInt getHitGroupCount()
     {
         return spReflectionRayTracingPayload_getHitGroupCount(
@@ -4293,6 +4325,18 @@ struct TraceProgramSchemaReflection
     size_t getCallableRecordStride()
     {
         return spReflectionTraceProgramSchema_getCallableRecordStride(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    /// Returns the native host pipeline hit-attribute requirement in bytes.
+    size_t getMaxNativeHitAttributeSize()
+    {
+        return spReflectionTraceProgramSchema_getMaxNativeHitAttributeSize(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    /// Returns the Metal record-header size in bytes, or zero on other targets.
+    size_t getMetalRecordHeaderSize()
+    {
+        return spReflectionTraceProgramSchema_getMetalRecordHeaderSize(
             (SlangReflectionTraceProgramSchema*)this);
     }
     SlangUInt getDescriptorResourceCount()

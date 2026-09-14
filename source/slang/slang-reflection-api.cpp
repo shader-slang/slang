@@ -5518,6 +5518,20 @@ spReflectionTraceProgramSchema_getCallableRecordStride(SlangReflectionTraceProgr
     return reflectedSchema ? reflectedSchema->callableRecordStride : 0;
 }
 
+SLANG_API size_t spReflectionTraceProgramSchema_getMaxNativeHitAttributeSize(
+    SlangReflectionTraceProgramSchema* schema)
+{
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    return reflectedSchema ? reflectedSchema->maxNativeHitAttributeSize : 0;
+}
+
+SLANG_API size_t
+spReflectionTraceProgramSchema_getMetalRecordHeaderSize(SlangReflectionTraceProgramSchema* schema)
+{
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    return reflectedSchema ? reflectedSchema->metalRecordHeaderSize : 0;
+}
+
 SLANG_API SlangUInt
 spReflectionTraceProgramSchema_getDescriptorResourceCount(SlangReflectionTraceProgramSchema* schema)
 {
@@ -5569,6 +5583,13 @@ SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingPayload_getTypeLayout
 {
     auto reflectedPayload = (StructuralRayTracingPayloadReflection*)payload;
     return reflectedPayload ? convert(reflectedPayload->typeLayout) : nullptr;
+}
+
+SLANG_API size_t
+spReflectionRayTracingPayload_getNativePayloadSize(SlangReflectionRayTracingPayload* payload)
+{
+    auto reflectedPayload = (StructuralRayTracingPayloadReflection*)payload;
+    return reflectedPayload ? reflectedPayload->nativePayloadSize : 0;
 }
 
 SLANG_API SlangUInt

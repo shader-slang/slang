@@ -7,6 +7,23 @@ namespace Slang
 {
 
 struct IRModule;
+class TargetRequest;
+
+/// Native OptiX register limits shared by reflection and varying-parameter legalization.
+static constexpr IRIntegerValue kOptiXRayTracingRegisterSize = 4;
+static constexpr IRIntegerValue kOptiXMaxRayPayloadRegisterCount = 32;
+static constexpr IRIntegerValue kOptiXIndirectPayloadRegisterCount = 2;
+static constexpr IRIntegerValue kOptiXMinHitAttributeRegisterCount = 2;
+static constexpr IRIntegerValue kOptiXMaxHitAttributeRegisterCount = 8;
+
+/// Describes the physical OptiX payload transport selected by varying-parameter legalization.
+struct OptiXRayTracingPayloadABIInfo
+{
+    /// Number of 32-bit OptiX payload registers passed to each native stage.
+    IRIntegerValue registerCount = 0;
+    /// True when the registers contain a pointer to the payload instead of the payload bytes.
+    bool isIndirect = false;
+};
 
 struct StructuralRayTracingEntryPointIRInfo
 {
@@ -52,6 +69,50 @@ IRFunc* getStructuralRayTracingHitGroupStageInvoke(
 /// target layout: an empty derived struct and a wrapper containing an empty field can have similar
 /// physical representations but have different source-level payload semantics.
 bool isSemanticallyEmptyStructuralRayTracingPayloadType(IRType* type);
+
+/// Computes the OptiX payload ABI selected for `type`.
+///
+/// Payloads of at most 32 registers are transported inline according to the compiler's current
+/// CUDA IR-layout calculation. Larger payloads use the compiler's two-register pointer
+/// representation. Keeping this calculation beside the structural IR utilities gives reflection
+/// and varying-parameter legalization one source of truth.
+Result getOptiXRayTracingPayloadABIInfo(
+    IRBuilder* builder,
+    IRType* type,
+    OptiXRayTracingPayloadABIInfo* outInfo);
+
+/// Counts 32-bit OptiX attribute registers required by `type`.
+///
+/// OptiX assigns one register to each scalar leaf, including 8- and 16-bit leaves. This is not a
+/// byte-packed data layout, so callers must not derive this value from a general type-layout API.
+Result getOptiXRayTracingHitAttributeRegisterCount(
+    IRBuilder* builder,
+    IRType* type,
+    IRIntegerValue* outRegisterCount);
+
+/// Computes the host-visible native ray-payload ABI requirement in bytes for `targetRequest`.
+///
+/// D3D uses native DXIL aggregate allocation, while Vulkan uses its scalar-aligned block stride.
+/// OptiX reports the selected payload register transport, including its two-register pointer
+/// fallback. Targets without a native host payload-size setting report zero.
+Result getStructuralRayTracingNativePayloadSize(
+    TargetRequest* targetRequest,
+    IRBuilder* builder,
+    IRType* payloadType,
+    IRType* payloadSemanticType,
+    IRIntegerValue* outSize);
+
+/// Computes one custom hit-attribute type's native host ABI requirement in bytes.
+///
+/// D3D uses native DXIL aggregate allocation, while Vulkan uses its scalar-aligned block stride.
+/// OptiX uses one 32-bit register per scalar leaf. Built-in triangle attributes are handled by
+/// schema reflection because they have no equivalent source storage struct.
+Result getStructuralRayTracingNativeHitAttributeSize(
+    TargetRequest* targetRequest,
+    IRBuilder* builder,
+    IRType* attributesType,
+    IRIntegerValue* outSize);
+
 void collectUsedVulkanRayPayloadLocations(IRInst* root, HashSet<IRIntegerValue>& outLocations);
 
 /// Adds a linked-program payload assignment to `owner` without decorating the payload type.

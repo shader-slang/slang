@@ -7,6 +7,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-lower-out-parameters.h"
 #include "slang-ir-lower-tuple-types.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-util.h"
 #include "slang-parameter-binding.h"
 #include "slang-rich-diagnostics.h"
@@ -1124,9 +1125,6 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     //
     IRType* uint3Type = nullptr;
 
-    // Maximum number of payload registers (32 registers = 128 bytes)
-    static const int kMaxPayloadRegisters = 32;
-
     // Track payload write-back info for inout parameters
     struct PayloadWritebackInfo
     {
@@ -1175,28 +1173,18 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         return 4; // Default fallback
     }
 
-    // Get the C++ size of a type in bytes (including internal padding).
-    int getTypeCppSize(IRType* type, IRBuilder* builder)
-    {
-        int size, alignment;
-        if (getTypeCppSizeAndAlignment(type, builder, size, alignment))
-            return size;
-        return 0; // Failure
-    }
-
-    // Compute how many uint32 registers a type requires.
-    // Returns 0 if the type is too large (> 32 registers = 128 bytes),
-    // or if it cannot be flattened to registers.
-    // Uses C++ sizeof rules to match the prelude's PayloadRegisters<T>.
+    // Compute how many inline uint32 registers a type requires. Reflection uses the same shared
+    // helper to report the transport chosen by this legalization. Zero selects the existing
+    // two-register pointer fallback for a large or unlayoutable payload.
     int computePayloadRegisterCount(IRType* type, IRBuilder* builder)
     {
-        int sizeBytes = getTypeCppSize(type, builder);
-        if (sizeBytes == 0)
+        OptiXRayTracingPayloadABIInfo abiInfo;
+        if (SLANG_FAILED(getOptiXRayTracingPayloadABIInfo(builder, type, &abiInfo)) ||
+            abiInfo.isIndirect)
+        {
             return 0;
-        int regCount = (sizeBytes + 3) / 4;
-        if (regCount > kMaxPayloadRegisters)
-            return 0;
-        return regCount;
+        }
+        return int(abiInfo.registerCount);
     }
 
     // Emit code to read a value from payload registers.
@@ -2369,8 +2357,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 if (useRegisterBasedPayload)
                     registerCount = computePayloadRegisterCount(info.type, &builder);
 
-                if (!useRegisterBasedPayload || registerCount == 0 ||
-                    registerCount > kMaxPayloadRegisters)
+                if (!useRegisterBasedPayload || registerCount == 0)
                 {
                     // Fallback to pointer packing for large/unsupported payloads or non-callee
                     // stages
@@ -2420,12 +2407,17 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             {
                 IRBuilder builder(m_module);
                 builder.setInsertBefore(m_firstOrdinaryInst);
-                int ioBaseAttributeIndex = 0;
-                IRInst* getHitAttributes = emitOptiXAttributeFetch(
-                    /*ioBaseAttributeIndex*/ ioBaseAttributeIndex,
-                    /* type to fetch */ info.type,
-                    /*the builder in use*/ &builder);
-                if (ioBaseAttributeIndex > 8)
+
+                // Attribute registers are not a byte-packed CUDA struct. OptiX assigns one
+                // 32-bit slot to each scalar leaf, which is also the quantity exposed through
+                // structural reflection. Check the shared count before emitting any reads so an
+                // oversized attribute never leaves partially generated fetches behind.
+                IRIntegerValue requiredAttributeCount = 0;
+                SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(getOptiXRayTracingHitAttributeRegisterCount(
+                    &builder,
+                    info.type,
+                    &requiredAttributeCount)));
+                if (requiredAttributeCount > kOptiXMaxHitAttributeRegisterCount)
                 {
                     // A hit attribute is always a parameter, never a result, so
                     // `m_param` is set here; guard the deref in release too.
@@ -2437,6 +2429,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                         .location = m_param->sourceLoc});
                     return LegalizedVaryingVal();
                 }
+                int ioBaseAttributeIndex = 0;
+                IRInst* getHitAttributes = emitOptiXAttributeFetch(
+                    /*ioBaseAttributeIndex*/ ioBaseAttributeIndex,
+                    /* type to fetch */ info.type,
+                    /*the builder in use*/ &builder);
+                SLANG_RELEASE_ASSERT(
+                    getHitAttributes && ioBaseAttributeIndex == requiredAttributeCount);
                 return LegalizedVaryingVal::makeValue(getHitAttributes);
             }
         default:

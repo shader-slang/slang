@@ -530,6 +530,8 @@ enum class IRTypeLayoutRuleName
     C,
     CUDA,
     LLVM,
+    /// DXIL ray payload/callable/hit-attribute allocation (not a buffer layout).
+    D3DRayTracingInterface,
     _Count,
 };
 
