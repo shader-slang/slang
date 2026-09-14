@@ -3748,20 +3748,35 @@ static void _replaceMetalDescriptorStorageLayouts(
 
     List<IRStructTypeLayout*> layouts;
     _collectMetalStructTypeLayouts(module->getModuleInst(), layouts);
+    HashSet<IRInst*> storageFieldKeys;
+    for (auto storageField : info->storageFields)
+        storageFieldKeys.add(storageField->getKey());
     for (auto oldLayout : layouts)
     {
-        IRStructField* matchingStorageField = nullptr;
-        IRStructFieldLayoutAttr* matchingFieldLayout = nullptr;
-        for (auto storageField : info->storageFields)
+        // Consider this example:
+        //
+        //     struct Frame
+        //     {
+        //         rt::TraceProgramDescriptor<Schema> firstProgram;
+        //         rt::TraceProgramDescriptor<Schema> secondProgram;
+        //     }
+        //
+        // Retagging the two descriptor values records both fields in `storageFields`. The
+        // containing `Frame` type nevertheless has one shared layout, so replacing that layout
+        // after finding only the first field would leave `secondProgram` pointing at the source
+        // placeholder layout. Rebuild the containing layout once and physicalize every matching
+        // field in that same rebuild. Each cloned variable layout preserves its field-specific
+        // outer offsets while replacing only the nested descriptor type layout.
+        bool hasMatchingStorageField = false;
+        for (auto fieldLayout : oldLayout->getFieldLayoutAttrs())
         {
-            if (auto fieldLayout = _findStructFieldLayout(oldLayout, storageField->getKey()))
+            if (storageFieldKeys.contains(fieldLayout->getFieldKey()))
             {
-                matchingStorageField = storageField;
-                matchingFieldLayout = fieldLayout;
+                hasMatchingStorageField = true;
                 break;
             }
         }
-        if (!matchingStorageField)
+        if (!hasMatchingStorageField)
             continue;
 
         IRStructTypeLayout::Builder newLayoutBuilder(&builder);
@@ -3769,7 +3784,7 @@ static void _replaceMetalDescriptorStorageLayouts(
         for (auto fieldLayout : oldLayout->getFieldLayoutAttrs())
         {
             auto varLayout = fieldLayout->getLayout();
-            if (fieldLayout == matchingFieldLayout)
+            if (storageFieldKeys.contains(fieldLayout->getFieldKey()))
             {
                 varLayout = _cloneMetalVarLayout(
                     builder,
