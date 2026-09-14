@@ -591,7 +591,6 @@ static IRStructuralRayTracingProgramSchema* _findFinalizedStructuralRayTracingPr
 // here gives the whole-program linker a liveness root even when no entry point calls `trace`.
 static RefPtr<IRModule> _getFinalizedStructuralRayTracingProgramSchemaManifest(
     ProgramLayout* programLayout,
-    Type* schemaType,
     SubtypeWitness* schemaWitness,
     DiagnosticSink* sink)
 {
@@ -602,7 +601,17 @@ static RefPtr<IRModule> _getFinalizedStructuralRayTracingProgramSchemaManifest(
     components.add(program);
     components.add(schemaRequest);
     auto reflectionProgram = CompositeComponentType::create(linkage, components);
-    auto targetProgram = reflectionProgram->getTargetProgram(programLayout->getTargetReq());
+
+    // Consider a schema and a plugin that both import a context module containing their
+    // `IHitContext` conformances. The ordinary program may still expose that context module as an
+    // unsatisfied component requirement: `getLayout()` does not implicitly perform the public
+    // `link()` operation. Complete the private reflection composite through the same component
+    // requirement path so its IR link sees the imported witness definitions as well as the
+    // declarations that reference them.
+    auto linkedReflectionProgram = fillRequirements(reflectionProgram);
+    SLANG_RELEASE_ASSERT(linkedReflectionProgram);
+    auto targetProgram =
+        linkedReflectionProgram->getTargetProgram(programLayout->getTargetReq());
     return getOrCreateStructuralRayTracingProgramManifest(targetProgram, sink);
 }
 
@@ -1060,7 +1069,6 @@ StructuralRayTracingProgramSchemaReflection* findStructuralRayTracingProgramSche
     {
         manifest = _getFinalizedStructuralRayTracingProgramSchemaManifest(
             programLayout,
-            schemaType,
             schemaWitness,
             &sink);
         auto schemaTypeIdentity = getMangledTypeName(astBuilder, schemaType->getCanonicalType());
