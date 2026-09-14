@@ -8,6 +8,10 @@
 //TEST:SIMPLE(filecheck=DXILTRIANGLE): -experimental-feature -entry EmptyTriangleAnyHit -stage anyhit -target dxil -profile sm_6_7
 //TEST:SIMPLE(filecheck=DXILMISS): -experimental-feature -entry EmptyMiss -stage miss -target dxil -profile sm_6_7
 //TEST:SIMPLE(filecheck=DXILCALLABLE): -experimental-feature -entry EmptyCallable -stage callable -target dxil -profile sm_6_7
+//TEST:SIMPLE(filecheck=CUDAMISS): -experimental-feature -entry EmptyMiss -stage miss -target cuda
+//TEST:SIMPLE(filecheck=CUDACALLABLE): -experimental-feature -entry EmptyCallable -stage callable -target cuda
+//TEST:SIMPLE(filecheck=PTXMISS): -experimental-feature -entry EmptyMiss -stage miss -target ptx
+//TEST:SIMPLE(filecheck=PTXCALLABLE): -experimental-feature -entry EmptyCallable -stage callable -target ptx
 
 import slang.raytracing;
 
@@ -125,3 +129,17 @@ struct UsingCallable : rt::ICallableShader
 // DXILMISS: define void
 // DXILMISS: !dx.dxrPayloadAnnotations
 // DXILCALLABLE: define void
+
+// Even though the source methods do not read their inputs, an OptiX miss entry must still exchange
+// its declared payload through registers and a callable entry must still expose its data pointer.
+// Checking both CUDA source and NVRTC-produced PTX protects the source adapter and its final native
+// ABI independently.
+// CUDAMISS: extern "C" __global__ void __miss__EmptyMiss()
+// CUDAMISS: optixGetPayload_0()
+// CUDAMISS: optixSetPayload_0(
+// CUDACALLABLE: extern "C" __device__ void __direct_callable__EmptyCallable(TestCallableData_0 * data_0)
+// PTXMISS: .visible .entry __miss__EmptyMiss()
+// PTXMISS: call ({{.*}}), _optix_get_payload,
+// PTXMISS: call _optix_set_payload,
+// PTXCALLABLE: .visible .func __direct_callable__EmptyCallable(
+// PTXCALLABLE: .param .b64 __direct_callable__EmptyCallable_param_0
