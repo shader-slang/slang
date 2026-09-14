@@ -2168,7 +2168,13 @@ public:                                                              \
     typedef SlangProgramLayout SlangReflection;
     typedef SlangEntryPointLayout SlangReflectionEntryPoint;
 
-    /** Find a structural ray-tracing program schema by its source type name. */
+    /** Find a structural ray-tracing program schema by its source type name.
+
+    Returns null when the name is not a schema or the schema is invalid for this linked program.
+    This experimental pointer-returning query has no diagnostics channel. Invalid concrete source
+    contracts are diagnosed when their module is loaded; errors that depend on the linked set of
+    open-section entries are available from the ordinary code-generation APIs.
+    */
     SLANG_API SlangReflectionTraceProgramSchema* spReflection_findTraceProgramSchema(
         SlangReflection* reflection,
         char const* name);

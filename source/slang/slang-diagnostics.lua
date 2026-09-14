@@ -4508,7 +4508,7 @@ err(
     "structural-ray-tracing-open-tag-not-entry-interface",
     38083,
     "invalid structural ray-tracing open-section tag",
-    span { loc = "location", message = "open ~section tag '~tag:IRInst' must be an interface inheriting '~entryInterface:String'" }
+    span { loc = "location", message = "open ~section tag '~tag:Type' must be an interface inheriting '~entryInterface:String'" }
 )
 
 err(
@@ -4537,6 +4537,13 @@ err(
     38087,
     "duplicate structural ray-tracing entry",
     span { loc = "location", message = "~section entry '~entry:IRInst' is listed more than once in schema '~schema:IRInst'" }
+)
+
+err(
+    "structural-ray-tracing-open-tag-not-entry-interface-ir",
+    38088,
+    "invalid structural ray-tracing open-section tag",
+    span { loc = "location", message = "open ~section tag '~tag:IRInst' must be an interface inheriting '~entryInterface:String'" }
 )
 
 err(

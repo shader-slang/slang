@@ -2711,6 +2711,10 @@ public:
     void registerStructuralRayTracingStageConformance(
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         WitnessTable* witnessTable);
+    void diagnoseInvalidStructuralRayTracingOpenSectionTag(
+        Type* entryListType,
+        AssocTypeDecl* associatedTypeRequirement,
+        Decl* satisfyingDecl);
     void diagnoseDuplicateStructuralRayTracingSchemaEntries(
         Type* entryListType,
         AssocTypeDecl* associatedTypeRequirement,
