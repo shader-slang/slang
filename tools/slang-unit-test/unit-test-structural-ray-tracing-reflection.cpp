@@ -316,6 +316,9 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
 
 SLANG_UNIT_TEST(structuralRayTracingNativeABISizeReflection)
 {
+    // None of these closed schemas is referenced by a trace call. Reflection must retain each
+    // exact schema as a private target-manifest root; adding a trace use here would hide a producer
+    // regression by making its stages reachable through executable code instead.
     // The nested aggregate intentionally distinguishes D3D allocation from Vulkan scalar-block
     // layout. D3D gives `NestedInner` its 16-byte allocation before placing `tail`, producing 24
     // bytes. Vulkan may reuse the inner aggregate's tail and produces a 16-byte block.

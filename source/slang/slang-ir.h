@@ -2123,10 +2123,12 @@ struct ModuleLinkingInfo : RefObject
         return m_structuralRayTracingTaggedConformances.getArrayView();
     }
 
-    /// Query schema-scoped open-section requests emitted by exact type conformances.
+    /// Query reflection-only schema requests emitted by exact type conformances.
     ///
-    /// These roots are not ordinary exports: only whole-program manifest construction clones
-    /// them, which prevents reflection-only summaries from reaching target emission.
+    /// Closed requests retain specialized entry types for target ABI reflection; open requests
+    /// also drive tagged-conformance selection. These roots are not ordinary exports: only
+    /// whole-program manifest construction clones them, which prevents reflection-only summaries
+    /// from reaching target emission.
     ArrayView<IRInst*> getStructuralRayTracingProgramSchemas()
     {
         return m_structuralRayTracingProgramSchemas.getArrayView();
