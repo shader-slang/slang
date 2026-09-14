@@ -106,6 +106,7 @@ bool isCompilerOwnedStructuralRayTracingIROp(IROp op)
 
     switch (op)
     {
+    case kIROp_StructuralRayTracingProgramDescriptorType:
     case kIROp_StructuralRayTracingTrace:
     case kIROp_StructuralRayTracingCallShader:
     case kIROp_StructuralRayTracingProgramSchema:
@@ -135,11 +136,117 @@ bool isCompilerOwnedStructuralRayTracingIROp(IROp op)
     }
 }
 
+static void _collectStructuralRayTracingProgramDescriptorTypes(
+    IRInst* root,
+    List<IRStructuralRayTracingProgramDescriptorType*>& types)
+{
+    if (auto type = as<IRStructuralRayTracingProgramDescriptorType>(root))
+        types.add(type);
+    for (auto child : root->getChildren())
+        _collectStructuralRayTracingProgramDescriptorTypes(child, types);
+}
+
+void lowerStructuralRayTracingProgramDescriptorTypes(
+    IRModule* module,
+    const Dictionary<IRType*, IRType*>& targetTypesBySchema)
+{
+    // Collect first because `replaceUsesWith` updates and deduplicates hoistable users. Walking
+    // those users while mutating them can otherwise skip another descriptor nested in a function,
+    // tuple, pointer, or specialized user struct type.
+    List<IRStructuralRayTracingProgramDescriptorType*> descriptorTypes;
+    _collectStructuralRayTracingProgramDescriptorTypes(module->getModuleInst(), descriptorTypes);
+    for (auto descriptorType : descriptorTypes)
+    {
+        IRType* replacement = descriptorType->getStorageType();
+        if (auto targetType = targetTypesBySchema.tryGetValue(descriptorType->getSchemaType()))
+            replacement = *targetType;
+        SLANG_RELEASE_ASSERT(replacement);
+        descriptorType->replaceUsesWith(replacement);
+        descriptorType->removeAndDeallocate();
+    }
+
+    descriptorTypes.clear();
+    _collectStructuralRayTracingProgramDescriptorTypes(module->getModuleInst(), descriptorTypes);
+    SLANG_RELEASE_ASSERT(descriptorTypes.getCount() == 0);
+}
+
 struct ReachableRayTracingAPIUses
 {
     SourceLoc structuralLocation;
     SourceLoc legacyLocation;
 };
+
+// Adds the source stages that a structural dispatch operation may invoke at runtime.
+//
+// Consider this example:
+//
+//     struct Schema : rt::ITraceProgramSchema
+//     {
+//         typealias MissShaders = rt::MissShaderList<ImportedMiss>;
+//         ...
+//     }
+//
+//     tracer.trace(desc, scene, program, payload);
+//
+// The trace instruction has no ordinary IR call to `ImportedMiss::invoke`. Schema lowering records
+// that relationship as compiler-owned metadata because the runtime SBT selector decides which
+// listed stage runs. Target adapter synthesis later turns the selected metadata into an executable
+// call. Mixed-API validation must follow that same producer-owned edge before synthesis; otherwise
+// a legacy call hidden behind `ImportedMiss` is absent from the apparent call graph.
+//
+// A trace can select hit and miss entries only from its payload partition, while a callable
+// operation can select every entry in the schema-wide callable table. Keeping those two rules here
+// avoids treating unrelated schema entries as reachable merely because their metadata was linked.
+static void _addStructuralRayTracingDispatchCallees(IRInst* operation, List<IRFunc*>& outCallees)
+{
+    if (auto trace = as<IRStructuralRayTracingTrace>(operation))
+    {
+        auto payloadSemanticType = trace->getPayloadSemanticType();
+        SLANG_RELEASE_ASSERT(payloadSemanticType);
+        for (auto decoration : trace->getDecorations())
+        {
+            if (auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration))
+            {
+                if (group->getPayloadSemanticType() != payloadSemanticType)
+                    continue;
+
+                static const StructuralRayTracingStageKind kHitGroupStageKinds[] = {
+                    StructuralRayTracingStageKind::ClosestHit,
+                    StructuralRayTracingStageKind::AnyHit,
+                    StructuralRayTracingStageKind::Intersection,
+                };
+                for (auto stageKind : kHitGroupStageKinds)
+                {
+                    if (auto invoke = getStructuralRayTracingHitGroupStageInvoke(group, stageKind))
+                        outCallees.add(invoke);
+                }
+            }
+            else if (auto miss = as<IRStructuralRayTracingMissShaderInfoDecoration>(decoration))
+            {
+                if (miss->getPayloadSemanticType() != payloadSemanticType)
+                    continue;
+
+                auto invoke = as<IRFunc>(miss->getMiss());
+                SLANG_RELEASE_ASSERT(invoke);
+                outCallees.add(invoke);
+            }
+        }
+        return;
+    }
+
+    auto callShader = as<IRStructuralRayTracingCallShader>(operation);
+    SLANG_RELEASE_ASSERT(callShader);
+    for (auto decoration : callShader->getDecorations())
+    {
+        auto callable = as<IRStructuralRayTracingCallableShaderInfoDecoration>(decoration);
+        if (!callable)
+            continue;
+
+        auto invoke = as<IRFunc>(callable->getCallable());
+        SLANG_RELEASE_ASSERT(invoke);
+        outCallees.add(invoke);
+    }
+}
 
 static void _collectReachableRayTracingAPIUses(
     IRFunc* function,
@@ -154,9 +261,9 @@ static void _collectReachableRayTracingAPIUses(
 
     // Consider a separately compiled helper containing `TraceRay`, called by a ray-generation
     // entry point that also calls `RayTracer.trace`. Linking resolves the helper's call target but
-    // does not restore its checked AST. Walking direct IR calls from the selected entry point lets
-    // us observe both compiler-owned markers without treating types, metadata, or other
-    // non-executable operands as call-graph edges.
+    // does not restore its checked AST. Walking direct IR calls and the explicit structural
+    // dispatch metadata from the selected entry point lets us observe both compiler-owned markers
+    // without treating types or unrelated metadata as call-graph edges.
     List<IRFunc*> callees;
     for (auto block : function->getBlocks())
     {
@@ -166,6 +273,7 @@ static void _collectReachableRayTracingAPIUses(
                 inst->getOp() == kIROp_StructuralRayTracingCallShader)
             {
                 uses.structuralLocation = inst->sourceLoc;
+                _addStructuralRayTracingDispatchCallees(inst, callees);
             }
 
             auto call = as<IRCall>(inst);
@@ -1030,9 +1138,9 @@ static void _addStructuralRayTracingEmptyPayloadCandidate(
     _StructuralRayTracingEmptyPayloadCandidate& first,
     _StructuralRayTracingEmptyPayloadCandidate& second)
 {
-    if (!isSemanticallyEmptyStructuralRayTracingPayloadType(candidate.payloadType))
+    SLANG_RELEASE_ASSERT(candidate.payloadType && candidate.payloadSemanticType);
+    if (!isSemanticallyEmptyStructuralRayTracingPayloadType(candidate.payloadSemanticType))
         return;
-    SLANG_RELEASE_ASSERT(candidate.payloadSemanticType);
 
     if (!first.payloadSemanticType)
     {
@@ -1048,6 +1156,95 @@ static void _addStructuralRayTracingEmptyPayloadCandidate(
     }
     if (!second.payloadSemanticType)
         second = candidate;
+}
+
+// Returns the canonical schema type carried by each complete schema metadata owner.
+//
+// Trace and callable operations own the metadata needed by executable target lowering, while the
+// program-schema root owns the same metadata for reflection-only requests. Open-section completion
+// has already appended every linked entry to all three shapes before this function is used, so the
+// semantic schema operand is the only identity needed to deduplicate them.
+static IRType* _getStructuralRayTracingSchemaOwnerType(IRInst* owner)
+{
+    if (auto trace = as<IRStructuralRayTracingTrace>(owner))
+        return as<IRType>(trace->getProgramLayout());
+    if (auto call = as<IRStructuralRayTracingCallShader>(owner))
+        return as<IRType>(call->getProgramLayout());
+    if (auto schema = as<IRStructuralRayTracingProgramSchema>(owner))
+        return schema->getSchemaType();
+    return nullptr;
+}
+
+static void _collectStructuralRayTracingSchemaOwners(IRInst* root, List<IRInst*>& owners)
+{
+    // Specialization materializes every executable operation outside its generic template. A
+    // template can still contain dependent payload types, so it is not a finalized schema and
+    // must not participate in this whole-program invariant.
+    if (as<IRGeneric>(root))
+        return;
+
+    if (_getStructuralRayTracingSchemaOwnerType(root))
+        owners.add(root);
+    for (auto child = root->getFirstChild(); child; child = child->getNextInst())
+        _collectStructuralRayTracingSchemaOwners(child, owners);
+}
+
+// Checks the empty-payload invariant on complete schema metadata rather than on one trace call.
+//
+// Consider a schema that serves `EmptyA`, `EmptyB`, and `RadiancePayload`. An explicit
+// `trace<RadiancePayload>` is locally unambiguous, but reflection and a later payload-less trace
+// still observe one schema with two incompatible implicit payload identities. Every schema owner
+// contains its complete hit and miss metadata at this boundary, so checking once per canonical
+// schema type catches the conflict for executable and reflection-only programs alike.
+static bool _validateStructuralRayTracingSchemaEmptyPayloads(
+    IRModule* module,
+    DiagnosticSink* sink,
+    HashSet<IRType*>& outAmbiguousSchemas)
+{
+    List<IRInst*> owners;
+    _collectStructuralRayTracingSchemaOwners(module->getModuleInst(), owners);
+
+    bool isValid = true;
+    HashSet<IRType*> validatedSchemas;
+    for (auto owner : owners)
+    {
+        auto schemaType = _getStructuralRayTracingSchemaOwnerType(owner);
+        SLANG_RELEASE_ASSERT(schemaType);
+        if (!validatedSchemas.add(schemaType))
+            continue;
+
+        _StructuralRayTracingEmptyPayloadCandidate first;
+        _StructuralRayTracingEmptyPayloadCandidate second;
+        for (auto decoration : owner->getDecorations())
+        {
+            if (auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration))
+            {
+                _addStructuralRayTracingEmptyPayloadCandidate(
+                    {group->getPayloadType(), group->getPayloadSemanticType()},
+                    first,
+                    second);
+            }
+            else if (auto miss = as<IRStructuralRayTracingMissShaderInfoDecoration>(decoration))
+            {
+                _addStructuralRayTracingEmptyPayloadCandidate(
+                    {miss->getPayloadType(), miss->getPayloadSemanticType()},
+                    first,
+                    second);
+            }
+        }
+
+        if (!second.payloadSemanticType)
+            continue;
+
+        sink->diagnose(Diagnostics::StructuralRayTracingLinkedAmbiguousEmptyPayload{
+            .schemaType = schemaType,
+            .firstPayloadType = first.payloadSemanticType,
+            .secondPayloadType = second.payloadSemanticType,
+            .location = owner->sourceLoc});
+        outAmbiguousSchemas.add(schemaType);
+        isValid = false;
+    }
+    return isValid;
 }
 
 static IRStructuralRayTracingTrace* _completeDeferredStructuralRayTracingEmptyPayloadTrace(
@@ -1150,7 +1347,10 @@ static IRStructuralRayTracingTrace* _completeDeferredStructuralRayTracingEmptyPa
     return completedTrace;
 }
 
-bool resolveDeferredStructuralRayTracingEmptyPayloads(IRModule* module, DiagnosticSink* sink)
+static bool _resolveDeferredStructuralRayTracingEmptyPayloads(
+    IRModule* module,
+    DiagnosticSink* sink,
+    const HashSet<IRType*>& ambiguousSchemas)
 {
     List<IRStructuralRayTracingTrace*> traces;
     _collectDeferredStructuralRayTracingEmptyPayloadTraces(module->getModuleInst(), traces);
@@ -1193,11 +1393,11 @@ bool resolveDeferredStructuralRayTracingEmptyPayloads(IRModule* module, Diagnost
             }
             else
             {
-                sink->diagnose(Diagnostics::StructuralRayTracingLinkedAmbiguousEmptyPayload{
-                    .schemaType = trace->getProgramLayout(),
-                    .firstPayloadType = first.payloadSemanticType,
-                    .secondPayloadType = second.payloadSemanticType,
-                    .location = trace->sourceLoc});
+                // Schema validation owns this diagnostic even when the activating call happens to
+                // use the implicit overload. The resolver still removes the invalid trace so the
+                // failed manifest remains internally safe for the current request.
+                SLANG_RELEASE_ASSERT(
+                    ambiguousSchemas.contains(cast<IRType>(trace->getProgramLayout())));
             }
 
             builder.setInsertBefore(trace);
@@ -1209,6 +1409,15 @@ bool resolveDeferredStructuralRayTracingEmptyPayloads(IRModule* module, Diagnost
 
         _completeDeferredStructuralRayTracingEmptyPayloadTrace(module, trace, deferred, first);
     }
+    return isValid;
+}
+
+bool finalizeStructuralRayTracingSchemaPayloads(IRModule* module, DiagnosticSink* sink)
+{
+    HashSet<IRType*> ambiguousSchemas;
+    bool isValid = _validateStructuralRayTracingSchemaEmptyPayloads(module, sink, ambiguousSchemas);
+    if (!_resolveDeferredStructuralRayTracingEmptyPayloads(module, sink, ambiguousSchemas))
+        isValid = false;
     return isValid;
 }
 

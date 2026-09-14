@@ -36,20 +36,14 @@ struct MissA : rt::IMissShader
 {
     typealias Context = MissContextA;
 
-    void invoke(rt::MissInput<Context> input)
-    {
-        input.payload.value = 1;
-    }
+    void invoke(rt::MissInput<Context> input) { input.payload.value = 1; }
 }
 
 struct MissB : rt::IMissShader
 {
     typealias Context = MissContextB;
 
-    void invoke(rt::MissInput<Context> input)
-    {
-        input.payload.value = 2.0;
-    }
+    void invoke(rt::MissInput<Context> input) { input.payload.value = 2.0; }
 }
 
 struct OnePayloadSchema : rt::ITraceProgramSchema
@@ -86,9 +80,9 @@ void main()
     twoPayloadTracer.trace(desc, scene, twoPayloadProgram, payloadB);
 }
 
-// Specialization erases the phantom schema generic argument from the source descriptor shape.
-// Metal lowering must nevertheless retain one physical descriptor type per schema: the first has
-// one payload resource triple, while the second has two.
+// The source descriptor's ParameterBlock storage has the same shape for every schema. The
+// compiler-owned wrapper retains the phantom schema argument until Metal creates one physical
+// descriptor type per schema: the first has one payload resource triple, while the second has two.
 // METAL-LABEL: struct rt_TraceProgramDescriptorResources_default_0
 // METAL: intersectionFunctions_0;
 // METAL: missFunctions_0;

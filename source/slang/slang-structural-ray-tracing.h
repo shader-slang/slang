@@ -389,11 +389,29 @@ public:
     StructuralRayTracingHitAttributesKind getHitAttributesKind(Type* primitiveType) const;
     StructuralRayTracingMotionKind getMotionKind(Type* motionType) const;
 
+    /// Returns the checked schema argument of the trusted `TraceProgramDescriptor` type.
+    ///
+    /// The descriptor's ordinary storage representation does not mention this phantom generic
+    /// argument. AST-to-IR lowering uses this declaration-derived query while the semantic type is
+    /// still available so that the IR can preserve the schema identity explicitly.
+    Type* tryGetTraceProgramDescriptorSchemaType(Type* descriptorType) const;
+
     FunctionDeclBase* getStageInvokeRequirement(StructuralRayTracingStageKind kind) const;
     void registerStageImplementation(
         FunctionDeclBase* implementation,
         StructuralRayTracingStageKind kind);
     StructuralRayTracingStageKind getStageKind(FunctionDeclBase* implementation) const;
+
+    /// Returns true the first time semantic checking validates `declaration`'s stage
+    /// representation.
+    ///
+    /// Interface conformance checking can report the same completed witness more than once, while
+    /// several concrete stage types can share a base struct. Representation diagnostics belong to
+    /// the declaration that introduces the invalid kind or field, so callers emit them once there.
+    bool beginStageRepresentationDeclarationCheck(AggTypeDecl* declaration);
+
+    /// Returns true the first time semantic checking validates a non-aggregate stage `type`.
+    bool beginStageRepresentationTypeCheck(Type* type);
     bool registerAPIUse(
         Module* module,
         RayTracingAPIFamily family,
@@ -436,11 +454,14 @@ private:
     Dictionary<FunctionDeclBase*, StructuralRayTracingCallShaderMethodInfo> m_callShaderMethods;
     ModuleDecl* m_trustedModuleDecl = nullptr;
     AggTypeDecl* m_rayTracerType = nullptr;
+    AggTypeDecl* m_traceProgramDescriptorType = nullptr;
     AggTypeDecl* m_trianglePrimitiveType = nullptr;
     AggTypeDecl* m_curvePrimitiveType = nullptr;
     AggTypeDecl* m_motionTypes[4] = {};
     AggTypeDecl* m_stagePlaceholderTypes[int(StructuralRayTracingStageKind::Count)] = {};
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageKind> m_stageImplementations;
+    HashSet<AggTypeDecl*> m_stageDeclarationsWithCheckedRepresentation;
+    HashSet<Type*> m_stageTypesWithCheckedRepresentation;
     Dictionary<Module*, RayTracingAPIUsage> m_apiUsage;
     Dictionary<FunctionDeclBase*, HashSet<FunctionDeclBase*>> m_functionCallees;
     HashSet<FunctionDeclBase*> m_structuralProgramCallers;

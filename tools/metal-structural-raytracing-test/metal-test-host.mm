@@ -53,7 +53,11 @@ struct ProgramDescription
 {
     const char* sourceRelativePath;
     const char* schemaName;
-    const char* entryPointName = "main";
+    // Keep the entry-point name explicit at every call site. Structural stage structs use their
+    // type names as native entry-point names, while an ordinary ray-generation entry point keeps
+    // its source function name; silently assuming `main` would hide that distinction from this
+    // host-side programming example.
+    const char* entryPointName;
 };
 
 enum class RecordSection : uint32_t
@@ -79,8 +83,8 @@ struct RecordInitializer
 
 struct RecordBufferDescription
 {
-    const uint32_t* instanceHitGroupOffsets;
-    uint32_t instanceHitGroupOffsetCount;
+    const uint32_t* instancePathTrie;
+    uint32_t instancePathTrieWordCount;
     const RecordInitializer* records;
     uint32_t recordCount;
 };
@@ -262,6 +266,13 @@ bool createProgram(
         return fail(@"the generated Metal library is missing the ray-generation entry point");
 
     NSMutableArray<id<MTLFunction>>* allFunctions = [NSMutableArray array];
+    // A single physical function can occupy several logical VFT slots. In particular, every
+    // `NoClosestHit` slot in one payload partition names the same synthesized no-op function.
+    // Metal requires `linkedFunctions` to contain each exported symbol only once, so cache visible
+    // functions by their reflected physical name while still placing the shared function into
+    // every requested table slot below.
+    NSMutableDictionary<NSString*, id<MTLFunction>>* visibleFunctionsByName =
+        [NSMutableDictionary dictionary];
 
     struct PayloadFunctionObjects
     {
@@ -278,13 +289,18 @@ bool createProgram(
     std::vector<id<MTLFunction>> callableFunctions(outProgram.schema->getCallableShaderCount());
 
     NSError* error = nil;
-    auto loadVisibleFunction = [&](const char* name, id<MTLFunction>& outFunction)
+    auto loadVisibleFunction = [&](const char* name, id<MTLFunction> __strong& outFunction)
     {
         if (!name)
             return false;
-        outFunction = [library newFunctionWithName:[NSString stringWithUTF8String:name]];
+        NSString* physicalName = [NSString stringWithUTF8String:name];
+        outFunction = visibleFunctionsByName[physicalName];
+        if (outFunction)
+            return true;
+        outFunction = [library newFunctionWithName:physicalName];
         if (!outFunction)
             return false;
+        visibleFunctionsByName[physicalName] = outFunction;
         [allFunctions addObject:outFunction];
         return true;
     };
@@ -536,8 +552,10 @@ void writeUInt32(std::vector<uint8_t>& bytes, size_t offset, uint32_t value)
 }
 
 // Builds the native records buffer from the reflected schema ABI. The first four words contain
-// byte offsets for the instance-contribution table and the three record sections. Every record is
-// addressed with the corresponding reflected, schema-wide byte stride; the first 16 bytes are a
+// byte offsets for the instance-path trie and the three record sections. At each non-final IAS
+// depth, a trie value is the next node's word offset relative to the trie base. A final-depth value
+// is the physical hit-record contribution. A one-level scene is therefore represented by one flat
+// root node. Every record uses the reflected, schema-wide byte stride; its first 16 bytes are a
 // compiler-owned header whose first word selects a function-table entry.
 id<MTLBuffer> createRecords(
     id<MTLDevice> device,
@@ -557,7 +575,7 @@ id<MTLBuffer> createRecords(
 
     size_t sectionOffsets[uint32_t(RecordSection::Count)] = {};
     constexpr size_t kHeaderSize = sizeof(uint32_t) * (uint32_t(RecordSection::Count) + 1);
-    size_t byteCount = kHeaderSize + sizeof(uint32_t) * description.instanceHitGroupOffsetCount;
+    size_t byteCount = kHeaderSize + sizeof(uint32_t) * description.instancePathTrieWordCount;
     for (uint32_t sectionIndex = 0; sectionIndex < uint32_t(RecordSection::Count); ++sectionIndex)
     {
         auto section = RecordSection(sectionIndex);
@@ -585,14 +603,14 @@ id<MTLBuffer> createRecords(
             writeUInt32(bytes, sectionOffsets[sectionIndex] + recordIndex * stride, UINT32_MAX);
         }
     }
-    if (description.instanceHitGroupOffsetCount)
+    if (description.instancePathTrieWordCount)
     {
-        if (!description.instanceHitGroupOffsets)
-            return fail(@"instance hit-group offsets are missing"), nil;
+        if (!description.instancePathTrie)
+            return fail(@"the instance-path trie is missing"), nil;
         std::memcpy(
             bytes.data() + kHeaderSize,
-            description.instanceHitGroupOffsets,
-            sizeof(uint32_t) * description.instanceHitGroupOffsetCount);
+            description.instancePathTrie,
+            sizeof(uint32_t) * description.instancePathTrieWordCount);
     }
 
     for (uint32_t i = 0; i < description.recordCount; ++i)
@@ -626,16 +644,16 @@ id<MTLBuffer> createDefaultTraceRecords(
     const NativeProgram& program,
     uint32_t instanceCount = 1)
 {
-    // Every scene in this helper maps each native instance to physical hit record zero. Both
-    // physical records then select logical shader zero through their reflected function indices.
-    std::vector<uint32_t> instanceHitGroupOffsets(instanceCount);
+    // A one-level scene needs only the trie's flat root node. Every native instance maps to physical
+    // hit record zero, whose compiler-owned header selects logical shader zero.
+    std::vector<uint32_t> instancePathTrie(instanceCount);
     const RecordInitializer records[] = {
         {RecordSection::Hit, 0, 0, 0, nullptr, 0},
         {RecordSection::Miss, 0, 0, 0, nullptr, 0},
     };
     RecordBufferDescription description = {
-        instanceHitGroupOffsets.data(),
-        uint32_t(instanceHitGroupOffsets.size()),
+        instancePathTrie.data(),
+        uint32_t(instancePathTrie.size()),
         records,
         uint32_t(SLANG_COUNT_OF(records)),
     };
@@ -669,8 +687,7 @@ id<MTLBuffer> createProgramResourceBuffer(
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_INTERSECTION_FUNCTION_TABLE:
             if (payloadIndex < 0 || size_t(payloadIndex) >= program.payloads.size())
                 return nil;
-            resource =
-                program.payloads[size_t(payloadIndex)].intersectionTable.gpuResourceID._impl;
+            resource = program.payloads[size_t(payloadIndex)].intersectionTable.gpuResourceID._impl;
             break;
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_MISS_VISIBLE_FUNCTION_TABLE:
             if (payloadIndex < 0 || size_t(payloadIndex) >= program.payloads.size())
@@ -680,8 +697,7 @@ id<MTLBuffer> createProgramResourceBuffer(
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_CLOSEST_HIT_VISIBLE_FUNCTION_TABLE:
             if (payloadIndex < 0 || size_t(payloadIndex) >= program.payloads.size())
                 return nil;
-            resource =
-                program.payloads[size_t(payloadIndex)].closestHitTable.gpuResourceID._impl;
+            resource = program.payloads[size_t(payloadIndex)].closestHitTable.gpuResourceID._impl;
             break;
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_CALLABLE_VISIBLE_FUNCTION_TABLE:
             if (payloadIndex != -1)
@@ -861,7 +877,8 @@ bool runTriangleHitMiss(
 {
     ProgramDescription description = {
         "tests/ray-tracing-2/runtime/shaders/triangle-hit-miss.slang",
-        "Schema"};
+        "Schema",
+        "rayGenerationMain"};
     static const uint32_t kExpected[] = {1, 0, 2, 2, 0xffffffff, 2};
     return runTriangleProgram(
         globalSession,
@@ -887,7 +904,8 @@ bool runRecursiveTrace(
 {
     ProgramDescription description = {
         "tests/ray-tracing-2/runtime/shaders/recursive-trace.slang",
-        "Schema"};
+        "Schema",
+        "rayGenerationMain"};
     static const uint32_t kExpected[] = {21, 1, 2, 20, 0, 2};
     return runTriangleProgram(
         globalSession,
@@ -909,7 +927,8 @@ bool runRepeatedRecords(
 {
     ProgramDescription description = {
         "tests/ray-tracing-2/runtime/shaders/repeated-records.slang",
-        "Schema"};
+        "Schema",
+        "rayGenerationMain"};
     NativeProgram program = {};
     if (!createProgram(globalSession, device, repositoryRoot, description, program))
         return false;
@@ -928,7 +947,7 @@ bool runRepeatedRecords(
         return fail(sceneError);
     }
 
-    const uint32_t instanceHitGroupOffset = 0;
+    const uint32_t instanceHitGroupContribution = 0;
     const uint32_t recordValues[] = {100, 200, 300, 400};
     // Physical records zero and one deliberately choose the same reflected function index in each
     // section. Different record bytes must still reach the stage selected by each runtime index.
@@ -939,7 +958,7 @@ bool runRepeatedRecords(
         {RecordSection::Miss, 1, 0, 0, &recordValues[3], sizeof(uint32_t)},
     };
     const RecordBufferDescription recordDescription = {
-        &instanceHitGroupOffset,
+        &instanceHitGroupContribution,
         1,
         recordsToWrite,
         uint32_t(SLANG_COUNT_OF(recordsToWrite)),
@@ -1063,10 +1082,10 @@ bool runRepeatedRecords(
         return false;
     }
     if (!validateResults(
-        "repeated-records-after-replacement",
-        results,
-        kExpectedAfterReplacement,
-        uint32_t(SLANG_COUNT_OF(kExpectedAfterReplacement))))
+            "repeated-records-after-replacement",
+            results,
+            kExpectedAfterReplacement,
+            uint32_t(SLANG_COUNT_OF(kExpectedAfterReplacement))))
     {
         return false;
     }
@@ -1126,7 +1145,8 @@ bool runSelectorAddressing(
 {
     ProgramDescription description = {
         "tests/ray-tracing-2/runtime/shaders/sbt-selector-addressing.slang",
-        "Schema"};
+        "Schema",
+        "rayGenerationMain"};
     NativeProgram program = {};
     if (!createProgram(globalSession, device, repositoryRoot, description, program))
         return false;
@@ -1136,13 +1156,13 @@ bool runSelectorAddressing(
     if (!buildMetalTwoGeometryTriangleScene(device, queue, scene, &sceneError))
         return fail(sceneError);
 
-    const uint32_t instanceHitGroupOffset = 1;
+    const uint32_t instanceHitGroupContribution = 1;
     const uint32_t hitRecordValues[] = {100, 101, 102, 103, 104};
     const uint32_t missRecordValues[] = {200, 201};
     // Metal's instance descriptor offset selects an intersection function, so the structural ABI
-    // carries the native SBT instance contribution in this reflected records buffer instead. The
-    // compiler indexes this one-element table with the traversal result's instance ID before
-    // adding the shader's geometry-stride and ray-offset terms.
+    // carries the native SBT instance contribution in this reflected records buffer instead. This
+    // one-level scene has a one-element instance-path trie root, indexed by the traversal result's
+    // instance ID before the compiler adds the geometry-stride and ray-offset terms.
     const RecordInitializer recordsToWrite[] = {
         {RecordSection::Hit, 0, 0, 0, &hitRecordValues[0], sizeof(uint32_t)},
         {RecordSection::Hit, 1, 0, 0, &hitRecordValues[1], sizeof(uint32_t)},
@@ -1153,7 +1173,7 @@ bool runSelectorAddressing(
         {RecordSection::Miss, 1, 0, 0, &missRecordValues[1], sizeof(uint32_t)},
     };
     const RecordBufferDescription recordDescription = {
-        &instanceHitGroupOffset,
+        &instanceHitGroupContribution,
         1,
         recordsToWrite,
         uint32_t(SLANG_COUNT_OF(recordsToWrite)),
@@ -1232,7 +1252,7 @@ bool runMultiplePayloads(
         return fail(sceneError);
     }
 
-    const uint32_t instanceHitGroupOffset = 0;
+    const uint32_t instanceHitGroupContribution = 0;
     // The shader selects physical record zero for shadow rays and one for radiance rays. Reflection
     // keeps each record's function index scoped to its payload table, so both logical indices are
     // zero even though the physical record ordering is reversed.
@@ -1243,7 +1263,7 @@ bool runMultiplePayloads(
         {RecordSection::Miss, 1, 0, 0, nullptr, 0},
     };
     const RecordBufferDescription recordDescription = {
-        &instanceHitGroupOffset,
+        &instanceHitGroupContribution,
         1,
         recordsToWrite,
         uint32_t(SLANG_COUNT_OF(recordsToWrite)),
@@ -1297,7 +1317,8 @@ bool runTriangleAttributesFlags(
 {
     ProgramDescription description = {
         "tests/ray-tracing-2/runtime/shaders/triangle-attributes-flags.slang",
-        "Schema"};
+        "Schema",
+        "rayGenerationMain"};
     static const uint32_t kExpected[] = {
         3,  0, 25, 25, 0,  1, 10, 2,  0, 0, 0,  0,  1, 10, 2,  1, 25, 25, 0,  1, 10, 3,  1, 25,
         25, 0, 1,  10, 40, 0, 0,  0,  0, 1, 10, 2,  0, 0,  0,  0, 1,  10, 3,  0, 25, 25, 0, 1,
@@ -1324,7 +1345,8 @@ bool runStageInputState(
 {
     ProgramDescription description = {
         "tests/ray-tracing-2/runtime/shaders/stage-input-state.slang",
-        "Schema"};
+        "Schema",
+        "rayGenerationMain"};
     static const uint32_t kExpected[] = {
         1, 1, 1000,   50,  100, 25, 100, 200, 50, 0, 0, 0, 17, 1, 0, 2,
         2, 1, 100000, 300, 100, 0,  0,   0,   0,  0, 0, 0, 0,  1, 1, 2,
@@ -1358,7 +1380,8 @@ bool runCallableRecord(
 {
     ProgramDescription description = {
         "tests/ray-tracing-2/runtime/shaders/callable-record.slang",
-        "Schema"};
+        "Schema",
+        "rayGenerationMain"};
     NativeProgram program = {};
     if (!createProgram(globalSession, device, repositoryRoot, description, program))
         return false;
@@ -1393,7 +1416,8 @@ bool runProceduralHitFilter(
 {
     ProgramDescription description = {
         "tests/ray-tracing-2/runtime/shaders/procedural-hit-filter.slang",
-        "Schema"};
+        "Schema",
+        "rayGenerationMain"};
     NativeProgram program = {};
     if (!createProgram(globalSession, device, repositoryRoot, description, program))
         return false;
@@ -1439,7 +1463,8 @@ bool runOpaqueIntersectionFunctions(
 {
     ProgramDescription description = {
         "tests/ray-tracing-2/runtime/metal/opaque-intersection-functions.slang",
-        "Schema"};
+        "Schema",
+        "main"};
     NativeProgram program = {};
     if (!createProgram(globalSession, device, repositoryRoot, description, program))
         return false;
@@ -1481,7 +1506,8 @@ bool runCurveHitFilter(
 {
     ProgramDescription description = {
         "tests/ray-tracing-2/runtime/metal/curve-hit-filter.slang",
-        "Schema"};
+        "Schema",
+        "main"};
     NativeProgram program = {};
     if (!createProgram(globalSession, device, repositoryRoot, description, program))
         return false;
@@ -1525,7 +1551,8 @@ bool runMultilevelHit(
 {
     ProgramDescription description = {
         "tests/ray-tracing-2/runtime/metal/multilevel-hit.slang",
-        "Schema"};
+        "Schema",
+        "main"};
     NativeProgram program = {};
     if (!createProgram(globalSession, device, repositoryRoot, description, program))
         return false;
@@ -1535,12 +1562,41 @@ bool runMultilevelHit(
     if (!buildMetalMultilevelScene(device, queue, scene, &sceneError))
         return fail(sceneError);
 
-    // The leaf instance id can be either zero or one, and both select physical hit record zero.
-    id<MTLBuffer> records = createDefaultTraceRecords(device, program, 2);
+    // Both rays reach leaf instance index zero, but through distinct outer indices. The root words
+    // direct [0] and [1] to child nodes at trie-relative word offsets two and three. Indexing each
+    // child by the shared leaf index zero then yields physical-record contributions zero and one.
+    // Looking only at the leaf index would incorrectly select the first record for both rays.
+    const uint32_t instancePathTrie[] = {2, 3, 0, 1};
+    const uint32_t closestHitIncrements[] = {1, 10};
+    const RecordInitializer recordsToWrite[] = {
+        {RecordSection::Hit,
+         0,
+         0,
+         0,
+         &closestHitIncrements[0],
+         sizeof(closestHitIncrements[0])},
+        {RecordSection::Hit,
+         1,
+         0,
+         1,
+         &closestHitIncrements[1],
+         sizeof(closestHitIncrements[1])},
+        {RecordSection::Miss, 0, 0, 0, nullptr, 0},
+    };
+    const RecordBufferDescription recordDescription = {
+        instancePathTrie,
+        uint32_t(SLANG_COUNT_OF(instancePathTrie)),
+        recordsToWrite,
+        uint32_t(SLANG_COUNT_OF(recordsToWrite)),
+    };
+    id<MTLBuffer> records = createRecords(device, program, recordDescription);
     if (!records)
         return false;
     id<MTLBuffer> programResources = createProgramResourceBuffer(device, program, records);
-    static const uint32_t kExpected[] = {1, 2};
+    // AnyHit identifies the candidate record (900 or 112), while the record data independently
+    // identifies the committed record (+1 or +10). Both dispatches must therefore resolve the same
+    // full path; the third ray misses.
+    static const uint32_t kExpected[] = {901, 122, 2};
     id<MTLBuffer> results = [device newBufferWithLength:sizeof(kExpected)
                                                 options:MTLResourceStorageModeShared];
     if (!dispatch(
@@ -1551,11 +1607,15 @@ bool runMultilevelHit(
             programResources,
             records,
             results,
-            2,
+            3,
             false,
             false))
         return false;
-    return validateResults("multilevel-hit", results, kExpected, 2);
+    return validateResults(
+        "multilevel-hit",
+        results,
+        kExpected,
+        uint32_t(SLANG_COUNT_OF(kExpected)));
 }
 
 bool runMotionTime(
@@ -1566,7 +1626,8 @@ bool runMotionTime(
 {
     ProgramDescription description = {
         "tests/ray-tracing-2/runtime/metal/motion-time.slang",
-        "Schema"};
+        "Schema",
+        "main"};
     NativeProgram program = {};
     if (!createProgram(globalSession, device, repositoryRoot, description, program))
         return false;

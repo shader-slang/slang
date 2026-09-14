@@ -4627,7 +4627,23 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
 
         auto loweredDeclRef = emitDeclRef(context, declRef, context->irBuilder->getTypeKind());
-        return (IRType*)getSimpleVal(context, loweredDeclRef);
+        auto loweredType = (IRType*)getSimpleVal(context, loweredDeclRef);
+
+        // `Schema` is intentionally a phantom source-level parameter: every descriptor initially
+        // has the same ParameterBlock-compatible storage struct. Preserve the checked argument in
+        // a dedicated IR type before that information disappears. Generic specialization then
+        // substitutes the schema operand normally, so helpers instantiated for different schemas
+        // cannot accidentally share a descriptor type.
+        auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+        if (auto schemaType = registry.tryGetTraceProgramDescriptorSchemaType(type))
+        {
+            IRInst* operands[] = {loweredType, lowerType(context, schemaType)};
+            return getBuilder()->getType(
+                kIROp_StructuralRayTracingProgramDescriptorType,
+                SLANG_COUNT_OF(operands),
+                operands);
+        }
+        return loweredType;
     }
 
     IRType* visitValuePackType(ValuePackType* type)

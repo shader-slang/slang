@@ -5,8 +5,6 @@ if(NOT APPLE)
     )
 endif()
 
-enable_language(OBJCXX)
-
 add_executable(
     metal-structural-raytracing-test
     EXCLUDE_FROM_ALL
@@ -21,6 +19,11 @@ target_link_libraries(
     metal-structural-raytracing-test
     PRIVATE slang "-framework Foundation" "-framework Metal"
 )
+
+# The test loads `slang.raytracing` at runtime, so building this target alone must also produce the
+# separately shipped standard module. `slang` itself intentionally has no dependency on that
+# module because ordinary compiler users should not pay its build or load cost.
+add_dependencies(metal-structural-raytracing-test slang-raytracing-module)
 
 set_target_properties(
     metal-structural-raytracing-test

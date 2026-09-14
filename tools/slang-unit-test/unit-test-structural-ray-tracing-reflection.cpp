@@ -1743,6 +1743,123 @@ SLANG_UNIT_TEST(structuralRayTracingOpenSchemaReflection)
     SLANG_CHECK(layout->findTraceProgramSchema("MismatchedSchema") == nullptr);
 }
 
+SLANG_UNIT_TEST(structuralRayTracingEmptyPayloadInvariantAppliesToReflectionOnlySchemas)
+{
+    const char* source = R"(
+        import slang.raytracing;
+
+        struct EmptyPayloadA {}
+        struct EmptyPayloadB {}
+
+        struct TraceContext : rt::ITraceContext
+        {
+            typealias AccelerationStructure = rt::AccelerationStructure;
+            typealias Motion = rt::NoMotion;
+        }
+
+        interface IMissTag : rt::IMissShader {}
+        interface IValidMissTag : rt::IMissShader {}
+
+        struct MissContext<PayloadType> : rt::IPayloadContext
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias Payload = PayloadType;
+            typealias Record = void;
+        }
+
+        struct MissA : IMissTag
+        {
+            typealias Context = MissContext<EmptyPayloadA>;
+            void invoke(rt::MissInput<Context> input) {}
+        }
+
+        struct MissB : IMissTag
+        {
+            typealias Context = MissContext<EmptyPayloadB>;
+            void invoke(rt::MissInput<Context> input) {}
+        }
+
+        struct ValidMiss : IValidMissTag
+        {
+            typealias Context = MissContext<EmptyPayloadA>;
+            void invoke(rt::MissInput<Context> input) {}
+        }
+
+        struct ClosedSchema : rt::ITraceProgramSchema
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias HitGroups = rt::NoHitGroups;
+            typealias MissShaders = rt::MissShaderList<MissA, MissB>;
+            typealias CallableShaders = rt::NoCallableShaders;
+        }
+
+        struct OpenSchema : rt::ITraceProgramSchema
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias HitGroups = rt::NoHitGroups;
+            typealias MissShaders = rt::OpenMissShaders<IMissTag>;
+            typealias CallableShaders = rt::NoCallableShaders;
+        }
+
+        struct ValidClosedSchema : rt::ITraceProgramSchema
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias HitGroups = rt::NoHitGroups;
+            typealias MissShaders = rt::MissShaderList<ValidMiss>;
+            typealias CallableShaders = rt::NoCallableShaders;
+        }
+
+        struct ValidOpenSchema : rt::ITraceProgramSchema
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias HitGroups = rt::NoHitGroups;
+            typealias MissShaders = rt::OpenMissShaders<IValidMissTag>;
+            typealias CallableShaders = rt::NoCallableShaders;
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry experimentalOption = {};
+    experimentalOption.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalOption.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalOption.value.intValue0 = 1;
+
+    slang::TargetDesc target = {};
+    target.format = SLANG_METAL;
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &target;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &experimentalOption;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+        "structuralReflectionOnlyEmptyPayloads",
+        "structural-reflection-only-empty-payloads.slang",
+        source,
+        diagnostics.writeRef()));
+    if (!module && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto layout = module->getLayout(0, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(layout != nullptr);
+
+    // None of these schemas is activated by an entry point or trace. Positive controls prove that
+    // ordinary reflection succeeds through both paths; the invalid closed list and linked open
+    // section must fail specifically because each contains two empty payload identities.
+    SLANG_CHECK(layout->findTraceProgramSchema("ValidClosedSchema") != nullptr);
+    SLANG_CHECK(layout->findTraceProgramSchema("ValidOpenSchema") != nullptr);
+    SLANG_CHECK(layout->findTraceProgramSchema("ClosedSchema") == nullptr);
+    SLANG_CHECK(layout->findTraceProgramSchema("OpenSchema") == nullptr);
+}
+
 SLANG_UNIT_TEST(structuralRayTracingInvalidOpenSchemaManifestIsNotCached)
 {
     const char* source = R"(
@@ -1750,6 +1867,7 @@ SLANG_UNIT_TEST(structuralRayTracingInvalidOpenSchemaManifestIsNotCached)
 
         struct EmptyPayloadA {}
         struct EmptyPayloadB {}
+        struct PayloadWithData { uint value; }
 
         struct TraceContext : rt::ITraceContext
         {
@@ -1785,11 +1903,24 @@ SLANG_UNIT_TEST(structuralRayTracingInvalidOpenSchemaManifestIsNotCached)
             void invoke(rt::MissInput<Context> input) {}
         }
 
+        struct DataMissContext : rt::IPayloadContext
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias Payload = PayloadWithData;
+            typealias Record = void;
+        }
+
+        struct DataMiss : rt::IMissShader
+        {
+            typealias Context = DataMissContext;
+            void invoke(rt::MissInput<Context> input) {}
+        }
+
         struct Schema : rt::ITraceProgramSchema
         {
             typealias TraceContext = ::TraceContext;
             typealias HitGroups = rt::NoHitGroups;
-            typealias MissShaders = rt::OpenMissShaders<IMissTag>;
+            typealias MissShaders = rt::OpenMissShaders<IMissTag, DataMiss>;
             typealias CallableShaders = rt::NoCallableShaders;
         }
 
@@ -1800,7 +1931,8 @@ SLANG_UNIT_TEST(structuralRayTracingInvalidOpenSchemaManifestIsNotCached)
         void main()
         {
             rt::RayTracer<Schema> tracer;
-            tracer.trace({}, scene, program);
+            PayloadWithData payload = {};
+            tracer.trace<PayloadWithData>({}, scene, program, payload);
         }
     )";
 
@@ -1847,6 +1979,13 @@ SLANG_UNIT_TEST(structuralRayTracingInvalidOpenSchemaManifestIsNotCached)
     ComPtr<slang::IComponentType> linkedProgram;
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(program->link(linkedProgram.writeRef(), diagnostics.writeRef())));
+
+    // Reflection requests a finalized schema even when no payload-less trace is present. The two
+    // linked empty payload identities therefore invalidate the same schema before reflection can
+    // publish it; choosing `PayloadWithData` in `main` cannot hide that schema-wide conflict.
+    auto layout = program->getLayout(0, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(layout != nullptr);
+    SLANG_CHECK(layout->findTraceProgramSchema("Schema") == nullptr);
 
     auto expectAmbiguousPayloadDiagnostic = [&]()
     {

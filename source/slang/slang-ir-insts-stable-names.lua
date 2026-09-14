@@ -933,5 +933,8 @@ return {
 	["Decoration.structuralRayTracingDeferredEmptyPayload"] = 957,
 	["structuralRayTracingProgramSchema"] = 958,
 	["Decoration.structuralRayTracingVulkanPayloadStorage"] = 959,
-	["Decoration.structuralRayTracingLegacyAPIUse"] = 960
+	["Decoration.structuralRayTracingLegacyAPIUse"] = 960,
+	["Type.StructuralRayTracingProgramDescriptor"] = 961,
+	["Decoration.layoutFieldType"] = 962,
+	["Decoration.preserveValueParameterABI"] = 963
 }

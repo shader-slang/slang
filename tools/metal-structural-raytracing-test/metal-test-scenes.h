@@ -12,8 +12,10 @@ struct MetalRayTracingScene
     id<MTLBuffer> indexBuffer;
     id<MTLBuffer> instanceDescriptorBuffer;
     id<MTLBuffer> innerInstanceDescriptorBuffer;
+    id<MTLBuffer> siblingInnerInstanceDescriptorBuffer;
     id<MTLAccelerationStructure> primitiveAccelerationStructure;
     id<MTLAccelerationStructure> innerInstanceAccelerationStructure;
+    id<MTLAccelerationStructure> siblingInnerInstanceAccelerationStructure;
     id<MTLAccelerationStructure> instanceAccelerationStructure;
 };
 
@@ -46,6 +48,8 @@ bool buildMetalCurveScene(
     MetalRayTracingScene& outScene,
     NSString** outError);
 
+/// Builds two sibling inner IAS branches whose leaf instances both have local index zero.
+/// Rays can therefore distinguish correct full-path record selection from a leaf-only lookup.
 bool buildMetalMultilevelScene(
     id<MTLDevice> device,
     id<MTLCommandQueue> queue,

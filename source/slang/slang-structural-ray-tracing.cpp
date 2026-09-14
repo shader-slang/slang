@@ -1038,11 +1038,10 @@ static bool _isDirectTypeOf(Type* type, Decl* expectedDecl)
     return declRef && declRef.getDecl() == expectedDecl;
 }
 
-/// Returns whether `type` is `TraceProgramDescriptor` specialized with `schemaType`.
-static bool _isTraceProgramDescriptorForSchema(
+/// Returns the schema argument when `type` is the trusted `TraceProgramDescriptor` specialization.
+static Type* _tryGetTraceProgramDescriptorSchemaType(
     Type* type,
-    AggTypeDecl* traceProgramDescriptorType,
-    Type* schemaType)
+    AggTypeDecl* traceProgramDescriptorType)
 {
     auto descriptorType = as<DeclRefType>(type ? type->resolve() : nullptr);
     auto descriptorGenericDecl = as<GenericDecl>(
@@ -1052,7 +1051,7 @@ static bool _isTraceProgramDescriptorForSchema(
         !descriptorGenericDecl || descriptorGenericDecl->inner != traceProgramDescriptorType ||
         !descriptorSchemaParameter)
     {
-        return false;
+        return nullptr;
     }
 
     auto descriptorApplication =
@@ -1063,9 +1062,19 @@ static bool _isTraceProgramDescriptorForSchema(
         schemaArgumentIndex >= descriptorApplication->getArgCount() ||
         descriptorApplication->getArgCount() != getGenericArgumentCount(descriptorGenericDecl))
     {
-        return false;
+        return nullptr;
     }
-    auto descriptorSchema = as<Type>(descriptorApplication->getArg(schemaArgumentIndex)->resolve());
+    return as<Type>(descriptorApplication->getArg(schemaArgumentIndex)->resolve());
+}
+
+/// Returns whether `type` is `TraceProgramDescriptor` specialized with `schemaType`.
+static bool _isTraceProgramDescriptorForSchema(
+    Type* type,
+    AggTypeDecl* traceProgramDescriptorType,
+    Type* schemaType)
+{
+    auto descriptorSchema =
+        _tryGetTraceProgramDescriptorSchemaType(type, traceProgramDescriptorType);
     return descriptorSchema && descriptorSchema->equals(schemaType);
 }
 
@@ -1832,6 +1841,7 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     auto rayTraversalDescType = as<AggTypeDecl>(_findNamedDecl(module, "RayTraversalDesc"));
     auto traceProgramDescriptorType =
         as<AggTypeDecl>(_findNamedDecl(module, "TraceProgramDescriptor"));
+    m_traceProgramDescriptorType = traceProgramDescriptorType;
     auto accelerationStructureRequirement = getAssociatedTypeRequirement(
         StructuralRayTracingAssociatedTypeKind::TraceAccelerationStructure);
     auto motionRequirement =
@@ -1900,6 +1910,12 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
 bool StructuralRayTracingDeclRegistry::isTrustedModule(Module* module) const
 {
     return module && module->getModuleDecl() == m_trustedModuleDecl;
+}
+
+Type* StructuralRayTracingDeclRegistry::tryGetTraceProgramDescriptorSchemaType(
+    Type* descriptorType) const
+{
+    return _tryGetTraceProgramDescriptorSchemaType(descriptorType, m_traceProgramDescriptorType);
 }
 
 AssocTypeDecl* StructuralRayTracingDeclRegistry::getAssociatedTypeRequirement(
@@ -2380,6 +2396,17 @@ StructuralRayTracingStageKind StructuralRayTracingDeclRegistry::getStageKind(
     if (auto kind = m_stageImplementations.tryGetValue(implementation))
         return *kind;
     return StructuralRayTracingStageKind::Count;
+}
+
+bool StructuralRayTracingDeclRegistry::beginStageRepresentationDeclarationCheck(
+    AggTypeDecl* declaration)
+{
+    return declaration && m_stageDeclarationsWithCheckedRepresentation.add(declaration);
+}
+
+bool StructuralRayTracingDeclRegistry::beginStageRepresentationTypeCheck(Type* type)
+{
+    return type && m_stageTypesWithCheckedRepresentation.add(type);
 }
 
 bool StructuralRayTracingDeclRegistry::registerAPIUse(

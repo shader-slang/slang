@@ -115,7 +115,7 @@ void main()
 // SPIRV: OpVariable {{.*}} RayPayloadKHR {{.*}}Location 0
 
 // AMBIGUOUS: linked structural ray-tracing schema has multiple empty payloads
-// AMBIGUOUS-DAG: after its open sections are linked
+// AMBIGUOUS-DAG: after the program is linked
 // AMBIGUOUS-DAG: 'EmptyPayload'
 // AMBIGUOUS-DAG: 'OtherEmptyPayload'
 

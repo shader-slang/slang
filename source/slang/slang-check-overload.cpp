@@ -4017,7 +4017,13 @@ Expr* SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
         arg = CheckTerm(arg);
     }
 
-    return checkGenericAppWithCheckedArgs(genericAppExpr);
+    auto result = checkGenericAppWithCheckedArgs(genericAppExpr);
+    if (!IsErrorExpr(result) && as<TypeType>(result->type) &&
+        diagnoseInvalidStructuralRayTracingGenericTypeApplication(genericAppExpr, result))
+    {
+        return CreateErrorExpr(genericAppExpr);
+    }
+    return result;
 }
 
 /// Check a generic application where the operands have already been checked.
