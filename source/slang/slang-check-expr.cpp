@@ -4923,6 +4923,24 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         elementType = vecType->getElementType();
     else if ((matType = as<MatrixExpressionType>(operandType)))
         elementType = matType->getElementType();
+
+    // `vector<T,N> == vector<T,N>` / `!=` has a stdlib overload
+    // (`glsl.meta.slang`'s `operator==<T:__BuiltinArithmeticType/__BuiltinLogicalType,N>`,
+    // `[OverloadRank(15/14)]`) that reduces the per-component comparison to a single `bool`
+    // via `all(equal(...))`/`any(notEqual(...))`. Its `[require(...)]` list spans every target
+    // Slang emits to, so it is visible to overload resolution regardless of
+    // `isGLSLOperatorScope()` -- unlike the matrix-operator and concrete-vector-equality cases
+    // handled by the `isGLSLOperatorScope()` check above, which really are GLSL-scope-specific.
+    // For a GENERIC element type there is no competing builtin form to prefer instead: the raw
+    // per-component comparison this fast path would otherwise produce is only ever reachable by
+    // constructing a `BuiltinOperatorExpr` directly, never through a declarable stdlib overload,
+    // so before this function recognized generic element types, `vector<T,N> == vector<T,N>`
+    // for an abstract `T` had nowhere else to resolve to and always went through that stdlib
+    // overload. Decline here so it still does -- only a *concrete* element type keeps this
+    // function's pre-existing (GLSL-scope-gated) `==`/`!=` behavior on vectors unchanged.
+    if (isEquality && vecType && !as<BasicExpressionType>(elementType))
+        return nullptr;
+
     auto family = classifyBuiltinArithmeticElementType(elementType);
     if (!family.isKnown())
         return nullptr;

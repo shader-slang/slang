@@ -40,6 +40,25 @@
 // T : __BuiltinFloatingPointType` constraint used outside an `if (T is ...)` check -- is not
 // covered anywhere yet: instantiating it with a concretely non-conforming type currently crashes
 // the compiler for a reason unrelated to this PR (shader-slang/slang#13018).
+//
+// A THIRD negative case -- `vector<T,N> == vector<T,N>` specifically -- is covered separately by
+// `gh-12458-generic-vector-equality-decline.slang` (a `COMPARE_COMPUTE` test, not `INTERPRET`:
+// the `all(equal(...))` lowering this case resolves to is not yet supported by the bytecode
+// interpreter's codegen, an unrelated, pre-existing gap). `glsl.meta.slang` declares `bool
+// operator==<T:__BuiltinArithmeticType,N>(vector<T,N>, vector<T,N>)` (`[OverloadRank(15)]`,
+// `[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]` -- visible on every target, not just GLSL
+// scope) that reduces vector equality to a single `bool` via `all(equal(...))`, and real code
+// (`tests/metal/math-vector.slang`'s generic `Test_Vector<T:__BuiltinFloatingPointType,N>`)
+// relies on `vec == vec` type-checking as `bool` directly in a boolean context. Before this PR, a
+// generic element type was never recognized by `classifyBuiltinArithmeticElementType`, so
+// `vector<T,N> == vector<T,N>` for abstract `T` always fell through to that stdlib overload.
+// Widening the classification to recognize generic `T` made the fast path fire here too,
+// producing the RAW per-component `vector<bool,N>` instead -- which fails to coerce to `bool` and
+// broke that real test. Vectors have no declarable stdlib overload for the raw per-component form
+// (it exists only as this fast path's own `BuiltinOperatorExpr` construction), so unlike every
+// other operator, `==`/`!=` on a GENERIC-element-type vector must keep falling through to the
+// stdlib overload instead of taking the fast path; only a CONCRETE element type keeps this
+// function's pre-existing (`isGLSLOperatorScope()`-gated) vector-equality behavior unchanged.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
