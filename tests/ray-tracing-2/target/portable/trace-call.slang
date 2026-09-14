@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=HLSL): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5
+//TEST:SIMPLE(filecheck=DXIL): -experimental-feature -entry main -stage raygeneration -target dxil -profile sm_6_5
 //TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
 //TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
 //TEST:SIMPLE(filecheck=IR): -experimental-feature -entry main -stage raygeneration -dump-ir -no-codegen
@@ -40,6 +41,7 @@ struct Schema : rt::ITraceProgramSchema
 rt::AccelerationStructure scene;
 rt::TraceProgramDescriptor<Schema> program;
 RWStructuredBuffer<float> output;
+uniform uint seed;
 
 void traceHelper(rt::RayTraversalDesc desc, inout MyPayload payload)
 {
@@ -61,7 +63,7 @@ void main()
     desc.sbtStride = 2;
     desc.missIndex = 3;
 
-    MyPayload payload = { 0.0 };
+    MyPayload payload = { float(seed) };
     traceHelper(desc, payload);
     output[0] = payload.value;
 }
@@ -70,6 +72,7 @@ void main()
 // IR: structuralRayTracingTrace({{.*}}, [[PROGRAM_SCHEMA]], "Schema",
 // HLSL: TraceRay(
 // HLSL-SAME: .rayFlags
+// DXIL: define void
 // SPIRV: OpTraceRayKHR
 // METAL: {{\[\[kernel\]\]}} void main_0(
 // METAL-SAME: metal::raytracing::acceleration_structure

@@ -148,7 +148,8 @@ static void _collectStructuralRayTracingProgramDescriptorTypes(
 
 void lowerStructuralRayTracingProgramDescriptorTypes(
     IRModule* module,
-    const Dictionary<IRType*, IRType*>& targetTypesBySchema)
+    const Dictionary<IRType*, IRType*>& targetTypesBySchema,
+    IRType* fallbackType)
 {
     // Collect first because `replaceUsesWith` updates and deduplicates hoistable users. Walking
     // those users while mutating them can otherwise skip another descriptor nested in a function,
@@ -157,7 +158,7 @@ void lowerStructuralRayTracingProgramDescriptorTypes(
     _collectStructuralRayTracingProgramDescriptorTypes(module->getModuleInst(), descriptorTypes);
     for (auto descriptorType : descriptorTypes)
     {
-        IRType* replacement = descriptorType->getStorageType();
+        IRType* replacement = fallbackType ? fallbackType : descriptorType->getStorageType();
         if (auto targetType = targetTypesBySchema.tryGetValue(descriptorType->getSchemaType()))
             replacement = *targetType;
         SLANG_RELEASE_ASSERT(replacement);

@@ -1868,7 +1868,10 @@ Result linkAndOptimizeIR(
         if (requiredLoweringPassSet.structuralRayTracingProgramDescriptor)
         {
             Dictionary<IRType*, IRType*> noTargetDescriptorTypes;
-            SLANG_PASS(lowerStructuralRayTracingProgramDescriptorTypes, noTargetDescriptorTypes);
+            SLANG_PASS(
+                lowerStructuralRayTracingProgramDescriptorTypes,
+                noTargetDescriptorTypes,
+                nullptr);
         }
         SLANG_PASS(performForceInlining);
         // Autodiff can leave void differential parameters and matching call arguments, but the
@@ -1912,11 +1915,17 @@ Result linkAndOptimizeIR(
     if (target != CodeGenTarget::Metal &&
         requiredLoweringPassSet.structuralRayTracingProgramDescriptor)
     {
-        // The schema operand has served its target-independent specialization role. Portable
-        // targets retain the ParameterBlock-compatible source storage, while Metal replaces the
-        // same wrapper with a schema-specific physical descriptor during target preparation.
+        // The schema operand has served its target-independent specialization role. A portable
+        // trace selects the host-owned native SBT and therefore has no shader-visible descriptor
+        // storage. Erasing the type here also erases descriptors retained by a surrounding global
+        // parameter layout; lowering to the source ParameterBlock shape would leak Slang-only
+        // syntax into HLSL passed to DXC.
         Dictionary<IRType*, IRType*> noTargetDescriptorTypes;
-        SLANG_PASS(lowerStructuralRayTracingProgramDescriptorTypes, noTargetDescriptorTypes);
+        IRBuilder builder(irModule);
+        SLANG_PASS(
+            lowerStructuralRayTracingProgramDescriptorTypes,
+            noTargetDescriptorTypes,
+            builder.getVoidType());
     }
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].

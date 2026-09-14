@@ -40,11 +40,13 @@ bool isCompilerOwnedStructuralRayTracingIROp(IROp op);
 /// Lowers every schema-carrying program-descriptor type in `module`.
 ///
 /// A schema found in `targetTypesBySchema` maps to its target-specific descriptor type. Every
-/// other descriptor maps back to its ordinary source storage representation, including retained
-/// generic templates that have no concrete target ABI.
+/// other descriptor maps to `fallbackType` when it is non-null, or back to its ordinary source
+/// storage representation otherwise. The explicit fallback lets a target erase descriptors that
+/// have no physical runtime representation while Metal can retain unspecialized source templates.
 void lowerStructuralRayTracingProgramDescriptorTypes(
     IRModule* module,
-    const Dictionary<IRType*, IRType*>& targetTypesBySchema);
+    const Dictionary<IRType*, IRType*>& targetTypesBySchema,
+    IRType* fallbackType);
 
 /// Diagnoses a selected entry point whose reachable IR combines structural operations with a
 /// call marked as a legacy pipeline operation during AST lowering.
