@@ -65,6 +65,26 @@ struct CollectGlobalUniformParametersContext
         }
     }
 
+    // Returns the value type represented by a global-scope layout field key.
+    //
+    // Most keys are `IRGlobalParam`s, including existential wrappers whose operand names the
+    // underlying parameter. Global varyings use two other valid shapes: a load of the varying,
+    // whose type is already the field value type, and the backing `IRGlobalVar`, whose type is a
+    // pointer to that value. `processModule` replaces all of these with an untyped `IRStructKey`.
+    // Preserve the checked value type before that replacement so a later type/layout walk never
+    // has to reconstruct it from a key that intentionally carries no type.
+    IRType* _getGlobalLayoutFieldValueType(IRBuilder* builder, IRInst* key)
+    {
+        if (auto globalParam = _getGlobalParamFromLayoutFieldKey(key))
+            return globalParam->getFullType();
+
+        auto keyType = key ? key->getDataType() : nullptr;
+        SLANG_RELEASE_ASSERT(keyType);
+        if (auto valueType = tryGetPointedToType(builder, keyType))
+            return valueType;
+        return keyType;
+    }
+
     // This is a relatively simple pass, and it is all driven
     // by a single subroutine.
     //
@@ -229,14 +249,17 @@ struct CollectGlobalUniformParametersContext
             // layout so that the "key" for the field is the corresponding
             // global shader parameter.
 
-            // Save the original global param before replacement.
-            auto globalParam = _getGlobalParamFromLayoutFieldKey(fieldLayoutAttr->getFieldKey());
+            // Save the original key and global parameter before replacement. The new key is an
+            // intentionally untyped nominal identity, so only this pre-replacement value can
+            // supply the type of a layout-only field.
+            auto originalFieldKey = fieldLayoutAttr->getFieldKey();
+            auto globalParam = _getGlobalParamFromLayoutFieldKey(originalFieldKey);
 
             auto globalParamLayout = fieldLayoutAttr->getLayout();
 
             // Set insert position to a valid instruction under the global parent scope so we can
             // create struct keys.
-            builder->setInsertAfter(fieldLayoutAttr->getFieldKey());
+            builder->setInsertAfter(originalFieldKey);
 
             // This global parameter needs to be turned into a field of the global
             // parameter structure type, and that field will need a key.
@@ -262,7 +285,16 @@ struct CollectGlobalUniformParametersContext
             // passes can handle that case, since they would need to do so in general.
             //
             if (!globalParamLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::Uniform))
+            {
+                // The global-scope layout retains this field even though the synthesized
+                // `GlobalParams` struct deliberately does not. This includes resources and global
+                // input/output varyings. Preserve the checked value type from the original key on
+                // the new layout-only key so later target passes can walk the type and layout as a
+                // pair. Ordinary nominal fields already carry this information directly.
+                auto fieldType = _getGlobalLayoutFieldValueType(builder, originalFieldKey);
+                builder->addDecoration(fieldKey, kIROp_LayoutFieldTypeDecoration, fieldType);
                 continue;
+            }
 
             SLANG_ASSERT(globalParam);
 

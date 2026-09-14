@@ -1,0 +1,55 @@
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature
+
+import slang.raytracing;
+
+struct TestPayload {}
+struct TestRecord {}
+
+struct TestTraceContext : rt::ITraceContext
+{
+    typealias AccelerationStructure = rt::AccelerationStructure;
+    typealias Motion = rt::NoMotion;
+}
+
+struct TriangleContext : rt::IHitContext
+{
+    typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
+    typealias Primitive = rt::TrianglePrimitive;
+    typealias Record = TestRecord;
+}
+
+struct CustomAttributes
+{
+    float2 value;
+}
+
+struct ProceduralContext : rt::IHitContext
+{
+    typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
+    typealias Primitive = rt::BoundingBoxPrimitive<CustomAttributes>;
+    typealias Record = TestRecord;
+}
+
+struct InvalidClosestHit : rt::IClosestHitShader
+{
+    typealias Context = TriangleContext;
+    void invoke(rt::ClosestHitInput<TriangleContext> input)
+    {
+        let attributes = input.attributes;
+//CHECK:                       ^^^^^^^^^^ member not found
+//CHECK:                       ^^^^^^^^^^ 'attributes' is not a member of 'rt.ClosestHitInput<TriangleContext>'.
+    }
+}
+
+struct InvalidProceduralClosestHit : rt::IClosestHitShader
+{
+    typealias Context = ProceduralContext;
+    void invoke(rt::ClosestHitInput<ProceduralContext> input)
+    {
+        let triangle = input.triangle;
+//CHECK:                     ^^^^^^^^ member not found
+//CHECK:                     ^^^^^^^^ 'triangle' is not a member of 'rt.ClosestHitInput<ProceduralContext>'.
+    }
+}

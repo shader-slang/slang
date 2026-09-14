@@ -2110,6 +2110,14 @@ public:                                                              \
     typedef SlangReflectionUserAttribute SlangReflectionAttribute;
     typedef struct SlangReflectionFunction SlangReflectionFunction;
     typedef struct SlangReflectionGeneric SlangReflectionGeneric;
+    typedef struct SlangReflectionTraceProgramSchema SlangReflectionTraceProgramSchema;
+    typedef struct SlangReflectionRayTracingPayload SlangReflectionRayTracingPayload;
+    typedef struct SlangReflectionRayTracingStage SlangReflectionRayTracingStage;
+    typedef struct SlangReflectionRayTracingHitGroup SlangReflectionRayTracingHitGroup;
+    typedef struct SlangReflectionRayTracingMissShader SlangReflectionRayTracingMissShader;
+    typedef struct SlangReflectionRayTracingCallableShader SlangReflectionRayTracingCallableShader;
+    typedef struct SlangReflectionRayTracingIntersectionFunction
+        SlangReflectionRayTracingIntersectionFunction;
 
     union SlangReflectionGenericArg
     {
@@ -2125,11 +2133,357 @@ public:                                                              \
         SLANG_GENERIC_ARG_BOOL = 2
     };
 
+    typedef SlangUInt32 SlangStructuralRayTracingDescriptorResourceKindIntegral;
+    enum SlangStructuralRayTracingDescriptorResourceKind : SlangStructuralRayTracingDescriptorResourceKindIntegral
+    {
+        SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_INTERSECTION_FUNCTION_TABLE = 0,
+        SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_MISS_VISIBLE_FUNCTION_TABLE = 1,
+        SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_CLOSEST_HIT_VISIBLE_FUNCTION_TABLE = 2,
+        SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_CALLABLE_VISIBLE_FUNCTION_TABLE = 3,
+        SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_RECORDS = 4,
+        SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_RESOURCE_UNKNOWN = 0xffffffff,
+    };
+
+    typedef SlangUInt32 SlangStructuralRayTracingGeometryKindIntegral;
+    enum SlangStructuralRayTracingGeometryKind : SlangStructuralRayTracingGeometryKindIntegral
+    {
+        SLANG_STRUCTURAL_RAY_TRACING_GEOMETRY_TRIANGLE = 0,
+        SLANG_STRUCTURAL_RAY_TRACING_GEOMETRY_BOUNDING_BOX = 1,
+        SLANG_STRUCTURAL_RAY_TRACING_GEOMETRY_CURVE = 2,
+        SLANG_STRUCTURAL_RAY_TRACING_GEOMETRY_UNKNOWN = 0xffffffff,
+    };
+
+    typedef SlangUInt32 SlangStructuralRayTracingIntersectionFunctionImplementationKindIntegral;
+    enum SlangStructuralRayTracingIntersectionFunctionImplementationKind : SlangStructuralRayTracingIntersectionFunctionImplementationKindIntegral
+    {
+        SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_EXPORTED_FUNCTION = 0,
+        SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_OPAQUE_TRIANGLE = 1,
+        SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_OPAQUE_CURVE = 2,
+        SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_IMPLEMENTATION_UNKNOWN = 0xffffffff,
+    };
+
     /*
     Type aliases to maintain backward compatibility.
     */
     typedef SlangProgramLayout SlangReflection;
     typedef SlangEntryPointLayout SlangReflectionEntryPoint;
+
+    /** Enumerate concrete structural hit-group declarations visible to this component program.
+
+    This schema-free catalogue is independent of every `ITraceProgramSchema`. Entries use a
+    deterministic canonical-type order and are deduplicated by canonical type identity, but the
+    order is not a native function-table order. Consequently each returned entry reports
+    `functionIndex == -1` and `isLinked == false`. On Metal, schema-specific target symbols are not
+    available from catalogue entries; query a finalized schema to obtain them.
+
+    Merely querying this catalogue does not retain otherwise-unused stage code in target output.
+    */
+    SLANG_API SlangUInt
+    spReflection_getStructuralRayTracingHitGroupCount(SlangReflection* reflection);
+    SLANG_API SlangReflectionRayTracingHitGroup* spReflection_getStructuralRayTracingHitGroup(
+        SlangReflection* reflection,
+        SlangUInt index);
+
+    /** Enumerate concrete structural miss-shader declarations visible to this component program.
+
+    Entries use deterministic canonical-type order and deduplication, report `functionIndex == -1`
+    and `isLinked == false`, and have no schema-specific Metal symbol. Querying the catalogue does
+    not retain otherwise-unused stage code.
+    */
+    SLANG_API SlangUInt
+    spReflection_getStructuralRayTracingMissShaderCount(SlangReflection* reflection);
+    SLANG_API SlangReflectionRayTracingMissShader* spReflection_getStructuralRayTracingMissShader(
+        SlangReflection* reflection,
+        SlangUInt index);
+
+    /** Enumerate concrete structural callable-shader declarations visible to this component.
+
+    Entries use deterministic canonical-type order and deduplication, report `functionIndex == -1`
+    and `isLinked == false`, and have no schema-specific Metal symbol. Querying the catalogue does
+    not retain otherwise-unused stage code. Callable declarations with different data types can
+    coexist because only a concrete schema imposes a native callable-table contract.
+    */
+    SLANG_API SlangUInt
+    spReflection_getStructuralRayTracingCallableShaderCount(SlangReflection* reflection);
+    SLANG_API SlangReflectionRayTracingCallableShader*
+    spReflection_getStructuralRayTracingCallableShader(
+        SlangReflection* reflection,
+        SlangUInt index);
+
+    /** Find a structural ray-tracing program schema by its source type name.
+
+    Returns null when the name is not a schema or the schema is invalid for this linked program.
+    This experimental pointer-returning query has no diagnostics channel. Invalid concrete source
+    contracts are diagnosed when their module is loaded; errors that depend on the linked set of
+    open-section entries are available from the ordinary code-generation APIs.
+    */
+    SLANG_API SlangReflectionTraceProgramSchema* spReflection_findTraceProgramSchema(
+        SlangReflection* reflection,
+        char const* name);
+    /** Get the stable compiler-owned name that identifies this trace-program schema.
+
+    Use this exact value to correlate schema reflection with target metadata. It may differ from
+    the source query used by `spReflection_findTraceProgramSchema`, for example when the schema is
+    a specialization of a generic type.
+    */
+    SLANG_API char const* spReflectionTraceProgramSchema_getName(
+        SlangReflectionTraceProgramSchema* schema);
+    SLANG_API SlangReflectionType* spReflectionTraceProgramSchema_getType(
+        SlangReflectionTraceProgramSchema* schema);
+    SLANG_API SlangReflectionType* spReflectionTraceProgramSchema_getTraceContextType(
+        SlangReflectionTraceProgramSchema* schema);
+    /** Return whether linked conformances can add hit groups to this schema.
+
+    The returned entry list is already finalized for the reflected program. This flag describes
+    how the schema was declared; callers do not need to perform another discovery step.
+    */
+    SLANG_API bool spReflectionTraceProgramSchema_isHitGroupSectionOpen(
+        SlangReflectionTraceProgramSchema* schema);
+    /** Return whether linked conformances can add miss shaders to this schema. */
+    SLANG_API bool spReflectionTraceProgramSchema_isMissShaderSectionOpen(
+        SlangReflectionTraceProgramSchema* schema);
+    /** Return whether linked conformances can add callable shaders to this schema. */
+    SLANG_API bool spReflectionTraceProgramSchema_isCallableShaderSectionOpen(
+        SlangReflectionTraceProgramSchema* schema);
+    /** Get the payload partitions selected for this program's finalized schema.
+
+    Payloads appear in order of first use by hit groups, followed by payloads first used by miss
+    shaders.
+    */
+    SLANG_API SlangUInt
+    spReflectionTraceProgramSchema_getPayloadCount(SlangReflectionTraceProgramSchema* schema);
+    SLANG_API SlangReflectionRayTracingPayload* spReflectionTraceProgramSchema_getPayload(
+        SlangReflectionTraceProgramSchema* schema,
+        SlangUInt index);
+    /** Get callable shaders in schema declaration order and function-index order. */
+    SLANG_API SlangUInt spReflectionTraceProgramSchema_getCallableShaderCount(
+        SlangReflectionTraceProgramSchema* schema);
+    SLANG_API SlangReflectionRayTracingCallableShader* spReflectionTraceProgramSchema_getCallableShader(
+        SlangReflectionTraceProgramSchema* schema,
+        SlangUInt index);
+    /** Get the hit-section record stride, in bytes, for the current target.
+
+    The value includes the compiler-owned record header and is aligned to 16 bytes. It is zero when
+    the target does not use a compiler-owned structural record buffer.
+    */
+    SLANG_API size_t
+    spReflectionTraceProgramSchema_getHitRecordStride(SlangReflectionTraceProgramSchema* schema);
+    /** Get the miss-section record stride, in bytes, for the current target.
+
+    The value includes the compiler-owned record header and is aligned to 16 bytes. It is zero when
+    the target does not use a compiler-owned structural record buffer.
+    */
+    SLANG_API size_t
+    spReflectionTraceProgramSchema_getMissRecordStride(SlangReflectionTraceProgramSchema* schema);
+    /** Get the callable-section record stride, in bytes, for the current target.
+
+    The value includes the compiler-owned record header and is aligned to 16 bytes. It is zero when
+    the target does not use a compiler-owned structural record buffer.
+    */
+    SLANG_API size_t spReflectionTraceProgramSchema_getCallableRecordStride(
+        SlangReflectionTraceProgramSchema* schema);
+    /** Get the maximum native hit-attribute ABI requirement, in bytes, for this schema.
+
+    D3D returns native DXIL aggregate allocation and Vulkan returns its scalar-aligned interface-
+    block size. OptiX returns four times the maximum attribute-register count selected by Slang's
+    native lowering, with the native two-register minimum. Targets without a corresponding host
+    pipeline setting return zero.
+    */
+    SLANG_API size_t spReflectionTraceProgramSchema_getMaxNativeHitAttributeSize(
+        SlangReflectionTraceProgramSchema* schema);
+    /** Get the compiler-owned Metal record-header size, in bytes.
+
+    This is the offset at which application record data begins in every structural Metal record.
+    Non-Metal targets return zero.
+    */
+    SLANG_API size_t spReflectionTraceProgramSchema_getMetalRecordHeaderSize(
+        SlangReflectionTraceProgramSchema* schema);
+    /** Enumerate the resources in a compiler-synthesized Metal program descriptor.
+
+    Non-Metal targets return zero resources. Each hit/miss table has a non-negative payload index;
+    callable and record resources are schema-wide and report -1. Use
+    `spReflectionTraceProgramSchema_getDescriptorResourceMetalArgumentBufferIndex` to place each
+    resource; enumeration order is not a host binding contract.
+    */
+    SLANG_API SlangUInt spReflectionTraceProgramSchema_getDescriptorResourceCount(
+        SlangReflectionTraceProgramSchema* schema);
+    SLANG_API SlangStructuralRayTracingDescriptorResourceKind
+    spReflectionTraceProgramSchema_getDescriptorResourceKind(
+        SlangReflectionTraceProgramSchema* schema,
+        SlangUInt index);
+    SLANG_API SlangInt spReflectionTraceProgramSchema_getDescriptorResourcePayloadIndex(
+        SlangReflectionTraceProgramSchema* schema,
+        SlangUInt index);
+    /** Get the Metal argument-buffer `[[id]]` assigned to this descriptor resource.
+
+    The IDs are unique and densely cover `[0, resourceCount)`, but are exposed independently of
+    enumeration order so a host does not need to reproduce the compiler's field-order convention.
+    Returns -1 when `index` is out of range. Non-Metal targets expose no descriptor resources.
+    */
+    SLANG_API SlangInt spReflectionTraceProgramSchema_getDescriptorResourceMetalArgumentBufferIndex(
+        SlangReflectionTraceProgramSchema* schema,
+        SlangUInt index);
+    /** Get the logical field name used by the synthesized Metal descriptor. */
+    SLANG_API char const* spReflectionTraceProgramSchema_getDescriptorResourceName(
+        SlangReflectionTraceProgramSchema* schema,
+        SlangUInt index);
+
+    /** Get the payload type that identifies this partition. */
+    SLANG_API SlangReflectionType* spReflectionRayTracingPayload_getType(
+        SlangReflectionRayTracingPayload* payload);
+    /** Get the payload layout under the reflected target's ordinary data-layout rules. */
+    SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingPayload_getTypeLayout(
+        SlangReflectionRayTracingPayload* payload);
+    /** Get this payload partition's native host pipeline ABI requirement, in bytes.
+
+    D3D returns native DXIL aggregate allocation and Vulkan returns its scalar-aligned payload-
+    block size. OptiX returns four times the payload-register count selected by Slang lowering,
+    including the two-register representation used for an indirect payload. Targets without a
+    corresponding host pipeline setting return zero. This value is intentionally distinct from
+    `getTypeLayout`, whose ordinary reflected layout need not describe ray-tracing transport.
+    */
+    SLANG_API size_t
+    spReflectionRayTracingPayload_getNativePayloadSize(SlangReflectionRayTracingPayload* payload);
+    /** Get hit groups in their dense function-index order for this payload. */
+    SLANG_API SlangUInt
+    spReflectionRayTracingPayload_getHitGroupCount(SlangReflectionRayTracingPayload* payload);
+    SLANG_API SlangReflectionRayTracingHitGroup* spReflectionRayTracingPayload_getHitGroup(
+        SlangReflectionRayTracingPayload* payload,
+        SlangUInt index);
+    /** Get miss shaders in their dense function-index order for this payload. */
+    SLANG_API SlangUInt
+    spReflectionRayTracingPayload_getMissShaderCount(SlangReflectionRayTracingPayload* payload);
+    SLANG_API SlangReflectionRayTracingMissShader* spReflectionRayTracingPayload_getMissShader(
+        SlangReflectionRayTracingPayload* payload,
+        SlangUInt index);
+    /** Get the number of physical slots required by this payload's fixed-index Metal IFT.
+
+    A payload with candidate logic always has generated triangle and bounding-box entries at
+    indices zero and one. It also has a curve entry at index two when the schema contains a curve
+    group. Non-Metal targets and payloads without candidate logic return zero.
+    */
+    SLANG_API SlangUInt spReflectionRayTracingPayload_getIntersectionFunctionTableSize(
+        SlangReflectionRayTracingPayload* payload);
+    /** Enumerate the generated functions in this payload's Metal IFT. */
+    SLANG_API SlangUInt spReflectionRayTracingPayload_getIntersectionFunctionCount(
+        SlangReflectionRayTracingPayload* payload);
+    SLANG_API SlangReflectionRayTracingIntersectionFunction*
+    spReflectionRayTracingPayload_getIntersectionFunction(
+        SlangReflectionRayTracingPayload* payload,
+        SlangUInt index);
+
+    /** Get the fixed Metal IFT index for this entry: triangle 0, bounding box 1, or curve 2. */
+    SLANG_API SlangInt spReflectionRayTracingIntersectionFunction_getIntersectionFunctionTableIndex(
+        SlangReflectionRayTracingIntersectionFunction* function);
+    SLANG_API SlangStructuralRayTracingGeometryKind
+    spReflectionRayTracingIntersectionFunction_getGeometryKind(
+        SlangReflectionRayTracingIntersectionFunction* function);
+    SLANG_API SlangStructuralRayTracingIntersectionFunctionImplementationKind
+    spReflectionRayTracingIntersectionFunction_getImplementationKind(
+        SlangReflectionRayTracingIntersectionFunction* function);
+    /** Get the exact Metal symbol for an exported function. */
+    SLANG_API char const* spReflectionRayTracingIntersectionFunction_getEntryPointName(
+        SlangReflectionRayTracingIntersectionFunction* function);
+
+    /** Get the dense index within this payload partition's hit-group function table.
+
+    Returns -1 for a schema-free declaration catalogue entry because a schema has not assigned a
+    function-table index.
+    */
+    SLANG_API SlangInt
+    spReflectionRayTracingHitGroup_getFunctionIndex(SlangReflectionRayTracingHitGroup* group);
+    SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getType(
+        SlangReflectionRayTracingHitGroup* group);
+    SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getContextType(
+        SlangReflectionRayTracingHitGroup* group);
+    SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getRecordType(
+        SlangReflectionRayTracingHitGroup* group);
+    /** Get the application-record layout used by structural record-buffer lowering.
+
+    Metal uses structured-buffer layout rules because the compiler reads records from a raw device
+    buffer. Other targets use their ordinary data-layout rules.
+    */
+    SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingHitGroup_getRecordTypeLayout(
+        SlangReflectionRayTracingHitGroup* group);
+    /** Return whether this group was discovered from a linked open-section conformance. */
+    SLANG_API bool spReflectionRayTracingHitGroup_isLinked(
+        SlangReflectionRayTracingHitGroup* group);
+    SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getPrimitiveType(
+        SlangReflectionRayTracingHitGroup* group);
+    SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getIntersectionAttributesType(
+        SlangReflectionRayTracingHitGroup* group);
+    /** Get the exact target symbol installed in this group's closest-hit table slot.
+
+    Metal gives every reflected hit group a closest-hit table entry, so this also returns the
+    synthesized no-op symbol for every `NoClosestHit` group. It returns null when another target
+    does not require a physical closest-hit function for this group.
+    */
+    SLANG_API char const* spReflectionRayTracingHitGroup_getClosestHitEntryPointName(
+        SlangReflectionRayTracingHitGroup* group);
+    SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingHitGroup_getClosestHit(
+        SlangReflectionRayTracingHitGroup* group);
+    SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingHitGroup_getAnyHit(
+        SlangReflectionRayTracingHitGroup* group);
+    SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingHitGroup_getIntersection(
+        SlangReflectionRayTracingHitGroup* group);
+
+    /** Get the dense index within this payload partition's miss function table.
+
+    Returns -1 for a schema-free declaration catalogue entry.
+    */
+    SLANG_API SlangInt
+    spReflectionRayTracingMissShader_getFunctionIndex(SlangReflectionRayTracingMissShader* shader);
+    SLANG_API SlangReflectionType* spReflectionRayTracingMissShader_getType(
+        SlangReflectionRayTracingMissShader* shader);
+    SLANG_API SlangReflectionType* spReflectionRayTracingMissShader_getContextType(
+        SlangReflectionRayTracingMissShader* shader);
+    SLANG_API SlangReflectionType* spReflectionRayTracingMissShader_getRecordType(
+        SlangReflectionRayTracingMissShader* shader);
+    /** Get the application-record layout used by structural record-buffer lowering. */
+    SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingMissShader_getRecordTypeLayout(
+        SlangReflectionRayTracingMissShader* shader);
+    /** Return whether this shader was discovered from a linked open-section conformance. */
+    SLANG_API bool spReflectionRayTracingMissShader_isLinked(
+        SlangReflectionRayTracingMissShader* shader);
+    SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingMissShader_getMiss(
+        SlangReflectionRayTracingMissShader* shader);
+
+    /** Get the dense index within the schema-wide callable function table.
+
+    Returns -1 for a schema-free declaration catalogue entry.
+    */
+    SLANG_API SlangInt spReflectionRayTracingCallableShader_getFunctionIndex(
+        SlangReflectionRayTracingCallableShader* shader);
+    SLANG_API SlangReflectionType* spReflectionRayTracingCallableShader_getType(
+        SlangReflectionRayTracingCallableShader* shader);
+    SLANG_API SlangReflectionType* spReflectionRayTracingCallableShader_getContextType(
+        SlangReflectionRayTracingCallableShader* shader);
+    SLANG_API SlangReflectionType* spReflectionRayTracingCallableShader_getRecordType(
+        SlangReflectionRayTracingCallableShader* shader);
+    /** Get the application-record layout used by structural record-buffer lowering. */
+    SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingCallableShader_getRecordTypeLayout(
+        SlangReflectionRayTracingCallableShader* shader);
+    /** Return whether this shader was discovered from a linked open-section conformance. */
+    SLANG_API bool spReflectionRayTracingCallableShader_isLinked(
+        SlangReflectionRayTracingCallableShader* shader);
+    SLANG_API SlangReflectionType* spReflectionRayTracingCallableShader_getDataType(
+        SlangReflectionRayTracingCallableShader* shader);
+    SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingCallableShader_getCallable(
+        SlangReflectionRayTracingCallableShader* shader);
+
+    SLANG_API SlangStage
+    spReflectionRayTracingStage_getStage(SlangReflectionRayTracingStage* stage);
+    SLANG_API SlangReflectionType* spReflectionRayTracingStage_getType(
+        SlangReflectionRayTracingStage* stage);
+    /** Get the physical target symbol for this stage, when it is independently bindable.
+
+    Metal returns null for AnyHit and Intersection because they are folded into a reflected
+    payload/geometry intersection-function dispatcher. Metal also returns null for every stage
+    obtained from the schema-free declaration catalogue because its physical symbol depends on a
+    schema, payload partition, and function index.
+    */
+    SLANG_API char const* spReflectionRayTracingStage_getEntryPointName(
+        SlangReflectionRayTracingStage* stage);
 
     // type reflection
 
@@ -2473,6 +2827,13 @@ struct VariableLayoutReflection;
 struct VariableReflection;
 struct FunctionReflection;
 struct GenericReflection;
+struct TraceProgramSchemaReflection;
+struct RayTracingPayloadReflection;
+struct RayTracingStageReflection;
+struct RayTracingHitGroupReflection;
+struct RayTracingMissShaderReflection;
+struct RayTracingCallableShaderReflection;
+struct RayTracingIntersectionFunctionReflection;
 
 union GenericArgReflection
 {
@@ -3699,6 +4060,380 @@ struct EntryPointReflection
 
 typedef EntryPointReflection EntryPointLayout;
 
+struct RayTracingStageReflection
+{
+    SlangStage getStage()
+    {
+        return spReflectionRayTracingStage_getStage((SlangReflectionRayTracingStage*)this);
+    }
+    TypeReflection* getType()
+    {
+        return (TypeReflection*)spReflectionRayTracingStage_getType(
+            (SlangReflectionRayTracingStage*)this);
+    }
+    char const* getEntryPointName()
+    {
+        return spReflectionRayTracingStage_getEntryPointName((SlangReflectionRayTracingStage*)this);
+    }
+};
+
+struct RayTracingHitGroupReflection
+{
+    /// Returns this group's dense index, or -1 for a schema-free catalogue declaration.
+    SlangInt getFunctionIndex()
+    {
+        return spReflectionRayTracingHitGroup_getFunctionIndex(
+            (SlangReflectionRayTracingHitGroup*)this);
+    }
+    TypeReflection* getType()
+    {
+        return (TypeReflection*)spReflectionRayTracingHitGroup_getType(
+            (SlangReflectionRayTracingHitGroup*)this);
+    }
+    TypeReflection* getContextType()
+    {
+        return (TypeReflection*)spReflectionRayTracingHitGroup_getContextType(
+            (SlangReflectionRayTracingHitGroup*)this);
+    }
+    TypeReflection* getRecordType()
+    {
+        return (TypeReflection*)spReflectionRayTracingHitGroup_getRecordType(
+            (SlangReflectionRayTracingHitGroup*)this);
+    }
+    TypeLayoutReflection* getRecordTypeLayout()
+    {
+        return (TypeLayoutReflection*)spReflectionRayTracingHitGroup_getRecordTypeLayout(
+            (SlangReflectionRayTracingHitGroup*)this);
+    }
+    bool isLinked()
+    {
+        return spReflectionRayTracingHitGroup_isLinked((SlangReflectionRayTracingHitGroup*)this);
+    }
+    TypeReflection* getPrimitiveType()
+    {
+        return (TypeReflection*)spReflectionRayTracingHitGroup_getPrimitiveType(
+            (SlangReflectionRayTracingHitGroup*)this);
+    }
+    TypeReflection* getIntersectionAttributesType()
+    {
+        return (TypeReflection*)spReflectionRayTracingHitGroup_getIntersectionAttributesType(
+            (SlangReflectionRayTracingHitGroup*)this);
+    }
+    /// Returns the exact target symbol installed in this group's closest-hit table slot, including
+    /// Metal's synthesized no-op symbol for a `NoClosestHit` group.
+    char const* getClosestHitEntryPointName()
+    {
+        return spReflectionRayTracingHitGroup_getClosestHitEntryPointName(
+            (SlangReflectionRayTracingHitGroup*)this);
+    }
+    RayTracingStageReflection* getClosestHit()
+    {
+        return (RayTracingStageReflection*)spReflectionRayTracingHitGroup_getClosestHit(
+            (SlangReflectionRayTracingHitGroup*)this);
+    }
+    RayTracingStageReflection* getAnyHit()
+    {
+        return (RayTracingStageReflection*)spReflectionRayTracingHitGroup_getAnyHit(
+            (SlangReflectionRayTracingHitGroup*)this);
+    }
+    RayTracingStageReflection* getIntersection()
+    {
+        return (RayTracingStageReflection*)spReflectionRayTracingHitGroup_getIntersection(
+            (SlangReflectionRayTracingHitGroup*)this);
+    }
+};
+
+struct RayTracingMissShaderReflection
+{
+    /// Returns this shader's dense index, or -1 for a schema-free catalogue declaration.
+    SlangInt getFunctionIndex()
+    {
+        return spReflectionRayTracingMissShader_getFunctionIndex(
+            (SlangReflectionRayTracingMissShader*)this);
+    }
+    TypeReflection* getType()
+    {
+        return (TypeReflection*)spReflectionRayTracingMissShader_getType(
+            (SlangReflectionRayTracingMissShader*)this);
+    }
+    TypeReflection* getContextType()
+    {
+        return (TypeReflection*)spReflectionRayTracingMissShader_getContextType(
+            (SlangReflectionRayTracingMissShader*)this);
+    }
+    TypeReflection* getRecordType()
+    {
+        return (TypeReflection*)spReflectionRayTracingMissShader_getRecordType(
+            (SlangReflectionRayTracingMissShader*)this);
+    }
+    TypeLayoutReflection* getRecordTypeLayout()
+    {
+        return (TypeLayoutReflection*)spReflectionRayTracingMissShader_getRecordTypeLayout(
+            (SlangReflectionRayTracingMissShader*)this);
+    }
+    bool isLinked()
+    {
+        return spReflectionRayTracingMissShader_isLinked(
+            (SlangReflectionRayTracingMissShader*)this);
+    }
+    RayTracingStageReflection* getMiss()
+    {
+        return (RayTracingStageReflection*)spReflectionRayTracingMissShader_getMiss(
+            (SlangReflectionRayTracingMissShader*)this);
+    }
+};
+
+struct RayTracingCallableShaderReflection
+{
+    /// Returns this shader's dense index, or -1 for a schema-free catalogue declaration.
+    SlangInt getFunctionIndex()
+    {
+        return spReflectionRayTracingCallableShader_getFunctionIndex(
+            (SlangReflectionRayTracingCallableShader*)this);
+    }
+    TypeReflection* getType()
+    {
+        return (TypeReflection*)spReflectionRayTracingCallableShader_getType(
+            (SlangReflectionRayTracingCallableShader*)this);
+    }
+    TypeReflection* getContextType()
+    {
+        return (TypeReflection*)spReflectionRayTracingCallableShader_getContextType(
+            (SlangReflectionRayTracingCallableShader*)this);
+    }
+    TypeReflection* getRecordType()
+    {
+        return (TypeReflection*)spReflectionRayTracingCallableShader_getRecordType(
+            (SlangReflectionRayTracingCallableShader*)this);
+    }
+    TypeLayoutReflection* getRecordTypeLayout()
+    {
+        return (TypeLayoutReflection*)spReflectionRayTracingCallableShader_getRecordTypeLayout(
+            (SlangReflectionRayTracingCallableShader*)this);
+    }
+    bool isLinked()
+    {
+        return spReflectionRayTracingCallableShader_isLinked(
+            (SlangReflectionRayTracingCallableShader*)this);
+    }
+    TypeReflection* getDataType()
+    {
+        return (TypeReflection*)spReflectionRayTracingCallableShader_getDataType(
+            (SlangReflectionRayTracingCallableShader*)this);
+    }
+    RayTracingStageReflection* getCallable()
+    {
+        return (RayTracingStageReflection*)spReflectionRayTracingCallableShader_getCallable(
+            (SlangReflectionRayTracingCallableShader*)this);
+    }
+};
+
+struct RayTracingIntersectionFunctionReflection
+{
+    /// Returns the fixed Metal IFT index for this geometry kind.
+    SlangInt getIntersectionFunctionTableIndex()
+    {
+        return spReflectionRayTracingIntersectionFunction_getIntersectionFunctionTableIndex(
+            (SlangReflectionRayTracingIntersectionFunction*)this);
+    }
+    SlangStructuralRayTracingGeometryKind getGeometryKind()
+    {
+        return spReflectionRayTracingIntersectionFunction_getGeometryKind(
+            (SlangReflectionRayTracingIntersectionFunction*)this);
+    }
+    SlangStructuralRayTracingIntersectionFunctionImplementationKind getImplementationKind()
+    {
+        return spReflectionRayTracingIntersectionFunction_getImplementationKind(
+            (SlangReflectionRayTracingIntersectionFunction*)this);
+    }
+    /// Returns the exact Metal symbol for an exported function, or null for an opaque built-in.
+    char const* getEntryPointName()
+    {
+        return spReflectionRayTracingIntersectionFunction_getEntryPointName(
+            (SlangReflectionRayTracingIntersectionFunction*)this);
+    }
+};
+
+struct RayTracingPayloadReflection
+{
+    /// Returns the payload type shared by every hit and miss entry in this partition.
+    TypeReflection* getType()
+    {
+        return (TypeReflection*)spReflectionRayTracingPayload_getType(
+            (SlangReflectionRayTracingPayload*)this);
+    }
+    TypeLayoutReflection* getTypeLayout()
+    {
+        return (TypeLayoutReflection*)spReflectionRayTracingPayload_getTypeLayout(
+            (SlangReflectionRayTracingPayload*)this);
+    }
+    /// Returns the native host pipeline payload requirement in bytes for the reflected target.
+    size_t getNativePayloadSize()
+    {
+        return spReflectionRayTracingPayload_getNativePayloadSize(
+            (SlangReflectionRayTracingPayload*)this);
+    }
+    SlangUInt getHitGroupCount()
+    {
+        return spReflectionRayTracingPayload_getHitGroupCount(
+            (SlangReflectionRayTracingPayload*)this);
+    }
+    RayTracingHitGroupReflection* getHitGroup(SlangUInt index)
+    {
+        return (RayTracingHitGroupReflection*)spReflectionRayTracingPayload_getHitGroup(
+            (SlangReflectionRayTracingPayload*)this,
+            index);
+    }
+    SlangUInt getMissShaderCount()
+    {
+        return spReflectionRayTracingPayload_getMissShaderCount(
+            (SlangReflectionRayTracingPayload*)this);
+    }
+    RayTracingMissShaderReflection* getMissShader(SlangUInt index)
+    {
+        return (RayTracingMissShaderReflection*)spReflectionRayTracingPayload_getMissShader(
+            (SlangReflectionRayTracingPayload*)this,
+            index);
+    }
+    SlangUInt getIntersectionFunctionTableSize()
+    {
+        return spReflectionRayTracingPayload_getIntersectionFunctionTableSize(
+            (SlangReflectionRayTracingPayload*)this);
+    }
+    SlangUInt getIntersectionFunctionCount()
+    {
+        return spReflectionRayTracingPayload_getIntersectionFunctionCount(
+            (SlangReflectionRayTracingPayload*)this);
+    }
+    RayTracingIntersectionFunctionReflection* getIntersectionFunction(SlangUInt index)
+    {
+        return (RayTracingIntersectionFunctionReflection*)
+            spReflectionRayTracingPayload_getIntersectionFunction(
+                (SlangReflectionRayTracingPayload*)this,
+                index);
+    }
+};
+
+struct TraceProgramSchemaReflection
+{
+    /// Returns the stable key used by generated target symbols and target metadata.
+    char const* getName()
+    {
+        return spReflectionTraceProgramSchema_getName((SlangReflectionTraceProgramSchema*)this);
+    }
+    TypeReflection* getType()
+    {
+        return (TypeReflection*)spReflectionTraceProgramSchema_getType(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    TypeReflection* getTraceContextType()
+    {
+        return (TypeReflection*)spReflectionTraceProgramSchema_getTraceContextType(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    bool isHitGroupSectionOpen()
+    {
+        return spReflectionTraceProgramSchema_isHitGroupSectionOpen(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    bool isMissShaderSectionOpen()
+    {
+        return spReflectionTraceProgramSchema_isMissShaderSectionOpen(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    bool isCallableShaderSectionOpen()
+    {
+        return spReflectionTraceProgramSchema_isCallableShaderSectionOpen(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    SlangUInt getPayloadCount()
+    {
+        return spReflectionTraceProgramSchema_getPayloadCount(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    RayTracingPayloadReflection* getPayload(SlangUInt index)
+    {
+        return (RayTracingPayloadReflection*)spReflectionTraceProgramSchema_getPayload(
+            (SlangReflectionTraceProgramSchema*)this,
+            index);
+    }
+    SlangUInt getCallableShaderCount()
+    {
+        return spReflectionTraceProgramSchema_getCallableShaderCount(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    RayTracingCallableShaderReflection* getCallableShader(SlangUInt index)
+    {
+        return (RayTracingCallableShaderReflection*)
+            spReflectionTraceProgramSchema_getCallableShader(
+                (SlangReflectionTraceProgramSchema*)this,
+                index);
+    }
+    /// Returns the Metal hit-section record stride in bytes, including its 16-byte header.
+    /// Returns zero when the current target has no compiler-owned structural record buffer.
+    size_t getHitRecordStride()
+    {
+        return spReflectionTraceProgramSchema_getHitRecordStride(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    /// Returns the Metal miss-section record stride in bytes, including its 16-byte header.
+    /// Returns zero when the current target has no compiler-owned structural record buffer.
+    size_t getMissRecordStride()
+    {
+        return spReflectionTraceProgramSchema_getMissRecordStride(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    /// Returns the Metal callable-section record stride in bytes, including its 16-byte header.
+    /// Returns zero when the current target has no compiler-owned structural record buffer.
+    size_t getCallableRecordStride()
+    {
+        return spReflectionTraceProgramSchema_getCallableRecordStride(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    /// Returns the native host pipeline hit-attribute requirement in bytes.
+    size_t getMaxNativeHitAttributeSize()
+    {
+        return spReflectionTraceProgramSchema_getMaxNativeHitAttributeSize(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    /// Returns the Metal record-header size in bytes, or zero on other targets.
+    size_t getMetalRecordHeaderSize()
+    {
+        return spReflectionTraceProgramSchema_getMetalRecordHeaderSize(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    SlangUInt getDescriptorResourceCount()
+    {
+        return spReflectionTraceProgramSchema_getDescriptorResourceCount(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    SlangStructuralRayTracingDescriptorResourceKind getDescriptorResourceKind(SlangUInt index)
+    {
+        return spReflectionTraceProgramSchema_getDescriptorResourceKind(
+            (SlangReflectionTraceProgramSchema*)this,
+            index);
+    }
+    SlangInt getDescriptorResourcePayloadIndex(SlangUInt index)
+    {
+        return spReflectionTraceProgramSchema_getDescriptorResourcePayloadIndex(
+            (SlangReflectionTraceProgramSchema*)this,
+            index);
+    }
+    /// Returns the resource's Metal argument-buffer `[[id]]`, or -1 for an invalid resource index.
+    SlangInt getDescriptorResourceMetalArgumentBufferIndex(SlangUInt index)
+    {
+        return spReflectionTraceProgramSchema_getDescriptorResourceMetalArgumentBufferIndex(
+            (SlangReflectionTraceProgramSchema*)this,
+            index);
+    }
+    char const* getDescriptorResourceName(SlangUInt index)
+    {
+        return spReflectionTraceProgramSchema_getDescriptorResourceName(
+            (SlangReflectionTraceProgramSchema*)this,
+            index);
+    }
+};
+
 struct TypeParameterReflection
 {
     char const* getName()
@@ -3850,6 +4585,51 @@ struct ShaderReflection
     {
         return (
             EntryPointReflection*)spReflection_findEntryPointByName((SlangReflection*)this, name);
+    }
+
+    TraceProgramSchemaReflection* findTraceProgramSchema(const char* name)
+    {
+        return (TraceProgramSchemaReflection*)spReflection_findTraceProgramSchema(
+            (SlangReflection*)this,
+            name);
+    }
+
+    /// Enumerates schema-free structural hit-group declarations in canonical identity order.
+    SlangUInt getStructuralRayTracingHitGroupCount()
+    {
+        return spReflection_getStructuralRayTracingHitGroupCount((SlangReflection*)this);
+    }
+
+    RayTracingHitGroupReflection* getStructuralRayTracingHitGroup(SlangUInt index)
+    {
+        return (RayTracingHitGroupReflection*)spReflection_getStructuralRayTracingHitGroup(
+            (SlangReflection*)this,
+            index);
+    }
+
+    /// Enumerates schema-free structural miss-shader declarations in canonical identity order.
+    SlangUInt getStructuralRayTracingMissShaderCount()
+    {
+        return spReflection_getStructuralRayTracingMissShaderCount((SlangReflection*)this);
+    }
+
+    RayTracingMissShaderReflection* getStructuralRayTracingMissShader(SlangUInt index)
+    {
+        return (RayTracingMissShaderReflection*)spReflection_getStructuralRayTracingMissShader(
+            (SlangReflection*)this,
+            index);
+    }
+
+    /// Enumerates schema-free structural callable declarations in canonical identity order.
+    SlangUInt getStructuralRayTracingCallableShaderCount()
+    {
+        return spReflection_getStructuralRayTracingCallableShaderCount((SlangReflection*)this);
+    }
+
+    RayTracingCallableShaderReflection* getStructuralRayTracingCallableShader(SlangUInt index)
+    {
+        return (RayTracingCallableShaderReflection*)
+            spReflection_getStructuralRayTracingCallableShader((SlangReflection*)this, index);
     }
 
     TypeReflection* specializeType(
@@ -4800,6 +5580,80 @@ struct IBindlessResourceMetadata : public ISlangCastable
     virtual SLANG_NO_THROW bool SLANG_MCALL usesBindlessResourceHeap() = 0;
 };
     #define SLANG_UUID_IBindlessResourceMetadata IBindlessResourceMetadata::getTypeGuid()
+
+/** Metal intersection-function signature requirements for one structural ray-tracing payload.
+
+The numeric values deliberately match Apple's `MTLIntersectionFunctionSignature` values. A Metal
+host can therefore pass the underlying value directly when it installs an opaque triangle or curve
+function in an intersection-function table. This is target ABI metadata, not a source-level Metal
+tag-list model.
+*/
+enum class MetalIntersectionFunctionSignature : uint32_t
+{
+    None = 0,
+    Instancing = 1 << 0,
+    TriangleData = 1 << 1,
+    WorldSpaceData = 1 << 2,
+    InstanceMotion = 1 << 3,
+    PrimitiveMotion = 1 << 4,
+    ExtendedLimits = 1 << 5,
+    MaxLevels = 1 << 6,
+    CurveData = 1 << 7,
+};
+
+/** Final Metal ABI requirements for one payload partition of one trace-program schema.
+
+`schemaName` and `payloadIndex` identify the same schema and deterministic payload ordinal
+reported by structural ray-tracing program reflection. The string is owned by the metadata object
+and remains valid for that object's lifetime.
+*/
+struct StructuralRayTracingMetalPayloadInfo
+{
+    size_t structSize = sizeof(StructuralRayTracingMetalPayloadInfo);
+
+    /// Exact stable name returned by `TraceProgramSchemaReflection::getName()`.
+    const char* schemaName = nullptr;
+
+    /// Deterministic payload ordinal within `schemaName`.
+    uint32_t payloadIndex = 0;
+
+    /// Bitwise combination of `MetalIntersectionFunctionSignature` values required by this
+    /// payload's finalized Metal intersection-function table.
+    MetalIntersectionFunctionSignature intersectionFunctionSignature =
+        MetalIntersectionFunctionSignature::None;
+};
+
+/** Post-lowering structural ray-tracing ABI metadata for a compiled target.
+
+Retrieve the artifact-associated `IMetadata` with `IComponentType::getTargetMetadata()` after
+target code has been compiled, then cast it to this interface with `castAs()`. Ordinary schema,
+stage, function-index, descriptor-resource, and record-layout information remains in
+`ProgramLayout` reflection. This interface only reports requirements that target lowering can
+finalize, such as Metal's intersection-function signature.
+
+Metal payload records are ordered by schema name and then by reflected payload ordinal. Hosts
+should use those two fields as the lookup key rather than assigning meaning to the list position.
+Non-Metal targets report zero records.
+*/
+struct IStructuralRayTracingMetadata : public ISlangCastable
+{
+    SLANG_COM_INTERFACE(
+        0x796d29b9,
+        0x0a4e,
+        0x492b,
+        {0x93, 0xc5, 0x9b, 0x2b, 0xc2, 0xfb, 0x1f, 0xad})
+
+    /// Returns the number of finalized Metal payload-partition records. Returns zero for a
+    /// non-Metal target.
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL getMetalPayloadInfoCount() = 0;
+
+    /// Populates `outInfo` for `index`. The caller must default-initialize `outInfo` so its
+    /// `structSize` describes the public struct version it was compiled against. Returns
+    /// `SLANG_E_INVALID_ARG` for a null/too-small output or an out-of-range index.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getMetalPayloadInfo(uint32_t index, StructuralRayTracingMetalPayloadInfo* outInfo) = 0;
+};
+    #define SLANG_UUID_IStructuralRayTracingMetadata IStructuralRayTracingMetadata::getTypeGuid()
 
 /** Coverage tracing metadata produced when any shader coverage mode is active.
 

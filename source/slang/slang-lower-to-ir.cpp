@@ -35,10 +35,12 @@
 #include "slang-ir-ssa.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-strip.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-use-uninitialized-values.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
+#include "slang-lookup.h"
 #include "slang-mangle.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
@@ -810,6 +812,8 @@ bool isFunctionStaticVarDecl(VarDeclBase* decl)
 
 IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered);
 
+IRInst* lowerSimpleVal(IRGenContext* context, Val* val);
+
 int32_t getIntrinsicOp(Decl* decl, IntrinsicOpModifier* intrinsicOpMod)
 {
     int32_t op = intrinsicOpMod->op;
@@ -950,6 +954,1403 @@ IRInst* AstOrIRType::getIRType(IRGenContext* context)
     return irType;
 }
 
+struct StructuralRayTracingStageReference
+{
+    IRType* type = nullptr;
+    IRStringLit* sourceTypeName = nullptr;
+    IRStringLit* typeIdentity = nullptr;
+    bool isPresent = false;
+    IRInst* invoke = nullptr;
+};
+
+// Preserve the final logical source name while both the substituted AST type and the IR builder
+// are available. Structural metadata consumers use this string to derive target-safe symbols;
+// they must not try to recover source identity later from an IR name hint.
+static IRStringLit* _lowerStructuralRayTracingSourceTypeName(IRGenContext* context, Type* type)
+{
+    auto sourceTypeName = getStructuralRayTracingSourceTypeName(context->astBuilder, type);
+    SLANG_RELEASE_ASSERT(sourceTypeName.getLength() != 0);
+    return context->irBuilder->getStringValue(sourceTypeName.getUnownedSlice());
+}
+
+// Preserve canonical source identity before empty nominal types can be shape-deduplicated in IR.
+// Unlike the user-facing source name, this identity includes the defining module and all generic
+// substitutions. Consumers compare it as an opaque key and never parse its mangled spelling.
+static IRStringLit* _lowerStructuralRayTracingCanonicalTypeIdentity(
+    IRGenContext* context,
+    Type* type)
+{
+    SLANG_RELEASE_ASSERT(type);
+    auto canonicalType = type->getCanonicalType();
+    auto identity = getMangledTypeName(context->astBuilder, canonicalType);
+    SLANG_RELEASE_ASSERT(identity.getLength() != 0);
+    context->getLinkage()->getStructuralRayTracingDeclRegistry().registerReflectionType(
+        identity.getUnownedSlice(),
+        canonicalType);
+    return context->irBuilder->getStringValue(identity.getUnownedSlice());
+}
+
+// Preserves the module export-table key for a structural entry's nominal declaration.
+//
+// Consider a separately compiled plugin that contains `struct Glass : IMaterialHit`. Its IR keeps
+// the canonical type identity used to select `Glass`, but a fresh session loading the serialized
+// module has not run AST-to-IR lowering and therefore has not registered the corresponding AST
+// `Type*`. Module serialization already preserves an exact declaration table indexed by this
+// unobfuscated mangled name. Reflection can use that table to reconstruct the nominal type and
+// then verify it against the independently persisted canonical type identity. This key is opaque
+// compiler metadata; no consumer parses it or treats the user-facing source name as identity.
+//
+// The key intentionally identifies the declaration rather than trying to serialize generic
+// arguments a second time. An explicitly composed `GenericHitGroup<uint> : IMaterialHit`
+// conformance retains that exact semantic type in its `SubtypeWitness`; lowering the conformance
+// calls `_lowerStructuralRayTracingCanonicalTypeIdentity` and registers the specialization in the
+// receiving `Linkage`. Declaration lookup is therefore only the deserialization bridge for the
+// declaration-level entries that did not pass through a fresh semantic conformance producer.
+static IRStringLit* _lowerStructuralRayTracingDeclLookupName(IRGenContext* context, Type* type)
+{
+    auto canonicalType = type ? type->getCanonicalType() : nullptr;
+    auto declRefType = as<DeclRefType>(canonicalType);
+    SLANG_RELEASE_ASSERT(declRefType);
+    auto decl = declRefType->getDeclRef().getDecl();
+    SLANG_RELEASE_ASSERT(decl);
+    auto lookupName = getMangledName(context->astBuilder, decl);
+    SLANG_RELEASE_ASSERT(lookupName.getLength() != 0);
+    return context->irBuilder->getStringValue(lookupName.getUnownedSlice());
+}
+
+struct StructuralRayTracingHitContextInfo
+{
+    Type* traceContextType = nullptr;
+    Type* primitiveType = nullptr;
+    Type* payloadType = nullptr;
+    Type* recordType = nullptr;
+    Type* hitAttributesType = nullptr;
+    StructuralRayTracingHitAttributesKind hitAttributesKind =
+        StructuralRayTracingHitAttributesKind::None;
+};
+
+static StructuralRayTracingAssociatedTypeKind _getStructuralRayTracingStageContextKind(
+    StructuralRayTracingStageKind stageKind)
+{
+    switch (stageKind)
+    {
+    case StructuralRayTracingStageKind::ClosestHit:
+        return StructuralRayTracingAssociatedTypeKind::ClosestHitShaderContext;
+    case StructuralRayTracingStageKind::AnyHit:
+        return StructuralRayTracingAssociatedTypeKind::AnyHitShaderContext;
+    case StructuralRayTracingStageKind::Intersection:
+        return StructuralRayTracingAssociatedTypeKind::IntersectionStageContext;
+    case StructuralRayTracingStageKind::Miss:
+        return StructuralRayTracingAssociatedTypeKind::MissShaderContext;
+    case StructuralRayTracingStageKind::Callable:
+        return StructuralRayTracingAssociatedTypeKind::CallableShaderContext;
+    default:
+        SLANG_UNEXPECTED("invalid structural ray-tracing stage kind");
+    }
+}
+
+static Type* _getStructuralRayTracingStageContextType(
+    IRGenContext* context,
+    SubtypeWitness* stageWitness,
+    StructuralRayTracingStageKind stageKind)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    return registry.resolveAssociatedType(
+        context->astBuilder,
+        stageWitness,
+        _getStructuralRayTracingStageContextKind(stageKind));
+}
+
+static SubtypeWitness* _getStructuralRayTracingStageContextWitness(
+    IRGenContext* context,
+    SubtypeWitness* stageWitness,
+    StructuralRayTracingStageKind stageKind)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    return registry.resolveAssociatedTypeConstraint(
+        context->astBuilder,
+        stageWitness,
+        _getStructuralRayTracingStageContextKind(stageKind));
+}
+
+static StructuralRayTracingHitContextInfo _getStructuralRayTracingHitContextInfo(
+    IRGenContext* context,
+    SubtypeWitness* groupWitness)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto contextWitness = registry.resolveAssociatedTypeConstraint(
+        context->astBuilder,
+        groupWitness,
+        StructuralRayTracingAssociatedTypeKind::HitGroupContext);
+    SLANG_ASSERT(contextWitness);
+
+    StructuralRayTracingHitContextInfo result;
+    result.traceContextType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::StageTraceContext);
+    result.payloadType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::PayloadContextPayload);
+    result.primitiveType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::HitPrimitive);
+    result.recordType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::StageRecord);
+    auto primitiveWitness = registry.resolveAssociatedTypeConstraint(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::HitPrimitive);
+    result.hitAttributesType = registry.resolveAssociatedType(
+        context->astBuilder,
+        primitiveWitness,
+        StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes);
+    SLANG_ASSERT(
+        result.traceContextType && result.primitiveType && result.payloadType &&
+        result.recordType && result.hitAttributesType);
+    result.hitAttributesKind = registry.getHitAttributesKind(result.primitiveType);
+    return result;
+}
+
+static DeclRef<CallableDecl> _findStructuralRayTracingStageInvoke(
+    ASTBuilder* astBuilder,
+    const StructuralRayTracingDeclRegistry& registry,
+    StructuralRayTracingStageKind stageKind,
+    SubtypeWitness* witness)
+{
+    witness = witness ? as<SubtypeWitness>(witness->resolve()) : nullptr;
+    auto invokeRequirement = registry.getStageInvokeRequirement(stageKind);
+    if (!invokeRequirement || !witness)
+        return DeclRef<CallableDecl>();
+    auto invokeWitness = tryLookUpRequirementWitness(astBuilder, witness, invokeRequirement);
+    return invokeWitness.getFlavor() == RequirementWitness::Flavor::declRef
+               ? invokeWitness.getDeclRef().as<CallableDecl>()
+               : DeclRef<CallableDecl>();
+}
+
+static SubtypeWitness* _getStructuralRayTracingStageInvokeWitness(
+    IRGenContext* context,
+    Type* stageType,
+    StructuralRayTracingStageKind stageKind,
+    SubtypeWitness* stageWitness)
+{
+    stageWitness = stageWitness ? as<SubtypeWitness>(stageWitness->resolve()) : nullptr;
+    if (stageKind != StructuralRayTracingStageKind::Intersection)
+        return stageWitness;
+
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    // `IHitGroup.Intersection` accepts the sealed `IIntersectionStage` marker so it can also name
+    // `NoIntersection`. Once the exact placeholder has been removed, the concrete type must also
+    // conform to `IIntersectionShader`. Consider this valid user declaration:
+    //
+    //     interface MyIntersectionContract : rt::IIntersectionShader {}
+    //     struct MyIntersection : MyIntersectionContract { ... }
+    //
+    // The marker witness does not encode how many user interfaces occur in that inheritance path.
+    // Ask the checked subtype system for the executable conformance instead of depending on one
+    // particular compressed-witness representation. The returned witness is then the normal source
+    // of truth for looking up `IIntersectionShader.invoke`.
+    auto shaderInterface = registry.getStageInterface(stageKind);
+    SLANG_RELEASE_ASSERT(shaderInterface);
+    auto shaderInterfaceType =
+        DeclRefType::create(context->astBuilder, makeDeclRef(shaderInterface));
+    auto sharedSemanticsContext = context->getLinkage()->getSemanticsForReflection();
+    SemanticsContext semanticsContext(sharedSemanticsContext);
+    SemanticsVisitor visitor(semanticsContext);
+    auto shaderWitness = visitor.tryGetInterfaceConformanceWitness(stageType, shaderInterfaceType);
+    SLANG_RELEASE_ASSERT(shaderWitness);
+    return shaderWitness;
+}
+
+static StructuralRayTracingStageReference _lowerStructuralRayTracingStageReference(
+    IRGenContext* context,
+    Type* stageType,
+    SubtypeWitness* stageWitness,
+    StructuralRayTracingStageKind stageKind)
+{
+    auto builder = context->irBuilder;
+    StructuralRayTracingStageReference result = {
+        builder->getVoidType(),
+        builder->getStringValue(toSlice("")),
+        builder->getStringValue(toSlice("")),
+        false,
+        builder->getVoidValue()};
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    SLANG_ASSERT(stageType);
+    if (registry.isStagePlaceholder(stageKind, stageType))
+        return result;
+
+    auto invokeWitness =
+        _getStructuralRayTracingStageInvokeWitness(context, stageType, stageKind, stageWitness);
+    auto invokeDeclRef = _findStructuralRayTracingStageInvoke(
+        context->astBuilder,
+        registry,
+        stageKind,
+        invokeWitness);
+    SLANG_ASSERT(invokeDeclRef);
+    auto invokeType = lowerType(context, getFuncType(context->astBuilder, invokeDeclRef));
+    result.type = lowerType(context, stageType);
+    result.sourceTypeName = _lowerStructuralRayTracingSourceTypeName(context, stageType);
+    result.typeIdentity = _lowerStructuralRayTracingCanonicalTypeIdentity(context, stageType);
+    result.isPresent = true;
+    result.invoke = getSimpleVal(context, emitDeclRef(context, invokeDeclRef, invokeType));
+    SLANG_ASSERT(result.invoke);
+    return result;
+}
+
+static StructuralRayTracingStageReference _lowerStructuralRayTracingAssociatedStageReference(
+    IRGenContext* context,
+    SubtypeWitness* ownerWitness,
+    StructuralRayTracingAssociatedTypeKind associatedTypeKind,
+    StructuralRayTracingStageKind stageKind)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto stageType =
+        registry.resolveAssociatedType(context->astBuilder, ownerWitness, associatedTypeKind);
+    auto stageWitness = registry.resolveAssociatedTypeConstraint(
+        context->astBuilder,
+        ownerWitness,
+        associatedTypeKind);
+    return _lowerStructuralRayTracingStageReference(context, stageType, stageWitness, stageKind);
+}
+
+struct StructuralRayTracingFunctionIndexAllocator
+{
+    Dictionary<Type*, Index> hitIndicesByPayload;
+    Dictionary<Type*, Index> missIndicesByPayload;
+    Index nextCallableIndex = 0;
+
+    Index allocateHitIndex(Type* payloadType)
+    {
+        auto& nextIndex = hitIndicesByPayload.getOrAddValue(payloadType, 0);
+        return nextIndex++;
+    }
+
+    Index allocateMissIndex(Type* payloadType)
+    {
+        auto& nextIndex = missIndicesByPayload.getOrAddValue(payloadType, 0);
+        return nextIndex++;
+    }
+
+    Index allocateCallableIndex() { return nextCallableIndex++; }
+};
+
+static void _addStructuralRayTracingHitGroupEntryInfo(
+    IRGenContext* context,
+    IRInst* owner,
+    Type* groupType,
+    SubtypeWitness* groupWitness,
+    Index functionIndex,
+    bool isLinked)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto contextType = registry.resolveAssociatedType(
+        context->astBuilder,
+        groupWitness,
+        StructuralRayTracingAssociatedTypeKind::HitGroupContext);
+    SLANG_ASSERT(groupType && groupWitness && contextType);
+    auto contextInfo = _getStructuralRayTracingHitContextInfo(context, groupWitness);
+
+    auto closestHit = _lowerStructuralRayTracingAssociatedStageReference(
+        context,
+        groupWitness,
+        StructuralRayTracingAssociatedTypeKind::HitGroupClosestHit,
+        StructuralRayTracingStageKind::ClosestHit);
+    auto anyHit = _lowerStructuralRayTracingAssociatedStageReference(
+        context,
+        groupWitness,
+        StructuralRayTracingAssociatedTypeKind::HitGroupAnyHit,
+        StructuralRayTracingStageKind::AnyHit);
+    auto intersection = _lowerStructuralRayTracingAssociatedStageReference(
+        context,
+        groupWitness,
+        StructuralRayTracingAssociatedTypeKind::HitGroupIntersection,
+        StructuralRayTracingStageKind::Intersection);
+    auto irPayloadType = lowerType(context, contextInfo.payloadType);
+
+    IRInst* operands[] = {
+        lowerType(context, groupType),
+        _lowerStructuralRayTracingSourceTypeName(context, groupType),
+        _lowerStructuralRayTracingCanonicalTypeIdentity(context, groupType),
+        _lowerStructuralRayTracingDeclLookupName(context, groupType),
+        context->irBuilder->getIntValue(
+            context->irBuilder->getIntType(),
+            IRIntegerValue(functionIndex)),
+        lowerType(context, contextType),
+        lowerType(context, contextInfo.traceContextType),
+        lowerType(context, contextInfo.primitiveType),
+        irPayloadType,
+        irPayloadType,
+        lowerType(context, contextInfo.recordType),
+        lowerType(context, contextInfo.hitAttributesType),
+        context->irBuilder->getIntValue(
+            context->irBuilder->getIntType(),
+            IRIntegerValue(contextInfo.hitAttributesKind)),
+        closestHit.type,
+        closestHit.sourceTypeName,
+        closestHit.typeIdentity,
+        context->irBuilder->getBoolValue(closestHit.isPresent),
+        closestHit.invoke,
+        anyHit.type,
+        anyHit.sourceTypeName,
+        anyHit.typeIdentity,
+        context->irBuilder->getBoolValue(anyHit.isPresent),
+        anyHit.invoke,
+        intersection.type,
+        intersection.sourceTypeName,
+        intersection.typeIdentity,
+        context->irBuilder->getBoolValue(intersection.isPresent),
+        intersection.invoke,
+        context->irBuilder->getBoolValue(isLinked),
+        context->irBuilder->getIntValue(context->irBuilder->getIntType(), -1),
+    };
+    context->irBuilder->addDecoration(
+        owner,
+        kIROp_StructuralRayTracingHitGroupInfoDecoration,
+        operands,
+        SLANG_COUNT_OF(operands));
+}
+
+static void _addStructuralRayTracingHitGroupInfo(
+    IRGenContext* context,
+    IRInst* traceOperation,
+    const StructuralRayTracingEntryPack& groups,
+    StructuralRayTracingFunctionIndexAllocator& functionIndices)
+{
+    if (!groups.witnesses)
+        return;
+
+    for (Index i = 0; i < groups.types->getTypeCount(); ++i)
+    {
+        auto groupType = groups.types->getElementType(i);
+        auto groupWitness = groups.witnesses->getWitness(i);
+        auto contextInfo = _getStructuralRayTracingHitContextInfo(context, groupWitness);
+        _addStructuralRayTracingHitGroupEntryInfo(
+            context,
+            traceOperation,
+            groupType,
+            groupWitness,
+            functionIndices.allocateHitIndex(contextInfo.payloadType),
+            false);
+    }
+}
+
+static void _addStructuralRayTracingMissShaderEntryInfo(
+    IRGenContext* context,
+    IRInst* owner,
+    Type* shaderType,
+    SubtypeWitness* shaderWitness,
+    Index functionIndex,
+    bool isLinked)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto contextType = _getStructuralRayTracingStageContextType(
+        context,
+        shaderWitness,
+        StructuralRayTracingStageKind::Miss);
+    auto contextWitness = _getStructuralRayTracingStageContextWitness(
+        context,
+        shaderWitness,
+        StructuralRayTracingStageKind::Miss);
+    auto miss = _lowerStructuralRayTracingStageReference(
+        context,
+        shaderType,
+        shaderWitness,
+        StructuralRayTracingStageKind::Miss);
+    SLANG_ASSERT(shaderType && shaderWitness && contextType && contextWitness);
+    auto traceContextType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::StageTraceContext);
+    auto payloadType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::PayloadContextPayload);
+    auto recordType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::StageRecord);
+    SLANG_ASSERT(traceContextType && payloadType && recordType);
+    auto irPayloadType = lowerType(context, payloadType);
+
+    IRInst* operands[] = {
+        context->irBuilder->getIntValue(
+            context->irBuilder->getIntType(),
+            IRIntegerValue(functionIndex)),
+        lowerType(context, contextType),
+        lowerType(context, traceContextType),
+        irPayloadType,
+        irPayloadType,
+        lowerType(context, recordType),
+        miss.type,
+        miss.sourceTypeName,
+        miss.typeIdentity,
+        _lowerStructuralRayTracingDeclLookupName(context, shaderType),
+        miss.invoke,
+        context->irBuilder->getBoolValue(isLinked),
+        context->irBuilder->getIntValue(context->irBuilder->getIntType(), -1),
+    };
+    context->irBuilder->addDecoration(
+        owner,
+        kIROp_StructuralRayTracingMissShaderInfoDecoration,
+        operands,
+        SLANG_COUNT_OF(operands));
+}
+
+static void _addStructuralRayTracingMissShaderInfo(
+    IRGenContext* context,
+    IRInst* traceOperation,
+    const StructuralRayTracingEntryPack& shaders,
+    StructuralRayTracingFunctionIndexAllocator& functionIndices)
+{
+    if (!shaders.witnesses)
+        return;
+
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    for (Index i = 0; i < shaders.types->getTypeCount(); ++i)
+    {
+        auto shaderType = shaders.types->getElementType(i);
+        auto shaderWitness = shaders.witnesses->getWitness(i);
+        auto contextWitness = _getStructuralRayTracingStageContextWitness(
+            context,
+            shaderWitness,
+            StructuralRayTracingStageKind::Miss);
+        auto payloadType = registry.resolveAssociatedType(
+            context->astBuilder,
+            contextWitness,
+            StructuralRayTracingAssociatedTypeKind::PayloadContextPayload);
+        SLANG_ASSERT(payloadType);
+        _addStructuralRayTracingMissShaderEntryInfo(
+            context,
+            traceOperation,
+            shaderType,
+            shaderWitness,
+            functionIndices.allocateMissIndex(payloadType),
+            false);
+    }
+}
+
+static void _addStructuralRayTracingCallableShaderEntryInfo(
+    IRGenContext* context,
+    IRInst* owner,
+    Type* shaderType,
+    SubtypeWitness* shaderWitness,
+    Index functionIndex,
+    bool isLinked)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto contextType = _getStructuralRayTracingStageContextType(
+        context,
+        shaderWitness,
+        StructuralRayTracingStageKind::Callable);
+    auto contextWitness = _getStructuralRayTracingStageContextWitness(
+        context,
+        shaderWitness,
+        StructuralRayTracingStageKind::Callable);
+    auto callable = _lowerStructuralRayTracingStageReference(
+        context,
+        shaderType,
+        shaderWitness,
+        StructuralRayTracingStageKind::Callable);
+    SLANG_ASSERT(shaderType && shaderWitness && contextType && contextWitness);
+    auto traceContextType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::StageTraceContext);
+    auto callableDataType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::CallableData);
+    auto recordType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::StageRecord);
+    SLANG_ASSERT(traceContextType && callableDataType && recordType);
+
+    IRInst* operands[] = {
+        context->irBuilder->getIntValue(
+            context->irBuilder->getIntType(),
+            IRIntegerValue(functionIndex)),
+        lowerType(context, contextType),
+        lowerType(context, traceContextType),
+        lowerType(context, callableDataType),
+        lowerType(context, recordType),
+        callable.type,
+        callable.sourceTypeName,
+        callable.typeIdentity,
+        _lowerStructuralRayTracingDeclLookupName(context, shaderType),
+        callable.invoke,
+        context->irBuilder->getBoolValue(isLinked),
+    };
+    context->irBuilder->addDecoration(
+        owner,
+        kIROp_StructuralRayTracingCallableShaderInfoDecoration,
+        operands,
+        SLANG_COUNT_OF(operands));
+}
+
+static void _addStructuralRayTracingCallableShaderInfo(
+    IRGenContext* context,
+    IRInst* traceOperation,
+    const StructuralRayTracingEntryPack& shaders,
+    StructuralRayTracingFunctionIndexAllocator& functionIndices)
+{
+    if (!shaders.witnesses)
+        return;
+
+    for (Index i = 0; i < shaders.types->getTypeCount(); ++i)
+    {
+        _addStructuralRayTracingCallableShaderEntryInfo(
+            context,
+            traceOperation,
+            shaders.types->getElementType(i),
+            shaders.witnesses->getWitness(i),
+            functionIndices.allocateCallableIndex(),
+            false);
+    }
+}
+
+static void _addStructuralRayTracingOpenSectionInfo(
+    IRGenContext* context,
+    IRInst* operation,
+    const StructuralRayTracingOpenSectionInfo& info,
+    StructuralRayTracingSectionKind sectionKind)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+
+    // This marker is the complete request consumed by the demand-driven linker. The public open
+    // aggregate was recognized by its trusted declaration identity when layout was decoded. Its
+    // ordinary generic constraint proves conformance to the entry contract; the extra check here
+    // proves that the tag itself is an interface while its checked semantic type is still
+    // available. Linked IR never guesses either role from a source spelling.
+    IRInst* operands[] = {
+        context->irBuilder->getIntValue(
+            context->irBuilder->getIntType(),
+            IRIntegerValue(sectionKind)),
+        lowerType(context, info.tagType),
+        context->irBuilder->getBoolValue(
+            registry.isValidOpenSectionTag(context->astBuilder, info.tagType, sectionKind)),
+    };
+    context->irBuilder->addDecoration(
+        operation,
+        kIROp_StructuralRayTracingOpenSectionDecoration,
+        operands,
+        SLANG_COUNT_OF(operands));
+}
+
+static void _addStructuralRayTracingTaggedConformanceInfo(
+    IRGenContext* context,
+    IRInst* conformanceOwner,
+    Type* concreteType,
+    Type* tagType,
+    SubtypeWitness* tagWitness)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    if (!registry.isInitialized() || !conformanceOwner || !concreteType || !tagType || !tagWitness)
+        return;
+    // A tag interface describes the open family; it is not itself an entry and its associated
+    // requirements need not be concrete. Only a concrete conformer can provide stage metadata.
+    if (isDeclRefTypeOf<InterfaceDecl>(concreteType))
+        return;
+
+    for (int i = 0; i < int(StructuralRayTracingSectionKind::Count); ++i)
+    {
+        auto sectionKind = StructuralRayTracingSectionKind(i);
+        List<Type*> matchingTagTypes;
+        registry
+            .collectOpenSectionTags(context->astBuilder, tagType, sectionKind, matchingTagTypes);
+        if (matchingTagTypes.getCount() == 0)
+            continue;
+
+        // Consider this separately compiled declaration:
+        //
+        //     interface IMaterialHit : rt::IHitGroup {}
+        //     struct Glass : IMaterialHit { ... }
+        //
+        // `Glass : IMaterialHit` is the conformance an open schema selects. Project that exact
+        // checked witness to `IHitGroup` now, while the front end still owns requirement identity,
+        // and serialize the complete entry metadata on the same canonical conformance value. That
+        // value is normally the witness table and is the exact `IRSpecialize` owned by an explicit
+        // concrete conformance component. Link-time completion can then read one producer-owned
+        // record; it never walks inherited witness operands or rediscovers associated requirements
+        // by name or position.
+        auto entryWitness =
+            registry.projectOpenSectionEntryWitness(context->astBuilder, tagWitness, sectionKind);
+        SLANG_RELEASE_ASSERT(entryWitness);
+
+        for (auto matchingTagType : matchingTagTypes)
+        {
+            IRInst* tagOperands[] = {
+                context->irBuilder->getIntValue(
+                    context->irBuilder->getIntType(),
+                    IRIntegerValue(sectionKind)),
+                lowerType(context, matchingTagType),
+            };
+            context->irBuilder->addDecoration(
+                conformanceOwner,
+                kIROp_StructuralRayTracingTaggedConformanceDecoration,
+                tagOperands,
+                SLANG_COUNT_OF(tagOperands));
+        }
+
+        switch (sectionKind)
+        {
+        case StructuralRayTracingSectionKind::HitGroups:
+            _addStructuralRayTracingHitGroupEntryInfo(
+                context,
+                conformanceOwner,
+                concreteType,
+                entryWitness,
+                -1,
+                true);
+            break;
+        case StructuralRayTracingSectionKind::MissShaders:
+            _addStructuralRayTracingMissShaderEntryInfo(
+                context,
+                conformanceOwner,
+                concreteType,
+                entryWitness,
+                -1,
+                true);
+            break;
+        case StructuralRayTracingSectionKind::CallableShaders:
+            _addStructuralRayTracingCallableShaderEntryInfo(
+                context,
+                conformanceOwner,
+                concreteType,
+                entryWitness,
+                -1,
+                true);
+            break;
+        default:
+            SLANG_UNEXPECTED("invalid structural ray-tracing open section kind");
+        }
+    }
+}
+
+struct StructuralRayTracingProgramLayoutInfo
+{
+    Type* programLayoutType = nullptr;
+    SubtypeWitness* programLayoutWitness = nullptr;
+    Type* traceContextType = nullptr;
+    Type* accelerationStructureType = nullptr;
+    Type* motionType = nullptr;
+    StructuralRayTracingMotionKind motionKind = StructuralRayTracingMotionKind::Invalid;
+    Type* hitGroupsType = nullptr;
+    Type* missShadersType = nullptr;
+    Type* callableShadersType = nullptr;
+    StructuralRayTracingEntryPack hitGroupEntries;
+    StructuralRayTracingEntryPack missShaderEntries;
+    StructuralRayTracingEntryPack callableShaderEntries;
+    StructuralRayTracingOpenSectionInfo openHitGroups;
+    StructuralRayTracingOpenSectionInfo openMissShaders;
+    StructuralRayTracingOpenSectionInfo openCallableShaders;
+    bool hasOpenHitGroups = false;
+    bool hasOpenMissShaders = false;
+    bool hasOpenCallableShaders = false;
+
+    bool isComplete() const
+    {
+        return programLayoutType && programLayoutWitness && traceContextType &&
+               accelerationStructureType && motionType &&
+               motionKind != StructuralRayTracingMotionKind::Invalid && hitGroupsType &&
+               missShadersType && callableShadersType;
+    }
+};
+
+static StructuralRayTracingProgramLayoutInfo _getStructuralRayTracingProgramLayoutInfo(
+    IRGenContext* context,
+    Type* candidateType,
+    SubtypeWitness* candidateWitness)
+{
+    StructuralRayTracingProgramLayoutInfo result;
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    SLANG_RELEASE_ASSERT(candidateType && candidateWitness);
+
+    // Retain the schema identity even if one of its associated types is still open. The
+    // three-argument trace diagnostic can then name the actual generic schema instead of an error
+    // placeholder.
+    result.programLayoutType = candidateType;
+    result.programLayoutWitness = candidateWitness;
+    auto traceContextType = registry.resolveAssociatedType(
+        context->astBuilder,
+        candidateWitness,
+        StructuralRayTracingAssociatedTypeKind::ProgramTraceContext);
+    if (traceContextType)
+    {
+        result.traceContextType = traceContextType;
+        auto traceContextWitness = registry.resolveAssociatedTypeConstraint(
+            context->astBuilder,
+            candidateWitness,
+            StructuralRayTracingAssociatedTypeKind::ProgramTraceContext);
+        result.accelerationStructureType = registry.resolveAssociatedType(
+            context->astBuilder,
+            traceContextWitness,
+            StructuralRayTracingAssociatedTypeKind::TraceAccelerationStructure);
+        result.motionType = registry.resolveAssociatedType(
+            context->astBuilder,
+            traceContextWitness,
+            StructuralRayTracingAssociatedTypeKind::TraceMotion);
+        result.motionKind = registry.getMotionKind(result.motionType);
+        result.hitGroupsType = registry.resolveAssociatedType(
+            context->astBuilder,
+            candidateWitness,
+            StructuralRayTracingAssociatedTypeKind::ProgramHitGroups);
+        result.missShadersType = registry.resolveAssociatedType(
+            context->astBuilder,
+            candidateWitness,
+            StructuralRayTracingAssociatedTypeKind::ProgramMissShaders);
+        result.callableShadersType = registry.resolveAssociatedType(
+            context->astBuilder,
+            candidateWitness,
+            StructuralRayTracingAssociatedTypeKind::ProgramCallableShaders);
+    }
+
+    if (result.hitGroupsType)
+    {
+        result.hasOpenHitGroups = registry.tryGetOpenSectionInfo(
+            context->astBuilder,
+            result.hitGroupsType,
+            StructuralRayTracingSectionKind::HitGroups,
+            result.openHitGroups);
+        result.hitGroupEntries =
+            result.hasOpenHitGroups
+                ? result.openHitGroups.listedEntries
+                : getStructuralRayTracingEntryPack(context->astBuilder, result.hitGroupsType);
+    }
+    if (result.missShadersType)
+    {
+        result.hasOpenMissShaders = registry.tryGetOpenSectionInfo(
+            context->astBuilder,
+            result.missShadersType,
+            StructuralRayTracingSectionKind::MissShaders,
+            result.openMissShaders);
+        result.missShaderEntries =
+            result.hasOpenMissShaders
+                ? result.openMissShaders.listedEntries
+                : getStructuralRayTracingEntryPack(context->astBuilder, result.missShadersType);
+    }
+    if (result.callableShadersType)
+    {
+        result.hasOpenCallableShaders = registry.tryGetOpenSectionInfo(
+            context->astBuilder,
+            result.callableShadersType,
+            StructuralRayTracingSectionKind::CallableShaders,
+            result.openCallableShaders);
+        result.callableShaderEntries =
+            result.hasOpenCallableShaders
+                ? result.openCallableShaders.listedEntries
+                : getStructuralRayTracingEntryPack(context->astBuilder, result.callableShadersType);
+    }
+    return result;
+}
+
+static StructuralRayTracingProgramLayoutInfo _getStructuralRayTracingProgramLayoutInfo(
+    IRGenContext* context,
+    FunctionDeclBase* functionDecl,
+    DeclRef<Decl> funcDeclRef)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    // A trace method can have both a method generic (`Payload` or `maxLevelCount`) and an enclosing
+    // extension generic (`Schema`). Registration records the latter explicitly, so this lookup
+    // cannot mistake a method argument and its witness for the program schema.
+    auto methodInfo = registry.getRayTracerMethodInfo(functionDecl);
+    SLANG_RELEASE_ASSERT(methodInfo);
+    auto schemaApplication =
+        SubstitutionSet(funcDeclRef).findGenericAppDeclRef(methodInfo->schemaGenericDecl);
+    SLANG_RELEASE_ASSERT(
+        schemaApplication && methodInfo->schemaTypeArgumentIndex >= 0 &&
+        methodInfo->schemaTypeArgumentIndex < schemaApplication->getArgCount() &&
+        methodInfo->schemaWitnessArgumentIndex >= 0 &&
+        methodInfo->schemaWitnessArgumentIndex < schemaApplication->getArgCount());
+
+    auto schemaType =
+        as<Type>(schemaApplication->getArg(methodInfo->schemaTypeArgumentIndex)->resolve());
+    auto schemaWitness = as<SubtypeWitness>(
+        schemaApplication->getArg(methodInfo->schemaWitnessArgumentIndex)->resolve());
+    SLANG_RELEASE_ASSERT(schemaType && schemaWitness);
+    return _getStructuralRayTracingProgramLayoutInfo(context, schemaType, schemaWitness);
+}
+
+static IRMakeValuePack* _lowerStructuralRayTracingEntryIdentityPack(
+    IRGenContext* context,
+    const StructuralRayTracingEntryPack& entries)
+{
+    List<IRInst*> identities;
+    if (entries.types)
+    {
+        for (Index i = 0; i < entries.types->getTypeCount(); ++i)
+        {
+            identities.add(_lowerStructuralRayTracingCanonicalTypeIdentity(
+                context,
+                entries.types->getElementType(i)));
+        }
+    }
+    return cast<IRMakeValuePack>(
+        context->irBuilder->emitMakeValuePack(identities.getCount(), identities.getBuffer()));
+}
+
+// Emits the schema-scoped request consumed by whole-program structural reflection.
+//
+// Consider a client that declares `ClosedSchema : ITraceProgramSchema`, never calls `trace`, and
+// asks reflection for the target ABI size of its payload. The reflection path composes an exact
+// `ClosedSchema : ITraceProgramSchema` conformance component so this producer emits one private
+// schema root with the same listed-entry metadata used by trace lowering. Target-manifest linking
+// retains that root and specializes its entry types before reflection computes their ABI sizes.
+// An open schema uses the same root; open-section completion additionally appends the selected
+// identities to its three packs. Ordinary backend links do not opt into schema roots, so producing
+// a closed-schema request here does not retain otherwise-unused stages in emitted code.
+static void _addStructuralRayTracingProgramSchemaInfo(
+    IRGenContext* context,
+    Type* schemaType,
+    SubtypeWitness* schemaWitness)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto interfaceType = as<DeclRefType>(schemaWitness->getSup()->resolve());
+    auto interfaceDecl =
+        interfaceType ? interfaceType->getDeclRef().as<InterfaceDecl>() : DeclRef<InterfaceDecl>();
+    if (!interfaceDecl || registry.getMetadataKind(interfaceDecl.getDecl()) !=
+                              StructuralRayTracingMetadataKind::TraceProgramSchema)
+    {
+        return;
+    }
+
+    auto layout = _getStructuralRayTracingProgramLayoutInfo(context, schemaType, schemaWitness);
+    SLANG_RELEASE_ASSERT(layout.isComplete());
+
+    IRInst* operands[] = {
+        lowerType(context, schemaType),
+        _lowerStructuralRayTracingSourceTypeName(context, schemaType),
+        _lowerStructuralRayTracingCanonicalTypeIdentity(context, schemaType),
+        lowerType(context, layout.traceContextType),
+        context->irBuilder->getBoolValue(layout.hasOpenHitGroups),
+        context->irBuilder->getBoolValue(layout.hasOpenMissShaders),
+        context->irBuilder->getBoolValue(layout.hasOpenCallableShaders),
+        _lowerStructuralRayTracingEntryIdentityPack(context, layout.hitGroupEntries),
+        _lowerStructuralRayTracingEntryIdentityPack(context, layout.missShaderEntries),
+        _lowerStructuralRayTracingEntryIdentityPack(context, layout.callableShaderEntries),
+    };
+    auto schema = cast<IRStructuralRayTracingProgramSchema>(context->irBuilder->emitIntrinsicInst(
+        nullptr,
+        kIROp_StructuralRayTracingProgramSchema,
+        SLANG_COUNT_OF(operands),
+        operands));
+
+    StructuralRayTracingFunctionIndexAllocator functionIndices;
+    _addStructuralRayTracingHitGroupInfo(context, schema, layout.hitGroupEntries, functionIndices);
+    _addStructuralRayTracingMissShaderInfo(
+        context,
+        schema,
+        layout.missShaderEntries,
+        functionIndices);
+    _addStructuralRayTracingCallableShaderInfo(
+        context,
+        schema,
+        layout.callableShaderEntries,
+        functionIndices);
+    if (layout.hasOpenHitGroups)
+    {
+        _addStructuralRayTracingOpenSectionInfo(
+            context,
+            schema,
+            layout.openHitGroups,
+            StructuralRayTracingSectionKind::HitGroups);
+    }
+    if (layout.hasOpenMissShaders)
+    {
+        _addStructuralRayTracingOpenSectionInfo(
+            context,
+            schema,
+            layout.openMissShaders,
+            StructuralRayTracingSectionKind::MissShaders);
+    }
+    if (layout.hasOpenCallableShaders)
+    {
+        _addStructuralRayTracingOpenSectionInfo(
+            context,
+            schema,
+            layout.openCallableShaders,
+            StructuralRayTracingSectionKind::CallableShaders);
+    }
+}
+
+struct StructuralRayTracingCallableContextInfo
+{
+    Type* contextType = nullptr;
+    Type* dataType = nullptr;
+};
+
+static StructuralRayTracingCallableContextInfo _getStructuralRayTracingCallableContextInfo(
+    IRGenContext* context,
+    FunctionDeclBase* functionDecl,
+    DeclRef<Decl> funcDeclRef)
+{
+    StructuralRayTracingCallableContextInfo result;
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto methodInfo = registry.getCallShaderMethodInfo(functionDecl);
+    SLANG_RELEASE_ASSERT(methodInfo);
+    auto genericApplication =
+        SubstitutionSet(funcDeclRef).findGenericAppDeclRef(methodInfo->methodGenericDecl);
+    SLANG_RELEASE_ASSERT(
+        genericApplication && methodInfo->callableContextTypeArgumentIndex >= 0 &&
+        methodInfo->callableContextTypeArgumentIndex < genericApplication->getArgCount() &&
+        methodInfo->callableContextWitnessArgumentIndex >= 0 &&
+        methodInfo->callableContextWitnessArgumentIndex < genericApplication->getArgCount());
+
+    result.contextType = as<Type>(
+        genericApplication->getArg(methodInfo->callableContextTypeArgumentIndex)->resolve());
+    auto contextWitness = as<SubtypeWitness>(
+        genericApplication->getArg(methodInfo->callableContextWitnessArgumentIndex)->resolve());
+    SLANG_RELEASE_ASSERT(result.contextType && contextWitness);
+    result.dataType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::CallableData);
+    SLANG_RELEASE_ASSERT(result.dataType);
+    return result;
+}
+
+static SourceLoc _getStructuralRayTracingCallLocation(IRGenContext* context)
+{
+    for (auto locInfo = context->irBuilder->getSourceLocInfo(); locInfo; locInfo = locInfo->next)
+    {
+        if (locInfo->sourceLoc.isValid())
+            return locInfo->sourceLoc;
+    }
+    return SourceLoc();
+}
+
+static bool _isConcreteStructuralRayTracingNominalType(IRGenContext* context, Type* type)
+{
+    // A checked program schema and its sealed entry lists are nominal types. Their decl refs carry
+    // all substitutions, including substitutions on enclosing declarations. Use the semantic
+    // dependency query that generic checking already relies on instead of defining another walk
+    // over arbitrary `Val` operands here.
+    type = type ? as<Type>(type->resolve()) : nullptr;
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType || as<ErrorType>(type))
+        return false;
+
+    auto sharedSemanticsContext = context->getLinkage()->getSemanticsForReflection();
+    return !sharedSemanticsContext->getDependentGenericParent(declRefType->getDeclRef());
+}
+
+static bool _isUnresolvedStructuralRayTracingPayloadType(IRGenContext* context, Type* type)
+{
+    type = type ? as<Type>(type->resolve()) : nullptr;
+    if (!type || as<ErrorType>(type) || as<ThisType>(type))
+        return true;
+
+    // Every empty payload eligible for this feature is nominal. Checking its decl ref with the
+    // same semantic dependency query also rejects `Empty<T>` while `T` is still open. Other
+    // payload shapes come from the already-checked concrete schema and cannot influence which
+    // empty user struct is selected.
+    if (as<DeclRefType>(type))
+        return !_isConcreteStructuralRayTracingNominalType(context, type);
+    return false;
+}
+
+enum class StructuralRayTracingEmptyPayloadSelection
+{
+    Unique,
+    NotFound,
+    Ambiguous,
+    SchemaNotConcrete,
+};
+
+struct StructuralRayTracingEmptyPayloadInfo
+{
+    StructuralRayTracingEmptyPayloadSelection selection =
+        StructuralRayTracingEmptyPayloadSelection::NotFound;
+    Type* payloadType = nullptr;
+    Type* secondPayloadType = nullptr;
+};
+
+static bool _isConcreteStructuralRayTracingProgramLayout(
+    IRGenContext* context,
+    const StructuralRayTracingProgramLayoutInfo& layout)
+{
+    // A concrete schema may still have an open hit, miss, or callable section. The nominal list
+    // values are nevertheless fully specialized at this point; only the finite set of entries is
+    // completed later from linked conformances. Generic schemas are rejected here so the deferred
+    // IR record never has to reconstruct missing source substitutions.
+    return layout.isComplete() &&
+           _isConcreteStructuralRayTracingNominalType(context, layout.programLayoutType) &&
+           _isConcreteStructuralRayTracingNominalType(context, layout.hitGroupsType) &&
+           _isConcreteStructuralRayTracingNominalType(context, layout.missShadersType);
+}
+
+static StructuralRayTracingEmptyPayloadInfo _findStructuralRayTracingEmptyPayload(
+    IRGenContext* context,
+    const StructuralRayTracingProgramLayoutInfo& layout)
+{
+    StructuralRayTracingEmptyPayloadInfo result;
+    // `layout.isComplete()` proves that the associated-type requirements resolved, but an open
+    // generic schema can still resolve them to types that depend on its parameters. The schema and
+    // sealed list decl refs are the checked source of truth for the whole entry set: their
+    // substitutions contain each hit-group/miss-shader type and its enclosing substitutions. The
+    // semantic dependency query therefore distinguishes a concrete schema without
+    // rediscovering generic context by walking arbitrary `Val` operands.
+    if (!_isConcreteStructuralRayTracingProgramLayout(context, layout))
+    {
+        result.selection = StructuralRayTracingEmptyPayloadSelection::SchemaNotConcrete;
+        return result;
+    }
+
+    List<Type*> payloadTypes;
+    bool hasUnresolvedPayload = false;
+    auto addPayloadType = [&](Type* payloadType)
+    {
+        payloadType = payloadType ? payloadType->getCanonicalType() : nullptr;
+        if (_isUnresolvedStructuralRayTracingPayloadType(context, payloadType))
+        {
+            hasUnresolvedPayload = true;
+            return;
+        }
+
+        for (auto existingType : payloadTypes)
+        {
+            if (existingType->equals(payloadType))
+                return;
+        }
+        payloadTypes.add(payloadType);
+    };
+
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    if (layout.hitGroupEntries.types->getTypeCount() != 0 && !layout.hitGroupEntries.witnesses)
+    {
+        hasUnresolvedPayload = true;
+    }
+    else if (layout.hitGroupEntries.witnesses)
+    {
+        for (Index i = 0; i < layout.hitGroupEntries.types->getTypeCount(); ++i)
+        {
+            auto groupWitness = layout.hitGroupEntries.witnesses->getWitness(i);
+            auto contextWitness = registry.resolveAssociatedTypeConstraint(
+                context->astBuilder,
+                groupWitness,
+                StructuralRayTracingAssociatedTypeKind::HitGroupContext);
+            addPayloadType(registry.resolveAssociatedType(
+                context->astBuilder,
+                contextWitness,
+                StructuralRayTracingAssociatedTypeKind::PayloadContextPayload));
+        }
+    }
+
+    if (layout.missShaderEntries.types->getTypeCount() != 0 && !layout.missShaderEntries.witnesses)
+    {
+        hasUnresolvedPayload = true;
+    }
+    else if (layout.missShaderEntries.witnesses)
+    {
+        for (Index i = 0; i < layout.missShaderEntries.types->getTypeCount(); ++i)
+        {
+            auto shaderWitness = layout.missShaderEntries.witnesses->getWitness(i);
+            auto contextWitness = _getStructuralRayTracingStageContextWitness(
+                context,
+                shaderWitness,
+                StructuralRayTracingStageKind::Miss);
+            addPayloadType(registry.resolveAssociatedType(
+                context->astBuilder,
+                contextWitness,
+                StructuralRayTracingAssociatedTypeKind::PayloadContextPayload));
+        }
+    }
+
+    if (hasUnresolvedPayload)
+    {
+        result.selection = StructuralRayTracingEmptyPayloadSelection::SchemaNotConcrete;
+        return result;
+    }
+
+    for (auto payloadType : payloadTypes)
+    {
+        if (!isSemanticallyEmptyStructuralRayTracingPayload(context->astBuilder, payloadType))
+            continue;
+        if (!result.payloadType)
+        {
+            result.payloadType = payloadType;
+            result.selection = StructuralRayTracingEmptyPayloadSelection::Unique;
+        }
+        else
+        {
+            result.secondPayloadType = payloadType;
+            result.selection = StructuralRayTracingEmptyPayloadSelection::Ambiguous;
+            return result;
+        }
+    }
+    return result;
+}
+
+static void _addFlattenedTupleArgs(List<IRInst*>& ioArgs, IRInst* val);
+
+struct StructuralRayTracingPairedPayloadMethod
+{
+    FunctionDeclBase* method = nullptr;
+    const StructuralRayTracingTraceMethodInfo* methodInfo = nullptr;
+    DeclRef<GenericDecl> genericDeclRef;
+    GenericAppDeclRef* implicitGenericApplication = nullptr;
+    GenericAppDeclRef* extensionGenericApplication = nullptr;
+};
+
+/// Finds the paired explicit-payload overload and its two checked generic applications.
+///
+/// The registry owns all role discovery. This helper only follows the named declarations recorded
+/// there, so both eager AST specialization and deferred IR production consume the same source of
+/// truth without inferring anything from generic argument positions.
+static StructuralRayTracingPairedPayloadMethod _getPairedStructuralRayTracingPayloadMethod(
+    IRGenContext* context,
+    DeclRef<Decl> noPayloadMethodRef,
+    FunctionDeclBase* noPayloadMethod,
+    const StructuralRayTracingTraceMethodInfo& noPayloadMethodInfo)
+{
+    StructuralRayTracingPairedPayloadMethod result;
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto rayTracerMethodInfo = registry.getRayTracerMethodInfo(noPayloadMethod);
+    result.method = noPayloadMethodInfo.pairedPayloadMethod;
+    result.methodInfo = registry.getTraceMethodInfo(result.method);
+    SLANG_RELEASE_ASSERT(
+        rayTracerMethodInfo && result.methodInfo &&
+        result.methodInfo->kind == StructuralRayTracingTraceMethodKind::ExplicitPayload);
+
+    DeclRef<Decl> extensionDeclRef = noPayloadMethodRef;
+    while (extensionDeclRef && extensionDeclRef.getDecl() != rayTracerMethodInfo->extensionDecl)
+        extensionDeclRef = extensionDeclRef.getParent();
+    SLANG_RELEASE_ASSERT(extensionDeclRef);
+
+    auto payloadGenericDecl = result.methodInfo->methodGenericDecl;
+    SLANG_RELEASE_ASSERT(payloadGenericDecl && payloadGenericDecl->inner == result.method);
+    result.genericDeclRef =
+        context->astBuilder->getMemberDeclRef(extensionDeclRef, payloadGenericDecl)
+            .as<GenericDecl>();
+    result.extensionGenericApplication =
+        SubstitutionSet(extensionDeclRef)
+            .findGenericAppDeclRef(rayTracerMethodInfo->schemaGenericDecl);
+    SLANG_RELEASE_ASSERT(result.genericDeclRef && result.extensionGenericApplication);
+
+    if (noPayloadMethodInfo.methodGenericDecl)
+    {
+        result.implicitGenericApplication =
+            SubstitutionSet(noPayloadMethodRef)
+                .findGenericAppDeclRef(noPayloadMethodInfo.methodGenericDecl);
+        SLANG_RELEASE_ASSERT(result.implicitGenericApplication);
+    }
+    return result;
+}
+
+/// Specializes the trusted payload-taking overload selected for an implicit empty-payload call.
+///
+/// Registration already mapped every target generic argument to either the selected payload type
+/// or an argument from the checked empty-payload call. Consuming that mapping here avoids
+/// reconstructing the standard module's generic signature by position.
+static DeclRef<Decl> _specializePairedStructuralRayTracingPayloadMethod(
+    IRGenContext* context,
+    DeclRef<Decl> noPayloadMethodRef,
+    FunctionDeclBase* noPayloadMethod,
+    const StructuralRayTracingTraceMethodInfo& noPayloadMethodInfo,
+    Type* payloadType)
+{
+    auto paired = _getPairedStructuralRayTracingPayloadMethod(
+        context,
+        noPayloadMethodRef,
+        noPayloadMethod,
+        noPayloadMethodInfo);
+    List<Val*> payloadGenericArgs;
+    for (auto source : noPayloadMethodInfo.pairedPayloadGenericArguments)
+    {
+        if (source.kind == StructuralRayTracingPairedTraceArgumentSourceKind::PayloadType)
+        {
+            payloadGenericArgs.add(payloadType);
+            continue;
+        }
+
+        SLANG_RELEASE_ASSERT(
+            source.kind ==
+            StructuralRayTracingPairedTraceArgumentSourceKind::ImplicitEmptyPayloadMethodArgument);
+        SLANG_RELEASE_ASSERT(
+            paired.implicitGenericApplication && source.argumentIndex >= 0 &&
+            source.argumentIndex < paired.implicitGenericApplication->getArgCount());
+        payloadGenericArgs.add(paired.implicitGenericApplication->getArg(source.argumentIndex));
+    }
+    return context->astBuilder->getGenericAppDeclRef(
+        paired.genericDeclRef,
+        payloadGenericArgs.getArrayView(),
+        paired.method);
+}
+
+struct StructuralRayTracingDeferredEmptyPayloadFallback
+{
+    IRInst* generic = nullptr;
+    IRMakeValuePack* genericArgumentsWithoutPayload = nullptr;
+    Index payloadGenericArgumentIndex = -1;
+    IRMakeValuePack* argumentsWithoutPayload = nullptr;
+    Index payloadArgumentIndex = -1;
+};
+
+/// Preserves the exact generic and value call shapes for link-time payload insertion.
+///
+/// Consider the Metal overload `trace<Payload, let maxLevelCount>(..., inout Payload payload)`.
+/// Generic lowering flattens its value parameter and equality witness into the same IR argument
+/// list as `Payload`, while the receiver participates only in the fallback value argument list.
+/// Registration has already paired each explicit-overload role with its implicit-overload source.
+/// This producer applies the enclosing `RayTracer<Schema>` extension arguments now, stores every
+/// non-payload method argument in its lowered order, and records the two insertion points. Once an
+/// open section is complete, the linker can therefore insert the selected payload without parsing
+/// a generic, reconstructing a function signature, or assuming where either payload role lives.
+static StructuralRayTracingDeferredEmptyPayloadFallback
+_makeDeferredStructuralRayTracingEmptyPayloadFallback(
+    IRGenContext* context,
+    DeclRef<Decl> noPayloadMethodRef,
+    FunctionDeclBase* noPayloadMethod,
+    const StructuralRayTracingTraceMethodInfo& noPayloadMethodInfo,
+    IRInst* tracer,
+    IRInst* desc,
+    IRInst* accelerationStructure,
+    IRInst* descriptor)
+{
+    auto builder = context->irBuilder;
+    auto paired = _getPairedStructuralRayTracingPayloadMethod(
+        context,
+        noPayloadMethodRef,
+        noPayloadMethod,
+        noPayloadMethodInfo);
+
+    // `ensureDecl` yields the complete nested generic. Apply only the enclosing extension here,
+    // and specialize its type generic in lockstep with its value generic. The result remains the
+    // explicit overload's method generic, with the compiler-produced function type intact.
+    auto generic = getSimpleVal(context, ensureDecl(context, paired.genericDeclRef.getDecl()));
+    SLANG_RELEASE_ASSERT(generic && generic->getDataType());
+    List<IRInst*> extensionArguments;
+    for (auto argument : paired.extensionGenericApplication->getArgs())
+    {
+        auto loweredArgument = lowerSimpleVal(context, argument);
+        SLANG_RELEASE_ASSERT(loweredArgument);
+        _addFlattenedTupleArgs(extensionArguments, loweredArgument);
+    }
+    auto specializedGenericType = as<IRType>(builder->emitSpecializeInst(
+        builder->getTypeKind(),
+        generic->getDataType(),
+        extensionArguments));
+    SLANG_RELEASE_ASSERT(specializedGenericType);
+
+    StructuralRayTracingDeferredEmptyPayloadFallback result;
+    result.generic =
+        builder->emitSpecializeInst(specializedGenericType, generic, extensionArguments);
+
+    List<IRInst*> genericArgumentsWithoutPayload;
+    for (auto source : noPayloadMethodInfo.pairedPayloadGenericArguments)
+    {
+        if (source.kind == StructuralRayTracingPairedTraceArgumentSourceKind::PayloadType)
+        {
+            SLANG_RELEASE_ASSERT(result.payloadGenericArgumentIndex < 0);
+            result.payloadGenericArgumentIndex = genericArgumentsWithoutPayload.getCount();
+            continue;
+        }
+
+        SLANG_RELEASE_ASSERT(
+            source.kind == StructuralRayTracingPairedTraceArgumentSourceKind::
+                               ImplicitEmptyPayloadMethodArgument &&
+            paired.implicitGenericApplication && source.argumentIndex >= 0 &&
+            source.argumentIndex < paired.implicitGenericApplication->getArgCount());
+        auto loweredArgument = lowerSimpleVal(
+            context,
+            paired.implicitGenericApplication->getArg(source.argumentIndex));
+        SLANG_RELEASE_ASSERT(loweredArgument);
+        _addFlattenedTupleArgs(genericArgumentsWithoutPayload, loweredArgument);
+    }
+    SLANG_RELEASE_ASSERT(result.payloadGenericArgumentIndex >= 0);
+    result.genericArgumentsWithoutPayload = cast<IRMakeValuePack>(builder->emitMakeValuePack(
+        genericArgumentsWithoutPayload.getCount(),
+        genericArgumentsWithoutPayload.getBuffer()));
+
+    auto parameters = paired.method->getParameters();
+    List<IRInst*> argumentsWithoutPayload;
+    argumentsWithoutPayload.add(tracer);
+    auto addParameterArgument = [&](Index parameterIndex, IRInst* argument)
+    {
+        SLANG_RELEASE_ASSERT(
+            parameterIndex >= 0 && parameterIndex < parameters.getCount() && argument);
+        if (parameterIndex == paired.methodInfo->payloadParameterIndex)
+        {
+            SLANG_RELEASE_ASSERT(result.payloadArgumentIndex < 0);
+            result.payloadArgumentIndex = argumentsWithoutPayload.getCount();
+            return;
+        }
+        argumentsWithoutPayload.add(argument);
+    };
+
+    // Visit declaration order while obtaining each value from its registered semantic role. This
+    // keeps the saved pack correct if the trusted overload later reorders its source parameters.
+    for (Index parameterIndex = 0; parameterIndex < parameters.getCount(); ++parameterIndex)
+    {
+        IRInst* argument = nullptr;
+        if (parameterIndex == paired.methodInfo->traversalDescParameterIndex)
+            argument = desc;
+        else if (parameterIndex == paired.methodInfo->accelerationStructureParameterIndex)
+            argument = accelerationStructure;
+        else if (parameterIndex == paired.methodInfo->descriptorParameterIndex)
+            argument = descriptor;
+        else if (parameterIndex == paired.methodInfo->payloadParameterIndex)
+            argument = builder->getVoidValue();
+        else
+            SLANG_UNEXPECTED("unregistered structural ray-tracing trace parameter");
+        addParameterArgument(parameterIndex, argument);
+    }
+    SLANG_RELEASE_ASSERT(result.payloadArgumentIndex >= 0);
+    result.argumentsWithoutPayload = cast<IRMakeValuePack>(builder->emitMakeValuePack(
+        argumentsWithoutPayload.getCount(),
+        argumentsWithoutPayload.getBuffer()));
+    return result;
+}
+
+/// Packs a trace fallback's arguments in the order declared by that exact overload.
+///
+/// Consider a future trusted declaration that moves `inout Payload payload` before `descriptor`.
+/// The structural trace instruction still exposes those values through semantic accessors for
+/// target lowering, but its portable fallback must receive them in the source declaration's
+/// order. Registration has already proved that the four recorded roles cover every parameter, so
+/// this producer can form the exact call once and the portable consumer need not reinterpret
+/// front-end parameter indices.
+static IRInst* _makeStructuralRayTracingTraceFallbackArguments(
+    IRBuilder* builder,
+    FunctionDeclBase* fallbackMethod,
+    const StructuralRayTracingTraceMethodInfo& fallbackMethodInfo,
+    IRInst* tracer,
+    IRInst* desc,
+    IRInst* accelerationStructure,
+    IRInst* descriptor,
+    IRInst* payload)
+{
+    auto parameters = fallbackMethod->getParameters();
+    SLANG_RELEASE_ASSERT(
+        fallbackMethodInfo.kind == StructuralRayTracingTraceMethodKind::ExplicitPayload);
+
+    List<IRInst*> fallbackArguments;
+    fallbackArguments.add(tracer);
+    for (Index parameterIndex = 0; parameterIndex < parameters.getCount(); ++parameterIndex)
+        fallbackArguments.add(nullptr);
+    auto setParameterArgument = [&](Index parameterIndex, IRInst* argument)
+    {
+        SLANG_RELEASE_ASSERT(
+            parameterIndex >= 0 && parameterIndex < parameters.getCount() && argument &&
+            !fallbackArguments[parameterIndex + 1]);
+        fallbackArguments[parameterIndex + 1] = argument;
+    };
+    setParameterArgument(fallbackMethodInfo.traversalDescParameterIndex, desc);
+    setParameterArgument(
+        fallbackMethodInfo.accelerationStructureParameterIndex,
+        accelerationStructure);
+    setParameterArgument(fallbackMethodInfo.descriptorParameterIndex, descriptor);
+    setParameterArgument(fallbackMethodInfo.payloadParameterIndex, payload);
+    for (auto argument : fallbackArguments)
+        SLANG_RELEASE_ASSERT(argument);
+    return builder->emitMakeValuePack(fallbackArguments.getCount(), fallbackArguments.getBuffer());
+}
+
 // Given a `DeclRef` for something callable, along with a bunch of
 // arguments, emit an appropriate call to it.
 LoweredValInfo emitCallToDeclRef(
@@ -966,6 +2367,402 @@ LoweredValInfo emitCallToDeclRef(
     auto builder = context->irBuilder;
 
     auto funcDecl = funcDeclRef.getDecl();
+    auto& structuralRayTracingRegistry =
+        context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    if (structuralRayTracingRegistry.isInitialized())
+    {
+        if (auto functionDecl = as<FunctionDeclBase>(funcDecl))
+        {
+            auto traceMethodInfo = structuralRayTracingRegistry.getTraceMethodInfo(functionDecl);
+            if (traceMethodInfo)
+            {
+                auto traceMethodKind = traceMethodInfo->kind;
+                auto layout =
+                    _getStructuralRayTracingProgramLayoutInfo(context, functionDecl, funcDeclRef);
+                auto location = _getStructuralRayTracingCallLocation(context);
+                auto parameters = functionDecl->getParameters();
+                SLANG_RELEASE_ASSERT(argCount == UInt(parameters.getCount() + 1));
+                auto getParameterArgument = [&](Index parameterIndex)
+                {
+                    SLANG_RELEASE_ASSERT(
+                        parameterIndex >= 0 && parameterIndex < parameters.getCount());
+                    return args[parameterIndex + 1];
+                };
+
+                Type* astPayloadType = nullptr;
+                IRType* payloadType = nullptr;
+                IRInst* payloadArgument = nullptr;
+                bool deferEmptyPayload = false;
+                StructuralRayTracingDeferredEmptyPayloadFallback deferredFallback;
+                DeclRef<Decl> fallbackDeclRef = funcDeclRef;
+                IRType* fallbackFuncType = funcType;
+                List<IRInst*> traceArgs;
+                traceArgs.add(args[0]);
+                auto descArgument =
+                    getParameterArgument(traceMethodInfo->traversalDescParameterIndex);
+                auto accelerationStructureArgument =
+                    getParameterArgument(traceMethodInfo->accelerationStructureParameterIndex);
+                auto descriptorArgument =
+                    getParameterArgument(traceMethodInfo->descriptorParameterIndex);
+                traceArgs.add(descArgument);
+                traceArgs.add(accelerationStructureArgument);
+                traceArgs.add(descriptorArgument);
+                if (traceMethodKind == StructuralRayTracingTraceMethodKind::ExplicitPayload)
+                {
+                    SLANG_RELEASE_ASSERT(layout.isComplete() && argCount != 0);
+                    auto payloadParam = parameters[traceMethodInfo->payloadParameterIndex];
+                    astPayloadType =
+                        funcDeclRef.substitute(context->astBuilder, payloadParam->type.type);
+                    SLANG_RELEASE_ASSERT(!isSemanticallyEmptyStructuralRayTracingPayload(
+                        context->astBuilder,
+                        astPayloadType));
+
+                    payloadArgument = getParameterArgument(traceMethodInfo->payloadParameterIndex);
+                    auto payloadPointerType = as<IRPtrTypeBase>(payloadArgument->getDataType());
+                    SLANG_RELEASE_ASSERT(payloadPointerType);
+                    payloadType = payloadPointerType->getValueType();
+                    traceArgs.add(payloadArgument);
+                }
+                else
+                {
+                    if (!_isConcreteStructuralRayTracingProgramLayout(context, layout))
+                    {
+                        context->getSink()->diagnose(
+                            Diagnostics::StructuralRayTracingSchemaNotConcrete{
+                                .schemaType = layout.programLayoutType
+                                                  ? layout.programLayoutType
+                                                  : context->astBuilder->getErrorType(),
+                                .location = location});
+                        return LoweredValInfo::simple(builder->getVoidValue());
+                    }
+
+                    deferEmptyPayload = layout.hasOpenHitGroups || layout.hasOpenMissShaders;
+                    if (deferEmptyPayload)
+                    {
+                        // Hit and miss conformances linked later can change whether the empty
+                        // payload set is absent, unique, or ambiguous. Keep the existing trace as
+                        // the request owner, with explicit sentinels in every payload-dependent
+                        // field, and attach the exact producer record needed to complete it.
+                        payloadType = builder->getVoidType();
+                        payloadArgument = builder->getVoidValue();
+                        traceArgs.add(payloadArgument);
+                        deferredFallback = _makeDeferredStructuralRayTracingEmptyPayloadFallback(
+                            context,
+                            funcDeclRef,
+                            functionDecl,
+                            *traceMethodInfo,
+                            args[0],
+                            descArgument,
+                            accelerationStructureArgument,
+                            descriptorArgument);
+                    }
+                    else
+                    {
+                        // An open callable section cannot add a payload-serving stage, so it does
+                        // not delay the ordinary eager empty-payload selection.
+                        auto emptyPayload = _findStructuralRayTracingEmptyPayload(context, layout);
+                        switch (emptyPayload.selection)
+                        {
+                        case StructuralRayTracingEmptyPayloadSelection::SchemaNotConcrete:
+                            SLANG_UNEXPECTED("concrete schema changed during payload selection");
+                        case StructuralRayTracingEmptyPayloadSelection::NotFound:
+                            context->getSink()->diagnose(
+                                Diagnostics::StructuralRayTracingEmptyPayloadNotFound{
+                                    .schemaType = layout.programLayoutType,
+                                    .location = location});
+                            return LoweredValInfo::simple(builder->getVoidValue());
+                        case StructuralRayTracingEmptyPayloadSelection::Ambiguous:
+                            context->getSink()->diagnose(
+                                Diagnostics::StructuralRayTracingAmbiguousEmptyPayload{
+                                    .schemaType = layout.programLayoutType,
+                                    .firstPayloadType = emptyPayload.payloadType,
+                                    .secondPayloadType = emptyPayload.secondPayloadType,
+                                    .location = location});
+                            return LoweredValInfo::simple(builder->getVoidValue());
+                        case StructuralRayTracingEmptyPayloadSelection::Unique:
+                            break;
+                        }
+
+                        astPayloadType = emptyPayload.payloadType;
+                        payloadType = lowerType(context, astPayloadType);
+                        payloadArgument = builder->emitVar(payloadType);
+                        builder->emitStore(
+                            payloadArgument,
+                            builder->emitDefaultConstruct(payloadType));
+                        traceArgs.add(payloadArgument);
+
+                        fallbackDeclRef = _specializePairedStructuralRayTracingPayloadMethod(
+                            context,
+                            funcDeclRef,
+                            functionDecl,
+                            *traceMethodInfo,
+                            emptyPayload.payloadType);
+                        auto fallbackCallableDeclRef = fallbackDeclRef.as<CallableDecl>();
+                        SLANG_RELEASE_ASSERT(fallbackCallableDeclRef);
+                        // The paired payload-taking overload is a checked declaration specialized
+                        // with the selected empty payload and all ordinary arguments from the
+                        // original call. Lower its semantic function type directly so this path
+                        // shares the same parameter representation as every ordinary call;
+                        // rebuilding the signature here would create a second source of truth for
+                        // substitution and parameter directions.
+                        fallbackFuncType = lowerType(
+                            context,
+                            getFuncType(context->astBuilder, fallbackCallableDeclRef));
+                    }
+                }
+
+                IRInst* fallback = nullptr;
+                IRInst* fallbackArguments = nullptr;
+                if (deferEmptyPayload)
+                {
+                    fallback = builder->getVoidValue();
+                    fallbackArguments = builder->getVoidValue();
+                }
+                else
+                {
+                    auto fallbackMethod = as<FunctionDeclBase>(fallbackDeclRef.getDecl());
+                    SLANG_RELEASE_ASSERT(fallbackMethod);
+                    auto fallbackMethodInfo =
+                        structuralRayTracingRegistry.getTraceMethodInfo(fallbackMethod);
+                    SLANG_RELEASE_ASSERT(fallbackMethodInfo);
+                    fallbackArguments = _makeStructuralRayTracingTraceFallbackArguments(
+                        builder,
+                        fallbackMethod,
+                        *fallbackMethodInfo,
+                        args[0],
+                        descArgument,
+                        accelerationStructureArgument,
+                        descriptorArgument,
+                        payloadArgument);
+                    fallback = getSimpleVal(
+                        context,
+                        emitDeclRef(context, fallbackDeclRef, fallbackFuncType));
+                }
+
+                List<IRInst*> operationArgs;
+                operationArgs.add(fallback);
+                operationArgs.add(fallbackArguments);
+                operationArgs.add(lowerType(context, layout.programLayoutType));
+                operationArgs.add(
+                    _lowerStructuralRayTracingSourceTypeName(context, layout.programLayoutType));
+                operationArgs.add(lowerType(context, layout.traceContextType));
+                operationArgs.add(payloadType);
+                // Keep a second reference to the logical type as semantic metadata. Unlike the
+                // ABI-facing payload operand, this reference is never rebuilt from a mangled name
+                // and therefore follows ordinary IR generic substitution. For example, cloning a
+                // generic helper twice maps its `%T` semantic operand to each concrete payload
+                // specialization independently.
+                operationArgs.add(payloadType);
+                operationArgs.add(
+                    builder->getIntValue(builder->getIntType(), IRIntegerValue(traceMethodKind)));
+                operationArgs.add(
+                    builder->getIntValue(builder->getIntType(), IRIntegerValue(layout.motionKind)));
+                operationArgs.add(lowerType(context, layout.hitGroupsType));
+                operationArgs.add(lowerType(context, layout.hitGroupEntries.types));
+                operationArgs.add(lowerType(context, layout.missShadersType));
+                operationArgs.add(lowerType(context, layout.missShaderEntries.types));
+                operationArgs.add(lowerType(context, layout.callableShadersType));
+                operationArgs.add(lowerType(context, layout.callableShaderEntries.types));
+                operationArgs.addRange(traceArgs);
+                // Whole-program manifest construction replaces this sentinel with the location
+                // shared by this trace and every reachable stage using the same semantic payload.
+                operationArgs.add(builder->getIntValue(builder->getIntType(), -1));
+                auto traceOperation = builder->emitIntrinsicInst(
+                    type,
+                    kIROp_StructuralRayTracingTrace,
+                    operationArgs.getCount(),
+                    operationArgs.getBuffer());
+                if (deferEmptyPayload)
+                {
+                    IRInst* operands[] = {
+                        deferredFallback.generic,
+                        deferredFallback.genericArgumentsWithoutPayload,
+                        builder->getIntValue(
+                            builder->getIntType(),
+                            deferredFallback.payloadGenericArgumentIndex),
+                        deferredFallback.argumentsWithoutPayload,
+                        builder->getIntValue(
+                            builder->getIntType(),
+                            deferredFallback.payloadArgumentIndex),
+                    };
+                    auto deferred = builder->addDecoration(
+                        traceOperation,
+                        kIROp_StructuralRayTracingDeferredEmptyPayloadDecoration,
+                        operands,
+                        SLANG_COUNT_OF(operands));
+                    deferred->sourceLoc = traceOperation->sourceLoc;
+                }
+                StructuralRayTracingFunctionIndexAllocator functionIndices;
+                _addStructuralRayTracingHitGroupInfo(
+                    context,
+                    traceOperation,
+                    layout.hitGroupEntries,
+                    functionIndices);
+                _addStructuralRayTracingMissShaderInfo(
+                    context,
+                    traceOperation,
+                    layout.missShaderEntries,
+                    functionIndices);
+                _addStructuralRayTracingCallableShaderInfo(
+                    context,
+                    traceOperation,
+                    layout.callableShaderEntries,
+                    functionIndices);
+                if (layout.hasOpenHitGroups)
+                {
+                    _addStructuralRayTracingOpenSectionInfo(
+                        context,
+                        traceOperation,
+                        layout.openHitGroups,
+                        StructuralRayTracingSectionKind::HitGroups);
+                }
+                if (layout.hasOpenMissShaders)
+                {
+                    _addStructuralRayTracingOpenSectionInfo(
+                        context,
+                        traceOperation,
+                        layout.openMissShaders,
+                        StructuralRayTracingSectionKind::MissShaders);
+                }
+                if (layout.hasOpenCallableShaders)
+                {
+                    _addStructuralRayTracingOpenSectionInfo(
+                        context,
+                        traceOperation,
+                        layout.openCallableShaders,
+                        StructuralRayTracingSectionKind::CallableShaders);
+                }
+                return LoweredValInfo::simple(traceOperation);
+            }
+            if (structuralRayTracingRegistry.isCallShaderMethod(functionDecl))
+            {
+                auto callShaderMethodInfo =
+                    structuralRayTracingRegistry.getCallShaderMethodInfo(functionDecl);
+                SLANG_RELEASE_ASSERT(callShaderMethodInfo);
+                auto layout =
+                    _getStructuralRayTracingProgramLayoutInfo(context, functionDecl, funcDeclRef);
+                SLANG_RELEASE_ASSERT(layout.isComplete());
+                auto callableContext =
+                    _getStructuralRayTracingCallableContextInfo(context, functionDecl, funcDeclRef);
+
+                List<IRInst*> operationArgs;
+                operationArgs.add(
+                    getSimpleVal(context, emitDeclRef(context, funcDeclRef, funcType)));
+                // Unlike the target-facing semantic operands below, the fallback arguments are
+                // already in the checked source declaration's order. Preserve that order as one
+                // value pack so portable lowering never reconstructs a call ABI by position.
+                operationArgs.add(builder->emitMakeValuePack(argCount, args));
+                operationArgs.add(lowerType(context, layout.programLayoutType));
+                operationArgs.add(
+                    _lowerStructuralRayTracingSourceTypeName(context, layout.programLayoutType));
+                operationArgs.add(lowerType(context, layout.traceContextType));
+                operationArgs.add(lowerType(context, layout.accelerationStructureType));
+                operationArgs.add(
+                    builder->getIntValue(builder->getIntType(), IRIntegerValue(layout.motionKind)));
+                operationArgs.add(lowerType(context, layout.hitGroupsType));
+                operationArgs.add(lowerType(context, layout.hitGroupEntries.types));
+                operationArgs.add(lowerType(context, layout.missShadersType));
+                operationArgs.add(lowerType(context, layout.missShaderEntries.types));
+                operationArgs.add(lowerType(context, layout.callableShadersType));
+                operationArgs.add(lowerType(context, layout.callableShaderEntries.types));
+                operationArgs.add(lowerType(context, callableContext.contextType));
+                operationArgs.add(lowerType(context, callableContext.dataType));
+                auto parameters = functionDecl->getParameters();
+                SLANG_RELEASE_ASSERT(argCount == UInt(parameters.getCount() + 1));
+                auto getParameterArgument = [&](Index parameterIndex)
+                {
+                    SLANG_RELEASE_ASSERT(
+                        parameterIndex >= 0 && parameterIndex < parameters.getCount());
+                    return args[parameterIndex + 1];
+                };
+                operationArgs.add(args[0]);
+                operationArgs.add(
+                    getParameterArgument(callShaderMethodInfo->callableIndexParameterIndex));
+                operationArgs.add(
+                    getParameterArgument(callShaderMethodInfo->descriptorParameterIndex));
+                operationArgs.add(getParameterArgument(callShaderMethodInfo->dataParameterIndex));
+                auto callOperation = builder->emitIntrinsicInst(
+                    type,
+                    kIROp_StructuralRayTracingCallShader,
+                    operationArgs.getCount(),
+                    operationArgs.getBuffer());
+                StructuralRayTracingFunctionIndexAllocator functionIndices;
+                _addStructuralRayTracingHitGroupInfo(
+                    context,
+                    callOperation,
+                    layout.hitGroupEntries,
+                    functionIndices);
+                _addStructuralRayTracingMissShaderInfo(
+                    context,
+                    callOperation,
+                    layout.missShaderEntries,
+                    functionIndices);
+                _addStructuralRayTracingCallableShaderInfo(
+                    context,
+                    callOperation,
+                    layout.callableShaderEntries,
+                    functionIndices);
+                if (layout.hasOpenHitGroups)
+                {
+                    _addStructuralRayTracingOpenSectionInfo(
+                        context,
+                        callOperation,
+                        layout.openHitGroups,
+                        StructuralRayTracingSectionKind::HitGroups);
+                }
+                if (layout.hasOpenMissShaders)
+                {
+                    _addStructuralRayTracingOpenSectionInfo(
+                        context,
+                        callOperation,
+                        layout.openMissShaders,
+                        StructuralRayTracingSectionKind::MissShaders);
+                }
+                if (layout.hasOpenCallableShaders)
+                {
+                    _addStructuralRayTracingOpenSectionInfo(
+                        context,
+                        callOperation,
+                        layout.openCallableShaders,
+                        StructuralRayTracingSectionKind::CallableShaders);
+                }
+                return LoweredValInfo::simple(callOperation);
+            }
+            auto operationKind =
+                structuralRayTracingRegistry.getStageInputOperationKind(functionDecl);
+            if (operationKind != StructuralRayTracingStageInputOperationKind::Count)
+            {
+                if (operationKind == StructuralRayTracingStageInputOperationKind::Payload)
+                {
+                    auto payloadType =
+                        getResultType(context->astBuilder, funcDeclRef.as<CallableDecl>());
+                    SLANG_RELEASE_ASSERT(!isSemanticallyEmptyStructuralRayTracingPayload(
+                        context->astBuilder,
+                        payloadType));
+                }
+                auto operation = getStructuralRayTracingStageInputOperationOp(operationKind);
+                SLANG_ASSERT(operation != kIROp_Invalid);
+                List<IRInst*> operationArgs;
+                if (operationKind != StructuralRayTracingStageInputOperationKind::Payload &&
+                    operationKind != StructuralRayTracingStageInputOperationKind::CallableData &&
+                    operationKind != StructuralRayTracingStageInputOperationKind::Record &&
+                    operationKind != StructuralRayTracingStageInputOperationKind::HitAttributes &&
+                    operationKind !=
+                        StructuralRayTracingStageInputOperationKind::TriangleBarycentricCoord &&
+                    operationKind != StructuralRayTracingStageInputOperationKind::CurveParameter)
+                {
+                    operationArgs.add(
+                        getSimpleVal(context, emitDeclRef(context, funcDeclRef, funcType)));
+                }
+                operationArgs.addRange(args, argCount);
+                return LoweredValInfo::simple(builder->emitIntrinsicInst(
+                    type,
+                    operation,
+                    operationArgs.getCount(),
+                    operationArgs.getBuffer()));
+            }
+        }
+    }
     if (auto intrinsicOpModifier = funcDecl->findModifier<IntrinsicOpModifier>())
     {
         // The intrinsic op maps to a single IR instruction,
@@ -1002,6 +2799,18 @@ LoweredValInfo emitCallToDeclRef(
     //
     LoweredValInfo funcVal = emitDeclRef(context, funcDeclRef, funcType);
     auto callInst = emitCallToVal(context, type, funcVal, argCount, args, tryEnv);
+    if (isCoreLegacyRayTracingPipelineMethod(as<FunctionDeclBase>(funcDecl)))
+    {
+        // A separately compiled helper retains only its serialized IR when it is linked into a
+        // later program. Mark the precise source call while its checked core declaration is still
+        // available, so linked-program validation never has to infer API identity from a mangled
+        // name or target-specific intrinsic spelling.
+        auto call = as<IRCall>(callInst.val);
+        SLANG_RELEASE_ASSERT(call);
+        auto decoration =
+            builder->addDecoration(call, kIROp_StructuralRayTracingLegacyAPIUseDecoration);
+        decoration->sourceLoc = call->sourceLoc;
+    }
     return callInst;
 }
 
@@ -2818,7 +4627,23 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
 
         auto loweredDeclRef = emitDeclRef(context, declRef, context->irBuilder->getTypeKind());
-        return (IRType*)getSimpleVal(context, loweredDeclRef);
+        auto loweredType = (IRType*)getSimpleVal(context, loweredDeclRef);
+
+        // `Schema` is intentionally a phantom source-level parameter: every descriptor initially
+        // has the same ParameterBlock-compatible storage struct. Preserve the checked argument in
+        // a dedicated IR type before that information disappears. Generic specialization then
+        // substitutes the schema operand normally, so helpers instantiated for different schemas
+        // cannot accidentally share a descriptor type.
+        auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+        if (auto schemaType = registry.tryGetTraceProgramDescriptorSchemaType(type))
+        {
+            IRInst* operands[] = {loweredType, lowerType(context, schemaType)};
+            return getBuilder()->getType(
+                kIROp_StructuralRayTracingProgramDescriptorType,
+                SLANG_COUNT_OF(operands),
+                operands);
+        }
+        return loweredType;
     }
 
     IRType* visitValuePackType(ValuePackType* type)
@@ -3124,6 +4949,36 @@ static void addNodeIDDecoration(IRGenContext* context, IRInst* inst, NodeIDAttri
     builder->addDecoration(inst, kIROp_NodeIDDecoration, ops, 2);
 }
 
+/// Returns whether `decl` is the automatic Vulkan payload storage owned by a structural trace
+/// fallback.
+///
+/// Consider the trusted `RayTracer.trace<Payload>` implementation:
+///
+///     [__vulkanRayPayload]
+///     [__structuralRayTracingVulkanPayloadStorage]
+///     static Payload nativePayload;
+///
+/// The structural trace call keeps that implementation as its source fallback. The internal
+/// declaration marker identifies the variable while the checked declaration is still available;
+/// `lowerFunctionStaticVarDecl` already has the containing IR function as its insertion parent and
+/// attaches the exact lowered global there. Later target lowering therefore does not need to search
+/// an inlined operand graph to rediscover their relationship. The marker is necessary at this
+/// producer boundary because the standard module is compiled and serialized before an importing
+/// session registers its trusted trace methods.
+static bool isStructuralRayTracingVulkanPayloadStorage(
+    Decl* decl,
+    VulkanRayPayloadAttribute* attribute)
+{
+    auto variableDecl = as<VarDeclBase>(decl);
+    if (!variableDecl ||
+        !variableDecl->findModifier<StructuralRayTracingVulkanPayloadStorageAttribute>())
+        return false;
+
+    SLANG_RELEASE_ASSERT(
+        attribute && attribute->location < 0 && isFunctionStaticVarDecl(variableDecl));
+    return true;
+}
+
 void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
 {
     auto builder = context->irBuilder;
@@ -3156,8 +5011,13 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         else if (auto rayPayloadAttr = as<VulkanRayPayloadAttribute>(mod))
         {
             builder->addVulkanRayPayloadDecoration(inst, rayPayloadAttr->location);
-            // may not be referenced; adding HLSL export modifier force emits
-            builder->addHLSLExportDecoration(inst);
+            if (!isStructuralRayTracingVulkanPayloadStorage(decl, rayPayloadAttr))
+            {
+                // Legacy payload globals may not be referenced; HLSL export forces their emission.
+                // A structural fallback instead retains its global through explicit compiler
+                // metadata until target lowering assigns or discards the Vulkan storage.
+                builder->addHLSLExportDecoration(inst);
+            }
         }
         else if (auto rayPayloadInAttr = as<VulkanRayPayloadInAttribute>(mod))
         {
@@ -11534,6 +13394,27 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     cast<IRWitnessTable>(irWitnessTable),
                     getWitnessTableBaseDeclRef(subContext, inheritanceDeclRef));
                 subContext->mapASTWitnessTableToIRWitnessTable = oldWitnessTableMap;
+
+                if (_isConcreteStructuralRayTracingNominalType(subContext, subType))
+                {
+                    // Build open-section metadata at the concrete conformance construction
+                    // boundary. The declared witness is the same checked proof used to populate
+                    // this table; using it here preserves interface projection without rebuilding
+                    // anything from the lowered operand graph. A generic declaration's symbolic
+                    // `Entry<T>` table is deliberately excluded: it denotes an unbounded family,
+                    // and an explicitly composed TypeConformance component catalogs each finite
+                    // `Entry<int>` specialization instead.
+                    auto tagWitness = context->astBuilder->getDeclaredSubtypeWitness(
+                        subType,
+                        superType,
+                        inheritanceDeclRef);
+                    _addStructuralRayTracingTaggedConformanceInfo(
+                        subContext,
+                        cast<IRWitnessTable>(irWitnessTable),
+                        subType,
+                        superType,
+                        tagWitness);
+                }
             }
 
             irWitnessTable->moveToEnd();
@@ -11941,8 +13822,26 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         subBuilder->setInsertBefore(parent);
 
         IRType* subVarType = lowerType(subContext, decl->getType());
-        IRGlobalValueWithCode* irGlobal = subBuilder->createGlobalVar(subVarType);
+        IRGlobalVar* irGlobal = subBuilder->createGlobalVar(subVarType);
         addVarDecorations(subContext, irGlobal, decl);
+
+        if (isStructuralRayTracingVulkanPayloadStorage(
+                decl,
+                decl->findModifier<VulkanRayPayloadAttribute>()))
+        {
+            // Function-static storage is deliberately inserted immediately before its containing
+            // function, inside the same outer generic. Attaching the sibling global to that
+            // function makes ordinary generic cloning specialize both together and remap this
+            // operand to the exact specialized storage.
+            auto owner = as<IRFunc>(parent);
+            SLANG_RELEASE_ASSERT(
+                owner &&
+                !owner->findDecoration<IRStructuralRayTracingVulkanPayloadStorageDecoration>());
+            subBuilder->addDecoration(
+                owner,
+                kIROp_StructuralRayTracingVulkanPayloadStorageDecoration,
+                irGlobal);
+        }
 
         addNameHint(context, irGlobal, decl);
         maybeSetRate(context, irGlobal, decl);
@@ -12382,8 +14281,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             operandCount++;
         }
 
-        // Allocate an IRInterfaceType with the `operandCount` operands.
-        IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
+        // Preserve compiler-owned stage identity when lowering the exact declarations
+        // registered from the trusted slang.raytracing standard module.
+        auto interfaceOp = kIROp_InterfaceType;
+        auto stageKind =
+            context->getLinkage()->getStructuralRayTracingDeclRegistry().getStageKind(decl);
+        if (stageKind != StructuralRayTracingStageKind::Count)
+            interfaceOp = getStructuralRayTracingStageInterfaceOp(stageKind);
+
+        IRInterfaceType* irInterface =
+            subBuilder->createInterfaceType(interfaceOp, operandCount, nullptr);
         auto finalVal = finishOuterGenerics(subBuilder, irInterface, outerGeneric);
 
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
@@ -12846,6 +14753,27 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irAggType, decl);
         addLinkageDecoration(context, irAggType, decl);
 
+        if (auto structDecl = as<StructDecl>(decl))
+        {
+            // Preserve source-level emptiness on the nominal type itself. Consider a generic
+            // helper that calls `trace<Payload>(..., payload)` and is later specialized with
+            // `struct EmptyPayload {}`. The explicit trace is checked while `Payload` is still
+            // open, so only post-specialization validation can reject the now-empty value. The
+            // specialized IR type must carry the source fact because an empty derived struct has
+            // an IR base field and a wrapper containing an empty field must not count as empty.
+            //
+            // This decoration is emitted even when the declaring module does not import
+            // `slang.raytracing`: an empty payload can be declared in a separately compiled data
+            // module and become a payload only after another module imports it.
+            auto structDeclRef = createDefaultSpecializedDeclRef(subContext, nullptr, structDecl);
+            auto sourceType = DeclRefType::create(context->astBuilder, structDeclRef);
+            if (isSemanticallyEmptyStructuralRayTracingPayload(context->astBuilder, sourceType))
+            {
+                subBuilder->addDecoration(
+                    irAggType,
+                    kIROp_StructuralRayTracingSemanticallyEmptyPayloadDecoration);
+            }
+        }
 
         if (const auto rayPayloadAttribute = decl->findModifier<RayPayloadAttribute>();
             rayPayloadAttribute)
@@ -13068,139 +14996,103 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return Slang::maybeGetConstExprType(getBuilder(), type, decl);
     }
 
-    /// Emit appropriate generic parameters for a constraint, and return the value of that
-    /// constraint.
+    /// Creates a hidden generic parameter and makes it visible before its type is lowered.
     ///
-    /// The `supType` paramete represents the super-type that a parameter is constrained to.
-    IRInst* emitGenericConstraintValue(
-        IRGenContext* subContext,
-        DeclRef<GenericTypeConstraintDecl> constraintDeclRef,
-        IRType* supType)
+    /// The null type is temporary: `emitGenericDecl` completes every placeholder before it emits
+    /// the generic body or returns the generic. IR parameter cloning uses the same two-pass form
+    /// because parameter types may refer to parameters declared later in the block.
+    void predeclareGenericConstraintDecl(IRGenContext* subContext, Decl* constraintDecl)
     {
-        auto constraintDecl = constraintDeclRef.getDecl();
-
-        auto subBuilder = subContext->irBuilder;
-
-        // There are two cases we care about here.
-        //
-        if (auto andType = as<IRConjunctionType>(supType))
-        {
-            // The non-trivial case is when the constraint on a generic parameter
-            // was of the form `T : A & B`. In this case, we really want to
-            // emit the function with parameters for each of the two independent
-            // constraints `T : A` and `T : B`.
-            //
-            // We will loop over the "cases" of the conjunction (since
-            // the `IRConunctionType` can support more than just binary
-            // conjunctions) and recursively add constraints for each.
-            //
-            List<IRInst*> caseVals;
-            auto caseCount = andType->getCaseCount();
-            for (Int i = 0; i < caseCount; ++i)
-            {
-                auto caseType = andType->getCaseType(i);
-                auto caseVal = emitGenericConstraintValue(subContext, constraintDecl, caseType);
-                caseVals.add(caseVal);
-            }
-
-            return subBuilder->emitMakeTuple(caseVals);
-        }
-        else
-        {
-            // The case case is any other type being used as the constraint.
-            //
-            // The constraint will then map to a single generic parameter passing
-            // a witness table for conformance to the given `supType`.
-            //
-            auto param = subBuilder->emitParam(subBuilder->getWitnessTableType(supType));
-            addNameHint(context, param, constraintDecl);
-
-            // In order to support some of the "any-value" work in dynamic dispatch
-            // we have to attach the interface that was used as a constraint onto the
-            // type that is being constrained (which we expect to be a generic type
-            // parameter).
-            //
-            // TODO: It feels a bit gross to be doing this here; perhaps the front-end
-            // should handle propgation of value-size information from constraints
-            // back to generic parameters?
-            //
-            if (auto genParamDeclRef = isDeclRefTypeOf<GenericTypeParamDeclBase>(
-                    getSub(subContext->astBuilder, constraintDeclRef)))
-            {
-                auto typeParamDeclVal = subContext->findLoweredDecl(genParamDeclRef.getDecl());
-                SLANG_ASSERT(typeParamDeclVal && typeParamDeclVal->val);
-                subBuilder->addTypeConstraintDecoration(typeParamDeclVal->val, supType);
-            }
-
-            return param;
-        }
+        auto param = subContext->irBuilder->emitParam(nullptr);
+        addNameHint(context, param, constraintDecl);
+        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
     }
 
-    void emitGenericConstraintDecl(
+    /// Returns the placeholder created for a checked generic constraint.
+    IRParam* getPredeclaredGenericConstraintParam(IRGenContext* subContext, Decl* constraintDecl)
+    {
+        auto value = subContext->findLoweredDecl(constraintDecl);
+        SLANG_RELEASE_ASSERT(value && value->val);
+        auto param = as<IRParam>(value->val);
+        SLANG_RELEASE_ASSERT(param);
+        return param;
+    }
+
+    void completeGenericConstraintDecl(
         IRGenContext* subContext,
         DeclRef<GenericTypeConstraintDecl> constraintDeclRef)
     {
         auto supType = lowerType(subContext, getSup(subContext->astBuilder, constraintDeclRef));
-        auto value = emitGenericConstraintValue(subContext, constraintDeclRef, supType);
-        subContext->setValue(constraintDeclRef.getDecl(), LoweredValInfo::simple(value));
+        // `SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl` recursively splits every
+        // valid `T : A & B` constraint into one declaration per leaf. Equality constraints are not
+        // split, but their two operands must both be proper constrainee types and therefore cannot
+        // be conjunctions. Thus each checked constraint maps to exactly one hidden IR parameter.
+        SLANG_RELEASE_ASSERT(!as<IRConjunctionType>(supType));
+        auto constraintDecl = constraintDeclRef.getDecl();
+        auto param = getPredeclaredGenericConstraintParam(subContext, constraintDecl);
+        param->setFullType(subContext->irBuilder->getWitnessTableType(supType));
+
+        // In order to support some of the "any-value" work in dynamic dispatch, attach the
+        // interface used as a constraint to the constrained generic type parameter.
+        //
+        // TODO: The front end should probably propagate value-size information from constraints
+        // back to generic parameters instead of having IR lowering do it here.
+        if (auto genParamDeclRef = isDeclRefTypeOf<GenericTypeParamDeclBase>(
+                getSub(subContext->astBuilder, constraintDeclRef)))
+        {
+            auto typeParamDeclVal = subContext->findLoweredDecl(genParamDeclRef.getDecl());
+            SLANG_ASSERT(typeParamDeclVal && typeParamDeclVal->val);
+            subContext->irBuilder->addTypeConstraintDecoration(typeParamDeclVal->val, supType);
+        }
     }
 
-    void emitGenericConstraintDecl(
+    void completeGenericConstraintDecl(
         IRGenContext* subContext,
         DeclRef<TypeCoercionConstraintDecl> constraintDeclRef)
     {
         auto constraintDecl = constraintDeclRef.getDecl();
-        auto subBuilder = subContext->irBuilder;
         auto fromType =
             lowerType(subContext, getFromType(subContext->astBuilder, constraintDeclRef));
         auto toType = lowerType(subContext, getToType(subContext->astBuilder, constraintDeclRef));
-        auto funcType = subBuilder->getFuncType(1, &fromType, toType);
-        auto param = subBuilder->emitParam(funcType);
-        addNameHint(context, param, constraintDecl);
-        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
+        auto param = getPredeclaredGenericConstraintParam(subContext, constraintDecl);
+        param->setFullType(subContext->irBuilder->getFuncType(1, &fromType, toType));
     }
 
-    void emitGenericConstraintDecl(
+    void completeGenericConstraintDecl(
         IRGenContext* subContext,
         DeclRef<NonEmptyPackConstraintDecl> constraintDeclRef)
     {
         auto constraintDecl = constraintDeclRef.getDecl();
+        auto param = getPredeclaredGenericConstraintParam(subContext, constraintDecl);
         auto subBuilder = subContext->irBuilder;
-        auto witnessType = subBuilder->getWitnessTableType(subBuilder->getVoidType());
-        auto param = subBuilder->emitParam(witnessType);
-        addNameHint(context, param, constraintDecl);
-        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
+        param->setFullType(subBuilder->getWitnessTableType(subBuilder->getVoidType()));
     }
 
-    void emitGenericConstraintDecl(
+    void completeGenericConstraintDecl(
         IRGenContext* subContext,
         DeclRef<GenericVariadicPackCountConstraintDecl> constraintDeclRef)
     {
         auto constraintDecl = constraintDeclRef.getDecl();
-        auto subBuilder = subContext->irBuilder;
         // Generic lowering turns each source generic constraint into a hidden
         // parameter. The checker has already validated `countof(Pack) == Count`,
         // so lowering only needs a proof value with the same witness-table
         // representation consumed by `visitDeclaredVariadicPackCountWitness`.
-        auto witnessType = subBuilder->getWitnessTableType(subBuilder->getVoidType());
-        auto param = subBuilder->emitParam(witnessType);
-        addNameHint(context, param, constraintDecl);
-        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
+        auto param = getPredeclaredGenericConstraintParam(subContext, constraintDecl);
+        auto subBuilder = subContext->irBuilder;
+        param->setFullType(subBuilder->getWitnessTableType(subBuilder->getVoidType()));
     }
 
-    void emitGenericConstraintDecl(
+    void completeGenericConstraintDecl(
         IRGenContext* subContext,
         DeclRef<HasDiffTypeInfoConstraintDecl> constraintDeclRef)
     {
         auto constraintDecl = constraintDeclRef.getDecl();
-        auto subBuilder = subContext->irBuilder;
-        auto param = subBuilder->emitParam(subBuilder->getVoidType());
-        addNameHint(context, param, constraintDecl);
-        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
+        auto param = getPredeclaredGenericConstraintParam(subContext, constraintDecl);
+        param->setFullType(subContext->irBuilder->getVoidType());
     }
 
     template<typename T>
-    void emitGenericConstraintDecl(
+    void completeGenericConstraintDecl(
         IRGenContext* subContext,
         DeclRef<GenericDecl> genericDeclRef,
         T* constraintDecl)
@@ -13208,7 +15100,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto constraintDeclRef =
             subContext->astBuilder->getMemberDeclRef(genericDeclRef, constraintDecl)
                 .template as<T>();
-        emitGenericConstraintDecl(subContext, constraintDeclRef);
+        completeGenericConstraintDecl(subContext, constraintDeclRef);
     }
 
     IRGeneric* emitGenericDecl(IRGenContext* subContext, DeclRef<GenericDecl> genericDeclRef)
@@ -13260,14 +15152,29 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 subContext->setValue(valDecl, LoweredValInfo::simple(param));
             }
         }
-        // Then we emit constraint parameters, again in
-        // declaration order.
+        // Consider this example:
+        //
+        //     void use<Element, Storage>()
+        //         where Storage : IStorage<Element>
+        //         where Element : __BuiltinFloatingPointType;
+        //
+        // Lowering `IStorage<Element>` consumes the witness for the later `Element` constraint.
+        // Declare every hidden parameter in source order first so that the complete checked
+        // constraint environment is available when the next pass lowers parameter types.
+        for (auto constraintDecl : genericDecl->getDirectMemberDecls())
+        {
+            if (isGenericConstraintParameterDecl(constraintDecl))
+                predeclareGenericConstraintDecl(subContext, constraintDecl);
+        }
+
+        // Now that every constraint has an IR value, lower the parameter types in declaration
+        // order. IR parameters intentionally permit forward references in their types.
         for (auto constraintDecl : genericDecl->getDirectMemberDecls())
         {
             if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
             {
                 if (isGenericConstraintParameterDecl(genericTypeConstraintDecl))
-                    emitGenericConstraintDecl(
+                    completeGenericConstraintDecl(
                         subContext,
                         genericDeclRef,
                         genericTypeConstraintDecl);
@@ -13276,7 +15183,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
             {
                 if (isGenericConstraintParameterDecl(typeCoercionConstraintDecl))
-                    emitGenericConstraintDecl(
+                    completeGenericConstraintDecl(
                         subContext,
                         genericDeclRef,
                         typeCoercionConstraintDecl);
@@ -13284,21 +15191,27 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
             {
                 if (isGenericConstraintParameterDecl(nonEmptyConstraintDecl))
-                    emitGenericConstraintDecl(subContext, genericDeclRef, nonEmptyConstraintDecl);
+                    completeGenericConstraintDecl(
+                        subContext,
+                        genericDeclRef,
+                        nonEmptyConstraintDecl);
             }
             else if (
                 auto packCountConstraintDecl =
                     as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
             {
                 if (isGenericConstraintParameterDecl(packCountConstraintDecl))
-                    emitGenericConstraintDecl(subContext, genericDeclRef, packCountConstraintDecl);
+                    completeGenericConstraintDecl(
+                        subContext,
+                        genericDeclRef,
+                        packCountConstraintDecl);
             }
             else if (
                 auto hasDiffTypeInfoConstraintDecl =
                     as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
             {
                 if (isGenericConstraintParameterDecl(hasDiffTypeInfoConstraintDecl))
-                    emitGenericConstraintDecl(
+                    completeGenericConstraintDecl(
                         subContext,
                         genericDeclRef,
                         hasDiffTypeInfoConstraintDecl);
@@ -15518,6 +17431,11 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
     return info;
 }
 
+static void _lowerStructuralRayTracingEntryPointInfo(
+    IRGenContext* context,
+    EntryPoint* entryPoint,
+    IRFunc* entryPointFunc);
+
 static void lowerFrontEndEntryPointToIR(
     IRGenContext* context,
     EntryPoint* entryPoint,
@@ -15535,7 +17453,8 @@ static void lowerFrontEndEntryPointToIR(
 
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
 
-    if (!entryPointFuncDecl->findModifier<EntryPointAttribute>())
+    if (!entryPoint->getStructuralRayTracingInvokeMethod() &&
+        !entryPointFuncDecl->findModifier<EntryPointAttribute>())
     {
         // If the entry point doesn't have an explicit `[shader("...")]` attribute,
         // then we make sure to add one here, so the lowering logic knows it is an
@@ -15565,9 +17484,11 @@ static void lowerFrontEndEntryPointToIR(
     if (instToDecorate->findDecoration<IREntryPointDecoration>())
         return;
 
+    _lowerStructuralRayTracingEntryPointInfo(context, entryPoint, as<IRFunc>(instToDecorate));
+
     {
 
-        Name* entryPointName = entryPoint->getFuncDecl()->getName();
+        Name* entryPointName = entryPoint->getName();
         builder->addEntryPointDecoration(
             instToDecorate,
             entryPoint->getProfile(),
@@ -15613,6 +17534,61 @@ static void lowerFrontEndEntryPointToIR(
         builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(instToDecorate);
 }
 
+/// Lowers the checked structural stage contract onto an IR entry-point declaration.
+///
+/// The declaration can be either the source-module definition or the selected target program's
+/// layout-IR import. Keeping both producers here gives the linker one canonical IR representation
+/// to preserve and specialize.
+static void _lowerStructuralRayTracingEntryPointInfo(
+    IRGenContext* context,
+    EntryPoint* entryPoint,
+    IRFunc* entryPointFunc)
+{
+    auto invokeMethod = entryPoint->getStructuralRayTracingInvokeMethod();
+    if (!invokeMethod)
+        return;
+    SLANG_RELEASE_ASSERT(entryPointFunc);
+
+    auto& structuralInfo = entryPoint->getStructuralRayTracingInfo();
+    auto invokeDeclRef = makeDeclRef(invokeMethod);
+    auto invokeFuncType = lowerType(context, getFuncType(context->astBuilder, invokeDeclRef));
+    auto invokeFunc =
+        as<IRFunc>(getSimpleVal(context, emitDeclRef(context, invokeDeclRef, invokeFuncType)));
+    SLANG_ASSERT(invokeFunc);
+    auto irPayloadType =
+        structuralInfo.payloadType ? lowerType(context, structuralInfo.payloadType) : nullptr;
+
+    if (!entryPointFunc->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+    {
+        addStructuralRayTracingEntryPointInfo(
+            *context->irBuilder,
+            entryPointFunc,
+            {
+                .stageKind = structuralInfo.stageKind,
+                .invoke = invokeFunc,
+                .stageType = lowerType(context, structuralInfo.stageType),
+                .stageSourceTypeName =
+                    _lowerStructuralRayTracingSourceTypeName(context, structuralInfo.stageType),
+                .stageTypeIdentity = _lowerStructuralRayTracingCanonicalTypeIdentity(
+                    context,
+                    structuralInfo.stageType),
+                .contextType = lowerType(context, structuralInfo.contextType),
+                .payloadType = irPayloadType,
+                .payloadSemanticType = irPayloadType,
+                .recordType = structuralInfo.recordType
+                                  ? lowerType(context, structuralInfo.recordType)
+                                  : nullptr,
+                .hitAttributesType = structuralInfo.hitAttributesType
+                                         ? lowerType(context, structuralInfo.hitAttributesType)
+                                         : nullptr,
+                .callableDataType = structuralInfo.callableDataType
+                                        ? lowerType(context, structuralInfo.callableDataType)
+                                        : nullptr,
+                .hitAttributesKind = structuralInfo.hitAttributesKind,
+            });
+    }
+}
+
 static void lowerProgramEntryPointToIR(
     IRGenContext* context,
     EntryPoint* entryPoint,
@@ -15632,6 +17608,11 @@ static void lowerProgramEntryPointToIR(
 
     auto loweredEntryPointFunc =
         getSimpleVal(context, emitDeclRef(context, entryPointFuncDeclRef, entryPointFuncType));
+
+    _lowerStructuralRayTracingEntryPointInfo(
+        context,
+        entryPoint,
+        as<IRFunc>(loweredEntryPointFunc));
 
     if (!loweredEntryPointFunc->findDecoration<IRLinkageDecoration>())
     {
@@ -16294,7 +18275,27 @@ struct TypeConformanceIRGenContext
 
         context->irBuilder = builder;
 
-        auto witness = lowerSimpleVal(context, typeConformance->getSubtypeWitness());
+        auto subtypeWitness = typeConformance->getSubtypeWitness();
+        auto witness = lowerSimpleVal(context, subtypeWitness);
+
+        // Consider an explicitly composed conformance component for
+        // `GenericHitGroup<uint> : IMaterialHit`. Its exact lowered witness is an
+        // `IRSpecialize`, not a direct `IRWitnessTable`, so the declaration-module producer cannot
+        // catalog this finite specialization. Attach the same semantic metadata to the component's
+        // canonical witness value while its exact AST `SubtypeWitness` still owns both types.
+        // `specializeModule` copies decorations from the `IRSpecialize` to the resulting witness
+        // table, giving linked completion the same final representation as a nongeneric
+        // declaration without inspecting specialization operands.
+        _addStructuralRayTracingTaggedConformanceInfo(
+            context,
+            witness,
+            subtypeWitness->getSub(),
+            subtypeWitness->getSup(),
+            subtypeWitness);
+        _addStructuralRayTracingProgramSchemaInfo(
+            context,
+            subtypeWitness->getSub(),
+            subtypeWitness);
         builder->addKeepAliveDecoration(witness);
         builder->addHLSLExportDecoration(witness);
         builder->addDynamicDispatchWitnessDecoration(witness);
@@ -16780,21 +18781,15 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     auto latestSpirvAtom = getLatestSpirvAtom();
     auto latestMetalAtom = getLatestMetalAtom();
 
-    // Map each entry-point function declaration to the capability set inferred for it *as an entry
-    // point*, which can exceed the function declaration's own requirements (see
-    // `EntryPoint::getInferredCapabilityRequirements`). The layout list below is keyed by
-    // `DeclRef<FuncDecl>`, so we look up the owning `EntryPoint` here to read its stored set.
-    Dictionary<FuncDecl*, CapabilitySetVal*> entryPointInferredCaps;
-    for (Index i = 0; i < program->getEntryPointCount(); ++i)
+    // Parameter binding and `ComponentType` enumeration intentionally use the same entry-point
+    // order. Keep that index here: unlike a `FuncDecl*` lookup, it distinguishes two specialized
+    // entry points that originate from the same generic declaration.
+    auto entryPointCount = program->getEntryPointCount();
+    SLANG_RELEASE_ASSERT(programLayout->entryPoints.getCount() == entryPointCount);
+    for (Index entryPointIndex = 0; entryPointIndex < entryPointCount; ++entryPointIndex)
     {
-        auto entryPoint = program->getEntryPoint(i);
-        if (auto entryPointFuncDecl = entryPoint->getFuncDecl())
-            entryPointInferredCaps[entryPointFuncDecl] =
-                entryPoint->getInferredCapabilityRequirements();
-    }
-
-    for (auto entryPointLayout : programLayout->entryPoints)
-    {
+        auto entryPoint = program->getEntryPoint(entryPointIndex);
+        auto entryPointLayout = programLayout->entryPoints[entryPointIndex];
         auto funcDeclRef = entryPointLayout->entryPoint;
 
         // HACK: skip over entry points that came from deserialization,
@@ -16818,14 +18813,17 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
                 getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
         }
 
-        auto asFuncDecl = as<FuncDecl>(funcDeclRef.getDecl());
-        SLANG_ASSERT(asFuncDecl);
-        // Every layout entry point is one of the program's entry points (both come from the same
-        // component-type walk), so its inferred capability set — which can exceed the function
-        // declaration's own requirements — is always in the map.
-        auto found = entryPointInferredCaps.tryGetValue(asFuncDecl);
-        SLANG_RELEASE_ASSERT(found);
-        CapabilitySet set{*found};
+        // A structural stage can be selected after its source module has already been lowered and
+        // cached. Its ordinary module definition therefore has no checked stage contract. The
+        // target program's layout IR is the canonical IR that knows which entry points were
+        // selected, so attach the contract to this imported declaration. Linking merges it onto
+        // the ordinary definition with the layout decoration below; downstream synthesis never
+        // has to reconstruct checked AST information.
+        _lowerStructuralRayTracingEntryPointInfo(context, entryPoint, as<IRFunc>(irFunc));
+
+        // Entry-point capability requirements can exceed the function declaration's own
+        // requirements because they include stage-dependent contributions such as semantics.
+        CapabilitySet set{entryPoint->getInferredCapabilityRequirements()};
         for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)

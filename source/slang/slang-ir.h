@@ -530,6 +530,8 @@ enum class IRTypeLayoutRuleName
     C,
     CUDA,
     LLVM,
+    /// DXIL ray payload/callable/hit-attribute allocation (not a buffer layout).
+    D3DRayTracingInterface,
     _Count,
 };
 
@@ -1747,9 +1749,26 @@ struct IRInterfaceRequirementEntry : IRInst
 FIDDLE()
 struct IRInterfaceType : IRType
 {
-    FIDDLE(leafInst())
+    FIDDLE(leafInst{noIsaImpl = true})
+
+    static bool isaImpl(IROp opIn)
+    {
+        const int op = kIROpMask_OpMask & opIn;
+        return op == kIROp_InterfaceType || (op >= kIROp_FirstRaytracingStageInterface &&
+                                             op <= kIROp_LastRaytracingStageInterface);
+    }
+    enum
+    {
+        kOp = kIROp_InterfaceType
+    };
 
     UInt getRequirementCount() { return getOperandCount(); }
+};
+
+FIDDLE()
+struct IRRaytracingStageInterface : IRInterfaceType
+{
+    FIDDLE(baseInst())
 };
 
 FIDDLE()
@@ -2092,6 +2111,29 @@ struct ModuleLinkingInfo : RefObject
     /// The result is only valid while the module is unchanged from when this info was built.
     ArrayView<IRInst*> getHLSLExports() { return m_hlslExports.getArrayView(); }
 
+    /// Query concrete conformance values carrying compiler-produced open-section metadata.
+    ///
+    /// Most values are direct witness tables. An explicitly composed concrete specialization can
+    /// instead be an `IRSpecialize`; `specializeModule` turns that owner into the same final table
+    /// shape. Merely indexing these values does not root them. The final linker consults this list
+    /// only after a reachable structural operation requests an exact open tag, which keeps closed
+    /// schemas on the ordinary no-retention path.
+    ArrayView<IRInst*> getStructuralRayTracingTaggedConformances()
+    {
+        return m_structuralRayTracingTaggedConformances.getArrayView();
+    }
+
+    /// Query reflection-only schema requests emitted by exact type conformances.
+    ///
+    /// Closed requests retain specialized entry types for target ABI reflection; open requests
+    /// also drive tagged-conformance selection. These roots are not ordinary exports: only
+    /// whole-program manifest construction clones them, which prevents reflection-only summaries
+    /// from reaching target emission.
+    ArrayView<IRInst*> getStructuralRayTracingProgramSchemas()
+    {
+        return m_structuralRayTracingProgramSchemas.getArrayView();
+    }
+
     /// Query the acceleration cache for global shader parameters.
     /// The result is only valid while the module is unchanged from when this info was built.
     ArrayView<IRInst*> getGlobalParams() { return m_globalParams.getArrayView(); }
@@ -2115,6 +2157,8 @@ private:
 
     // Acceleration caches for linker decisions that previously scanned all global instructions.
     List<IRInst*> m_hlslExports;
+    List<IRInst*> m_structuralRayTracingTaggedConformances;
+    List<IRInst*> m_structuralRayTracingProgramSchemas;
     List<IRInst*> m_globalParams;
     List<IRInst*> m_knownBuiltins;
 
@@ -2258,7 +2302,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 28;
+    const static UInt k_maxSupportedModuleVersion = 51;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

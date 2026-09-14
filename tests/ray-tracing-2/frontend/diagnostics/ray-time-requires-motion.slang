@@ -1,0 +1,31 @@
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry TestClosestHit -stage closesthit -target hlsl
+
+import slang.raytracing;
+
+struct TestPayload {}
+struct TestRecord {}
+
+struct TestTraceContext : rt::ITraceContext
+{
+    typealias AccelerationStructure = rt::AccelerationStructure;
+    typealias Motion = rt::NoMotion;
+}
+
+struct TestHitContext : rt::IHitContext
+{
+    typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
+    typealias Primitive = rt::TrianglePrimitive;
+    typealias Record = TestRecord;
+}
+
+struct TestClosestHit : rt::IClosestHitShader
+{
+    typealias Context = TestHitContext;
+    void invoke(rt::ClosestHitInput<TestHitContext> input)
+    {
+        float rayTime = input.time;
+//CHECK:                      ^^^^ member not found
+//CHECK:                      ^^^^ 'time' is not a member of 'rt.ClosestHitInput<TestHitContext>'.
+    }
+}

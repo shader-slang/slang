@@ -26,6 +26,16 @@ struct TransformParamsToConstRefContext
         if (!type)
             return false;
 
+        // Some compiler-created nominal structs stand for native target values whose ABI must not
+        // be rewritten. For example, Metal structural ray tracing represents an instance path as
+        // `metal::array_ref<uint>` and the native intersection-function signature requires that
+        // value, not a pointer in the generic address space. Its producer marks that exact type.
+        // Do not infer this rule from `IRTargetIntrinsicDecoration`: a normal source struct can
+        // carry an HLSL-only intrinsic spelling while remaining an ordinary transformable struct
+        // on SPIR-V or Metal.
+        if (type->findDecoration<IRPreserveValueParameterABIDecoration>())
+            return false;
+
         switch (type->getOp())
         {
         case kIROp_StructType:
@@ -437,6 +447,8 @@ struct EntryPointInParamToBorrowContext : public TransformParamsToConstRefContex
     virtual bool shouldProcessFunction(IRFunc* func) override
     {
         if (!func->isDefinition())
+            return false;
+        if (func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
             return false;
         if (func->findDecoration<IREntryPointDecoration>() != nullptr)
             return true;

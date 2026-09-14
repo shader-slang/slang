@@ -16,6 +16,13 @@ if(CMAKE_HOST_WIN32)
 else()
     set(CMAKE_HOST_EXECUTABLE_SUFFIX "")
 endif()
+
+# This native test compiles structural ray-tracing shaders through Slang and executes the emitted
+# Metal on a local macOS device. It is opt-in because Metal runtime coverage is not yet part of the
+# cross-platform test deployment.
+if(APPLE AND SLANG_ENABLE_TESTS)
+    add_subdirectory(metal-structural-raytracing-test)
+endif()
 function(generator dir)
     if(SLANG_GENERATORS_PATH)
         cmake_parse_arguments(ARG "" "TARGET_NAME" "" ${ARGN})
@@ -301,7 +308,12 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
-    add_dependencies(slang-test slang-neural-module slang-workgraph-module)
+    add_dependencies(
+        slang-test
+        slang-neural-module
+        slang-workgraph-module
+        slang-raytracing-module
+    )
 
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}

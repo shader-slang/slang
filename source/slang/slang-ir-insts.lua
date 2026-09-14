@@ -537,6 +537,21 @@ local insts = {
 						},
 					},
 					{ RaytracingAccelerationStructure = { struct_name = "RaytracingAccelerationStructureType" } },
+					{
+						MetalIntersectionFunctionTable = {
+							operands = { { "tagMask", "IRIntLit" }, { "maxLevels", "IRIntLit" } },
+							hoistable = true,
+						},
+					},
+					{
+						MetalVisibleFunctionTable = {
+							operands = {
+								{ "functionType", "IRFuncType" },
+								{ "stageKind", "IRIntLit" },
+							},
+							hoistable = true,
+						},
+					},
 				},
 			},
 			{
@@ -752,6 +767,50 @@ local insts = {
 				class = { struct_name = "ClassType", parent = true },
 			},
 			{ interface = { struct_name = "InterfaceType", global = true } },
+			{
+				RaytracingStageInterface = {
+					global = true,
+					{
+						closest_hit_stage_interface = {
+							struct_name = "ClosestHitStageInterface",
+						},
+					},
+					{
+						any_hit_stage_interface = {
+							struct_name = "AnyHitStageInterface",
+						},
+					},
+					{
+						intersection_stage_interface = {
+							struct_name = "IntersectionStageInterface",
+						},
+					},
+					{
+						miss_stage_interface = {
+							struct_name = "MissStageInterface",
+						},
+					},
+					{
+						callable_stage_interface = {
+							struct_name = "CallableStageInterface",
+						},
+					},
+				},
+			},
+			-- Preserves the schema argument of `TraceProgramDescriptor<Schema>` after the
+			-- descriptor's ordinary source storage type has erased that phantom parameter.
+			-- Target lowering replaces this wrapper with either the source storage type or a
+			-- target-specific physical descriptor type.
+			{
+				StructuralRayTracingProgramDescriptor = {
+					struct_name = "StructuralRayTracingProgramDescriptorType",
+					operands = {
+						{ "storageType", "IRType" },
+						{ "schemaType", "IRType" },
+					},
+					hoistable = true,
+				},
+			},
 			{
 				associated_type = {
 					struct_name = "AssociatedType",
@@ -1167,6 +1226,173 @@ local insts = {
 	{ GetWorkGroupSize = { hoistable = true } },
 	-- An inst that returns the current stage of the calling entry point.
 	{ GetCurrentStage = {} },
+	{
+		StructuralRayTracingStageInputOperation = {
+			{ structuralRayTracingGetPayload = { operands = { { "input" } } } },
+			{ structuralRayTracingGetCallableData = { operands = { { "input" } } } },
+			{ structuralRayTracingGetRecord = { operands = { { "input" } } } },
+			{ structuralRayTracingGetHitAttributes = { operands = { { "input" } } } },
+			{ structuralRayTracingGetTriangleBarycentricCoord = { operands = { { "input" } } } },
+			{ structuralRayTracingGetTriangleFrontFacing = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetCurveParameter = { operands = { { "input" } } } },
+			{ structuralRayTracingGetRayTMin = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetRayTCurrent = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetRayTime = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetRayFlags = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetHitKind = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetWorldRayOrigin = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetWorldRayDirection = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetObjectSpaceRay = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetPrimitiveIndex = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetGeometryIndex = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetInstanceIndex = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetInstanceID = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetObjectToWorld = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetWorldToObject = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetDispatchRaysIndex = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetDispatchRaysDimensions = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingIgnoreHit = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingAcceptHitAndEndSearch = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingReportHit = { min_operands = 4 } },
+			{ structuralRayTracingReportHitWithKind = { min_operands = 5 } },
+		},
+	},
+	{
+		structuralRayTracingTrace = {
+			operands = {
+				{ "fallback" },
+				{ "fallbackArguments" },
+				{ "programLayout" },
+				{ "programLayoutSourceTypeName", "IRStringLit" },
+				{ "traceContext" },
+				{ "payloadType", "IRType" },
+				{ "payloadSemanticType", "IRType" },
+				{ "traceMethodKind", "IRIntLit" },
+				{ "motionKind" },
+				{ "hitGroups" },
+				{ "hitGroupTypes" },
+				{ "missShaders" },
+				{ "missShaderTypes" },
+				{ "callableShaders" },
+				{ "callableShaderTypes" },
+				{ "tracer" },
+				{ "desc" },
+				{ "accelerationStructure" },
+				{ "descriptor" },
+				{ "payload" },
+				{ "payloadLocation", "IRIntLit" },
+			},
+		},
+	},
+	{
+		structuralRayTracingCallShader = {
+			operands = {
+				{ "fallback" },
+				{ "fallbackArguments" },
+				{ "programLayout" },
+				{ "programLayoutSourceTypeName", "IRStringLit" },
+				{ "traceContext" },
+				{ "accelerationStructureType", "IRType" },
+				{ "motionKind", "IRIntLit" },
+				{ "hitGroups" },
+				{ "hitGroupTypes" },
+				{ "missShaders" },
+				{ "missShaderTypes" },
+				{ "callableShaders" },
+				{ "callableShaderTypes" },
+				{ "callableContext" },
+				{ "callableDataType" },
+				{ "tracer" },
+				{ "callableIndex" },
+				{ "descriptor" },
+				{ "data" },
+			},
+		},
+	},
+	-- A schema type-conformance component emits this compiler-owned root when any section is open.
+	-- Its three identity packs begin with the explicitly listed entries. Whole-program linking
+	-- appends the selected tagged conformances, turning the same instruction into the finalized
+	-- reflection summary without introducing a second discovery pipeline.
+	{
+		structuralRayTracingProgramSchema = {
+			struct_name = "StructuralRayTracingProgramSchema",
+			global = true,
+			operands = {
+				{ "schemaType", "IRType" },
+				{ "schemaSourceTypeName", "IRStringLit" },
+				{ "schemaTypeIdentity", "IRStringLit" },
+				{ "traceContextType", "IRType" },
+				{ "hitGroupSectionOpen", "IRBoolLit" },
+				{ "missShaderSectionOpen", "IRBoolLit" },
+				{ "callableShaderSectionOpen", "IRBoolLit" },
+				{ "hitGroupTypeIdentities", "IRMakeValuePack" },
+				{ "missShaderTypeIdentities", "IRMakeValuePack" },
+				{ "callableShaderTypeIdentities", "IRMakeValuePack" },
+			},
+		},
+	},
+	{
+		metalStructuralRayTracingTrace = {
+			operands = {
+				{ "tagMask" },
+				{ "maxLevels" },
+				{ "missRequirements" },
+				{ "closestHitRequirements" },
+				{ "geometryKind" },
+				{ "hasIntersectionFunctions" },
+				{ "hasMissFunctions" },
+				{ "hasClosestHitFunctions" },
+				{ "origin" },
+				{ "direction" },
+				{ "minDistance" },
+				{ "maxDistance" },
+				{ "time" },
+				{ "rayFlags" },
+				{ "instanceMask" },
+				{ "sbtOffset" },
+				{ "sbtStride" },
+				{ "missIndex" },
+				{ "accelerationStructure" },
+				{ "intersectionFunctions" },
+				{ "missFunctions" },
+				{ "closestHitFunctions" },
+				{ "descriptorResources" },
+				{ "records" },
+				{ "hitRecordStride", "IRIntLit" },
+				{ "missRecordStride", "IRIntLit" },
+				{ "rayData" },
+				{ "missHasGlobalContext" },
+				{ "closestHitHasGlobalContext" },
+				{ "globalContext" },
+				-- Candidate dispatch and committed closest-hit dispatch call this same helper so
+				-- both interpret a multi-level instance path through the records-buffer trie
+				-- identically. It is meaningful only when the tag mask contains instancing.
+				{ "instanceHitGroupContributionLookup" },
+			},
+		},
+	},
+	{
+		metalStructuralRayTracingCallShader = {
+			operands = {
+				{ "callableIndex" },
+				{ "data" },
+				{ "dispatchRaysIndex" },
+				{ "dispatchRaysDimensions" },
+				{ "hasDispatchRaysIndex" },
+				{ "hasDispatchRaysDimensions" },
+				{ "descriptorResources" },
+				{ "records" },
+				{ "callableRecordStride", "IRIntLit" },
+				{ "hasRecord", "IRBoolLit" },
+				{ "descriptorResourcesType" },
+				{ "callableFunctionsField" },
+				{ "hasGlobalContext" },
+				{ "globalContext" },
+			},
+		},
+	},
+	{ metalStructuralRayTracingDispatchRaysIndex = {} },
+	{ metalStructuralRayTracingDispatchRaysDimensions = {} },
 	{ param = {} },
 	{ field = { struct_name = "StructField", min_operands = 2 } },
 	{ var = {} },
@@ -1831,6 +2057,15 @@ local insts = {
 				nameHint = { struct_name = "NameHintDecoration", operands = { { "nameOperand", "IRStringLit" } } },
 			},
 			{
+				layoutFieldType = {
+					-- Records the checked value type of a layout-only field key synthesized for
+					-- a global resource or varying that remains outside the nominal GlobalParams
+					-- struct.
+					struct_name = "LayoutFieldTypeDecoration",
+					operands = { { "fieldType", "IRType" } },
+				},
+			},
+			{
 				PhysicalType = {
 					struct_name = "PhysicalTypeDecoration",
 					min_operands = 1,
@@ -1847,6 +2082,14 @@ local insts = {
 					-- Marks a type as being used as binary interface (e.g. shader parameters).
 					-- This prevents the legalizeEmptyType() pass from eliminating it on C++/CUDA targets.
 					struct_name = "BinaryInterfaceTypeDecoration",
+				},
+			},
+			{
+				preserveValueParameterABI = {
+					-- Marks a compiler-created type whose target ABI requires value parameters to
+					-- remain values. `transformParamsToConstRef` must not turn such a parameter
+					-- into `borrow in`, even when the IR type is represented as a struct.
+					struct_name = "PreserveValueParameterABIDecoration",
 				},
 			},
 			{
@@ -2095,6 +2338,197 @@ local insts = {
 						{ "profileInst", "IRIntLit" },
 						{ "name", "IRStringLit" },
 						{ "moduleName", "IRStringLit", optional = true },
+					},
+				},
+			},
+			{
+				structuralRayTracingEntryPointInfo = {
+					struct_name = "StructuralRayTracingEntryPointInfoDecoration",
+					operands = {
+						{ "stageKind", "IRIntLit" },
+						{ "invoke" },
+						{ "stageType", "IRType" },
+						{ "stageSourceTypeName", "IRStringLit" },
+						{ "stageTypeIdentity", "IRStringLit" },
+						{ "contextType", "IRType" },
+						{ "payloadType", "IRType" },
+						{ "payloadSemanticType", "IRType" },
+						{ "recordType", "IRType" },
+						{ "hitAttributesType", "IRType" },
+						{ "callableDataType", "IRType" },
+						{ "hitAttributesKind", "IRIntLit" },
+						{ "payloadLocation", "IRIntLit" },
+					},
+				},
+			},
+			-- Marks a call whose checked source callee is a top-level legacy ray-tracing pipeline
+			-- intrinsic from core. The marker survives module serialization so linked-program
+			-- validation can distinguish the legacy API without matching source or mangled names.
+			{
+				structuralRayTracingLegacyAPIUse = {
+					struct_name = "StructuralRayTracingLegacyAPIUseDecoration",
+				},
+			},
+			{
+				structuralRayTracingProgramPayloadLocation = {
+					struct_name = "StructuralRayTracingProgramPayloadLocationDecoration",
+					operands = {
+						{ "payloadType", "IRType" },
+						{ "payloadSemanticType", "IRType" },
+						{ "location", "IRIntLit" },
+					},
+				},
+			},
+			{
+				structuralRayTracingSemanticallyEmptyPayload = {
+					struct_name = "StructuralRayTracingSemanticallyEmptyPayloadDecoration",
+				},
+			},
+			{
+				structuralRayTracingMetalPayloadMetadata = {
+					struct_name = "StructuralRayTracingMetalPayloadMetadataDecoration",
+					operands = {
+						{ "schemaName", "IRStringLit" },
+						{ "payloadIndex", "IRIntLit" },
+						{ "intersectionFunctionSignature", "IRIntLit" },
+					},
+				},
+			},
+			{
+				structuralRayTracingOpenSection = {
+					struct_name = "StructuralRayTracingOpenSectionDecoration",
+					operands = {
+						{ "sectionKind", "IRIntLit" },
+						{ "tagType", "IRType" },
+						{ "isValidTag", "IRBoolLit" },
+					},
+				},
+			},
+			{
+				structuralRayTracingDeferredEmptyPayload = {
+					struct_name = "StructuralRayTracingDeferredEmptyPayloadDecoration",
+					operands = {
+						{ "fallbackGeneric" },
+						{ "fallbackGenericArgumentsWithoutPayload", "IRMakeValuePack" },
+						{ "payloadGenericArgumentIndex", "IRIntLit" },
+						{ "fallbackArgumentsWithoutPayload", "IRMakeValuePack" },
+						{ "payloadFallbackArgumentIndex", "IRIntLit" },
+					},
+				},
+			},
+			{
+				structuralRayTracingVulkanPayloadStorage = {
+					struct_name = "StructuralRayTracingVulkanPayloadStorageDecoration",
+					operands = {
+						{ "storage", "IRGlobalVar" },
+					},
+				},
+			},
+			{
+				structuralRayTracingTaggedConformance = {
+					struct_name = "StructuralRayTracingTaggedConformanceDecoration",
+					operands = {
+						{ "sectionKind", "IRIntLit" },
+						{ "tagType", "IRType" },
+					},
+				},
+			},
+			{
+				structuralRayTracingHitGroupInfo = {
+					struct_name = "StructuralRayTracingHitGroupInfoDecoration",
+					operands = {
+						{ "groupType", "IRType" },
+						{ "groupSourceTypeName", "IRStringLit" },
+						{ "groupTypeIdentity", "IRStringLit" },
+						{ "groupDeclLookupName", "IRStringLit" },
+						{ "functionIndex", "IRIntLit" },
+						{ "contextType", "IRType" },
+						{ "traceContextType", "IRType" },
+						{ "primitiveType", "IRType" },
+						{ "payloadType", "IRType" },
+						{ "payloadSemanticType", "IRType" },
+						{ "recordType", "IRType" },
+						{ "hitAttributesType", "IRType" },
+						{ "hitAttributesKind", "IRIntLit" },
+						{ "closestHitType", "IRType" },
+						{ "closestHitSourceTypeName", "IRStringLit" },
+						{ "closestHitTypeIdentity", "IRStringLit" },
+						{ "hasClosestHit", "IRBoolLit" },
+						{ "closestHit" },
+						{ "anyHitType", "IRType" },
+						{ "anyHitSourceTypeName", "IRStringLit" },
+						{ "anyHitTypeIdentity", "IRStringLit" },
+						{ "hasAnyHit", "IRBoolLit" },
+						{ "anyHit" },
+						{ "intersectionType", "IRType" },
+						{ "intersectionSourceTypeName", "IRStringLit" },
+						{ "intersectionTypeIdentity", "IRStringLit" },
+						{ "hasIntersection", "IRBoolLit" },
+						{ "intersection" },
+						{ "isLinked", "IRBoolLit" },
+						{ "payloadLocation", "IRIntLit" },
+					},
+				},
+			},
+			{
+				structuralRayTracingMissShaderInfo = {
+					struct_name = "StructuralRayTracingMissShaderInfoDecoration",
+					operands = {
+						{ "functionIndex", "IRIntLit" },
+						{ "contextType", "IRType" },
+						{ "traceContextType", "IRType" },
+						{ "payloadType", "IRType" },
+						{ "payloadSemanticType", "IRType" },
+						{ "recordType", "IRType" },
+						{ "missType", "IRType" },
+						{ "missSourceTypeName", "IRStringLit" },
+						{ "missTypeIdentity", "IRStringLit" },
+						{ "missDeclLookupName", "IRStringLit" },
+						{ "miss" },
+						{ "isLinked", "IRBoolLit" },
+						{ "payloadLocation", "IRIntLit" },
+					},
+				},
+			},
+			{
+				structuralRayTracingCallableShaderInfo = {
+					struct_name = "StructuralRayTracingCallableShaderInfoDecoration",
+					operands = {
+						{ "functionIndex", "IRIntLit" },
+						{ "contextType", "IRType" },
+						{ "traceContextType", "IRType" },
+						{ "callableDataType", "IRType" },
+						{ "recordType", "IRType" },
+						{ "callableType", "IRType" },
+						{ "callableSourceTypeName", "IRStringLit" },
+						{ "callableTypeIdentity", "IRStringLit" },
+						{ "callableDeclLookupName", "IRStringLit" },
+						{ "callable" },
+						{ "isLinked", "IRBoolLit" },
+					},
+				},
+			},
+			{
+				metalVisibleFunction = {
+					struct_name = "MetalVisibleFunctionDecoration",
+					operands = {
+						{ "stageKind", "IRIntLit" },
+						{ "tableType", "IRType" },
+					},
+				},
+			},
+			{
+				explicitGlobalContext = {
+					struct_name = "ExplicitGlobalContextDecoration",
+				},
+			},
+			{
+				metalIntersectionFunction = {
+					struct_name = "MetalIntersectionFunctionDecoration",
+					operands = {
+						{ "geometryKind", "IRIntLit" },
+						{ "tagMask", "IRIntLit" },
+						{ "maxLevels", "IRIntLit" },
 					},
 				},
 			},

@@ -4262,6 +4262,9 @@ void SemanticsVisitor::_checkAliasedOutArguments(
 
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
+    if (diagnoseInvalidStructuralRayTracingConstruction(expr))
+        return CreateErrorExpr(expr);
+
     auto rs = ResolveInvoke(expr);
     if (auto invoke = as<InvokeExpr>(rs))
     {
@@ -4277,6 +4280,15 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
         // validation logic on the inner expr.
         if (expr->arguments.getCount() == 1 && invoke == expr->arguments[0])
             return rs;
+
+        if (diagnoseInvalidStructuralRayTracingInvokeResult(invoke))
+            return CreateErrorExpr(invoke);
+
+        if (diagnoseInvalidStructuralRayTracingGenericArguments(invoke))
+            return CreateErrorExpr(invoke);
+
+        if (diagnoseInvalidStructuralRayTracingEmptyPayloadArgument(invoke))
+            return CreateErrorExpr(invoke);
 
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
         {
@@ -4294,6 +4306,18 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             FunctionDeclBase* funcDeclBase = nullptr;
             if (funcDeclRefExpr)
                 funcDeclBase = as<FunctionDeclBase>(funcDeclRefExpr->declRef.getDecl());
+
+            registerRayTracingAPICall(
+                getLinkage(),
+                m_parentFunc,
+                funcDeclBase,
+                invoke->functionExpr->loc,
+                getSink());
+
+            if (funcDeclBase && diagnoseDirectStructuralRayTracingStageInvoke(invoke, funcDeclBase))
+            {
+                return CreateErrorExpr(invoke);
+            }
 
             Index paramCount = funcType->getParamCount();
 
@@ -8933,7 +8957,14 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
             }
         }
     }
-    return createLookupResultExpr(expr->name, lookupResult, expr->baseExpression, expr->loc, expr);
+    auto resultExpr =
+        createLookupResultExpr(expr->name, lookupResult, expr->baseExpression, expr->loc, expr);
+    if (auto propertyExpr = as<DeclRefExpr>(resultExpr))
+    {
+        if (diagnoseInvalidStructuralRayTracingEmptyPayloadAccess(propertyExpr))
+            return CreateErrorExpr(propertyExpr);
+    }
+    return resultExpr;
 }
 
 Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)

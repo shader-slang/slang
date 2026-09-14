@@ -96,6 +96,7 @@
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-metal-legalize.h"
+#include "slang-ir-metal-structural-ray-tracing.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
@@ -119,7 +120,9 @@
 #include "slang-ir-strip-debug-info.h"
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-synthesize-active-mask.h"
+#include "slang-ir-synthesize-structural-ray-tracing.h"
 #include "slang-ir-thread-switch-on-constant-phi.h"
 #include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
@@ -423,6 +426,16 @@ void calcRequiredLoweringPassSet(
     {
         result.autodiff = true;
     }
+    if (as<IRStructuralRayTracingStageInputOperation>(inst) ||
+        as<IRStructuralRayTracingEntryPointInfoDecoration>(inst))
+    {
+        result.structuralRayTracingStageInput = true;
+    }
+    if (inst->getOp() == kIROp_StructuralRayTracingTrace ||
+        inst->getOp() == kIROp_StructuralRayTracingCallShader)
+        result.structuralRayTracingTrace = true;
+    if (inst->getOp() == kIROp_StructuralRayTracingProgramDescriptorType)
+        result.structuralRayTracingProgramDescriptor = true;
     // no_diff is an attribute payload, not a distinct opcode, so it needs findAttr.
     if (auto attrType = as<IRAttributedType>(inst))
     {
@@ -1042,6 +1055,17 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) || isCUDATarget(targetRequest))
+    {
+        SLANG_PASS(preparePortableStructuralRayTracingEntryPoints, irEntryPoints);
+        outLinkedIR.entryPoints = irEntryPoints;
+    }
+    else if (isMetalTarget(targetRequest))
+    {
+        SLANG_PASS(prepareMetalStructuralRayTracingEntryPoints, irEntryPoints);
+        outLinkedIR.entryPoints = irEntryPoints;
+    }
+
     // Create the post-emit metadata object up-front so that IR passes
     // that need to record reportable data (e.g. `instrumentCoverage`'s
     // source-entry mapping) can write into it directly. `collectMetadata`
@@ -1546,11 +1570,56 @@ Result linkAndOptimizeIR(
         SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
     }
 
+    const bool hasStructuralRayTracing = requiredLoweringPassSet.structuralRayTracingTrace ||
+                                         requiredLoweringPassSet.structuralRayTracingStageInput;
+    if (requiredLoweringPassSet.higherOrderFunc && hasStructuralRayTracing)
+    {
+        // Structural reachability must see the executable callee selected for a function-valued
+        // argument. Defunctionalize before diagnosing mixed API use and before structural adapter
+        // synthesis; those passes introduce only direct calls and need no second run.
+        SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
+    }
+
+    if (hasStructuralRayTracing)
+    {
+        // Module-local semantic checking catches source modules that use both APIs. Perform the
+        // corresponding linked-IR check after generic and higher-order specialization so calls
+        // through interface constraints or function-valued parameters have become direct
+        // executable edges. Structural operations and their schema metadata still exist here, so
+        // a selected stage cannot hide a legacy TraceRay/TraceMotionRay/CallShader call in a
+        // serialized helper module.
+        SLANG_PASS(diagnoseMixedRayTracingAPIsInReachableIR, irEntryPoints, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
+
+    // A standalone structural stage has no trace operation, but it still needs post-specialization
+    // contract validation and adapter synthesis. Stage-input IR marks that path independently from
+    // a schema-driven trace or callable operation.
+    if ((requiredLoweringPassSet.structuralRayTracingTrace ||
+         requiredLoweringPassSet.structuralRayTracingStageInput) &&
+        (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
+         isCUDATarget(targetRequest)))
+    {
+        SLANG_PASS(synthesizePortableStructuralRayTracingEntryPoints, irEntryPoints, sink);
+        outLinkedIR.entryPoints = irEntryPoints;
+    }
+    else if (
+        target == CodeGenTarget::Metal &&
+        (requiredLoweringPassSet.structuralRayTracingTrace ||
+         requiredLoweringPassSet.structuralRayTracingStageInput ||
+         requiredLoweringPassSet.structuralRayTracingProgramDescriptor))
+    {
+        SLANG_PASS(prepareMetalStructuralRayTracing, irEntryPoints, targetRequest, sink);
+    }
+
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
-    if (requiredLoweringPassSet.higherOrderFunc)
+    if (requiredLoweringPassSet.higherOrderFunc && !hasStructuralRayTracing)
     {
+        // Preserve the established non-ray-tracing pass order. Only structural mixed-API
+        // reachability needs higher-order calls materialized before the checks above.
         SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
     }
 
@@ -1796,6 +1865,14 @@ Result linkAndOptimizeIR(
     // for host vm.
     if (target == CodeGenTarget::HostVM)
     {
+        if (requiredLoweringPassSet.structuralRayTracingProgramDescriptor)
+        {
+            Dictionary<IRType*, IRType*> noTargetDescriptorTypes;
+            SLANG_PASS(
+                lowerStructuralRayTracingProgramDescriptorTypes,
+                noTargetDescriptorTypes,
+                nullptr);
+        }
         SLANG_PASS(performForceInlining);
         // Autodiff can leave void differential parameters and matching call arguments, but the
         // bytecode constants section cannot represent void values. Remove them before emission,
@@ -1830,8 +1907,51 @@ Result linkAndOptimizeIR(
         SLANG_PASS(lowerCooperativeVectors, sink);
     }
 
+    if (requiredLoweringPassSet.structuralRayTracingTrace &&
+        (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
+         isCUDATarget(targetRequest)))
+        SLANG_PASS(lowerPortableStructuralRayTracingOperations, targetRequest);
+
+    if (target != CodeGenTarget::Metal &&
+        requiredLoweringPassSet.structuralRayTracingProgramDescriptor)
+    {
+        // The schema operand has served its target-independent specialization role. D3D tracing
+        // selects the host-owned native SBT and therefore has no shader-visible descriptor
+        // storage. Erasing the type also erases descriptors retained by global-parameter layout
+        // metadata; lowering those to the source ParameterBlock shape would leak Slang-only syntax
+        // into HLSL passed to DXC. Other portable targets retain that source shape until their
+        // existing target-specific global-context/resource lowering has consumed it.
+        Dictionary<IRType*, IRType*> noTargetDescriptorTypes;
+        IRBuilder builder(irModule);
+        SLANG_PASS(
+            lowerStructuralRayTracingProgramDescriptorTypes,
+            noTargetDescriptorTypes,
+            isD3DTarget(targetRequest) ? builder.getVoidType() : nullptr);
+    }
+
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     SLANG_PASS(performForceInlining);
+
+    if (requiredLoweringPassSet.structuralRayTracingStageInput &&
+        (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
+         isCUDATarget(targetRequest)))
+    {
+        if (isCUDATarget(targetRequest))
+        {
+            // OptiX exposes shader records through its SBT-data pointer and report-intersection
+            // attributes as explicit uint registers. Materialize those native operations before
+            // portable lowering turns the same structural markers into stage parameters or calls
+            // their standard-module fallbacks.
+            SLANG_PASS(lowerOptiXStructuralRayTracingStageInputOperations, sink);
+        }
+        SLANG_PASS(lowerPortableStructuralRayTracingStageInputOperations);
+
+        // Structural stage-input lowering synthesizes native varying parameters after the
+        // canonical entry-point `in`-parameter translation above. Normalize those late
+        // parameters too, so target varying legalization sees the same borrow-in form as it
+        // does for source-authored entry-point inputs.
+        SLANG_PASS(translateEntryPointInParamToBorrow, sink);
+    }
 
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
@@ -1990,11 +2110,25 @@ Result linkAndOptimizeIR(
             SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
         }
 
+        // `OpExecuteCallableKHR` always consumes a real callable-data variable. Give an empty
+        // source payload role-local physical storage before general type legalization removes its
+        // semantic value.
+        if (isSPIRV(targetRequest->getTarget()))
+        {
+            SLANG_PASS(legalizeEmptyVulkanCallablePayloads);
+        }
+
         // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions
         // (must run before legalizeExistentialTypeLayout removes empty struct parameters)
         if (isD3DTarget(targetRequest))
         {
             SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+
+            // A callable entry point must keep exactly one argument parameter for DXC, but an
+            // empty callable-data struct would be erased by the empty-struct legalization below.
+            // Pad it with a dummy field first (must run before legalizeExistentialTypeLayout /
+            // legalizeResourceTypes remove the empty struct parameter).
+            SLANG_PASS(legalizeEmptyCallableDataPayloadsForHLSL);
 
             // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
             // both a `read(...)` and a `write(...)` qualifier. The call-site fill above
@@ -2501,6 +2635,9 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
         break;
     }
+
+    if (target == CodeGenTarget::Metal)
+        SLANG_PASS(finalizeMetalStructuralRayTracingGlobalContext, sink);
 
     // TODO: our current dynamic dispatch pass will remove all uses of witness tables.
     // If we are going to support function-pointer based, "real" modular dynamic dispatch,

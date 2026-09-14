@@ -729,6 +729,25 @@ struct CLayoutRules : IRTypeLayoutRules
     }
 };
 
+// DXIL validator metadata records the allocation size of ray payload and hit-attribute structs.
+// Consider `struct Inner { double d; float f; }; struct Outer { Inner i; float x; };`. DXIL rounds
+// `Inner` to 16 bytes before placing `x`, then rounds `Outer` to 24 bytes. Vulkan's scalar block
+// rule instead permits `x` to reuse `Inner`'s tail and produces 16 bytes. The ordinary C rule has
+// the needed recursive tail padding but represents `bool` as one byte; LLVM layout power-of-two
+// aligns vectors. This dedicated rule combines only the properties required by the D3D ray
+// interface: natural scalar and vector alignment, four-byte bool, and recursive aggregate padding.
+struct D3DRayTracingInterfaceLayoutRules : NaturalLayoutRules
+{
+    D3DRayTracingInterfaceLayoutRules() { ruleName = IRTypeLayoutRuleName::D3DRayTracingInterface; }
+
+    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
+    {
+        IRSizeAndAlignment alignedSize = elementSize;
+        alignedSize.size = align(alignedSize.size, alignedSize.alignment);
+        return alignedSize;
+    }
+};
+
 // CUDA layout rules extend C layout rules with CUDA-specific vector alignment.
 // CUDA vector types (float2, float3, float4, etc.) have special alignment requirements:
 // - vec2: 2 * element size (e.g., float2 is 8-byte aligned)
@@ -738,6 +757,36 @@ struct CLayoutRules : IRTypeLayoutRules
 struct CUDALayoutRules : CLayoutRules
 {
     CUDALayoutRules() { ruleName = IRTypeLayoutRuleName::CUDA; }
+
+    virtual Result calcSizeAndAlignment(
+        TargetRequest* targetReq,
+        IRType* type,
+        IRSizeAndAlignment* outSizeAndAlignment) override
+    {
+        // Slang emits `half3` and `half4` as the custom CUDA-prelude types below:
+        //
+        //     struct __align__(4) __half3 { __half x, y, z; };
+        //     struct __align__(4) __half4 { __half x, y, z, w; };
+        //
+        // Generic CUDA vector rules would give half3 size/alignment 6/2 and half4 8/8. Payload
+        // transport uses the emitted C++ type's `sizeof(T)`, so the IR layout must describe the
+        // same 8/4 representation when deciding register counts and field offsets.
+        if (auto vectorType = as<IRVectorType>(type))
+        {
+            if (vectorType->getElementType()->getOp() == kIROp_HalfType)
+            {
+                if (auto elementCount = as<IRIntLit>(vectorType->getElementCount()))
+                {
+                    if (elementCount->getValue() == 3 || elementCount->getValue() == 4)
+                    {
+                        *outSizeAndAlignment = IRSizeAndAlignment(8, 4);
+                        return SLANG_OK;
+                    }
+                }
+            }
+        }
+        return CLayoutRules::calcSizeAndAlignment(targetReq, type, outSizeAndAlignment);
+    }
 
     virtual IRSizeAndAlignment getVectorSizeAndAlignment(
         IRSizeAndAlignment element,
@@ -995,6 +1044,12 @@ IRTypeLayoutRules* IRTypeLayoutRules::getCUDA()
     return &rules;
 }
 
+IRTypeLayoutRules* IRTypeLayoutRules::getD3DRayTracingInterface()
+{
+    static D3DRayTracingInterfaceLayoutRules rules;
+    return &rules;
+}
+
 IRTypeLayoutRules* IRTypeLayoutRules::getLLVM()
 {
     static LLVMLayoutRules rules;
@@ -1026,6 +1081,8 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         return getConstantBuffer();
     case IRTypeLayoutRuleName::LLVM:
         return getLLVM();
+    case IRTypeLayoutRuleName::D3DRayTracingInterface:
+        return getD3DRayTracingInterface();
     default:
         return nullptr;
     }

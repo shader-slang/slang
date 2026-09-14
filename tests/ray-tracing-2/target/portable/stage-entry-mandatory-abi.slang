@@ -1,0 +1,145 @@
+//TEST:SIMPLE(filecheck=HLSLCUSTOM): -experimental-feature -entry EmptyCustomClosestHit -stage closesthit -target hlsl
+//TEST:SIMPLE(filecheck=HLSLTRIANGLE): -experimental-feature -entry EmptyTriangleAnyHit -stage anyhit -target hlsl
+//TEST:SIMPLE(filecheck=HLSLMISS): -experimental-feature -entry EmptyMiss -stage miss -target hlsl
+//TEST:SIMPLE(filecheck=HLSLCALLABLE): -experimental-feature -entry EmptyCallable -stage callable -target hlsl
+//TEST:SIMPLE(filecheck=HLSLCALLABLEUSED): -experimental-feature -entry UsingCallable -stage callable -target hlsl
+//TEST:SIMPLE(filecheck=SPIRVCALLABLE): -experimental-feature -entry UsingCallable -stage callable -target spirv-assembly -emit-spirv-directly
+//TEST:SIMPLE(filecheck=DXILCUSTOM): -experimental-feature -entry EmptyCustomClosestHit -stage closesthit -target dxil -profile sm_6_7
+//TEST:SIMPLE(filecheck=DXILTRIANGLE): -experimental-feature -entry EmptyTriangleAnyHit -stage anyhit -target dxil -profile sm_6_7
+//TEST:SIMPLE(filecheck=DXILMISS): -experimental-feature -entry EmptyMiss -stage miss -target dxil -profile sm_6_7
+//TEST:SIMPLE(filecheck=DXILCALLABLE): -experimental-feature -entry EmptyCallable -stage callable -target dxil -profile sm_6_7
+//TEST:SIMPLE(filecheck=CUDAMISS): -experimental-feature -entry EmptyMiss -stage miss -target cuda
+//TEST:SIMPLE(filecheck=CUDACALLABLE): -experimental-feature -entry EmptyCallable -stage callable -target cuda
+//TEST:SIMPLE(filecheck=PTXMISS): -experimental-feature -entry EmptyMiss -stage miss -target ptx
+//TEST:SIMPLE(filecheck=PTXCALLABLE): -experimental-feature -entry EmptyCallable -stage callable -target ptx
+
+import slang.raytracing;
+
+struct TestPayload
+{
+    uint value;
+}
+
+struct TestRecord {}
+
+struct TestTraceContext : rt::ITraceContext
+{
+    typealias AccelerationStructure = rt::AccelerationStructure;
+    typealias Motion = rt::NoMotion;
+}
+
+struct TestCustomAttributes
+{
+    float2 value;
+}
+
+struct CustomHitContext : rt::IHitContext
+{
+    typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
+    typealias Primitive = rt::BoundingBoxPrimitive<TestCustomAttributes>;
+    typealias Record = TestRecord;
+}
+
+struct TriangleHitContext : rt::IHitContext
+{
+    typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
+    typealias Primitive = rt::TrianglePrimitive;
+    typealias Record = TestRecord;
+}
+
+struct TestMissContext : rt::IPayloadContext
+{
+    typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
+    typealias Record = TestRecord;
+}
+
+struct TestCallableData
+{
+    uint value;
+}
+
+struct TestCallableContext : rt::ICallableContext
+{
+    typealias TraceContext = TestTraceContext;
+    typealias CallableData = TestCallableData;
+    typealias Record = TestRecord;
+}
+
+struct EmptyCustomClosestHit : rt::IClosestHitShader
+{
+    typealias Context = CustomHitContext;
+    void invoke(rt::ClosestHitInput<CustomHitContext> input) {}
+}
+
+struct EmptyTriangleAnyHit : rt::IAnyHitShader
+{
+    typealias Context = TriangleHitContext;
+    void invoke(rt::AnyHitInput<TriangleHitContext> input) {}
+}
+
+struct EmptyMiss : rt::IMissShader
+{
+    typealias Context = TestMissContext;
+    void invoke(rt::MissInput<TestMissContext> input) {}
+}
+
+struct EmptyCallable : rt::ICallableShader
+{
+    typealias Context = TestCallableContext;
+    void invoke(rt::CallableInput<TestCallableContext> input) {}
+}
+
+void updateCallableData(rt::CallableInput<TestCallableContext> input)
+{
+    input.data.value++;
+}
+
+struct UsingCallable : rt::ICallableShader
+{
+    typealias Context = TestCallableContext;
+    void invoke(rt::CallableInput<TestCallableContext> input)
+    {
+        updateCallableData(input);
+    }
+}
+
+// HLSLCUSTOM: [shader("closesthit")]void EmptyCustomClosestHit(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload, TestCustomAttributes_0 attributes_{{[0-9]+}} : SV_IntersectionAttributes)
+
+// HLSLTRIANGLE: struct StructuralTriangleHitAttributes_0
+// HLSLTRIANGLE: [shader("anyhit")]void EmptyTriangleAnyHit(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload, StructuralTriangleHitAttributes_0 attributes_{{[0-9]+}} : SV_IntersectionAttributes)
+
+// HLSLMISS: [shader("miss")]void EmptyMiss(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload)
+
+// HLSLCALLABLE: [shader("callable")]void EmptyCallable(inout TestCallableData_0 data_{{[0-9]+}})
+
+// HLSLCALLABLEUSED: void updateCallableData_0(inout TestCallableData_0 data_{{[0-9]+}})
+// HLSLCALLABLEUSED: [shader("callable")]void UsingCallable(inout TestCallableData_0 data_{{[0-9]+}})
+
+// SPIRVCALLABLE: OpEntryPoint CallableKHR %UsingCallable "main" %data
+// SPIRVCALLABLE: %_ptr_IncomingCallableDataKHR_TestCallableData = OpTypePointer IncomingCallableDataKHR %TestCallableData
+// SPIRVCALLABLE: %data = OpVariable %_ptr_IncomingCallableDataKHR_TestCallableData IncomingCallableDataKHR
+
+// DXILCUSTOM: define void
+// DXILCUSTOM: !dx.dxrPayloadAnnotations
+// DXILTRIANGLE: define void
+// DXILTRIANGLE: !dx.dxrPayloadAnnotations
+// DXILMISS: define void
+// DXILMISS: !dx.dxrPayloadAnnotations
+// DXILCALLABLE: define void
+
+// Even though the source methods do not read their inputs, an OptiX miss entry must still exchange
+// its declared payload through registers and a callable entry must still expose its data pointer.
+// Checking both CUDA source and NVRTC-produced PTX protects the source adapter and its final native
+// ABI independently.
+// CUDAMISS: extern "C" __global__ void __miss__EmptyMiss()
+// CUDAMISS: optixGetPayload_0()
+// CUDAMISS: optixSetPayload_0(
+// CUDACALLABLE: extern "C" __device__ void __direct_callable__EmptyCallable(TestCallableData_0 * data_0)
+// PTXMISS: .visible .entry __miss__EmptyMiss()
+// PTXMISS: call ({{.*}}), _optix_get_payload,
+// PTXMISS: call _optix_set_payload,
+// PTXCALLABLE: .visible .func __direct_callable__EmptyCallable(
+// PTXCALLABLE: .param .b64 __direct_callable__EmptyCallable_param_0
