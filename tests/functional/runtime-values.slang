@@ -62,16 +62,13 @@ void computeMain()
     outputBuffer[7] = int(closureMappedVector.x == 1.0 && closureMappedVector.w == 7.0);
 
     int matrixBase = 20;
-    matrix<int, 2, 3, kRowMajorMatrixLayout> generatedMatrix =
-        matrix<int, 2, 3, kRowMajorMatrixLayout>(
-            (int row, int column) => matrixBase + row * 10 + column);
-    matrix<int, 2, 3, kRowMajorMatrixLayout> factoryMatrix =
-        matrix<int, 2, 3, kRowMajorMatrixLayout>.generate(
-            (int row, int column) => row * 10 + column);
-    matrix<float, 2, 3, kRowMajorMatrixLayout> functionMappedMatrix =
-        generatedMatrix.map(addHalf);
+    row_major int2x3 generatedMatrix =
+        int2x3((int row, int column) => matrixBase + row * 10 + column);
+    row_major int2x3 factoryMatrix =
+        int2x3.generate((int row, int column) => row * 10 + column);
+    row_major float2x3 functionMappedMatrix = generatedMatrix.map(addHalf);
     int matrixOffset = 5;
-    matrix<float, 2, 3, kRowMajorMatrixLayout> closureMappedMatrix =
+    row_major float2x3 closureMappedMatrix =
         generatedMatrix.map((int value) => float(value + matrixOffset) + 0.25);
 
     outputBuffer[8] = int(generatedMatrix[0][0] == 20 && generatedMatrix[1][2] == 32);
