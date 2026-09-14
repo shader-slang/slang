@@ -80,6 +80,7 @@ void main()
 // semantic stage and request the same portable symbol. The D3D/Vulkan path therefore shares one
 // native entry-point adapter across both forms of reuse.
 // HLSL-COUNT-1: [shader("closesthit")]void SharedClosestHit(
+// HLSL-NOT: [shader("closesthit")]
 
 // Metal must keep the schema-specific ray-data parameter type in the physical signature. It emits
 // one adapter per logical record, while all adapters still run the one SharedClosestHit
