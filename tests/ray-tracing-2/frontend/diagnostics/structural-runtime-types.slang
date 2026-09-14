@@ -45,9 +45,17 @@ void invalidStorage(
 //CHECK:                                     ^^^^^^^^^^^^ storage of a structural ray-tracing stage input
 //CHECK:                                     ^^^^^^^^^^^^ ray-tracing stage input type 'Box<rt.ClosestHitInput<TestHitContext>>' is compiler-provided and may only be used as a value parameter
 
+    Box<Box<rt::ClosestHitInput<TestHitContext>>> nestedWrappedInput;
+//CHECK:                                          ^^^^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
+//CHECK:                                          ^^^^^^^^^^^^^^^^^^ ray-tracing stage input type 'Box<Box<rt.ClosestHitInput<TestHitContext>>>' is compiler-provided and may only be used as a value parameter
+
     Box<TestClosestHit> wrappedStage;
 //CHECK:                ^^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
 //CHECK:                ^^^^^^^^^^^^ structural ray-tracing stage type 'Box<TestClosestHit>' has no runtime representation
+
+    Box<Box<TestClosestHit>> nestedWrappedStage;
+//CHECK:                     ^^^^^^^^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
+//CHECK:                     ^^^^^^^^^^^^^^^^^^ structural ray-tracing stage type 'Box<Box<TestClosestHit>>' has no runtime representation
 
     TestClosestHit();
 /*CHECK:

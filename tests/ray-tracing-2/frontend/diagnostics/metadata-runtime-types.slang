@@ -41,6 +41,11 @@ struct TestSchema : rt::ITraceProgramSchema
     typealias CallableShaders = rt::NoCallableShaders;
 }
 
+struct Box<T>
+{
+    T value;
+}
+
 void invalidMetadataValues(
     TestHitGroup group,
 //CHECK:         ^^^^^ runtime use of structural ray-tracing metadata
@@ -57,6 +62,9 @@ void invalidMetadataValues(
     TestSchema schema,
 //CHECK:       ^^^^^^ runtime use of structural ray-tracing metadata
 //CHECK:       ^^^^^^ structural ray-tracing metadata type 'TestSchema' has no runtime representation
+    Box<Box<TestHitGroup>> nestedGroup,
+//CHECK:                    ^^^^^^^^^^^ runtime use of structural ray-tracing metadata
+//CHECK:                    ^^^^^^^^^^^ structural ray-tracing metadata type 'Box<Box<TestHitGroup>>' has no runtime representation
     rt::ITraceProgramSchema schemaInterface)
 //CHECK:                    ^^^^^^^^^^^^^^^ runtime use of structural ray-tracing metadata
 //CHECK:                    ^^^^^^^^^^^^^^^ structural ray-tracing metadata type 'rt.ITraceProgramSchema' has no runtime representation
