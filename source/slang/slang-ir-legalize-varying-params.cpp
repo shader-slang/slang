@@ -7,7 +7,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-lower-out-parameters.h"
 #include "slang-ir-lower-tuple-types.h"
-#include "slang-ir-structural-ray-tracing.h"
+#include "slang-ir-optix-ray-tracing-abi.h"
 #include "slang-ir-util.h"
 #include "slang-parameter-binding.h"
 #include "slang-rich-diagnostics.h"
@@ -1130,7 +1130,6 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     {
         IRVar* localVar;
         IRType* payloadType;
-        int registerCount;
     };
     List<PayloadWritebackInfo> m_payloadWritebacks;
 
@@ -1139,548 +1138,6 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         return m_payloadWritebacks.findFirstIndex(
                    [&](const PayloadWritebackInfo& writeback)
                    { return writeback.payloadType == payloadType; }) != -1;
-    }
-
-    // Get C++ size and alignment of a type using CUDA layout rules.
-    // Uses IRTypeLayoutRules::getCUDA() which extends C layout with CUDA-specific
-    // vector alignment to match CUDA C++ compiler behavior and the prelude's layout.
-    bool getTypeCppSizeAndAlignment(
-        IRType* type,
-        IRBuilder* builder,
-        int& outSize,
-        int& outAlignment)
-    {
-        if (auto ptrValType = tryGetPointedToType(builder, type))
-            type = ptrValType;
-
-        IRSizeAndAlignment sizeAndAlign;
-        Result result =
-            getSizeAndAlignment(nullptr, IRTypeLayoutRules::getCUDA(), type, &sizeAndAlign);
-        if (SLANG_FAILED(result))
-            return false;
-
-        outSize = int(sizeAndAlign.size);
-        outAlignment = int(sizeAndAlign.alignment);
-        return true;
-    }
-
-    // Get the C++ alignment of a type in bytes.
-    int getTypeCppAlignment(IRType* type, IRBuilder* builder)
-    {
-        int size, alignment;
-        if (getTypeCppSizeAndAlignment(type, builder, size, alignment))
-            return alignment;
-        return 4; // Default fallback
-    }
-
-    // Compute how many inline uint32 registers a type requires. Reflection uses the same shared
-    // helper to report the transport chosen by this legalization. Zero selects the existing
-    // two-register pointer fallback for a large or unlayoutable payload.
-    int computePayloadRegisterCount(IRType* type, IRBuilder* builder)
-    {
-        OptiXRayTracingPayloadABIInfo abiInfo;
-        if (SLANG_FAILED(getOptiXRayTracingPayloadABIInfo(builder, type, &abiInfo)) ||
-            abiInfo.isIndirect)
-        {
-            return 0;
-        }
-        return int(abiInfo.registerCount);
-    }
-
-    // Emit code to read a value from payload registers.
-    // ioByteOffset is the current byte offset, aligned to the type's alignment before reading.
-    // This must match C++ struct layout rules for compatibility with the prelude's
-    // PayloadRegisters.
-    IRInst* emitOptiXPayloadRead(int& ioByteOffset, IRType* typeToFetch, IRBuilder* builder)
-    {
-        if (auto ptrValType = tryGetPointedToType(builder, typeToFetch))
-            typeToFetch = ptrValType;
-
-        if (auto structType = as<IRStructType>(typeToFetch))
-        {
-            List<IRInst*> fieldVals;
-            for (auto field : structType->getFields())
-            {
-                auto fieldType = field->getFieldType();
-
-                // Empty-type legalization preserves non-optimizable empty fields as `void` so
-                // that field indices stay stable. The field occupies no storage, but make-struct
-                // still needs a matching operand until void cleanup removes both of them.
-                if (as<IRVoidType>(fieldType))
-                {
-                    fieldVals.add(builder->getVoidValue());
-                    continue;
-                }
-
-                // Align to field alignment before reading
-                int fieldAlign = getTypeCppAlignment(fieldType, builder);
-                ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
-                auto fieldVal = emitOptiXPayloadRead(ioByteOffset, fieldType, builder);
-                if (!fieldVal)
-                    return nullptr;
-                fieldVals.add(fieldVal);
-            }
-            return builder->emitMakeStruct(typeToFetch, fieldVals);
-        }
-        else if (auto arrayType = as<IRArrayTypeBase>(typeToFetch))
-        {
-            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
-            if (!elementCountInst)
-                return nullptr;
-            IRIntegerValue elementCount = elementCountInst->getValue();
-            auto elementType = arrayType->getElementType();
-            List<IRInst*> elementVals;
-            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
-            {
-                auto elementVal = emitOptiXPayloadRead(ioByteOffset, elementType, builder);
-                if (!elementVal)
-                    return nullptr;
-                elementVals.add(elementVal);
-            }
-            return builder->emitMakeArray(
-                typeToFetch,
-                elementVals.getCount(),
-                elementVals.getBuffer());
-        }
-        else if (auto matType = as<IRMatrixType>(typeToFetch))
-        {
-            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
-            if (rowCountInst)
-            {
-                auto rowType =
-                    builder->getVectorType(matType->getElementType(), matType->getColumnCount());
-                IRIntegerValue rowCount = rowCountInst->getValue();
-                List<IRInst*> rowVals;
-                for (IRIntegerValue ii = 0; ii < rowCount; ++ii)
-                {
-                    auto rowVal = emitOptiXPayloadRead(ioByteOffset, rowType, builder);
-                    if (!rowVal)
-                        return nullptr;
-                    rowVals.add(rowVal);
-                }
-                return builder->emitIntrinsicInst(
-                    typeToFetch,
-                    kIROp_MakeMatrix,
-                    rowVals.getCount(),
-                    rowVals.getBuffer());
-            }
-        }
-        else if (auto vecType = as<IRVectorType>(typeToFetch))
-        {
-            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
-            if (!elementCountInst)
-                return nullptr;
-            IRIntegerValue elementCount = elementCountInst->getValue();
-            IRType* elementType = vecType->getElementType();
-            List<IRInst*> elementVals;
-            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
-            {
-                auto elementVal = emitOptiXPayloadRead(ioByteOffset, elementType, builder);
-                if (!elementVal)
-                    return nullptr;
-                elementVals.add(elementVal);
-            }
-            return builder->emitMakeVector(
-                typeToFetch,
-                elementVals.getCount(),
-                elementVals.getBuffer());
-        }
-        else if (auto basicType = as<IRBasicType>(typeToFetch))
-        {
-            auto uintType = builder->getBasicType(BaseType::UInt);
-            int regIdx = ioByteOffset / 4;
-            IRInst* regIdxInst = builder->getIntValue(builder->getIntType(), regIdx);
-
-            switch (basicType->getBaseType())
-            {
-            case BaseType::Int:
-            case BaseType::UInt:
-                {
-                    // Direct read - register holds the value
-                    ioByteOffset += 4;
-                    return builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdxInst);
-                }
-            case BaseType::Float:
-                {
-                    // Read as uint, then bitcast to float
-                    ioByteOffset += 4;
-                    auto uintVal = builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdxInst);
-                    return builder->emitBitCast(typeToFetch, uintVal);
-                }
-            case BaseType::Bool:
-            case BaseType::Int8:
-            case BaseType::UInt8:
-                {
-                    // Read 1 byte from the appropriate position in the register
-                    int byteInReg = ioByteOffset % 4;
-                    ioByteOffset += 1;
-                    auto regVal = builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdxInst);
-                    if (byteInReg > 0)
-                    {
-                        auto shiftAmount = builder->getIntValue(uintType, byteInReg * 8);
-                        regVal = builder->emitShr(uintType, regVal, shiftAmount);
-                    }
-                    auto mask = builder->getIntValue(uintType, 0xFF);
-                    auto maskedVal = builder->emitBitAnd(uintType, regVal, mask);
-                    return builder->emitCast(typeToFetch, maskedVal);
-                }
-            case BaseType::Int16:
-            case BaseType::UInt16:
-            case BaseType::Half:
-                {
-                    // Read 2 bytes from the appropriate position in the register
-                    int byteInReg = ioByteOffset % 4;
-                    ioByteOffset += 2;
-                    auto regVal = builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdxInst);
-                    if (byteInReg > 0)
-                    {
-                        auto shiftAmount = builder->getIntValue(uintType, byteInReg * 8);
-                        regVal = builder->emitShr(uintType, regVal, shiftAmount);
-                    }
-                    auto mask = builder->getIntValue(uintType, 0xFFFF);
-                    auto maskedVal = builder->emitBitAnd(uintType, regVal, mask);
-                    if (basicType->getBaseType() == BaseType::Half)
-                    {
-                        // Cast uint32 → uint16 first, then bitcast uint16 → Half
-                        auto uint16Type = builder->getBasicType(BaseType::UInt16);
-                        auto uint16Val = builder->emitCast(uint16Type, maskedVal);
-                        return builder->emitBitCast(typeToFetch, uint16Val);
-                    }
-                    return builder->emitCast(typeToFetch, maskedVal);
-                }
-            case BaseType::Int64:
-            case BaseType::UInt64:
-                {
-                    // Read low and high parts
-                    auto uint64Type = builder->getBasicType(BaseType::UInt64);
-                    auto lowVal = builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdxInst);
-                    ioByteOffset += 4;
-                    int regIdx2 = ioByteOffset / 4;
-                    IRInst* regIdx2Inst = builder->getIntValue(builder->getIntType(), regIdx2);
-                    auto highVal = builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdx2Inst);
-                    ioByteOffset += 4;
-                    // Combine: (high << 32) | low
-                    auto lowExt = builder->emitCast(uint64Type, lowVal);
-                    auto highExt = builder->emitCast(uint64Type, highVal);
-                    auto shift = builder->getIntValue(uint64Type, 32);
-                    auto highShifted = builder->emitShl(uint64Type, highExt, shift);
-                    auto combined = builder->emitBitOr(uint64Type, highShifted, lowExt);
-                    if (basicType->getBaseType() == BaseType::Int64)
-                        return builder->emitBitCast(typeToFetch, combined);
-                    return combined;
-                }
-            case BaseType::Double:
-                {
-                    // Read as uint64, then bitcast to double
-                    auto uint64Type = builder->getBasicType(BaseType::UInt64);
-                    auto lowVal = builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdxInst);
-                    ioByteOffset += 4;
-                    int regIdx2 = ioByteOffset / 4;
-                    IRInst* regIdx2Inst = builder->getIntValue(builder->getIntType(), regIdx2);
-                    auto highVal = builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdx2Inst);
-                    ioByteOffset += 4;
-                    auto lowExt = builder->emitCast(uint64Type, lowVal);
-                    auto highExt = builder->emitCast(uint64Type, highVal);
-                    auto shift = builder->getIntValue(uint64Type, 32);
-                    auto highShifted = builder->emitShl(uint64Type, highExt, shift);
-                    auto combined = builder->emitBitOr(uint64Type, highShifted, lowExt);
-                    return builder->emitBitCast(typeToFetch, combined);
-                }
-            default:
-                return nullptr;
-            }
-        }
-        return nullptr;
-    }
-
-    // Emit code to write a value to payload registers.
-    // ioByteOffset is the current byte offset, aligned to the type's alignment before writing.
-    // This must match C++ struct layout rules for compatibility with the prelude's
-    // PayloadRegisters.
-    void emitOptiXPayloadWrite(int& ioByteOffset, IRInst* value, IRType* type, IRBuilder* builder)
-    {
-        if (auto ptrValType = tryGetPointedToType(builder, type))
-            type = ptrValType;
-
-        auto uintType = builder->getBasicType(BaseType::UInt);
-
-        if (auto structType = as<IRStructType>(type))
-        {
-            for (auto field : structType->getFields())
-            {
-                auto fieldType = field->getFieldType();
-
-                // A legalized empty field has no storage, so it contributes no alignment or data.
-                if (as<IRVoidType>(fieldType))
-                    continue;
-
-                // Align to field alignment before writing
-                int fieldAlign = getTypeCppAlignment(fieldType, builder);
-                ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
-                auto fieldKey = field->getKey();
-                auto fieldVal = builder->emitFieldExtract(fieldType, value, fieldKey);
-                emitOptiXPayloadWrite(ioByteOffset, fieldVal, fieldType, builder);
-            }
-        }
-        else if (auto arrayType = as<IRArrayTypeBase>(type))
-        {
-            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
-            if (!elementCountInst)
-                return;
-            IRIntegerValue elementCount = elementCountInst->getValue();
-            auto elementType = arrayType->getElementType();
-            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
-            {
-                auto idx = builder->getIntValue(builder->getIntType(), ii);
-                auto elementVal = builder->emitElementExtract(elementType, value, idx);
-                emitOptiXPayloadWrite(ioByteOffset, elementVal, elementType, builder);
-            }
-        }
-        else if (auto matType = as<IRMatrixType>(type))
-        {
-            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
-            auto colCountInst = as<IRIntLit>(matType->getColumnCount());
-            if (rowCountInst && colCountInst)
-            {
-                IRIntegerValue rowCount = rowCountInst->getValue();
-                IRIntegerValue colCount = colCountInst->getValue();
-                auto elementType = matType->getElementType();
-                auto rowType = builder->getVectorType(elementType, matType->getColumnCount());
-                for (IRIntegerValue row = 0; row < rowCount; ++row)
-                {
-                    auto rowIdx = builder->getIntValue(builder->getIntType(), row);
-                    // First extract the row (which is a vector)
-                    auto rowVal = builder->emitElementExtract(rowType, value, rowIdx);
-                    for (IRIntegerValue col = 0; col < colCount; ++col)
-                    {
-                        auto colIdx = builder->getIntValue(builder->getIntType(), col);
-                        // Then extract the element from the row vector
-                        auto elementVal = builder->emitElementExtract(elementType, rowVal, colIdx);
-                        emitOptiXPayloadWrite(ioByteOffset, elementVal, elementType, builder);
-                    }
-                }
-            }
-        }
-        else if (auto vecType = as<IRVectorType>(type))
-        {
-            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
-            if (!elementCountInst)
-                return;
-            IRIntegerValue elementCount = elementCountInst->getValue();
-            auto elementType = vecType->getElementType();
-            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
-            {
-                auto idx = builder->getIntValue(builder->getIntType(), ii);
-                auto elementVal = builder->emitElementExtract(elementType, value, idx);
-                emitOptiXPayloadWrite(ioByteOffset, elementVal, elementType, builder);
-            }
-        }
-        else if (auto basicType = as<IRBasicType>(type))
-        {
-            int regIdx = ioByteOffset / 4;
-            IRInst* regIdxInst = builder->getIntValue(builder->getIntType(), regIdx);
-            IRInst* uintVal = nullptr;
-
-            switch (basicType->getBaseType())
-            {
-            case BaseType::Int:
-            case BaseType::UInt:
-                uintVal = builder->emitBitCast(uintType, value);
-                break;
-            case BaseType::Float:
-                uintVal = builder->emitBitCast(uintType, value);
-                break;
-            case BaseType::Bool:
-            case BaseType::Int8:
-            case BaseType::UInt8:
-                {
-                    // Write 1 byte at the appropriate position in the register
-                    // Need read-modify-write since multiple sub-word values may share a register
-                    int byteInReg = ioByteOffset % 4;
-                    auto valAsUint = builder->emitCast(uintType, value);
-                    auto mask = builder->getIntValue(uintType, 0xFF);
-                    valAsUint = builder->emitBitAnd(uintType, valAsUint, mask);
-
-                    if (byteInReg > 0)
-                    {
-                        auto shiftAmount = builder->getIntValue(uintType, byteInReg * 8);
-                        valAsUint = builder->emitShl(uintType, valAsUint, shiftAmount);
-                    }
-
-                    // Read current register value
-                    auto oldVal = builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdxInst);
-                    // Clear the byte we're writing
-                    auto clearMask =
-                        builder->getIntValue(uintType, ~IRIntegerValue(0xFFu << (byteInReg * 8)));
-                    auto clearedVal = builder->emitBitAnd(uintType, oldVal, clearMask);
-                    // OR in the new value
-                    auto newVal = builder->emitBitOr(uintType, clearedVal, valAsUint);
-
-                    IRInst* args[] = {regIdxInst, newVal};
-                    builder->emitIntrinsicInst(
-                        builder->getVoidType(),
-                        kIROp_SetOptiXPayloadRegister,
-                        2,
-                        args);
-                    ioByteOffset += 1;
-                    return;
-                }
-            case BaseType::Int16:
-            case BaseType::UInt16:
-            case BaseType::Half:
-                {
-                    // Write 2 bytes at the appropriate position in the register
-                    // Need read-modify-write since multiple sub-word values may share a register
-                    int byteInReg = ioByteOffset % 4;
-                    IRInst* valAsUint;
-                    if (basicType->getBaseType() == BaseType::Half)
-                    {
-                        // Bitcast Half → uint16 first, then cast uint16 → uint32
-                        auto uint16Type = builder->getBasicType(BaseType::UInt16);
-                        auto uint16Val = builder->emitBitCast(uint16Type, value);
-                        valAsUint = builder->emitCast(uintType, uint16Val);
-                    }
-                    else
-                        valAsUint = builder->emitCast(uintType, value);
-                    auto mask = builder->getIntValue(uintType, 0xFFFF);
-                    valAsUint = builder->emitBitAnd(uintType, valAsUint, mask);
-
-                    if (byteInReg > 0)
-                    {
-                        auto shiftAmount = builder->getIntValue(uintType, byteInReg * 8);
-                        valAsUint = builder->emitShl(uintType, valAsUint, shiftAmount);
-                    }
-
-                    // Read current register value
-                    auto oldVal = builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdxInst);
-                    // Clear the bytes we're writing
-                    auto clearMask =
-                        builder->getIntValue(uintType, ~IRIntegerValue(0xFFFFu << (byteInReg * 8)));
-                    auto clearedVal = builder->emitBitAnd(uintType, oldVal, clearMask);
-                    // OR in the new value
-                    auto newVal = builder->emitBitOr(uintType, clearedVal, valAsUint);
-
-                    IRInst* args[] = {regIdxInst, newVal};
-                    builder->emitIntrinsicInst(
-                        builder->getVoidType(),
-                        kIROp_SetOptiXPayloadRegister,
-                        2,
-                        args);
-                    ioByteOffset += 2;
-                    return;
-                }
-            case BaseType::Int64:
-            case BaseType::UInt64:
-                {
-                    // Write low and high parts
-                    auto uint64Type = builder->getBasicType(BaseType::UInt64);
-                    auto valAs64 = builder->emitBitCast(uint64Type, value);
-                    auto lowVal = builder->emitCast(uintType, valAs64);
-                    auto shift = builder->getIntValue(uint64Type, 32);
-                    auto highVal64 = builder->emitShr(uint64Type, valAs64, shift);
-                    auto highVal = builder->emitCast(uintType, highVal64);
-
-                    IRInst* lowArgs[] = {regIdxInst, lowVal};
-                    builder->emitIntrinsicInst(
-                        builder->getVoidType(),
-                        kIROp_SetOptiXPayloadRegister,
-                        2,
-                        lowArgs);
-                    ioByteOffset += 4;
-                    int regIdx2 = ioByteOffset / 4;
-                    IRInst* regIdx2Inst = builder->getIntValue(builder->getIntType(), regIdx2);
-                    IRInst* highArgs[] = {regIdx2Inst, highVal};
-                    builder->emitIntrinsicInst(
-                        builder->getVoidType(),
-                        kIROp_SetOptiXPayloadRegister,
-                        2,
-                        highArgs);
-                    ioByteOffset += 4;
-                    return;
-                }
-            case BaseType::Double:
-                {
-                    // Cast to uint64, then write low and high parts
-                    auto uint64Type = builder->getBasicType(BaseType::UInt64);
-                    auto valAs64 = builder->emitBitCast(uint64Type, value);
-                    auto lowVal = builder->emitCast(uintType, valAs64);
-                    auto shift = builder->getIntValue(uint64Type, 32);
-                    auto highVal64 = builder->emitShr(uint64Type, valAs64, shift);
-                    auto highVal = builder->emitCast(uintType, highVal64);
-
-                    IRInst* lowArgs[] = {regIdxInst, lowVal};
-                    builder->emitIntrinsicInst(
-                        builder->getVoidType(),
-                        kIROp_SetOptiXPayloadRegister,
-                        2,
-                        lowArgs);
-                    ioByteOffset += 4;
-                    int regIdx2 = ioByteOffset / 4;
-                    IRInst* regIdx2Inst = builder->getIntValue(builder->getIntType(), regIdx2);
-                    IRInst* highArgs[] = {regIdx2Inst, highVal};
-                    builder->emitIntrinsicInst(
-                        builder->getVoidType(),
-                        kIROp_SetOptiXPayloadRegister,
-                        2,
-                        highArgs);
-                    ioByteOffset += 4;
-                    return;
-                }
-            default:
-                return;
-            }
-
-            if (uintVal)
-            {
-                IRInst* args[] = {regIdxInst, uintVal};
-                builder->emitIntrinsicInst(
-                    builder->getVoidType(),
-                    kIROp_SetOptiXPayloadRegister,
-                    2,
-                    args);
-                ioByteOffset += 4;
-            }
-        }
     }
 
     // Check if a function is a shader-terminating intrinsic (IgnoreHit, AcceptHitAndEndSearch)
@@ -2034,8 +1491,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 {
                     builder.setInsertBefore(terminator);
                     auto payloadVal = builder.emitLoad(actualVar);
-                    int regIndex = 0;
-                    emitOptiXPayloadWrite(regIndex, payloadVal, info.payloadType, &builder);
+                    SLANG_RELEASE_ASSERT(
+                        SLANG_SUCCEEDED(emitOptiXRayTracingPayloadWrite(&builder, payloadVal)));
                 }
 
                 // Insert write-backs before shader-terminating calls
@@ -2048,8 +1505,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                         {
                             builder.setInsertBefore(call);
                             auto payloadVal = builder.emitLoad(actualVar);
-                            int regIndex = 0;
-                            emitOptiXPayloadWrite(regIndex, payloadVal, info.payloadType, &builder);
+                            SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(
+                                emitOptiXRayTracingPayloadWrite(&builder, payloadVal)));
                         }
                     }
                 }
@@ -2066,104 +1523,6 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 return attr->getResourceKind();
         }
         return LayoutResourceKind::None;
-    }
-
-    IRInst* emitOptiXAttributeFetch(
-        int& ioBaseAttributeIndex,
-        IRType* typeToFetch,
-        IRBuilder* builder)
-    {
-        if (auto ptrValType = tryGetPointedToType(builder, typeToFetch))
-            typeToFetch = ptrValType;
-        if (auto structType = as<IRStructType>(typeToFetch))
-        {
-            List<IRInst*> fieldVals;
-            for (auto field : structType->getFields())
-            {
-                auto fieldType = field->getFieldType();
-                auto fieldVal = emitOptiXAttributeFetch(ioBaseAttributeIndex, fieldType, builder);
-                if (!fieldVal)
-                    return nullptr;
-
-                fieldVals.add(fieldVal);
-            }
-            return builder->emitMakeStruct(typeToFetch, fieldVals);
-        }
-        else if (auto arrayType = as<IRArrayTypeBase>(typeToFetch))
-        {
-            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
-            IRIntegerValue elementCount = elementCountInst->getValue();
-            auto elementType = arrayType->getElementType();
-            List<IRInst*> elementVals;
-            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
-            {
-                auto elementVal =
-                    emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
-                if (!elementVal)
-                    return nullptr;
-                elementVals.add(elementVal);
-            }
-            return builder->emitMakeArray(
-                typeToFetch,
-                elementVals.getCount(),
-                elementVals.getBuffer());
-        }
-        else if (auto matType = as<IRMatrixType>(typeToFetch))
-        {
-            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
-            if (rowCountInst)
-            {
-                auto rowType =
-                    builder->getVectorType(matType->getElementType(), matType->getColumnCount());
-                IRType* elementType = rowType;
-                IRIntegerValue elementCount = rowCountInst->getValue();
-                List<IRInst*> elementVals;
-                for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
-                {
-                    auto elementVal =
-                        emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
-                    if (!elementVal)
-                        return nullptr;
-                    elementVals.add(elementVal);
-                }
-                return builder->emitIntrinsicInst(
-                    typeToFetch,
-                    kIROp_MakeMatrix,
-                    elementVals.getCount(),
-                    elementVals.getBuffer());
-            }
-        }
-        else if (auto vecType = as<IRVectorType>(typeToFetch))
-        {
-            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
-            IRIntegerValue elementCount = elementCountInst->getValue();
-            IRType* elementType = vecType->getElementType();
-            List<IRInst*> elementVals;
-            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
-            {
-                auto elementVal =
-                    emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
-                if (!elementVal)
-                    return nullptr;
-                elementVals.add(elementVal);
-            }
-            return builder->emitMakeVector(
-                typeToFetch,
-                elementVals.getCount(),
-                elementVals.getBuffer());
-        }
-        else if (const auto basicType = as<IRBasicType>(typeToFetch); basicType)
-        {
-            IRIntegerValue idx = ioBaseAttributeIndex;
-            auto idxInst = builder->getIntValue(builder->getIntType(), idx);
-            ioBaseAttributeIndex++;
-            IRInst* args[] = {typeToFetch, idxInst};
-            IRInst* getAttr =
-                builder->emitIntrinsicInst(typeToFetch, kIROp_GetOptiXHitAttribute, 2, args);
-            return getAttr;
-        }
-
-        return nullptr;
     }
 
     void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
@@ -2352,15 +1711,24 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                                                (m_stage == Stage::ClosestHit) ||
                                                (m_stage == Stage::Miss);
 
-                // Compute how many registers are required for this payload type
-                int registerCount = 0;
-                if (useRegisterBasedPayload)
-                    registerCount = computePayloadRegisterCount(info.type, &builder);
-
-                if (!useRegisterBasedPayload || registerCount == 0)
+                OptiXRayTracingPayloadABIInfo payloadABI;
+                if (useRegisterBasedPayload &&
+                    SLANG_FAILED(
+                        getOptiXRayTracingPayloadABIInfo(&builder, info.type, &payloadABI)))
                 {
-                    // Fallback to pointer packing for large/unsupported payloads or non-callee
-                    // stages
+                    SLANG_RELEASE_ASSERT(m_param);
+                    m_sink->diagnose(Diagnostics::Unexpected{
+                        .message = "the supplied ray payload cannot be represented by the OptiX "
+                                   "payload ABI",
+                        .location = m_param->sourceLoc});
+                    return LegalizedVaryingVal();
+                }
+
+                if (!useRegisterBasedPayload || payloadABI.isIndirect)
+                {
+                    // The CUDA prelude uses the same size rule to put a large payload's address in
+                    // two registers. Non-callee stages already receive their payload through an
+                    // ordinary pointer and do not read ambient registers here.
                     IRPtrType* ptrType = builder.getPtrType(info.type);
                     IRInst* getRayPayload =
                         builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
@@ -2368,34 +1736,24 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 }
                 else
                 {
-                    // Use inline payload registers for small payloads
-                    // 1. Read payload from registers
-                    int regIndex = 0;
-                    IRInst* payloadVal = emitOptiXPayloadRead(regIndex, info.type, &builder);
-                    if (!payloadVal)
-                    {
-                        // Fallback if read fails
-                        IRPtrType* ptrType = builder.getPtrType(info.type);
-                        IRInst* getRayPayload = builder.emitIntrinsicInst(
-                            ptrType,
-                            kIROp_GetOptiXRayPayloadPtr,
-                            0,
-                            nullptr);
-                        return LegalizedVaryingVal::makeAddress(getRayPayload);
-                    }
+                    // Reconstruct exactly the native bytes packed by `PayloadRegisters<T>` in the
+                    // CUDA prelude. In particular, nested aggregate tail padding advances the next
+                    // field or array element instead of being reused.
+                    IRInst* payloadVal = nullptr;
+                    SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(
+                        emitOptiXRayTracingPayloadRead(&builder, info.type, &payloadVal)));
 
-                    // 2. Create a local variable to hold the payload
+                    // Create a local variable to hold the payload.
                     auto localVar = builder.emitVar(info.type);
                     builder.emitStore(localVar, payloadVal);
 
-                    // 3. Track this payload for write-back at function exit
-                    // Only add if not already present - the first variable created is the one used
+                    // Track this payload for write-back at function exit. The first variable
+                    // created is the one used by the legalized function body.
                     if (m_payloadWritebacks.getCount() == 0)
                     {
                         PayloadWritebackInfo writebackInfo;
                         writebackInfo.localVar = as<IRVar>(localVar);
                         writebackInfo.payloadType = info.type;
-                        writebackInfo.registerCount = registerCount;
                         m_payloadWritebacks.add(writebackInfo);
                     }
 
@@ -2408,14 +1766,16 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 IRBuilder builder(m_module);
                 builder.setInsertBefore(m_firstOrdinaryInst);
 
-                // Attribute registers are not a byte-packed CUDA struct. OptiX assigns one
-                // 32-bit slot to each scalar leaf, which is also the quantity exposed through
-                // structural reflection. Check the shared count before emitting any reads so an
-                // oversized attribute never leaves partially generated fetches behind.
+                // Hit attributes are declared as an `in` entry-point parameter, so `info.type`
+                // can still be its `BorrowInParam<Attributes>` wrapper at this point. The OptiX
+                // transport describes the value inside that parameter, just as the function body
+                // does after parameter legalization.
+                auto attributeType = tryGetPointedToType(&builder, info.type);
+                SLANG_RELEASE_ASSERT(attributeType);
                 IRIntegerValue requiredAttributeCount = 0;
                 SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(getOptiXRayTracingHitAttributeRegisterCount(
                     &builder,
-                    info.type,
+                    attributeType,
                     &requiredAttributeCount)));
                 if (requiredAttributeCount > kOptiXMaxHitAttributeRegisterCount)
                 {
@@ -2429,13 +1789,15 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                         .location = m_param->sourceLoc});
                     return LegalizedVaryingVal();
                 }
-                int ioBaseAttributeIndex = 0;
-                IRInst* getHitAttributes = emitOptiXAttributeFetch(
-                    /*ioBaseAttributeIndex*/ ioBaseAttributeIndex,
-                    /* type to fetch */ info.type,
-                    /*the builder in use*/ &builder);
+                IRInst* getHitAttributes = nullptr;
+                IRIntegerValue fetchedAttributeCount = 0;
+                SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(emitOptiXRayTracingHitAttributeFetch(
+                    &builder,
+                    attributeType,
+                    &getHitAttributes,
+                    &fetchedAttributeCount)));
                 SLANG_RELEASE_ASSERT(
-                    getHitAttributes && ioBaseAttributeIndex == requiredAttributeCount);
+                    getHitAttributes && fetchedAttributeCount == requiredAttributeCount);
                 return LegalizedVaryingVal::makeValue(getHitAttributes);
             }
         default:
