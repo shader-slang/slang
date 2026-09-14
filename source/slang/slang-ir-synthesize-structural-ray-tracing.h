@@ -16,7 +16,7 @@ class TargetRequest;
 bool validateStructuralRayTracingEntryPoint(IRFunc* entryPoint, DiagnosticSink* sink);
 
 /// Validate the target-independent relationships encoded by one structural trace or callable
-/// operation after linking and specialization have made its complete closed schema available.
+/// operation after linking and specialization have made its complete schema available.
 bool validateStructuralRayTracingSchemaOperation(IRInst* operation, DiagnosticSink* sink);
 
 /// Replace selected logical stage methods with zero-parameter native entry-point adapters before

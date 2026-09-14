@@ -2340,6 +2340,18 @@ local insts = {
 				},
 			},
 			{
+				structuralRayTracingDeferredEmptyPayload = {
+					struct_name = "StructuralRayTracingDeferredEmptyPayloadDecoration",
+					operands = {
+						{ "fallbackGeneric" },
+						{ "fallbackGenericArgumentsWithoutPayload", "IRMakeValuePack" },
+						{ "payloadGenericArgumentIndex", "IRIntLit" },
+						{ "fallbackArgumentsWithoutPayload", "IRMakeValuePack" },
+						{ "payloadFallbackArgumentIndex", "IRIntLit" },
+					},
+				},
+			},
+			{
 				structuralRayTracingTaggedConformance = {
 					struct_name = "StructuralRayTracingTaggedConformanceDecoration",
 					operands = {

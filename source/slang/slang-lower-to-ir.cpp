@@ -812,6 +812,8 @@ bool isFunctionStaticVarDecl(VarDeclBase* decl)
 
 IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered);
 
+IRInst* lowerSimpleVal(IRGenContext* context, Val* val);
+
 int32_t getIntrinsicOp(Decl* decl, IntrinsicOpModifier* intrinsicOpMod)
 {
     int32_t op = intrinsicOpMod->op;
@@ -1810,7 +1812,7 @@ enum class StructuralRayTracingEmptyPayloadSelection
     Unique,
     NotFound,
     Ambiguous,
-    SchemaNotClosed,
+    SchemaNotConcrete,
 };
 
 struct StructuralRayTracingEmptyPayloadInfo
@@ -1821,6 +1823,20 @@ struct StructuralRayTracingEmptyPayloadInfo
     Type* secondPayloadType = nullptr;
 };
 
+static bool _isConcreteStructuralRayTracingProgramLayout(
+    IRGenContext* context,
+    const StructuralRayTracingProgramLayoutInfo& layout)
+{
+    // A concrete schema may still have an open hit, miss, or callable section. The nominal list
+    // values are nevertheless fully specialized at this point; only the finite set of entries is
+    // completed later from linked conformances. Generic schemas are rejected here so the deferred
+    // IR record never has to reconstruct missing source substitutions.
+    return layout.isComplete() &&
+           _isConcreteStructuralRayTracingNominalType(context, layout.programLayoutType) &&
+           _isConcreteStructuralRayTracingNominalType(context, layout.hitGroupsType) &&
+           _isConcreteStructuralRayTracingNominalType(context, layout.missShadersType);
+}
+
 static StructuralRayTracingEmptyPayloadInfo _findStructuralRayTracingEmptyPayload(
     IRGenContext* context,
     const StructuralRayTracingProgramLayoutInfo& layout)
@@ -1830,14 +1846,11 @@ static StructuralRayTracingEmptyPayloadInfo _findStructuralRayTracingEmptyPayloa
     // generic schema can still resolve them to types that depend on its parameters. The schema and
     // sealed list decl refs are the checked source of truth for the whole entry set: their
     // substitutions contain each hit-group/miss-shader type and its enclosing substitutions. The
-    // semantic dependency query therefore distinguishes a concrete closed schema without
+    // semantic dependency query therefore distinguishes a concrete schema without
     // rediscovering generic context by walking arbitrary `Val` operands.
-    if (!layout.isComplete() ||
-        !_isConcreteStructuralRayTracingNominalType(context, layout.programLayoutType) ||
-        !_isConcreteStructuralRayTracingNominalType(context, layout.hitGroupsType) ||
-        !_isConcreteStructuralRayTracingNominalType(context, layout.missShadersType))
+    if (!_isConcreteStructuralRayTracingProgramLayout(context, layout))
     {
-        result.selection = StructuralRayTracingEmptyPayloadSelection::SchemaNotClosed;
+        result.selection = StructuralRayTracingEmptyPayloadSelection::SchemaNotConcrete;
         return result;
     }
 
@@ -1903,7 +1916,7 @@ static StructuralRayTracingEmptyPayloadInfo _findStructuralRayTracingEmptyPayloa
 
     if (hasUnresolvedPayload)
     {
-        result.selection = StructuralRayTracingEmptyPayloadSelection::SchemaNotClosed;
+        result.selection = StructuralRayTracingEmptyPayloadSelection::SchemaNotConcrete;
         return result;
     }
 
@@ -1926,6 +1939,62 @@ static StructuralRayTracingEmptyPayloadInfo _findStructuralRayTracingEmptyPayloa
     return result;
 }
 
+static void _addFlattenedTupleArgs(List<IRInst*>& ioArgs, IRInst* val);
+
+struct StructuralRayTracingPairedPayloadMethod
+{
+    FunctionDeclBase* method = nullptr;
+    const StructuralRayTracingTraceMethodInfo* methodInfo = nullptr;
+    DeclRef<GenericDecl> genericDeclRef;
+    GenericAppDeclRef* implicitGenericApplication = nullptr;
+    GenericAppDeclRef* extensionGenericApplication = nullptr;
+};
+
+/// Finds the paired explicit-payload overload and its two checked generic applications.
+///
+/// The registry owns all role discovery. This helper only follows the named declarations recorded
+/// there, so both eager AST specialization and deferred IR production consume the same source of
+/// truth without inferring anything from generic argument positions.
+static StructuralRayTracingPairedPayloadMethod _getPairedStructuralRayTracingPayloadMethod(
+    IRGenContext* context,
+    DeclRef<Decl> noPayloadMethodRef,
+    FunctionDeclBase* noPayloadMethod,
+    const StructuralRayTracingTraceMethodInfo& noPayloadMethodInfo)
+{
+    StructuralRayTracingPairedPayloadMethod result;
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto rayTracerMethodInfo = registry.getRayTracerMethodInfo(noPayloadMethod);
+    result.method = noPayloadMethodInfo.pairedPayloadMethod;
+    result.methodInfo = registry.getTraceMethodInfo(result.method);
+    SLANG_RELEASE_ASSERT(
+        rayTracerMethodInfo && result.methodInfo &&
+        result.methodInfo->kind == StructuralRayTracingTraceMethodKind::ExplicitPayload);
+
+    DeclRef<Decl> extensionDeclRef = noPayloadMethodRef;
+    while (extensionDeclRef && extensionDeclRef.getDecl() != rayTracerMethodInfo->extensionDecl)
+        extensionDeclRef = extensionDeclRef.getParent();
+    SLANG_RELEASE_ASSERT(extensionDeclRef);
+
+    auto payloadGenericDecl = result.methodInfo->methodGenericDecl;
+    SLANG_RELEASE_ASSERT(payloadGenericDecl && payloadGenericDecl->inner == result.method);
+    result.genericDeclRef =
+        context->astBuilder->getMemberDeclRef(extensionDeclRef, payloadGenericDecl)
+            .as<GenericDecl>();
+    result.extensionGenericApplication =
+        SubstitutionSet(extensionDeclRef)
+            .findGenericAppDeclRef(rayTracerMethodInfo->schemaGenericDecl);
+    SLANG_RELEASE_ASSERT(result.genericDeclRef && result.extensionGenericApplication);
+
+    if (noPayloadMethodInfo.methodGenericDecl)
+    {
+        result.implicitGenericApplication =
+            SubstitutionSet(noPayloadMethodRef)
+                .findGenericAppDeclRef(noPayloadMethodInfo.methodGenericDecl);
+        SLANG_RELEASE_ASSERT(result.implicitGenericApplication);
+    }
+    return result;
+}
+
 /// Specializes the trusted payload-taking overload selected for an implicit empty-payload call.
 ///
 /// Registration already mapped every target generic argument to either the selected payload type
@@ -1938,33 +2007,11 @@ static DeclRef<Decl> _specializePairedStructuralRayTracingPayloadMethod(
     const StructuralRayTracingTraceMethodInfo& noPayloadMethodInfo,
     Type* payloadType)
 {
-    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
-    auto rayTracerMethodInfo = registry.getRayTracerMethodInfo(noPayloadMethod);
-    auto payloadMethod = noPayloadMethodInfo.pairedPayloadMethod;
-    auto payloadMethodInfo = registry.getTraceMethodInfo(payloadMethod);
-    SLANG_RELEASE_ASSERT(
-        rayTracerMethodInfo && payloadMethodInfo &&
-        payloadMethodInfo->kind == StructuralRayTracingTraceMethodKind::ExplicitPayload);
-
-    DeclRef<Decl> extensionDeclRef = noPayloadMethodRef;
-    while (extensionDeclRef && extensionDeclRef.getDecl() != rayTracerMethodInfo->extensionDecl)
-        extensionDeclRef = extensionDeclRef.getParent();
-    SLANG_RELEASE_ASSERT(extensionDeclRef);
-
-    auto payloadGenericDecl = payloadMethodInfo->methodGenericDecl;
-    SLANG_RELEASE_ASSERT(payloadGenericDecl && payloadGenericDecl->inner == payloadMethod);
-    auto payloadGenericDeclRef =
-        context->astBuilder->getMemberDeclRef(extensionDeclRef, payloadGenericDecl)
-            .as<GenericDecl>();
-
-    GenericAppDeclRef* noPayloadGenericApplication = nullptr;
-    if (noPayloadMethodInfo.methodGenericDecl)
-    {
-        noPayloadGenericApplication =
-            SubstitutionSet(noPayloadMethodRef)
-                .findGenericAppDeclRef(noPayloadMethodInfo.methodGenericDecl);
-        SLANG_RELEASE_ASSERT(noPayloadGenericApplication);
-    }
+    auto paired = _getPairedStructuralRayTracingPayloadMethod(
+        context,
+        noPayloadMethodRef,
+        noPayloadMethod,
+        noPayloadMethodInfo);
     List<Val*> payloadGenericArgs;
     for (auto source : noPayloadMethodInfo.pairedPayloadGenericArguments)
     {
@@ -1978,14 +2025,139 @@ static DeclRef<Decl> _specializePairedStructuralRayTracingPayloadMethod(
             source.kind ==
             StructuralRayTracingPairedTraceArgumentSourceKind::ImplicitEmptyPayloadMethodArgument);
         SLANG_RELEASE_ASSERT(
-            noPayloadGenericApplication && source.argumentIndex >= 0 &&
-            source.argumentIndex < noPayloadGenericApplication->getArgCount());
-        payloadGenericArgs.add(noPayloadGenericApplication->getArg(source.argumentIndex));
+            paired.implicitGenericApplication && source.argumentIndex >= 0 &&
+            source.argumentIndex < paired.implicitGenericApplication->getArgCount());
+        payloadGenericArgs.add(paired.implicitGenericApplication->getArg(source.argumentIndex));
     }
     return context->astBuilder->getGenericAppDeclRef(
-        payloadGenericDeclRef,
+        paired.genericDeclRef,
         payloadGenericArgs.getArrayView(),
-        payloadMethod);
+        paired.method);
+}
+
+struct StructuralRayTracingDeferredEmptyPayloadFallback
+{
+    IRInst* generic = nullptr;
+    IRMakeValuePack* genericArgumentsWithoutPayload = nullptr;
+    Index payloadGenericArgumentIndex = -1;
+    IRMakeValuePack* argumentsWithoutPayload = nullptr;
+    Index payloadArgumentIndex = -1;
+};
+
+/// Preserves the exact generic and value call shapes for link-time payload insertion.
+///
+/// Consider the Metal overload `trace<Payload, let maxLevelCount>(..., inout Payload payload)`.
+/// Generic lowering flattens its value parameter and equality witness into the same IR argument
+/// list as `Payload`, while the receiver participates only in the fallback value argument list.
+/// Registration has already paired each explicit-overload role with its implicit-overload source.
+/// This producer applies the enclosing `RayTracer<Schema>` extension arguments now, stores every
+/// non-payload method argument in its lowered order, and records the two insertion points. Once an
+/// open section is complete, the linker can therefore insert the selected payload without parsing
+/// a generic, reconstructing a function signature, or assuming where either payload role lives.
+static StructuralRayTracingDeferredEmptyPayloadFallback
+_makeDeferredStructuralRayTracingEmptyPayloadFallback(
+    IRGenContext* context,
+    DeclRef<Decl> noPayloadMethodRef,
+    FunctionDeclBase* noPayloadMethod,
+    const StructuralRayTracingTraceMethodInfo& noPayloadMethodInfo,
+    IRInst* tracer,
+    IRInst* desc,
+    IRInst* accelerationStructure,
+    IRInst* descriptor)
+{
+    auto builder = context->irBuilder;
+    auto paired = _getPairedStructuralRayTracingPayloadMethod(
+        context,
+        noPayloadMethodRef,
+        noPayloadMethod,
+        noPayloadMethodInfo);
+
+    // `ensureDecl` yields the complete nested generic. Apply only the enclosing extension here,
+    // and specialize its type generic in lockstep with its value generic. The result remains the
+    // explicit overload's method generic, with the compiler-produced function type intact.
+    auto generic = getSimpleVal(context, ensureDecl(context, paired.genericDeclRef.getDecl()));
+    SLANG_RELEASE_ASSERT(generic && generic->getDataType());
+    List<IRInst*> extensionArguments;
+    for (auto argument : paired.extensionGenericApplication->getArgs())
+    {
+        auto loweredArgument = lowerSimpleVal(context, argument);
+        SLANG_RELEASE_ASSERT(loweredArgument);
+        _addFlattenedTupleArgs(extensionArguments, loweredArgument);
+    }
+    auto specializedGenericType = as<IRType>(builder->emitSpecializeInst(
+        builder->getTypeKind(),
+        generic->getDataType(),
+        extensionArguments));
+    SLANG_RELEASE_ASSERT(specializedGenericType);
+
+    StructuralRayTracingDeferredEmptyPayloadFallback result;
+    result.generic =
+        builder->emitSpecializeInst(specializedGenericType, generic, extensionArguments);
+
+    List<IRInst*> genericArgumentsWithoutPayload;
+    for (auto source : noPayloadMethodInfo.pairedPayloadGenericArguments)
+    {
+        if (source.kind == StructuralRayTracingPairedTraceArgumentSourceKind::PayloadType)
+        {
+            SLANG_RELEASE_ASSERT(result.payloadGenericArgumentIndex < 0);
+            result.payloadGenericArgumentIndex = genericArgumentsWithoutPayload.getCount();
+            continue;
+        }
+
+        SLANG_RELEASE_ASSERT(
+            source.kind == StructuralRayTracingPairedTraceArgumentSourceKind::
+                               ImplicitEmptyPayloadMethodArgument &&
+            paired.implicitGenericApplication && source.argumentIndex >= 0 &&
+            source.argumentIndex < paired.implicitGenericApplication->getArgCount());
+        auto loweredArgument = lowerSimpleVal(
+            context,
+            paired.implicitGenericApplication->getArg(source.argumentIndex));
+        SLANG_RELEASE_ASSERT(loweredArgument);
+        _addFlattenedTupleArgs(genericArgumentsWithoutPayload, loweredArgument);
+    }
+    SLANG_RELEASE_ASSERT(result.payloadGenericArgumentIndex >= 0);
+    result.genericArgumentsWithoutPayload = cast<IRMakeValuePack>(builder->emitMakeValuePack(
+        genericArgumentsWithoutPayload.getCount(),
+        genericArgumentsWithoutPayload.getBuffer()));
+
+    auto parameters = paired.method->getParameters();
+    List<IRInst*> argumentsWithoutPayload;
+    argumentsWithoutPayload.add(tracer);
+    auto addParameterArgument = [&](Index parameterIndex, IRInst* argument)
+    {
+        SLANG_RELEASE_ASSERT(
+            parameterIndex >= 0 && parameterIndex < parameters.getCount() && argument);
+        if (parameterIndex == paired.methodInfo->payloadParameterIndex)
+        {
+            SLANG_RELEASE_ASSERT(result.payloadArgumentIndex < 0);
+            result.payloadArgumentIndex = argumentsWithoutPayload.getCount();
+            return;
+        }
+        argumentsWithoutPayload.add(argument);
+    };
+
+    // Visit declaration order while obtaining each value from its registered semantic role. This
+    // keeps the saved pack correct if the trusted overload later reorders its source parameters.
+    for (Index parameterIndex = 0; parameterIndex < parameters.getCount(); ++parameterIndex)
+    {
+        IRInst* argument = nullptr;
+        if (parameterIndex == paired.methodInfo->traversalDescParameterIndex)
+            argument = desc;
+        else if (parameterIndex == paired.methodInfo->accelerationStructureParameterIndex)
+            argument = accelerationStructure;
+        else if (parameterIndex == paired.methodInfo->descriptorParameterIndex)
+            argument = descriptor;
+        else if (parameterIndex == paired.methodInfo->payloadParameterIndex)
+            argument = builder->getVoidValue();
+        else
+            SLANG_UNEXPECTED("unregistered structural ray-tracing trace parameter");
+        addParameterArgument(parameterIndex, argument);
+    }
+    SLANG_RELEASE_ASSERT(result.payloadArgumentIndex >= 0);
+    result.argumentsWithoutPayload = cast<IRMakeValuePack>(builder->emitMakeValuePack(
+        argumentsWithoutPayload.getCount(),
+        argumentsWithoutPayload.getBuffer()));
+    return result;
 }
 
 /// Packs a trace fallback's arguments in the order declared by that exact overload.
@@ -2073,6 +2245,8 @@ LoweredValInfo emitCallToDeclRef(
                 Type* astPayloadType = nullptr;
                 IRType* payloadType = nullptr;
                 IRInst* payloadArgument = nullptr;
+                bool deferEmptyPayload = false;
+                StructuralRayTracingDeferredEmptyPayloadFallback deferredFallback;
                 DeclRef<Decl> fallbackDeclRef = funcDeclRef;
                 IRType* fallbackFuncType = funcType;
                 List<IRInst*> traceArgs;
@@ -2104,78 +2278,122 @@ LoweredValInfo emitCallToDeclRef(
                 }
                 else
                 {
-                    auto emptyPayload = _findStructuralRayTracingEmptyPayload(context, layout);
-                    switch (emptyPayload.selection)
+                    if (!_isConcreteStructuralRayTracingProgramLayout(context, layout))
                     {
-                    case StructuralRayTracingEmptyPayloadSelection::SchemaNotClosed:
                         context->getSink()->diagnose(
-                            Diagnostics::StructuralRayTracingSchemaNotClosed{
+                            Diagnostics::StructuralRayTracingSchemaNotConcrete{
                                 .schemaType = layout.programLayoutType
                                                   ? layout.programLayoutType
                                                   : context->astBuilder->getErrorType(),
                                 .location = location});
                         return LoweredValInfo::simple(builder->getVoidValue());
-                    case StructuralRayTracingEmptyPayloadSelection::NotFound:
-                        context->getSink()->diagnose(
-                            Diagnostics::StructuralRayTracingEmptyPayloadNotFound{
-                                .schemaType = layout.programLayoutType,
-                                .location = location});
-                        return LoweredValInfo::simple(builder->getVoidValue());
-                    case StructuralRayTracingEmptyPayloadSelection::Ambiguous:
-                        context->getSink()->diagnose(
-                            Diagnostics::StructuralRayTracingAmbiguousEmptyPayload{
-                                .schemaType = layout.programLayoutType,
-                                .firstPayloadType = emptyPayload.payloadType,
-                                .secondPayloadType = emptyPayload.secondPayloadType,
-                                .location = location});
-                        return LoweredValInfo::simple(builder->getVoidValue());
-                    case StructuralRayTracingEmptyPayloadSelection::Unique:
-                        break;
                     }
 
-                    astPayloadType = emptyPayload.payloadType;
-                    payloadType = lowerType(context, astPayloadType);
-                    payloadArgument = builder->emitVar(payloadType);
-                    builder->emitStore(payloadArgument, builder->emitDefaultConstruct(payloadType));
-                    traceArgs.add(payloadArgument);
+                    deferEmptyPayload = layout.hasOpenHitGroups || layout.hasOpenMissShaders;
+                    if (deferEmptyPayload)
+                    {
+                        // Hit and miss conformances linked later can change whether the empty
+                        // payload set is absent, unique, or ambiguous. Keep the existing trace as
+                        // the request owner, with explicit sentinels in every payload-dependent
+                        // field, and attach the exact producer record needed to complete it.
+                        payloadType = builder->getVoidType();
+                        payloadArgument = builder->getVoidValue();
+                        traceArgs.add(payloadArgument);
+                        deferredFallback = _makeDeferredStructuralRayTracingEmptyPayloadFallback(
+                            context,
+                            funcDeclRef,
+                            functionDecl,
+                            *traceMethodInfo,
+                            args[0],
+                            descArgument,
+                            accelerationStructureArgument,
+                            descriptorArgument);
+                    }
+                    else
+                    {
+                        // An open callable section cannot add a payload-serving stage, so it does
+                        // not delay the ordinary eager empty-payload selection.
+                        auto emptyPayload = _findStructuralRayTracingEmptyPayload(context, layout);
+                        switch (emptyPayload.selection)
+                        {
+                        case StructuralRayTracingEmptyPayloadSelection::SchemaNotConcrete:
+                            SLANG_UNEXPECTED("concrete schema changed during payload selection");
+                        case StructuralRayTracingEmptyPayloadSelection::NotFound:
+                            context->getSink()->diagnose(
+                                Diagnostics::StructuralRayTracingEmptyPayloadNotFound{
+                                    .schemaType = layout.programLayoutType,
+                                    .location = location});
+                            return LoweredValInfo::simple(builder->getVoidValue());
+                        case StructuralRayTracingEmptyPayloadSelection::Ambiguous:
+                            context->getSink()->diagnose(
+                                Diagnostics::StructuralRayTracingAmbiguousEmptyPayload{
+                                    .schemaType = layout.programLayoutType,
+                                    .firstPayloadType = emptyPayload.payloadType,
+                                    .secondPayloadType = emptyPayload.secondPayloadType,
+                                    .location = location});
+                            return LoweredValInfo::simple(builder->getVoidValue());
+                        case StructuralRayTracingEmptyPayloadSelection::Unique:
+                            break;
+                        }
 
-                    fallbackDeclRef = _specializePairedStructuralRayTracingPayloadMethod(
-                        context,
-                        funcDeclRef,
-                        functionDecl,
-                        *traceMethodInfo,
-                        emptyPayload.payloadType);
-                    auto fallbackCallableDeclRef = fallbackDeclRef.as<CallableDecl>();
-                    SLANG_RELEASE_ASSERT(fallbackCallableDeclRef);
-                    // The paired payload-taking overload is a checked declaration specialized
-                    // with the selected empty payload and all ordinary arguments from the original
-                    // call. Lower its semantic function type directly so this path shares the same
-                    // parameter representation as every ordinary call; rebuilding the signature
-                    // here would create a second source of truth for substitution and parameter
-                    // directions.
-                    fallbackFuncType = lowerType(
-                        context,
-                        getFuncType(context->astBuilder, fallbackCallableDeclRef));
+                        astPayloadType = emptyPayload.payloadType;
+                        payloadType = lowerType(context, astPayloadType);
+                        payloadArgument = builder->emitVar(payloadType);
+                        builder->emitStore(
+                            payloadArgument,
+                            builder->emitDefaultConstruct(payloadType));
+                        traceArgs.add(payloadArgument);
+
+                        fallbackDeclRef = _specializePairedStructuralRayTracingPayloadMethod(
+                            context,
+                            funcDeclRef,
+                            functionDecl,
+                            *traceMethodInfo,
+                            emptyPayload.payloadType);
+                        auto fallbackCallableDeclRef = fallbackDeclRef.as<CallableDecl>();
+                        SLANG_RELEASE_ASSERT(fallbackCallableDeclRef);
+                        // The paired payload-taking overload is a checked declaration specialized
+                        // with the selected empty payload and all ordinary arguments from the
+                        // original call. Lower its semantic function type directly so this path
+                        // shares the same parameter representation as every ordinary call;
+                        // rebuilding the signature here would create a second source of truth for
+                        // substitution and parameter directions.
+                        fallbackFuncType = lowerType(
+                            context,
+                            getFuncType(context->astBuilder, fallbackCallableDeclRef));
+                    }
                 }
 
-                auto fallbackMethod = as<FunctionDeclBase>(fallbackDeclRef.getDecl());
-                SLANG_RELEASE_ASSERT(fallbackMethod);
-                auto fallbackMethodInfo =
-                    structuralRayTracingRegistry.getTraceMethodInfo(fallbackMethod);
-                SLANG_RELEASE_ASSERT(fallbackMethodInfo);
-                auto fallbackArguments = _makeStructuralRayTracingTraceFallbackArguments(
-                    builder,
-                    fallbackMethod,
-                    *fallbackMethodInfo,
-                    args[0],
-                    descArgument,
-                    accelerationStructureArgument,
-                    descriptorArgument,
-                    payloadArgument);
+                IRInst* fallback = nullptr;
+                IRInst* fallbackArguments = nullptr;
+                if (deferEmptyPayload)
+                {
+                    fallback = builder->getVoidValue();
+                    fallbackArguments = builder->getVoidValue();
+                }
+                else
+                {
+                    auto fallbackMethod = as<FunctionDeclBase>(fallbackDeclRef.getDecl());
+                    SLANG_RELEASE_ASSERT(fallbackMethod);
+                    auto fallbackMethodInfo =
+                        structuralRayTracingRegistry.getTraceMethodInfo(fallbackMethod);
+                    SLANG_RELEASE_ASSERT(fallbackMethodInfo);
+                    fallbackArguments = _makeStructuralRayTracingTraceFallbackArguments(
+                        builder,
+                        fallbackMethod,
+                        *fallbackMethodInfo,
+                        args[0],
+                        descArgument,
+                        accelerationStructureArgument,
+                        descriptorArgument,
+                        payloadArgument);
+                    fallback = getSimpleVal(
+                        context,
+                        emitDeclRef(context, fallbackDeclRef, fallbackFuncType));
+                }
 
                 List<IRInst*> operationArgs;
-                operationArgs.add(
-                    getSimpleVal(context, emitDeclRef(context, fallbackDeclRef, fallbackFuncType)));
+                operationArgs.add(fallback);
                 operationArgs.add(fallbackArguments);
                 operationArgs.add(lowerType(context, layout.programLayoutType));
                 operationArgs.add(
@@ -2207,6 +2425,26 @@ LoweredValInfo emitCallToDeclRef(
                     kIROp_StructuralRayTracingTrace,
                     operationArgs.getCount(),
                     operationArgs.getBuffer());
+                if (deferEmptyPayload)
+                {
+                    IRInst* operands[] = {
+                        deferredFallback.generic,
+                        deferredFallback.genericArgumentsWithoutPayload,
+                        builder->getIntValue(
+                            builder->getIntType(),
+                            deferredFallback.payloadGenericArgumentIndex),
+                        deferredFallback.argumentsWithoutPayload,
+                        builder->getIntValue(
+                            builder->getIntType(),
+                            deferredFallback.payloadArgumentIndex),
+                    };
+                    auto deferred = builder->addDecoration(
+                        traceOperation,
+                        kIROp_StructuralRayTracingDeferredEmptyPayloadDecoration,
+                        operands,
+                        SLANG_COUNT_OF(operands));
+                    deferred->sourceLoc = traceOperation->sourceLoc;
+                }
                 StructuralRayTracingFunctionIndexAllocator functionIndices;
                 _addStructuralRayTracingHitGroupInfo(
                     context,

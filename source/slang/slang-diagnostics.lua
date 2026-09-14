@@ -4477,10 +4477,10 @@ err(
 )
 
 err(
-    "structural-ray-tracing-schema-not-closed",
+    "structural-ray-tracing-schema-not-concrete",
     38078,
-    "structural ray-tracing schema is not concrete and closed",
-    span { loc = "location", message = "the three-argument 'trace' overload requires a concrete closed schema, but schema '~schemaType:Type' has an unresolved hit-group or miss-shader payload type" }
+    "structural ray-tracing schema is not concrete",
+    span { loc = "location", message = "the three-argument 'trace' overload requires a concrete schema, but schema '~schemaType:Type' has an unresolved hit-group or miss-shader payload type" }
 )
 
 err(
@@ -4512,8 +4512,22 @@ err(
 )
 
 err(
-    "structural-ray-tracing-world-space-data-requires-instancing",
+    "structural-ray-tracing-linked-empty-payload-not-found",
     38084,
+    "linked structural ray-tracing schema has no empty payload",
+    span { loc = "location", message = "schema '~schemaType:IRInst' has no concrete empty payload served by a hit group or miss shader after its open sections are linked" }
+)
+
+err(
+    "structural-ray-tracing-linked-ambiguous-empty-payload",
+    38085,
+    "linked structural ray-tracing schema has multiple empty payloads",
+    span { loc = "location", message = "schema '~schemaType:IRInst' serves distinct empty payload types '~firstPayloadType:IRInst' and '~secondPayloadType:IRInst' after its open sections are linked; the three-argument 'trace' overload cannot choose between them" }
+)
+
+err(
+    "structural-ray-tracing-world-space-data-requires-instancing",
+    38086,
     "structural ray-tracing world-space candidate data requires instancing",
     span { loc = "location", message = "Metal cannot provide world-space data to intersection or any-hit logic when tracing a direct primitive acceleration structure" }
 )

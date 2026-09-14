@@ -2800,6 +2800,17 @@ static RefPtr<IRModule> _getOrCreateStructuralRayTracingProgramManifest(
         specializationOptions);
 
     completeOpenStructuralRayTracingSchemas(linked.module, codeGenContext->getSink());
+    resolveDeferredStructuralRayTracingEmptyPayloads(linked.module, codeGenContext->getSink());
+
+    // Resolving a deferred implicit-payload trace creates the ordinary specialization of its
+    // paired payload-taking fallback. Materialize that specialization before payload assignment
+    // and before publishing the manifest, just as the first pass materialized source-authored
+    // specializations before open-section completion.
+    specializeModule(
+        linked.module,
+        targetProgram,
+        codeGenContext->getSink(),
+        specializationOptions);
     _assignStructuralRayTracingProgramPayloadLocations(linked.module);
 
     // The front-end normally builds the mangled-name map after it finishes constructing a module.

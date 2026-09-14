@@ -5447,6 +5447,8 @@ void prepareMetalStructuralRayTracing(
         }
 
         auto trace = cast<IRStructuralRayTracingTrace>(operation);
+        SLANG_RELEASE_ASSERT(
+            !trace->findDecoration<IRStructuralRayTracingDeferredEmptyPayloadDecoration>());
         auto traceRequirements = traceContextRequirements.tryGetValue(operation);
         SLANG_RELEASE_ASSERT(traceRequirements);
         IRBuilder operationBuilder(trace);

@@ -91,4 +91,11 @@ bool identifyStructuralRayTracingStageInterfaces(
 /// appended with dense indices. Returns false after emitting any invalid-tag diagnostic.
 bool completeOpenStructuralRayTracingSchemas(IRModule* module, DiagnosticSink* sink);
 
+/// Resolves implicit-empty-payload traces whose hit or miss section was open at source lowering.
+///
+/// Open-section completion must run first so each trace owns its final linked entry metadata. The
+/// resolver consumes only the producer-owned deferred record and those final entries; it never
+/// reconstructs an AST overload or interprets a generic/function signature by position.
+bool resolveDeferredStructuralRayTracingEmptyPayloads(IRModule* module, DiagnosticSink* sink);
+
 } // namespace Slang
