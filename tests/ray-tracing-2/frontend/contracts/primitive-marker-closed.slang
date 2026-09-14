@@ -36,11 +36,15 @@ struct ClosestHitStage : rt::IClosestHitShader
 }
 
 struct HitGroup : rt::IHitGroup
+//CHECK:              ^^^^^^^^^ type argument doesn't conform to interface
+//CHECK:              ^^^^^^^^^ type argument 'HitGroup' does not conform to the required interface 'rt.IHitGroup'
 {
     typealias Context = HitContext;
     typealias ClosestHit = ClosestHitStage;
     typealias AnyHit = rt::NoAnyHit<HitContext>;
     typealias Intersection = rt::NoIntersection<HitContext>;
+//CHECK:                         ^^^^^^^^^^^^^^ type argument doesn't conform to interface
+//CHECK:                         ^^^^^^^^^^^^^^ type argument 'FakePrimitive' does not conform to the required interface 'rt.IBuiltinIntersectionPrimitive'
 }
 
 struct Schema : rt::ITraceProgramSchema
