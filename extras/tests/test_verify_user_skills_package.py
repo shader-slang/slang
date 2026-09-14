@@ -8,7 +8,9 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import stat
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -20,6 +22,7 @@ from unittest import mock
 
 
 EXTRAS_DIR = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = EXTRAS_DIR.parent
 VERIFIER_PATH = EXTRAS_DIR / "verify-user-skills-package.py"
 SPEC = importlib.util.spec_from_file_location("verify_user_skills_package", VERIFIER_PATH)
 if SPEC is None or SPEC.loader is None:
@@ -112,6 +115,15 @@ class TestUserSkillsPackageVerifier(unittest.TestCase):
                     verify(archive_path, self.expected_files, EXPECTED_COMMIT),
                     SLANG_VERSION,
                 )
+
+    def test_rejects_bundle_entries_outside_provenance_prefix(self) -> None:
+        """Every bundle-looking entry must use the prefix selected by provenance."""
+
+        entries = self._valid_entries("slang-test/")
+        entries[f"extra/{verifier.BUNDLE_ROOT}/README.md"] = b"stray bundle copy\n"
+        archive_path = self._write_zip("multiple-prefixes.zip", list(entries.items()))
+        with self.assertRaisesRegex(verifier.VerificationError, "provenance prefix"):
+            verifier._verify_zip(archive_path, self.expected_files, EXPECTED_COMMIT)
 
     def test_rejects_missing_extra_and_modified_bundle_files(self) -> None:
         """The packaged file set and bytes must match the source exactly."""
@@ -381,6 +393,179 @@ class TestUserSkillsPackageVerifier(unittest.TestCase):
         ):
             self.assertEqual(verifier.main(), 1)
         self.assertIn("unsupported release archive", error_output.getvalue())
+
+
+class TestUserSkillsCMakeIntegration(unittest.TestCase):
+    """Exercises CMake installation against temporary Git repositories."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Locate the external tools required by the CMake integration tests."""
+
+        cls.git = shutil.which("git")
+        cls.cmake = shutil.which("cmake")
+        if cls.git is None or cls.cmake is None:
+            raise unittest.SkipTest("Git and CMake are required for integration tests")
+
+    def setUp(self) -> None:
+        """Create a minimal superproject with a committed skills gitlink."""
+
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary_directory.name)
+        self.project_dir = self.root / "project"
+        self.skills_dir = self.project_dir / "external" / "slang-user-skills"
+        skill_dir = self.skills_dir / "skills" / "example"
+        hidden_dir = skill_dir / ".cache"
+        hidden_dir.mkdir(parents=True)
+        (self.skills_dir / "README.md").write_text("skills readme\n", encoding="utf-8")
+        (self.skills_dir / "LICENSE").write_text("test license\n", encoding="utf-8")
+        (self.skills_dir / ".gitignore").write_text("ignored.tmp\n", encoding="utf-8")
+        (skill_dir / "SKILL.md").write_text("# Example skill\n", encoding="utf-8")
+        (skill_dir / ".hidden").write_text("excluded\n", encoding="utf-8")
+        (hidden_dir / "generated.txt").write_text("excluded\n", encoding="utf-8")
+
+        self._git(self.skills_dir, "init", "--quiet")
+        self._git(self.skills_dir, "config", "user.name", "Slang test")
+        self._git(self.skills_dir, "config", "user.email", "slang-test@example.invalid")
+        self._git(self.skills_dir, "add", ".")
+        self._git(self.skills_dir, "commit", "--quiet", "-m", "Initial skills")
+        self.skills_commit = self._git(
+            self.skills_dir, "rev-parse", "HEAD"
+        ).stdout.strip()
+
+        module_path = (PROJECT_ROOT / "cmake" / "SlangUserSkills.cmake").as_posix()
+        cmake_dir = self.project_dir / "cmake"
+        cmake_dir.mkdir()
+        shutil.copyfile(
+            PROJECT_ROOT / "cmake" / "SlangUserSkillsProvenance.json.in",
+            cmake_dir / "SlangUserSkillsProvenance.json.in",
+        )
+        cmake_lists = f"""\
+cmake_minimum_required(VERSION 3.20)
+project(UserSkillsIntegration NONE)
+find_package(Git REQUIRED)
+set(slang_SOURCE_DIR "${{CMAKE_SOURCE_DIR}}")
+set(slang_BINARY_DIR "${{CMAKE_BINARY_DIR}}")
+set(SLANG_VERSION_FULL "integration-test")
+include("{module_path}")
+slang_install_user_skills()
+"""
+        (self.project_dir / "CMakeLists.txt").write_text(cmake_lists, encoding="utf-8")
+        self._git(self.project_dir, "init", "--quiet")
+        self._git(self.project_dir, "config", "user.name", "Slang test")
+        self._git(self.project_dir, "config", "user.email", "slang-test@example.invalid")
+        self._git(self.project_dir, "add", ".")
+        self._git(self.project_dir, "commit", "--quiet", "-m", "Initial project")
+
+    def tearDown(self) -> None:
+        """Remove the temporary Git repositories and CMake build trees."""
+
+        self.temporary_directory.cleanup()
+
+    def _run(
+        self, command: list[str | Path], *, cwd: Path | None = None
+    ) -> subprocess.CompletedProcess[str]:
+        """Run a command and capture combined output for assertions."""
+
+        return subprocess.run(
+            [str(argument) for argument in command],
+            cwd=cwd,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+
+    def _git(self, repository: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+        """Run Git in a temporary repository and fail with its output on error."""
+
+        result = self._run([self.git, "-C", repository, *arguments])
+        if result.returncode != 0:
+            self.fail(f"Git command failed:\n{result.stdout}")
+        return result
+
+    def _configure(
+        self, build_name: str, mode: str
+    ) -> tuple[subprocess.CompletedProcess[str], Path]:
+        """Configure one fresh build tree with the requested installation mode."""
+
+        build_dir = self.root / build_name
+        result = self._run(
+            [
+                self.cmake,
+                "-S",
+                self.project_dir,
+                "-B",
+                build_dir,
+                f"-DSLANG_INSTALL_USER_SKILLS={mode}",
+            ]
+        )
+        return result, build_dir
+
+    def test_cmake_install_matches_verifier_exclusion_contract(self) -> None:
+        """A clean exact checkout installs a bundle the verifier accepts."""
+
+        configure, build_dir = self._configure("build-clean", "ON")
+        self.assertEqual(configure.returncode, 0, configure.stdout)
+        install_dir = self.root / "install"
+        install = self._run(
+            [
+                self.cmake,
+                "--install",
+                build_dir,
+                "--config",
+                "Release",
+                "--component",
+                "user-skills",
+                "--prefix",
+                install_dir,
+            ]
+        )
+        self.assertEqual(install.returncode, 0, install.stdout)
+
+        bundle_dir = install_dir / verifier.BUNDLE_ROOT
+        self.assertTrue((bundle_dir / "skills" / "example" / "SKILL.md").is_file())
+        self.assertFalse((bundle_dir / "skills" / "example" / ".hidden").exists())
+        self.assertFalse((bundle_dir / "skills" / "example" / ".cache").exists())
+
+        archive_path = self.root / "cmake-install.zip"
+        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as archive:
+            for installed_path in sorted(install_dir.rglob("*")):
+                if installed_path.is_file():
+                    archive.write(
+                        installed_path,
+                        installed_path.relative_to(install_dir).as_posix(),
+                    )
+        self.assertEqual(
+            verifier._verify_zip(
+                archive_path,
+                verifier._expected_files(self.skills_dir),
+                self.skills_commit,
+            ),
+            "integration-test",
+        )
+
+    def test_cmake_modes_reject_dirty_and_mismatched_checkouts(self) -> None:
+        """ON fails closed while AUTO skips dirty input, and pin mismatches fail."""
+
+        ignored_path = self.skills_dir / "ignored.tmp"
+        ignored_path.write_text("ignored but dirty\n", encoding="utf-8")
+        dirty_on, _ = self._configure("build-dirty-on", "ON")
+        self.assertNotEqual(dirty_on.returncode, 0)
+        self.assertIn("contains local changes", dirty_on.stdout)
+
+        dirty_auto, _ = self._configure("build-dirty-auto", "AUTO")
+        self.assertEqual(dirty_auto.returncode, 0, dirty_auto.stdout)
+        self.assertIn("Continuing because SLANG_INSTALL_USER_SKILLS=AUTO", dirty_auto.stdout)
+
+        ignored_path.unlink()
+        skill_path = self.skills_dir / "skills" / "example" / "SKILL.md"
+        skill_path.write_text("# Updated example skill\n", encoding="utf-8")
+        self._git(self.skills_dir, "add", "skills/example/SKILL.md")
+        self._git(self.skills_dir, "commit", "--quiet", "-m", "Update skills")
+        mismatch, _ = self._configure("build-mismatch", "ON")
+        self.assertNotEqual(mismatch.returncode, 0)
+        self.assertIn("does not match the committed pin", mismatch.stdout)
 
 
 if __name__ == "__main__":

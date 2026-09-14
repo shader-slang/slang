@@ -67,6 +67,7 @@ function(slang_install_user_skills)
         endif()
 
         if(_gitlink_result EQUAL 0 AND _checkout_result EQUAL 0)
+            # Git prints lowercase SHAs; normalize defensively before validating and comparing.
             string(TOLOWER "${_gitlink_commit}" _gitlink_commit)
             string(TOLOWER "${_checkout_commit}" _checkout_commit)
             string(LENGTH "${_gitlink_commit}" _gitlink_length)

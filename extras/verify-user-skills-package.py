@@ -34,8 +34,8 @@ def _normalize_archive_path(name: str) -> str:
     return normalized.as_posix()
 
 
-def _is_bundle_path(path: str) -> bool:
-    """Return whether an archive path is inside a possibly prefixed skills bundle."""
+def _may_be_bundle_path(path: str) -> bool:
+    """Return whether any path prefix places this entry in a skills-bundle subtree."""
 
     return path.startswith(f"{BUNDLE_ROOT}/") or f"/{BUNDLE_ROOT}/" in path
 
@@ -89,6 +89,16 @@ def _verify_entries(
     # complete file set with the prefix-free source layout.
     archive_prefix = provenance_name[: -len(PROVENANCE_PATH)]
     bundle_prefix = f"{archive_prefix}{BUNDLE_ROOT}/"
+    stray_bundle_files = sorted(
+        name
+        for name in entry_names
+        if _may_be_bundle_path(name) and not name.startswith(bundle_prefix)
+    )
+    if stray_bundle_files:
+        raise VerificationError(
+            "bundle entries do not share the provenance prefix in "
+            f"{archive_path}: {', '.join(stray_bundle_files)}"
+        )
     actual_bundle_files = {
         name[len(archive_prefix) :]
         for name in entry_names
@@ -153,7 +163,7 @@ def _verify_zip(
             if (
                 entry.create_system == 3
                 and unix_file_type not in (0, stat.S_IFREG)
-                and _is_bundle_path(normalized_name)
+                and _may_be_bundle_path(normalized_name)
             ):
                 raise VerificationError(
                     f"bundle contains a non-regular archive entry: {normalized_name}"
@@ -185,7 +195,7 @@ def _verify_tar(
                 not entry.isfile()
                 and not entry.isdir()
                 # This verifier vouches only for entry types inside the skills bundle.
-                and _is_bundle_path(normalized_name)
+                and _may_be_bundle_path(normalized_name)
             ):
                 raise VerificationError(
                     f"bundle contains a non-regular archive entry: {normalized_name}"
