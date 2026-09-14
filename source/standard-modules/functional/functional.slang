@@ -98,7 +98,7 @@ public extension<T, let N : int> vector<T, N>
 }
 
 /// Adds higher-order element operations to builtin matrices.
-public extension<T, let R : int, let C : int, let L : int> matrix<T, R, C, L>
+public extension<T, let R : int, let C : int, let L : MatrixLayoutMode> matrix<T, R, C, L>
 {
     /// Applies `function` to every element and preserves the matrix dimensions and layout.
     [ForceInline]
