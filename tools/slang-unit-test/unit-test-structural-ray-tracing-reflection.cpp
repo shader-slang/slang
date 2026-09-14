@@ -198,6 +198,7 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(payloadA != nullptr);
     SLANG_CHECK(UnownedStringSlice(payloadA->getType()->getName()) == "PayloadA");
     SLANG_CHECK(payloadA->getTypeLayout() != nullptr);
+    SLANG_CHECK(payloadA->getNativePayloadSize() == 0);
     SLANG_CHECK(payloadA->getHitGroupCount() == 2);
     auto hitGroupA0 = payloadA->getHitGroup(0);
     auto hitGroupA1 = payloadA->getHitGroup(1);
@@ -253,6 +254,7 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(payloadB != nullptr);
     SLANG_CHECK(UnownedStringSlice(payloadB->getType()->getName()) == "PayloadB");
     SLANG_CHECK(payloadB->getTypeLayout() != nullptr);
+    SLANG_CHECK(payloadB->getNativePayloadSize() == 0);
     SLANG_CHECK(payloadB->getHitGroupCount() == 1);
     SLANG_CHECK(payloadB->getHitGroup(0)->getFunctionIndex() == 0);
     SLANG_CHECK(payloadB->getMissShaderCount() == 1);
@@ -281,6 +283,10 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(schema->getHitRecordStride() == 48);
     SLANG_CHECK(schema->getMissRecordStride() == 32);
     SLANG_CHECK(schema->getCallableRecordStride() == 48);
+    // Metal does not ask the host for native payload or attribute maxima. Its independent
+    // structural record ABI starts application data after one fixed 16-byte header.
+    SLANG_CHECK(schema->getMaxNativeHitAttributeSize() == 0);
+    SLANG_CHECK(schema->getMetalRecordHeaderSize() == 16);
 
     SLANG_CHECK(schema->getDescriptorResourceCount() == 8);
     SLANG_CHECK(
@@ -306,6 +312,187 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(UnownedStringSlice(schema->getDescriptorResourceName(7)) == "records");
 
     SLANG_CHECK(program->findTraceProgramSchema("HitContextA") == nullptr);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingNativeABISizeReflection)
+{
+    // The nested aggregate intentionally distinguishes D3D allocation from Vulkan scalar-block
+    // layout. D3D gives `NestedInner` its 16-byte allocation before placing `tail`, producing 24
+    // bytes. Vulkan may reuse the inner aggregate's tail and produces a 16-byte block.
+    const char* source = R"(
+        import slang.raytracing;
+
+        struct NestedInner { double wide; float narrow; }
+        struct NestedValue { NestedInner inner; float tail; }
+        struct ThreeWordPayload { uint a; uint b; uint c; }
+        struct LargePayload { uint words[33]; }
+
+        struct TraceContext : rt::ITraceContext
+        {
+            typealias AccelerationStructure = rt::AccelerationStructure;
+            typealias Motion = rt::NoMotion;
+        }
+        typealias CommonTraceContext = TraceContext;
+
+        struct CustomHitContext : rt::IHitContext
+        {
+            typealias TraceContext = CommonTraceContext;
+            typealias Payload = NestedValue;
+            typealias Primitive = rt::BoundingBoxPrimitive<NestedValue>;
+            typealias Record = void;
+        }
+
+        struct CustomIntersection : rt::IIntersectionShader
+        {
+            typealias Context = CustomHitContext;
+            void invoke(rt::IntersectionInput<Context> input) {}
+        }
+
+        struct CustomHitGroup : rt::IHitGroup
+        {
+            typealias Context = CustomHitContext;
+            typealias ClosestHit = rt::NoClosestHit<Context>;
+            typealias AnyHit = rt::NoAnyHit<Context>;
+            typealias Intersection = CustomIntersection;
+        }
+
+        struct TriangleHitContext : rt::IHitContext
+        {
+            typealias TraceContext = CommonTraceContext;
+            typealias Payload = ThreeWordPayload;
+            typealias Primitive = rt::TrianglePrimitive;
+            typealias Record = void;
+        }
+
+        struct TriangleClosestHit : rt::IClosestHitShader
+        {
+            typealias Context = TriangleHitContext;
+            void invoke(rt::ClosestHitInput<Context> input) {}
+        }
+
+        struct TriangleHitGroup : rt::IHitGroup
+        {
+            typealias Context = TriangleHitContext;
+            typealias ClosestHit = TriangleClosestHit;
+            typealias AnyHit = rt::NoAnyHit<Context>;
+            typealias Intersection = rt::NoIntersection<Context>;
+        }
+
+        struct LargeMissContext : rt::IPayloadContext
+        {
+            typealias TraceContext = CommonTraceContext;
+            typealias Payload = LargePayload;
+            typealias Record = void;
+        }
+
+        struct LargeMiss : rt::IMissShader
+        {
+            typealias Context = LargeMissContext;
+            void invoke(rt::MissInput<Context> input) {}
+        }
+
+        struct CustomSchema : rt::ITraceProgramSchema
+        {
+            typealias TraceContext = CommonTraceContext;
+            typealias HitGroups = rt::HitGroupList<CustomHitGroup>;
+            typealias MissShaders = rt::NoMissShaders;
+            typealias CallableShaders = rt::NoCallableShaders;
+        }
+
+        struct TriangleSchema : rt::ITraceProgramSchema
+        {
+            typealias TraceContext = CommonTraceContext;
+            typealias HitGroups = rt::HitGroupList<TriangleHitGroup>;
+            typealias MissShaders = rt::NoMissShaders;
+            typealias CallableShaders = rt::NoCallableShaders;
+        }
+
+        struct LargeSchema : rt::ITraceProgramSchema
+        {
+            typealias TraceContext = CommonTraceContext;
+            typealias HitGroups = rt::NoHitGroups;
+            typealias MissShaders = rt::MissShaderList<LargeMiss>;
+            typealias CallableShaders = rt::NoCallableShaders;
+        }
+    )";
+
+    struct TargetExpectation
+    {
+        SlangCompileTarget target;
+        const char* profile;
+        const char* moduleName;
+        size_t nestedPayloadSize;
+        size_t customAttributeSize;
+        size_t threeWordPayloadSize;
+        size_t largePayloadSize;
+        size_t emptySchemaAttributeSize;
+    };
+    static const TargetExpectation kTargets[] = {
+        {SLANG_HLSL, "sm_6_5", "structuralNativeABID3D", 24, 24, 12, 132, 0},
+        {SLANG_SPIRV, "spirv_1_5", "structuralNativeABIVulkan", 16, 16, 12, 132, 0},
+        // OptiX transports the nested value in six 32-bit payload registers, but flattens the
+        // same three scalar attribute leaves to three registers. A 33-word payload switches to
+        // the compiler's two-register pointer representation.
+        {SLANG_PTX, nullptr, "structuralNativeABIOptiX", 24, 12, 12, 8, 8},
+    };
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::CompilerOptionEntry experimentalOption = {};
+    experimentalOption.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalOption.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalOption.value.intValue0 = 1;
+
+    for (const auto& expectation : kTargets)
+    {
+        slang::TargetDesc target = {};
+        target.format = expectation.target;
+        if (expectation.profile)
+            target.profile = globalSession->findProfile(expectation.profile);
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &target;
+        sessionDesc.compilerOptionEntryCount = 1;
+        sessionDesc.compilerOptionEntries = &experimentalOption;
+
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+        ComPtr<slang::IBlob> diagnostics;
+        auto module = session->loadModuleFromSourceString(
+            expectation.moduleName,
+            expectation.moduleName,
+            source,
+            diagnostics.writeRef());
+        if (!module && diagnostics)
+            fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+        SLANG_CHECK_ABORT(module != nullptr);
+
+        auto layout = module->getLayout();
+        auto customSchema = layout->findTraceProgramSchema("CustomSchema");
+        auto triangleSchema = layout->findTraceProgramSchema("TriangleSchema");
+        auto largeSchema = layout->findTraceProgramSchema("LargeSchema");
+        SLANG_CHECK_ABORT(customSchema && triangleSchema && largeSchema);
+        SLANG_CHECK(customSchema->getPayloadCount() == 1);
+        SLANG_CHECK(triangleSchema->getPayloadCount() == 1);
+        SLANG_CHECK(largeSchema->getPayloadCount() == 1);
+        SLANG_CHECK(
+            customSchema->getPayload(0)->getNativePayloadSize() == expectation.nestedPayloadSize);
+        SLANG_CHECK(
+            customSchema->getMaxNativeHitAttributeSize() == expectation.customAttributeSize);
+        SLANG_CHECK(
+            triangleSchema->getPayload(0)->getNativePayloadSize() ==
+            expectation.threeWordPayloadSize);
+        SLANG_CHECK(triangleSchema->getMaxNativeHitAttributeSize() == 8);
+        SLANG_CHECK(
+            largeSchema->getPayload(0)->getNativePayloadSize() == expectation.largePayloadSize);
+        SLANG_CHECK(
+            largeSchema->getMaxNativeHitAttributeSize() == expectation.emptySchemaAttributeSize);
+        SLANG_CHECK(customSchema->getMetalRecordHeaderSize() == 0);
+        SLANG_CHECK(triangleSchema->getMetalRecordHeaderSize() == 0);
+        SLANG_CHECK(largeSchema->getMetalRecordHeaderSize() == 0);
+    }
 }
 
 SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)

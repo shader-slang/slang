@@ -87,6 +87,11 @@ public:
     static IRTypeLayoutRules* getNatural();
     static IRTypeLayoutRules* getC();
     static IRTypeLayoutRules* getCUDA();
+    /// Gets the aggregate allocation rules used by native D3D ray-tracing interfaces.
+    ///
+    /// These rules scalar-align vectors and store `bool` in four bytes, like natural layout, but
+    /// also include recursive aggregate tail padding as required by DXIL `DataLayout` allocation.
+    static IRTypeLayoutRules* getD3DRayTracingInterface();
     static IRTypeLayoutRules* getConstantBuffer();
     static IRTypeLayoutRules* getLLVM();
     static IRTypeLayoutRules* get(IRTypeLayoutRuleName name);

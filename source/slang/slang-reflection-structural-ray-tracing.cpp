@@ -3,6 +3,7 @@
 #include "slang-check-impl.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-link.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-linkable-impls.h"
 #include "slang-linkable.h"
 #include "slang-mangle.h"
@@ -610,8 +611,7 @@ static RefPtr<IRModule> _getFinalizedStructuralRayTracingProgramSchemaManifest(
     // declarations that reference them.
     auto linkedReflectionProgram = fillRequirements(reflectionProgram);
     SLANG_RELEASE_ASSERT(linkedReflectionProgram);
-    auto targetProgram =
-        linkedReflectionProgram->getTargetProgram(programLayout->getTargetReq());
+    auto targetProgram = linkedReflectionProgram->getTargetProgram(programLayout->getTargetReq());
     return getOrCreateStructuralRayTracingProgramManifest(targetProgram, sink);
 }
 
@@ -892,6 +892,148 @@ static bool _populateStructuralRayTracingTypeLayouts(
     return true;
 }
 
+// Finds the target-manifest entry paired with a reflected AST type. The canonical mangled type
+// identity is already the schema completion key; using it here avoids coupling ABI reflection to
+// source names, list positions, or decoration operand indices.
+static IRDecoration* _findFinalizedStructuralRayTracingEntryInfo(
+    ASTBuilder* astBuilder,
+    IRStructuralRayTracingProgramSchema* schema,
+    StructuralRayTracingSectionKind kind,
+    Type* entryType)
+{
+    SLANG_RELEASE_ASSERT(astBuilder && schema && entryType);
+    auto identity = getMangledTypeName(astBuilder, entryType->getCanonicalType());
+    return _findFinalizedStructuralRayTracingEntryInfo(schema, kind, identity.getUnownedSlice());
+}
+
+// Publishes the native pipeline-interface sizes derived from the same canonical target IR that
+// target legalization consumes. Ordinary `TypeLayout` is intentionally not used here: constant-
+// buffer packing is not the Vulkan scalar block rule, and OptiX payload/attribute registers are a
+// transport ABI rather than a packed source struct.
+static bool _populateNativeRayTracingABISizes(
+    StructuralRayTracingProgramSchemaReflection* result,
+    ASTBuilder* astBuilder,
+    TargetRequest* targetRequest,
+    IRModule* manifest,
+    IRStructuralRayTracingProgramSchema* finalizedSchema)
+{
+    if (!(isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
+          isCUDATarget(targetRequest)))
+    {
+        return true;
+    }
+    if (!manifest || !finalizedSchema)
+        return false;
+
+    IRBuilder builder(manifest);
+    for (auto payload : result->payloads)
+    {
+        IRType* payloadType = nullptr;
+        IRType* payloadSemanticType = nullptr;
+        if (payload->hitGroups.getCount() != 0)
+        {
+            auto entryInfo = as<IRStructuralRayTracingHitGroupInfoDecoration>(
+                _findFinalizedStructuralRayTracingEntryInfo(
+                    astBuilder,
+                    finalizedSchema,
+                    StructuralRayTracingSectionKind::HitGroups,
+                    payload->hitGroups[0]->groupType));
+            if (!entryInfo)
+                return false;
+            payloadType = entryInfo->getPayloadType();
+            payloadSemanticType = entryInfo->getPayloadSemanticType();
+        }
+        else if (payload->missShaders.getCount() != 0)
+        {
+            auto entryInfo = as<IRStructuralRayTracingMissShaderInfoDecoration>(
+                _findFinalizedStructuralRayTracingEntryInfo(
+                    astBuilder,
+                    finalizedSchema,
+                    StructuralRayTracingSectionKind::MissShaders,
+                    payload->missShaders[0]->shaderType));
+            if (!entryInfo)
+                return false;
+            payloadType = entryInfo->getPayloadType();
+            payloadSemanticType = entryInfo->getPayloadSemanticType();
+        }
+        else
+        {
+            SLANG_UNEXPECTED("a reflected payload partition has no hit or miss entry");
+        }
+
+        IRIntegerValue nativeSize = 0;
+        if (SLANG_FAILED(getStructuralRayTracingNativePayloadSize(
+                targetRequest,
+                &builder,
+                payloadType,
+                payloadSemanticType,
+                &nativeSize)) ||
+            nativeSize < 0)
+        {
+            return false;
+        }
+        payload->nativePayloadSize = size_t(nativeSize);
+    }
+
+    for (auto payload : result->payloads)
+    {
+        for (auto group : payload->hitGroups)
+        {
+            auto entryInfo = as<IRStructuralRayTracingHitGroupInfoDecoration>(
+                _findFinalizedStructuralRayTracingEntryInfo(
+                    astBuilder,
+                    finalizedSchema,
+                    StructuralRayTracingSectionKind::HitGroups,
+                    group->groupType));
+            if (!entryInfo)
+                return false;
+
+            IRIntegerValue nativeSize = 0;
+            auto attributesKind = StructuralRayTracingHitAttributesKind(
+                entryInfo->getHitAttributesKind()->getValue());
+            switch (attributesKind)
+            {
+            case StructuralRayTracingHitAttributesKind::Triangle:
+                // Native triangle attributes are two 32-bit barycentric coordinates. The source
+                // `TriangleData` view also exposes properties backed by other built-ins, so its
+                // ordinary struct layout is not the native hit-attribute ABI.
+                nativeSize = 8;
+                break;
+            case StructuralRayTracingHitAttributesKind::Curve:
+            case StructuralRayTracingHitAttributesKind::None:
+                // Curves are Metal-only in the structural API; Metal has no native host maximum.
+                break;
+            case StructuralRayTracingHitAttributesKind::Custom:
+                if (SLANG_FAILED(getStructuralRayTracingNativeHitAttributeSize(
+                        targetRequest,
+                        &builder,
+                        entryInfo->getHitAttributesType(),
+                        &nativeSize)))
+                {
+                    return false;
+                }
+                break;
+            default:
+                SLANG_UNEXPECTED("invalid structural ray-tracing hit-attribute kind");
+            }
+            if (nativeSize < 0)
+                return false;
+            result->maxNativeHitAttributeSize =
+                Math::Max(result->maxNativeHitAttributeSize, size_t(nativeSize));
+        }
+    }
+    if (isCUDATarget(targetRequest))
+    {
+        // Every OptiX pipeline reserves at least two attribute registers, even if this schema has
+        // no hit group or a custom type with only one scalar leaf. Triangle attributes naturally
+        // occupy the same two-register baseline.
+        result->maxNativeHitAttributeSize = Math::Max(
+            result->maxNativeHitAttributeSize,
+            size_t(kOptiXMinHitAttributeRegisterCount * kOptiXRayTracingRegisterSize));
+    }
+    return true;
+}
+
 // Publishes the compiler-owned Metal record-buffer ABI through schema reflection. Other targets
 // use native shader-table representations whose strides remain host-defined, so their reflected
 // values deliberately stay zero.
@@ -901,6 +1043,8 @@ static bool _populateMetalRecordStrides(
 {
     if (!isMetalTarget(targetRequest))
         return true;
+
+    result->metalRecordHeaderSize = size_t(kStructuralRayTracingMetalRecordHeaderSize);
 
     auto payloadCount = result->payloads.getCount();
     for (Index payloadIndex = 0; payloadIndex < payloadCount; ++payloadIndex)
@@ -932,8 +1076,8 @@ static bool _populateMetalRecordStrides(
         result->descriptorResources.add(_Move(resource));
     }
 
-    result->hitRecordStride = size_t(getStructuralRayTracingMetalRecordStride(/* dataSize */ 0));
-    result->missRecordStride = size_t(getStructuralRayTracingMetalRecordStride(/* dataSize */ 0));
+    result->hitRecordStride = result->metalRecordHeaderSize;
+    result->missRecordStride = result->metalRecordHeaderSize;
     for (auto payload : result->payloads)
     {
         for (auto group : payload->hitGroups)
@@ -952,8 +1096,7 @@ static bool _populateMetalRecordStrides(
         }
     }
 
-    result->callableRecordStride =
-        size_t(getStructuralRayTracingMetalRecordStride(/* dataSize */ 0));
+    result->callableRecordStride = result->metalRecordHeaderSize;
     for (auto shader : result->callableShaders)
     {
         size_t stride = 0;
@@ -1065,17 +1208,24 @@ StructuralRayTracingProgramSchemaReflection* findStructuralRayTracingProgramSche
 
     bool entriesAdded = false;
     RefPtr<IRModule> manifest;
-    if (hasOpenSection)
+    IRStructuralRayTracingProgramSchema* finalizedSchema = nullptr;
+    auto targetRequest = programLayout->getTargetReq();
+    bool needsNativeABISizes =
+        isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) || isCUDATarget(targetRequest);
+    if (hasOpenSection || needsNativeABISizes)
     {
         manifest = _getFinalizedStructuralRayTracingProgramSchemaManifest(
             programLayout,
             schemaWitness,
             &sink);
         auto schemaTypeIdentity = getMangledTypeName(astBuilder, schemaType->getCanonicalType());
-        auto finalizedSchema = manifest ? _findFinalizedStructuralRayTracingProgramSchema(
-                                              manifest,
-                                              schemaTypeIdentity.getUnownedSlice())
-                                        : nullptr;
+        finalizedSchema = manifest ? _findFinalizedStructuralRayTracingProgramSchema(
+                                         manifest,
+                                         schemaTypeIdentity.getUnownedSlice())
+                                   : nullptr;
+    }
+    if (hasOpenSection)
+    {
         entriesAdded = sink.getErrorCount() == 0 && finalizedSchema &&
                        _addFinalizedStructuralRayTracingProgramSchema(
                            result,
@@ -1086,21 +1236,25 @@ StructuralRayTracingProgramSchemaReflection* findStructuralRayTracingProgramSche
     }
     else
     {
-        // Closed schemas stay on the direct AST path. They need no target manifest and retain the
-        // same lazy reflection behavior as before open sections were introduced.
+        // Closed schemas still enumerate entries through their checked AST lists. A native ABI
+        // query may create a target manifest above, but that manifest supplies only the
+        // target-specialized types used for size calculation; it does not become a second source
+        // of list membership or function indices.
         entriesAdded = _addHitGroups(result, astBuilder, registry, hitGroupsType) &&
                        _addMissShaders(result, astBuilder, registry, missShadersType) &&
                        _addCallableShaders(result, astBuilder, registry, callableShadersType);
     }
 
-    if (!entriesAdded ||
-        !_populateStructuralRayTracingTypeLayouts(result, programLayout->getTargetReq()) ||
-        !_populateMetalFunctionReflection(
+    if (sink.getErrorCount() != 0 || !entriesAdded ||
+        !_populateStructuralRayTracingTypeLayouts(result, targetRequest) ||
+        !_populateNativeRayTracingABISizes(
             result,
             astBuilder,
-            registry,
-            programLayout->getTargetReq()) ||
-        !_populateMetalRecordStrides(result, programLayout->getTargetReq()))
+            targetRequest,
+            manifest,
+            finalizedSchema) ||
+        !_populateMetalFunctionReflection(result, astBuilder, registry, targetRequest) ||
+        !_populateMetalRecordStrides(result, targetRequest))
     {
         return nullptr;
     }

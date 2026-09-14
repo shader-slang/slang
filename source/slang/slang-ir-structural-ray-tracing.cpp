@@ -2,10 +2,12 @@
 
 #include "slang-diagnostics.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
 #include "slang-module.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -266,6 +268,184 @@ bool isSemanticallyEmptyStructuralRayTracingPayloadType(IRType* type)
     auto resolvedType = type ? getResolvedInstForDecorations(unwrapAttributedType(type)) : nullptr;
     return resolvedType &&
            resolvedType->findDecoration<IRStructuralRayTracingSemanticallyEmptyPayloadDecoration>();
+}
+
+Result getOptiXRayTracingPayloadABIInfo(
+    IRBuilder* builder,
+    IRType* type,
+    OptiXRayTracingPayloadABIInfo* outInfo)
+{
+    SLANG_RELEASE_ASSERT(builder && type && outInfo);
+    *outInfo = {};
+
+    if (auto pointedToType = tryGetPointedToType(builder, type))
+        type = pointedToType;
+
+    IRSizeAndAlignment layout;
+    SLANG_RETURN_ON_FAIL(getSizeAndAlignment(nullptr, IRTypeLayoutRules::getCUDA(), type, &layout));
+    if (layout.size == IRSizeAndAlignment::kIndeterminateSize)
+        return SLANG_FAIL;
+
+    // Varying-parameter legalization transports values inline when the compiler's CUDA-layout
+    // size fits in 32 OptiX payload registers. Larger values are stored in memory and the native
+    // payload carries one 64-bit pointer split across two registers. Reflection must report that
+    // selected transport rather than an ordinary source-type layout. Inline values occupy the
+    // minimum number of 32-bit registers that cover the value size; trailing alignment padding is
+    // not transported.
+    auto inlineRegisterCount =
+        (layout.size + kOptiXRayTracingRegisterSize - 1) / kOptiXRayTracingRegisterSize;
+    if (inlineRegisterCount == 0 || inlineRegisterCount > kOptiXMaxRayPayloadRegisterCount)
+    {
+        outInfo->registerCount = kOptiXIndirectPayloadRegisterCount;
+        outInfo->isIndirect = true;
+    }
+    else
+    {
+        outInfo->registerCount = inlineRegisterCount;
+    }
+    return SLANG_OK;
+}
+
+static Result _countOptiXRayTracingHitAttributeRegisters(
+    IRBuilder* builder,
+    IRType* type,
+    IRIntegerValue& ioCount)
+{
+    if (auto pointedToType = tryGetPointedToType(builder, type))
+        type = pointedToType;
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            SLANG_RETURN_ON_FAIL(_countOptiXRayTracingHitAttributeRegisters(
+                builder,
+                field->getFieldType(),
+                ioCount));
+        }
+        return SLANG_OK;
+    }
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+    {
+        auto elementCount = as<IRIntLit>(arrayType->getElementCount());
+        if (!elementCount)
+            return SLANG_FAIL;
+        for (IRIntegerValue i = 0; i < elementCount->getValue(); ++i)
+        {
+            SLANG_RETURN_ON_FAIL(_countOptiXRayTracingHitAttributeRegisters(
+                builder,
+                arrayType->getElementType(),
+                ioCount));
+        }
+        return SLANG_OK;
+    }
+    if (auto matrixType = as<IRMatrixType>(type))
+    {
+        auto rowCount = as<IRIntLit>(matrixType->getRowCount());
+        auto columnCount = as<IRIntLit>(matrixType->getColumnCount());
+        if (!rowCount || !columnCount)
+            return SLANG_FAIL;
+        ioCount += rowCount->getValue() * columnCount->getValue();
+        return SLANG_OK;
+    }
+    if (auto vectorType = as<IRVectorType>(type))
+    {
+        auto elementCount = as<IRIntLit>(vectorType->getElementCount());
+        if (!elementCount)
+            return SLANG_FAIL;
+        for (IRIntegerValue i = 0; i < elementCount->getValue(); ++i)
+        {
+            SLANG_RETURN_ON_FAIL(_countOptiXRayTracingHitAttributeRegisters(
+                builder,
+                vectorType->getElementType(),
+                ioCount));
+        }
+        return SLANG_OK;
+    }
+    if (as<IRBasicType>(type))
+    {
+        ++ioCount;
+        return SLANG_OK;
+    }
+    return SLANG_FAIL;
+}
+
+Result getOptiXRayTracingHitAttributeRegisterCount(
+    IRBuilder* builder,
+    IRType* type,
+    IRIntegerValue* outRegisterCount)
+{
+    SLANG_RELEASE_ASSERT(builder && type && outRegisterCount);
+    *outRegisterCount = 0;
+    return _countOptiXRayTracingHitAttributeRegisters(builder, type, *outRegisterCount);
+}
+
+Result getStructuralRayTracingNativePayloadSize(
+    TargetRequest* targetRequest,
+    IRBuilder* builder,
+    IRType* payloadType,
+    IRType* payloadSemanticType,
+    IRIntegerValue* outSize)
+{
+    SLANG_RELEASE_ASSERT(targetRequest && builder && payloadType && payloadSemanticType && outSize);
+    *outSize = 0;
+    if (isSemanticallyEmptyStructuralRayTracingPayloadType(payloadSemanticType))
+        return SLANG_OK;
+
+    if (isCUDATarget(targetRequest))
+    {
+        OptiXRayTracingPayloadABIInfo abiInfo;
+        SLANG_RETURN_ON_FAIL(getOptiXRayTracingPayloadABIInfo(builder, payloadType, &abiInfo));
+        *outSize = abiInfo.registerCount * kOptiXRayTracingRegisterSize;
+        return SLANG_OK;
+    }
+    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest))
+    {
+        auto layoutRules = isD3DTarget(targetRequest)
+                               ? IRTypeLayoutRules::getD3DRayTracingInterface()
+                               : IRTypeLayoutRules::getNatural();
+        IRSizeAndAlignment layout;
+        SLANG_RETURN_ON_FAIL(getSizeAndAlignment(targetRequest, layoutRules, payloadType, &layout));
+        if (layout.size == IRSizeAndAlignment::kIndeterminateSize)
+            return SLANG_FAIL;
+        // Vulkan defines ray payload and hit-attribute block sizes as if every member used scalar
+        // alignment. Slang's natural IR layout is exactly that rule; `getStride()` supplies the
+        // final block tail padding. D3D uses the dedicated rule above because DXIL allocation also
+        // pads nested aggregates before placing the following field.
+        *outSize = layout.getStride();
+    }
+    return SLANG_OK;
+}
+
+Result getStructuralRayTracingNativeHitAttributeSize(
+    TargetRequest* targetRequest,
+    IRBuilder* builder,
+    IRType* attributesType,
+    IRIntegerValue* outSize)
+{
+    SLANG_RELEASE_ASSERT(targetRequest && builder && attributesType && outSize);
+    *outSize = 0;
+    if (isCUDATarget(targetRequest))
+    {
+        IRIntegerValue registerCount = 0;
+        SLANG_RETURN_ON_FAIL(
+            getOptiXRayTracingHitAttributeRegisterCount(builder, attributesType, &registerCount));
+        *outSize = registerCount * kOptiXRayTracingRegisterSize;
+        return SLANG_OK;
+    }
+    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest))
+    {
+        auto layoutRules = isD3DTarget(targetRequest)
+                               ? IRTypeLayoutRules::getD3DRayTracingInterface()
+                               : IRTypeLayoutRules::getNatural();
+        IRSizeAndAlignment layout;
+        SLANG_RETURN_ON_FAIL(
+            getSizeAndAlignment(targetRequest, layoutRules, attributesType, &layout));
+        if (layout.size == IRSizeAndAlignment::kIndeterminateSize)
+            return SLANG_FAIL;
+        *outSize = layout.getStride();
+    }
+    return SLANG_OK;
 }
 
 // Collect every concrete Vulkan ray-payload location in the lexical IR subtree. Payload

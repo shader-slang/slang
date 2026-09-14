@@ -99,6 +99,8 @@ public:
     Type* payloadType = nullptr;
     /// Target layout of the payload value carried by this partition.
     TypeLayout* typeLayout = nullptr;
+    /// Native host pipeline ABI requirement for this payload, in bytes.
+    size_t nativePayloadSize = 0;
 
     /// Number of physical slots required by this payload's sparse Metal IFT.
     Index intersectionFunctionTableSize = 0;
@@ -138,6 +140,10 @@ public:
     size_t hitRecordStride = 0;
     size_t missRecordStride = 0;
     size_t callableRecordStride = 0;
+    /// Native hit-attribute ABI requirement, including any target minimum, in bytes.
+    size_t maxNativeHitAttributeSize = 0;
+    /// Fixed compiler-owned Metal record header, or zero on other targets.
+    size_t metalRecordHeaderSize = 0;
 
     /// Payloads are ordered by first use in hit groups, then first use in miss shaders.
     List<RefPtr<StructuralRayTracingPayloadReflection>> payloads;

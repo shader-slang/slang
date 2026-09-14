@@ -127,6 +127,25 @@ slang::RayTracingPayloadReflection* findPayloadPartition(
     return nullptr;
 }
 
+// Configures the host pipeline from the finalized structural schema rather than duplicating the
+// shader's payload and hit-attribute declarations in C++. Multiple payload partitions can have
+// different native sizes, so the one native pipeline uses their maximum requirement.
+void applyNativeRayTracingABISizes(
+    slang::TraceProgramSchemaReflection* schema,
+    RayTracingPipelineDesc& pipelineDesc)
+{
+    SLANG_RELEASE_ASSERT(schema);
+    size_t maxPayloadSize = 0;
+    for (SlangUInt i = 0; i < schema->getPayloadCount(); ++i)
+    {
+        auto payload = schema->getPayload(i);
+        SLANG_RELEASE_ASSERT(payload);
+        maxPayloadSize = Math::Max(maxPayloadSize, payload->getNativePayloadSize());
+    }
+    pipelineDesc.maxRayPayloadSize = maxPayloadSize;
+    pipelineDesc.maxAttributeSizeInBytes = schema->getMaxNativeHitAttributeSize();
+}
+
 } // namespace
 
 ComPtr<IDevice> createStructuralRayTracingTestDevice(
@@ -273,6 +292,15 @@ void runStructuralRayTracingProceduralHitFilter(IDevice* device)
     SLANG_CHECK_ABORT(queue != nullptr);
     StructuralRayTracingProceduralScene scene(device, queue);
 
+    auto slangSession = device->getSlangSession();
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(
+        slangSession->loadModule("procedural-hit-filter", diagnostics.writeRef()));
+    diagnoseIfNeeded(diagnostics);
+    SLANG_CHECK_ABORT(module != nullptr);
+    auto schema = module->getLayout()->findTraceProgramSchema("Schema");
+    SLANG_CHECK_ABORT(schema != nullptr);
+
     static const EntryDesc kEntries[] = {
         {"main", SLANG_STAGE_RAY_GENERATION},
         {"RuntimeIntersection", SLANG_STAGE_INTERSECTION},
@@ -281,12 +309,8 @@ void runStructuralRayTracingProceduralHitFilter(IDevice* device)
         {"RuntimeMiss", SLANG_STAGE_MISS},
     };
     ComPtr<IShaderProgram> program;
-    GFX_CHECK_CALL_ABORT(loadProgram(
-        device,
-        "procedural-hit-filter",
-        kEntries,
-        SLANG_COUNT_OF(kEntries),
-        program.writeRef()));
+    GFX_CHECK_CALL_ABORT(
+        loadProgram(device, module, kEntries, SLANG_COUNT_OF(kEntries), program.writeRef()));
 
     static const char* kHitGroupNames[] = {"proceduralHitGroup"};
     HitGroupDesc hitGroup = {};
@@ -300,8 +324,7 @@ void runStructuralRayTracingProceduralHitFilter(IDevice* device)
     pipelineDesc.hitGroups = &hitGroup;
     pipelineDesc.hitGroupCount = 1;
     pipelineDesc.maxRecursion = 1;
-    pipelineDesc.maxRayPayloadSize = sizeof(uint32_t) * 3;
-    pipelineDesc.maxAttributeSizeInBytes = sizeof(uint32_t);
+    applyNativeRayTracingABISizes(schema, pipelineDesc);
 
     ComPtr<IRayTracingPipeline> pipeline;
     GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
@@ -589,8 +612,7 @@ void runStructuralRayTracingRepeatedRecords(IDevice* device)
     pipelineDesc.hitGroups = &hitGroup;
     pipelineDesc.hitGroupCount = 1;
     pipelineDesc.maxRecursion = 1;
-    pipelineDesc.maxRayPayloadSize = sizeof(uint32_t) * 2;
-    pipelineDesc.maxAttributeSizeInBytes = sizeof(float) * 2;
+    applyNativeRayTracingABISizes(schema, pipelineDesc);
 
     ComPtr<IRayTracingPipeline> pipeline;
     GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
@@ -945,8 +967,7 @@ void runStructuralRayTracingMultiplePayloads(IDevice* device)
     pipelineDesc.hitGroups = hitGroups;
     pipelineDesc.hitGroupCount = SLANG_COUNT_OF(hitGroups);
     pipelineDesc.maxRecursion = 1;
-    pipelineDesc.maxRayPayloadSize = sizeof(uint32_t) * 3;
-    pipelineDesc.maxAttributeSizeInBytes = sizeof(float) * 2;
+    applyNativeRayTracingABISizes(schema, pipelineDesc);
 
     ComPtr<IRayTracingPipeline> pipeline;
     GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
