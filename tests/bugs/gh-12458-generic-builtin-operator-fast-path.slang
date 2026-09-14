@@ -59,6 +59,17 @@
 // other operator, `==`/`!=` on a GENERIC-element-type vector must keep falling through to the
 // stdlib overload instead of taking the fast path; only a CONCRETE element type keeps this
 // function's pre-existing (`isGLSLOperatorScope()`-gated) vector-equality behavior unchanged.
+//
+// `notT` pins a FOURTH case, on unary `!` specifically: `__BuiltinLogicalType` is implemented by
+// `bool` AND every builtin integer type (it also backs bitwise-operator codegen elsewhere), so a
+// `T : __BuiltinLogicalType` parameter may be instantiated with `int`, not just `bool` --
+// `notT<int>(5)` below is exactly that. Unary `!` must still decline the fast path for such a
+// `T`, because its result has to be `bool`-shaped: `classifyBuiltinArithmeticElementType` tracks
+// this with two separate flags, `isBool` (true only for a genuinely concrete `bool` element,
+// never provable for a generic parameter) and `isLogical` (true for `__BuiltinLogicalType`
+// conformance broadly, safe for `==`/`eqT` above but NOT for `!`). `notT<int>(5)` verifies the
+// result is `0` (5 is truthy, so `!5` is `false`, via normal overload resolution's int-to-bool
+// conversion), not a raw `Not` misapplied to the integer bit pattern.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
@@ -71,6 +82,7 @@ T bitAndT<T : __BuiltinIntegerType>(T a, T b) { return a & b; }
 T negF<T : __BuiltinFloatingPointType>(T a) { return -a; }
 T vaddF<T : __BuiltinFloatingPointType>(vector<T, 3> a, vector<T, 3> b) { return (a + b).x; }
 T vmodI<T : __BuiltinIntegerType>(vector<T, 2> a, vector<T, 2> b) { return (a % b).y; }
+T notT<T : __BuiltinLogicalType>(T a) { return !a; }
 
 void main()
 {
@@ -92,4 +104,6 @@ void main()
     printf("%f\n", vaddF<float>(vector<float, 3>(1.0, 2.0, 3.0), vector<float, 3>(5.5, 6.0, 7.0)));
     // CHECK-NEXT: 2
     printf("%d\n", vmodI<int>(vector<int, 2>(7, 8), vector<int, 2>(3, 3)));
+    // CHECK-NEXT: 0
+    printf("%d\n", notT<int>(5));
 }

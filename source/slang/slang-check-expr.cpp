@@ -4742,8 +4742,14 @@ SemanticsExprVisitor::BuiltinArithmeticElementFamily SemanticsExprVisitor::
     if (auto floatInterface = astBuilder->getBuiltinFloatingPointType())
         family.isFloat =
             isProvenConformance(tryGetInterfaceConformanceWitness(elementType, floatInterface));
+    // `__BuiltinLogicalType` is implemented by `bool` AND every builtin integer type (it also
+    // backs bitwise-operator codegen elsewhere), so proving conformance to it does not prove the
+    // element is `bool` -- only `family.isLogical`, not `family.isBool`, may be set here. A
+    // generic parameter can never prove `isBool`: there is no sealed marker interface `bool`
+    // alone implements, so only the concrete-type branch above (`baseType == BaseType::Bool`)
+    // ever sets it.
     if (auto logicalInterface = astBuilder->getBuiltinLogicalType())
-        family.isBool =
+        family.isLogical =
             isProvenConformance(tryGetInterfaceConformanceWitness(elementType, logicalInterface));
     return family;
 }
@@ -4800,6 +4806,11 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
             return nullptr;
         bool uInt = uFamily.isInteger;
         bool uFloat = uFamily.isFloat;
+        // Deliberately `isBool` (strict: concrete `bool` only), not `isLogical`: `!` must
+        // produce a `bool`-shaped result, and a generic parameter constrained only to
+        // `__BuiltinLogicalType` may be instantiated with an integer, for which `isBool` is
+        // false (see `BuiltinArithmeticElementFamily`'s field comments) -- correctly declining
+        // the fast path here, the same way a concrete non-bool operand already does.
         bool uBool = uFamily.isBool;
         // `-` => signed/float negate; `~` => integer bitwise-not; `!` => bool logical-not.
         bool uEligible = isNeg ? (uInt || uFloat) : (isBitNot ? uInt : /*isLogicalNot*/ uBool);
@@ -4947,6 +4958,7 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     bool isIntegerBase = family.isInteger;
     bool isFloatBase = family.isFloat;
     bool isBoolBase = family.isBool;
+    bool isLogicalBase = family.isLogical;
     // Some operators do not apply to every element type. For example, it is invalid to apply a
     // bitwise operator to a floating-point operand, and arithmetic does not apply to `bool`. When
     // the element type is not valid for the operator family we return null, so the expression
@@ -4955,13 +4967,17 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     // (Floating-point bitwise/shift operands are rejected earlier with a dedicated diagnostic, so
     // a non-integer bitwise operand reaching here is `bool`, which still resolves via `ILogical`.)
     //   - bitwise/shift (`& | ^ << >> ~`): integer only;
-    //   - equality (`== !=`): integer, floating-point, or bool;
+    //   - equality (`== !=`): integer, floating-point, bool, or (for a generic element type)
+    //     anything conforming to `__BuiltinLogicalType` -- `isLogicalBase` is checked here, not
+    //     just `isBoolBase`, because `kIROp_Eql`/`kIROp_Neq` are valid on that whole family
+    //     uniformly, unlike unary logical-not (see `uBool` above, which deliberately does NOT
+    //     accept `isLogical`);
     //   - arithmetic (`+ - * / %`) and ordering comparison (`< > <= >=`): integer or float.
     bool eligible;
     if (isBitwise)
         eligible = isIntegerBase;
     else if (isEquality)
-        eligible = isIntegerBase || isFloatBase || isBoolBase;
+        eligible = isIntegerBase || isFloatBase || isBoolBase || isLogicalBase;
     else
         eligible = isIntegerBase || isFloatBase;
     if (!eligible)

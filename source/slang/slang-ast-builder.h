@@ -42,13 +42,19 @@ public:
     /// Get the `IDifferentiable` type
     Type* getDiffInterfaceType();
 
-    // The three `[sealed]` marker interfaces that partition the builtin scalar types by family
-    // (`__BuiltinIntegerType`, `__BuiltinFloatingPointType`, `__BuiltinLogicalType`; see
-    // core.meta.slang). Because they are sealed, only the compiler's own builtin scalar types can
-    // conform to them, so a generic type parameter constrained to one of them is guaranteed to be
-    // instantiated with a type of that family. `SemanticsExprVisitor::
+    // Three `[sealed]` marker interfaces over the builtin scalar types (`__BuiltinIntegerType`,
+    // `__BuiltinFloatingPointType`, `__BuiltinLogicalType`; see core.meta.slang). These are NOT a
+    // mutually-exclusive partition: every builtin integer type conforms to both
+    // `__BuiltinIntegerType` and `__BuiltinLogicalType` (the latter also backs bitwise-operator
+    // codegen), so `isInteger` and `isLogical` can both be true for the same element type -- only
+    // `bool` conforms to `__BuiltinLogicalType` without also conforming to `__BuiltinIntegerType`.
+    // Because they are sealed, only the compiler's own builtin scalar types can conform to them
+    // at all, so a generic type parameter constrained to one of them is guaranteed to be
+    // instantiated with a type from that (possibly overlapping) set. `SemanticsExprVisitor::
     // classifyBuiltinArithmeticElementType` uses these to widen the builtin-operator fast path to
-    // such a parameter, the same way it already recognizes a concrete `BasicExpressionType`.
+    // such a parameter, the same way it already recognizes a concrete `BasicExpressionType` --
+    // see `BuiltinArithmeticElementFamily`'s own field comments for why `isBool` and `isLogical`
+    // are tracked separately rather than folded into one flag.
     //
     // None of the three has a dedicated C++ `Type` subclass the way `IDifferentiable` does, so
     // they cannot be registered with `__magic_type`, which requires one (it resolves the name
