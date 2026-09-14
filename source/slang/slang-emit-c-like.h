@@ -658,6 +658,10 @@ protected:
     {
         SLANG_UNUSED(decl);
     }
+
+    /// Returns the target-language spelling of an unconditional loop header.
+    virtual char const* getUnconditionalLoopHeader() { return "for(;;)"; }
+
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) { SLANG_UNUSED(ifInst); }
     virtual void emitSwitchDecorationsImpl(IRSwitch* switchInst) { SLANG_UNUSED(switchInst); }
     virtual void emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault);
