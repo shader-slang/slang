@@ -57,6 +57,7 @@ struct ClosestHit : rt::IClosestHitShader
 // DXILCH: define void
 // DXILCH: !dx.dxrPayloadAnnotations
 // PTXCH: .visible .entry __closesthit__ClosestHit()
+// PTXCH: _optix_get_hit_kind
 
 void applyAnyHitTriangleData(rt::AnyHitInput<HitContext> input)
 {
@@ -79,3 +80,4 @@ struct AnyHit : rt::IAnyHitShader
 // DXILAH: define void
 // DXILAH: !dx.dxrPayloadAnnotations
 // PTXAH: .visible .entry __anyhit__AnyHit()
+// PTXAH: _optix_get_hit_kind
