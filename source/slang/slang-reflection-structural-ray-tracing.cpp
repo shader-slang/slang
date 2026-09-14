@@ -3,6 +3,7 @@
 #include "slang-check-impl.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-link.h"
+#include "slang-ir-optix-ray-tracing-abi.h"
 #include "slang-ir-structural-ray-tracing.h"
 #include "slang-linkable-impls.h"
 #include "slang-linkable.h"

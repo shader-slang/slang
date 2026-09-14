@@ -4,6 +4,7 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-optix-ray-tracing-abi.h"
 #include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -1629,6 +1630,119 @@ static void _addUniqueStructuralRayTracingPayloadType(
     if (as<IRVoidType>(payloadType) || !seenPayloadTypes.add(payloadType))
         return;
     payloadTypes.add(payloadType);
+}
+
+// Lowers structural `IntersectionInput.reportHit` markers to the native OptiX operation.
+//
+// The shared OptiX ABI helper owns aggregate-to-word transport. This context owns only the
+// target-specific call signature and caches one intrinsic declaration for each word count used by
+// the module.
+struct OptiXStructuralRayTracingReportHitLoweringContext
+{
+    IRModule* module = nullptr;
+    DiagnosticSink* sink = nullptr;
+    IRFunc* reportIntersectionIntrinsics[kOptiXMaxHitAttributeRegisterCount + 1] = {};
+
+    // Returns the module-local native intrinsic declaration for one attribute-word count.
+    IRFunc* getReportIntersectionIntrinsic(IRIntegerValue attributeRegisterCount)
+    {
+        SLANG_RELEASE_ASSERT(
+            attributeRegisterCount >= 0 &&
+            attributeRegisterCount <= kOptiXMaxHitAttributeRegisterCount);
+        auto& result = reportIntersectionIntrinsics[attributeRegisterCount];
+        if (result)
+            return result;
+
+        // `optixReportIntersection` is a C++ template whose trailing arguments are one uint per
+        // physical attribute register. Materialize one compiler-owned declaration per arity so
+        // ordinary call emission produces the same native call as the legacy `ReportHitOptix`
+        // intrinsic, without exposing register flattening in the structural shader API.
+        IRBuilder builder(module);
+        builder.setInsertInto(module->getModuleInst());
+        List<IRType*> parameterTypes;
+        parameterTypes.add(builder.getFloatType());
+        parameterTypes.add(builder.getUIntType());
+        for (IRIntegerValue i = 0; i < attributeRegisterCount; ++i)
+            parameterTypes.add(builder.getUIntType());
+
+        result = builder.createFunc();
+        result->setFullType(builder.getFuncType(parameterTypes, builder.getBoolType()));
+        builder.addNameHintDecoration(
+            result,
+            UnownedTerminatedStringSlice("optixReportIntersection"));
+        builder.addTargetIntrinsicDecoration(
+            result,
+            CapabilitySet::makeEmpty(),
+            UnownedTerminatedStringSlice("optixReportIntersection"));
+        return result;
+    }
+
+    // Replaces one structural report-hit marker with a native OptiX call.
+    void lower(IRStructuralRayTracingStageInputOperation* operation)
+    {
+        const bool hasHitKind = operation->getOp() == kIROp_StructuralRayTracingReportHitWithKind;
+        SLANG_RELEASE_ASSERT(
+            operation->getOp() == kIROp_StructuralRayTracingReportHit || hasHitKind);
+
+        // AST-to-IR lowering preserves the complete source call as:
+        //
+        //     reportHit(fallback, input, distance, [hitKind,] attributes)
+        //
+        // `fallback` and `input` belong to the source-level method call. OptiX needs only the
+        // distance, effective hit kind, and the physical attribute words.
+        SLANG_RELEASE_ASSERT(operation->getOperandCount() == (hasHitKind ? 5 : 4));
+        IRBuilder builder(operation);
+        builder.setInsertBefore(operation);
+        auto distance = operation->getOperand(2);
+        auto hitKind = hasHitKind ? operation->getOperand(3)
+                                  : builder.getIntValue(builder.getUIntType(), IRIntegerValue(0));
+        auto attributes = operation->getOperand(hasHitKind ? 4 : 3);
+
+        IRIntegerValue requiredRegisterCount = 0;
+        SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(getOptiXRayTracingHitAttributeRegisterCount(
+            &builder,
+            attributes->getDataType(),
+            &requiredRegisterCount)));
+        if (requiredRegisterCount > kOptiXMaxHitAttributeRegisterCount)
+        {
+            sink->diagnose(Diagnostics::Unexpected{
+                .message = "the supplied hit attribute exceeds the maximum hit attribute "
+                           "structure size (32 bytes)",
+                .location = operation->sourceLoc});
+            return;
+        }
+
+        List<IRInst*> arguments;
+        arguments.add(distance);
+        arguments.add(hitKind);
+        SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(
+            emitOptiXRayTracingHitAttributeReportArguments(&builder, attributes, arguments)));
+        SLANG_RELEASE_ASSERT(arguments.getCount() == Index(requiredRegisterCount + 2));
+
+        auto call = builder.emitCallInst(
+            operation->getDataType(),
+            getReportIntersectionIntrinsic(requiredRegisterCount),
+            arguments);
+        call->sourceLoc = operation->sourceLoc;
+        operation->replaceUsesWith(call);
+        operation->removeAndDeallocate();
+    }
+};
+
+void lowerOptiXStructuralRayTracingReportHitOperations(IRModule* module, DiagnosticSink* sink)
+{
+    SLANG_RELEASE_ASSERT(module && sink);
+    List<IRInst*> operations;
+    _collectStageInputOperations(module->getModuleInst(), operations);
+    OptiXStructuralRayTracingReportHitLoweringContext context = {module, sink};
+    for (auto operation : operations)
+    {
+        if (operation->getOp() == kIROp_StructuralRayTracingReportHit ||
+            operation->getOp() == kIROp_StructuralRayTracingReportHitWithKind)
+        {
+            context.lower(cast<IRStructuralRayTracingStageInputOperation>(operation));
+        }
+    }
 }
 
 void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
