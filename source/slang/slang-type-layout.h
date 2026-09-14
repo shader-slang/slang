@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <compare>
 #include <limits>
+#include <mutex>
 
 namespace Slang
 {
@@ -1270,7 +1271,13 @@ public:
     /// >= 0 means a stable space was allocated; it does not by itself prove post-lowering heap use.
     Int bindlessSpaceIndex = -1;
 
-    /// Lazily constructed structural ray-tracing schemas requested through reflection.
+    /// Lazily constructed structural ray-tracing objects requested through reflection.
+    ///
+    /// The returned public objects borrow their lifetime from this cache, so construction and
+    /// publication must be serialized. Without this mutex, threads A and B can both observe an
+    /// empty cache and construct different owners; B's publication then destroys A's owner while A
+    /// is still populating or returning one of its raw reflection pointers.
+    mutable std::mutex structuralRayTracingReflectionMutex;
     RefPtr<RefObject> structuralRayTracingReflectionData;
 };
 

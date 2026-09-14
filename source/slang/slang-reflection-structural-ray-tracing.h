@@ -23,7 +23,8 @@ class StructuralRayTracingHitGroupReflection : public RefObject
 {
 public:
     /// Identifies this group within the hit-group function table for its payload partition.
-    Index functionIndex = 0;
+    /// Schema-free declaration catalogue entries retain -1 because no schema selected a slot.
+    Index functionIndex = -1;
     Type* groupType = nullptr;
     Type* contextType = nullptr;
     Type* recordType = nullptr;
@@ -47,7 +48,8 @@ class StructuralRayTracingMissShaderReflection : public RefObject
 {
 public:
     /// Identifies this shader within the miss function table for its payload partition.
-    Index functionIndex = 0;
+    /// Schema-free declaration catalogue entries retain -1 because no schema selected a slot.
+    Index functionIndex = -1;
     Type* shaderType = nullptr;
     Type* contextType = nullptr;
     Type* recordType = nullptr;
@@ -62,7 +64,8 @@ class StructuralRayTracingCallableShaderReflection : public RefObject
 {
 public:
     /// Identifies this shader within the schema-wide callable function table.
-    Index functionIndex = 0;
+    /// Schema-free declaration catalogue entries retain -1 because no schema selected a slot.
+    Index functionIndex = -1;
     Type* shaderType = nullptr;
     Type* contextType = nullptr;
     Type* recordType = nullptr;
@@ -153,11 +156,31 @@ public:
     List<DescriptorResource> descriptorResources;
 };
 
+/// Owns structural entry declarations that are visible to one ordinary component program.
+///
+/// These objects deliberately do not belong to a trace-program schema. They let a host discover
+/// the concrete hit, miss, and callable declarations from which it may construct schemas or native
+/// pipeline records without requesting schema finalization. Consequently their function indices
+/// remain -1, `isLinked` remains false, and they never contain schema-specific Metal symbols.
+class StructuralRayTracingEntryCatalogueReflection : public RefObject
+{
+public:
+    List<RefPtr<StructuralRayTracingHitGroupReflection>> hitGroups;
+    List<RefPtr<StructuralRayTracingMissShaderReflection>> missShaders;
+    List<RefPtr<StructuralRayTracingCallableShaderReflection>> callableShaders;
+};
+
 class StructuralRayTracingReflectionData : public RefObject
 {
 public:
+    /// The schema-free catalogue has its own entry objects. A later schema query can assign slots
+    /// and target symbols without mutating the declarations previously returned to the host.
+    RefPtr<StructuralRayTracingEntryCatalogueReflection> entryCatalogue;
     List<RefPtr<StructuralRayTracingProgramSchemaReflection>> programSchemas;
 };
+
+StructuralRayTracingEntryCatalogueReflection* getStructuralRayTracingEntryCatalogueReflection(
+    ProgramLayout* programLayout);
 
 StructuralRayTracingProgramSchemaReflection* findStructuralRayTracingProgramSchemaReflection(
     ProgramLayout* programLayout,

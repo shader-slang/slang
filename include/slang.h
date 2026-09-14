@@ -2168,6 +2168,48 @@ public:                                                              \
     typedef SlangProgramLayout SlangReflection;
     typedef SlangEntryPointLayout SlangReflectionEntryPoint;
 
+    /** Enumerate concrete structural hit-group declarations visible to this component program.
+
+    This schema-free catalogue is independent of every `ITraceProgramSchema`. Entries use a
+    deterministic canonical-type order and are deduplicated by canonical type identity, but the
+    order is not a native function-table order. Consequently each returned entry reports
+    `functionIndex == -1` and `isLinked == false`. On Metal, schema-specific target symbols are not
+    available from catalogue entries; query a finalized schema to obtain them.
+
+    Merely querying this catalogue does not retain otherwise-unused stage code in target output.
+    */
+    SLANG_API SlangUInt
+    spReflection_getStructuralRayTracingHitGroupCount(SlangReflection* reflection);
+    SLANG_API SlangReflectionRayTracingHitGroup* spReflection_getStructuralRayTracingHitGroup(
+        SlangReflection* reflection,
+        SlangUInt index);
+
+    /** Enumerate concrete structural miss-shader declarations visible to this component program.
+
+    Entries use deterministic canonical-type order and deduplication, report `functionIndex == -1`
+    and `isLinked == false`, and have no schema-specific Metal symbol. Querying the catalogue does
+    not retain otherwise-unused stage code.
+    */
+    SLANG_API SlangUInt
+    spReflection_getStructuralRayTracingMissShaderCount(SlangReflection* reflection);
+    SLANG_API SlangReflectionRayTracingMissShader* spReflection_getStructuralRayTracingMissShader(
+        SlangReflection* reflection,
+        SlangUInt index);
+
+    /** Enumerate concrete structural callable-shader declarations visible to this component.
+
+    Entries use deterministic canonical-type order and deduplication, report `functionIndex == -1`
+    and `isLinked == false`, and have no schema-specific Metal symbol. Querying the catalogue does
+    not retain otherwise-unused stage code. Callable declarations with different data types can
+    coexist because only a concrete schema imposes a native callable-table contract.
+    */
+    SLANG_API SlangUInt
+    spReflection_getStructuralRayTracingCallableShaderCount(SlangReflection* reflection);
+    SLANG_API SlangReflectionRayTracingCallableShader*
+    spReflection_getStructuralRayTracingCallableShader(
+        SlangReflection* reflection,
+        SlangUInt index);
+
     /** Find a structural ray-tracing program schema by its source type name.
 
     Returns null when the name is not a schema or the schema is invalid for this linked program.
@@ -2332,7 +2374,11 @@ public:                                                              \
     SLANG_API char const* spReflectionRayTracingIntersectionFunction_getEntryPointName(
         SlangReflectionRayTracingIntersectionFunction* function);
 
-    /** Get the dense index within this payload partition's hit-group function table. */
+    /** Get the dense index within this payload partition's hit-group function table.
+
+    Returns -1 for a schema-free declaration catalogue entry because a schema has not assigned a
+    function-table index.
+    */
     SLANG_API SlangInt
     spReflectionRayTracingHitGroup_getFunctionIndex(SlangReflectionRayTracingHitGroup* group);
     SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getType(
@@ -2370,7 +2416,10 @@ public:                                                              \
     SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingHitGroup_getIntersection(
         SlangReflectionRayTracingHitGroup* group);
 
-    /** Get the dense index within this payload partition's miss function table. */
+    /** Get the dense index within this payload partition's miss function table.
+
+    Returns -1 for a schema-free declaration catalogue entry.
+    */
     SLANG_API SlangInt
     spReflectionRayTracingMissShader_getFunctionIndex(SlangReflectionRayTracingMissShader* shader);
     SLANG_API SlangReflectionType* spReflectionRayTracingMissShader_getType(
@@ -2388,7 +2437,10 @@ public:                                                              \
     SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingMissShader_getMiss(
         SlangReflectionRayTracingMissShader* shader);
 
-    /** Get the dense index within the schema-wide callable function table. */
+    /** Get the dense index within the schema-wide callable function table.
+
+    Returns -1 for a schema-free declaration catalogue entry.
+    */
     SLANG_API SlangInt spReflectionRayTracingCallableShader_getFunctionIndex(
         SlangReflectionRayTracingCallableShader* shader);
     SLANG_API SlangReflectionType* spReflectionRayTracingCallableShader_getType(
@@ -2415,7 +2467,9 @@ public:                                                              \
     /** Get the physical target symbol for this stage, when it is independently bindable.
 
     Metal returns null for AnyHit and Intersection because they are folded into a reflected
-    payload/geometry intersection-function dispatcher.
+    payload/geometry intersection-function dispatcher. Metal also returns null for every stage
+    obtained from the schema-free declaration catalogue because its physical symbol depends on a
+    schema, payload partition, and function index.
     */
     SLANG_API char const* spReflectionRayTracingStage_getEntryPointName(
         SlangReflectionRayTracingStage* stage);
@@ -4014,7 +4068,7 @@ struct RayTracingStageReflection
 
 struct RayTracingHitGroupReflection
 {
-    /// Returns this group's dense index within its payload partition's hit function table.
+    /// Returns this group's dense index, or -1 for a schema-free catalogue declaration.
     SlangInt getFunctionIndex()
     {
         return spReflectionRayTracingHitGroup_getFunctionIndex(
@@ -4079,7 +4133,7 @@ struct RayTracingHitGroupReflection
 
 struct RayTracingMissShaderReflection
 {
-    /// Returns this shader's dense index within its payload partition's miss function table.
+    /// Returns this shader's dense index, or -1 for a schema-free catalogue declaration.
     SlangInt getFunctionIndex()
     {
         return spReflectionRayTracingMissShader_getFunctionIndex(
@@ -4119,7 +4173,7 @@ struct RayTracingMissShaderReflection
 
 struct RayTracingCallableShaderReflection
 {
-    /// Returns this shader's dense index within the schema-wide callable function table.
+    /// Returns this shader's dense index, or -1 for a schema-free catalogue declaration.
     SlangInt getFunctionIndex()
     {
         return spReflectionRayTracingCallableShader_getFunctionIndex(
@@ -4519,6 +4573,44 @@ struct ShaderReflection
         return (TraceProgramSchemaReflection*)spReflection_findTraceProgramSchema(
             (SlangReflection*)this,
             name);
+    }
+
+    /// Enumerates schema-free structural hit-group declarations in canonical identity order.
+    SlangUInt getStructuralRayTracingHitGroupCount()
+    {
+        return spReflection_getStructuralRayTracingHitGroupCount((SlangReflection*)this);
+    }
+
+    RayTracingHitGroupReflection* getStructuralRayTracingHitGroup(SlangUInt index)
+    {
+        return (RayTracingHitGroupReflection*)spReflection_getStructuralRayTracingHitGroup(
+            (SlangReflection*)this,
+            index);
+    }
+
+    /// Enumerates schema-free structural miss-shader declarations in canonical identity order.
+    SlangUInt getStructuralRayTracingMissShaderCount()
+    {
+        return spReflection_getStructuralRayTracingMissShaderCount((SlangReflection*)this);
+    }
+
+    RayTracingMissShaderReflection* getStructuralRayTracingMissShader(SlangUInt index)
+    {
+        return (RayTracingMissShaderReflection*)spReflection_getStructuralRayTracingMissShader(
+            (SlangReflection*)this,
+            index);
+    }
+
+    /// Enumerates schema-free structural callable declarations in canonical identity order.
+    SlangUInt getStructuralRayTracingCallableShaderCount()
+    {
+        return spReflection_getStructuralRayTracingCallableShaderCount((SlangReflection*)this);
+    }
+
+    RayTracingCallableShaderReflection* getStructuralRayTracingCallableShader(SlangUInt index)
+    {
+        return (RayTracingCallableShaderReflection*)
+            spReflection_getStructuralRayTracingCallableShader((SlangReflection*)this, index);
     }
 
     TypeReflection* specializeType(

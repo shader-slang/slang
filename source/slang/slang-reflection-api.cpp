@@ -5411,6 +5411,55 @@ static SlangStage _getReflectedRayTracingStage(StructuralRayTracingStageKind kin
     }
 }
 
+SLANG_API SlangUInt spReflection_getStructuralRayTracingHitGroupCount(SlangReflection* reflection)
+{
+    auto catalogue = getStructuralRayTracingEntryCatalogueReflection(convert(reflection));
+    return catalogue ? SlangUInt(catalogue->hitGroups.getCount()) : 0;
+}
+
+SLANG_API SlangReflectionRayTracingHitGroup* spReflection_getStructuralRayTracingHitGroup(
+    SlangReflection* reflection,
+    SlangUInt index)
+{
+    auto catalogue = getStructuralRayTracingEntryCatalogueReflection(convert(reflection));
+    if (!catalogue || index >= SlangUInt(catalogue->hitGroups.getCount()))
+        return nullptr;
+    return (SlangReflectionRayTracingHitGroup*)catalogue->hitGroups[Index(index)].Ptr();
+}
+
+SLANG_API SlangUInt spReflection_getStructuralRayTracingMissShaderCount(SlangReflection* reflection)
+{
+    auto catalogue = getStructuralRayTracingEntryCatalogueReflection(convert(reflection));
+    return catalogue ? SlangUInt(catalogue->missShaders.getCount()) : 0;
+}
+
+SLANG_API SlangReflectionRayTracingMissShader* spReflection_getStructuralRayTracingMissShader(
+    SlangReflection* reflection,
+    SlangUInt index)
+{
+    auto catalogue = getStructuralRayTracingEntryCatalogueReflection(convert(reflection));
+    if (!catalogue || index >= SlangUInt(catalogue->missShaders.getCount()))
+        return nullptr;
+    return (SlangReflectionRayTracingMissShader*)catalogue->missShaders[Index(index)].Ptr();
+}
+
+SLANG_API SlangUInt
+spReflection_getStructuralRayTracingCallableShaderCount(SlangReflection* reflection)
+{
+    auto catalogue = getStructuralRayTracingEntryCatalogueReflection(convert(reflection));
+    return catalogue ? SlangUInt(catalogue->callableShaders.getCount()) : 0;
+}
+
+SLANG_API SlangReflectionRayTracingCallableShader* spReflection_getStructuralRayTracingCallableShader(
+    SlangReflection* reflection,
+    SlangUInt index)
+{
+    auto catalogue = getStructuralRayTracingEntryCatalogueReflection(convert(reflection));
+    if (!catalogue || index >= SlangUInt(catalogue->callableShaders.getCount()))
+        return nullptr;
+    return (SlangReflectionRayTracingCallableShader*)catalogue->callableShaders[Index(index)].Ptr();
+}
+
 SLANG_API SlangReflectionTraceProgramSchema* spReflection_findTraceProgramSchema(
     SlangReflection* reflection,
     char const* name)
