@@ -37,6 +37,14 @@ jobs:
               cpack --preset release -G ZIP
               cpack --preset release -G TGZ
             '
+      - name: Verify bundled user skills
+        run: |
+          expected_commit=$(git rev-parse HEAD:external/slang-user-skills)
+          python3 extras/verify-user-skills-package.py \
+            --source-dir external/slang-user-skills \
+            --expected-commit "$expected_commit" \
+            build/dist-release/slang.zip \
+            build/dist-release/slang.tar.gz
       - name: Package Slang
         id: package
         if: startsWith(github.ref, 'refs/tags/v')
@@ -54,17 +62,6 @@ jobs:
           echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
           sudo mv "$(pwd)/build/dist-release/slang.tar.gz" "${base}.tar.gz"
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> "$GITHUB_OUTPUT"
-      - name: Verify bundled user skills
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          BINARY_ARCHIVE_ZIP: ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_ZIP }}
-          BINARY_ARCHIVE_TAR: ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_TAR }}
-        run: |
-          expected_commit=$(git rev-parse HEAD:external/slang-user-skills)
-          python3 extras/verify-user-skills-package.py \
-            --source-dir external/slang-user-skills \
-            --expected-commit "$expected_commit" \
-            "$BINARY_ARCHIVE_ZIP" "$BINARY_ARCHIVE_TAR"
       - name: File check
         run: |
           find "build/dist-release" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file

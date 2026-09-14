@@ -1,4 +1,7 @@
 # Installs the user-facing agent skills pinned by the Slang superproject.
+# OFF always skips installation. AUTO installs only from an exact, clean checkout and otherwise
+# continues without the skills. ON requires that checkout and treats missing content, unavailable
+# Git metadata, a mismatched pin, or tracked, untracked, and ignored changes as fatal errors.
 function(slang_install_user_skills)
     if(SLANG_INSTALL_USER_SKILLS STREQUAL "OFF")
         message(
@@ -88,7 +91,7 @@ function(slang_install_user_skills)
         execute_process(
             COMMAND
                 "${GIT_EXECUTABLE}" -C "${_source_dir}" status --porcelain
-                --untracked-files=all
+                --untracked-files=all --ignored=matching
             RESULT_VARIABLE _status_result
             OUTPUT_VARIABLE _status_output
             ERROR_VARIABLE _status_error
@@ -139,6 +142,7 @@ function(slang_install_user_skills)
         DIRECTORY "${_source_dir}/skills/"
         DESTINATION "${_install_dir}/skills"
         COMPONENT user-skills
+        # Keep this dot-component exclusion in sync with _expected_files() in the archive verifier.
         PATTERN ".*" EXCLUDE
     )
     install(

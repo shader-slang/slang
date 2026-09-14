@@ -40,6 +40,11 @@ on:
         type: boolean
         default: false
         description: "Restrict slang-test to CPU and LLVM backends via -api cpu+llvm"
+      slang-user-skills:
+        required: false
+        type: boolean
+        default: false
+        description: "Validate the bundled Slang user skills and their examples"
       gpu-api-only:
         required: false
         type: boolean
@@ -93,10 +98,14 @@ jobs:
           git submodule update --init --depth=1 external/optix-dev
 
       - name: Checkout Slang user skills
-        if: inputs.os == 'linux' && inputs.platform == 'x86_64' && inputs.config == 'release' && inputs.cpu-only
+        if: inputs.slang-user-skills
         run: |
           git submodule sync -- external/slang-user-skills
           git submodule update --init --depth=1 external/slang-user-skills
+
+      - name: Test user-skills package verifier
+        if: inputs.slang-user-skills
+        run: python3 extras/tests/test_verify_user_skills_package.py
 
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
@@ -109,7 +118,7 @@ jobs:
           cpu-only: ${{ inputs.cpu-only }}
 
       - name: Validate Slang user-skill examples
-        if: inputs.os == 'linux' && inputs.platform == 'x86_64' && inputs.config == 'release' && inputs.cpu-only
+        if: inputs.slang-user-skills
         run: >-
           python3 external/slang-user-skills/scripts/validate-examples.py
           --slangc "$bin_dir/slangc"

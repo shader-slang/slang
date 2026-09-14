@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import stat
 import sys
 import tarfile
 import zipfile
@@ -22,6 +23,8 @@ class VerificationError(Exception):
 
 
 def _normalize_archive_path(name: str) -> str:
+    """Return a normalized safe archive path or raise VerificationError."""
+
     path = name.replace("\\", "/")
     while path.startswith("./"):
         path = path[2:]
@@ -31,7 +34,15 @@ def _normalize_archive_path(name: str) -> str:
     return normalized.as_posix()
 
 
+def _is_bundle_path(path: str) -> bool:
+    """Return whether an archive path is inside a possibly prefixed skills bundle."""
+
+    return path.startswith(f"{BUNDLE_ROOT}/") or f"/{BUNDLE_ROOT}/" in path
+
+
 def _expected_files(source_dir: Path) -> dict[str, bytes]:
+    """Return the exact source file set, rejecting symlinks or an empty skills tree."""
+
     expected = {
         f"{BUNDLE_ROOT}/README.md": (source_dir / "README.md").read_bytes(),
         f"{BUNDLE_ROOT}/LICENSE": (source_dir / "LICENSE").read_bytes(),
@@ -43,6 +54,7 @@ def _expected_files(source_dir: Path) -> dict[str, bytes]:
         if not source_path.is_file():
             continue
         relative_path = source_path.relative_to(source_dir)
+        # Keep this dot-component exclusion in sync with CMake's PATTERN ".*" EXCLUDE rule.
         if any(part.startswith(".") for part in relative_path.parts):
             continue
         expected[f"{BUNDLE_ROOT}/{relative_path.as_posix()}"] = source_path.read_bytes()
@@ -58,6 +70,8 @@ def _verify_entries(
     expected_files: dict[str, bytes],
     expected_commit: str,
 ) -> str:
+    """Verify bundle bytes and provenance, then return its Slang version."""
+
     provenance_matches = [
         name
         for name in entry_names
@@ -70,6 +84,9 @@ def _verify_entries(
         )
 
     provenance_name = provenance_matches[0]
+    # A release archive may wrap its payload in one shared top-level directory. The unique
+    # provenance path identifies the bundle and lets us strip that prefix before comparing its
+    # complete file set with the prefix-free source layout.
     archive_prefix = provenance_name[: -len(PROVENANCE_PATH)]
     bundle_prefix = f"{archive_prefix}{BUNDLE_ROOT}/"
     actual_bundle_files = {
@@ -116,12 +133,23 @@ def _verify_entries(
 def _verify_zip(
     archive_path: Path, expected_files: dict[str, bytes], expected_commit: str
 ) -> str:
+    """Verify a ZIP skills bundle and return its provenance Slang version."""
+
     with zipfile.ZipFile(archive_path) as archive:
         entries: dict[str, zipfile.ZipInfo] = {}
         for entry in archive.infolist():
             if entry.is_dir():
                 continue
             normalized_name = _normalize_archive_path(entry.filename)
+            unix_file_type = stat.S_IFMT(entry.external_attr >> 16)
+            if (
+                entry.create_system == 3
+                and unix_file_type not in (0, stat.S_IFREG)
+                and _is_bundle_path(normalized_name)
+            ):
+                raise VerificationError(
+                    f"bundle contains a non-regular archive entry: {normalized_name}"
+                )
             if normalized_name in entries:
                 raise VerificationError(f"duplicate archive path: {normalized_name}")
             entries[normalized_name] = entry
@@ -137,6 +165,8 @@ def _verify_zip(
 def _verify_tar(
     archive_path: Path, expected_files: dict[str, bytes], expected_commit: str
 ) -> str:
+    """Verify a TAR skills bundle and return its provenance Slang version."""
+
     with tarfile.open(archive_path, "r:*") as archive:
         entries: dict[str, tarfile.TarInfo] = {}
         for entry in archive.getmembers():
@@ -144,10 +174,8 @@ def _verify_tar(
             if (
                 not entry.isfile()
                 and not entry.isdir()
-                and (
-                    normalized_name.startswith(f"{BUNDLE_ROOT}/")
-                    or f"/{BUNDLE_ROOT}/" in normalized_name
-                )
+                # This verifier vouches only for entry types inside the skills bundle.
+                and _is_bundle_path(normalized_name)
             ):
                 raise VerificationError(
                     f"bundle contains a non-regular archive entry: {normalized_name}"
@@ -159,6 +187,8 @@ def _verify_tar(
             entries[normalized_name] = entry
 
         def read_entry(name: str) -> bytes:
+            """Read one regular TAR entry or raise VerificationError."""
+
             extracted = archive.extractfile(entries[name])
             if extracted is None:
                 raise VerificationError(f"could not read archive path: {name}")
@@ -174,6 +204,8 @@ def _verify_tar(
 
 
 def main() -> int:
+    """Verify command-line archives and return a process exit status."""
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-dir", required=True, type=Path)
     parser.add_argument("--expected-commit", required=True)
