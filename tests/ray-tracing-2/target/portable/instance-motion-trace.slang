@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
 //TEST:SIMPLE(filecheck=CUDA): -experimental-feature -entry main -stage raygeneration -target cuda
+//TEST:SIMPLE(filecheck=IR): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -dump-ir-after specializeModule
 
 // InstanceMotion selects the existing target trace operation that accepts ray time. Metal consumes
 // the structural marker directly; Vulkan emits OpTraceRayMotionNV, and OptiX passes the same time
@@ -58,7 +59,12 @@ void main()
 
 // SPIRV-DAG: OpCapability RayTracingMotionBlurNV
 // SPIRV-DAG: OpExtension "SPV_NV_ray_tracing_motion_blur"
+// SPIRV-DAG: OpVariable {{.*}} RayPayloadKHR {{.*}}Location 0
 // SPIRV: OpTraceRayMotionNV
 
 // CUDA: ->time_0 = 0.375
 // CUDA: optixTrace({{.*}}.time_0,
+
+// The instance-motion fallback must retain its own automatic storage just like the no-motion
+// fallback. The final SPIR-V checks above verify that target lowering consumes this exact operand.
+// IR: structuralRayTracingVulkanPayloadStorage(

@@ -116,6 +116,7 @@ bool isCompilerOwnedStructuralRayTracingIROp(IROp op)
     case kIROp_StructuralRayTracingMetalPayloadMetadataDecoration:
     case kIROp_StructuralRayTracingOpenSectionDecoration:
     case kIROp_StructuralRayTracingDeferredEmptyPayloadDecoration:
+    case kIROp_StructuralRayTracingVulkanPayloadStorageDecoration:
     case kIROp_StructuralRayTracingTaggedConformanceDecoration:
     case kIROp_StructuralRayTracingHitGroupInfoDecoration:
     case kIROp_StructuralRayTracingMissShaderInfoDecoration:

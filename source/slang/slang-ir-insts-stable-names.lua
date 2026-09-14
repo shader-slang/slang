@@ -931,5 +931,6 @@ return {
 	["Decoration.structuralRayTracingOpenSection"] = 955,
 	["Decoration.structuralRayTracingTaggedConformance"] = 956,
 	["Decoration.structuralRayTracingDeferredEmptyPayload"] = 957,
-	["structuralRayTracingProgramSchema"] = 958
+	["structuralRayTracingProgramSchema"] = 958,
+	["Decoration.structuralRayTracingVulkanPayloadStorage"] = 959
 }

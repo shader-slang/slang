@@ -42,11 +42,30 @@ public extension<Schema> RayTracer<Schema>
         TraceProgramDescriptor<Schema> descriptor,
         inout Payload payload)
     {
+        // Unlike the legacy `TraceRay` helper, the structural trace fallback owns its automatic
+        // Vulkan storage. IR generation records this exact value on the fallback function, so
+        // specialization and target lowering retain the relationship without searching its body.
+        [__vulkanRayPayload]
+        [__structuralRayTracingVulkanPayloadStorage]
+        static Payload nativePayload;
+
         __target_switch
         {
         case metal:
             // The compiler consumes this call as a structural trace operation before emission.
             break;
+        case glsl:
+        case spirv:
+            __traceRayWithVulkanPayloadStorage(
+                accelerationStructure,
+                desc.rayFlags,
+                desc.instanceMask,
+                desc.sbtOffset,
+                desc.sbtStride,
+                desc.missIndex,
+                desc.ray,
+                payload,
+                nativePayload);
         default:
             TraceRay(
                 accelerationStructure,
@@ -120,11 +139,30 @@ public extension<Schema> RayTracer<Schema>
         TraceProgramDescriptor<Schema> descriptor,
         inout Payload payload)
     {
+        // Instance motion uses the same producer-owned Vulkan payload contract as the no-motion
+        // overload. Only the native trace helper differs.
+        [__vulkanRayPayload]
+        [__structuralRayTracingVulkanPayloadStorage]
+        static Payload nativePayload;
+
         __target_switch
         {
         case metal:
             // The compiler consumes this call as a structural trace operation before emission.
             break;
+        case glsl:
+        case spirv:
+            __traceMotionRayWithVulkanPayloadStorage(
+                accelerationStructure,
+                desc.rayFlags,
+                desc.instanceMask,
+                desc.sbtOffset,
+                desc.sbtStride,
+                desc.missIndex,
+                desc.ray,
+                desc.time,
+                payload,
+                nativePayload);
         default:
             TraceMotionRay(
                 accelerationStructure,
