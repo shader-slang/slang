@@ -774,6 +774,11 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
         (const char*)code->getBufferPointer(),
         (const char*)code->getBufferPointer() + code->getBufferSize());
     SLANG_CHECK(generatedCode.indexOf(toSlice("__closesthit__renamedStructuralClosestHit")) != -1);
+    // Per-entry code generation must not promote structural metadata retained for another selected
+    // component. This product owns only the renamed closest-hit adapter and has no trace operation
+    // that would request a schema-stable adapter.
+    SLANG_CHECK(generatedCode.indexOf(toSlice("__miss__renamedStructuralMiss")) == -1);
+    SLANG_CHECK(generatedCode.indexOf(expectedClosestHitSymbol.getUnownedSlice()) == -1);
 
     code.setNull();
     result = linkedProgram->getEntryPointCode(2, 0, code.writeRef(), diagnostics.writeRef());
@@ -785,6 +790,8 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
         (const char*)code->getBufferPointer(),
         (const char*)code->getBufferPointer() + code->getBufferSize());
     SLANG_CHECK(generatedCode.indexOf(toSlice("__miss__renamedStructuralMiss")) != -1);
+    SLANG_CHECK(generatedCode.indexOf(toSlice("__closesthit__renamedStructuralClosestHit")) == -1);
+    SLANG_CHECK(generatedCode.indexOf(expectedMissSymbol.getUnownedSlice()) == -1);
 
     // The castable interface is available on every compiled target, but target-only Metal ABI
     // records must not leak into CUDA (or any other portable target).
