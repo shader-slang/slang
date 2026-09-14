@@ -6,6 +6,7 @@
 #include "slang-linkable-impls.h"
 #include "slang-linkable.h"
 #include "slang-mangle.h"
+#include "slang-module.h"
 #include "slang-target-program.h"
 #include "slang-target.h"
 #include "slang-type-layout.h"
@@ -385,6 +386,75 @@ static IRDecoration* _findFinalizedStructuralRayTracingEntryInfo(
     return result;
 }
 
+static IRStringLit* _getStructuralRayTracingEntryDeclLookupName(
+    IRDecoration* entryInfo,
+    StructuralRayTracingSectionKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingSectionKind::HitGroups:
+        return cast<IRStructuralRayTracingHitGroupInfoDecoration>(entryInfo)
+            ->getGroupDeclLookupName();
+    case StructuralRayTracingSectionKind::MissShaders:
+        return cast<IRStructuralRayTracingMissShaderInfoDecoration>(entryInfo)
+            ->getMissDeclLookupName();
+    case StructuralRayTracingSectionKind::CallableShaders:
+        return cast<IRStructuralRayTracingCallableShaderInfoDecoration>(entryInfo)
+            ->getCallableDeclLookupName();
+    default:
+        SLANG_UNEXPECTED("invalid structural ray-tracing section kind");
+    }
+}
+
+// Returns the checked AST type selected by one finalized structural entry.
+//
+// There are two producer paths for the same canonical representation. Source-loaded entries pass
+// through `_lowerStructuralRayTracingCanonicalTypeIdentity`, which registers their exact semantic
+// type directly. A precompiled plugin such as `struct Glass : IMaterialHit` instead contributes
+// serialized IR to a fresh session, so that lowering-time registration did not happen in this
+// `Linkage`. Its compiler-owned entry metadata carries the exact unobfuscated key already used by
+// the defining module's serialized export table. We look up that declaration in the ordinary
+// composite's module dependency closure, construct its nominal type, and accept it only if
+// recomputing the canonical type identity yields the identity selected by link-time schema
+// completion. Thus neither source names nor obfuscated IR linkage names become a second identity
+// system.
+static Type* _findOrRecoverStructuralRayTracingReflectionType(
+    ComponentType* program,
+    StructuralRayTracingDeclRegistry& registry,
+    UnownedStringSlice typeIdentity,
+    UnownedStringSlice declLookupName)
+{
+    if (auto registeredType = registry.findReflectionType(typeIdentity))
+        return registeredType;
+
+    SLANG_RELEASE_ASSERT(
+        program && typeIdentity.getLength() != 0 && declLookupName.getLength() != 0);
+    auto astBuilder = program->getLinkage()->getASTBuilder();
+    Type* recoveredType = nullptr;
+    for (auto module : program->getModuleDependencies())
+    {
+        auto decl = module->findExportedDeclByMangledName(declLookupName);
+        auto typeDecl = as<AggTypeDecl>(decl);
+        if (!typeDecl)
+            continue;
+
+        auto candidateType =
+            DeclRefType::create(astBuilder, makeDeclRef(typeDecl))->getCanonicalType();
+        auto candidateIdentity = getMangledTypeName(astBuilder, candidateType);
+        if (candidateIdentity.getUnownedSlice() != typeIdentity)
+            continue;
+
+        // Canonical type identity is injective. Seeing a different canonical type here would mean
+        // the producer persisted an ambiguous identity, so reject it at this boundary.
+        SLANG_RELEASE_ASSERT(!recoveredType || recoveredType == candidateType);
+        recoveredType = candidateType;
+    }
+
+    if (recoveredType)
+        registry.registerReflectionType(typeIdentity, recoveredType);
+    return recoveredType;
+}
+
 // Reconstructs the ordinary source-level entry witness used by existing closed-schema reflection.
 // The manifest selects identity and index; checked AST semantics remain the source of associated
 // payload, context, record, and stage types exposed through the public API.
@@ -407,8 +477,9 @@ static SubtypeWitness* _getStructuralRayTracingEntryWitness(
 // Converts one finalized manifest section back into the public source-type reflection model.
 static bool _addFinalizedStructuralRayTracingSection(
     StructuralRayTracingProgramSchemaReflection* result,
+    ComponentType* program,
     Linkage* linkage,
-    const StructuralRayTracingDeclRegistry& registry,
+    StructuralRayTracingDeclRegistry& registry,
     IRStructuralRayTracingProgramSchema* schema,
     StructuralRayTracingSectionKind kind,
     IRMakeValuePack* typeIdentities)
@@ -420,13 +491,21 @@ static bool _addFinalizedStructuralRayTracingSection(
         if (!identity)
             return false;
         auto identityText = identity->getStringSlice();
-        auto entryType = registry.findReflectionType(identityText);
+        auto entryInfo = _findFinalizedStructuralRayTracingEntryInfo(schema, kind, identityText);
+        if (!entryInfo)
+            return false;
+        auto declLookupName = _getStructuralRayTracingEntryDeclLookupName(entryInfo, kind);
+        auto entryType = declLookupName ? _findOrRecoverStructuralRayTracingReflectionType(
+                                              program,
+                                              registry,
+                                              identityText,
+                                              declLookupName->getStringSlice())
+                                        : nullptr;
         if (!entryType)
             return false;
-        auto entryInfo = _findFinalizedStructuralRayTracingEntryInfo(schema, kind, identityText);
         auto entryWitness =
             _getStructuralRayTracingEntryWitness(linkage, registry, entryType, kind);
-        if (!entryInfo || !entryWitness)
+        if (!entryWitness)
             return false;
 
         switch (kind)
@@ -530,8 +609,9 @@ static RefPtr<IRModule> _getFinalizedStructuralRayTracingProgramSchemaManifest(
 // Populates public reflection from the three entry lists completed in the target manifest.
 static bool _addFinalizedStructuralRayTracingProgramSchema(
     StructuralRayTracingProgramSchemaReflection* result,
+    ComponentType* program,
     Linkage* linkage,
-    const StructuralRayTracingDeclRegistry& registry,
+    StructuralRayTracingDeclRegistry& registry,
     IRStructuralRayTracingProgramSchema* schema)
 {
     result->name = schema->getSchemaSourceTypeName()->getStringSlice();
@@ -540,6 +620,7 @@ static bool _addFinalizedStructuralRayTracingProgramSchema(
     result->callableShaderSectionOpen = schema->getCallableShaderSectionOpen()->getValue();
     return _addFinalizedStructuralRayTracingSection(
                result,
+               program,
                linkage,
                registry,
                schema,
@@ -547,6 +628,7 @@ static bool _addFinalizedStructuralRayTracingProgramSchema(
                schema->getHitGroupTypeIdentities()) &&
            _addFinalizedStructuralRayTracingSection(
                result,
+               program,
                linkage,
                registry,
                schema,
@@ -554,6 +636,7 @@ static bool _addFinalizedStructuralRayTracingProgramSchema(
                schema->getMissShaderTypeIdentities()) &&
            _addFinalizedStructuralRayTracingSection(
                result,
+               program,
                linkage,
                registry,
                schema,
@@ -988,6 +1071,7 @@ StructuralRayTracingProgramSchemaReflection* findStructuralRayTracingProgramSche
         entriesAdded = sink.getErrorCount() == 0 && finalizedSchema &&
                        _addFinalizedStructuralRayTracingProgramSchema(
                            result,
+                           programLayout->getProgram(),
                            linkage,
                            registry,
                            finalizedSchema);

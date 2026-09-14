@@ -553,6 +553,7 @@ static IRStructuralRayTracingHitGroupInfoDecoration* _appendStructuralRayTracing
         source->getGroupType(),
         source->getGroupSourceTypeName(),
         source->getGroupTypeIdentity(),
+        source->getGroupDeclLookupName(),
         builder.getIntValue(builder.getIntType(), functionIndex),
         source->getContextType(),
         source->getTraceContextType(),
@@ -605,6 +606,7 @@ static IRStructuralRayTracingMissShaderInfoDecoration* _appendStructuralRayTraci
         source->getMissType(),
         source->getMissSourceTypeName(),
         source->getMissTypeIdentity(),
+        source->getMissDeclLookupName(),
         source->getMiss(),
         builder.getBoolValue(true),
         source->getPayloadLocation(),
@@ -634,6 +636,7 @@ _appendStructuralRayTracingLinkedCallableShader(
         source->getCallableType(),
         source->getCallableSourceTypeName(),
         source->getCallableTypeIdentity(),
+        source->getCallableDeclLookupName(),
         source->getCallable(),
         builder.getBoolValue(true),
     };
