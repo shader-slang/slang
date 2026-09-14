@@ -758,6 +758,36 @@ struct CUDALayoutRules : CLayoutRules
 {
     CUDALayoutRules() { ruleName = IRTypeLayoutRuleName::CUDA; }
 
+    virtual Result calcSizeAndAlignment(
+        TargetRequest* targetReq,
+        IRType* type,
+        IRSizeAndAlignment* outSizeAndAlignment) override
+    {
+        // Slang emits `half3` and `half4` as the custom CUDA-prelude types below:
+        //
+        //     struct __align__(4) __half3 { __half x, y, z; };
+        //     struct __align__(4) __half4 { __half x, y, z, w; };
+        //
+        // Generic CUDA vector rules would give half3 size/alignment 6/2 and half4 8/8. Payload
+        // transport uses the emitted C++ type's `sizeof(T)`, so the IR layout must describe the
+        // same 8/4 representation when deciding register counts and field offsets.
+        if (auto vectorType = as<IRVectorType>(type))
+        {
+            if (vectorType->getElementType()->getOp() == kIROp_HalfType)
+            {
+                if (auto elementCount = as<IRIntLit>(vectorType->getElementCount()))
+                {
+                    if (elementCount->getValue() == 3 || elementCount->getValue() == 4)
+                    {
+                        *outSizeAndAlignment = IRSizeAndAlignment(8, 4);
+                        return SLANG_OK;
+                    }
+                }
+            }
+        }
+        return CLayoutRules::calcSizeAndAlignment(targetReq, type, outSizeAndAlignment);
+    }
+
     virtual IRSizeAndAlignment getVectorSizeAndAlignment(
         IRSizeAndAlignment element,
         IRIntegerValue count)

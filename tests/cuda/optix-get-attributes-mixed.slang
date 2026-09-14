@@ -2,13 +2,19 @@
 //TEST:SIMPLE(filecheck=CHECK_PTX): -target ptx -entry closestHitShader -stage closesthit
 
 //CHECK: optixGetAttribute_0()
-//CHECK: __int_as_float(optixGetAttribute_1())
+// OptiX returns every native attribute as uint32. Keep that physical type explicit in IR and
+// reconstruct floating-point source values from its bit pattern.
+//CHECK: [[ATTR1:[A-Za-z_][A-Za-z0-9_]*]] = optixGetAttribute_1()
+//CHECK: slang_bit_cast<float>([[ATTR1]])
 //CHECK: optixGetAttribute_2()
-//CHECK: __int_as_float(optixGetAttribute_3())
+//CHECK: [[ATTR3:[A-Za-z_][A-Za-z0-9_]*]] = optixGetAttribute_3()
+//CHECK: slang_bit_cast<float>([[ATTR3]])
 //CHECK: optixGetAttribute_4()
-//CHECK: __int_as_float(optixGetAttribute_5())
+//CHECK: [[ATTR5:[A-Za-z_][A-Za-z0-9_]*]] = optixGetAttribute_5()
+//CHECK: slang_bit_cast<float>([[ATTR5]])
 //CHECK: optixGetAttribute_6()
-//CHECK: __int_as_float(optixGetAttribute_7())
+//CHECK: [[ATTR7:[A-Za-z_][A-Za-z0-9_]*]] = optixGetAttribute_7()
+//CHECK: slang_bit_cast<float>([[ATTR7]])
 //CHECK_PTX: _optix_get_attribute_0
 //CHECK_PTX: _optix_get_attribute_1
 //CHECK_PTX: _optix_get_attribute_2
