@@ -1,0 +1,11 @@
+[Unit]
+Description=Update GCP Runner Scaler from GitHub Actions artifact
+Documentation=https://github.com/shader-slang/slang/tree/master/extras/scaler
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/opt/scaler/scaler.env
+ExecStart=/opt/scaler/update-scaler-from-github-artifact.sh
+Environment=DRAIN_TIMEOUT_SECONDS=1500

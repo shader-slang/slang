@@ -15,7 +15,7 @@
 // `Optional<int>` (with both success and `none` branches) plus a
 // caller that inspects `.hasValue` and `.value` surfaces all four.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform bool c;

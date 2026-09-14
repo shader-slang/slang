@@ -15,7 +15,7 @@
 // after the value, which pins the `(ptr, val, order)` shape shared by
 // the whole read-modify-write family.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<Atomic<int>> abuf;
 uniform RWStructuredBuffer<int> rwbuf;

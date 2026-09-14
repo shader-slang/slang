@@ -13,7 +13,7 @@
 // upper element count. `half4` exercises the standard upper element
 // count with the narrow floating-point element.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform half4 v;
 uniform RWStructuredBuffer<float> buf;

@@ -15,7 +15,7 @@
 // shader so the CHECKs can pin each type spelling against its own
 // parameter name.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> rwbuf;
 uniform StructuredBuffer<int> sbuf;

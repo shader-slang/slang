@@ -16,7 +16,7 @@
 // makeValuePack, so the arity of the call site is what determines the
 // operand count of the pack type.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o -
 
 RWStructuredBuffer<int> outputBuffer;
 

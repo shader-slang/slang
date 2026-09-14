@@ -14,7 +14,7 @@
 // crossing both the signedness and the int/float type boundary
 // in one step.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint a;
 uniform RWStructuredBuffer<float> fbuf;

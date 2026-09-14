@@ -18,7 +18,7 @@
 // and ThreadNodeOutputRecords on the allocation result, so each opcode is
 // observed at the point the surface construct produces it.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -dump-ir -o -
 
 import experimental.workgraph;
 

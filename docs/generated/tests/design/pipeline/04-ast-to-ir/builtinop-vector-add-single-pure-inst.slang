@@ -14,7 +14,7 @@
 // whose result type is the vector IR type, with no `call` in the body
 // (a call would mean the operator went through callable resolution).
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float3 a;
 uniform float3 b;

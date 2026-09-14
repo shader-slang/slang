@@ -13,7 +13,7 @@
 // dump. A `uint64_t[2]` global_param surfaces `Array(UInt64, 2 :
 // Int)`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint64_t v[2];
 uniform RWStructuredBuffer<uint> buf;

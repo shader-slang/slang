@@ -18,7 +18,7 @@
 // dump also shows an ordinary slot offset of kind 9 further in, so the two
 // kinds are visibly distinct rather than interchangeable.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 struct Material
 {

@@ -18,13 +18,13 @@
 // which is what makes an agreement across targets evidence that the same
 // passes ran rather than a coincidence of trivial output.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=CHECK):-target glsl -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=CHECK):-target metal -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=CHECK):-target wgsl -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=CHECK):-target cuda -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=CHECK):-target cpp -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target glsl -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target metal -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target wgsl -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target cuda -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target cpp -dump-ir -o - -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 uniform int a;

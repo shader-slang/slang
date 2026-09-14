@@ -11,7 +11,7 @@
 // Stresses the hoistable-dedup property at volume: five call sites of the same
 // instantiation. Each CHECK matches one call site and all five spell the same
 // callee, which is what dedup by (base, args) guarantees.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform int b;

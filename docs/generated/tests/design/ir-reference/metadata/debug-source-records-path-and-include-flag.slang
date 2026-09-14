@@ -15,7 +15,7 @@
 // since that middle operand is the whole file and would otherwise make the
 // pattern brittle.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g
 
 uniform RWStructuredBuffer<int> buf;
 

@@ -50,13 +50,13 @@ For each test in the bundle:
    Does the shader body look like it should compile under `slangc` with
    the declared target? (You do not actually run `slangc`; this is a
    reading review.)
-4b. **CHECK patterns are robust** (see `_common.md` § "FileCheck / CHECK
+   4b. **CHECK patterns are robust** (see `_common.md` § "FileCheck / CHECK
    pattern hygiene"). Flag any of these — they are the most common cause
    of a test that passes lint but fails under FileCheck:
    - a pinned generated id/name — literal `%29`/`_S3`/`main_0`, or a
      numeric-only capture `%{{[0-9]+}}` for an operand (SPIR-V is
      disassembled with friendly names like `%f_0`; use `%{{[A-Za-z0-9_]+}}`);
-   - an unescaped `[[...]]` or `{{` in an expected *literal* (Metal/HLSL
+   - an unescaped `[[...]]` or `{{` in an expected _literal_ (Metal/HLSL
      attributes emit literal `[[...]]` — must be `{{\[\[}}...{{\]\]}}`);
    - a short unanchored CHECK/CHECK-NOT that is a substring of a real
      token (`OpFunction` ⊂ `OpFunctionEnd`; `StructuredBuffer` ⊂
@@ -65,6 +65,11 @@ For each test in the bundle:
      (callees emit before entry points) where `CHECK-DAG` was meant;
    - an optimization-dependent assertion (inlined/folded away) without
      `-O1` on the directive (slang-test defaults to `-O0`);
+   - a pinned token the anchored claim does not depend on — typically a
+     declaration specifier or qualifier next to the subject (`__device__`,
+     `__noinline__`, `inline`, `static`) or a decoration the claim never
+     mentions. Ask of each pinned token: if it changed, would the claim be
+     false? If no, it should be wild or absent (rule 8);
    - a feature asserted on a target that does not support it;
    - a `DIAGNOSTIC_TEST` with an invented message string, a mis-aligned
      caret, or a wrong `non-exhaustive` (present when all diagnostics are

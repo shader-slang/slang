@@ -12,7 +12,7 @@
 // a struct field of UInt64 lowers to a field(...) row carrying UInt64.
 // A `uint64_t` field surfaces a `field(%key, UInt64)` row.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Handle64 { uint64_t opaque; }
 

@@ -19,7 +19,7 @@
 // The sibling `nodeDispatchGrid` row is checked alongside because it is the
 // integer-operand counterpart in the same decoration group.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage node -entry myNode -profile lib_6_8 -experimental-feature -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage node -entry myNode -profile lib_6_8 -experimental-feature -dump-ir -o -
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage node -entry myNode -profile lib_6_8 -experimental-feature
 
 import experimental.workgraph;

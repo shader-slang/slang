@@ -14,7 +14,7 @@
 // resource. The CHECK pins the 1D shape tag inside the texture type on
 // the parameter line.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform Texture1D<float4> tex;
 uniform RWStructuredBuffer<int> outbuf;

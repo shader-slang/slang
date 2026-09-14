@@ -14,7 +14,7 @@
 // `offset` attributes must carry the third operand with the value 2 -- the
 // case the two-operand encoding cannot express.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 
 Texture2D gTex : register(t0, space2);
 SamplerState gSamp : register(s0, space2);

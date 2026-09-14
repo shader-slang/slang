@@ -16,7 +16,7 @@
 // the leading operand position and the type function among the operands, which
 // together show the opcode slot accepts more than an integer literal.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage fragment
 
 Texture2D<float3> gTex;
 SamplerState gSamp;

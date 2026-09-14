@@ -12,7 +12,7 @@
 // A user struct lowers to a parent `struct %Name` opcode containing
 // `field(%key, <T>)` rows.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Mixed { int x; float y; bool z; }
 

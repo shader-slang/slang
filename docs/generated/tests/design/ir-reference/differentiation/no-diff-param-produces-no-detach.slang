@@ -20,7 +20,7 @@
 // the autodiff machinery really does run over this parameter; the absence is
 // therefore about the spelling, not about the function being ignored.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float a;
 uniform float d;

@@ -14,7 +14,7 @@
 // `ParameterBlock(%T)` IR-side spelling for the block itself and
 // the per-field IR types for the wrapped struct.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Narrow { int8_t i8; int16_t i16; half h; }
 

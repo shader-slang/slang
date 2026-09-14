@@ -15,7 +15,7 @@
 // `EntryPointLayout` record, take its second operand, and require 6 in
 // operand 0 of the offset and size hanging off that var layout.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage fragment
 
 float4 main(float2 uv : TEXCOORD0) : SV_Target
 {

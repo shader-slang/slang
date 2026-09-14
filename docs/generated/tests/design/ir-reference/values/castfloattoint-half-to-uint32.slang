@@ -12,7 +12,7 @@
 // Smallest-rank float to mid-rank unsigned int. Verifies that lowering keeps
 // it under one opcode keyed by operand and result type.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform half ha;
 uniform RWStructuredBuffer<uint> buf;

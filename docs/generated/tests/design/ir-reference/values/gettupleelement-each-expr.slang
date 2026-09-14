@@ -18,7 +18,7 @@
 // operand shape, which is what separates this opcode from the `swizzle`
 // that `t._0` would have produced.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

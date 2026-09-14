@@ -17,7 +17,7 @@
 // UntypedSamplerHandle followed by the SamplerState-typed local, so the
 // sampler-side handle is what the heap index converts through.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o -
 
 uniform uint heapIndex;
 Texture2D<float4> tex;

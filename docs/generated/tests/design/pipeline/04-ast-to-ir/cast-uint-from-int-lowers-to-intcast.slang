@@ -14,7 +14,7 @@
 // `uint(int_x)` is the same pure-value-inst family but a different
 // IR opcode (`intCast`) because both source and dest are integral.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<uint> buf;

@@ -12,7 +12,7 @@
 // The value-side edge: the function never returns `none`, so the
 // IR contains only `makeOptionalValue` (not `makeOptionalNone`).
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

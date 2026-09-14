@@ -16,7 +16,7 @@
 // require the dump to hold a `builtinRequirementKey(` definition and the
 // `%Grad` conformance table those keys belong to.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float u;
 uniform RWStructuredBuffer<float> buf;

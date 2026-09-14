@@ -16,7 +16,7 @@
 // `__intrinsic_asm` arm produces, which is only possible if the barrier
 // travels to emit as a call rather than as a shared opcode.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry main
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage compute -entry main

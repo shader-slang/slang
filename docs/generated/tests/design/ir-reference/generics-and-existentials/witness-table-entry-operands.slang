@@ -12,7 +12,7 @@
 // with the value that satisfies it. The CHECK pins both operands by their
 // user-derived names, so a row that stored the implementing function without
 // its key, or in the other order, would fail.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

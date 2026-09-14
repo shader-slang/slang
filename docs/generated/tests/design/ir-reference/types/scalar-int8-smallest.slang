@@ -13,7 +13,7 @@
 // global_param's IR type. A single `uniform int8_t` exercises the
 // boundary without struct wrapping.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int8_t v;
 uniform RWStructuredBuffer<int> buf;

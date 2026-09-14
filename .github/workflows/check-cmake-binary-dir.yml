@@ -1,0 +1,32 @@
+name: Check no CMAKE_BINARY_DIR in first-party CMake
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+    # Only relevant when a CMake file changes. The workflow file and the script
+    # are included so changes to the check's own machinery still trigger it.
+    # Intended to be configured as a non-required check, so a path-skipped run on
+    # an unrelated PR simply never reports and nothing waits on it.
+    paths:
+      - "**/*.cmake"
+      - "**/*.cmake.in"
+      - "**/CMakeLists.txt"
+      - "extras/check-no-cmake-binary-dir.sh"
+      - ".github/workflows/check-cmake-binary-dir.yml"
+
+jobs:
+  check-cmake-binary-dir:
+    if: github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      # The guard uses `git grep` over tracked files; submodules are neither
+      # fetched nor needed (their contents are intentionally out of scope).
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          submodules: false
+      - name: Assert no first-party CMAKE_BINARY_DIR
+        run: ./extras/check-no-cmake-binary-dir.sh

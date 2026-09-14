@@ -15,7 +15,7 @@
 // any `func` — proving the declaration was hoisted rather than lowered to a
 // block-local `var`. The uniform read keeps the store live.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int step;
 uniform RWStructuredBuffer<int> buf;
