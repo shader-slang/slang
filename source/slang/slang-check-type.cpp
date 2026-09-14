@@ -586,4 +586,10 @@ Expr* SemanticsExprVisitor::visitSharedTypeExpr(SharedTypeExpr* expr)
     return expr;
 }
 
+Expr* SemanticsExprVisitor::visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr* expr)
+{
+    expr->type = m_astBuilder->getTypeType(m_astBuilder->getUIntType());
+    return expr;
+}
+
 } // namespace Slang
