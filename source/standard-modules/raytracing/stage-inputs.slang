@@ -204,6 +204,7 @@ public extension<Context> ClosestHitInput<Context>
             {
             case glsl:
             case spirv:
+            case cuda:
                 return RayCurrentTime();
             default:
                 return 0.0;
@@ -260,10 +261,17 @@ public extension<Context> ClosestHitInput<Context>
             case hlsl:
             case glsl:
             case spirv:
-            case cuda:
                 result.origin = ObjectRayOrigin();
                 result.tMin = RayTMin();
                 result.direction = ObjectRayDirection();
+                result.tMax = RayTCurrent();
+            case cuda:
+                // OptiX does not expose object-space ray intrinsics in closest-hit. Reconstruct
+                // the same view from closest-hit-legal world-ray and transform-stack state.
+                let worldToObject = WorldToObject3x4();
+                result.origin = mul(worldToObject, float4(WorldRayOrigin(), 1.0));
+                result.tMin = RayTMin();
+                result.direction = mul(worldToObject, float4(WorldRayDirection(), 0.0));
                 result.tMax = RayTCurrent();
             default:
                 break;
@@ -566,6 +574,7 @@ public extension<Context> AnyHitInput<Context>
             {
             case glsl:
             case spirv:
+            case cuda:
                 return RayCurrentTime();
             default:
                 return 0.0;
@@ -913,6 +922,7 @@ public extension<Context> IntersectionInput<Context>
             {
             case glsl:
             case spirv:
+            case cuda:
                 return RayCurrentTime();
             default:
                 return 0.0;
@@ -1144,6 +1154,7 @@ public extension<Context> MissInput<Context>
             {
             case glsl:
             case spirv:
+            case cuda:
                 return RayCurrentTime();
             default:
                 return 0.0;

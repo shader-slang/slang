@@ -10,6 +10,8 @@
 //TEST:SIMPLE(filecheck=SPVLAYOUT): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
 //TEST:SIMPLE(filecheck=DXILLAYOUT): -experimental-feature -entry main -stage raygeneration -target dxil -profile sm_6_7
 //TEST:SIMPLE(filecheck=METALLAYOUT): -experimental-feature -entry main -stage raygeneration -target metal -profile metallib_2_4
+//TEST:SIMPLE(filecheck=CUDACH): -experimental-feature -entry ClosestHit -stage closesthit -target cuda
+//TEST:SIMPLE(filecheck=PTXCH): -experimental-feature -entry ClosestHit -stage closesthit -target ptx
 //TEST:SIMPLE(filecheck=CUDALAYOUT): -experimental-feature -entry main -stage raygeneration -target cuda
 //TEST:SIMPLE(filecheck=PTXLAYOUT): -experimental-feature -entry main -stage raygeneration -target ptx -Xnvrtc -I"./external/optix-dev/include/"
 
@@ -109,6 +111,18 @@ struct ClosestHit : rt::IClosestHitShader
 // SPVCH-DAG: BuiltIn WorldToObjectKHR
 // SPVCH-DAG: BuiltIn LaunchIdKHR
 // SPVCH-DAG: BuiltIn LaunchSizeKHR
+// OptiX does not provide object-ray intrinsics in closest-hit. The property is reconstructed from
+// closest-hit-legal world-ray and transform-stack state instead.
+// CUDACH-DAG: optixGetWorldRayOrigin()
+// CUDACH-DAG: optixGetWorldRayDirection()
+// CUDACH-DAG: slangOptixGetWorldToObjectTransformMatrix()
+// CUDACH-NOT: optixGetObjectRayOrigin()
+// CUDACH-NOT: optixGetObjectRayDirection()
+// PTXCH-DAG: _optix_get_world_ray_origin_x
+// PTXCH-DAG: _optix_get_world_ray_direction_x
+// PTXCH-DAG: _optix_get_transform_list_handle
+// PTXCH-NOT: _optix_get_object_ray_origin
+// PTXCH-NOT: _optix_get_object_ray_direction
 
 struct AnyHit : rt::IAnyHitShader
 {

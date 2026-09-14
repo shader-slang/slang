@@ -3,6 +3,8 @@
 //TEST:SIMPLE(filecheck=DXIL): -experimental-feature -entry main -stage raygeneration -target dxil -profile sm_6_7
 //TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -profile glsl_460 -emit-spirv-directly
 //TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
+//TEST:SIMPLE(filecheck=CUDA): -experimental-feature -entry main -stage raygeneration -target cuda
+//TEST:SIMPLE(filecheck=PTX): -experimental-feature -entry main -stage raygeneration -target ptx
 
 import slang.raytracing;
 
@@ -85,6 +87,13 @@ void main()
 // SPIRV-DAG: BuiltIn LaunchIdKHR
 // SPIRV-DAG: BuiltIn LaunchSizeKHR
 // SPIRV: OpExecuteCallableKHR %uint_0
+
+// OptiX uses its existing direct-call ABI. Structural lowering retains the context-typed data
+// pointer and emits the callable stage as an ordinary device function.
+// CUDA-DAG: optixDirectCall<void>(0U,
+// CUDA-DAG: extern "C" __device__ void __direct_callable__TestCallable(TestCallableData_0 *data_{{[0-9]+}})
+// PTX-DAG: _optix_direct_call
+// PTX-DAG: __direct_callable__TestCallable
 
 // METAL: metal::visible_function_table<void(TestCallableData_0 thread*, uint3, uint3, uchar device*, uint constant*, uint device*)> callableFunctions_0;
 // METAL: device uchar* [[CALLABLE_RECORD:_slang_callable_record]] =

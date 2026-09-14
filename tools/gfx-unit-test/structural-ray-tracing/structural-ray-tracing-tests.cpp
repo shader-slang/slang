@@ -54,6 +54,11 @@ SLANG_UNIT_TEST(structuralRayTracingCallableRecordVulkan)
     runCallableRecord(unitTestContext, DeviceType::Vulkan);
 }
 
+SLANG_UNIT_TEST(structuralRayTracingCallableRecordOptiX)
+{
+    runCallableRecord(unitTestContext, DeviceType::CUDA);
+}
+
 static void runRecursiveTrace(UnitTestContext* context, DeviceType deviceType)
 {
     auto device = createStructuralRayTracingTestDevice(context, deviceType);
@@ -153,6 +158,11 @@ SLANG_UNIT_TEST(structuralRayTracingStageInputStateD3D12)
 SLANG_UNIT_TEST(structuralRayTracingStageInputStateVulkan)
 {
     runStageInputState(unitTestContext, DeviceType::Vulkan);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingStageInputStateOptiX)
+{
+    runStageInputState(unitTestContext, DeviceType::CUDA);
 }
 
 } // namespace gfx_test

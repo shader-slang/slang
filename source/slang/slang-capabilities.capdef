@@ -1539,10 +1539,10 @@ alias structural_raytracing_callable = callable | _callable + metal;
 
 /// Stages that may invoke a callable shader through the structural ray-tracing API.
 /// [Compound]
-alias structural_raytracing_call_shader = glsl_hlsl_spirv + raygen
-                                         | glsl_hlsl_spirv + closesthit
-                                         | glsl_hlsl_spirv + miss
-                                         | glsl_hlsl_spirv + callable
+alias structural_raytracing_call_shader = cuda_glsl_hlsl_spirv + raygen
+                                         | cuda_glsl_hlsl_spirv + closesthit
+                                         | cuda_glsl_hlsl_spirv + miss
+                                         | cuda_glsl_hlsl_spirv + callable
                                          | _raygen + metal
                                          | compute + metal
                                          | _closesthit + metal
