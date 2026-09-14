@@ -76,7 +76,19 @@ Sign determineSign(int v)
 }
 ```
 
-Void values:
+Void values 1:
+
+```hlsl
+void returnVoid() { }
+
+void testFunc()
+{
+    // return a void value
+    return returnVoid();
+}
+```
+
+Void values 2:
 
 ```hlsl
 void incrementIfNonZero(inout uint v)

@@ -2425,9 +2425,9 @@ alias texture_querylevels = texture_sm_4_1 | GL_ARB_texture_query_levels;
 /// no explicit LOD (SampleCmp, SampleCmpLevelZero).
 /// [Compound]
 alias texture_shadow = texture_sm_4_1;
-/// Capabilities required for shadow texture LOD sampling on types
-/// natively supported by GLSL 1.50 (sampler1DShadow, sampler1DArrayShadow,
-/// sampler2DShadow).
+/// Capabilities required for shadow texture LOD sampling with an explicit LOD
+/// (SampleCmpLevel) on types natively supported by GLSL 1.50 (sampler1DShadow,
+/// sampler1DArrayShadow, sampler2DShadow).
 /// [Compound]
 alias texture_shadowlod = texture_sm_4_1;
 /// Capabilities required for shadow texture LOD sampling on types
@@ -2435,7 +2435,7 @@ alias texture_shadowlod = texture_sm_4_1;
 /// samplerCubeArrayShadow).
 /// [Compound]
 alias texture_shadowlod_ext = texture_sm_4_1 | GL_EXT_texture_shadow_lod;
-/// Capabilities required for shadow texture sampling with bias and gradients.
+/// Capabilities required for shadow texture sampling with gradients (SampleCmpGrad).
 /// New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 /// [Compound]
 alias texture_shadowgrad = _sm_6_8 | _GLSL_150 | spirv_1_0 | GL_EXT_texture_shadow_lod;

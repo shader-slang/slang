@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:43:19Z
-//META: source_commit=b15b8060d2525b8cd123f2268fafbcd82e837fb3
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#wgslsourceemitter-module-scope-array-constants
-//META: doc_section_digest=fbbf1497db1e4a587fdacf892f78df4d81a0f88d121cbeab859a34f4a0623146
+//META: doc_section_digest=c0e1734545a83082eaa2a430271a932e672569e0bbf49f8ad49b06ef278bca3c
 //META: purpose=A nested module-scope static const array folds its inner array constituents inline into the outer var<private> initializer rather than emitting separately named inner declarations
 //META: intent=functional
 //META: pipeline_stage=emit

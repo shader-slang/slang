@@ -112,124 +112,142 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
     applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
-    RefPtr<TargetRequest> targetReq = new TargetRequest(linkage, targetEnum);
-
-    List<RefPtr<ComponentType>> allComponentTypes;
-    allComponentTypes.add(this); // Add Module as a component type
-
-    for (auto entryPoint : this->getEntryPoints())
+    try
     {
-        allComponentTypes.add(entryPoint); // Add the entry point as a component type
-    }
+        RefPtr<TargetRequest> targetReq = new TargetRequest(linkage, targetEnum);
 
-    auto composite = CompositeComponentType::create(linkage, allComponentTypes);
+        List<RefPtr<ComponentType>> allComponentTypes;
+        allComponentTypes.add(this); // Add Module as a component type
 
-    composite = fillRequirements(composite);
-
-    TargetProgram tp(composite, targetReq);
-    tp.getOrCreateLayout(&sink);
-    Slang::Index const entryPointCount = m_entryPoints.getCount();
-    tp.getOptionSet().add(CompilerOptionName::GenerateWholeProgram, true);
-
-    switch (targetReq->getTarget())
-    {
-    case CodeGenTarget::DXIL:
-        tp.getOptionSet().add(CompilerOptionName::Profile, Profile::RawEnum::DX_Lib_6_6);
-        break;
-    case CodeGenTarget::SPIRV:
-        break;
-    default:
-        return SLANG_FAIL;
-    }
-
-    tp.getOptionSet().add(CompilerOptionName::EmbedDownstreamIR, true);
-
-    CodeGenContext::EntryPointIndices entryPointIndices;
-
-    entryPointIndices.setCount(entryPointCount);
-    for (Index i = 0; i < entryPointCount; i++)
-        entryPointIndices[i] = i;
-    CodeGenContext::Shared sharedCodeGenContext(&tp, entryPointIndices, &sink, nullptr);
-    CodeGenContext codeGenContext(&sharedCodeGenContext);
-
-    // Mark all public functions as exported, ensure there's at least one. Store a mapping
-    // of function name to IRInst* for later reference. After linking is done, we'll scan
-    // the linked result to see which functions survived the pruning and are included in the
-    // precompiled blob.
-    Dictionary<String, IRInst*> nameToFunction;
-    bool hasAtLeastOneFunction = false;
-    for (auto inst : module->getGlobalInsts())
-    {
-        if (attemptPrecompiledExport(inst))
+        for (auto entryPoint : this->getEntryPoints())
         {
-            hasAtLeastOneFunction = true;
-            builder.addDecoration(inst, kIROp_DownstreamModuleExportDecoration);
-            nameToFunction[inst->findDecoration<IRExportDecoration>()->getMangledName()] = inst;
+            allComponentTypes.add(entryPoint); // Add the entry point as a component type
         }
-    }
 
-    // Bail if there are no functions to export. That's not treated as an error
-    // because it's possible that the module just doesn't have any simple HLSL.
-    if (!hasAtLeastOneFunction)
-    {
-        return SLANG_OK;
-    }
+        auto composite = CompositeComponentType::create(linkage, allComponentTypes);
 
-    // Module::precompileForTarget is experimental and not thread-safe. It mutates the module
-    // by adding transient DownstreamModuleExport decorations, and mutating an existing module is
-    // not a well-supported operation. In particular, the linker acceleration cache snapshots
-    // module-scope export decorations, so force the embedded downstream IR compile to rebuild the
-    // cache and see those exports.
-    module->_invalidateLinkingInfo();
+        composite = fillRequirements(composite);
 
-    ComPtr<IArtifact> outArtifact;
-    SlangResult res = codeGenContext.emitPrecompiledDownstreamIR(outArtifact);
+        TargetProgram tp(composite, targetReq);
+        tp.getOrCreateLayout(&sink);
+        Slang::Index const entryPointCount = m_entryPoints.getCount();
+        tp.getOptionSet().add(CompilerOptionName::GenerateWholeProgram, true);
 
-    sink.getBlobIfNeeded(outDiagnostics);
-    if (res != SLANG_OK)
-    {
-        return res;
-    }
-
-    auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(outArtifact);
-    if (!metadata)
-    {
-        return SLANG_E_NOT_AVAILABLE;
-    }
-
-    for (const auto& mangledName : metadata->getExportedFunctionMangledNames())
-    {
-        auto moduleInst = nameToFunction[mangledName];
-        builder.addDecoration(
-            moduleInst,
-            kIROp_AvailableInDownstreamIRDecoration,
-            builder.getIntValue(builder.getIntType(), (int)targetReq->getTarget()));
-        auto moduleDec = moduleInst->findDecoration<IRDownstreamModuleExportDecoration>();
-        moduleDec->removeAndDeallocate();
-    }
-
-    // Finally, clean up the transient export decorations left over in the module. These are
-    // represent functions that were pruned from the IR after linking, before target generation.
-    for (auto moduleInst : module->getGlobalInsts())
-    {
-        if (moduleInst->getOp() == kIROp_Func)
+        switch (targetReq->getTarget())
         {
-            if (auto dec = moduleInst->findDecoration<IRDownstreamModuleExportDecoration>())
+        case CodeGenTarget::DXIL:
+            tp.getOptionSet().add(CompilerOptionName::Profile, Profile::RawEnum::DX_Lib_6_6);
+            break;
+        case CodeGenTarget::SPIRV:
+            break;
+        default:
+            return SLANG_FAIL;
+        }
+
+        tp.getOptionSet().add(CompilerOptionName::EmbedDownstreamIR, true);
+
+        CodeGenContext::EntryPointIndices entryPointIndices;
+
+        entryPointIndices.setCount(entryPointCount);
+        for (Index i = 0; i < entryPointCount; i++)
+            entryPointIndices[i] = i;
+        CodeGenContext::Shared sharedCodeGenContext(&tp, entryPointIndices, &sink, nullptr);
+        CodeGenContext codeGenContext(&sharedCodeGenContext);
+
+        // Mark all public functions as exported, ensure there's at least one. Store a mapping
+        // of function name to IRInst* for later reference. After linking is done, we'll scan
+        // the linked result to see which functions survived the pruning and are included in the
+        // precompiled blob.
+        Dictionary<String, IRInst*> nameToFunction;
+        bool hasAtLeastOneFunction = false;
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (attemptPrecompiledExport(inst))
             {
-                dec->removeAndDeallocate();
+                hasAtLeastOneFunction = true;
+                builder.addDecoration(inst, kIROp_DownstreamModuleExportDecoration);
+                nameToFunction[inst->findDecoration<IRExportDecoration>()->getMangledName()] = inst;
             }
         }
+
+        // Bail if there are no functions to export. That's not treated as an error
+        // because it's possible that the module just doesn't have any simple HLSL.
+        if (!hasAtLeastOneFunction)
+        {
+            return SLANG_OK;
+        }
+
+        // Module::precompileForTarget is experimental and not thread-safe. It mutates the module
+        // by adding transient DownstreamModuleExport decorations, and mutating an existing module
+        // is not a well-supported operation. In particular, the linker acceleration cache snapshots
+        // module-scope export decorations, so force the embedded downstream IR compile to rebuild
+        // the cache and see those exports.
+        module->_invalidateLinkingInfo();
+
+        ComPtr<IArtifact> outArtifact;
+        SlangResult res = codeGenContext.emitPrecompiledDownstreamIR(outArtifact);
+
+        sink.getBlobIfNeeded(outDiagnostics);
+        if (res != SLANG_OK)
+        {
+            return res;
+        }
+
+        auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(outArtifact);
+        if (!metadata)
+        {
+            return SLANG_E_NOT_AVAILABLE;
+        }
+
+        for (const auto& mangledName : metadata->getExportedFunctionMangledNames())
+        {
+            auto moduleInst = nameToFunction[mangledName];
+            builder.addDecoration(
+                moduleInst,
+                kIROp_AvailableInDownstreamIRDecoration,
+                builder.getIntValue(builder.getIntType(), (int)targetReq->getTarget()));
+            auto moduleDec = moduleInst->findDecoration<IRDownstreamModuleExportDecoration>();
+            moduleDec->removeAndDeallocate();
+        }
+
+        // Finally, clean up the transient export decorations left over in the module. These are
+        // represent functions that were pruned from the IR after linking, before target generation.
+        for (auto moduleInst : module->getGlobalInsts())
+        {
+            if (moduleInst->getOp() == kIROp_Func)
+            {
+                if (auto dec = moduleInst->findDecoration<IRDownstreamModuleExportDecoration>())
+                {
+                    dec->removeAndDeallocate();
+                }
+            }
+        }
+
+        ComPtr<ISlangBlob> blob;
+        outArtifact->loadBlob(ArtifactKeep::Yes, blob.writeRef());
+
+        // Add the precompiled blob to the module
+        builder.setInsertInto(module);
+
+        builder.emitEmbeddedDownstreamIR(targetReq->getTarget(), blob);
+        module->_invalidateLinkingInfo();
+        return SLANG_OK;
     }
-
-    ComPtr<ISlangBlob> blob;
-    outArtifact->loadBlob(ArtifactKeep::Yes, blob.writeRef());
-
-    // Add the precompiled blob to the module
-    builder.setInsertInto(module);
-
-    builder.emitEmbeddedDownstreamIR(targetReq->getTarget(), blob);
-    module->_invalidateLinkingInfo();
-    return SLANG_OK;
+    catch (const AbortCompilationException& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return SLANG_FAIL;
+    }
+    catch (const Exception& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return SLANG_FAIL;
+    }
+    catch (...)
+    {
+        outputExceptionDiagnostic(sink, outDiagnostics);
+        return SLANG_FAIL;
+    }
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Module::getPrecompiledTargetCode(

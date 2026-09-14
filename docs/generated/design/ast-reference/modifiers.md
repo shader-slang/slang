@@ -143,8 +143,8 @@ no data at all.
 | `InModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `in` parameter direction. |
 | `OutModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `out` parameter direction. |
 | `InOutModifier` | `OutModifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `inout` parameter direction (a refinement of `out`). |
-| `RefModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `ref` parameter passing mode. |
-| `BorrowModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `borrow` parameter passing mode. |
+| `RefModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `__ref` parameter passing mode; the un-prefixed `ref` is not a parameter modifier (it spells a `ref` property accessor instead). |
+| `BorrowModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `__constref` parameter passing mode; there is no `borrow` surface spelling. |
 | `ConstModifier` | `Modifier` | (no additional state) | [storage class](../syntax-reference/grammar.md#modifiers) | `const`. |
 | `InlineModifier` | `Modifier` | (no additional state) | [storage class](../syntax-reference/grammar.md#modifiers) | `inline`. |
 | `ParamModifier` | `Modifier` | (no additional state) | (none) | Internal marker on synthesized parameters. |
@@ -159,7 +159,7 @@ no data at all.
 | --- | --- | --- | --- | --- |
 | `PublicModifier` | `VisibilityModifier` | (no additional state) | [visibility](../syntax-reference/grammar.md#modifiers) | `public`. |
 | `PrivateModifier` | `VisibilityModifier` | (no additional state) | [visibility](../syntax-reference/grammar.md#modifiers) | `private`. |
-| `InternalModifier` | `VisibilityModifier` | (no additional state) | [visibility](../syntax-reference/grammar.md#modifiers) | `internal` (default in modern Slang). |
+| `InternalModifier` | `VisibilityModifier` | (no additional state) | [visibility](../syntax-reference/grammar.md#modifiers) | `internal`; the default when a decl names no visibility is per-module, not global — see [Visibility modifiers and language version](#visibility-modifiers-and-language-version). |
 
 ### Override / require / export / import boilerplate
 
@@ -204,8 +204,14 @@ no data at all.
 | --- | --- | --- | --- | --- |
 | `HLSLRowMajorLayoutModifier` | `RowMajorLayoutModifier` | (no additional state) | [matrix layout](../syntax-reference/grammar.md#modifiers) | HLSL `row_major`. |
 | `HLSLColumnMajorLayoutModifier` | `ColumnMajorLayoutModifier` | (no additional state) | [matrix layout](../syntax-reference/grammar.md#modifiers) | HLSL `column_major`. |
-| `GLSLRowMajorLayoutModifier` | `ColumnMajorLayoutModifier` | (no additional state) | [matrix layout](../syntax-reference/grammar.md#modifiers) | GLSL `row_major` (intentionally maps to *column* in Slang's convention). |
-| `GLSLColumnMajorLayoutModifier` | `RowMajorLayoutModifier` | (no additional state) | [matrix layout](../syntax-reference/grammar.md#modifiers) | GLSL `column_major` (intentionally maps to *row* in Slang's convention). |
+| `GLSLRowMajorLayoutModifier` | `ColumnMajorLayoutModifier` | (no additional state) | (none) | GLSL `row_major`, parented on the *column*-major base because Slang reads matrix conventions backwards from GLSL; no parse path constructs it. |
+| `GLSLColumnMajorLayoutModifier` | `RowMajorLayoutModifier` | (no additional state) | (none) | GLSL `column_major`, parented on the *row*-major base for the same reason; no parse path constructs it. |
+
+Both the `row_major` and `column_major` keywords parse into the *HLSL*
+classes regardless of input dialect. The two `GLSL*` classes exist only
+to record the inverted convention in the hierarchy: nothing under
+`source/` creates either of them, so there is no input mode in which the
+inversion is observable today.
 
 ### HLSL geometry-shader input-primitive modifiers
 
@@ -339,8 +345,8 @@ no data at all.
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `UnrollAttribute` | `Attribute` | `args: List<Expr*>` (inherited) | [unroll](../syntax-reference/grammar.md#attributes-and-decorations) | `[unroll(N)]`. |
-| `ForceUnrollAttribute` | `Attribute` | `maxIterations: int32_t` | (none) | `[ForceUnroll]`. |
+| `UnrollAttribute` | `Attribute` | `args: List<Expr*>` (inherited) | [unroll](../syntax-reference/grammar.md#attributes-and-decorations) | `[unroll(N)]`; a hint forwarded to the downstream compiler that does not change Slang's own behaviour, so the loop survives into the emitted code carrying the hint. |
+| `ForceUnrollAttribute` | `Attribute` | `maxIterations: int32_t` | (none) | `[ForceUnroll(N)]`; Slang performs the unrolling itself before emitting target code, so no loop remains in the output. |
 | `MaxItersAttribute` | `Attribute` | `value: IntVal*` | (none) | `[MaxIters(N)]`. |
 | `InferredMaxItersAttribute` | `Attribute` | `inductionVar: DeclRef<Decl>`, `value: int32_t` | (none) | Iteration bound inferred by checking rather than written by the user. |
 | `LoopAttribute` | `Attribute` | (no additional state) | (none) | `[loop]`. |
@@ -350,9 +356,9 @@ no data at all.
 | `FlattenAttribute` | `Attribute` | (no additional state) | (none) | `[flatten]`. |
 | `ForceCaseAttribute` | `Attribute` | (no additional state) | (none) | `[forcecase]`. |
 | `CallAttribute` | `Attribute` | (no additional state) | (none) | `[call]`. |
-| `UnscopedEnumAttribute` | `Attribute` | (no additional state) | (none) | `[UnscopedEnum]`; added by the parser from the user-written attribute or implicitly when a non-generic plain `enum` is compiled with `-unscoped-enum`. |
-| `EnumClassModifier` | `Modifier` | (no additional state) | (none) | Marker for `enum class` declarations; used to detect conflicting explicit scoped/unscoped enum declarations (no further semantics). |
-| `FlagsAttribute` | `Attribute` | (no additional state) | (none) | `[Flags]`. |
+| `UnscopedEnumAttribute` | `Attribute` | (no additional state) | (none) | `[UnscopedEnum]`; the enum's cases are not scoped within the enum type and resolve unqualified, because the parser also adds a `static const` alias for each case to the enclosing container. Added from the user-written attribute, or implicitly when a non-generic plain `enum` is compiled with `-unscoped-enum`. |
+| `EnumClassModifier` | `Modifier` | (no additional state) | (none) | Marker the parser adds for the `enum class` spelling; the conflicting shape it exists to detect is an explicit `[UnscopedEnum]` on an `enum class`, since the implicit attachment above happens only for an enum *not* written as `enum class`. |
+| `FlagsAttribute` | `Attribute` | (no additional state) | (none) | `[Flags]`; cases without an explicit initialiser are numbered with successive powers of two (1, 2, 4, ...) rather than consecutive integers. |
 | `NonDynamicUniformAttribute` | `Attribute` | (no additional state) | (none) | `[NonUniformReturn]`. |
 | `UnsafeForceInlineEarlyAttribute` | `Attribute` | (no additional state) | (none) | `[__unsafeForceInlineEarly]`. |
 | `ForceInlineAttribute` | `Attribute` | (no additional state) | [ForceInline](../syntax-reference/grammar.md#attributes-and-decorations) | `[ForceInline]`. |
@@ -383,7 +389,7 @@ no data at all.
 | `RequiresNVAPIAttribute` | `Attribute` | (no additional state) | (none) | `[__requiresNVAPI]`. |
 | `RequirePreludeAttribute` | `Attribute` | `capabilitySet: CapabilitySetVal*`, `prelude: String` | (none) | `[RequirePrelude(...)]`. |
 | `AllowAttribute` | `Attribute` | `diagnostic: DiagnosticInfo const*` | (none) | `[allow("diagnostic-name")]`; suppresses one diagnostic. |
-| `FormatAttribute` | `Attribute` | `format: ImageFormat` | (none) | `[format(...)]`, also spelled `[vk::image_format(...)]`. |
+| `FormatAttribute` | `Attribute` | `format: ImageFormat` | (none) | `[format("rgba32f")]`, also spelled `[vk::image_format("rgba16f")]`; the argument is declared as a `String`, so the format name must be a quoted string literal, not a bare identifier. |
 | `ExternAttribute` | `Attribute` | (no additional state) | (none) | `[__extern]`. |
 | `ComInterfaceAttribute` | `Attribute` | `guid: String` | (none) | `[COM(guid)]`. |
 
@@ -486,7 +492,7 @@ rather than in `core.meta.slang`.
 | --- | --- | --- | --- | --- |
 | `MutatingAttribute` | `Attribute` | (no additional state) | (none) | `[mutating]`. |
 | `NonmutatingAttribute` | `Attribute` | (no additional state) | (none) | `[nonmutating]`. |
-| `NoDiscardAttribute` | `Attribute` | (no additional state) | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | `[NoDiscard]`; flags a function whose result must not be discarded. |
+| `NoDiscardAttribute` | `Attribute` | (no additional state) | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | `[NoDiscard]`; flags a function whose result must not be discarded — a call used as a bare expression statement is error `30059`, "result of `[NoDiscard]` function is discarded", while binding the result is accepted. |
 | `ConstRefAttribute` | `Attribute` | (no additional state) | (none) | `[constref]`. |
 | `RefAttribute` | `Attribute` | (no additional state) | (none) | `[__ref]`. |
 | `AnyValueSizeAttribute` | `Attribute` | `size: int32_t` | (none) | `[anyValueSize(size)]`. |
@@ -516,8 +522,8 @@ rather than in `core.meta.slang`.
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `OpenAttribute` | `InheritanceControlAttribute` | (no additional state) | (none) | `[open]`. |
-| `SealedAttribute` | `InheritanceControlAttribute` | (no additional state) | (none) | `[sealed]`. |
+| `OpenAttribute` | `InheritanceControlAttribute` | (no additional state) | (none) | `[open]` on an aggregate type: it may be inherited from or implemented by types declared in other modules. This is also the default for a type carrying neither attribute. |
+| `SealedAttribute` | `InheritanceControlAttribute` | (no additional state) | (none) | `[sealed]` on an aggregate type: the relationship it rejects is cross-module — inheriting from it or conforming to it from another module. A type in the declaring module may still implement it. |
 
 ### CUDA / Python / FFI attributes
 
@@ -653,7 +659,7 @@ witness; see
 [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md)
 and [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md).
 
-### Work-graph node attributes
+### Work-graph node attribute spellings
 
 The eight `Node*` / `MaxRecords` / `AllowSparseNodes` attribute classes
 have their spellings declared outside `core.meta.slang`, in the

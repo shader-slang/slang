@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:06:56+00:00
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#auto-generated-reference
-//META: doc_section_digest=8ae3fbfa6c36eddd14d01848a2078f5e7d7dcff82bbdca7e808de3783b980183
+//META: doc_section_digest=193f4efb497d3a5e48943b5ae86614705efc25f80ae9ad3a2ea85d4446323ddb
 //META: purpose=The `subgroup_workgroup_index` compound alias restricts `WaveGetWaveIndex` to compute-class stages on GLSL; a fragment entry point calling it is rejected by the capability system with E36107.
 //META: intent=negative
 //META: pipeline_stage=check

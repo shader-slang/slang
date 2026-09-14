@@ -1,0 +1,39 @@
+name: Docs-only filter
+
+description: >
+  Classify a list of changed file paths as documentation-only or not, so
+  callers can skip expensive build/test/dispatch work for PRs that only
+  touch documentation. Shared by ci.yml (which supplies the list via `git
+  diff`) and ci-slangpy-trigger-test.yml (which supplies the list via the
+  GitHub API, since it runs under pull_request_target and must not check
+  out fork-controlled code).
+
+inputs:
+  files:
+    description: "Newline-separated list of changed file paths"
+    required: true
+
+outputs:
+  should-run:
+    description: "'false' if the change set is documentation-only, 'true' otherwise"
+    value: ${{ steps.filter.outputs.should-run }}
+
+runs:
+  using: composite
+  steps:
+    - id: filter
+      shell: bash
+      env:
+        FILES: ${{ inputs.files }}
+      run: |
+        shouldRun=true
+        if echo "$FILES" | grep -Eqx 'docs/(command-line-slangc-reference.md|user-guide/a4-02-reference-capability-atoms.md)'; then
+          echo "Generated reference document changed, running checks"
+          shouldRun=true
+        elif echo "$FILES" | grep -qvE '^(docs/|LICENSES/|LICENSE$|\.claude/|.*\.md$|\.coderabbit\.yaml$)'; then
+          shouldRun=true
+        else
+          echo "Only documentation files changed, skipping"
+          shouldRun=false
+        fi
+        echo "should-run=$shouldRun" >> "$GITHUB_OUTPUT"

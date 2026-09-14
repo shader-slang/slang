@@ -3,8 +3,9 @@ name: Check GitHub Actions Workflows
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-  merge_group:
-    types: [checks_requested]
+    paths:
+      - ".github/workflows/**"
+      - ".github/actionlint.yaml"
   workflow_dispatch:
 
 permissions:

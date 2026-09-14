@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=313101689307f6bffbb06bc9ca76f7664feb85d924d4e8d3684d1200e5480cf1
+//META: doc_section_digest=e2819e444d6e3f6b34734c9f23b4f355edf0380f743dd702ac415ae0a58a3024
 //META: purpose=Fires diagnostic E30901 (subscript-must-have-return-type) -- __subscript declaration must have a return type specified after '->'
 //META: intent=negative
 //META: pipeline_stage=check
@@ -11,11 +11,11 @@
 //META: catalog_name=subscript-must-have-return-type
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 struct S {
     __subscript(int i) { get { return 1; } }
 }
 
 
-// CHECK: E30901
+//CHECK: E30901

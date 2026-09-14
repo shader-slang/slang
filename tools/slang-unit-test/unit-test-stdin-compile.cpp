@@ -4,17 +4,11 @@
 #include "core/slang-process-util.h"
 #include "slang-com-ptr.h"
 #include "slang/slang-compiler-options.h"
-#include "slang/slang-internal.h"
 #include "unit-test/slang-unit-test.h"
 
-#ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>
-#else
-#include <fcntl.h>
-#include <unistd.h>
+#if !SLANG_WINDOWS_FAMILY
+#include <unistd.h> // for ::symlink(), used by the symlink-based coverage tests below
 #endif
-#include <mutex>
 #include <string.h>
 
 using namespace Slang;
@@ -23,69 +17,6 @@ static bool _contains(const String& text, const char* expected)
 {
     return text.getUnownedSlice().indexOf(UnownedStringSlice(expected)) >= 0;
 }
-
-static void _appendDiagnostic(char const* message, void* userData)
-{
-    StringBuilder* diagnostics = (StringBuilder*)userData;
-    *diagnostics << message;
-}
-
-struct ScopedWriteOnlyStdin
-{
-    SlangResult redirect()
-    {
-#ifdef _WIN32
-        const int stdinFd = _fileno(stdin);
-        m_savedStdinFd = _dup(stdinFd);
-        if (m_savedStdinFd == -1)
-            return SLANG_FAIL;
-
-        const int writeOnlyFd = _open("NUL", _O_WRONLY);
-        if (writeOnlyFd == -1)
-            return SLANG_FAIL;
-
-        const int result = _dup2(writeOnlyFd, stdinFd);
-        _close(writeOnlyFd);
-#else
-        const int stdinFd = fileno(stdin);
-        m_savedStdinFd = dup(stdinFd);
-        if (m_savedStdinFd == -1)
-            return SLANG_FAIL;
-
-        const int writeOnlyFd = open("/dev/null", O_WRONLY);
-        if (writeOnlyFd == -1)
-            return SLANG_FAIL;
-
-        const int result = dup2(writeOnlyFd, stdinFd);
-        close(writeOnlyFd);
-#endif
-        if (result == -1)
-            return SLANG_FAIL;
-
-        clearerr(stdin);
-        return SLANG_OK;
-    }
-
-    ~ScopedWriteOnlyStdin()
-    {
-        if (m_savedStdinFd == -1)
-            return;
-
-#ifdef _WIN32
-        _dup2(m_savedStdinFd, _fileno(stdin));
-        _close(m_savedStdinFd);
-#else
-        dup2(m_savedStdinFd, fileno(stdin));
-        close(m_savedStdinFd);
-#endif
-        clearerr(stdin);
-    }
-
-private:
-    int m_savedStdinFd = -1;
-};
-
-static std::mutex g_stdinRedirectMutex;
 
 static void _addStdinCompileArgs(List<String>& args, const char* language)
 {
@@ -493,40 +424,37 @@ static SlangResult _testInputTooLargeDiagnostic(UnitTestContext* context)
 
 static SlangResult _testCannotReadFromStdinDiagnostic(UnitTestContext* context)
 {
-    std::lock_guard<std::mutex> lock(g_stdinRedirectMutex);
+    // This case must not make stdin unreadable by redirecting *this* process's own fd 0, even
+    // though that is the cheapest way: under `slang-test -use-test-server` this unit test runs
+    // inside a persistent test-server process whose fd 0 is its JSON-RPC channel, so redirecting
+    // fd 0 corrupts that channel and breaks concurrently-dispatched tests. Instead we spawn slangc
+    // as a child and make the *child's* stdin unreadable via UnreadableStdin. See
+    // shader-slang/slang#12475.
+    List<String> args;
+    _addStdinCompileArgs(args, "slang");
 
-    ScopedWriteOnlyStdin stdinRedirect;
-    SLANG_RETURN_ON_FAIL(stdinRedirect.redirect());
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(ExecutableLocation(context->executableDirectory, "slangc"));
+    for (const auto& arg : args)
+        cmdLine.addArg(arg);
 
-    SlangCompileRequest* compileRequest = spCreateCompileRequest(context->slangGlobalSession);
-    if (!compileRequest)
+    RefPtr<Process> process;
+    SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::UnreadableStdin, process));
+
+    if (process->getStream(StdStreamType::In) != nullptr)
         return SLANG_FAIL;
 
-    StringBuilder diagnostics;
-    spSetDiagnosticCallback(compileRequest, _appendDiagnostic, &diagnostics);
-    spSetCommandLineCompilerMode(compileRequest);
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(ProcessUtil::readUntilTermination(process, result));
 
-    const char* args[] = {
-        "-lang",
-        "slang",
-        "-target",
-        "spirv-asm",
-        "-entry",
-        "main",
-        "-stage",
-        "compute",
-        "--",
-        "-",
-    };
-    const SlangResult result =
-        spProcessCommandLineArguments(compileRequest, args, SLANG_COUNT_OF(args));
-    spDestroyCompileRequest(compileRequest);
-
-    if (SLANG_SUCCEEDED(result))
+    // The child's read failing is the other half of the contract, and a non-zero exit alone is not
+    // enough to prove it: a readable but empty stdin also exits non-zero, via a different "no
+    // function found matching entry point name 'main'" diagnostic. Match the rendered severity and
+    // diagnostic code, which are emitted only on the read-error path and so distinguish it from a
+    // clean EOF.
+    if (result.resultCode == 0)
         return SLANG_FAIL;
-
-    const String diagnosticText = diagnostics.produceString();
-    if (!_contains(diagnosticText, "failed to read source from stdin"))
+    if (!_contains(result.standardError, "error[E00106]"))
         return SLANG_FAIL;
 
     return SLANG_OK;

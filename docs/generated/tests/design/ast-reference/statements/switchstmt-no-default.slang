@@ -1,19 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#switchstmt-casestmt-defaultstmt
-//META: doc_section_digest=a1ec0803b8c128d1fa4912560d537bd7689c45ee4daaefd344406cf6fe5b8219
-//META: purpose=A SwitchStmt without a DefaultStmt slices the body into per-case blocks only; an unmatched condition value passes through without entering any case body.
+//META: doc_section_digest=c17fa898c930ec5bd9c17383b899c278d84a084e1966bd606af453fb02db5a07
+//META: purpose=A SwitchStmt without a DefaultStmt marker lets an unmatched condition value pass through the switch without entering any case section.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary: SwitchStmt with two CaseStmt entries but no DefaultStmt.
-// The doc treats `default` as a CaseStmtBase marker among others; a
-// missing default means an unmatched value falls through the switch
-// without setting `r`. We observe both the surviving `switch` text
-// and that `classify(99)` leaves `r` at its initial 0.
+// Boundary: a switch with case markers but no `default:`. Verifies an
+// unmatched condition value simply passes through the switch without
+// entering any section. The CHECKs assert both case labels survive in
+// the emitted C++ while the unmatched call leaves the result at 0.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -entry computeMain -stage compute
 

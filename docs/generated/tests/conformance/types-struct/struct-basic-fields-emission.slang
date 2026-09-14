@@ -14,6 +14,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL_CHECK):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry main -stage compute -O0
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
@@ -41,6 +42,14 @@ void main()
 // CHECK: int y
 
 // GLSL_CHECK: struct Point_{{[0-9]+}}
+
+// SPIR-V emits Point as an OpTypeStruct of the two int fields. The struct only survives
+// to the emitted module at -O0; at default optimization the whole body constant-folds to a
+// single store, so the emission claim is pinned on the unoptimized module.
+// SPV: OpName %Point "Point"
+// SPV: OpMemberName %Point 0 "x"
+// SPV: OpMemberName %Point 1 "y"
+// SPV: %Point = OpTypeStruct %int %int
 
 // Metal emits struct Point with mangled field names.
 // METAL: struct Point_{{[0-9]+}}

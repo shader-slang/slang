@@ -1,20 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#requirecapabilitystmt
-//META: doc_section_digest=07606d141f870c1d9f8f16631fe40ff51877bcadd709a1b267ba3b0b350e73d2
+//META: doc_section_digest=3fad924642b0316fb757c593b888cc7f5c8b1f201aa0c0264b34655ffafd3fae
 //META: purpose=A RequireCapabilityStmt is a statement-level capability assertion (`__requireCapability(...)`) scoped to the enclosing function; the function compiles when the target capability set satisfies the listed atoms.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says RequireCapabilityStmt "asserts that the surrounding
-// function requires the listed capability atoms". This is the
-// in-function-body form; the module-scope `RequireCapabilityDecl`
-// form is covered by the declarations bundle. We compile under the
-// HLSL target with the `hlsl` capability listed: a target without
-// that capability would diagnose, but our test target does have it.
+// Verifies the statement spelling of `__requireCapability` is accepted
+// inside a function body and resolves the named atom against the
+// compilation target. Compiling for HLSL while requiring `hlsl` must
+// succeed; the CHECK asserts the enclosing code was emitted.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

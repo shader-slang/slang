@@ -1,17 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools
-//META: doc_section_digest=3b19519e792b092406320b661c62d171b0f8cdff6f282ae48cf30ac091136ae8
-//META: purpose=Metal emit begins with the standard <metal_stdlib>/<metal_math>/<metal_texture> includes and a `using namespace metal;` line.
+//META: doc_section_digest=f18a62d46309fae1d33b5fed992f19c2eff74d722d039dfeeeccc0dfdbf5b824
+//META: purpose=Every Metal compile begins with the `<metal_stdlib>` / `<metal_math>` / `<metal_texture>` includes followed by `using namespace metal;`.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The MetalSourceEmitter prelude is the first non-blank text in
-// every Metal compile. The block establishes the Metal namespace
-// before any user-emitted code.
+// Verifies the fixed Metal front matter the prelude emitter writes before
+// any user code. The unqualified type names Slang emits (`float4`,
+// `texture2d`, ...) only resolve because the namespace is opened here, so
+// the block is load-bearing rather than cosmetic. CHECK asserts the three
+// includes and the `using namespace` line in emission order.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

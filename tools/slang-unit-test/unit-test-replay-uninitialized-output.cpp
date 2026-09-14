@@ -2,8 +2,8 @@
 // Regression tests for issue #11865: the record layer must not read uninitialized caller memory for
 // output parameters when the wrapped API fails without writing them.
 //
-// Two proxy methods had this defect and are both covered here:
-//   - GlobalSessionProxy::getDownstreamCompilerVersion   (int* outMajor / int* outMinor)
+// Several proxy methods share this defect shape and are covered here:
+//   - GlobalSessionProxy::getDownstreamCompilerPath      (ISlangBlob** outPath)
 //   - SessionProxy::getTypeConformanceWitnessSequentialID (uint32_t* outId)
 //
 // Each proxy serializes its output slot(s) unconditionally, because the record stream has a fixed
@@ -39,12 +39,13 @@ static bool twoRecordedSegmentsIdentical(size_t off0, size_t off1, size_t off2)
     return memcmp(data + off0, data + off1, len1) == 0;
 }
 
-// GlobalSessionProxy::getDownstreamCompilerVersion serializes both int* output slots
+// GlobalSessionProxy::getDownstreamCompilerPath serializes its ISlangBlob* output slot
 // unconditionally. Called with SLANG_PASS_THROUGH_NONE the real IGlobalSession returns
-// SLANG_E_NOT_FOUND WITHOUT writing *outMajor/*outMinor (see Session::getDownstreamCompilerVersion
-// in slang-global-session.cpp), so before the fix the proxy read (and serialized) whatever the
-// caller left in that memory.
-SLANG_UNIT_TEST(replayGetDownstreamCompilerVersionFailureNoUninitializedRead)
+// SLANG_E_NOT_FOUND WITHOUT writing *outPath (see Session::getDownstreamCompilerPath in
+// slang-global-session.cpp), so the same uninitialized-read defect applies. Here the output is a
+// COM pointer, so a regression would serialize an uninitialized ISlangBlob* rather than a stray
+// int; recording twice with distinct poison pointers and byte-comparing confirms the redirect.
+SLANG_UNIT_TEST(replayGetDownstreamCompilerPathFailureNoUninitializedRead)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -63,25 +64,27 @@ SLANG_UNIT_TEST(replayGetDownstreamCompilerVersionFailureNoUninitializedRead)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(slang_createGlobalSession2(&desc, globalSession.writeRef())));
     SLANG_CHECK_ABORT(dynamic_cast<GlobalSessionProxy*>(globalSession.get()) != nullptr);
 
-    // Two failing calls, back to back, with distinct poison in the (untouched-on-failure) outputs.
+    // Two failing calls, back to back, with distinct poison in the (untouched-on-failure) outPath.
+    // outPath is a raw ISlangBlob* out-param, so we poison it directly rather than via a ComPtr.
     const size_t off0 = ctx().getStream().getSize();
-    int majorA = 0x11111111;
-    int minorA = 0x22222222;
+    ISlangBlob* pathA =
+        reinterpret_cast<ISlangBlob*>(static_cast<uintptr_t>(0x1111111111111111ull));
     SLANG_CHECK(
-        globalSession->getDownstreamCompilerVersion(SLANG_PASS_THROUGH_NONE, &majorA, &minorA) ==
+        globalSession->getDownstreamCompilerPath(SLANG_PASS_THROUGH_NONE, &pathA) ==
         SLANG_E_NOT_FOUND);
     const size_t off1 = ctx().getStream().getSize();
 
-    int majorB = 0x33333333;
-    int minorB = 0x44444444;
+    ISlangBlob* pathB =
+        reinterpret_cast<ISlangBlob*>(static_cast<uintptr_t>(0x2222222222222222ull));
     SLANG_CHECK(
-        globalSession->getDownstreamCompilerVersion(SLANG_PASS_THROUGH_NONE, &majorB, &minorB) ==
+        globalSession->getDownstreamCompilerPath(SLANG_PASS_THROUGH_NONE, &pathB) ==
         SLANG_E_NOT_FOUND);
     const size_t off2 = ctx().getStream().getSize();
 
-    // With the fix the differing caller-side poison never reaches the stream, so the two recorded
-    // call segments are byte-identical. Before the fix the poison was serialized into the output
-    // slots and the segments diverged.
+    // On failure the proxy redirects outPath to a zero-initialized temporary before recording, so
+    // the caller's poison pointer never reaches the stream: both calls serialize the same defined
+    // null and the two recorded segments are byte-identical. A proxy that recorded *outPath
+    // directly would serialize the two distinct poison pointers and the segments would diverge.
     SLANG_CHECK(twoRecordedSegmentsIdentical(off0, off1, off2));
 
     // Return to Idle before the session ComPtr releases during teardown.

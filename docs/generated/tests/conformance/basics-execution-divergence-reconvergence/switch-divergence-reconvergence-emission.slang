@@ -14,6 +14,8 @@
 // tid.x % 3; all reconverge after the switch statement.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
@@ -44,6 +46,18 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // SPIRV: OpSelectionMerge marks reconvergence; OpSwitch dispatches to case blocks.
 // CHECK: OpSelectionMerge
 // CHECK: OpSwitch
+
+// HLSL: switch statement preserved with three case arms.
+// CHECK_HLSL: switch(
+// CHECK_HLSL: case 0U
+// CHECK_HLSL: case 1U
+// CHECK_HLSL: default
+
+// GLSL: switch statement preserved with three case arms.
+// CHECK_GLSL: switch(
+// CHECK_GLSL: case 0U
+// CHECK_GLSL: case 1U
+// CHECK_GLSL: default
 
 // Metal: switch statement preserved with three case arms.
 // CHECK_METAL: switch(

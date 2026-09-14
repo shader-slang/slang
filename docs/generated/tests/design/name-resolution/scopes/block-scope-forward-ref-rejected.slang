@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#edge-cases-and-failure-modes
-//META: doc_section_digest=5c32316c757a32af0aa6a61ee5f325f4830e8f73bc176d8904fdb4ddc1d8d758
+//META: doc_section_digest=b57e81781278bd6752bd817f50c238aae4f56d4fda646e22befd826b34d6cab4
 //META: purpose=Inside a block the `Decl::hiddenFromLookup` flag hides a local until its DeclStmt; a forward reference inside the same block is rejected as undefined.
 //META: intent=negative
 //META: pipeline_stage=check

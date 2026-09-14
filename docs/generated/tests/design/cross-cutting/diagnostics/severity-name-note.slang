@@ -1,11 +1,11 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T12:30:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#severity-levels
-//META: doc_section_digest=6c1c702cf80ed3f86a13f8071f7debe50ebc4cb725e9ba9101ed110bca3e30e0
-//META: purpose=A diagnostic emitted at Severity::Note renders with the user-facing name "note".
-//META: intent=negative
+//META: doc_section_digest=a2c5b6b64f38a8b7fd3692290be87fe1f26f4a31a5f12e076913b5c584acc7f3
+//META: purpose=A companion note renders with the user-facing severity name `note`.
+//META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 

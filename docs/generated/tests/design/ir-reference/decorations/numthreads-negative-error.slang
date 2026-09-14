@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00Z
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#entry-point-and-stage
-//META: doc_section_digest=a78fa1c65d9e97005484d3326f0e07d9af56a6dadaad4955b0d779effe950727
-//META: purpose=Negative - [numthreads(-1,1,1)] is rejected with E31102, confirming that the positive-integer validator also catches signed underflow.
+//META: doc_section_digest=babb40e44ba0eb7addfafeddc37185c8c3bbed4c27b3b7fc8a2469d95b33aca1
+//META: purpose=Negative - [numthreads(-1,1,1)] is rejected with E31102, confirming the positive-integer validator also catches signed underflow.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Negative - signed-integer wrap of the leading dimension to -1
-// fails the positive-integer check; the same diagnostic E31102
-// fires before the numThreads decoration is created.
+// Verifies the value validation on the workgroup dimensions from below.
+// A negative leading dimension is rejected with the same diagnostic as
+// zero, and the caret annotations pin both the short and the long form of
+// the message so a rewording or renumbering is caught.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -stage compute -entry main
 uniform RWStructuredBuffer<int> buf;

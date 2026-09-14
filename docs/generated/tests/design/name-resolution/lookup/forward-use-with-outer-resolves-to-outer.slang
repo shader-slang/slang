@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:48:38Z
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
-//META: doc_ref=docs/generated/design/name-resolution/lookup.md#edge-cases-and-failure-modes
-//META: doc_section_digest=4c42d570b7022f6aea368273b44c89c0162efacf44581dd09dea681340a92303
-//META: purpose=When a name is referenced before its DeclStmt inside a block, the inner local is hiddenFromLookup at that point; lookup falls through to an outer same-name decl rather than resolving the inner.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/name-resolution/lookup.md#block-local-shadowing
+//META: doc_section_digest=fff04d2b441a5ad2e4ef387152ddc76216942a0668864eb5cdfb1c9b98e7e532
+//META: purpose=A local is hidden from lookup until its own declaration statement is reached, so a reference earlier in the block binds to a same-named outer decl instead.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's failure-modes section: "Using `b` before its `DeclStmt`
-// reaches the lookup with `hiddenFromLookup = true`; ... lookup
-// returns either the decl from an outer scope or empty." Here the
-// outer decl exists, so the forward use resolves to it — not to the
-// inner local that has not yet been "declared yet" at this textual
-// point.
+// Verifies that block-local hiding is a lookup filter, not an outright
+// error: the inner `q` is skipped at the earlier use site, so the walk
+// continues outward and finds the file-scope `q`. CHECK asserts the
+// earlier statement saw 1000 while the later print of the same
+// spelling sees the local 7, which separates hiding from shadowing.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
@@ -22,7 +21,7 @@ static const int q = 1000;
 
 void main()
 {
-    int y = q + 1;  // outer q (1000) resolves; inner q is hidden.
+    int y = q + 1;
     int q = 7;
     // CHECK: y=1001 inner=7
     printf("y=%d inner=%d\n", y, q);

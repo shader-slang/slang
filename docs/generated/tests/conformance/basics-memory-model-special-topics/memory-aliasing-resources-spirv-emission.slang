@@ -15,6 +15,10 @@
 // Binding decoration.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 ConstantBuffer<int> cbuf;
 RWStructuredBuffer<int> rwbuf;
@@ -34,3 +38,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK-DAG: OpDecorate %rwbuf{{.*}} Binding
 // CHECK-DAG: OpDecorate %rwbuf{{.*}} DescriptorSet
 // CHECK-DAG: OpVariable %_ptr_StorageBuffer_{{.*}} StorageBuffer
+
+// GLSL: layout({{.*}}) uniform block_{{.*}}
+// GLSL: layout(std430, binding = {{[0-9]+}}) buffer StructuredBuffer_int_t_{{[0-9]+}}
+
+// HLSL: cbuffer cbuf_{{[0-9]+}} : register(b{{[0-9]+}})
+// HLSL: RWStructuredBuffer<int > rwbuf_{{[0-9]+}} : register(u{{[0-9]+}})
+
+// MTL: int constant{{.*}} cbuf_{{[0-9]+}};
+// MTL: int device{{.*}} rwbuf_{{[0-9]+}};
+
+// WGSL: var<uniform> cbuf_{{[0-9]+}} : i32
+// WGSL: var<storage, read_write> rwbuf_{{[0-9]+}} : array<i32>

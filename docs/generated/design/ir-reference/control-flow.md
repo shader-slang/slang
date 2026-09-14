@@ -156,8 +156,8 @@ terminator.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `switch` | `IRSwitch` | `condition, breakLabel, defaultLabel, caseValue/caseLabel pairs...` (`min=3`) | | `SwitchStmt`, `StageSwitchStmt` via `visitSwitchStmt` (line 9495) and `visitStageSwitchStmt` (9329) | Multi-way switch; the case list is a set of (value, label) pairs reached through `getCaseValue` / `getCaseLabel`. |
-| `targetSwitch` | `IRTargetSwitch` | `breakBlock, caseValue/caseBlock pairs...` (`min=1`) | | `TargetSwitchStmt` via `visitTargetSwitchStmt` (line 9425) | Compile-time switch on the code-generation target; case values are `CapabilityName` integers, not runtime values. |
+| `switch` | `IRSwitch` | `condition, breakLabel, defaultLabel, caseValue/caseLabel pairs...` (`min=3`) | | `SwitchStmt` (`switch`), `StageSwitchStmt` (`__stage_switch`) via `visitSwitchStmt` (line 9495) and `visitStageSwitchStmt` (9329) | Multi-way switch; the case list is a set of (value, label) pairs reached through `getCaseValue` / `getCaseLabel`. |
+| `targetSwitch` | `IRTargetSwitch` | `breakBlock, caseValue/caseBlock pairs...` (`min=1`) | | `TargetSwitchStmt` (`__target_switch`) via `visitTargetSwitchStmt` (line 9425) | Compile-time switch on the code-generation target; case values are `CapabilityName` integers, not runtime values. |
 
 ### Terminators: error flow
 
@@ -171,14 +171,14 @@ terminator.
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `missingReturn` | `IRMissingReturn` (generated) | — | | `FunctionDeclBase` body lowering in `lowerFuncDeclInContext` | Terminates the fall-off-the-end block of a value-returning function so a later dataflow check can diagnose it. |
-| `unreachable` | `IRUnreachable` (generated) | — | | (synthesized) | Asserts that the block has no reachable continuation. |
+| `unreachable` | `IRUnreachable` (generated) | — | | IR passes only, never AST lowering; `applySparseConditionalConstantPropagation` is the one that produces it before the first dump | Asserts that the block has no reachable continuation. |
 
 ### Terminators: defer and asm
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `defer` | `IRDefer` | `deferBlock, mergeBlock, scopeBlock` | | `DeferStmt` via `visitDeferStmt` (line 8919) | Records a deferred-action block whose body must run before the surrounding scope exits. |
-| `GenericAsm` | `IRGenericAsm` | `asmText, args...` (`min=1`) | | `IntrinsicAsmStmt` via `visitIntrinsicAsmStmt` (line 9470) | Inline target-specific text whose semantics include terminating control flow; `getAsm()` reads operand 0 as a string literal. |
+| `GenericAsm` | `IRGenericAsm` | `asmText, args...` (`min=1`) | | `IntrinsicAsmStmt`, written as the statement `__intrinsic_asm "<text>";`, via `visitIntrinsicAsmStmt` (line 9470) | Inline target-specific text whose semantics include terminating control flow; `getAsm()` reads operand 0 as a string literal. |
 
 ### Other control-flow opcodes
 
@@ -200,6 +200,25 @@ appear as ordinary instructions inside a block.
 | `RequireQuadDerivatives` | `IRRequireQuadDerivatives` | — | | Call to `__requireQuadDerivatives` (`core.meta.slang`) | Marks an entry point as requiring the quad-derivatives execution mode. |
 
 ## Notable opcodes
+
+### What a lowering dump shows
+
+`-dump-ir` prints its first snapshot under the label `LOWER-TO-IR`,
+but that snapshot is not the raw output of the statement visitors.
+`generateIRForTranslationUnit` runs a fixed block of mandatory passes
+between the last visitor and the dump — `lowerErrorHandling` (line
+15578), `lowerDefer` (15581), `constructSSA` (15605),
+`applySparseConditionalConstantPropagation` (15606), `simplifyCFG`
+(15611), `eliminateDeadCode` (15624) and mandatory early inlining
+(15664) — and dumps only afterwards, at line 15797 of
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
+Three of the callouts below turn on that ordering: `throw`,
+`tryCall`, and `defer` are emitted by lowering but are already gone
+by the first dump; `unreachable` is never emitted by lowering but is
+already present; and an arm that lowering gave a block of its own may
+have been folded onto the merge block. Read an `AST origin` cell as a
+claim about which visitor *constructs* an opcode, not as a promise
+that a dump still contains it.
 
 ### `block` and `param`
 
@@ -241,6 +260,20 @@ registers the break and continue labels in
 statement's `uniqueID`, which is how `visitBreakStmt` and
 `visitContinueStmt` find the right label without walking the CFG.
 
+The three loop statements fill those operands differently.
+`visitForStmt` creates a dedicated continue block (line 8435), so
+target, `continueBlock`, and `breakBlock` are three distinct blocks.
+`visitWhileStmt` uses the loop head itself as the continue label
+(line 8568) and passes it as both the target and the continue
+operand, so *every* `while` has `target == continueBlock`.
+`visitDoWhileStmt` uses the trailing test block instead (line 8653)
+and inverts the predicate — `emitNot` at line 8689, then
+`emitIfElse(not(cond), breakBlock, merge, merge)` at line 8734 — so a
+`do`-`while` leaves the loop when the *negated* test is true. A
+`while (true)` keeps the shared head-and-continue block and leaves
+its break block without a predecessor, which is why that block
+carries `unreachable` by the time the loop is dumped.
+
 ### `ifElse`
 
 `ifElse <condition> <trueBlock> <falseBlock> <afterBlock>` is the
@@ -260,6 +293,14 @@ calls `emitIfElse(val, bodyBlock, breakBlock, bodyBlock)`, so a
 loop-condition test has `afterBlock == trueBlock`. A pass that
 assumes the four operands are four distinct blocks will be wrong on
 both.
+
+A third collapsed shape is not the emitters' doing. `visitIfStmt`
+gives an `if`/`else` three fresh blocks (lines 8303-8309) however
+empty its arms are, but the mandatory `simplifyCFG` folds away an arm
+that does nothing except branch to the merge block. An `if` whose
+*then* arm is empty and whose `else` arm is not therefore reaches a
+dump as `trueBlock == afterBlock` — the mirror image of the else-less
+shape, and one no convenience emitter produces.
 
 ### `conditionalBranch` vs `ifElse`
 
@@ -331,6 +372,17 @@ the enclosing code has no `CatchStmt` handler, a `param` plus a
 one is, it emits an `unconditionalBranch` to the handler block
 carrying the error value as a block argument.
 
+Both opcodes are short-lived. `lowerErrorHandling`, called from
+`generateIRForTranslationUnit` at line 15578 — before the first
+`-dump-ir` snapshot — rewrites a throwing function into one that
+returns a `Result<T, E>` value and turns each `tryCall` into an
+ordinary `call` plus an `ifElse`. A surface program's error flow
+therefore reaches every later reader as the `Result` opcodes
+(`makeResultValue`, `makeResultError`, `isResultError`,
+`getResultError`, `getResultValue`, declared at
+[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
+lines 1135-1139) rather than as `throw` and `tryCall`.
+
 ### `defer`
 
 `defer` records a deferred action block. Its three operands are
@@ -340,8 +392,10 @@ the defer and merge blocks, emits the `defer`, lowers the deferred
 statement into `deferBlock`, and terminates it with a branch to
 `mergeBlock`; `scopeBlock` is whatever `context->scopeEndBlock`
 was, which is how the deferred body learns which enclosing scope it
-belongs to. A later IR pass rewrites the construct so that `defer`
-does not survive to emit.
+belongs to. `lowerDefer` then rewrites the construct so that later
+passes need not be aware of it; it runs inside
+`generateIRForTranslationUnit` at line 15581, ahead of the first
+`-dump-ir` snapshot, so `defer` is not visible even there.
 
 ### `missingReturn` and `unreachable`
 
@@ -352,23 +406,44 @@ final block is still unterminated, a `void`-returning function gets
 an implicit `return_val` of the void value, but a value-returning
 function gets `missingReturn` (line 14361) precisely so a later
 dataflow check can report the missing `return` if that block turns
-out to be reachable. `unreachable` carries no such obligation and
-is only introduced by IR passes.
+out to be reachable. That check is `checkForMissingReturns`, run from
+`generateIRForTranslationUnit` at line 15706 with the target left as
+`CodeGenTarget::None` and warnings enabled, and run again per target
+during emit. It reports at the `missingReturn`'s own source location,
+which lands on the function signature rather than on the body:
+warning 41010 (`missing-return`, "non-void function does not return
+in all cases") where the target tolerates a missing return, and error
+41009 (`missing-return-error`) where it does not.
+
+`unreachable` carries no such obligation, and nothing in AST lowering
+emits it —
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+never calls `emitUnreachable`. It reaches a lowering dump only
+through the mandatory passes: SCCP gives a block that still has uses
+but has lost all its predecessors a body of exactly one
+`unreachable`, which is what terminates the synthesized break block
+of a `switch`, a `__target_switch`, or a `while (true)` whose arms
+all diverge.
 
 ### Unreachable-code diagnostics come from lowering
 
-Two `Diagnostics::UnreachableCode` sites live in
+Three `Diagnostics::UnreachableCode` sites live in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp),
-not in the semantic checker. `startBlockIfNeeded` (line 8205) is
+not in the semantic checker. `startBlockIfNeeded` is
 called before lowering each statement; if the current block is
 already terminated, the statement it is about to lower has no label
-to be branched to, so it diagnoses at line 8228 and then starts a
-fresh block anyway. `lowerSwitchCases` (line 9223) diagnoses at
-line 9315 for a statement that appears inside a `switch` body
+to be branched to, so it diagnoses and then starts a
+fresh block anyway. `lowerSwitchCases` diagnoses
+for a statement that appears inside a `switch` body
 before the first `case` or `default` label — Slang has no `goto`
 into a switch body, so control cannot reach such a statement — and
 sets `warnedUnreachableBeforeFirstCase` so the whole leading run
-warns once.
+warns once. `visitSwitchStmt` diagnoses at its no-cases early
+return, where the body has no `case` or `default` label at all: the
+same argument makes the whole body unreachable, and
+`findFirstNonEmptyStmt` supplies the first statement being discarded
+as the diagnostic's location. A body that discards nothing (`{ }`,
+`{ ; }`) stays silent.
 
 ### `discard`
 
@@ -377,7 +452,16 @@ processing without running later stages. Although it terminates the
 pixel's *runtime* processing, it is *not* an IR terminator: its
 opcode is one past `kIROp_LastTerminatorInst`, so `as<IRTerminatorInst>`
 rejects it, and it sits as an ordinary instruction inside a block
-that ends with whatever real terminator follows.
+that ends with whatever real terminator follows. `visitDiscardStmt`
+(line 9059) emits nothing but the `discard`, so in the common
+`if (...) discard;` shape the hosting block reads `discard` followed
+by the `unconditionalBranch` to the post-`if` merge block.
+
+Reaching `discard` from a non-fragment entry point is not an IR-level
+error at all. The capability check rejects the entry point first,
+with error 36107 (`entry-point-uses-unavailable-capability`,
+"unavailable features in entry point") reported on the entry-point
+declaration, so no `discard` opcode is ever built.
 
 ### `Abort`
 

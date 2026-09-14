@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:39:00Z
-//META: source_commit=199a52d71d360a84e8a13837b913746113a9b510
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/tokens.md#special-case-lexing-rules
-//META: doc_section_digest=28a5007e7990e447eb6cc6141908413f26bb0721bb1b7dcb8e454fd24d38dbb8
+//META: doc_section_digest=790d7f70b0af6fa58e0bbfe83b09c796ce08d85a7e54ec041d9c3c7dfdcfd61b
 //META: purpose=Boundary - a leading-zero exponent with a `-` sign (`0e-3`) lexes as a single FloatingPointLiteral token.
 //META: intent=boundary
 //META: pipeline_stage=lex

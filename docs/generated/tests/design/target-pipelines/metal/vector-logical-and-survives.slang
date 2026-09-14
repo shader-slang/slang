@@ -1,18 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=355a74cccddb8eb52d0513615291bc6d928b55d9bdd73146a80f6df81b210ae4
-//META: purpose=legalizeLogicalAndOr (Metal arm) preserves `&&` over vector operands as element-wise vector AND in the emitted MSL.
+//META: doc_section_digest=5fdd0ac6daa767e15b8f1dad12d2d7a2846fe891f83f100e2466f794797eb465
+//META: purpose=The Metal arm of `legalizeLogicalAndOr` keeps `&&` over vector operands as a single element-wise expression between two `bool3(...)` values.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `legalizeLogicalAndOr` runs in the Metal arm. With vector
-// operands, the resulting MSL keeps the `&&` operator between
-// two `bool3(...)` constructions (Metal supports element-wise
-// `&&` on vector booleans).
+// Verifies that the Metal arm of `legalizeLogicalAndOr` rewrites only the
+// short-circuiting scalar form and leaves element-wise vector `&&` intact,
+// which MSL supports natively. One operand is derived from the dispatch id
+// so the expression cannot be constant-folded away; CHECK asserts the
+// emitted text still contains a single `&&` sitting between two `bool3(`
+// constructions rather than a lowered select or a per-component expansion.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

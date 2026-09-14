@@ -1,20 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#inheritancedecl
 //META: doc_section_digest=faee42cf53078ee6cd6b1f69e2f5e33966ac4159fe9a593a801ecde8862f2dc6
-//META: purpose=An InheritanceDecl carries a witness table after checking; an interface default method is reachable through the conforming type.
+//META: purpose=The witness recorded on an inheritance clause is what connects a requirement to the conformer's member at each dispatch site.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented note that "the witness-table" recorded on
-// an InheritanceDecl "is the connection point between the
-// declaration AST and the witness-table machinery". A method
-// declared on the interface (here, the simple `area()` requirement
-// satisfied by the conforming struct) is reachable via
-// interface-typed dispatch.
+// Verifies that the conformance recorded by an inheritance clause routes an
+// interface requirement to the conformer's member. A struct with two fields
+// implements the single requirement in terms of both; the CHECK asserts their
+// product, which is only produced by the conformer's body being selected.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

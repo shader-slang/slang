@@ -60,6 +60,25 @@ The Slang sources for the core module are:
   `Array`, `Optional`, and `Tuple`; and the PyTorch-facing
   `TensorView`, `DiffTensorView`, and `TorchTensor` types.
 
+An HLSL-compatibility name is not a call on every target. These
+intrinsics are written as a `__target_switch` whose cases give the
+per-target form, with the ordinary Slang body under `default` used
+where no case matches — that body is emitted as a generated helper
+function. `mul` is the sharpest case; for `mul(m, v)` on a `float4x4`
+and a `float4`:
+
+| Target | Emitted form |
+| --- | --- |
+| HLSL | `mul(m, v)` |
+| GLSL, Metal, WGSL | `(v * m)` — the `*` operator, not a call |
+| SPIR-V | `OpVectorTimesMatrix` |
+| CUDA, C++ | a generated `mul_<n>` helper from the `default` body |
+
+`dot` and `length` keep their names on HLSL, GLSL, Metal and WGSL, and
+become `OpDot` and the `GLSL.std.450` `Length` extended instruction on
+SPIR-V; on CUDA and C++ they too fall through to generated `dot_<n>` /
+`length_<n>` helpers.
+
 The embedding glue lives in
 [source/slang-core-module/](../../../../source/slang-core-module):
 
@@ -100,7 +119,11 @@ The core module file sets up the language vocabulary that user code
 `public module core;` and a block of scalar aliases (`float16_t`,
 `float32_t`, `float64_t`, `int32_t`, `uint32_t`, `size_t`, `usize_t`,
 `ssize_t`), then declares modifier syntax (`constexpr`,
-`globallycoherent`, `pervertex`, ...) via `syntax` declarations.
+`globallycoherent`, `pervertex`, ...) via `syntax` declarations. These
+are real modifiers rather than merely accepted spellings, and some of
+them survive lowering into the emitted code: a `globallycoherent`
+buffer emits `globallycoherent` on HLSL, `coherent` on GLSL, and a
+`Coherent` decoration on SPIR-V.
 
 The full set of declarations covers scalar / vector / matrix types,
 operator overloads mapped onto IR opcodes with the `__intrinsic_op`
@@ -112,6 +135,18 @@ and `Tuple`, and the autodiff vocabulary itself — `IDifferentiable`
 and the `DifferentialPair` magic type are declared here in
 [core.meta.slang](../../../../source/slang/core.meta.slang), not in
 the diff meta-module.
+
+Those three have small surfaces worth naming, since they are usable
+with no `import`:
+
+- `Optional<T>` — the `hasValue` and `value` properties, an implicit
+  conversion from `T`, and the `none` literal, which is also what
+  default initialization produces.
+- `Tuple<each T>` — positional members `_0`, `_1`, ..., which also
+  compose into swizzles (`t._2_1_0`); constructed with `makeTuple`.
+- `IRangedValue` — `static const This maxValue` and `minValue`,
+  supplied per scalar type by the extensions that conform each builtin
+  numeric type to the interface.
 
 The HLSL meta-module layers in HLSL-named texture / sampler / buffer
 types and the corresponding intrinsics so that HLSL code compiles
@@ -186,6 +221,13 @@ and produces one `.slang-module` artifact. Two exist today:
   the `BarrierMemoryTypeFlags` / `BarrierSemanticFlags` enums with the
   `Barrier` overloads that consume them.
 
+The `[ExperimentalModule]` attribute both modules carry — declared as
+an `attribute_syntax` in
+[core.meta.slang](../../../../source/slang/core.meta.slang) — gates the
+import rather than merely labelling the module: importing one without
+enabling experimental features is an error naming the resolved module
+path and the `-experimental-feature` option.
+
 Both directories share the configuration defined in
 [standard-modules/CMakeLists.txt](../../../../source/standard-modules/CMakeLists.txt):
 
@@ -245,7 +287,18 @@ C++ and HLSL strings as the default language preludes, and emit writes
 the selected string directly into the generated source (see
 [../pipeline/06-emit.md](../pipeline/06-emit.md)). The headers are
 also installed, and a caller may override a language prelude with text
-that merely `#include`s one of them.
+that merely `#include`s one of them. The command-line tools take that
+route, so the head of a `-target cpp` emit is the include rather than
+the header's text:
+
+```cpp
+#include "<install-dir>/slang-cpp-prelude.h"
+```
+
+and the generated entry point that follows is marked with a macro the
+header defines, `SLANG_PRELUDE_EXPORT`. `-target cuda` is the same
+shape with
+[slang-cuda-prelude.h](../../../../prelude/slang-cuda-prelude.h).
 
 | Prelude | Target |
 | --- | --- |

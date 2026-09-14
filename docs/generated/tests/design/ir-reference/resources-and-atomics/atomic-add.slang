@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T12:00:00+00:00
-//META: source_commit=5f0e613fdd3c2890bb087d9ff76154e2605a14d2
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomic-operations
-//META: doc_section_digest=52293a26550b22915d50787927526213ba913b7231afe19be04ac5605d79d8b4
+//META: doc_section_digest=e0b71e7cc30a0e069a5833b7fdc7038f02b6ab982bbba6656983e3a65dcba7ce
 //META: purpose=`Atomic<T>::add(v)` lowers to `atomicAdd(%ptr, %val, %order)`, the IR encoding of the atomic add primitive.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -16,7 +16,7 @@
 // `IRMemoryOrder` constant (`0 : Int` is relaxed) that the operand
 // column now names explicitly.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<Atomic<int>> abuf;
 uniform RWStructuredBuffer<int> rwbuf;

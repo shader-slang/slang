@@ -1,11 +1,11 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:00:00Z
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
-//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#error-codes-and-the-name-field
-//META: doc_section_digest=3c2365d6e03d7d49bdb8070671c9161746cf63482dd5364eff59042e14f93322
-//META: purpose=Ids in the shared namespace are normally unique per diagnostic; function-redefinition renders its own code E30201.
-//META: intent=negative
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#error-code-namespace
+//META: doc_section_digest=e5426f9afa17becb9e7d33c23301014e082fad12bbf8aff1c4a169d90575556e
+//META: purpose=Codes are unique per entry: function-redefinition renders its own code E30201, distinct from its neighbours.
+//META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 

@@ -386,6 +386,18 @@ IRInst* cloneInst(IRCloneEnv* env, IRBuilder* builder, IRInst* oldInst)
     if (newInst == oldInst)
         return newInst;
 
+    // `cloneInstAndOperands` may also return a *different*, pre-existing
+    // hoistable inst via global value numbering (e.g. two witness tables with
+    // the same op/type/operands but different entries, since entries aren't
+    // part of the dedup key). That inst is already fully populated, so
+    // grafting `oldInst`'s children onto it here would add a duplicate,
+    // unrelated entry instead of merging anything. Detect this the same way:
+    // a freshly created hoistable inst is empty until populated below, so one
+    // that already has children here must be a pre-existing dedup hit.
+    //
+    if (getIROpInfo(newInst->getOp()).isHoistable() && newInst->getFirstDecorationOrChild())
+        return newInst;
+
     cloneInstDecorationsAndChildren(env, builder->getModule(), oldInst, newInst);
 
     return newInst;

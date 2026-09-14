@@ -1,19 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#deferstmt
-//META: doc_section_digest=8d7ee5a379aeb4b393aeb766e8179650d332b2a7a6bcc65b16e7e5c13a614827
-//META: purpose=A DeferStmt enqueues its inner statement to run when the enclosing scope exits; the deferred side effect is observed after the surrounding scope's other statements complete.
+//META: doc_section_digest=9d7a17de2e7a4cacf7a44eefe78eaa8bea0a9a617b555cc1e20d4e784f62d6bf
+//META: purpose=A DeferStmt's inner statement runs when the enclosing scope exits rather than at the position the `defer` is written.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says DeferStmt "is not executed at the position it appears,
-// but instead enqueued to run when the enclosing scope exits". We
-// place a `defer` early in a block and a non-deferred print after it:
-// the deferred print must land after the block-closing point of the
-// inner scope.
+// Verifies a deferred statement does not run where it is written but at
+// the exit of the block containing it. The CHECK asserts the ordering
+// body -> deferred -> after-block, which is what distinguishes
+// scope-exit execution from in-place execution.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

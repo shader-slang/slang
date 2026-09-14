@@ -1,19 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00Z
-//META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=355a74cccddb8eb52d0513615291bc6d928b55d9bdd73146a80f6df81b210ae4
-//META: purpose=Boundary: asfloat(uint) renders as as_type<float>(...) on Metal (bitcast direction uint->float, dual of asuint).
+//META: doc_section_digest=5fdd0ac6daa767e15b8f1dad12d2d7a2846fe891f83f100e2466f794797eb465
+//META: purpose=Boundary: the reverse bitcast direction `asfloat(uint)` also renders as `as_type<float>(...)` on Metal.
 //META: intent=boundary
-//META: pipeline_stage=ir-pass
+//META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary axis: as_type<T> bitcast directions. The companion
-// smoke test (`bitcast-emits-as-type.slang`) probes asuint(float).
-// Here we probe the reverse direction: asfloat(uint) must also
-// render as `as_type<float>(...)`. Source bits come from
-// SV_DispatchThreadID so DCE cannot fold away the bitcast.
+// Probes the other direction of the bitcast axis covered by
+// `bitcast-emits-as-type.slang`: the emitter must pick the destination
+// type for `as_type<T>` from the bitcast's result type, so an
+// integer-to-float reinterpret has to render as `as_type<float>`. The
+// source bits come from `SV_DispatchThreadID` so nothing is folded, and
+// CHECK asserts the float-destination spelling.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=4ce24fa35b12f879a2326d5099ddaf798613c25b3c70f9a1c81a264e43a2ab71
+//META: doc_section_digest=a7bc419a78aaa8aad78f72a1a3efb85da2a381a5bc1379c4c81d9446b87d0627
 //META: purpose=Fires diagnostic E31219 (push-or-specialization-constant-cannot-be-static) -- push/specialization constant storage class error
 //META: intent=negative
 //META: pipeline_stage=check
@@ -18,4 +18,4 @@
 void main() {}
 
 
-// CHECK: E31219
+//CHECK: E31219

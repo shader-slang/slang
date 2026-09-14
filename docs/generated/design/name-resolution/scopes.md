@@ -116,6 +116,41 @@ they look like they might:
 - `SeqStmt`, `DeclStmt`, and other `Stmt` subclasses that are not
   `ScopeStmt` simply live inside the enclosing scope.
 
+A declaration used directly as the body of a statement that owns no
+scope — `while (c) int x = 1;`, and the same shape under `do` or
+`if` — is accepted rather than rejected, and the name leaks:
+`Parser::parseVarDeclrStatement`
+([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+7255) hands the declaration to `currentScope->containerDecl` (line
+7260), which is the *enclosing* container when no scope was pushed for
+the statement, so `x` stays visible after the loop. Only a `{ ... }`
+body isolates it, because only the `BlockStmt` pushes a `ScopeDecl`.
+
+The two switch forms differ in the same way. A plain `switch` gives its
+whole body one scoped `BlockStmt` (`ParseSwitchStmt`,
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+6588), so a local declared under one `case` label is still in scope in
+textually later cases of the same `switch`, and out of scope after it.
+`__target_switch` and `__stage_switch` instead push and pop a
+`ScopeDecl` around *each* case group (`parseTargetSwitchStmtImpl`,
+lines 6622-6623 and 6702), so a local declared in one case is not
+visible from any other case of the same statement.
+
+The scope holding a lambda's parameter list ends with the expression
+that introduced it: `parseLambdaExpr`
+([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+8441) pushes `paramScopeDecl` before the parameter list (line 8446) and
+pops it after the body (line 8467), so a parameter is visible
+throughout the body — block form or single-expression form — and
+undefined once the expression ends.
+
+```slang
+// `applyF` is an `IFunc`-constrained helper; `c` is a local of the
+// enclosing function.
+int r = applyF((int p) => p * c, 5);
+int q = p; // error: undefined identifier 'p'
+```
+
 ### Parser scope construction
 
 The parser carries the current scope pointer as a member field
@@ -236,6 +271,40 @@ Four concrete uses of sibling scopes are visible in the source:
    `addSiblingScopeForContainerDecl` (line 17355) to splice that
    namespace's owned/sibling scopes into the `using` decl's scope, so
    the namespace's members become reachable without qualification.
+
+A three-module shape shows what the filter in use case 2 keeps and what
+it drops. Module `C` declares `namespace Foo`; module `A` is
+
+```slang
+import C;            // plain import: A does not re-export C
+using namespace Foo; // splices Foo onto A's module scope sibling chain
+```
+
+and module `B` is `import A;`. `B` sees `A`'s own members and the
+members of every file `A` pulls in with `__include`, because those are
+the only two shapes `isOwnModuleOrIncludedFileScope` admits. It does
+not see `Foo`'s members unqualified — the `using`-spliced
+`NamespaceDecl` scope is neither `A` nor a `FileDecl` parented to `A` —
+and it does not see `C`, whose scope and whose `FileDecl`s all carry a
+`parentDecl` of `C`. Writing `__exported import C;` in `A` is what
+makes `C` reachable from `B`: `importModuleIntoScope` recurses into
+nested `import`s that carry the `ExportedModifier`
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+lines 17085-17092).
+
+When two scopes on the same sibling chain supply the same name, neither
+wins by position. `_lookUpInScopes`
+([slang-lookup.cpp](../../../../source/slang/slang-lookup.cpp) line
+806) walks every `nextSibling` link before it considers stopping, so a
+hit in one sibling does not preclude a hit in another and both
+declarations land in one `LookupResult`. Overloadable declarations then
+form an overload set that overload resolution ranks; anything else
+remains an `OverloadedExpr` whose use site is reported as
+`Diagnostics::AmbiguousReference` by
+`SemanticsVisitor::diagnoseAmbiguousReference`
+([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
+line 1497). See [lookup.md](lookup.md) for the refinement steps that
+run before that point.
 
 ### Implicit scopes
 

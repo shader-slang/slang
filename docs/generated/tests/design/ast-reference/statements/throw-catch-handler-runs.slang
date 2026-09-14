@@ -1,20 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#throwstmt-and-catchstmt
-//META: doc_section_digest=4beb3cdf4f4fc264b184a0269fd084212ac38cb61fe979ed8cba8421dba3f523
+//META: doc_section_digest=0c9bef4794f61ac3fead35d16b0cd0603f6881658db01263a9dfdf11e63c7f46
 //META: purpose=A ThrowStmt in an errorable function transfers control to the caller's matching CatchStmt; the catch handler runs and the protected body's remaining statements are skipped.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says ThrowStmt and CatchStmt are "the two halves of Slang's
-// errorable-function model" and a CatchStmt "holds both the protected
-// body (tryBody) and the handler (handleBody)". We observe both
-// halves: a normal call returns 105 (no throw), and a failing call
-// triggers the handler that writes -1. The interpreter does not
-// faithfully model throw/catch, so we use CPU compute as the runtime.
+// Verifies `throw` in an errorable function transfers control to the
+// caller's handler, while the non-throwing path returns normally. The
+// CHECKs assert 105 for the successful call and -1 for the failing one,
+// which separates the protected body from the handler.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer

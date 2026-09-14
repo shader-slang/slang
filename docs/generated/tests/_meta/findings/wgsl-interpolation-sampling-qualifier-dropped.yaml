@@ -1,0 +1,60 @@
+schema_version: 1
+id: wgsl-interpolation-sampling-qualifier-dropped
+bundle: coverage/emit
+suspected_kind: wrong-codegen
+title: "WGSL drops `centroid`/`sample` interpolation qualifiers"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: wgsl
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/coverage/emit/glsl-interpolation-modifiers.slang -target wgsl -entry fragMain -stage fragment"
+  source_slang: docs/generated/tests/coverage/emit/glsl-interpolation-modifiers.slang
+  observed_summary: |
+    A fragment input struct carrying one field per HLSL interpolation modifier emits this
+    WGSL struct:
+
+      struct pixelInput_0
+      {
+          @interpolate(flat)   @location(0) flatColor_0 : vec3<f32>,   // nointerpolation
+          @interpolate(linear) @location(4) npUV_0 : vec2<f32>,        // noperspective
+                               @location(1) cUV_0 : vec2<f32>,         // centroid  -- qualifier lost
+                               @location(2) sUV_0 : vec2<f32>,         // sample    -- qualifier lost
+          @interpolate(linear) @location(3) lin_0 : f32,               // linear    -- wrong mode
+      };
+
+    Two distinct problems, both in `WGSLSourceEmitter::emitInterpolationModifiersImpl`
+    (source/slang/slang-emit-wgsl.cpp:1842):
+
+    1. `IRInterpolationMode::Centroid` and `IRInterpolationMode::Sample` set only the
+       local `interpolationSampling` variable, and the emit is guarded by
+       `if (interpolationType)`. With no interpolation *type* also present, nothing is
+       written, so both fields silently fall back to WGSL's default
+       (perspective, centre). The `interpolationSampling` string is only ever reachable
+       when a second, type-setting modifier appears on the same field.
+    2. `IRInterpolationMode::Linear` shares the `NoPerspective` arm and becomes
+       `@interpolate(linear)`. WGSL's `linear` means *non*-perspective-correct, whereas
+       HLSL's `linear` is the default perspective-correct mode, so the perspective
+       correction is dropped.
+
+    The GLSL, SPIR-V and HLSL back ends handle the same five inputs correctly, so the
+    shader is well-formed; the committed test pins those three targets and deliberately
+    omits WGSL.
+expected:
+  claim: |
+    WGSL spells the sampling qualifiers as a second argument to `@interpolate`, so
+    HLSL `centroid` should emit `@interpolate(perspective, centroid)` and `sample`
+    should emit `@interpolate(perspective, sample)` rather than nothing at all, and
+    HLSL `linear` (perspective-correct, the HLSL default) should emit
+    `@interpolate(perspective)` rather than `@interpolate(linear)`, which is WGSL's
+    non-perspective mode.
+  citation_kind: sibling-test
+  citation: tests/pipeline/rasterization/get-attribute-at-vertex-struct.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/06-emit.md
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Deliberate: WGSL cannot express the qualifier — ruled out, WGSL's @interpolate takes an optional sampling argument (`centroid`, `sample`) alongside the interpolation type."
+    - "Test bug: ruled out — the same struct produces the correct qualifier on GLSL, SPIR-V and HLSL, and the guard that drops the sampling-only case is visible directly in slang-emit-wgsl.cpp."
+    - "Harmless because WGSL's default already matches: ruled out for `centroid`/`sample` (the default is centre, not centroid or per-sample) and for `linear` (WGSL `linear` is explicitly non-perspective)."

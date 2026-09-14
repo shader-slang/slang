@@ -123,11 +123,39 @@ begins, in
   - `Value = 0x4` — everything that is neither a type, a function, an
     attribute, a syntax decl, nor a semantic decl (variables,
     parameters, fields, ...); it is the fall-through case.
-  - `Attribute = 0x8` — `AttributeDecl`.
-  - `SyntaxDecl = 0x10` — keyword-introducing `SyntaxDecl`.
-  - `Semantic = 0x20` — `SemanticDecl`.
+  - `Attribute = 0x8` — `AttributeDecl`, the declarations
+    introduced by `attribute_syntax [name(...)]` in
+    [core.meta.slang](../../../../source/slang/core.meta.slang) (line
+    4599 declares `[numthreads]`). Source reaches them only by writing
+    `[name(...)]` on a declaration
+    ([slang-ast-decl.h line
+    1168](../../../../source/slang/slang-ast-decl.h)).
+  - `SyntaxDecl = 0x10` — keyword-introducing `SyntaxDecl`. The parser
+    asks for this bit on its own when reading the modifier list of a
+    parameter declaration, so that only a keyword decl can begin a
+    modifier there
+    ([slang-parser.cpp lines 5059 and
+    7655](../../../../source/slang/slang-parser.cpp)).
+  - `Semantic = 0x20` — `SemanticDecl`, the
+    `semantic sv_position { ... }` declarations in
+    [core.meta.slang](../../../../source/slang/core.meta.slang) (line
+    5001) that record which types and stages a `: SV_*` annotation on a
+    shader parameter is valid for
+    ([slang-ast-decl.h line
+    729](../../../../source/slang/slang-ast-decl.h)).
   - `Default = type | Function | Value | SyntaxDecl` — the mask the
     parser and most checker entry points use.
+
+  `Attribute` and `Semantic` are the two bits *outside* `Default`, so
+  only a caller that names them can reach those decls: an ordinary
+  identifier spelled like an attribute neither hides the attribute nor
+  is hidden by it. `type`, `Function`, and `Value` are already inside
+  `Default`, so a use site that needs exactly one of those categories
+  usually narrows the result after the fact through `refineLookup`
+  rather than at the lookup call — the operand of `fwd_diff(...)` /
+  `bwd_diff(...)` is resolved that way with `LookupMask::Function`
+  ([slang-check-expr.cpp line
+  6012](../../../../source/slang/slang-check-expr.cpp)).
 
   Classification happens in `DeclPassesLookupMask`
   ([slang-lookup.cpp](../../../../source/slang/slang-lookup.cpp) lines
@@ -348,13 +376,42 @@ That function is where the dispatch on type shape happens:
 - **`ModifiedType`.** Modifiers are transparent to lookup; the facet
   walk runs on the modified type directly
   ([slang-lookup.cpp lines
-  641-654](../../../../source/slang/slang-lookup.cpp)).
+  641-654](../../../../source/slang/slang-lookup.cpp)). Exactly three
+  spellings produce one: `unorm`, `snorm`, and `no_diff`, the only
+  modifiers `checkTypeModifier` turns into a modifier `Val`
+  ([slang-check-expr.cpp lines
+  9356-9375](../../../../source/slang/slang-check-expr.cpp)). The
+  parser moves such a modifier off the declaration and onto its type
+  expression (`_moveTypeModifiersToTypeExpr`,
+  [slang-parser.cpp line
+  3300](../../../../source/slang/slang-parser.cpp)), so a member
+  access on a value declared `no_diff S` reaches this arm. The
+  compiler also introduces `no_diff` on its own while building
+  derivative function types (`getBackwardDiffFuncType`,
+  [slang-check-expr.cpp lines
+  5711-5776](../../../../source/slang/slang-check-expr.cpp)).
 - **`ExtractExistentialType`.** The implicit `ThisType` decl-ref of
   the underlying interface is the target of lookup, so that
   associated types in a found member's signature resolve against a
   comparable substitution
   ([slang-lookup.cpp lines
-  687-702](../../../../source/slang/slang-lookup.cpp)).
+  687-702](../../../../source/slang/slang-lookup.cpp)). The source
+  shape that produces one is a variable, parameter, or field declared
+  with an interface type: `maybeOpenExistential`
+  ([slang-check-expr.cpp line
+  240](../../../../source/slang/slang-check-expr.cpp)) rewrites a
+  member-access base whose type is a `DeclRefType` of an
+  `InterfaceDecl` into an `ExtractExistentialValueExpr` typed
+  `ExtractExistentialType` (lines 197-206), and it runs on the base of
+  every member access (line 8824) and static member access (line
+  8744).
+
+  ```
+  interface ICounter { int val(); }
+  struct S : ICounter { int val() { return 5; } }
+  ICounter c = S();   // `c` has existential type
+  int n = c.val();    // member lookup takes this arm
+  ```
 - **`AndType`.** Unexpected at lookup time;
   `visitGenericTypeConstraintDecl` is supposed to have flattened it
   earlier, so the arm is a `SLANG_UNEXPECTED`.
@@ -471,6 +528,19 @@ so that an unqualified reference to `f` resolves through
 2. `Deref` — `ConstantBuffer<Anon0>` is pointer-like, so lookup
    dereferences it.
 
+`__transparent` is not a source-writable modifier — no keyword in the
+parser's tables introduces one. The single site that creates a
+`TransparentModifier` is `ParseBufferBlockDecl`
+([slang-parser.cpp line
+4159](../../../../source/slang/slang-parser.cpp)), which backs the
+`cbuffer` and `tbuffer` declaration keywords
+([slang-parser.cpp lines
+10727-10728](../../../../source/slang/slang-parser.cpp)) and the GLSL
+interface-block forms that route to the same helper from
+`ParseDeclWithModifiers` (lines 5868-5891). Every transparent member
+in a user program therefore comes from one of those buffer-block
+declarations.
+
 `ContainerDecl::getTransparentDirectMemberDecls`
 ([slang-ast-decl.h line
 212](../../../../source/slang/slang-ast-decl.h), defined at
@@ -490,9 +560,16 @@ prepends a `Member` breadcrumb, and recurses via
   recursion is forbidden for attributes to avoid infinite recursion
   on transparent types that themselves contain attribute members),
   or
-- the request's `options` include `IgnoreTransparentMembers` (used,
-  for example, when looking up an unscoped-enum's underlying type
-  to break a similar cycle).
+- the request's `options` include `IgnoreTransparentMembers`. The one
+  context that sets that option is the check of a declaration's base
+  clause when the declaration itself carries `TransparentModifier`,
+  where looking back through the transparent member would be circular
+  (`excludeTransparentMembersFromLookup`,
+  [slang-check-decl.cpp lines
+  4798-4804](../../../../source/slang/slang-check-decl.cpp)); it
+  reaches lookup through `visitVarExpr`
+  ([slang-check-expr.cpp line
+  5342](../../../../source/slang/slang-check-expr.cpp)).
 
 ### Breadcrumbs
 
@@ -633,9 +710,24 @@ lines 17325-17427), a dedicated check phase that runs to
 `DeclCheckState::ScopesWired`, which sits between `ModifiersChecked` and
 `SignatureChecked`
 ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-lines 492-506). Wiring therefore completes before any signature is
-checked, so lookups performed while resolving declaration headers already
-see the complete sibling chain. `addSiblingScopeForContainerDecl` (declared at
+lines 492-506). The whole module is driven to `ScopesWired` before any
+declaration advances past it — the state loop at
+[slang-check-decl.cpp lines
+5244-5321](../../../../source/slang/slang-check-decl.cpp) runs
+`ensureAllDeclsRec` once per state, in order. Wiring therefore
+completes before any signature is checked, so lookups performed while
+resolving declaration headers already see the complete sibling chain.
+That ordering is intentional and user-visible: a `using` declaration
+may appear *after* the declaration whose header depends on it, and the
+header still resolves.
+
+```
+namespace NS { struct Widget { int v; }; }
+Widget makeW(int n) { Widget w; w.v = n; return w; }  // resolves
+using namespace NS;
+```
+
+`addSiblingScopeForContainerDecl` (declared at
 [slang-ast-decl.h line
 1192](../../../../source/slang/slang-ast-decl.h), called at
 [slang-check-decl.cpp line
@@ -706,7 +798,17 @@ does not pass through the `GenericDecl`.
   item failing `DeclPassesLookupMask` silently and returns the single
   survivor — no diagnostic is raised for the filtered-out candidates.
   `refineLookup` also returns its input unchanged when the input is
-  invalid or not overloaded.
+  invalid or not overloaded. Its caller in the checker is
+  `SemanticsVisitor::_resolveOverloadedExprImpl`
+  ([slang-check-expr.cpp line
+  1542](../../../../source/slang/slang-check-expr.cpp)), which is
+  handed the narrower mask by the use site; the operand of
+  `fwd_diff(...)` / `bwd_diff(...)` asks for `LookupMask::Function`
+  that way
+  ([slang-check-expr.cpp line
+  6012](../../../../source/slang/slang-check-expr.cpp)), so a
+  same-named non-function candidate is dropped there without a
+  diagnostic.
 - **Ambiguous reference at use site.** When narrowing leaves more than
   one candidate and the context needs exactly one, the checker calls
   `diagnoseAmbiguousReference`
@@ -791,8 +893,26 @@ does not pass through the `GenericDecl`.
   otherwise-valid result, the diagnosing wrapper reports
   `Diagnostics::RequiredConstraintIsNotChecked`
   ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
-  lines 1375-1394), except in language-server mode where the
-  unfiltered result is returned instead.
+  lines 1383-1402), except in language-server mode where the
+  unfiltered result is returned instead. The constraint is written
+  with `optional` after `where`
+  ([slang-parser.cpp line
+  1947](../../../../source/slang/slang-parser.cpp)), and the witness
+  it produces counts as checked only inside an enclosing `if` whose
+  predicate is an `is` test naming the same sub- and super-type
+  (`isWitnessUncheckedOptional`,
+  [slang-check-expr.cpp lines
+  1311-1355](../../../../source/slang/slang-check-expr.cpp)):
+
+  ```
+  interface IPrintable { int code(); }
+
+  int f<T>(T v) where optional T : IPrintable
+  { return v.code(); }                                 // rejected
+
+  int g<T>(T v) where optional T : IPrintable
+  { if (T is IPrintable) return v.code(); return -1; } // accepted
+  ```
 
 ## See also
 

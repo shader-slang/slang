@@ -1,19 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#specialization-and-generics
-//META: doc_section_digest=48bf733638e3eef5be6628f3f74ad4bfa6b0600b0268542423d3dd43367db05c
-//META: purpose=The specialize-arrays pass resolves a fixed-size-array generic parameter so the emit reflects the concrete N.
+//META: doc_section_digest=2f10610b6a8497f9b2cec62d411162a4585b32e9698a95e5288845967ffba16d
+//META: purpose=The specialize driver resolves a `let N : int` array-size generic parameter so the emit reflects the concrete N and no generic shape survives.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The "Specialize arrays" row of the specialization / generics
-// table (`slang-ir-specialize-arrays.cpp`) specializes array-typed
-// generic parameters. A function generic over `let N : int` is
-// observably resolved when called with `N = 4`: the inlined / emit
-// text contains the literal index range.
+// Verifies that generic-parameter substitution resolves an array-size
+// generic. `sumN<let N : int>` is called with N = 4; the CHECK asserts
+// the entry point is emitted and no `sumN` symbol survives, which only
+// holds once the generic was specialized to a concrete N and inlined.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main
 

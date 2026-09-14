@@ -1,19 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#labelstmt-breakstmt-continuestmt-and-discardstmt
-//META: doc_section_digest=783ca4610d04324a19528b2ebb2e46ebb414a710625751b56159692db3954604
+//META: doc_section_digest=7c61fa1b4009ab648f41bc90151176c2c3ef804455b39f0ca18a8fb8d9a62d07
 //META: purpose=A LabelStmt attaches a label token to an inner statement; a `BreakStmt` with a matching `targetLabel` breaks out of the labeled (non-innermost) loop rather than the innermost one.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says "BreakStmt::targetLabel optionally names the enclosing
-// labeled loop or switch to break out of. Resolution of `targetLabel`
-// to a `BreakableStmt::uniqueID` is done by the checker." We observe
-// labeled break by escaping a 2-deep loop nest from the inner loop:
-// the outer loop must not get a chance to start its second iteration.
+// Verifies a label attached to a loop can be named by `break`, so the
+// jump leaves the labeled outer loop rather than the innermost one. The
+// CHECKs assert the outer body ran once and the inner ran twice, which
+// is only reachable if the labeled break escaped both loops.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

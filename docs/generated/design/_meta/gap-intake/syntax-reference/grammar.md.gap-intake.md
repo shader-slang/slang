@@ -1,0 +1,76 @@
+---
+gap_intake_report: true
+intake_model: claude-opus-5[1m]
+intake_at: 2026-08-11T16:42:21Z
+target_doc: syntax-reference/grammar.md
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
+gap_count: 10
+actions:
+  fixed: 8
+  rejected_bogus: 0
+  rejected_out_of_scope: 0
+  deferred: 2
+  escalated_to_finding: 0
+---
+
+# Gap-intake report for syntax-reference/grammar.md
+
+## Summary
+
+Eight of the ten gaps were fixed in the document and two were deferred.
+No gap was escalated: the one `drift-from-source` row that looked like a
+compiler defect (`__require_capability` separators) turned out to be
+confirmed by the watched source itself — `AdvanceIf(parser, "+")` cannot
+match an operator token — so the document, not the compiler, was wrong,
+and the production was narrowed with a note explaining why the list form
+is unreachable. The two deferred gaps both ask for check-time facts
+(the `$for` loop variable's type and constant-bounds rule; whether an
+untyped modern parameter survives checking) whose answers live in
+`source/slang/slang-check-stmt.cpp` and `source/slang/slang-check-decl.cpp`,
+neither of which is in this document's `watched_paths`; the answers are
+recorded below so a `watched_paths` expansion can land them cheaply.
+Two further observations that no gap covered are flagged at the end.
+
+## Actions
+
+| Gap ID | Action | Evidence | Fix summary |
+| --- | --- | --- | --- |
+| 2570d305e7ce | fixed | `source/slang/core.meta.slang:2037-2041` declares `interface IFunc<TR, each TP>` with the requirement `TR operator()(expand each TP p)`; the lambda form itself is `source/slang/slang-parser.cpp:8441-8468`. The consuming shape matches the CI-run example `tests/language-feature/lambda/lambda-0.slang`. | added a note plus a two-line example under the expression grammar showing a lambda passed to an `IFunc`-typed parameter and called through `operator()` |
+| 115c5727e059 | deferred | The parser only records the absence of a type: `parseModernVarDeclBaseCommon` (`source/slang/slang-parser.cpp:4994-5012`) leaves `decl->type` unset when `':' Type` is omitted. The rejection is `ParamWithoutTypeMustHaveInitializer` at `source/slang/slang-check-decl.cpp:13933` (defined as E30621 in `source/slang/slang-diagnostics.lua:3637-3642`), i.e. the untyped form is valid only when an initializer supplies the type. Both files are outside `watched_paths`, so the claim cannot be confirmed under this document's contract; needs a `watched_paths` expansion (or the note belongs in `../pipeline/03-semantic-check.md`). | — |
+| dd12ac189d86 | fixed | `source/slang/slang-parser.cpp:1984-1998`: the reversed clause is detected by `_hasCountOfOnRightOfPackCountComparison` and diagnosed as `Diagnostics::VariadicPackCountConstraintRequiresCountofOnLeft` (line 1993), after which `_skipRestOfGenericWhereClause` discards the remainder of the clause. The numeric code and message text live in `source/slang/slang-diagnostics.lua:2021-2026`, outside `watched_paths`, so the diagnostic is named symbolically, matching how this document names `UnknownCapability` and `OperatorNameOnNonFunction`. | named the diagnostic and added that the rest of the `where` clause is skipped after it fires |
+| 202fbec095aa | fixed | `source/slang/slang-parser.cpp:1947` reads the `optional` keyword and lines 2029-2034 / 2048-2051 attach `OptionalConstraintModifier` to the conformance and equality terms; the guard requirement is the expected diagnostic of the CI test `tests/language-feature/generics/where-optional-1.slang` ("the constraint providing 'thing' is optional and must be checked with an 'is' statement before usage") and the working shape is `tests/language-feature/generics/where-optional-2.slang`. | added a minimal `where optional T : IThing` example with the `if (T is IThing)` guard |
+| c60c5946d167 | fixed | `source/slang/slang-parser.cpp:10759-10763` ("simple" modifiers, no further tokens) vs. `10831-10853` ("more complex modifiers, which allow or expect more tokens"); parens are optional in `parseIntrinsicOpModifier` (10123), `parseTargetIntrinsicModifier` (10138), `parseSpecializedForTargetModifier` (10178) and `parseImplicitConversionModifier` (10641), and mandatory in `parseGLSLExtensionModifier` (10190), `parseGLSLVersionModifier` (10201), `parseWGSLExtensionModifier` (10212), `parseSemanticVersion` (10224, used by `__spirv_version` / `__cuda_sm_version`), `parseBuiltinTypeModifier` (10555), `parseBuiltinRequirementModifier` (10566), `parseMagicTypeModifierImpl` (10586), `parseIntrinsicTypeModifier` (10624), `parseAttributeTargetModifier` (10670) and `parseLayoutModifier` (10397); `parseHitAttributeEXTModifier` (10545-10550) and `parseShared/Volatile/Coherent/Restrict/Readonly/WriteonlyModifier` (10281-10383) read nothing. Tail examples are real spellings in `source/slang/core.meta.slang` / `source/slang/hlsl.meta.slang` (`__spirv_version(1.3)`, `__glsl_extension(GL_EXT_texture_shadow_lod)`, `__magic_type(DifferentiableType)`, `__target_intrinsic(hlsl, RayDesc)`). | split `ModifierKeyword` into `BareModifierKeyword` / `TailModifierKeyword`, marked which tails are required vs. optional, and replaced `ModifierTail ::= '(' ArgList? ')'` with a per-modifier token-shape description |
+| 1b1ee9e6546d | deferred | `parseCompileTimeForStmt` (`source/slang/slang-parser.cpp:6862-6906`) creates the loop `VarDecl` with **no** type and parses both `Range` arguments as ordinary `ParseArgExpr()`s, so neither answer is in a watched path. `source/slang/slang-check-stmt.cpp:329-352` supplies them: the variable is given `int` plus a `ConstModifier`, and both bounds go through `checkExpressionAndExpectIntegerConstant(..., ConstantFoldingKind::LinkTime)` with an omitted begin defaulting to 0. Needs a `watched_paths` expansion to `slang-check-stmt.cpp` (or the note belongs in `../pipeline/03-semantic-check.md`). | — |
+| 574379db1ee4 | fixed | `parseModuleDeclarationDecl` (`source/slang/slang-parser.cpp:1384-1414`) reads exactly one `Identifier` or one `StringLiteral` and then `';'`, while the dotted spelling exists only in `parseFileReferenceDeclBase` (`source/slang/slang-parser.cpp:1337-1356`), which serves `implementing`, `import` and `__include`. | added to the `ModuleName` comment that only the `implementing` alternative and `ImportPath` reach the dotted form |
+| 8bf2be1914f4 | fixed | `parseFuncExtensionDecl` (`source/slang/slang-parser.cpp:4244-4298`): higher-order head via `tryParseUsingSyntaxDecl`, then `parseModernParamList`, optional `throws`, optional `-> Type`, optional `where`, then `parseOptBody`. The example is the shape of the CI-run test `tests/autodiff/func-extension/fwd-diff-basic.slang`; the `-experimental-feature` spelling the document already carries is confirmed at `source/slang/slang-options.cpp:1222-1225` and enforced at `source/slang/slang-check-decl.cpp:16258-16262`. | added a minimal `__func_extension fwd_diff(cube)(...)` example and noted that the parameter list is the modern one |
+| 77a45d0801b2 | fixed | `parseRequireCapabilityDecl` (`source/slang/slang-parser.cpp:4637-4659`) does contain a `AdvanceIf(parser, "+") \|\| AdvanceIf(parser, ",")` continuation, but that overload routes to `Parser::LookAheadToken(const char*)` (`source/slang/slang-parser.cpp:717-721`), which requires `token.type == TokenType::Identifier`; `+` and `,` are never `Identifier` tokens, so the branch is unreachable and the loop always falls through to `ReadToken(TokenType::Semicolon)` at 4657. The source therefore agrees with the observation, not with the old production. | narrowed the production to a single `CapabilityName`, added a note explaining why the separator branch is unreachable, and pointed multi-atom use at the statement form |
+| 22e335a751f6 | fixed | Both `':'` clauses resolve through `astBuilder->findSyntaxClass` (`source/slang/slang-parser.cpp:5227` and `5587`), i.e. against the compiler's AST node classes; worked examples come from the watched core module: `syntax constexpr : ConstExprModifier;` (`source/slang/core.meta.slang:28`) and `attribute_syntax [vk_binding(binding: int, set: int = 0)] : GLSLBindingAttribute;` (`source/slang/core.meta.slang:4381`). The gap's "core-module-only" hypothesis was **not** written: nothing gates `syntax` / `attribute_syntax` on `options.isCoreModule` (`g_parseSyntaxEntries[]`, lines 10738-10739), and `docs/generated/tests/_meta/findings/declarations-attribute-syntax-unknown-class-ice.yaml` records user code reaching `attribute_syntax`. | said what the `':'` clause may name and added one worked example of each form from `core.meta.slang` |
+
+## Notes for the operator
+
+- Blocked on source outside `watched_paths`: gaps `115c5727e059` and
+  `1b1ee9e6546d` need `source/slang/slang-check-decl.cpp` and
+  `source/slang/slang-check-stmt.cpp` respectively. Diagnostic codes and
+  message texts (used by gap `dd12ac189d86`) live in
+  `source/slang/slang-diagnostics.lua`, also unwatched — which is why
+  this document names diagnostics symbolically and no E-code was added.
+- Suspected compiler defect, no finding opened: the separator branch in
+  `parseRequireCapabilityDecl` (`source/slang/slang-parser.cpp:4652`) is
+  dead code. `AdvanceIf(parser, "+")` / `AdvanceIf(parser, ",")` compare
+  against `Identifier` token text, so `__require_capability hlsl + sm_5_0;`
+  and `__require_capability compute, sm_5_0;` both fail at the `';'`.
+  Either the branch should be deleted or it should test `TokenType::OpAdd`
+  / `TokenType::Comma`. Handled as `fixed` (the document was wrong about
+  accepted syntax) rather than `escalated-to-finding` because the watched
+  source agrees with the observed behaviour.
+- Second suspected defect, not documented: `maybeParseGenericConstraints`
+  consumes a leading `optional` for a type-coercion `where` term but never
+  attaches `OptionalConstraintModifier` to it
+  (`source/slang/slang-parser.cpp:1947` vs. `2054-2067`), unlike the
+  conformance and equality branches. The document's existing claim that
+  `optional` is "accepted" on that term stays true as written, so nothing
+  was changed.
+- Gap `8bf2be1914f4` is anchored at `#type-defining-declarations`, but
+  `FuncExtensionDecl` is defined under `### Function-style declarations`;
+  the fix landed there.
