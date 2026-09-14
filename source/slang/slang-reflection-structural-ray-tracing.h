@@ -152,7 +152,9 @@ public:
     List<RefPtr<StructuralRayTracingPayloadReflection>> payloads;
     List<RefPtr<StructuralRayTracingCallableShaderReflection>> callableShaders;
 
-    /// Metal descriptor fields in their physical argument-buffer order. Other targets have none.
+    /// Logical Metal descriptor resources. Their semantic kind and payload partition determine
+    /// the physical argument-buffer index through the shared compiler ABI mapping.
+    /// Other targets have none.
     List<DescriptorResource> descriptorResources;
 };
 

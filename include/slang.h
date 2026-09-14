@@ -2298,10 +2298,12 @@ public:                                                              \
     */
     SLANG_API size_t spReflectionTraceProgramSchema_getMetalRecordHeaderSize(
         SlangReflectionTraceProgramSchema* schema);
-    /** Get Metal program-descriptor resources in their physical argument-buffer field order.
+    /** Enumerate the resources in a compiler-synthesized Metal program descriptor.
 
     Non-Metal targets return zero resources. Each hit/miss table has a non-negative payload index;
-    callable and record resources are schema-wide and report -1.
+    callable and record resources are schema-wide and report -1. Use
+    `spReflectionTraceProgramSchema_getDescriptorResourceMetalArgumentBufferIndex` to place each
+    resource; enumeration order is not a host binding contract.
     */
     SLANG_API SlangUInt spReflectionTraceProgramSchema_getDescriptorResourceCount(
         SlangReflectionTraceProgramSchema* schema);
@@ -2310,6 +2312,15 @@ public:                                                              \
         SlangReflectionTraceProgramSchema* schema,
         SlangUInt index);
     SLANG_API SlangInt spReflectionTraceProgramSchema_getDescriptorResourcePayloadIndex(
+        SlangReflectionTraceProgramSchema* schema,
+        SlangUInt index);
+    /** Get the Metal argument-buffer `[[id]]` assigned to this descriptor resource.
+
+    The IDs are unique and densely cover `[0, resourceCount)`, but are exposed independently of
+    enumeration order so a host does not need to reproduce the compiler's field-order convention.
+    Returns -1 when `index` is out of range. Non-Metal targets expose no descriptor resources.
+    */
+    SLANG_API SlangInt spReflectionTraceProgramSchema_getDescriptorResourceMetalArgumentBufferIndex(
         SlangReflectionTraceProgramSchema* schema,
         SlangUInt index);
     /** Get the logical field name used by the synthesized Metal descriptor. */
@@ -4404,6 +4415,13 @@ struct TraceProgramSchemaReflection
     SlangInt getDescriptorResourcePayloadIndex(SlangUInt index)
     {
         return spReflectionTraceProgramSchema_getDescriptorResourcePayloadIndex(
+            (SlangReflectionTraceProgramSchema*)this,
+            index);
+    }
+    /// Returns the resource's Metal argument-buffer `[[id]]`, or -1 for an invalid resource index.
+    SlangInt getDescriptorResourceMetalArgumentBufferIndex(SlangUInt index)
+    {
+        return spReflectionTraceProgramSchema_getDescriptorResourceMetalArgumentBufferIndex(
             (SlangReflectionTraceProgramSchema*)this,
             index);
     }

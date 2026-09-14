@@ -5610,6 +5610,23 @@ SLANG_API SlangInt spReflectionTraceProgramSchema_getDescriptorResourcePayloadIn
     return SlangInt(reflectedSchema->descriptorResources[Index(index)].payloadIndex);
 }
 
+SLANG_API SlangInt spReflectionTraceProgramSchema_getDescriptorResourceMetalArgumentBufferIndex(
+    SlangReflectionTraceProgramSchema* schema,
+    SlangUInt index)
+{
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    if (!reflectedSchema || index >= SlangUInt(reflectedSchema->descriptorResources.getCount()))
+        return -1;
+    const auto& resource = reflectedSchema->descriptorResources[Index(index)];
+    // Derive the physical index from the resource's semantic identity instead of storing a second
+    // copy in reflection. Metal lowering calls the same helper, so the public value cannot drift
+    // from the layout when resource enumeration is refactored.
+    return SlangInt(getStructuralRayTracingMetalDescriptorResourceArgumentBufferIndex(
+        resource.kind,
+        resource.payloadIndex,
+        reflectedSchema->payloads.getCount()));
+}
+
 SLANG_API char const* spReflectionTraceProgramSchema_getDescriptorResourceName(
     SlangReflectionTraceProgramSchema* schema,
     SlangUInt index)
