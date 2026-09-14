@@ -971,6 +971,7 @@ static void _materializeStructuralRayTracingPayloadLocations(
 void preparePortableStructuralRayTracingEntryPoints(IRModule* module, List<IRFunc*>& ioEntryPoints)
 {
     List<StructuralRayTracingGeneratedEntryPoint> generated;
+    HashSet<IRFunc*> selectedStructuralEntryPoints;
     List<IRFunc*> structuralEntryPoints;
     for (auto inst : module->getGlobalInsts())
     {
@@ -985,32 +986,54 @@ void preparePortableStructuralRayTracingEntryPoints(IRModule* module, List<IRFun
     ioEntryPoints.clear();
     for (auto entryPoint : selectedEntryPoints)
     {
-        if (!entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+        if (entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+            selectedStructuralEntryPoints.add(entryPoint);
+        else
             ioEntryPoints.add(entryPoint);
     }
 
     for (auto entryPoint : structuralEntryPoints)
     {
         auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
-        auto stageKind = StructuralRayTracingStageKind(info->getStageKind()->getValue());
-        _generateStructuralRayTracingEntryPoint(
-            module,
-            ioEntryPoints,
-            generated,
-            stageKind,
-            info->getStageType(),
-            info->getStageSourceTypeName(),
-            info->getStageTypeIdentity(),
-            true,
-            info->getInvoke(),
-            info->getContextType(),
-            info->getPayloadType(),
-            info->getRecordType(),
-            info->getHitAttributesType(),
-            StructuralRayTracingHitAttributesKind(info->getHitAttributesKind()->getValue()),
-            info->getCallableDataType(),
-            info->getPayloadSemanticType(),
-            info->getPayloadLocation()->getValue());
+
+        // Consider a target program containing `raygenMain`, a separately selected and renamed
+        // `ClosestHit`, and a schema that also references `ClosestHit`. The immutable manifest
+        // retains all three components so payload allocation is independent of request order. A
+        // later `getEntryPointCode(0)` link therefore sees the stage's checked info while cloning
+        // the schema dependency, even though only `raygenMain` belongs to that output product.
+        //
+        // `ioEntryPoints` is the linker's exact per-product selection. Promote a logical stage to
+        // a native adapter only when that stage occurs in this list. Schema-reachable stages are
+        // synthesized after specialization from their structural trace operation, where they use
+        // schema-stable names. A standalone `getEntryPointCode()` request still lists its selected
+        // logical stage here and therefore retains its requested rename.
+        if (selectedStructuralEntryPoints.contains(entryPoint))
+        {
+            auto stageKind = StructuralRayTracingStageKind(info->getStageKind()->getValue());
+            _generateStructuralRayTracingEntryPoint(
+                module,
+                ioEntryPoints,
+                generated,
+                stageKind,
+                info->getStageType(),
+                info->getStageSourceTypeName(),
+                info->getStageTypeIdentity(),
+                true,
+                info->getInvoke(),
+                info->getContextType(),
+                info->getPayloadType(),
+                info->getRecordType(),
+                info->getHitAttributesType(),
+                StructuralRayTracingHitAttributesKind(info->getHitAttributesKind()->getValue()),
+                info->getCallableDataType(),
+                info->getPayloadSemanticType(),
+                info->getPayloadLocation()->getValue());
+        }
+
+        // Entry-point and structural-info decorations can arrive on unselected dependencies from
+        // the whole-program manifest. Their selection lifetime ends at this boundary. Later schema
+        // synthesis consumes the operation-owned entry metadata instead of these logical-stage
+        // decorations.
         if (auto entryPointDecoration = entryPoint->findDecoration<IREntryPointDecoration>())
             entryPointDecoration->removeAndDeallocate();
         info->removeAndDeallocate();
