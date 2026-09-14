@@ -86,7 +86,7 @@ void main()
 // METAL: uint device* descriptorData_{{[0-9]+}};
 // METAL: uint customHitKind_{{[0-9]+}};
 // METAL: visible_function_table<void(Schema_rayData_0 thread*, float, uint, float3, float3, uchar device*)>
-// METAL: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(
+// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(
 // METAL-SAME: Schema_rayData_0 thread* rayData_{{[0-9]+}},
 // METAL-SAME: float distance_{{[0-9]+}},
 // METAL-SAME: uint hitKind_{{[0-9]+}},

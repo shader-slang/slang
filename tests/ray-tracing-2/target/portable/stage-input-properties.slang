@@ -260,8 +260,8 @@ void main()
 // DXILLAYOUT-DAG: Intersection
 // DXILLAYOUT-DAG: Miss
 
-// The Metal emitter sanitizes the compiler-owned physical adapter name for source output.
-// METALLAYOUT-DAG: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}
+// Metal emits the compiler-owned physical adapter name exactly as reflection exposes it.
+// METALLAYOUT-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(
 // METALLAYOUT-DAG: {{\[\[intersection\(triangle,}}
 // METALLAYOUT-DAG: uint primitiveIndex_{{[0-9]+}} {{\[\[primitive_id\]\]}}
 // METALLAYOUT-DAG: uint geometryIndex_{{[0-9]+}} {{\[\[geometry_id\]\]}}

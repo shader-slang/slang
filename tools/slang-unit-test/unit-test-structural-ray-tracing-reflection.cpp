@@ -1002,12 +1002,23 @@ SLANG_UNIT_TEST(structuralRayTracingMetalTargetMetadata)
     SLANG_CHECK(triangleGroup->getClosestHitEntryPointName() != nullptr);
     SLANG_CHECK(boundingBoxGroup->getClosestHitEntryPointName() != nullptr);
     SLANG_CHECK(curveGroup->getClosestHitEntryPointName() != nullptr);
+    SLANG_CHECK(UnownedStringSlice(triangleGroup->getClosestHitEntryPointName())
+                    .startsWith("__slang_structural_rt_"));
     UnownedStringSlice code(
         (const char*)generatedCode->getBufferPointer(),
         (const char*)generatedCode->getBufferPointer() + generatedCode->getBufferSize());
-    SLANG_CHECK(
-        code.indexOf(UnownedStringSlice(triangleGroup->getClosestHitEntryPointName())) != -1);
-    SLANG_CHECK(code.indexOf(UnownedStringSlice(curveGroup->getClosestHitEntryPointName())) != -1);
+    // Include the opening parenthesis so an emitted `reflectedName_0` does not pass as a prefix.
+    // Hosts look up these functions by the reflected spelling, so the complete identifier is ABI.
+    auto containsExactFunctionName = [&](const char* name)
+    {
+        StringBuilder token;
+        token << name << "(";
+        return code.indexOf(token.getUnownedSlice()) != -1;
+    };
+    SLANG_CHECK(containsExactFunctionName(triangleGroup->getClosestHitEntryPointName()));
+    SLANG_CHECK(containsExactFunctionName(boundingBoxGroup->getClosestHitEntryPointName()));
+    SLANG_CHECK(containsExactFunctionName(curveGroup->getClosestHitEntryPointName()));
+    SLANG_CHECK(containsExactFunctionName(boundingBoxFunction->getEntryPointName()));
 
     ComPtr<slang::IMetadata> metadata;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(

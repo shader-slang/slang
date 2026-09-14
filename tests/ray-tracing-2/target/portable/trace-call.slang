@@ -74,4 +74,4 @@ void main()
 // METAL: {{\[\[kernel\]\]}} void main_0(
 // METAL-SAME: metal::raytracing::acceleration_structure
 // METAL-SAME: rt_TraceProgramDescriptorResources
-// METAL: {{\[\[visible\]\]}} void _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(
+// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(
