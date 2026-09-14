@@ -81,6 +81,10 @@ __intrinsic_op(structuralRayTracingOpenSection) void fakeOpenSectionMetadata();
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingOpenSection' is reserved for compiler use
 
+__intrinsic_op(structuralRayTracingDeferredEmptyPayload) void fakeDeferredEmptyPayloadMetadata();
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingDeferredEmptyPayload' is reserved for compiler use
+
 __intrinsic_op(structuralRayTracingTaggedConformance) void fakeTaggedConformanceMetadata();
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingTaggedConformance' is reserved for compiler use

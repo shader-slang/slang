@@ -11,6 +11,6 @@ void traceOpenSchema<Schema>(
     where Schema.TraceContext.Motion == rt::NoMotion
 {
     tracer.trace({}, scene, program);
-//CHECK:        ^ structural ray-tracing schema is not concrete and closed
-//CHECK:        ^ the three-argument 'trace' overload requires a concrete closed schema, but schema 'Schema' has an unresolved hit-group or miss-shader payload type
+//CHECK:        ^ structural ray-tracing schema is not concrete
+//CHECK:        ^ the three-argument 'trace' overload requires a concrete schema, but schema 'Schema' has an unresolved hit-group or miss-shader payload type
 }

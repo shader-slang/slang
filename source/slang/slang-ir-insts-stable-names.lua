@@ -929,5 +929,6 @@ return {
 	["Decoration.structuralRayTracingSemanticallyEmptyPayload"] = 953,
 	["Decoration.structuralRayTracingMetalPayloadMetadata"] = 954,
 	["Decoration.structuralRayTracingOpenSection"] = 955,
-	["Decoration.structuralRayTracingTaggedConformance"] = 956
+	["Decoration.structuralRayTracingTaggedConformance"] = 956,
+	["Decoration.structuralRayTracingDeferredEmptyPayload"] = 957
 }

@@ -114,6 +114,7 @@ bool isCompilerOwnedStructuralRayTracingIROp(IROp op)
     case kIROp_StructuralRayTracingSemanticallyEmptyPayloadDecoration:
     case kIROp_StructuralRayTracingMetalPayloadMetadataDecoration:
     case kIROp_StructuralRayTracingOpenSectionDecoration:
+    case kIROp_StructuralRayTracingDeferredEmptyPayloadDecoration:
     case kIROp_StructuralRayTracingTaggedConformanceDecoration:
     case kIROp_StructuralRayTracingHitGroupInfoDecoration:
     case kIROp_StructuralRayTracingMissShaderInfoDecoration:
@@ -760,6 +761,221 @@ bool completeOpenStructuralRayTracingSchemas(IRModule* module, DiagnosticSink* s
         // now roots every selected stage directly, so later per-entry linking and DCE need not
         // retain or rediscover the contributing witness tables.
         request->removeAndDeallocate();
+    }
+    return isValid;
+}
+
+struct _StructuralRayTracingEmptyPayloadCandidate
+{
+    IRType* payloadType = nullptr;
+    IRType* payloadSemanticType = nullptr;
+};
+
+static void _collectDeferredStructuralRayTracingEmptyPayloadTraces(
+    IRInst* root,
+    List<IRStructuralRayTracingTrace*>& traces)
+{
+    for (auto child = root->getFirstChild(); child; child = child->getNextInst())
+    {
+        // The first specialization pass materializes every executable trace outside its retained
+        // generic template. Resolving the template would manufacture a payload choice for an
+        // uninstantiated program and would consume generic metadata that is intentionally not a
+        // concrete linked-program identity.
+        if (as<IRGeneric>(child))
+            continue;
+
+        if (auto trace = as<IRStructuralRayTracingTrace>(child))
+        {
+            if (trace->findDecoration<IRStructuralRayTracingDeferredEmptyPayloadDecoration>())
+                traces.add(trace);
+        }
+        _collectDeferredStructuralRayTracingEmptyPayloadTraces(child, traces);
+    }
+}
+
+static void _addStructuralRayTracingEmptyPayloadCandidate(
+    _StructuralRayTracingEmptyPayloadCandidate candidate,
+    _StructuralRayTracingEmptyPayloadCandidate& first,
+    _StructuralRayTracingEmptyPayloadCandidate& second)
+{
+    if (!isSemanticallyEmptyStructuralRayTracingPayloadType(candidate.payloadType))
+        return;
+    SLANG_RELEASE_ASSERT(candidate.payloadSemanticType);
+
+    if (!first.payloadSemanticType)
+    {
+        first = candidate;
+        return;
+    }
+    if (first.payloadSemanticType == candidate.payloadSemanticType)
+    {
+        // One semantic payload identity has exactly one target representation at this phase.
+        // Hit and miss metadata may repeat that identity, but they must not reinterpret it.
+        SLANG_RELEASE_ASSERT(first.payloadType == candidate.payloadType);
+        return;
+    }
+    if (!second.payloadSemanticType)
+        second = candidate;
+}
+
+static IRStructuralRayTracingTrace* _completeDeferredStructuralRayTracingEmptyPayloadTrace(
+    IRModule* module,
+    IRStructuralRayTracingTrace* trace,
+    IRStructuralRayTracingDeferredEmptyPayloadDecoration* deferred,
+    _StructuralRayTracingEmptyPayloadCandidate payload)
+{
+    SLANG_RELEASE_ASSERT(
+        trace && deferred && payload.payloadType && payload.payloadSemanticType &&
+        as<IRVoidLit>(trace->getFallback()) && as<IRVoidLit>(trace->getFallbackArguments()) &&
+        as<IRVoidType>(trace->getPayloadType()) &&
+        as<IRVoidType>(trace->getPayloadSemanticType()) && as<IRVoidLit>(trace->getPayload()) &&
+        trace->getPayloadLocation()->getValue() < 0 &&
+        StructuralRayTracingTraceMethodKind(trace->getTraceMethodKind()->getValue()) ==
+            StructuralRayTracingTraceMethodKind::ImplicitEmptyPayload);
+
+    IRBuilder builder(module);
+    builder.setInsertBefore(trace);
+    auto payloadVariable = builder.emitVar(payload.payloadType);
+    builder.emitStore(payloadVariable, builder.emitDefaultConstruct(payload.payloadType));
+
+    auto genericArgumentsWithoutPayload = deferred->getFallbackGenericArgumentsWithoutPayload();
+    auto payloadGenericArgumentIndex =
+        Index(deferred->getPayloadGenericArgumentIndex()->getValue());
+    SLANG_RELEASE_ASSERT(
+        payloadGenericArgumentIndex >= 0 &&
+        payloadGenericArgumentIndex <= Index(genericArgumentsWithoutPayload->getOperandCount()));
+    List<IRInst*> genericArguments;
+    for (Index i = 0; i <= Index(genericArgumentsWithoutPayload->getOperandCount()); ++i)
+    {
+        if (i == payloadGenericArgumentIndex)
+            genericArguments.add(payload.payloadType);
+        if (i < Index(genericArgumentsWithoutPayload->getOperandCount()))
+            genericArguments.add(genericArgumentsWithoutPayload->getOperand(UInt(i)));
+    }
+
+    auto fallbackGeneric = deferred->getFallbackGeneric();
+    SLANG_RELEASE_ASSERT(fallbackGeneric && fallbackGeneric->getDataType());
+    auto fallbackType = as<IRType>(builder.emitSpecializeInst(
+        builder.getTypeKind(),
+        fallbackGeneric->getDataType(),
+        genericArguments));
+    SLANG_RELEASE_ASSERT(fallbackType);
+    auto fallback = builder.emitSpecializeInst(fallbackType, fallbackGeneric, genericArguments);
+
+    auto argumentsWithoutPayload = deferred->getFallbackArgumentsWithoutPayload();
+    auto payloadArgumentIndex = Index(deferred->getPayloadFallbackArgumentIndex()->getValue());
+    SLANG_RELEASE_ASSERT(
+        payloadArgumentIndex >= 0 &&
+        payloadArgumentIndex <= Index(argumentsWithoutPayload->getOperandCount()));
+    List<IRInst*> fallbackArguments;
+    for (Index i = 0; i <= Index(argumentsWithoutPayload->getOperandCount()); ++i)
+    {
+        if (i == payloadArgumentIndex)
+            fallbackArguments.add(payloadVariable);
+        if (i < Index(argumentsWithoutPayload->getOperandCount()))
+            fallbackArguments.add(argumentsWithoutPayload->getOperand(UInt(i)));
+    }
+    auto fallbackArgumentPack =
+        builder.emitMakeValuePack(fallbackArguments.getCount(), fallbackArguments.getBuffer());
+
+    // Rebuild from semantic accessors so this resolver stays independent of the trace's physical
+    // operand layout. Only the five payload-dependent fields change; the trace remains the owner
+    // of every completed entry record and of the source operation's result uses.
+    IRInst* operands[] = {
+        fallback,
+        fallbackArgumentPack,
+        trace->getProgramLayout(),
+        trace->getProgramLayoutSourceTypeName(),
+        trace->getTraceContext(),
+        payload.payloadType,
+        payload.payloadSemanticType,
+        trace->getTraceMethodKind(),
+        trace->getMotionKind(),
+        trace->getHitGroups(),
+        trace->getHitGroupTypes(),
+        trace->getMissShaders(),
+        trace->getMissShaderTypes(),
+        trace->getCallableShaders(),
+        trace->getCallableShaderTypes(),
+        trace->getTracer(),
+        trace->getDesc(),
+        trace->getAccelerationStructure(),
+        trace->getDescriptor(),
+        payloadVariable,
+        trace->getPayloadLocation(),
+    };
+    auto completedTrace = cast<IRStructuralRayTracingTrace>(builder.emitIntrinsicInst(
+        trace->getDataType(),
+        kIROp_StructuralRayTracingTrace,
+        SLANG_COUNT_OF(operands),
+        operands));
+    completedTrace->sourceLoc = trace->sourceLoc;
+
+    deferred->removeAndDeallocate();
+    trace->transferDecorationsTo(completedTrace);
+    trace->replaceUsesWith(completedTrace);
+    trace->removeAndDeallocate();
+    return completedTrace;
+}
+
+bool resolveDeferredStructuralRayTracingEmptyPayloads(IRModule* module, DiagnosticSink* sink)
+{
+    List<IRStructuralRayTracingTrace*> traces;
+    _collectDeferredStructuralRayTracingEmptyPayloadTraces(module->getModuleInst(), traces);
+
+    bool isValid = true;
+    IRBuilder builder(module);
+    for (auto trace : traces)
+    {
+        auto deferred =
+            trace->findDecoration<IRStructuralRayTracingDeferredEmptyPayloadDecoration>();
+        SLANG_RELEASE_ASSERT(deferred);
+
+        _StructuralRayTracingEmptyPayloadCandidate first;
+        _StructuralRayTracingEmptyPayloadCandidate second;
+        for (auto decoration : trace->getDecorations())
+        {
+            if (auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration))
+            {
+                _addStructuralRayTracingEmptyPayloadCandidate(
+                    {group->getPayloadType(), group->getPayloadSemanticType()},
+                    first,
+                    second);
+            }
+            else if (auto miss = as<IRStructuralRayTracingMissShaderInfoDecoration>(decoration))
+            {
+                _addStructuralRayTracingEmptyPayloadCandidate(
+                    {miss->getPayloadType(), miss->getPayloadSemanticType()},
+                    first,
+                    second);
+            }
+        }
+
+        if (!first.payloadSemanticType || second.payloadSemanticType)
+        {
+            if (!first.payloadSemanticType)
+            {
+                sink->diagnose(Diagnostics::StructuralRayTracingLinkedEmptyPayloadNotFound{
+                    .schemaType = trace->getProgramLayout(),
+                    .location = trace->sourceLoc});
+            }
+            else
+            {
+                sink->diagnose(Diagnostics::StructuralRayTracingLinkedAmbiguousEmptyPayload{
+                    .schemaType = trace->getProgramLayout(),
+                    .firstPayloadType = first.payloadSemanticType,
+                    .secondPayloadType = second.payloadSemanticType,
+                    .location = trace->sourceLoc});
+            }
+
+            builder.setInsertBefore(trace);
+            trace->replaceUsesWith(builder.getVoidValue());
+            trace->removeAndDeallocate();
+            isValid = false;
+            continue;
+        }
+
+        _completeDeferredStructuralRayTracingEmptyPayloadTrace(module, trace, deferred, first);
     }
     return isValid;
 }

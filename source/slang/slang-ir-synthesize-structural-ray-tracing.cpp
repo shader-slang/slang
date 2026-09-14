@@ -350,7 +350,7 @@ static bool _insertStructuralRayTracingEntry(
 //
 // AST-to-IR lowering puts the concrete `%MaterialRecord` type directly on each
 // `structuralRayTracingHitGroupInfo` decoration. Generic specialization runs before this file
-// validates those decorations, so a closed schema reaches this helper as basic, aggregate, enum,
+// validates those decorations, so a concrete schema reaches this helper as basic, aggregate, enum,
 // or disallowed opaque IR types rather than as source declarations that need to be rediscovered.
 // Keeping this check on those canonical decoration operands gives descriptor lowering and native
 // entry-point synthesis one target-independent contract.
@@ -662,6 +662,20 @@ bool validateStructuralRayTracingSchemaOperation(IRInst* operation, DiagnosticSi
         auto methodKind =
             StructuralRayTracingTraceMethodKind(traceOperation->getTraceMethodKind()->getValue());
         SLANG_RELEASE_ASSERT(methodKind != StructuralRayTracingTraceMethodKind::None);
+        if (methodKind == StructuralRayTracingTraceMethodKind::ImplicitEmptyPayload)
+        {
+            auto payloadPointerType =
+                as<IRPtrTypeBase>(traceOperation->getPayload()->getDataType());
+            SLANG_RELEASE_ASSERT(
+                !traceOperation
+                     ->findDecoration<IRStructuralRayTracingDeferredEmptyPayloadDecoration>() &&
+                !as<IRVoidLit>(traceOperation->getFallback()) &&
+                !as<IRVoidType>(traceOperation->getPayloadType()) &&
+                isSemanticallyEmptyStructuralRayTracingPayloadType(
+                    traceOperation->getPayloadType()) &&
+                payloadPointerType &&
+                payloadPointerType->getValueType() == traceOperation->getPayloadType());
+        }
         if (methodKind == StructuralRayTracingTraceMethodKind::ExplicitPayload &&
             isSemanticallyEmptyStructuralRayTracingPayloadType(traceOperation->getPayloadType()))
         {
@@ -2136,6 +2150,9 @@ void lowerPortableStructuralRayTracingOperations(IRModule* module, TargetRequest
         IRInst* call = nullptr;
         if (auto traceOperation = as<IRStructuralRayTracingTrace>(operation))
         {
+            SLANG_RELEASE_ASSERT(
+                !traceOperation
+                     ->findDecoration<IRStructuralRayTracingDeferredEmptyPayloadDecoration>());
             call = _emitStructuralRayTracingFallbackCall(
                 builder,
                 traceOperation->getDataType(),
