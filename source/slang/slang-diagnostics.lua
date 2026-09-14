@@ -5555,6 +5555,13 @@ err(
     "global shader parameter '~name' is not supported by the Slang interpreter (slangi), which runs on the CPU and does not support global parameters or GPU resource types; compile this program with slangc to a GPU target instead."
 )
 
+err(
+    "type-not-representable-by-interpreter",
+    52014,
+    "type not representable by the Slang interpreter",
+    span { loc = "location", message = "a value of type '~type:IRInst' is not representable by the Slang interpreter (slangi), which runs on the CPU and has no byte layout for it; use 'NativeString' for a null-terminated string, another type the interpreter supports, or compile this program with slangc to a GPU target." }
+)
+
 warning(
     "mesh-output-must-be-out",
     54001,
