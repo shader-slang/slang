@@ -68,6 +68,6 @@ void main()
     tracer.trace(desc, sceneParameters.scene, program, payload);
 }
 
-// METAL: struct SceneParameters_0
+// METAL: struct SceneParameters_default_0
 // METAL: metal::raytracing::acceleration_structure<metal::raytracing::instancing, metal::raytracing::instance_motion> scene_0;
 // METAL: metal::raytracing::intersector<metal::raytracing::instancing, metal::raytracing::instance_motion> _slang_intersector;
