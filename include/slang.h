@@ -2303,15 +2303,15 @@ public:                                                              \
     SLANG_API SlangReflectionRayTracingMissShader* spReflectionRayTracingPayload_getMissShader(
         SlangReflectionRayTracingPayload* payload,
         SlangUInt index);
-    /** Get the number of physical slots required by this payload's sparse Metal IFT.
+    /** Get the number of physical slots required by this payload's fixed-index Metal IFT.
 
-    This value can exceed the number of enumerated entries because geometry kinds use fixed
-    target-wide indices. Non-Metal targets return zero.
+    A payload with candidate logic always has generated triangle and bounding-box entries at
+    indices zero and one. It also has a curve entry at index two when the schema contains a curve
+    group. Non-Metal targets and payloads without candidate logic return zero.
     */
     SLANG_API SlangUInt spReflectionRayTracingPayload_getIntersectionFunctionTableSize(
         SlangReflectionRayTracingPayload* payload);
-    /** Enumerate the installed generated or built-in opaque functions in this payload's Metal IFT.
-     */
+    /** Enumerate the generated functions in this payload's Metal IFT. */
     SLANG_API SlangUInt spReflectionRayTracingPayload_getIntersectionFunctionCount(
         SlangReflectionRayTracingPayload* payload);
     SLANG_API SlangReflectionRayTracingIntersectionFunction*
@@ -2328,10 +2328,7 @@ public:                                                              \
     SLANG_API SlangStructuralRayTracingIntersectionFunctionImplementationKind
     spReflectionRayTracingIntersectionFunction_getImplementationKind(
         SlangReflectionRayTracingIntersectionFunction* function);
-    /** Get the exact Metal symbol for an exported function.
-
-    Returns null for the built-in opaque-triangle and opaque-curve implementations.
-    */
+    /** Get the exact Metal symbol for an exported function. */
     SLANG_API char const* spReflectionRayTracingIntersectionFunction_getEntryPointName(
         SlangReflectionRayTracingIntersectionFunction* function);
 

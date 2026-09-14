@@ -89,9 +89,9 @@ struct BoundingBoxGroup : rt::IHitGroup
 }
 
 // These two groups do not need custom candidate behavior. Once the bounding-box group activates
-// the schema's sparse IFT, reflection tells the host to install Metal's opaque triangle and curve
-// functions at fixed indices zero and two. Their `NoClosestHit` entries likewise become reflected
-// no-op functions because the payload has one real closest-hit stage.
+// the schema's IFT, the compiler still emits triangle and curve dispatchers at fixed indices zero
+// and two. Their explicit accepting arms select these groups through the record function index,
+// while both `NoClosestHit` entries reuse one reflected no-op visible function.
 struct TriangleGroup : rt::IHitGroup
 {
     typealias Context = TriangleContext;
@@ -136,10 +136,27 @@ void main()
     output[0] = payload.value;
 }
 
-// The exported bounding-box dispatcher occupies fixed IFT index one, so the generated table type
-// is large enough to preserve triangle index zero and curve index two on the host.
+// The three exported per-kind dispatchers occupy fixed IFT indices zero, one, and two. Unlike a
+// native opaque entry, each built-in dispatcher consults the runtime record function index.
 // METAL: intersection_function_table<metal::raytracing::instancing{{.*}}>
 // The visible functions comprise one miss adapter, the real bounding-box closest-hit adapter, and
-// two closest-hit placeholders that keep all three reflected hit-group indices addressable.
-// METAL-COUNT-4: {{\[\[visible\]\]}} void __slang_structural_rt_
+// one shared closest-hit placeholder installed at both placeholder function indices.
+// METAL-COUNT-3: {{\[\[visible\]\]}} void __slang_structural_rt_
+// METAL: {{\[\[}}intersection(triangle, metal::raytracing::instancing{{.*}})]]
+// METAL: default:
+// METAL: = { false, true };
+// METAL: case int(1):
+// METAL: = { true, true };
+// METAL: case 4294967295U:
+// METAL: = { true, true };
+// METAL: {{\[\[}}intersection(curve, metal::raytracing::instancing{{.*}})]]
+// METAL: default:
+// METAL: = { false, true };
+// METAL: case int(2):
+// METAL: = { true, true };
+// METAL: case 4294967295U:
+// METAL: = { true, true };
 // METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing{{.*}})]]
+// METAL: default:
+// METAL: = { false, true, 0.0f };
+// METAL: case int(0):

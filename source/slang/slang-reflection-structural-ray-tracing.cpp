@@ -680,8 +680,9 @@ static void _addMetalIntersectionFunctionReflection(
 }
 
 // Replaces portable source-stage names with the exact schema-specific Metal symbols and describes
-// the sparse IFT that the host must construct. AnyHit and Intersection do not have independently
-// bindable Metal symbols: the compiler folds them into one dispatcher per payload and geometry.
+// the fixed-index IFT that the host must construct. AnyHit and Intersection do not have
+// independently bindable Metal symbols: the compiler folds them into one dispatcher per payload
+// and geometry kind, including reject-all dispatchers for absent triangle or bounding-box kinds.
 static bool _populateMetalFunctionReflection(
     StructuralRayTracingProgramSchemaReflection* result,
     ASTBuilder* astBuilder,
@@ -698,15 +699,8 @@ static bool _populateMetalFunctionReflection(
     for (Index payloadIndex = 0; payloadIndex < result->payloads.getCount(); ++payloadIndex)
     {
         auto payload = result->payloads[payloadIndex];
-        bool hasTriangle = false;
         bool hasCurve = false;
-        bool hasBoundingBox = false;
-        bool hasTriangleDispatcher = false;
-        bool hasCurveDispatcher = false;
-        bool hasBoundingBoxDispatcher = false;
-        bool hasClosestHitTable = false;
-        for (auto group : payload->hitGroups)
-            hasClosestHitTable |= group->closestHit != nullptr;
+        bool hasCandidateLogic = false;
         for (auto group : payload->hitGroups)
         {
             auto groupSourceTypeName =
@@ -728,16 +722,15 @@ static bool _populateMetalFunctionReflection(
                         stageSourceTypeName.getUnownedSlice());
                 group->closestHitEntryPointName = group->closestHit->entryPointName;
             }
-            else if (hasClosestHitTable)
+            else
             {
-                // The logical placeholder remains absent from stage reflection, while this exact
-                // physical symbol tells the host what must fill its dense Metal VFT slot.
+                // Source reflection keeps the logical placeholder absent, while every placeholder
+                // index names the same physical no-op. A dense Metal VFT is then complete even for
+                // a payload partition whose hit groups all use `NoClosestHit`.
                 group->closestHitEntryPointName =
                     getStructuralRayTracingMetalNoOpClosestHitFunctionName(
                         schemaSourceTypeName,
-                        payloadIndex,
-                        group->functionIndex,
-                        groupSourceTypeName.getUnownedSlice());
+                        payloadIndex);
             }
             if (group->anyHit)
                 group->anyHit->entryPointName = String();
@@ -747,16 +740,14 @@ static bool _populateMetalFunctionReflection(
             switch (registry.getHitAttributesKind(group->primitiveType))
             {
             case StructuralRayTracingHitAttributesKind::Triangle:
-                hasTriangle = true;
-                hasTriangleDispatcher |= group->anyHit != nullptr;
+                hasCandidateLogic |= group->anyHit != nullptr;
                 break;
             case StructuralRayTracingHitAttributesKind::Curve:
                 hasCurve = true;
-                hasCurveDispatcher |= group->anyHit != nullptr;
+                hasCandidateLogic |= group->anyHit != nullptr;
                 break;
             case StructuralRayTracingHitAttributesKind::Custom:
-                hasBoundingBox = true;
-                hasBoundingBoxDispatcher |= group->intersection != nullptr;
+                hasCandidateLogic |= group->intersection != nullptr;
                 break;
             default:
                 return false;
@@ -775,33 +766,26 @@ static bool _populateMetalFunctionReflection(
                 stageSourceTypeName.getUnownedSlice());
         }
 
-        // A payload with no generated candidate dispatcher does not consume an IFT. Once any
-        // geometry does need one, enumerate the built-in opaque functions for other geometry
-        // kinds used by the same payload so the host can populate the fixed sparse indices.
-        if (!(hasTriangleDispatcher || hasCurveDispatcher || hasBoundingBoxDispatcher))
+        // A payload with no candidate logic does not consume an IFT. Once candidate logic exists,
+        // however, traces of that payload pass one table for every traversed geometry. Always
+        // expose exported triangle and bounding-box dispatchers at indices zero and one: a kind
+        // absent from the schema is implemented by a reject-all stub, preventing an unrelated
+        // record function index from silently accepting a candidate of the wrong primitive kind.
+        if (!hasCandidateLogic)
             continue;
-        if (hasTriangle)
-        {
-            _addMetalIntersectionFunctionReflection(
-                payload,
-                schemaSourceTypeName,
-                payloadIndex,
-                StructuralRayTracingMetalCandidateKind::Triangle,
-                hasTriangleDispatcher
-                    ? StructuralRayTracingMetalIntersectionFunctionImplementationKind::
-                          ExportedFunction
-                    : StructuralRayTracingMetalIntersectionFunctionImplementationKind::
-                          OpaqueTriangle);
-        }
-        if (hasBoundingBox && hasBoundingBoxDispatcher)
-        {
-            _addMetalIntersectionFunctionReflection(
-                payload,
-                schemaSourceTypeName,
-                payloadIndex,
-                StructuralRayTracingMetalCandidateKind::BoundingBox,
-                StructuralRayTracingMetalIntersectionFunctionImplementationKind::ExportedFunction);
-        }
+
+        _addMetalIntersectionFunctionReflection(
+            payload,
+            schemaSourceTypeName,
+            payloadIndex,
+            StructuralRayTracingMetalCandidateKind::Triangle,
+            StructuralRayTracingMetalIntersectionFunctionImplementationKind::ExportedFunction);
+        _addMetalIntersectionFunctionReflection(
+            payload,
+            schemaSourceTypeName,
+            payloadIndex,
+            StructuralRayTracingMetalCandidateKind::BoundingBox,
+            StructuralRayTracingMetalIntersectionFunctionImplementationKind::ExportedFunction);
         if (hasCurve)
         {
             _addMetalIntersectionFunctionReflection(
@@ -809,10 +793,7 @@ static bool _populateMetalFunctionReflection(
                 schemaSourceTypeName,
                 payloadIndex,
                 StructuralRayTracingMetalCandidateKind::Curve,
-                hasCurveDispatcher
-                    ? StructuralRayTracingMetalIntersectionFunctionImplementationKind::
-                          ExportedFunction
-                    : StructuralRayTracingMetalIntersectionFunctionImplementationKind::OpaqueCurve);
+                StructuralRayTracingMetalIntersectionFunctionImplementationKind::ExportedFunction);
         }
     }
 

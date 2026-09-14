@@ -1032,15 +1032,6 @@ SLANG_UNIT_TEST(structuralRayTracingMetalTargetMetadata)
             typealias Record = void;
         }
 
-        struct BoundingBoxClosestHit : rt::IClosestHitShader
-        {
-            typealias Context = BoundingBoxContext;
-            void invoke(rt::ClosestHitInput<Context> input)
-            {
-                input.payload.value = input.attributes.value;
-            }
-        }
-
         struct BoundingBoxIntersection : rt::IIntersectionShader
         {
             typealias Context = BoundingBoxContext;
@@ -1062,7 +1053,7 @@ SLANG_UNIT_TEST(structuralRayTracingMetalTargetMetadata)
         struct BoundingBoxGroup : rt::IHitGroup
         {
             typealias Context = BoundingBoxContext;
-            typealias ClosestHit = BoundingBoxClosestHit;
+            typealias ClosestHit = rt::NoClosestHit<Context>;
             typealias AnyHit = rt::NoAnyHit<Context>;
             typealias Intersection = BoundingBoxIntersection;
         }
@@ -1156,8 +1147,9 @@ SLANG_UNIT_TEST(structuralRayTracingMetalTargetMetadata)
     auto payload = schema->getPayload(0);
     SLANG_CHECK_ABORT(payload != nullptr);
 
-    // Activating the bounding-box dispatcher makes the Metal IFT sparse but complete: the plain
-    // triangle and curve slots are represented by opaque built-ins at their fixed target indices.
+    // Activating bounding-box candidate logic generates fixed-index dispatchers for every geometry
+    // kind this payload may encounter. Triangle and curve have explicit accepting arms for the
+    // schema's fixed-function groups; no host-authored opaque function bypasses record selection.
     SLANG_CHECK(payload->getIntersectionFunctionTableSize() == 3);
     SLANG_CHECK(payload->getIntersectionFunctionCount() == 3);
     auto triangleFunction = payload->getIntersectionFunction(0);
@@ -1167,8 +1159,8 @@ SLANG_UNIT_TEST(structuralRayTracingMetalTargetMetadata)
     SLANG_CHECK(triangleFunction->getIntersectionFunctionTableIndex() == 0);
     SLANG_CHECK(
         triangleFunction->getImplementationKind() ==
-        SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_OPAQUE_TRIANGLE);
-    SLANG_CHECK(triangleFunction->getEntryPointName() == nullptr);
+        SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_EXPORTED_FUNCTION);
+    SLANG_CHECK(triangleFunction->getEntryPointName() != nullptr);
     SLANG_CHECK(boundingBoxFunction->getIntersectionFunctionTableIndex() == 1);
     SLANG_CHECK(
         boundingBoxFunction->getImplementationKind() ==
@@ -1177,21 +1169,27 @@ SLANG_UNIT_TEST(structuralRayTracingMetalTargetMetadata)
     SLANG_CHECK(curveFunction->getIntersectionFunctionTableIndex() == 2);
     SLANG_CHECK(
         curveFunction->getImplementationKind() ==
-        SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_OPAQUE_CURVE);
-    SLANG_CHECK(curveFunction->getEntryPointName() == nullptr);
+        SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_EXPORTED_FUNCTION);
+    SLANG_CHECK(curveFunction->getEntryPointName() != nullptr);
 
-    // Source reflection keeps `NoClosestHit` absent. The group-level physical name nevertheless
-    // exposes the signature-compatible no-op that must occupy each placeholder slot in the dense
-    // Metal closest-hit VFT.
+    // Source reflection keeps `NoClosestHit` absent. This schema has no real closest-hit stage, but
+    // every group still reflects the same signature-compatible no-op so its dense VFT has no hole.
     auto triangleGroup = payload->getHitGroup(0);
     auto boundingBoxGroup = payload->getHitGroup(1);
     auto curveGroup = payload->getHitGroup(2);
     SLANG_CHECK_ABORT(triangleGroup && boundingBoxGroup && curveGroup);
     SLANG_CHECK(triangleGroup->getClosestHit() == nullptr);
+    SLANG_CHECK(boundingBoxGroup->getClosestHit() == nullptr);
     SLANG_CHECK(curveGroup->getClosestHit() == nullptr);
     SLANG_CHECK(triangleGroup->getClosestHitEntryPointName() != nullptr);
     SLANG_CHECK(boundingBoxGroup->getClosestHitEntryPointName() != nullptr);
     SLANG_CHECK(curveGroup->getClosestHitEntryPointName() != nullptr);
+    SLANG_CHECK(
+        UnownedStringSlice(triangleGroup->getClosestHitEntryPointName()) ==
+        boundingBoxGroup->getClosestHitEntryPointName());
+    SLANG_CHECK(
+        UnownedStringSlice(triangleGroup->getClosestHitEntryPointName()) ==
+        curveGroup->getClosestHitEntryPointName());
     SLANG_CHECK(UnownedStringSlice(triangleGroup->getClosestHitEntryPointName())
                     .startsWith("__slang_structural_rt_"));
     UnownedStringSlice code(
@@ -1206,9 +1204,9 @@ SLANG_UNIT_TEST(structuralRayTracingMetalTargetMetadata)
         return code.indexOf(token.getUnownedSlice()) != -1;
     };
     SLANG_CHECK(containsExactFunctionName(triangleGroup->getClosestHitEntryPointName()));
-    SLANG_CHECK(containsExactFunctionName(boundingBoxGroup->getClosestHitEntryPointName()));
-    SLANG_CHECK(containsExactFunctionName(curveGroup->getClosestHitEntryPointName()));
+    SLANG_CHECK(containsExactFunctionName(triangleFunction->getEntryPointName()));
     SLANG_CHECK(containsExactFunctionName(boundingBoxFunction->getEntryPointName()));
+    SLANG_CHECK(containsExactFunctionName(curveFunction->getEntryPointName()));
 
     ComPtr<slang::IMetadata> metadata;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(

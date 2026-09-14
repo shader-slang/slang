@@ -102,7 +102,7 @@ public:
     /// Native host pipeline ABI requirement for this payload, in bytes.
     size_t nativePayloadSize = 0;
 
-    /// Number of physical slots required by this payload's sparse Metal IFT.
+    /// Number of physical slots required by this payload's fixed-index Metal IFT.
     Index intersectionFunctionTableSize = 0;
     List<RefPtr<StructuralRayTracingIntersectionFunctionReflection>> intersectionFunctions;
 
