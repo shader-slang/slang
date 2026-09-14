@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -experimental-feature -no-codegen
 
 import slang.raytracing;
 
@@ -64,6 +64,17 @@ struct ListedCallable : rt::ICallableShader
 {
     typealias Context = CallableContext;
     void invoke(rt::CallableInput<Context> input) {}
+}
+
+// The declaration of a generic schema cannot know whether its eventual tag argument names an
+// interface. Validation is deferred until specialization makes this type concrete.
+struct GenericSchema<Tag> : rt::ITraceProgramSchema
+    where Tag : rt::IHitGroup
+{
+    typealias TraceContext = ::TraceContext;
+    typealias HitGroups = rt::OpenHitGroups<Tag>;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::NoCallableShaders;
 }
 
 struct InvalidSchema : rt::ITraceProgramSchema

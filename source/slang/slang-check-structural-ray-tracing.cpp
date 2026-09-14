@@ -141,26 +141,92 @@ void SemanticsVisitor::registerStructuralRayTracingStageConformance(
         stageKind);
 }
 
-static const char* _getStructuralRayTracingSchemaSectionName(
+struct _StructuralRayTracingSchemaSectionInfo
+{
+    StructuralRayTracingSectionKind kind = StructuralRayTracingSectionKind::Count;
+    const char* name = nullptr;
+    const char* entryInterfaceName = nullptr;
+};
+
+static bool _tryGetStructuralRayTracingSchemaSectionInfo(
     const StructuralRayTracingDeclRegistry& registry,
-    AssocTypeDecl* requirement)
+    AssocTypeDecl* requirement,
+    _StructuralRayTracingSchemaSectionInfo& outInfo)
 {
     if (requirement == registry.getAssociatedTypeRequirement(
                            StructuralRayTracingAssociatedTypeKind::ProgramHitGroups))
     {
-        return "hit-group";
+        outInfo = {StructuralRayTracingSectionKind::HitGroups, "hit-group", "IHitGroup"};
+        return true;
     }
     if (requirement == registry.getAssociatedTypeRequirement(
                            StructuralRayTracingAssociatedTypeKind::ProgramMissShaders))
     {
-        return "miss-shader";
+        outInfo = {StructuralRayTracingSectionKind::MissShaders, "miss-shader", "IMissShader"};
+        return true;
     }
     if (requirement == registry.getAssociatedTypeRequirement(
                            StructuralRayTracingAssociatedTypeKind::ProgramCallableShaders))
     {
-        return "callable-shader";
+        outInfo = {
+            StructuralRayTracingSectionKind::CallableShaders,
+            "callable-shader",
+            "ICallableShader"};
+        return true;
     }
-    return nullptr;
+    return false;
+}
+
+void SemanticsVisitor::diagnoseInvalidStructuralRayTracingOpenSectionTag(
+    Type* entryListType,
+    AssocTypeDecl* associatedTypeRequirement,
+    Decl* satisfyingDecl)
+{
+    auto& registry = getLinkage()->getStructuralRayTracingDeclRegistry();
+    if (!registry.isInitialized())
+        return;
+
+    _StructuralRayTracingSchemaSectionInfo section;
+    if (!_tryGetStructuralRayTracingSchemaSectionInfo(registry, associatedTypeRequirement, section))
+    {
+        return;
+    }
+
+    SLANG_RELEASE_ASSERT(entryListType && satisfyingDecl);
+    StructuralRayTracingOpenSectionInfo openSection;
+    if (!registry.tryGetOpenSectionInfo(
+            getASTBuilder(),
+            entryListType->getCanonicalType(),
+            section.kind,
+            openSection))
+    {
+        return;
+    }
+
+    auto tagType = openSection.tagType->getCanonicalType();
+    auto tagDeclRefType = as<DeclRefType>(tagType);
+    auto tagDecl = tagDeclRefType ? tagDeclRefType->getDeclRef().getDecl() : nullptr;
+    if (tagDecl && (isGenericParam(tagDecl) || as<GlobalGenericParamDecl>(tagDecl) ||
+                    as<AssocTypeDecl>(tagDecl) || as<ThisTypeDecl>(tagDecl)))
+    {
+        // A generic schema can defer the tag's exact declaration until specialization. The IR
+        // request retains the checked substituted type and diagnoses a non-interface argument at
+        // the target link where that type becomes concrete.
+        return;
+    }
+    if (as<ErrorType>(tagType) ||
+        (tagDeclRefType && tagDeclRefType->getDeclRef().as<InterfaceDecl>()))
+        return;
+
+    // `OpenHitGroups<ConcreteHit>` satisfies the ordinary `Tag : IHitGroup` generic constraint,
+    // but it cannot discover other conformers because a concrete type is not an interface tag.
+    // Diagnose that complete source contract while its associated-type declaration still provides
+    // a precise location. Generic substitutions retain the IR validation above as their backstop.
+    getSink()->diagnose(Diagnostics::StructuralRayTracingOpenTagNotEntryInterface{
+        .section = section.name,
+        .tag = tagType,
+        .entryInterface = section.entryInterfaceName,
+        .location = satisfyingDecl->loc});
 }
 
 void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
@@ -173,8 +239,8 @@ void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
     if (!registry.isInitialized())
         return;
 
-    auto section = _getStructuralRayTracingSchemaSectionName(registry, associatedTypeRequirement);
-    if (!section)
+    _StructuralRayTracingSchemaSectionInfo section;
+    if (!_tryGetStructuralRayTracingSchemaSectionInfo(registry, associatedTypeRequirement, section))
         return;
 
     SLANG_RELEASE_ASSERT(entryListType && schemaType && satisfyingDecl);
@@ -204,7 +270,7 @@ void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
             continue;
 
         getSink()->diagnose(Diagnostics::DuplicateStructuralRayTracingEntry{
-            .section = section,
+            .section = section.name,
             .entry = entryType,
             .schema = schemaType->getCanonicalType(),
             .location = satisfyingDecl->loc});

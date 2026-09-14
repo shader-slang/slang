@@ -6454,6 +6454,10 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
             return false;
     }
 
+    diagnoseInvalidStructuralRayTracingOpenSectionTag(
+        satisfyingType,
+        requiredAssociatedTypeDeclRef.getDecl(),
+        satisfyingDecl);
     diagnoseDuplicateStructuralRayTracingSchemaEntries(
         satisfyingType,
         requiredAssociatedTypeDeclRef.getDecl(),

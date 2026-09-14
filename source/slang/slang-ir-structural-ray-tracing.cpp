@@ -740,7 +740,7 @@ bool completeOpenStructuralRayTracingSchemas(IRModule* module, DiagnosticSink* s
             if ((diagnosedKinds & kindBit) == 0)
             {
                 diagnosedKinds |= kindBit;
-                sink->diagnose(Diagnostics::StructuralRayTracingOpenTagNotEntryInterface{
+                sink->diagnose(Diagnostics::StructuralRayTracingOpenTagNotEntryInterfaceIr{
                     .section = _getStructuralRayTracingSectionDiagnosticName(kind),
                     .tag = request->getTagType(),
                     .entryInterface = _getStructuralRayTracingSectionEntryInterfaceName(kind),

@@ -1221,6 +1221,12 @@ SLANG_UNIT_TEST(structuralRayTracingOpenSchemaReflection)
             typealias Motion = rt::NoMotion;
         }
 
+        public struct OtherTraceContext : rt::ITraceContext
+        {
+            typealias AccelerationStructure = rt::AccelerationStructure;
+            typealias Motion = rt::NoMotion;
+        }
+
         public typealias CommonTraceContext = TraceContext;
         public typealias CommonCallableData = CallableData;
 
@@ -1235,6 +1241,14 @@ SLANG_UNIT_TEST(structuralRayTracingOpenSchemaReflection)
         public struct LinkedHitContext : rt::IHitContext
         {
             typealias TraceContext = CommonTraceContext;
+            typealias Payload = LinkedPayload;
+            typealias Primitive = rt::TrianglePrimitive;
+            typealias Record = LinkedRecord;
+        }
+
+        public struct MismatchedHitContext : rt::IHitContext
+        {
+            typealias TraceContext = OtherTraceContext;
             typealias Payload = LinkedPayload;
             typealias Primitive = rt::TrianglePrimitive;
             typealias Record = LinkedRecord;
@@ -1269,6 +1283,7 @@ SLANG_UNIT_TEST(structuralRayTracingOpenSchemaReflection)
         }
 
         public interface IHitTag : rt::IHitGroup {}
+        public interface IMismatchedHitTag : rt::IHitGroup {}
         public interface IMissTag : rt::IMissShader {}
         public interface ICallableTag : rt::ICallableShader {}
     )";
@@ -1314,6 +1329,14 @@ SLANG_UNIT_TEST(structuralRayTracingOpenSchemaReflection)
             typealias MissShaders = rt::OpenMissShaders<IMissTag, ListedMiss>;
             typealias CallableShaders = rt::OpenCallableShaders<ICallableTag, ListedCallable>;
         }
+
+        public struct MismatchedSchema : rt::ITraceProgramSchema
+        {
+            typealias TraceContext = SchemaTraceContext;
+            typealias HitGroups = rt::OpenHitGroups<IMismatchedHitTag>;
+            typealias MissShaders = rt::NoMissShaders;
+            typealias CallableShaders = rt::NoCallableShaders;
+        }
     )";
 
     const char* pluginSource = R"(
@@ -1332,6 +1355,14 @@ SLANG_UNIT_TEST(structuralRayTracingOpenSchemaReflection)
         {
             typealias Context = LinkedHitContext;
             typealias ClosestHit = LinkedClosestHit;
+            typealias AnyHit = rt::NoAnyHit<Context>;
+            typealias Intersection = rt::NoIntersection<Context>;
+        }
+
+        struct MismatchedHitGroup : IMismatchedHitTag
+        {
+            typealias Context = MismatchedHitContext;
+            typealias ClosestHit = rt::NoClosestHit<Context>;
             typealias AnyHit = rt::NoAnyHit<Context>;
             typealias Intersection = rt::NoIntersection<Context>;
         }
@@ -1461,6 +1492,12 @@ SLANG_UNIT_TEST(structuralRayTracingOpenSchemaReflection)
     // The completed schema is cached on the ordinary program layout, so repeated host queries do
     // not relink or construct a second reflection object.
     SLANG_CHECK(layout->findTraceProgramSchema("Schema") == schema);
+
+    // This second schema is valid in its defining module, but the composed plugin contributes a
+    // hit group with a different trace context. The pointer-only reflection query must not publish
+    // that invalid finalized schema. It cannot return the link-time diagnostic; the corresponding
+    // code-generation diagnostic is covered by open-schema-trace-context-mismatch.slang.
+    SLANG_CHECK(layout->findTraceProgramSchema("MismatchedSchema") == nullptr);
 }
 
 SLANG_UNIT_TEST(structuralRayTracingInvalidOpenSchemaManifestIsNotCached)
