@@ -1915,17 +1915,18 @@ Result linkAndOptimizeIR(
     if (target != CodeGenTarget::Metal &&
         requiredLoweringPassSet.structuralRayTracingProgramDescriptor)
     {
-        // The schema operand has served its target-independent specialization role. A portable
-        // trace selects the host-owned native SBT and therefore has no shader-visible descriptor
-        // storage. Erasing the type here also erases descriptors retained by a surrounding global
-        // parameter layout; lowering to the source ParameterBlock shape would leak Slang-only
-        // syntax into HLSL passed to DXC.
+        // The schema operand has served its target-independent specialization role. D3D tracing
+        // selects the host-owned native SBT and therefore has no shader-visible descriptor
+        // storage. Erasing the type also erases descriptors retained by global-parameter layout
+        // metadata; lowering those to the source ParameterBlock shape would leak Slang-only syntax
+        // into HLSL passed to DXC. Other portable targets retain that source shape until their
+        // existing target-specific global-context/resource lowering has consumed it.
         Dictionary<IRType*, IRType*> noTargetDescriptorTypes;
         IRBuilder builder(irModule);
         SLANG_PASS(
             lowerStructuralRayTracingProgramDescriptorTypes,
             noTargetDescriptorTypes,
-            builder.getVoidType());
+            isD3DTarget(targetRequest) ? builder.getVoidType() : nullptr);
     }
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
