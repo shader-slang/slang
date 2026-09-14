@@ -35,5 +35,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // WGSL: [[I]] = [[I]] + u32(1);
 // WGSL-NEXT: continue;
 // WGSL: break;
+// WGSL: [[I]] = [[I]] + u32(1);
 
 // SPIRV: OpEntryPoint GLCompute
+// SPIRV: OpLoopMerge
