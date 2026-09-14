@@ -667,6 +667,156 @@ void runStructuralRayTracingRepeatedRecords(IDevice* device)
     }
 }
 
+void runStructuralRayTracingSelectorAddressing(IDevice* device)
+{
+    if (!device->hasFeature(Feature::RayTracing))
+    {
+        SLANG_IGNORE_TEST;
+    }
+
+    auto queue = device->getQueue(QueueType::Graphics);
+    SLANG_CHECK_ABORT(queue != nullptr);
+    constexpr uint32_t kInstanceContribution = 1;
+    StructuralRayTracingTwoGeometryTriangleScene scene(device, queue, kInstanceContribution);
+
+    auto slangSession = device->getSlangSession();
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(
+        slangSession->loadModule("sbt-selector-addressing", diagnostics.writeRef()));
+    diagnoseIfNeeded(diagnostics);
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto schema = module->getLayout()->findTraceProgramSchema("Schema");
+    SLANG_CHECK_ABORT(schema != nullptr);
+    SLANG_CHECK_ABORT(schema->getPayloadCount() == 1);
+    auto payload = schema->getPayload(0);
+    SLANG_CHECK_ABORT(payload != nullptr);
+    SLANG_CHECK_ABORT(payload->getHitGroupCount() == 1);
+    SLANG_CHECK_ABORT(payload->getMissShaderCount() == 1);
+
+    auto reflectedHitGroup = payload->getHitGroup(0);
+    auto reflectedMissShader = payload->getMissShader(0);
+    auto reflectedClosestHit = reflectedHitGroup ? reflectedHitGroup->getClosestHit() : nullptr;
+    auto reflectedMiss = reflectedMissShader ? reflectedMissShader->getMiss() : nullptr;
+    SLANG_CHECK_ABORT(reflectedClosestHit != nullptr);
+    SLANG_CHECK_ABORT(reflectedMiss != nullptr);
+    auto hitFunctionIndex = reflectedHitGroup->getFunctionIndex();
+    auto missFunctionIndex = reflectedMissShader->getFunctionIndex();
+    SLANG_CHECK_ABORT(hitFunctionIndex == 0);
+    SLANG_CHECK_ABORT(missFunctionIndex == 0);
+
+    const char* closestHitEntryPointName = reflectedClosestHit->getEntryPointName();
+    const char* missEntryPointName = reflectedMiss->getEntryPointName();
+    SLANG_CHECK_ABORT(closestHitEntryPointName != nullptr);
+    SLANG_CHECK_ABORT(missEntryPointName != nullptr);
+    const EntryDesc kEntries[] = {
+        {"main", SLANG_STAGE_RAY_GENERATION},
+        {closestHitEntryPointName, SLANG_STAGE_CLOSEST_HIT},
+        {missEntryPointName, SLANG_STAGE_MISS},
+    };
+    ComPtr<IShaderProgram> program;
+    GFX_CHECK_CALL_ABORT(
+        loadProgram(device, module, kEntries, SLANG_COUNT_OF(kEntries), program.writeRef()));
+
+    // Reflection identifies the structural shader once. The host assigns that function a native
+    // hit-group name and is then free to place the group in many physical records.
+    static const char* kNativeHitGroupNames[] = {"selectorHitFunction"};
+    const char* reflectedMissEntryPointNames[] = {missEntryPointName};
+    HitGroupDesc hitGroup = {};
+    hitGroup.hitGroupName = kNativeHitGroupNames[hitFunctionIndex];
+    hitGroup.closestHitEntryPoint = closestHitEntryPointName;
+
+    RayTracingPipelineDesc pipelineDesc = {};
+    pipelineDesc.program = program;
+    pipelineDesc.hitGroups = &hitGroup;
+    pipelineDesc.hitGroupCount = 1;
+    pipelineDesc.maxRecursion = 1;
+    pipelineDesc.maxRayPayloadSize = sizeof(uint32_t) * 3;
+    pipelineDesc.maxAttributeSizeInBytes = sizeof(float) * 2;
+
+    ComPtr<IRayTracingPipeline> pipeline;
+    GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
+
+    static const char* kRayGenerationNames[] = {"main"};
+    const char* hitGroupNames[5] = {};
+    uint32_t hitRecordValues[5] = {};
+    ShaderRecordData hitRecords[5] = {};
+    for (Index i = 0; i < SLANG_COUNT_OF(hitGroupNames); ++i)
+    {
+        hitGroupNames[i] = kNativeHitGroupNames[hitFunctionIndex];
+        hitRecordValues[i] = 100 + uint32_t(i);
+        hitRecords[i] = {&hitRecordValues[i], sizeof(hitRecordValues[i])};
+    }
+
+    const char* missNames[2] = {
+        reflectedMissEntryPointNames[missFunctionIndex],
+        reflectedMissEntryPointNames[missFunctionIndex],
+    };
+    uint32_t missRecordValues[2] = {200, 201};
+    ShaderRecordData missRecords[2] = {
+        {&missRecordValues[0], sizeof(missRecordValues[0])},
+        {&missRecordValues[1], sizeof(missRecordValues[1])},
+    };
+
+    // The shader sets sbtOffset=1 and sbtStride=2. Combined with the TLAS contribution above, the
+    // native formula selects hit records 2 and 4:
+    //
+    //     instanceContribution + geometryIndex * sbtStride + sbtOffset
+    //     1                    + {0, 1}        * 2         + 1
+    //
+    // Every physical record has unique data so a backend cannot accidentally omit one term and
+    // still pass. The miss ray independently verifies the shader's nonzero missIndex of one.
+    ShaderTableDesc shaderTableDesc = {};
+    shaderTableDesc.program = program;
+    shaderTableDesc.rayGenShaderCount = SLANG_COUNT_OF(kRayGenerationNames);
+    shaderTableDesc.rayGenShaderEntryPointNames = kRayGenerationNames;
+    shaderTableDesc.missShaderCount = SLANG_COUNT_OF(missNames);
+    shaderTableDesc.missShaderEntryPointNames = missNames;
+    shaderTableDesc.missShaderRecordData = missRecords;
+    shaderTableDesc.hitGroupCount = SLANG_COUNT_OF(hitGroupNames);
+    shaderTableDesc.hitGroupNames = hitGroupNames;
+    shaderTableDesc.hitGroupRecordData = hitRecords;
+
+    ComPtr<IShaderTable> shaderTable;
+    GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
+
+    BufferDesc resultDesc = {};
+    resultDesc.size = sizeof(StructuralRayTracingSelectorAddressingResult) * 3;
+    resultDesc.elementSize = sizeof(StructuralRayTracingSelectorAddressingResult);
+    resultDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::CopySource;
+    resultDesc.defaultState = ResourceState::UnorderedAccess;
+    auto results = device->createBuffer(resultDesc);
+    SLANG_CHECK_ABORT(results != nullptr);
+
+    auto commandEncoder = queue->createCommandEncoder();
+    auto passEncoder = commandEncoder->beginRayTracingPass();
+    auto rootObject = passEncoder->bindPipeline(pipeline, shaderTable);
+    ShaderCursor root(rootObject);
+    GFX_CHECK_CALL_ABORT(root["scene"].setBinding(Binding(scene.topLevel)));
+    GFX_CHECK_CALL_ABORT(root["results"].setBinding(Binding(results)));
+    passEncoder->dispatchRays(0, 3, 1, 1);
+    passEncoder->end();
+    GFX_CHECK_CALL_ABORT(queue->submit(commandEncoder->finish()));
+    GFX_CHECK_CALL_ABORT(queue->waitOnHost());
+
+    ComPtr<ISlangBlob> resultBlob;
+    GFX_CHECK_CALL_ABORT(device->readBuffer(results, 0, resultDesc.size, resultBlob.writeRef()));
+    auto actual = static_cast<const StructuralRayTracingSelectorAddressingResult*>(
+        resultBlob->getBufferPointer());
+    static const StructuralRayTracingSelectorAddressingResult kExpected[] = {
+        {10, 102, 0, 3},
+        {10, 104, 1, 3},
+        {20, 201, 0xffffffff, 3},
+    };
+    for (Index i = 0; i < SLANG_COUNT_OF(kExpected); ++i)
+    {
+        SLANG_CHECK(actual[i].stage == kExpected[i].stage);
+        SLANG_CHECK(actual[i].recordValue == kExpected[i].recordValue);
+        SLANG_CHECK(actual[i].geometryIndex == kExpected[i].geometryIndex);
+        SLANG_CHECK(actual[i].dispatchWidth == kExpected[i].dispatchWidth);
+    }
+}
+
 void runStructuralRayTracingMultiplePayloads(IDevice* device)
 {
     if (!device->hasFeature(Feature::RayTracing))

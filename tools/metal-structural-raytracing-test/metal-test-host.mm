@@ -967,6 +967,90 @@ bool runRepeatedRecords(
         uint32_t(SLANG_COUNT_OF(kExpected)));
 }
 
+bool runSelectorAddressing(
+    slang::IGlobalSession* globalSession,
+    id<MTLDevice> device,
+    id<MTLCommandQueue> queue,
+    NSString* repositoryRoot)
+{
+    ProgramDescription description = {
+        "tests/ray-tracing-2/runtime/shaders/sbt-selector-addressing.slang",
+        "Schema"};
+    NativeProgram program = {};
+    if (!createProgram(globalSession, device, repositoryRoot, description, program))
+        return false;
+
+    MetalRayTracingScene scene = {};
+    NSString* sceneError = nil;
+    if (!buildMetalTwoGeometryTriangleScene(device, queue, scene, &sceneError))
+        return fail(sceneError);
+
+    const uint32_t instanceHitGroupOffset = 1;
+    const uint32_t hitRecordValues[] = {100, 101, 102, 103, 104};
+    const uint32_t missRecordValues[] = {200, 201};
+    // Metal's instance descriptor offset selects an intersection function, so the structural ABI
+    // carries the native SBT instance contribution in this reflected records buffer instead. The
+    // compiler indexes this one-element table with the traversal result's instance ID before
+    // adding the shader's geometry-stride and ray-offset terms.
+    const RecordInitializer recordsToWrite[] = {
+        {RecordSection::Hit, 0, 0, 0, &hitRecordValues[0], sizeof(uint32_t)},
+        {RecordSection::Hit, 1, 0, 0, &hitRecordValues[1], sizeof(uint32_t)},
+        {RecordSection::Hit, 2, 0, 0, &hitRecordValues[2], sizeof(uint32_t)},
+        {RecordSection::Hit, 3, 0, 0, &hitRecordValues[3], sizeof(uint32_t)},
+        {RecordSection::Hit, 4, 0, 0, &hitRecordValues[4], sizeof(uint32_t)},
+        {RecordSection::Miss, 0, 0, 0, &missRecordValues[0], sizeof(uint32_t)},
+        {RecordSection::Miss, 1, 0, 0, &missRecordValues[1], sizeof(uint32_t)},
+    };
+    const RecordBufferDescription recordDescription = {
+        &instanceHitGroupOffset,
+        1,
+        recordsToWrite,
+        uint32_t(SLANG_COUNT_OF(recordsToWrite)),
+    };
+    id<MTLBuffer> records = createRecords(device, program, recordDescription);
+    if (!records)
+        return false;
+    id<MTLBuffer> programResources = createProgramResourceBuffer(device, program, records);
+
+    // With instanceContribution=1, sbtStride=2, and sbtOffset=1, geometry IDs zero and one must
+    // read hit records two and four. The miss ray must independently read miss record one.
+    static const uint32_t kExpected[] = {
+        10,
+        102,
+        0,
+        3,
+        10,
+        104,
+        1,
+        3,
+        20,
+        201,
+        UINT32_MAX,
+        3,
+    };
+    id<MTLBuffer> results = [device newBufferWithLength:sizeof(kExpected)
+                                                options:MTLResourceStorageModeShared];
+    if (!dispatch(
+            device,
+            queue,
+            program,
+            scene.instanceAccelerationStructure,
+            programResources,
+            records,
+            results,
+            3,
+            false,
+            false))
+    {
+        return false;
+    }
+    return validateResults(
+        "sbt-selector-addressing",
+        results,
+        kExpected,
+        uint32_t(SLANG_COUNT_OF(kExpected)));
+}
+
 bool runMultiplePayloads(
     slang::IGlobalSession* globalSession,
     id<MTLDevice> device,
@@ -1394,6 +1478,7 @@ bool runMetalStructuralRayTracingTests(const char* repositoryRootPath)
                runCallableRecord(globalSession, device, queue, repositoryRoot) &&
                runRecursiveTrace(globalSession, device, queue, repositoryRoot) &&
                runRepeatedRecords(globalSession, device, queue, repositoryRoot) &&
+               runSelectorAddressing(globalSession, device, queue, repositoryRoot) &&
                runMultiplePayloads(globalSession, device, queue, repositoryRoot) &&
                runTriangleAttributesFlags(globalSession, device, queue, repositoryRoot) &&
                runStageInputState(globalSession, device, queue, repositoryRoot) &&

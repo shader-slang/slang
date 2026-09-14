@@ -86,6 +86,22 @@ SLANG_UNIT_TEST(structuralRayTracingRepeatedRecordsVulkan)
     runRepeatedRecords(unitTestContext, DeviceType::Vulkan);
 }
 
+static void runSelectorAddressing(UnitTestContext* context, DeviceType deviceType)
+{
+    auto device = createStructuralRayTracingTestDevice(context, deviceType);
+    runStructuralRayTracingSelectorAddressing(device);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingSelectorAddressingD3D12)
+{
+    runSelectorAddressing(unitTestContext, DeviceType::D3D12);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingSelectorAddressingVulkan)
+{
+    runSelectorAddressing(unitTestContext, DeviceType::Vulkan);
+}
+
 static void runMultiplePayloads(UnitTestContext* context, DeviceType deviceType)
 {
     auto device = createStructuralRayTracingTestDevice(context, deviceType);

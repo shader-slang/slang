@@ -171,6 +171,66 @@ bool buildMetalTriangleScene(
         outError);
 }
 
+bool buildMetalTwoGeometryTriangleScene(
+    id<MTLDevice> device,
+    id<MTLCommandQueue> queue,
+    MetalRayTracingScene& outScene,
+    NSString** outError)
+{
+    static const simd_float3 kFirstVertices[] = {
+        {0.0f, 0.0f, 1.0f},
+        {1.0f, 0.0f, 1.0f},
+        {0.0f, 1.0f, 1.0f},
+    };
+    static const simd_float3 kSecondVertices[] = {
+        {2.0f, 0.0f, 1.0f},
+        {3.0f, 0.0f, 1.0f},
+        {2.0f, 1.0f, 1.0f},
+    };
+    outScene.vertexBuffer = [device newBufferWithBytes:kFirstVertices
+                                                length:sizeof(kFirstVertices)
+                                               options:MTLResourceStorageModeShared];
+    outScene.secondVertexBuffer = [device newBufferWithBytes:kSecondVertices
+                                                      length:sizeof(kSecondVertices)
+                                                     options:MTLResourceStorageModeShared];
+    if (!outScene.vertexBuffer || !outScene.secondVertexBuffer)
+    {
+        if (outError)
+            *outError = @"failed to allocate the two-geometry triangle vertex buffers";
+        return false;
+    }
+
+    auto firstGeometry = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
+    firstGeometry.vertexBuffer = outScene.vertexBuffer;
+    firstGeometry.vertexStride = sizeof(simd_float3);
+    firstGeometry.triangleCount = 1;
+    firstGeometry.opaque = YES;
+
+    auto secondGeometry = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
+    secondGeometry.vertexBuffer = outScene.secondVertexBuffer;
+    secondGeometry.vertexStride = sizeof(simd_float3);
+    secondGeometry.triangleCount = 1;
+    secondGeometry.opaque = YES;
+
+    // Separate descriptors are essential here: two primitives in one descriptor would both have
+    // geometry ID zero and would not exercise the geometry-stride term in SBT record addressing.
+    auto primitiveDescriptor = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
+    primitiveDescriptor.geometryDescriptors = @[ firstGeometry, secondGeometry ];
+    outScene.primitiveAccelerationStructure =
+        buildAccelerationStructure(device, queue, primitiveDescriptor, outError);
+    if (!outScene.primitiveAccelerationStructure)
+        return false;
+
+    return buildInstanceAccelerationStructure(
+        device,
+        queue,
+        MTLAccelerationStructureInstanceOptionOpaque,
+        0,
+        nullptr,
+        outScene,
+        outError);
+}
+
 bool buildMetalBoundingBoxScene(
     id<MTLDevice> device,
     id<MTLCommandQueue> queue,
