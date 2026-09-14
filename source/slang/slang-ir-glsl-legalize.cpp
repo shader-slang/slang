@@ -4356,6 +4356,28 @@ void legalizeEntryPointParameterForGLSL(
             stage,
             pp);
         tryReplaceUsesOfStageInput(context, globalValue, pp);
+
+        // Domain shader patch constant inputs: a varying input that isn't
+        // InputPatch/OutputPatch (handled by legalizePatchParam above).
+        // Patch constants are always passed by const reference
+        // (translateEntryPointInParamToBorrow). System values are skipped
+        // here: the emitter already adds Patch to the SV_TessFactor/
+        // SV_InsideTessFactor globals (gl_TessLevel*), and other system
+        // values such as gl_TessCoord must not get it.
+        if (stage == Stage::Domain)
+        {
+            SLANG_ASSERT(!as<IRHLSLPatchType>(valueType));
+            for (auto addr : globalValue.leafAddresses())
+            {
+                if (auto leafLayout = findVarLayout(addr))
+                {
+                    if (leafLayout->findAttr<IRSystemValueSemanticAttr>())
+                        continue;
+                }
+                builder->addGLSLPatchDecoration(addr);
+            }
+        }
+
         for (auto dec : pp->getDecorations())
         {
             if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
@@ -4429,7 +4451,6 @@ void legalizeEntryPointParameterForGLSL(
             LayoutResourceKind::VaryingInput,
             stage,
             pp);
-
         tryReplaceUsesOfStageInput(context, globalValue, pp);
 
         // we have a simple struct which represents all materialized GlobalParams, this
