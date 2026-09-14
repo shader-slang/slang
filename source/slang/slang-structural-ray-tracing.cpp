@@ -62,6 +62,39 @@ String getStructuralRayTracingMetalDescriptorResourceName(
     return result.produceString();
 }
 
+Index getStructuralRayTracingMetalDescriptorResourceArgumentBufferIndex(
+    StructuralRayTracingDescriptorResourceKind kind,
+    Index payloadIndex,
+    Index payloadCount)
+{
+    SLANG_RELEASE_ASSERT(payloadCount >= 0);
+
+    Index resourceOffset = 0;
+    switch (kind)
+    {
+    case StructuralRayTracingDescriptorResourceKind::IntersectionFunctionTable:
+        resourceOffset = 0;
+        break;
+    case StructuralRayTracingDescriptorResourceKind::MissVisibleFunctionTable:
+        resourceOffset = 1;
+        break;
+    case StructuralRayTracingDescriptorResourceKind::ClosestHitVisibleFunctionTable:
+        resourceOffset = 2;
+        break;
+    case StructuralRayTracingDescriptorResourceKind::CallableVisibleFunctionTable:
+        SLANG_RELEASE_ASSERT(payloadIndex == -1);
+        return payloadCount * 3;
+    case StructuralRayTracingDescriptorResourceKind::Records:
+        SLANG_RELEASE_ASSERT(payloadIndex == -1);
+        return payloadCount * 3 + 1;
+    default:
+        SLANG_UNEXPECTED("invalid structural ray-tracing descriptor resource kind");
+    }
+
+    SLANG_RELEASE_ASSERT(payloadIndex >= 0 && payloadIndex < payloadCount);
+    return payloadIndex * 3 + resourceOffset;
+}
+
 static String _getStructuralRayTracingSourceDeclName(Decl* decl)
 {
     if (!decl)

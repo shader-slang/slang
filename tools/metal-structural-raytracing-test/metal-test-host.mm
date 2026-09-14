@@ -647,43 +647,61 @@ id<MTLBuffer> createProgramResourceBuffer(
     const NativeProgram& program,
     id<MTLBuffer> records)
 {
-    std::vector<uint64_t> resources(program.schema->getDescriptorResourceCount());
-    for (SlangUInt i = 0; i < program.schema->getDescriptorResourceCount(); ++i)
+    const SlangUInt resourceCount = program.schema->getDescriptorResourceCount();
+    std::vector<uint64_t> resources(resourceCount);
+    std::vector<uint8_t> populatedBindings(resourceCount);
+    for (SlangUInt resourceIndex = 0; resourceIndex < resourceCount; ++resourceIndex)
     {
-        auto payloadIndex = program.schema->getDescriptorResourcePayloadIndex(i);
-        switch (program.schema->getDescriptorResourceKind(i))
+        // Reflection enumerates logical descriptor resources, while this buffer uses the
+        // compiler-selected Metal argument IDs. Keep those two indices separate so changing the
+        // reflection order cannot silently bind a valid table to the wrong synthesized field.
+        const SlangInt bindingIndex =
+            program.schema->getDescriptorResourceMetalArgumentBufferIndex(resourceIndex);
+        if (bindingIndex < 0 || bindingIndex >= SlangInt(resourceCount) ||
+            populatedBindings[size_t(bindingIndex)])
+            return nil;
+
+        const SlangInt payloadIndex =
+            program.schema->getDescriptorResourcePayloadIndex(resourceIndex);
+        uint64_t resource = 0;
+        switch (program.schema->getDescriptorResourceKind(resourceIndex))
         {
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_INTERSECTION_FUNCTION_TABLE:
             if (payloadIndex < 0 || size_t(payloadIndex) >= program.payloads.size())
                 return nil;
-            resources[i] =
+            resource =
                 program.payloads[size_t(payloadIndex)].intersectionTable.gpuResourceID._impl;
             break;
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_MISS_VISIBLE_FUNCTION_TABLE:
             if (payloadIndex < 0 || size_t(payloadIndex) >= program.payloads.size())
                 return nil;
-            resources[i] = program.payloads[size_t(payloadIndex)].missTable.gpuResourceID._impl;
+            resource = program.payloads[size_t(payloadIndex)].missTable.gpuResourceID._impl;
             break;
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_CLOSEST_HIT_VISIBLE_FUNCTION_TABLE:
             if (payloadIndex < 0 || size_t(payloadIndex) >= program.payloads.size())
                 return nil;
-            resources[i] =
+            resource =
                 program.payloads[size_t(payloadIndex)].closestHitTable.gpuResourceID._impl;
             break;
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_CALLABLE_VISIBLE_FUNCTION_TABLE:
             if (payloadIndex != -1)
                 return nil;
-            resources[i] = program.callableTable.gpuResourceID._impl;
+            resource = program.callableTable.gpuResourceID._impl;
             break;
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_RECORDS:
             if (payloadIndex != -1)
                 return nil;
-            resources[i] = records.gpuAddress;
+            resource = records.gpuAddress;
             break;
         default:
             return nil;
         }
+        resources[size_t(bindingIndex)] = resource;
+        populatedBindings[size_t(bindingIndex)] = true;
     }
+    for (uint8_t populated : populatedBindings)
+        if (!populated)
+            return nil;
     return [device newBufferWithBytes:resources.data()
                                length:sizeof(uint64_t) * resources.size()
                               options:MTLResourceStorageModeShared];

@@ -269,9 +269,20 @@ inline UInt64 getStructuralRayTracingMetalRecordStride(UInt64 dataSize)
 /// Returns the logical field name for one synthesized Metal descriptor resource.
 ///
 /// Per-payload fields include their partition index only when a schema has multiple payloads,
-/// matching the IR producer. Reflection exposes this logical name while physical binding follows
-/// the separately reflected field order.
+/// matching the IR producer. Reflection exposes this logical name independently from the
+/// separately reflected Metal argument-buffer index.
 String getStructuralRayTracingMetalDescriptorResourceName(
+    StructuralRayTracingDescriptorResourceKind kind,
+    Index payloadIndex,
+    Index payloadCount);
+
+/// Returns the Metal argument-buffer `[[id]]` for one synthesized descriptor resource.
+///
+/// The compiler and host reflection must use this same mapping: Metal lowering lays out the
+/// physical descriptor fields at these indices, while reflection tells the application where to
+/// write each table or record-buffer resource. The returned indices densely cover
+/// `[0, 3 * payloadCount + 2)`.
+Index getStructuralRayTracingMetalDescriptorResourceArgumentBufferIndex(
     StructuralRayTracingDescriptorResourceKind kind,
     Index payloadIndex,
     Index payloadCount);

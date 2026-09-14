@@ -304,26 +304,48 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(schema->getMetalRecordHeaderSize() == 16);
 
     SLANG_CHECK(schema->getDescriptorResourceCount() == 8);
+    bool populatedMetalBindings[8] = {};
+    for (SlangUInt resourceIndex = 0; resourceIndex < 8; ++resourceIndex)
+    {
+        // The lowering and reflection producers share the semantic resource-to-argument-index
+        // mapping. Verify the public result is a complete one-to-one binding map rather than an
+        // undocumented invitation for hosts to use `resourceIndex` as the Metal argument ID.
+        const SlangInt bindingIndex =
+            schema->getDescriptorResourceMetalArgumentBufferIndex(resourceIndex);
+        SLANG_CHECK(bindingIndex >= 0 && bindingIndex < 8);
+        if (bindingIndex >= 0 && bindingIndex < 8)
+        {
+            SLANG_CHECK(!populatedMetalBindings[bindingIndex]);
+            populatedMetalBindings[bindingIndex] = true;
+        }
+    }
+    for (bool populated : populatedMetalBindings)
+        SLANG_CHECK(populated);
+    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(8) == -1);
     SLANG_CHECK(
         schema->getDescriptorResourceKind(0) ==
         SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_INTERSECTION_FUNCTION_TABLE);
     SLANG_CHECK(schema->getDescriptorResourcePayloadIndex(0) == 0);
+    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(0) == 0);
     SLANG_CHECK(
         UnownedStringSlice(schema->getDescriptorResourceName(0)) == "intersectionFunctions0");
     SLANG_CHECK(
         schema->getDescriptorResourceKind(3) ==
         SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_INTERSECTION_FUNCTION_TABLE);
     SLANG_CHECK(schema->getDescriptorResourcePayloadIndex(3) == 1);
+    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(3) == 3);
     SLANG_CHECK(
         UnownedStringSlice(schema->getDescriptorResourceName(3)) == "intersectionFunctions1");
     SLANG_CHECK(
         schema->getDescriptorResourceKind(6) ==
         SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_CALLABLE_VISIBLE_FUNCTION_TABLE);
     SLANG_CHECK(schema->getDescriptorResourcePayloadIndex(6) == -1);
+    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(6) == 6);
     SLANG_CHECK(UnownedStringSlice(schema->getDescriptorResourceName(6)) == "callableFunctions");
     SLANG_CHECK(
         schema->getDescriptorResourceKind(7) == SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_RECORDS);
     SLANG_CHECK(schema->getDescriptorResourcePayloadIndex(7) == -1);
+    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(7) == 7);
     SLANG_CHECK(UnownedStringSlice(schema->getDescriptorResourceName(7)) == "records");
 
     SLANG_CHECK(program->findTraceProgramSchema("HitContextA") == nullptr);

@@ -3913,18 +3913,86 @@ static IRVarLayout* _cloneMetalVarLayout(
     return result.build();
 }
 
+// Stores one generated field at the argument-buffer index selected by its semantic role.
+static void _setMetalPhysicalDescriptorResource(
+    List<IRStructField*>& fields,
+    Index payloadCount,
+    IRStructField* field,
+    StructuralRayTracingDescriptorResourceKind kind,
+    Index payloadIndex)
+{
+    const Index argumentBufferIndex =
+        getStructuralRayTracingMetalDescriptorResourceArgumentBufferIndex(
+            kind,
+            payloadIndex,
+            payloadCount);
+    SLANG_RELEASE_ASSERT(
+        field && argumentBufferIndex >= 0 && argumentBufferIndex < fields.getCount() &&
+        !fields[argumentBufferIndex]);
+    fields[argumentBufferIndex] = field;
+}
+
+// Place every generated field at the index selected by the shared Metal descriptor ABI. The MSL
+// emitter preserves this declaration order and Metal assigns implicit `[[id]]` values from it, so
+// changing source collection order cannot silently change host bindings.
 static void _getMetalPhysicalDescriptorFields(
     MetalProgramDescriptorInfo* info,
     List<IRStructField*>& fields)
 {
+    const Index payloadCount = info->payloadPartitions.getCount();
+    const Index fieldCount = getStructuralRayTracingMetalDescriptorResourceArgumentBufferIndex(
+                                 StructuralRayTracingDescriptorResourceKind::Records,
+                                 -1,
+                                 payloadCount) +
+                             1;
+    for (Index i = 0; i < fieldCount; ++i)
+        fields.add(nullptr);
     for (auto& partition : info->payloadPartitions)
     {
-        fields.add(partition.intersectionFunctionsField);
-        fields.add(partition.missFunctionsField);
-        fields.add(partition.closestHitFunctionsField);
+        _setMetalPhysicalDescriptorResource(
+            fields,
+            payloadCount,
+            partition.intersectionFunctionsField,
+            StructuralRayTracingDescriptorResourceKind::IntersectionFunctionTable,
+            partition.payloadIndex);
+        _setMetalPhysicalDescriptorResource(
+            fields,
+            payloadCount,
+            partition.missFunctionsField,
+            StructuralRayTracingDescriptorResourceKind::MissVisibleFunctionTable,
+            partition.payloadIndex);
+        _setMetalPhysicalDescriptorResource(
+            fields,
+            payloadCount,
+            partition.closestHitFunctionsField,
+            StructuralRayTracingDescriptorResourceKind::ClosestHitVisibleFunctionTable,
+            partition.payloadIndex);
     }
-    fields.add(info->callableFunctionsField);
-    fields.add(info->recordsField);
+    _setMetalPhysicalDescriptorResource(
+        fields,
+        payloadCount,
+        info->callableFunctionsField,
+        StructuralRayTracingDescriptorResourceKind::CallableVisibleFunctionTable,
+        -1);
+    _setMetalPhysicalDescriptorResource(
+        fields,
+        payloadCount,
+        info->recordsField,
+        StructuralRayTracingDescriptorResourceKind::Records,
+        -1);
+
+    // The MSL struct emitter uses IR field declaration order for implicit argument IDs. Verify
+    // that the earlier descriptor-type producer created fields in the shared ABI order instead of
+    // merely attaching matching layout offsets to differently ordered declarations.
+    auto resourcesType = cast<IRStructType>(fields[0]->getParent());
+    Index declarationIndex = 0;
+    for (auto declaredField : resourcesType->getFields())
+    {
+        SLANG_RELEASE_ASSERT(
+            declarationIndex < fields.getCount() && fields[declarationIndex] == declaredField);
+        ++declarationIndex;
+    }
+    SLANG_RELEASE_ASSERT(declarationIndex == fields.getCount());
 }
 
 // Build the target layout that corresponds to one source descriptor layout. This follows the
@@ -3975,8 +4043,10 @@ static IRTypeLayout* _getMetalPhysicalDescriptorLayout(
     }
     for (auto alignmentAttr : sourceResourcesLayout->getAlignmentAttrs())
         resourcesLayoutBuilder.addAlignment(alignmentAttr);
-    for (Index i = 0; i < physicalFields.getCount(); ++i)
+    for (Index fieldIndex = 0; fieldIndex < physicalFields.getCount(); ++fieldIndex)
     {
+        auto field = physicalFields[fieldIndex];
+        SLANG_RELEASE_ASSERT(field);
         auto fieldLayout = _cloneMetalVarLayout(
             builder,
             sourceTableVarLayout,
@@ -3992,13 +4062,11 @@ static IRTypeLayout* _getMetalPhysicalDescriptorLayout(
                 indexedFieldLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
             offset->offset =
                 offsetAttr->getResourceKind() == LayoutResourceKind::MetalArgumentBufferElement
-                    ? LayoutOffset(i)
+                    ? LayoutOffset(fieldIndex)
                     : offsetAttr->getOffset();
             offset->space = offsetAttr->getSpace();
         }
-        resourcesLayoutBuilder.addField(
-            physicalFields[i]->getKey(),
-            indexedFieldLayoutBuilder.build());
+        resourcesLayoutBuilder.addField(field->getKey(), indexedFieldLayoutBuilder.build());
     }
     auto physicalResourcesLayout = resourcesLayoutBuilder.build();
 
