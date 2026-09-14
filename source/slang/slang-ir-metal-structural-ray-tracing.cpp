@@ -383,7 +383,10 @@ public:
     IRStructKey* dispatchRaysIndexKey = nullptr;
     IRStructKey* dispatchRaysDimensionsKey = nullptr;
     IRStructKey* customHitKindKey = nullptr;
-    Dictionary<IRInst*, IRStructKey*> customAttributeKeys;
+    // Metal carries committed procedural attributes in compiler-generated ray data. Two logical
+    // hit groups whose stages use the same concrete `Primitive.Attributes` type read and write the
+    // same representation, so the semantic type—not the group declaration—owns this field.
+    Dictionary<IRType*, IRStructKey*> customAttributeKeys;
 };
 
 static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
@@ -533,16 +536,20 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
         if (!requirements.hitAttributes)
             continue;
 
+        auto attributesType = cast<IRType>(group->getHitAttributesType());
+        if (result->customAttributeKeys.containsKey(attributesType))
+            continue;
+
         auto key = builder.createStructKey();
         StringBuilder fieldName;
-        if (auto groupName = group->getGroupType()->findDecoration<IRNameHintDecoration>())
-            fieldName << groupName->getName();
+        if (auto attributesName = attributesType->findDecoration<IRNameHintDecoration>())
+            fieldName << attributesName->getName();
         else
-            fieldName << "hitGroup";
+            fieldName << "custom";
         fieldName << ".attributes";
         builder.addNameHintDecoration(key, fieldName.getUnownedSlice());
-        builder.createStructField(result->type, key, cast<IRType>(group->getHitAttributesType()));
-        result->customAttributeKeys.add(group->getGroupType(), key);
+        builder.createStructField(result->type, key, attributesType);
+        result->customAttributeKeys.add(attributesType, key);
     }
 
     if (needsRecordData)
@@ -1554,11 +1561,15 @@ static IRFunc* _generateVisibleStageAdapter(
     if (!invoke && stageKind != StructuralRayTracingStageKind::ClosestHit)
         return nullptr;
     // Every physical closest-hit function in one payload partition has the same table-wide
-    // signature. A `NoClosestHit` adapter has no source entry identity or record-dependent work,
-    // so key it only by the ray-data type and reuse one no-op at every placeholder function index.
-    // Real adapters retain their entry identity because their bodies and records can differ.
+    // signature. A concrete `invoke` also fixes its Context, including Record and primitive
+    // attributes. Key a real closest-hit adapter by that executable function and the ray-data ABI,
+    // rather than by the hit group that references it, so repeated logical records share one
+    // physical VFT function. `NoClosestHit` has no source entry identity and remains keyed only by
+    // the ray-data type.
+    auto adapterIdentity =
+        invoke && stageKind == StructuralRayTracingStageKind::ClosestHit ? invoke : entryType;
     KeyValuePair<IRInst*, IRInst*> generatedKey(
-        invoke ? entryType : rayDataInfo->type,
+        invoke ? adapterIdentity : rayDataInfo->type,
         rayDataInfo->type);
     if (auto existing = generated.tryGetValue(generatedKey))
         return *existing;
@@ -1709,7 +1720,7 @@ static IRFunc* _generateVisibleStageAdapter(
 
     if (hitAttributesKind == StructuralRayTracingHitAttributesKind::Custom)
     {
-        if (auto key = rayDataInfo->customAttributeKeys.tryGetValue(entryType))
+        if (auto key = rayDataInfo->customAttributeKeys.tryGetValue(hitAttributesType))
             values.hitAttributes = builder.emitLoad(builder.emitFieldAddress(rayData, *key));
         if (rayDataInfo->customHitKindKey)
         {
@@ -3376,7 +3387,8 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
         dispatchValues[adapter] = {state.dispatchRaysIndex, state.dispatchRaysDimensions};
     }
     state.opaque = opaque;
-    if (auto key = rayDataInfo->customAttributeKeys.tryGetValue(groupType))
+    if (auto key = rayDataInfo->customAttributeKeys.tryGetValue(
+            cast<IRType>(group->getHitAttributesType())))
         state.committedAttributes = builder.emitFieldAddress(rayData, *key);
     if (rayDataInfo->customHitKindKey)
         state.committedHitKind = builder.emitFieldAddress(rayData, rayDataInfo->customHitKindKey);
@@ -4778,8 +4790,6 @@ static bool _materializeMetalPayloadPartition(
                     ? getStructuralRayTracingMetalClosestHitFunctionName(
                           programInfo->programLayoutSourceTypeName->getStringSlice(),
                           payloadPartition->payloadIndex,
-                          Index(group->getFunctionIndex()->getValue()),
-                          group->getGroupSourceTypeName()->getStringSlice(),
                           group->getClosestHitSourceTypeName()->getStringSlice())
                     : getStructuralRayTracingMetalNoOpClosestHitFunctionName(
                           programInfo->programLayoutSourceTypeName->getStringSlice(),

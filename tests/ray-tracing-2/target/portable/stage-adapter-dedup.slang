@@ -45,10 +45,64 @@ struct RepeatedStageHitGroup : rt::IHitGroup
     typealias Intersection = rt::NoIntersection<HitContext>;
 }
 
+struct CustomAttributes
+{
+    uint value;
+}
+
+struct CustomHitContext : rt::IHitContext
+{
+    typealias TraceContext = ::TraceContext;
+    typealias Payload = ::Payload;
+    typealias Primitive = rt::BoundingBoxPrimitive<CustomAttributes>;
+    typealias Record = void;
+}
+
+struct SharedCustomClosestHit : rt::IClosestHitShader
+{
+    typealias Context = CustomHitContext;
+    void invoke(rt::ClosestHitInput<CustomHitContext> input)
+    {
+        input.payload.value += input.attributes.value;
+    }
+}
+
+struct SharedCustomIntersection : rt::IIntersectionShader
+{
+    typealias Context = CustomHitContext;
+    void invoke(rt::IntersectionInput<CustomHitContext> input)
+    {
+        CustomAttributes attributes = { 2 };
+        input.reportHit(1.0, attributes);
+    }
+}
+
+struct SharedCustomHitGroup : rt::IHitGroup
+{
+    typealias Context = CustomHitContext;
+    typealias ClosestHit = SharedCustomClosestHit;
+    typealias AnyHit = rt::NoAnyHit<CustomHitContext>;
+    typealias Intersection = SharedCustomIntersection;
+}
+
+// These two group types describe different logical function indices, but their concrete stages,
+// context, and custom-attribute representation are identical.
+struct RepeatedCustomHitGroup : rt::IHitGroup
+{
+    typealias Context = CustomHitContext;
+    typealias ClosestHit = SharedCustomClosestHit;
+    typealias AnyHit = rt::NoAnyHit<CustomHitContext>;
+    typealias Intersection = SharedCustomIntersection;
+}
+
 struct FirstSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
-    typealias HitGroups = rt::HitGroupList<SharedHitGroup, RepeatedStageHitGroup>;
+    typealias HitGroups = rt::HitGroupList<
+        SharedHitGroup,
+        RepeatedStageHitGroup,
+        SharedCustomHitGroup,
+        RepeatedCustomHitGroup>;
     typealias MissShaders = rt::NoMissShaders;
     typealias CallableShaders = rt::NoCallableShaders;
 }
@@ -76,14 +130,21 @@ void main()
     secondTracer.trace(desc, scene, secondProgram, payload);
 }
 
-// Multiple records in FirstSchema and another record in SecondSchema all reference the same
-// semantic stage and request the same portable symbol. The D3D/Vulkan path therefore shares one
-// native entry-point adapter across both forms of reuse.
-// HLSL-COUNT-1: [shader("closesthit")]void SharedClosestHit(
-// HLSL-NOT: [shader("closesthit")]
+// Multiple groups in FirstSchema and another group in SecondSchema reference the same semantic
+// triangle stage. FirstSchema also references one custom closest-hit stage from two groups. The
+// D3D/Vulkan path therefore emits each concrete native entry point only once.
+// HLSL-COUNT-2: [shader("closesthit")]void
 
-// Metal must keep the schema-specific ray-data parameter type in the physical signature. It emits
-// one adapter per logical record, while all adapters still run the one SharedClosestHit
-// implementation.
+// The generated Metal ray data stores committed custom attributes by their concrete type. Both
+// custom groups therefore share this one field instead of allocating one field per group.
+// METAL-LABEL: struct FirstSchema_rayData_0
+// METAL: CustomAttributes_0 {{.*}}attributes_{{[0-9]+}};
+// METAL-NOT: CustomAttributes_0
+// METAL: };
+
+// Metal keeps the schema-specific ray-data type in the physical signature, but a logical group
+// index is not part of a stage adapter's identity. FirstSchema consequently emits two adapters:
+// one for SharedClosestHit and one for SharedCustomClosestHit, even though four groups reference
+// them. SecondSchema requires its own adapter because it has a different ray-data ABI type.
 // METAL-COUNT-2: {{\[\[visible\]\]}} void {{.*}}(FirstSchema_rayData_0 thread*
 // METAL-COUNT-1: {{\[\[visible\]\]}} void {{.*}}(SecondSchema_rayData_0 thread*
