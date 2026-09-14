@@ -16,6 +16,10 @@ void legalizeNonStructParameterToStructForHLSL(IRModule* module);
 
 void legalizeEmptyRayPayloadsForHLSL(IRModule* module);
 
+// Give an empty Vulkan callable payload a role-local physical backing value. The source type must
+// remain unchanged because the same nominal type can also participate in ordinary data layouts.
+void legalizeEmptyVulkanCallablePayloads(IRModule* module);
+
 // Pad an empty callable-data struct with a dummy field so a `[shader("callable")]` entry point
 // keeps a legal one-parameter ABI on the D3D/HLSL path. An empty struct is otherwise erased
 // during type legalization, leaving a zero-parameter callable that DXC rejects. The dummy field

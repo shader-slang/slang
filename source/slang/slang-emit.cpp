@@ -2045,6 +2045,14 @@ Result linkAndOptimizeIR(
             SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
         }
 
+        // `OpExecuteCallableKHR` always consumes a real callable-data variable. Give an empty
+        // source payload role-local physical storage before general type legalization removes its
+        // semantic value.
+        if (isSPIRV(targetRequest->getTarget()))
+        {
+            SLANG_PASS(legalizeEmptyVulkanCallablePayloads);
+        }
+
         // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions
         // (must run before legalizeExistentialTypeLayout removes empty struct parameters)
         if (isD3DTarget(targetRequest))

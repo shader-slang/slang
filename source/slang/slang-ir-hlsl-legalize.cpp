@@ -356,6 +356,81 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
     }
 }
 
+void legalizeEmptyVulkanCallablePayloads(IRModule* module)
+{
+    // Consider this example:
+    //
+    //     struct EmptyData {}
+    //     EmptyData data;
+    //     CallShader(0, data);
+    //
+    // The SPIR-V implementation of `CallShader` creates a `[__vulkanCallablePayload]` global,
+    // copies `data` into it, and passes the global's address to `OpExecuteCallableKHR`. Resource
+    // type legalization normally removes both an empty value and its storage. The assembly
+    // instruction cannot lose that operand, however: SPIR-V requires an addressable variable in
+    // the `CallableDataKHR` storage class.
+    //
+    // Do not pad `EmptyData` itself. The user can reuse that nominal type in an ordinary record or
+    // resource whose zero-size layout must not change. The decorated global is the producer-owned
+    // native ABI object, so give only that object an `int` backing type. Its source copies carry no
+    // bits: stores into the object can be removed, and loads from it produce the unique default
+    // value of the original empty struct. Non-memory uses are the native ABI consumers (most
+    // importantly the SPIR-V assembly operand), and observe the global's new physical pointer
+    // type directly.
+    List<IRGlobalVar*> emptyPayloadStorageVars;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto globalVar = as<IRGlobalVar>(globalInst);
+        if (!globalVar)
+            continue;
+        if (!globalVar->findDecoration<IRVulkanCallablePayloadDecoration>() &&
+            !globalVar->findDecoration<IRVulkanCallablePayloadInDecoration>())
+        {
+            continue;
+        }
+
+        auto pointerType = as<IRPtrTypeBase>(globalVar->getDataType());
+        if (!pointerType)
+            continue;
+        auto payloadType = as<IRStructType>(pointerType->getValueType());
+        if (!payloadType || payloadType->getFields().getFirst())
+            continue;
+
+        emptyPayloadStorageVars.add(globalVar);
+    }
+
+    IRBuilder builder(module);
+    for (auto globalVar : emptyPayloadStorageVars)
+    {
+        auto originalPointerType = cast<IRPtrTypeBase>(globalVar->getDataType());
+        auto originalPayloadType = cast<IRStructType>(originalPointerType->getValueType());
+
+        // Rewrite source-level transfers before changing the global's type. Keep evaluating any
+        // value that fed a removed store: its producing instruction remains in place, so unrelated
+        // side effects are preserved and ordinary DCE can remove only genuinely dead work.
+        for (auto use = globalVar->firstUse; use;)
+        {
+            auto nextUse = use->nextUse;
+            auto user = use->getUser();
+            if (auto store = as<IRStore>(user); store && store->getPtr() == globalVar)
+            {
+                store->removeAndDeallocate();
+            }
+            else if (auto load = as<IRLoad>(user); load && load->getPtr() == globalVar)
+            {
+                builder.setInsertBefore(load);
+                auto emptyValue = builder.emitDefaultConstruct(originalPayloadType);
+                load->replaceUsesWith(emptyValue);
+                load->removeAndDeallocate();
+            }
+            use = nextUse;
+        }
+
+        builder.setInsertInto(module->getModuleInst());
+        globalVar->setFullType(builder.getPtrType(builder.getIntType(), originalPointerType));
+    }
+}
+
 void legalizeEmptyCallableDataPayloadsForHLSL(IRModule* module)
 {
     // DXC requires a callable entry point to declare exactly one argument parameter, but an empty
