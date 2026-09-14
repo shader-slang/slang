@@ -659,7 +659,8 @@ protected:
         SLANG_UNUSED(decl);
     }
 
-    /// Returns the target-language spelling of an unconditional loop header.
+    /// Returns the target-language tokens emitted before the opening brace of an
+    /// unconditional loop, without trailing whitespace.
     virtual char const* getUnconditionalLoopHeader() { return "for(;;)"; }
 
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) { SLANG_UNUSED(ifInst); }

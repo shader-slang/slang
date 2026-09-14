@@ -30,10 +30,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     results[tid.x] = sum + i;
 }
 
+// WGSL-NOT: for(;;)
 // WGSL: loop
 // WGSL: break;
 // WGSL: continue;
 // WGSL: break;
-// WGSL-NOT: for(;;)
 
 // SPIRV: OpEntryPoint GLCompute
