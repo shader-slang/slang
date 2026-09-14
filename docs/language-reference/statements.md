@@ -46,5 +46,5 @@ Miscellaneous:
 
 - [block statement](statements-block.md) — groups multiple statements in a single statement.
 - [empty statement](statements-empty.md) — does nothing.
-- [compile-time for statement](statements-compile-time-for.md) — compile-time replication, alternative to
-  preprocessor techniques for loop unrolling.
+- [compile-time for statement](statements-compile-time-for.md) — compile-time replication. Deprecated.
+  Use a [loop statement](statements-loop.md) with `[ForceUnroll]` instead.

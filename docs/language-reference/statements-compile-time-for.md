@@ -1,8 +1,13 @@
 # Compile-Time For Statement
 
+> ⚠️ **Warning:** Compile-time for is deprecated, and it has been removed in Slang 202c. Use a regular
+> [loop statement](statements-loop.md) with the
+> [\[ForceUnroll\]](../../../core-module-reference/attributes/forceunroll-05.html) attribute instead. See
+> GitHub issue [#13065](https://github.com/shader-slang/slang/issues/13065) for details.
+
 ## Syntax
 
-Compile-time `$for` loop:
+Compile-time `$for` loop (Slang 2026 and earlier):
 
 > **`'$for'`** **`'('`**<br>
 > &nbsp;&nbsp;&nbsp;&nbsp; *`identifier`* **`'in'`**<br>
@@ -19,7 +24,3 @@ The expressions *`init-expr`* and *`upper-bound-expr`* are
 [compile-time constants](expressions-evaluation-classes.md) and they must have [integer](types-fundamental.md) types.
 
 The loop iterator value is provided as *`identifier`* as an immutable variable.
-
-TODO: The compiler needs some work:
-- https://github.com/shader-slang/slang/issues/12398
-- https://github.com/shader-slang/slang/issues/12399

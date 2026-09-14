@@ -85,6 +85,9 @@ A loop iteration can be terminated with a [`continue` statement](statements-brea
 *`cond-expr`* is evaluated to determine whether the looping continues. In `while` loops and `do-while`
 loops, a `continue` statement jumps to evaluating the loop condition.
 
+A loop statement can be unrolled with the
+[\[ForceUnroll\]](../../../core-module-reference/attributes/forceunroll-05.html) attribute. This forces the
+loop to be fully unrolled in the emitted target code. If the loop cannot be unrolled, an error is diagnosed.
 
 ## Examples
 
@@ -237,5 +240,23 @@ void computeMain()
     }
 
     output[0] = sum;
+}
+```
+
+An unrolled `for` loop:
+
+```hlsl
+StructuredBuffer<uint> input;
+RWStructuredBuffer<uint> output;
+
+[numthreads(1,1,1)]
+void computeMain()
+{
+    // copy 16 words from input to output
+    [ForceUnroll]
+    for (uint i = 0; i < 16; ++i)
+    {
+        output[i] = input[i];
+    }
 }
 ```
