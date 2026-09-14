@@ -1,10 +1,10 @@
-//TEST:SIMPLE(filecheck=HLSL): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5
-//TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
+//TEST:SIMPLE(filecheck=HLSL): -experimental-feature -entry rayGenerationMain -stage raygeneration -target hlsl -profile sm_6_5
+//TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry rayGenerationMain -stage raygeneration -target spirv-assembly -emit-spirv-directly
 //TEST:SIMPLE(filecheck=SPIRV_CLOSEST): -experimental-feature -entry RuntimeClosestHit -stage closesthit -target spirv-assembly -emit-spirv-directly
-//TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
+//TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry rayGenerationMain -stage raygeneration -target metal
 
 // HLSL: TraceRay(
-// HLSL: [shader("raygeneration")]void main()
+// HLSL: [shader("raygeneration")]void rayGenerationMain()
 // HLSL: TraceRay(
 // HLSL: [shader("miss")]void RuntimeMiss(
 // HLSL: [shader("closesthit")]void RuntimeClosestHit(
@@ -131,7 +131,7 @@ void traceSecondary(inout RuntimePayload payload)
 }
 
 [shader("raygeneration")]
-void main()
+void rayGenerationMain()
 {
     uint rayIndex = DispatchRaysIndex().x;
     RuntimePayload payload = {};

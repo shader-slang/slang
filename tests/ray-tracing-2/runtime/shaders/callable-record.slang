@@ -1,9 +1,9 @@
-//TEST:SIMPLE(filecheck=HLSL): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5
-//TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
-//TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
+//TEST:SIMPLE(filecheck=HLSL): -experimental-feature -entry rayGenerationMain -stage raygeneration -target hlsl -profile sm_6_5
+//TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry rayGenerationMain -stage raygeneration -target spirv-assembly -emit-spirv-directly
+//TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry rayGenerationMain -stage raygeneration -target metal
 //TEST:SIMPLE(filecheck=METAL_CALLABLE): -experimental-feature -entry RuntimeCallable -stage callable -target metal
 
-// HLSL-DAG: [shader("raygeneration")]void main()
+// HLSL-DAG: [shader("raygeneration")]void rayGenerationMain()
 // HLSL-DAG: CallShader(0U,
 // HLSL-DAG: [shader("callable")]void RuntimeCallable(
 // SPIRV-DAG: OpEntryPoint RayGenerationKHR {{.*}} "main"
@@ -69,7 +69,7 @@ rt::TraceProgramDescriptor<Schema> program;
 RWStructuredBuffer<RuntimeResult> results;
 
 [shader("raygeneration")]
-void main()
+void rayGenerationMain()
 {
     RuntimeCallableData data = { 3, 0, 0 };
     rt::RayTracer<Schema> tracer;
