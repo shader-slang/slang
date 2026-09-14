@@ -12,6 +12,29 @@ static StructuralRayTracingStageKind _getDirectStageInputKind(
     const StructuralRayTracingDeclRegistry& registry,
     Type* type);
 
+// Structural runtime-type checks must only inspect a module that can actually name the trusted
+// API. The registry is linkage-wide, so merely importing `slang.raytracing` in an earlier module
+// must not make later unrelated modules query inheritance while their generic declarations are
+// still being checked. Such eager queries can cache an incomplete conformance result.
+static bool _isStructuralRayTracingVisible(
+    SemanticsVisitor* visitor,
+    const StructuralRayTracingDeclRegistry& registry)
+{
+    if (!registry.isInitialized())
+        return false;
+
+    auto module = visitor->getShared()->getModule();
+    if (!module)
+        return true;
+
+    for (auto dependency : module->getModuleDependencies())
+    {
+        if (registry.isTrustedModule(dependency))
+            return true;
+    }
+    return false;
+}
+
 static FunctionDeclBase* _getStageImplementation(
     const StructuralRayTracingDeclRegistry& registry,
     StructuralRayTracingStageKind stageKind,
@@ -1052,7 +1075,7 @@ static StructuralRayTracingRuntimeTypeKind _findStructuralRuntimeType(
         type = modifiedType->getBase();
 
     auto& registry = visitor->getLinkage()->getStructuralRayTracingDeclRegistry();
-    if (!registry.isInitialized())
+    if (!_isStructuralRayTracingVisible(visitor, registry))
         return StructuralRayTracingRuntimeTypeKind::None;
     if (_getDirectStageInputKind(registry, type) != StructuralRayTracingStageKind::Count)
         return StructuralRayTracingRuntimeTypeKind::StageInput;
@@ -1278,7 +1301,7 @@ static Type* _getDirectStructuralRuntimeGenericArgument(
 bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(InvokeExpr* invoke)
 {
     auto& registry = getLinkage()->getStructuralRayTracingDeclRegistry();
-    if (!registry.isInitialized())
+    if (!_isStructuralRayTracingVisible(this, registry))
         return false;
 
     auto functionDeclRef = as<DeclRefExpr>(invoke->functionExpr);
@@ -1315,7 +1338,7 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericTypeApplication
     Expr* checkedResult)
 {
     auto& registry = getLinkage()->getStructuralRayTracingDeclRegistry();
-    if (!registry.isInitialized())
+    if (!_isStructuralRayTracingVisible(this, registry))
         return false;
 
     // Compiler-provided structural types own their generic arguments. For example,
