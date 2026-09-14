@@ -627,6 +627,11 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
     # independently make ok=False; crash_codes also fires as a third guard.
     sample_ok = []
     crash_codes = []
+    # Union over samples, not just the last one: the expected diagnostics have
+    # to be present in EVERY timed sample. Checking only the final text would
+    # let a run where the workload compiled clean four times and errored once
+    # report ok, which is the exact rot this guard exists to catch.
+    missing_diags = set()
     for _ in range(samples):
         rc, wall, text, rss = run_once(timed)
         last_text = text
@@ -644,9 +649,10 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         # Decide from the output instead of the code — every expected
         # diagnostic present, and no unexpected error — which holds whatever
         # the platform returns.
-        expected_failure = bool(expected_diags) and \
-            all(c in text for c in expected_diags) and \
-            real_error(text, benign) is None
+        sample_missing = [c for c in expected_diags if c not in text]
+        missing_diags.update(sample_missing)
+        expected_failure = (bool(expected_diags) and not sample_missing
+                            and real_error(text, benign) is None)
         if (rc > 1 or rc < 0) and not expected_failure:
             crash_codes.append(rc)
             sample_ok.append(False)
@@ -655,7 +661,10 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         if rss is not None:
             rsses.append(rss)
         err = real_error(text, benign)
-        sample_ok.append(err is None)  # ok when no compile error
+        # A sample that did not emit what the workload declares it emits is not
+        # a good sample, even though it compiled without error -- for these
+        # workloads a CLEAN compile is the failure mode.
+        sample_ok.append(err is None and not sample_missing)
         for name, ms in parse_timers(text).items():
             per_timer.setdefault(name, []).append(ms)
         for name, kb in parse_mem(text).items():
@@ -669,13 +678,12 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
     # reporting a healthy green number that measured something else entirely.
     # A workload that declares it emits E30019 and stops doing so is broken,
     # not passing.
-    missing_diags = [c for c in expected_diags if c not in last_text]
     if missing_diags:
         # Takes priority over whatever else the compile said. If the declared
         # diagnostic is gone, every other symptom (a stray error, no timers,
         # a non-zero exit) is downstream of that, and reporting one of those
         # instead sends the reader looking in the wrong place.
-        err = ("expected diagnostics absent: " + ", ".join(missing_diags) +
+        err = ("expected diagnostics absent: " + ", ".join(sorted(missing_diags)) +
                " - the workload no longer exercises what it claims to")
 
     # Every declared primary timer should be a counter the compiler actually
