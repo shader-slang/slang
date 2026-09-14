@@ -1388,6 +1388,18 @@ class VulkanRayPayloadAttribute : public Attribute
     FIDDLE(...)
     FIDDLE() int location;
 };
+
+/// Marks the compiler-owned Vulkan payload storage declared by a structural trace fallback.
+///
+/// IR generation uses this internal source marker to retain the exact global on the fallback
+/// function before the ray-tracing standard module is serialized. It is distinct from
+/// `VulkanRayPayloadAttribute`, which also applies to legacy user and core-module payload globals.
+FIDDLE()
+class StructuralRayTracingVulkanPayloadStorageAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class VulkanRayPayloadInAttribute : public Attribute
 {

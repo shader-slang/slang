@@ -2024,41 +2024,6 @@ struct PortableStructuralRayTracingTraceLoweringContext
         SLANG_RELEASE_ASSERT(targetRequest);
     }
 
-    /// Finds the compiler-owned Vulkan payload prototype referenced by `fallback`.
-    ///
-    /// The core `TraceRay` and `TraceMotionRay` implementations represent their outgoing Vulkan
-    /// payload with exactly one global carrying `[__vulkanRayPayload(-1)]`; `-1` is the existing IR
-    /// placeholder asking legalization to assign a location. Force-inlining those implementations
-    /// into the structural fallback makes the reference explicit. Walking only the fallback's
-    /// lexical instructions and inspecting their direct operands avoids the previous module-wide
-    /// global/use-list search and makes this producer/consumer contract local and checkable.
-    void findReferencedAutomaticVulkanPayloadImpl(IRInst* parent, IRGlobalVar*& ioResult)
-    {
-        for (auto inst = parent->getFirstChild(); inst; inst = inst->getNextInst())
-        {
-            for (UInt i = 0; i < inst->getOperandCount(); ++i)
-            {
-                auto variable = as<IRGlobalVar>(inst->getOperand(i));
-                auto decoration =
-                    variable ? variable->findDecoration<IRVulkanRayPayloadDecoration>() : nullptr;
-                if (!decoration || cast<IRIntLit>(decoration->getOperand(0))->getValue() >= 0)
-                {
-                    continue;
-                }
-                SLANG_RELEASE_ASSERT(!ioResult || ioResult == variable);
-                ioResult = variable;
-            }
-            findReferencedAutomaticVulkanPayloadImpl(inst, ioResult);
-        }
-    }
-
-    IRGlobalVar* findReferencedAutomaticVulkanPayload(IRFunc* fallback)
-    {
-        IRGlobalVar* result = nullptr;
-        findReferencedAutomaticVulkanPayloadImpl(fallback, result);
-        return result;
-    }
-
     IRGlobalVar* findOrCreatePayloadStorage(
         IRGlobalVar* prototype,
         IRType* payloadType,
@@ -2085,11 +2050,13 @@ struct PortableStructuralRayTracingTraceLoweringContext
         removeLinkageDecorations(variable);
 
         auto decoration = variable->findDecoration<IRVulkanRayPayloadDecoration>();
+        auto automaticLocation = as<IRIntLit>(getVulkanPayloadLocation(variable));
         auto pointerType = as<IRPtrTypeBase>(variable->getDataType());
         SLANG_RELEASE_ASSERT(
-            decoration && cast<IRIntLit>(decoration->getOperand(0))->getValue() < 0 &&
-            pointerType && pointerType->getValueType() == payloadType);
-        decoration->setOperand(0, builder.getIntValue(builder.getIntType(), location));
+            decoration && automaticLocation && automaticLocation->getValue() < 0 && pointerType &&
+            pointerType->getValueType() == payloadType);
+        decoration->removeAndDeallocate();
+        builder.addVulkanRayPayloadDecoration(variable, int(location));
 
         payloadStorage.add({payloadSemanticType, payloadType, location, variable});
         return variable;
@@ -2114,29 +2081,38 @@ struct PortableStructuralRayTracingTraceLoweringContext
         if (auto adapter = findAdapter(fallback, traceOperation->getPayloadSemanticType()))
             return adapter;
 
-        // The portable standard-module fallback is `[ForceInline]` and calls the core `TraceRay`
-        // helper, which owns Vulkan's outgoing payload variable. Inline that helper now so this
-        // schema operation can bind the variable to its semantic payload identity before the
-        // ordinary module-wide force-inlining pass erases the call boundary.
+        // The portable standard-module fallback and its Vulkan helper are `[ForceInline]`. Inline
+        // the helper before cloning so its native payload loads/stores are remapped together with
+        // the producer-owned global below.
         performForceInlining(fallback);
 
-        auto automaticPayloadVariable = findReferencedAutomaticVulkanPayload(fallback);
+        // Consider `RayTracer.trace<Payload>`, whose source declares `nativePayload` and passes it
+        // to the Vulkan helper. AST-to-IR lowering attaches that exact global to the fallback. The
+        // decoration operand follows ordinary generic cloning, so a specialized fallback already
+        // names the matching specialized global here. Reading this producer-owned metadata avoids
+        // reconstructing the relationship from the fallback's arbitrarily shaped operand graph.
+        auto storageMetadata =
+            fallback->findDecoration<IRStructuralRayTracingVulkanPayloadStorageDecoration>();
+        SLANG_RELEASE_ASSERT(storageMetadata);
+        auto automaticPayloadVariable = storageMetadata->getStorage();
+        SLANG_RELEASE_ASSERT(automaticPayloadVariable);
         if (!isKhronosTarget(targetRequest))
         {
-            // HLSL and CUDA use their native TraceRay payload ABI and must not accidentally retain
-            // the Vulkan-only prototype after target-switch specialization.
-            SLANG_RELEASE_ASSERT(!automaticPayloadVariable);
+            // HLSL and CUDA use their native TraceRay payload ABI. Their target-specialized
+            // fallback does not reference `automaticPayloadVariable`; once the adapter call is
+            // inlined, ordinary DCE removes both the fallback metadata and unused prototype.
             adapters.add({fallback, traceOperation->getPayloadSemanticType(), fallback});
             return fallback;
         }
 
-        // Every Khronos structural trace is lowered through the core Vulkan payload placeholder.
-        // Missing storage here is a broken standard-module/compiler contract, not a request for a
-        // late best-effort location allocation.
-        SLANG_RELEASE_ASSERT(automaticPayloadVariable);
+        // Every Khronos structural trace is lowered through its producer-owned automatic Vulkan
+        // payload placeholder. Missing storage here is a broken standard-module/compiler contract,
+        // not a request for a late best-effort location allocation.
         auto pointerType = as<IRPtrTypeBase>(automaticPayloadVariable->getDataType());
+        auto automaticLocation = as<IRIntLit>(getVulkanPayloadLocation(automaticPayloadVariable));
         SLANG_RELEASE_ASSERT(
-            pointerType && pointerType->getValueType() == traceOperation->getPayloadType());
+            automaticLocation && automaticLocation->getValue() < 0 && pointerType &&
+            pointerType->getValueType() == traceOperation->getPayloadType());
 
         auto location = findStructuralRayTracingProgramPayloadLocation(
             traceOperation,

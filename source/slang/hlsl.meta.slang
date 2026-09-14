@@ -19894,6 +19894,68 @@ __generic<Payload>
 __intrinsic_op($(kIROp_GetVulkanRayTracingPayloadLocation))
 int __rayPayloadLocation(__ref Payload payload);
 
+/// Implements the Vulkan payload ABI using storage supplied by the caller.
+///
+/// `TraceRay` owns its automatic storage for the legacy API. The structural ray-tracing module
+/// instead owns that storage in `RayTracer.trace`, where the compiler can retain its relationship
+/// to the structural trace operation as explicit IR metadata. Force-inlining this helper replaces
+/// `NativePayload` with that global before SPIR-V assembly observes its address.
+[ForceInline]
+__generic<payload_t>
+[require(glsl_spirv, raytracing_raygen_closesthit_miss)]
+void __traceRayWithVulkanPayloadStorage(
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint                            RayFlags,
+    uint                            InstanceInclusionMask,
+    uint                            RayContributionToHitGroupIndex,
+    uint                            MultiplierForGeometryContributionToHitGroupIndex,
+    uint                            MissShaderIndex,
+    RayDesc                         Ray,
+    inout payload_t                 Payload,
+    inout payload_t                 NativePayload)
+{
+    NativePayload = Payload;
+    __target_switch
+    {
+    case glsl:
+        __traceRay(
+            AccelerationStructure,
+            RayFlags,
+            InstanceInclusionMask,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            Ray.Origin,
+            Ray.TMin,
+            Ray.Direction,
+            Ray.TMax,
+            __rayPayloadLocation(NativePayload));
+    case spirv:
+    {
+        let origin = Ray.Origin;
+        let direction = Ray.Direction;
+        let tmin = Ray.TMin;
+        let tmax = Ray.TMax;
+        spirv_asm
+        {
+            OpTraceRayKHR
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $InstanceInclusionMask
+                /**/ $RayContributionToHitGroupIndex
+                /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                /**/ $MissShaderIndex
+                /**/ $origin
+                /**/ $tmin
+                /**/ $direction
+                /**/ $tmax
+                /**/ &NativePayload;
+        };
+    }
+    }
+    Payload = NativePayload;
+}
+
 /// Traces a ray through the acceleration structure.
 /// @param AccelerationStructure The acceleration structure to traverse
 /// @param RayFlags Flags controlling ray behavior
@@ -19933,51 +19995,21 @@ void TraceRay(
         return;
     case cuda: __intrinsic_asm "optixTrace";
     case glsl:
+    case spirv:
     {
         [__vulkanRayPayload]
         static payload_t p;
 
-        p = Payload;
-        __traceRay(
+        __traceRayWithVulkanPayloadStorage(
             AccelerationStructure,
             RayFlags,
             InstanceInclusionMask,
             RayContributionToHitGroupIndex,
             MultiplierForGeometryContributionToHitGroupIndex,
             MissShaderIndex,
-            Ray.Origin,
-            Ray.TMin,
-            Ray.Direction,
-            Ray.TMax,
-            __rayPayloadLocation(p));
-        Payload = p;
-    }
-    case spirv:
-    {
-        [__vulkanRayPayload]
-        static payload_t p;
-
-        p = Payload;
-        let origin = Ray.Origin;
-        let direction = Ray.Direction;
-        let tmin = Ray.TMin;
-        let tmax = Ray.TMax;
-        spirv_asm
-        {
-            OpTraceRayKHR
-                /**/ $AccelerationStructure
-                /**/ $RayFlags
-                /**/ $InstanceInclusionMask
-                /**/ $RayContributionToHitGroupIndex
-                /**/ $MultiplierForGeometryContributionToHitGroupIndex
-                /**/ $MissShaderIndex
-                /**/ $origin
-                /**/ $tmin
-                /**/ $direction
-                /**/ $tmax
-                /**/ &p;
-        };
-        Payload = p;
+            Ray,
+            Payload,
+            p);
     }
     }
 }
@@ -20002,6 +20034,73 @@ void __traceMotionRay(
     {
     case glsl: __intrinsic_asm "traceRayMotionNV";
     }
+}
+
+/// Implements the Vulkan motion-trace payload ABI using caller-supplied storage.
+///
+/// This is the motion counterpart of `__traceRayWithVulkanPayloadStorage`; keeping the storage in
+/// the structural fallback gives specialization one explicit value to clone and lets target
+/// lowering assign a payload location without rediscovering it from an inlined operand graph.
+[ForceInline]
+__generic<payload_t>
+[require(glsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
+void __traceMotionRayWithVulkanPayloadStorage(
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint                            RayFlags,
+    uint                            InstanceInclusionMask,
+    uint                            RayContributionToHitGroupIndex,
+    uint                            MultiplierForGeometryContributionToHitGroupIndex,
+    uint                            MissShaderIndex,
+    RayDesc                         Ray,
+    float                           CurrentTime,
+    inout payload_t                 Payload,
+    inout payload_t                 NativePayload)
+{
+    NativePayload = Payload;
+    __target_switch
+    {
+    case glsl:
+        __traceMotionRay(
+            AccelerationStructure,
+            RayFlags,
+            InstanceInclusionMask,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            Ray.Origin,
+            Ray.TMin,
+            Ray.Direction,
+            Ray.TMax,
+            CurrentTime,
+            __rayPayloadLocation(NativePayload));
+    case spirv:
+    {
+        let origin = Ray.Origin;
+        let direction = Ray.Direction;
+        let tmin = Ray.TMin;
+        let tmax = Ray.TMax;
+        spirv_asm
+        {
+            OpCapability RayTracingMotionBlurNV;
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+
+            OpTraceRayMotionNV
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $InstanceInclusionMask
+                /**/ $RayContributionToHitGroupIndex
+                /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                /**/ $MissShaderIndex
+                /**/ $origin
+                /**/ $tmin
+                /**/ $direction
+                /**/ $tmax
+                /**/ $CurrentTime
+                /**/ &NativePayload;
+        };
+    }
+    }
+    Payload = NativePayload;
 }
 
 /// Traces a ray with motion blur support through the acceleration structure.
@@ -20034,57 +20133,22 @@ void TraceMotionRay(
     {
     case cuda: __intrinsic_asm "optixTrace";
     case glsl:
+    case spirv:
     {
         [__vulkanRayPayload]
         static payload_t p;
 
-        p = Payload;
-        __traceMotionRay(
+        __traceMotionRayWithVulkanPayloadStorage(
             AccelerationStructure,
             RayFlags,
             InstanceInclusionMask,
             RayContributionToHitGroupIndex,
             MultiplierForGeometryContributionToHitGroupIndex,
             MissShaderIndex,
-            Ray.Origin,
-            Ray.TMin,
-            Ray.Direction,
-            Ray.TMax,
+            Ray,
             CurrentTime,
-            __rayPayloadLocation(p));
-        Payload = p;
-    }
-    case spirv:
-    {
-        [__vulkanRayPayload]
-        static payload_t p;
-
-        let origin = Ray.Origin;
-        let direction = Ray.Direction;
-        let tmin = Ray.TMin;
-        let tmax = Ray.TMax;
-
-        p = Payload;
-        spirv_asm
-        {
-            OpCapability RayTracingMotionBlurNV;
-            OpExtension "SPV_NV_ray_tracing_motion_blur";
-
-            OpTraceRayMotionNV
-                /**/ $AccelerationStructure
-                /**/ $RayFlags
-                /**/ $InstanceInclusionMask
-                /**/ $RayContributionToHitGroupIndex
-                /**/ $MultiplierForGeometryContributionToHitGroupIndex
-                /**/ $MissShaderIndex
-                /**/ $origin
-                /**/ $tmin
-                /**/ $direction
-                /**/ $tmax
-                /**/ $CurrentTime
-                /**/ &p;
-        };
-        Payload = p;
+            Payload,
+            p);
     }
     }
 }

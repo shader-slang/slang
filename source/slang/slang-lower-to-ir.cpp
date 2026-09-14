@@ -4922,6 +4922,36 @@ static void addNodeIDDecoration(IRGenContext* context, IRInst* inst, NodeIDAttri
     builder->addDecoration(inst, kIROp_NodeIDDecoration, ops, 2);
 }
 
+/// Returns whether `decl` is the automatic Vulkan payload storage owned by a structural trace
+/// fallback.
+///
+/// Consider the trusted `RayTracer.trace<Payload>` implementation:
+///
+///     [__vulkanRayPayload]
+///     [__structuralRayTracingVulkanPayloadStorage]
+///     static Payload nativePayload;
+///
+/// The structural trace call keeps that implementation as its source fallback. The internal
+/// declaration marker identifies the variable while the checked declaration is still available;
+/// `lowerFunctionStaticVarDecl` already has the containing IR function as its insertion parent and
+/// attaches the exact lowered global there. Later target lowering therefore does not need to search
+/// an inlined operand graph to rediscover their relationship. The marker is necessary at this
+/// producer boundary because the standard module is compiled and serialized before an importing
+/// session registers its trusted trace methods.
+static bool isStructuralRayTracingVulkanPayloadStorage(
+    Decl* decl,
+    VulkanRayPayloadAttribute* attribute)
+{
+    auto variableDecl = as<VarDeclBase>(decl);
+    if (!variableDecl ||
+        !variableDecl->findModifier<StructuralRayTracingVulkanPayloadStorageAttribute>())
+        return false;
+
+    SLANG_RELEASE_ASSERT(
+        attribute && attribute->location < 0 && isFunctionStaticVarDecl(variableDecl));
+    return true;
+}
+
 void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
 {
     auto builder = context->irBuilder;
@@ -4954,8 +4984,13 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         else if (auto rayPayloadAttr = as<VulkanRayPayloadAttribute>(mod))
         {
             builder->addVulkanRayPayloadDecoration(inst, rayPayloadAttr->location);
-            // may not be referenced; adding HLSL export modifier force emits
-            builder->addHLSLExportDecoration(inst);
+            if (!isStructuralRayTracingVulkanPayloadStorage(decl, rayPayloadAttr))
+            {
+                // Legacy payload globals may not be referenced; HLSL export forces their emission.
+                // A structural fallback instead retains its global through explicit compiler
+                // metadata until target lowering assigns or discards the Vulkan storage.
+                builder->addHLSLExportDecoration(inst);
+            }
         }
         else if (auto rayPayloadInAttr = as<VulkanRayPayloadInAttribute>(mod))
         {
@@ -13760,8 +13795,26 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         subBuilder->setInsertBefore(parent);
 
         IRType* subVarType = lowerType(subContext, decl->getType());
-        IRGlobalValueWithCode* irGlobal = subBuilder->createGlobalVar(subVarType);
+        IRGlobalVar* irGlobal = subBuilder->createGlobalVar(subVarType);
         addVarDecorations(subContext, irGlobal, decl);
+
+        if (isStructuralRayTracingVulkanPayloadStorage(
+                decl,
+                decl->findModifier<VulkanRayPayloadAttribute>()))
+        {
+            // Function-static storage is deliberately inserted immediately before its containing
+            // function, inside the same outer generic. Attaching the sibling global to that
+            // function makes ordinary generic cloning specialize both together and remap this
+            // operand to the exact specialized storage.
+            auto owner = as<IRFunc>(parent);
+            SLANG_RELEASE_ASSERT(
+                owner &&
+                !owner->findDecoration<IRStructuralRayTracingVulkanPayloadStorageDecoration>());
+            subBuilder->addDecoration(
+                owner,
+                kIROp_StructuralRayTracingVulkanPayloadStorageDecoration,
+                irGlobal);
+        }
 
         addNameHint(context, irGlobal, decl);
         maybeSetRate(context, irGlobal, decl);

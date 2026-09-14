@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
+//TEST:SIMPLE(filecheck=IR): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -dump-ir-after specializeModule
 
 import slang.raytracing;
 
@@ -84,3 +85,10 @@ void main()
 // SPIRV-DAG: OpVariable {{.*}} RayPayloadKHR {{.*}}Location 1
 // SPIRV-DAG: OpVariable {{.*}} IncomingRayPayloadKHR {{.*}}Location 0
 // SPIRV-DAG: OpVariable {{.*}} IncomingRayPayloadKHR {{.*}}Location 1
+// SPIRV: OpTraceRayKHR
+
+// The structural fallback owns its automatic Vulkan payload global. Specializing `tracePayload`
+// for the two semantic payloads must clone the fallback metadata and remap each decoration operand
+// to that specialization's own global. Target lowering consumes this relationship directly.
+// IR: structuralRayTracingVulkanPayloadStorage(
+// IR: structuralRayTracingVulkanPayloadStorage(

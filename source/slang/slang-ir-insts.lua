@@ -2374,6 +2374,14 @@ local insts = {
 				},
 			},
 			{
+				structuralRayTracingVulkanPayloadStorage = {
+					struct_name = "StructuralRayTracingVulkanPayloadStorageDecoration",
+					operands = {
+						{ "storage", "IRGlobalVar" },
+					},
+				},
+			},
+			{
 				structuralRayTracingTaggedConformance = {
 					struct_name = "StructuralRayTracingTaggedConformanceDecoration",
 					operands = {

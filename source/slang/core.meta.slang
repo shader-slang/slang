@@ -4625,6 +4625,13 @@ attribute_syntax [WaveSize(numLanes: int)]   : WaveSizeAttribute;
 __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanRayPayload(location : int = -1)] : VulkanRayPayloadAttribute;
 
+// Retains the exact automatic Vulkan payload global owned by a structural trace fallback. This
+// marker is internal to the packaged ray-tracing standard module; target lowering consumes its IR
+// decoration and does not expose it as part of the user-facing API.
+__attributeTarget(VarDeclBase)
+attribute_syntax [__structuralRayTracingVulkanPayloadStorage] :
+    StructuralRayTracingVulkanPayloadStorageAttribute;
+
 __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanCallablePayload(location : int = -1)] : VulkanCallablePayloadAttribute;
 

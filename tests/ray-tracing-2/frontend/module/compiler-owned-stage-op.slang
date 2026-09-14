@@ -85,6 +85,10 @@ __intrinsic_op(structuralRayTracingDeferredEmptyPayload) void fakeDeferredEmptyP
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingDeferredEmptyPayload' is reserved for compiler use
 
+__intrinsic_op(structuralRayTracingVulkanPayloadStorage) void fakeVulkanPayloadStorageMetadata();
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingVulkanPayloadStorage' is reserved for compiler use
+
 __intrinsic_op(structuralRayTracingTaggedConformance) void fakeTaggedConformanceMetadata();
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingTaggedConformance' is reserved for compiler use
