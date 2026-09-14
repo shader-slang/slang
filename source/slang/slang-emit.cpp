@@ -1892,6 +1892,13 @@ Result linkAndOptimizeIR(
         (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
          isCUDATarget(targetRequest)))
     {
+        if (isCUDATarget(targetRequest))
+        {
+            // Unlike D3D and Vulkan, OptiX exposes report-intersection attributes as up to eight
+            // explicit uint registers. Lower the structural aggregate through the shared OptiX
+            // transport plan before the target-independent fallback expansion consumes its marker.
+            SLANG_PASS(lowerOptiXStructuralRayTracingReportHitOperations, sink);
+        }
         SLANG_PASS(lowerPortableStructuralRayTracingStageInputOperations);
 
         // Structural stage-input lowering synthesizes native varying parameters after the
