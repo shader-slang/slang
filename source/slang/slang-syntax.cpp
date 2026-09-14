@@ -738,6 +738,36 @@ RequirementWitness tryLookUpRequirementWitness(
 
     if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subtypeWitness))
     {
+        if (as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
+        {
+            // Consider this example:
+            //
+            //     interface IPrimitive { associatedtype Attributes; }
+            //     interface ICustomPrimitive : IPrimitive {}
+            //     interface IContext { associatedtype Primitive : IPrimitive; }
+            //     struct Attributes {}
+            //     struct Primitive<T> : ICustomPrimitive { typealias Attributes = T; }
+            //     struct Context : IContext { typealias Primitive = ::Primitive<::Attributes>; }
+            //
+            // The selected `Primitive<Attributes> : IPrimitive` conformance follows the inherited
+            // `ICustomPrimitive : IPrimitive` requirement. The checker represents that path as a
+            // declared witness whose declaration reference looks up the inherited requirement in
+            // the parent conformance table. Follow that checked path to its nested witness table,
+            // then apply every substitution recorded along the same path.
+            auto unspecializedEntry =
+                getUnspecializedLookupRec(astBuilder, requirementKey, declaredSubtypeWitness);
+            if (unspecializedEntry.getFlavor() != RequirementWitness::Flavor::none)
+            {
+                // Requirements can be values, declaration references, or nested witness tables.
+                // `RequirementWitness::specialize` handles every concrete flavor, so forward all
+                // of them through the substitutions recorded by the lookup-backed conformance.
+                return specializeLookedUpRec(
+                    astBuilder,
+                    declaredSubtypeWitness,
+                    unspecializedEntry);
+            }
+        }
+
         if (auto inheritanceDeclRef = declaredSubtypeWitness->getDeclRef().as<InheritanceDecl>())
         {
             // A conformance that was declared as part of an inheritance clause
