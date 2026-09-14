@@ -9,11 +9,15 @@ struct IRGlobalValueWithCode;
 
 // `calleeSideEffectCache` memoizes `doesCalleeHaveSideEffect` queries the load/store redundancy
 // walk makes for every `Call` inst it scans past (see `canInstHaveSideEffectAtAddress` in
-// slang-ir-util.h/.cpp). It is optional and, when passed, follows the same sharing/staleness
-// contract as `IRDeadCodeEliminationOptions::calleeSideEffectCache`: safe to share across every
-// function processed in one pass, and across this pass and DCE within the same pass, as long as
-// it is cleared whenever a callee's purity could have changed since it was populated (e.g. after
-// `propagateFuncProperties`).
+// slang-ir-util.h/.cpp). It is optional; when shared with DCE (see the sharing/staleness
+// contract on `IRDeadCodeEliminationOptions::calleeSideEffectCache` in slang-ir-dce.h -- the
+// single place that contract is stated, not paraphrased here), callers must clear it whenever a
+// callee's purity could have changed since it was populated. That contract's "a stale entry is
+// conservative" reasoning is DCE-specific (a stale "no side effect" only keeps dead code alive);
+// for this consumer a stale "no side effect" instead lets `canInstHaveSideEffectAtAddress`
+// license forwarding a load/store across that call, which is not automatically safe -- callers
+// sharing a cache with this pass must clear it at least as often as DCE would need to, not rely
+// on DCE's weaker justification.
 bool removeRedundancy(
     IRModule* module,
     bool hoistLoopInvariantInsts,

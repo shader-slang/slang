@@ -129,6 +129,14 @@ void simplifyNonSSAIR(
     IRSimplificationOptions options,
     DiagnosticSink* sink)
 {
+    // Shared with removeRedundancy below, not just eliminateDeadCode, unlike the cache's
+    // original DCE-only contract (IRDeadCodeEliminationOptions::calleeSideEffectCache): a stale
+    // "no side effect" entry there only keeps dead code alive, but here it would let
+    // canInstHaveSideEffectAtAddress's Call case license forwarding a load/store across that
+    // call, which is not conservative. Nothing in this loop mutates callee purity today, so
+    // that never happens in practice, but clearing every iteration -- mirroring simplifyIR's
+    // own per-iteration clear -- makes that a property of the code instead of a convention a
+    // future change to this loop would have to remember.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
@@ -140,6 +148,7 @@ void simplifyNonSSAIR(
     while (changed && iterationCounter < kMaxIterations)
     {
         changed = false;
+        options.deadCodeElimOptions.calleeSideEffectCache->clear();
         changed |= applySparseConditionalConstantPropagationForGlobalScope(module, target, sink);
         changed |= peepholeOptimize(target, module, options.peepholeOptions);
 
@@ -166,6 +175,9 @@ void simplifyFunc(
     IRSimplificationOptions options,
     DiagnosticSink* sink)
 {
+    // See the identical comment in simplifyNonSSAIR above: this cache is shared with
+    // removeRedundancyInFunc below, not just eliminateDeadCode, so it is cleared every
+    // iteration rather than relying on this loop never mutating callee purity.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
@@ -179,6 +191,7 @@ void simplifyFunc(
             break;
 
         changed = false;
+        options.deadCodeElimOptions.calleeSideEffectCache->clear();
         changed |= applySparseConditionalConstantPropagation(func, target, sink);
         changed |= peepholeOptimize(target, func);
         if (!options.minimalOptimization)

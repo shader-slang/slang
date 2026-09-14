@@ -375,10 +375,10 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
 
 bool isPtrLikeOrHandleType(IRInst* type);
 
-// `calleeSideEffectCache` is optional; see `doesCalleeHaveSideEffect`'s memoized overload above
-// for its sharing/staleness contract. Passing one turns the `kIROp_Call` case's
-// `doesCalleeHaveSideEffect` query from O(#call sites to that callee) into an O(1) cache hit
-// after the first query for a given callee.
+// `calleeSideEffectCache` is optional; see `IRDeadCodeEliminationOptions::calleeSideEffectCache`
+// in slang-ir-dce.h for its sharing/staleness contract. Passing one turns the `kIROp_Call`
+// case's `doesCalleeHaveSideEffect` query from O(#call sites to that callee) into an O(1) cache
+// hit after the first query for a given callee.
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,
