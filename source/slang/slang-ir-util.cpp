@@ -984,6 +984,17 @@ static IRInst* _collectAccessChainLeafFirst(
     return addr;
 }
 
+// Overload for callers that want the chain but not the types. It exists so the
+// common case needs no explicit template arguments: passing `nullptr` for
+// `outTypes` cannot deduce `TTypeList` (its type is `std::nullptr_t`), which
+// would otherwise force every call site to spell out both parameters, the
+// second of them naming the type of a list that is never written.
+template<typename TChainList>
+static IRInst* _collectAccessChainLeafFirst(IRInst* addr, TChainList& outAccessChain)
+{
+    return _collectAccessChainLeafFirst<TChainList, List<IRInst*>>(addr, outAccessChain, nullptr);
+}
+
 IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes)
 {
     auto root = _collectAccessChainLeafFirst(addr, outAccessChain, outTypes);
@@ -1215,14 +1226,8 @@ bool canAddressesPotentiallyAlias(
         // that we can handle here, so that we don't need to handle the nuance
         // of whether or not to trace past any RWStructuredBufferGetElementPtr.
         //
-        root1 = _collectAccessChainLeafFirst<ShortList<IRInst*, 8>, List<IRInst*>>(
-            addr1,
-            accessChain1,
-            nullptr);
-        root2 = _collectAccessChainLeafFirst<ShortList<IRInst*, 8>, List<IRInst*>>(
-            addr2,
-            accessChain2,
-            nullptr);
+        root1 = _collectAccessChainLeafFirst(addr1, accessChain1);
+        root2 = _collectAccessChainLeafFirst(addr2, accessChain2);
         if (root1 != root2)
             return true;
         const Index count1 = accessChain1.getCount();
@@ -1693,14 +1698,16 @@ bool isSideEffectFreeFunctionalCall(
 template<typename TFunc>
 void forEachAssociatedCallee(IRInst* callee, TFunc callback)
 {
-    // Walked directly rather than through `traverseUsers`, which snapshots the
-    // whole use list into a `List` before iterating. That snapshot exists so a
-    // callback can mutate the IR; this one only reads decorations off the
-    // annotation's target, so it buys nothing here and costs a heap allocation
-    // plus a full copy per query -- and on a hot intrinsic the use list has one
-    // entry per call site. Callers that memoize this query pay that once per
-    // callee; the uncached callers that remain (slang-ir-simplify-for-emit.cpp,
-    // the autodiff passes) pay it per query.
+    // PRECONDITION: `callback` must not add or remove uses of `callee`. This
+    // walks the use list live, so mutating it invalidates `use->nextUse` under
+    // the iteration. `traverseUsers` snapshots into a `List<IRUse*>` precisely
+    // to tolerate that, and this does not -- because the snapshot costs a heap
+    // allocation and a full copy on every query, and on a hot intrinsic the use
+    // list holds one entry per call site. Callers that memoize the enclosing
+    // query pay that once per callee; the uncached ones that remain
+    // (slang-ir-simplify-for-emit.cpp, the autodiff passes) pay it per query.
+    //
+    // A mutating callback belongs on `traverseUsers`, not here.
     for (auto use = callee->firstUse; use; use = use->nextUse)
     {
         if (use->usedValue != callee)
