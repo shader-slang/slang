@@ -113,7 +113,17 @@ state="$work/state"
 progress="$work/progress.log"
 mkdir -p "$results" "$logs" "$scratch" "$state" || exit 1
 
-say() { printf '%s  %s\n' "$(date +%Y-%m-%dT%H:%M:%S)" "$*" | tee -a "$progress"; }
+# The log file is written first and on its own, then the same line is echoed for anyone
+# watching. Writing both through `tee` ties the log to standard output: if that goes away -- a
+# terminal closing, or the run being piped into something that stops reading -- `tee` goes with
+# it and the log stops, while the run itself carries on invisibly. The file is the record that
+# matters, so nothing that happens to stdout is allowed to interrupt it.
+say() {
+  local line
+  line="$(date +%Y-%m-%dT%H:%M:%S)  $*"
+  printf '%s\n' "$line" >>"$progress"
+  printf '%s\n' "$line" 2>/dev/null || true
+}
 
 # Which builds to measure: those named, or every build directory that has a binary to measure.
 # A directory without one is skipped rather than being an error, so a half-built matrix can be

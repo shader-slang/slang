@@ -702,38 +702,130 @@ public:
     void remove(const T& obj) { dict.remove(obj); }
     bool contains(const T& obj) const { return dict.containsKey(obj); }
 };
-template<typename T>
-class HashSet : public HashSetBase<T, Dictionary<T, _DummyClass>>
+/// A set of `T`, backed by the selected implementation's own set type.
+///
+/// This used to be a `Dictionary<T, _DummyClass>`, which stores an empty value beside every key.
+/// The value is not free: alignment rounds the entry up, so `HashSet<IRInst*>` took sixteen bytes
+/// an entry where the key needs eight. Entry size decides how many entries share a cache line,
+/// which is most of what a probe costs, and the compiler's hot sets are sets of pointers.
+template<typename T, typename Hash = Slang::Hash<T>, typename KeyEqual = std::equal_to<T>>
+class HashSet
 {
-    using Base = HashSetBase<T, Dictionary<T, _DummyClass>>;
+private:
+    using InnerSet = HashMapImpl::Set<T, Hash, KeyEqual>;
+    InnerSet set;
+    SLANG_CONTAINER_STATS_MEMBER
+
+    void init() {} // Base case for recursion
+    template<typename... Args>
+    void init(const T& v, Args... args)
+    {
+        add(v);
+        init(args...);
+    }
 
 public:
-    using Base::HashSetBase;
-
 #if SLANG_ENABLE_CONTAINER_STATS
-    // Default, copy and move constructors are never inherited, so `using Base::HashSetBase` above
-    // does not bring them in; the compiler supplies implicit ones instead, and those would capture
-    // this header as the site. Declaring them explicitly is what lets a `HashSet` report the line
-    // it was declared on.
+    // Spelled out rather than defaulted so that each records the line it was declared on; see the
+    // same constructors on `Dictionary`.
     HashSet(SLANG_CONTAINER_STATS_SITE_PARAM)
-        : Base(SLANG_CONTAINER_STATS_FORWARD)
+        : SLANG_CONTAINER_STATS_INIT(HashSet, T, _DummyClass)
     {
     }
-    // The casts to `Base` matter. `HashSetBase` also has a variadic constructor template, and
-    // passing a `HashSet` to it would be an exact match while its copy constructor would need a
-    // derived-to-base conversion -- so without the cast the variadic template wins overload
-    // resolution and the copy is compiled as "construct a set containing one set".
     HashSet(const HashSet& rhs, SLANG_CONTAINER_STATS_SITE_PARAM)
-        : Base(static_cast<const Base&>(rhs), SLANG_CONTAINER_STATS_FORWARD)
+        : set(rhs.set), SLANG_CONTAINER_STATS_INIT(HashSet, T, _DummyClass)
     {
+        SLANG_CONTAINER_STATS_NOTE_SIZE(set.size());
     }
     HashSet(HashSet&& rhs, SLANG_CONTAINER_STATS_SITE_PARAM)
-        : Base(static_cast<Base&&>(rhs), SLANG_CONTAINER_STATS_FORWARD)
+        : set(std::move(rhs.set)), SLANG_CONTAINER_STATS_INIT(HashSet, T, _DummyClass)
     {
+        m_containerStatsProbe.takeFrom(rhs.m_containerStatsProbe);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(set.size());
     }
+    HashSet& operator=(const HashSet& rhs)
+    {
+        set = rhs.set;
+        SLANG_CONTAINER_STATS_NOTE_OP(CopyAssign);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(set.size());
+        return *this;
+    }
+    HashSet& operator=(HashSet&& rhs)
+    {
+        set = std::move(rhs.set);
+        SLANG_CONTAINER_STATS_NOTE_OP(MoveAssign);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(set.size());
+        return *this;
+    }
+#else
+    HashSet() = default;
+    HashSet(const HashSet&) = default;
+    HashSet(HashSet&&) = default;
     HashSet& operator=(const HashSet&) = default;
     HashSet& operator=(HashSet&&) = default;
 #endif
+
+    /// Construct from elements, as `HashSet<int> s(1, 2, 3)`.
+    ///
+    /// The first parameter is constrained to `T` so that this does not outcompete the copy and
+    /// move constructors, which would otherwise be a worse match for a `HashSet` argument -- the
+    /// copy needs a derived-to-base conversion and this would be exact.
+    template<typename... Args>
+    HashSet(const T& arg, Args... args)
+    {
+        init(arg, args...);
+    }
+
+    using Iterator = typename InnerSet::const_iterator;
+    Iterator begin() const { return set.begin(); }
+    Iterator end() const { return set.end(); }
+
+    auto getCount() const { return set.size(); }
+    auto getBucketCount() const { return set.bucket_count(); }
+
+    void clear()
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(Clear);
+        if (!set.empty())
+            set.clear();
+    }
+
+    /// Empties the set and hands its memory back, where `clear` keeps it for reuse.
+    void clearAndDeallocate()
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(ClearAndDeallocate);
+        InnerSet emptySet(0, set.hash_function(), set.key_eq(), set.get_allocator());
+        set.swap(emptySet);
+    }
+
+    /// Insert `obj`, returning whether it was not already there.
+    bool add(const T& obj)
+    {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        const bool inserted = set.insert(obj).second;
+        SLANG_CONTAINER_STATS_NOTE_SIZE(set.size());
+        return inserted;
+    }
+    bool add(T&& obj)
+    {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        const bool inserted = set.insert(std::move(obj)).second;
+        SLANG_CONTAINER_STATS_NOTE_SIZE(set.size());
+        return inserted;
+    }
+
+    void remove(const T& obj)
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(Remove);
+        set.erase(obj);
+    }
+
+    bool contains(const T& obj) const
+    {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
+        // find() rather than contains(): std::unordered_set only gained contains() in C++20.
+        return set.find(obj) != set.end();
+    }
 };
 
 template<typename TKey, typename TValue>
