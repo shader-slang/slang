@@ -273,6 +273,23 @@ jobs:
             ccache --show-stats || true
           fi
 
+      - name: Verify third-party notices ship in the metadata component
+        if: inputs.platform != 'wasm' && runner.os == 'Linux'
+        run: |
+          # The third-party-notices install rules live in the metadata CPack
+          # component (EXCLUDE_FROM_ALL), otherwise materialized only by
+          # release-time cpack. Install just that component here so a bad path,
+          # RENAME, or guard is caught on every PR rather than at a release tag.
+          # The notices are configuration-independent files, so installing the
+          # Release config is valid regardless of which config was built.
+          cmake --install build --config Release --component metadata --prefix install-metadata
+          for f in cmark-COPYING lz4-LICENSE glslang-LICENSE.txt; do
+            test -f "install-metadata/third-party-notices/$f" || {
+              echo "::error::third-party notice missing from metadata component: $f"
+              exit 1
+            }
+          done
+
       - name: Verify Vulkan-Headers was not fetched
         if: inputs.platform != 'wasm'
         run: |
