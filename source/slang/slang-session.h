@@ -440,8 +440,11 @@ public:
 
     void _stopRetainingParentSession() { m_retainedSession = nullptr; }
 
-    // Get shared semantics information for reflection purposes.
-    SharedSemanticsContext* getSemanticsForReflection();
+    /// Gets a snapshot of the shared semantic state used by reflection operations.
+    ///
+    /// The strong reference keeps that snapshot alive if a later `-std` change replaces the
+    /// linkage's cached context.
+    RefPtr<SharedSemanticsContext> getSemanticsForReflection();
 
 private:
     /// The global Slang library session that this linkage is a child of

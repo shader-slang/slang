@@ -20,7 +20,8 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: "2"
-      - id: filter
+      - name: Diff changed files
+        id: diff
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
@@ -32,23 +33,25 @@ jobs:
             BASE=HEAD^1
           fi
 
-          shouldRun=true
           if files="$(git diff --name-only "${BASE}...HEAD")"; then
-            # Git diff succeeded, check if non-documentation files were changed
-            if echo "$files" | grep -Eqx 'docs/(command-line-slangc-reference.md|user-guide/a4-02-reference-capability-atoms.md)'; then
-              echo "Generated reference document changed, running checks"
-              shouldRun=true
-            elif echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|\.claude/|.*\.md$|\.coderabbit\.yaml$)'; then
-              shouldRun=true
-            else
-              echo "Only documentation files changed, skipping remaining steps"
-              shouldRun=false
-            fi
+            {
+              echo "files<<EOF"
+              echo "$files"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "diff-ok=true" >> "$GITHUB_OUTPUT"
           else
             echo "Git diff failed, conservatively running tests"
-            shouldRun=true
+            echo "diff-ok=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "should-run=$shouldRun" >> "$GITHUB_OUTPUT"
+      - id: filter_docs
+        if: steps.diff.outputs.diff-ok == 'true'
+        uses: ./.github/actions/docs-only-filter
+        with:
+          files: ${{ steps.diff.outputs.files }}
+      - id: filter
+        run: |
+          echo "should-run=${{ steps.diff.outputs.diff-ok == 'false' || steps.filter_docs.outputs.should-run }}" >> "$GITHUB_OUTPUT"
 
   # Low-priority gate. This job runs for every PR/dispatch that needs CI, but
   # only nv-slang-bot[bot] workflow_dispatch runs can ever yield. Those are the
