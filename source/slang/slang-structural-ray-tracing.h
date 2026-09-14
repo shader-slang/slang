@@ -5,6 +5,8 @@
 #include "core/slang-list.h"
 #include "slang-compiler-fwd.h"
 
+#include <mutex>
+
 namespace Slang
 {
 
@@ -385,6 +387,16 @@ public:
     bool functionReachesStructuralTrace(FunctionDeclBase* function) const;
     bool findReachableCallShader(FunctionDeclBase* function, SourceLoc& outCallLoc) const;
 
+    /// Records the checked AST type represented by a compiler-produced opaque identity.
+    ///
+    /// IR linking may preserve nominal identity after target specialization has erased the AST
+    /// declaration from the linked module. Reflection uses this producer-side bridge to recover
+    /// that already-checked type; it never parses the identity string as a source name.
+    void registerReflectionType(UnownedStringSlice identity, Type* type);
+
+    /// Finds the checked AST type previously registered for an opaque compiler identity.
+    Type* findReflectionType(UnownedStringSlice identity) const;
+
 private:
     InterfaceDecl* m_stageInterfaces[int(StructuralRayTracingStageKind::Count)] = {};
     InterfaceDecl* m_intersectionStageInterface = nullptr;
@@ -414,6 +426,8 @@ private:
     Dictionary<FunctionDeclBase*, HashSet<FunctionDeclBase*>> m_functionCallees;
     HashSet<FunctionDeclBase*> m_structuralProgramCallers;
     Dictionary<FunctionDeclBase*, SourceLoc> m_callShaderCallers;
+    mutable std::mutex m_reflectionTypesMutex;
+    mutable Dictionary<String, Type*> m_reflectionTypes;
 };
 
 const char* getStructuralRayTracingStageInterfaceName(StructuralRayTracingStageKind kind);

@@ -2199,7 +2199,20 @@ public:                                                              \
         SlangReflectionTraceProgramSchema* schema);
     SLANG_API SlangReflectionType* spReflectionTraceProgramSchema_getTraceContextType(
         SlangReflectionTraceProgramSchema* schema);
-    /** Get the payload partitions used by a closed schema.
+    /** Return whether linked conformances can add hit groups to this schema.
+
+    The returned entry list is already finalized for the reflected program. This flag describes
+    how the schema was declared; callers do not need to perform another discovery step.
+    */
+    SLANG_API bool spReflectionTraceProgramSchema_isHitGroupSectionOpen(
+        SlangReflectionTraceProgramSchema* schema);
+    /** Return whether linked conformances can add miss shaders to this schema. */
+    SLANG_API bool spReflectionTraceProgramSchema_isMissShaderSectionOpen(
+        SlangReflectionTraceProgramSchema* schema);
+    /** Return whether linked conformances can add callable shaders to this schema. */
+    SLANG_API bool spReflectionTraceProgramSchema_isCallableShaderSectionOpen(
+        SlangReflectionTraceProgramSchema* schema);
+    /** Get the payload partitions selected for this program's finalized schema.
 
     Payloads appear in order of first use by hit groups, followed by payloads first used by miss
     shaders.
@@ -2258,6 +2271,9 @@ public:                                                              \
     /** Get the payload type that identifies this partition. */
     SLANG_API SlangReflectionType* spReflectionRayTracingPayload_getType(
         SlangReflectionRayTracingPayload* payload);
+    /** Get the payload layout under the reflected target's ordinary data-layout rules. */
+    SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingPayload_getTypeLayout(
+        SlangReflectionRayTracingPayload* payload);
     /** Get hit groups in their dense function-index order for this payload. */
     SLANG_API SlangUInt
     spReflectionRayTracingPayload_getHitGroupCount(SlangReflectionRayTracingPayload* payload);
@@ -2311,6 +2327,16 @@ public:                                                              \
         SlangReflectionRayTracingHitGroup* group);
     SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getRecordType(
         SlangReflectionRayTracingHitGroup* group);
+    /** Get the application-record layout used by structural record-buffer lowering.
+
+    Metal uses structured-buffer layout rules because the compiler reads records from a raw device
+    buffer. Other targets use their ordinary data-layout rules.
+    */
+    SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingHitGroup_getRecordTypeLayout(
+        SlangReflectionRayTracingHitGroup* group);
+    /** Return whether this group was discovered from a linked open-section conformance. */
+    SLANG_API bool spReflectionRayTracingHitGroup_isLinked(
+        SlangReflectionRayTracingHitGroup* group);
     SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getPrimitiveType(
         SlangReflectionRayTracingHitGroup* group);
     SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getIntersectionAttributesType(
@@ -2339,6 +2365,12 @@ public:                                                              \
         SlangReflectionRayTracingMissShader* shader);
     SLANG_API SlangReflectionType* spReflectionRayTracingMissShader_getRecordType(
         SlangReflectionRayTracingMissShader* shader);
+    /** Get the application-record layout used by structural record-buffer lowering. */
+    SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingMissShader_getRecordTypeLayout(
+        SlangReflectionRayTracingMissShader* shader);
+    /** Return whether this shader was discovered from a linked open-section conformance. */
+    SLANG_API bool spReflectionRayTracingMissShader_isLinked(
+        SlangReflectionRayTracingMissShader* shader);
     SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingMissShader_getMiss(
         SlangReflectionRayTracingMissShader* shader);
 
@@ -2350,6 +2382,12 @@ public:                                                              \
     SLANG_API SlangReflectionType* spReflectionRayTracingCallableShader_getContextType(
         SlangReflectionRayTracingCallableShader* shader);
     SLANG_API SlangReflectionType* spReflectionRayTracingCallableShader_getRecordType(
+        SlangReflectionRayTracingCallableShader* shader);
+    /** Get the application-record layout used by structural record-buffer lowering. */
+    SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingCallableShader_getRecordTypeLayout(
+        SlangReflectionRayTracingCallableShader* shader);
+    /** Return whether this shader was discovered from a linked open-section conformance. */
+    SLANG_API bool spReflectionRayTracingCallableShader_isLinked(
         SlangReflectionRayTracingCallableShader* shader);
     SLANG_API SlangReflectionType* spReflectionRayTracingCallableShader_getDataType(
         SlangReflectionRayTracingCallableShader* shader);
@@ -4000,6 +4038,15 @@ struct RayTracingHitGroupReflection
         return (TypeReflection*)spReflectionRayTracingHitGroup_getRecordType(
             (SlangReflectionRayTracingHitGroup*)this);
     }
+    TypeLayoutReflection* getRecordTypeLayout()
+    {
+        return (TypeLayoutReflection*)spReflectionRayTracingHitGroup_getRecordTypeLayout(
+            (SlangReflectionRayTracingHitGroup*)this);
+    }
+    bool isLinked()
+    {
+        return spReflectionRayTracingHitGroup_isLinked((SlangReflectionRayTracingHitGroup*)this);
+    }
     TypeReflection* getPrimitiveType()
     {
         return (TypeReflection*)spReflectionRayTracingHitGroup_getPrimitiveType(
@@ -4056,6 +4103,16 @@ struct RayTracingMissShaderReflection
         return (TypeReflection*)spReflectionRayTracingMissShader_getRecordType(
             (SlangReflectionRayTracingMissShader*)this);
     }
+    TypeLayoutReflection* getRecordTypeLayout()
+    {
+        return (TypeLayoutReflection*)spReflectionRayTracingMissShader_getRecordTypeLayout(
+            (SlangReflectionRayTracingMissShader*)this);
+    }
+    bool isLinked()
+    {
+        return spReflectionRayTracingMissShader_isLinked(
+            (SlangReflectionRayTracingMissShader*)this);
+    }
     RayTracingStageReflection* getMiss()
     {
         return (RayTracingStageReflection*)spReflectionRayTracingMissShader_getMiss(
@@ -4084,6 +4141,16 @@ struct RayTracingCallableShaderReflection
     TypeReflection* getRecordType()
     {
         return (TypeReflection*)spReflectionRayTracingCallableShader_getRecordType(
+            (SlangReflectionRayTracingCallableShader*)this);
+    }
+    TypeLayoutReflection* getRecordTypeLayout()
+    {
+        return (TypeLayoutReflection*)spReflectionRayTracingCallableShader_getRecordTypeLayout(
+            (SlangReflectionRayTracingCallableShader*)this);
+    }
+    bool isLinked()
+    {
+        return spReflectionRayTracingCallableShader_isLinked(
             (SlangReflectionRayTracingCallableShader*)this);
     }
     TypeReflection* getDataType()
@@ -4130,6 +4197,11 @@ struct RayTracingPayloadReflection
     TypeReflection* getType()
     {
         return (TypeReflection*)spReflectionRayTracingPayload_getType(
+            (SlangReflectionRayTracingPayload*)this);
+    }
+    TypeLayoutReflection* getTypeLayout()
+    {
+        return (TypeLayoutReflection*)spReflectionRayTracingPayload_getTypeLayout(
             (SlangReflectionRayTracingPayload*)this);
     }
     SlangUInt getHitGroupCount()
@@ -4188,6 +4260,21 @@ struct TraceProgramSchemaReflection
     TypeReflection* getTraceContextType()
     {
         return (TypeReflection*)spReflectionTraceProgramSchema_getTraceContextType(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    bool isHitGroupSectionOpen()
+    {
+        return spReflectionTraceProgramSchema_isHitGroupSectionOpen(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    bool isMissShaderSectionOpen()
+    {
+        return spReflectionTraceProgramSchema_isMissShaderSectionOpen(
+            (SlangReflectionTraceProgramSchema*)this);
+    }
+    bool isCallableShaderSectionOpen()
+    {
+        return spReflectionTraceProgramSchema_isCallableShaderSectionOpen(
             (SlangReflectionTraceProgramSchema*)this);
     }
     SlangUInt getPayloadCount()

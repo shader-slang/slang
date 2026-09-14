@@ -1295,6 +1295,28 @@ local insts = {
 			},
 		},
 	},
+	-- A schema type-conformance component emits this compiler-owned root when any section is open.
+	-- Its three identity packs begin with the explicitly listed entries. Whole-program linking
+	-- appends the selected tagged conformances, turning the same instruction into the finalized
+	-- reflection summary without introducing a second discovery pipeline.
+	{
+		structuralRayTracingProgramSchema = {
+			struct_name = "StructuralRayTracingProgramSchema",
+			global = true,
+			operands = {
+				{ "schemaType", "IRType" },
+				{ "schemaSourceTypeName", "IRStringLit" },
+				{ "schemaTypeIdentity", "IRStringLit" },
+				{ "traceContextType", "IRType" },
+				{ "hitGroupSectionOpen", "IRBoolLit" },
+				{ "missShaderSectionOpen", "IRBoolLit" },
+				{ "callableShaderSectionOpen", "IRBoolLit" },
+				{ "hitGroupTypeIdentities", "IRMakeValuePack" },
+				{ "missShaderTypeIdentities", "IRMakeValuePack" },
+				{ "callableShaderTypeIdentities", "IRMakeValuePack" },
+			},
+		},
+	},
 	{
 		metalStructuralRayTracingTrace = {
 			operands = {

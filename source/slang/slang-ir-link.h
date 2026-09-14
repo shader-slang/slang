@@ -7,6 +7,8 @@
 namespace Slang
 {
 struct IRVarLayout;
+class TargetProgram;
+class DiagnosticSink;
 
 struct LinkedIR
 {
@@ -24,6 +26,13 @@ struct LinkedIR
 // target will be used.
 //
 LinkedIR linkIR(CodeGenContext* codeGenContext);
+
+/// Gets the finalized target manifest used by structural ray-tracing codegen and reflection.
+///
+/// This performs link/specialization/open-section completion but does not enter target emission.
+RefPtr<IRModule> getOrCreateStructuralRayTracingProgramManifest(
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink);
 
 // Prelinking is a step that happens immediately after visiting all AST nodes during IR lowering,
 // and before any IR validation steps. Prelinking copys all extern symbols that are

@@ -105,6 +105,7 @@ bool isCompilerOwnedStructuralRayTracingIROp(IROp op)
     {
     case kIROp_StructuralRayTracingTrace:
     case kIROp_StructuralRayTracingCallShader:
+    case kIROp_StructuralRayTracingProgramSchema:
     case kIROp_MetalStructuralRayTracingTrace:
     case kIROp_MetalStructuralRayTracingCallShader:
     case kIROp_MetalStructuralRayTracingDispatchRaysIndex:
@@ -127,6 +128,82 @@ bool isCompilerOwnedStructuralRayTracingIROp(IROp op)
     default:
         return false;
     }
+}
+
+static IRMakeValuePack* _getStructuralRayTracingProgramSchemaTypeIdentities(
+    IRStructuralRayTracingProgramSchema* schema,
+    StructuralRayTracingSectionKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingSectionKind::HitGroups:
+        return schema->getHitGroupTypeIdentities();
+    case StructuralRayTracingSectionKind::MissShaders:
+        return schema->getMissShaderTypeIdentities();
+    case StructuralRayTracingSectionKind::CallableShaders:
+        return schema->getCallableShaderTypeIdentities();
+    default:
+        SLANG_UNEXPECTED("invalid structural ray-tracing section kind");
+    }
+}
+
+// Returns a replacement summary whose selected section includes `typeIdentity`.
+//
+// IR operands cannot grow in place. Completion therefore builds a new value pack and schema root,
+// then moves the compiler-owned metadata from the old root. Callers must continue with the returned
+// root because the old instruction is deallocated.
+static IRStructuralRayTracingProgramSchema* _appendStructuralRayTracingProgramSchemaTypeIdentity(
+    IRBuilder& builder,
+    IRStructuralRayTracingProgramSchema* schema,
+    StructuralRayTracingSectionKind kind,
+    IRStringLit* typeIdentity)
+{
+    auto identities = _getStructuralRayTracingProgramSchemaTypeIdentities(schema, kind);
+    SLANG_RELEASE_ASSERT(identities && typeIdentity);
+    List<IRInst*> elements;
+    for (UInt i = 0; i < identities->getOperandCount(); ++i)
+        elements.add(identities->getOperand(i));
+    elements.add(typeIdentity);
+
+    IRBuilderInsertLocScope insertLocScope(&builder);
+    builder.setInsertBefore(schema);
+    auto extendedIdentities =
+        cast<IRMakeValuePack>(builder.emitMakeValuePack(elements.getCount(), elements.getBuffer()));
+    IRInst* operands[] = {
+        schema->getSchemaType(),
+        schema->getSchemaSourceTypeName(),
+        schema->getSchemaTypeIdentity(),
+        schema->getTraceContextType(),
+        schema->getHitGroupSectionOpen(),
+        schema->getMissShaderSectionOpen(),
+        schema->getCallableShaderSectionOpen(),
+        kind == StructuralRayTracingSectionKind::HitGroups ? extendedIdentities
+                                                           : schema->getHitGroupTypeIdentities(),
+        kind == StructuralRayTracingSectionKind::MissShaders
+            ? extendedIdentities
+            : schema->getMissShaderTypeIdentities(),
+        kind == StructuralRayTracingSectionKind::CallableShaders
+            ? extendedIdentities
+            : schema->getCallableShaderTypeIdentities(),
+    };
+    auto extendedSchema = cast<IRStructuralRayTracingProgramSchema>(builder.emitIntrinsicInst(
+        nullptr,
+        kIROp_StructuralRayTracingProgramSchema,
+        SLANG_COUNT_OF(operands),
+        operands));
+    extendedSchema->sourceLoc = schema->sourceLoc;
+
+    // Rebuild through semantic accessors so the completion algorithm never knows physical operand
+    // positions. Every child is a compiler-produced decoration; moving those same nodes preserves
+    // the open-request pointers already collected for this completion pass.
+    while (auto child = schema->getFirstDecorationOrChild())
+    {
+        SLANG_RELEASE_ASSERT(as<IRDecoration>(child));
+        child->insertAtEnd(extendedSchema);
+    }
+    schema->replaceUsesWith(extendedSchema);
+    schema->removeAndDeallocate();
+    return extendedSchema;
 }
 
 IRFunc* getStructuralRayTracingHitGroupStageInvoke(
@@ -646,7 +723,8 @@ bool completeOpenStructuralRayTracingSchemas(IRModule* module, DiagnosticSink* s
         auto operation = request->getParent();
         SLANG_RELEASE_ASSERT(
             as<IRStructuralRayTracingTrace>(operation) ||
-            as<IRStructuralRayTracingCallShader>(operation));
+            as<IRStructuralRayTracingCallShader>(operation) ||
+            as<IRStructuralRayTracingProgramSchema>(operation));
         auto kindValue = request->getSectionKind()->getValue();
         SLANG_RELEASE_ASSERT(
             kindValue >= 0 && kindValue < IRIntegerValue(StructuralRayTracingSectionKind::Count));
@@ -754,6 +832,16 @@ bool completeOpenStructuralRayTracingSchemas(IRModule* module, DiagnosticSink* s
                 break;
             default:
                 SLANG_UNEXPECTED("invalid structural ray-tracing section kind");
+            }
+
+            if (auto schema = as<IRStructuralRayTracingProgramSchema>(operation))
+            {
+                operation = _appendStructuralRayTracingProgramSchemaTypeIdentity(
+                    builder,
+                    schema,
+                    kind,
+                    candidate.typeIdentity);
+                builder.setInsertInto(operation);
             }
         }
 
