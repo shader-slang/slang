@@ -19,6 +19,7 @@ struct RadiancePayload
     uint stage;
     uint radiance;
     uint bounce;
+    uint padding[7];
 }
 
 struct ShadowPayload
@@ -76,6 +77,8 @@ namespace Stages
             input.payload.stage = 10;
             input.payload.radiance = 101;
             input.payload.bounce = 1;
+            for (uint i = 0; i < 7; ++i)
+                input.payload.padding[i] += 10 * (i + 1);
         }
     }
 
@@ -99,6 +102,8 @@ namespace Stages
             input.payload.stage = 11;
             input.payload.radiance = 202;
             input.payload.bounce = 0;
+            for (uint i = 0; i < 7; ++i)
+                input.payload.padding[i] += 20 * (i + 1);
         }
     }
 
@@ -176,10 +181,16 @@ void rayGenerationMain()
     else
     {
         RadiancePayload payload = {};
+        for (uint i = 0; i < 7; ++i)
+            payload.padding[i] = i + 1;
         tracer.trace(desc, scene, program, payload);
         // Include every payload word in the observable result so the OptiX run checks all payload
-        // registers, including the word that makes RadiancePayload larger than ShadowPayload.
+        // registers. Ten words is also deliberately between the old prelude's eight- and
+        // sixteen-register call shapes, so the pipeline's reflected register count must match the
+        // exact argument count passed to optixTrace.
         uint value = payload.radiance + 1000 * payload.bounce;
+        for (uint i = 0; i < 7; ++i)
+            value += payload.padding[i];
         results[rayIndex] = { payload.stage, value, DispatchRaysDimensions().x };
     }
 }

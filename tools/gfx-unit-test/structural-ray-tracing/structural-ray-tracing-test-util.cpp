@@ -596,10 +596,8 @@ void runStructuralRayTracingRepeatedRecords(IDevice* device)
 
         auto hitFunctionIndex = reflectedHitGroup->getFunctionIndex();
         auto missFunctionIndex = reflectedMissShader->getFunctionIndex();
-        SLANG_CHECK_ABORT(
-            hitFunctionIndex >= 0 && hitFunctionIndex < SlangInt(kFunctionCount));
-        SLANG_CHECK_ABORT(
-            missFunctionIndex >= 0 && missFunctionIndex < SlangInt(kFunctionCount));
+        SLANG_CHECK_ABORT(hitFunctionIndex >= 0 && hitFunctionIndex < SlangInt(kFunctionCount));
+        SLANG_CHECK_ABORT(missFunctionIndex >= 0 && missFunctionIndex < SlangInt(kFunctionCount));
         auto hitIndex = SlangUInt(hitFunctionIndex);
         auto missIndex = SlangUInt(missFunctionIndex);
         SLANG_CHECK_ABORT(closestHitEntryPointNames[hitIndex] == nullptr);
@@ -1104,9 +1102,9 @@ void runStructuralRayTracingMultiplePayloads(IDevice* device)
     auto actual = static_cast<const StructuralRayTracingMultiplePayloadResult*>(
         resultBlob->getBufferPointer());
     static const StructuralRayTracingMultiplePayloadResult kExpected[] = {
-        {10, 1101, 4},
+        {10, 1409, 4},
         {20, 1, 4},
-        {11, 202, 4},
+        {11, 790, 4},
         {21, 0, 4},
     };
     for (Index i = 0; i < SLANG_COUNT_OF(kExpected); ++i)
