@@ -8,6 +8,7 @@ namespace Slang
 
 class ProgramLayout;
 class Type;
+class TypeLayout;
 
 /// Describes one concrete structural stage and the physical entry-point name generated for it.
 class StructuralRayTracingStageReflection : public RefObject
@@ -26,8 +27,12 @@ public:
     Type* groupType = nullptr;
     Type* contextType = nullptr;
     Type* recordType = nullptr;
+    /// Layout the host uses for the application data stored after this group's record header.
+    TypeLayout* recordTypeLayout = nullptr;
     Type* primitiveType = nullptr;
     Type* intersectionAttributesType = nullptr;
+    /// True when whole-program open-section completion selected this group.
+    bool isLinked = false;
     /// Exact target symbol installed in this group's closest-hit table slot.
     ///
     /// This remains populated for a synthesized Metal no-op even though `closestHit` is null and
@@ -46,6 +51,10 @@ public:
     Type* shaderType = nullptr;
     Type* contextType = nullptr;
     Type* recordType = nullptr;
+    /// Layout the host uses for the application data stored after this shader's record header.
+    TypeLayout* recordTypeLayout = nullptr;
+    /// True when whole-program open-section completion selected this shader.
+    bool isLinked = false;
     RefPtr<StructuralRayTracingStageReflection> miss;
 };
 
@@ -57,7 +66,11 @@ public:
     Type* shaderType = nullptr;
     Type* contextType = nullptr;
     Type* recordType = nullptr;
+    /// Layout the host uses for the application data stored after this shader's record header.
+    TypeLayout* recordTypeLayout = nullptr;
     Type* callableDataType = nullptr;
+    /// True when whole-program open-section completion selected this shader.
+    bool isLinked = false;
     RefPtr<StructuralRayTracingStageReflection> callable;
 };
 
@@ -84,6 +97,8 @@ class StructuralRayTracingPayloadReflection : public RefObject
 {
 public:
     Type* payloadType = nullptr;
+    /// Target layout of the payload value carried by this partition.
+    TypeLayout* typeLayout = nullptr;
 
     /// Number of physical slots required by this payload's sparse Metal IFT.
     Index intersectionFunctionTableSize = 0;
@@ -113,6 +128,10 @@ public:
     String name;
     Type* schemaType = nullptr;
     Type* traceContextType = nullptr;
+    /// These flags describe the source schema; the entry lists below are already link-finalized.
+    bool hitGroupSectionOpen = false;
+    bool missShaderSectionOpen = false;
+    bool callableShaderSectionOpen = false;
 
     /// Fixed Metal record-buffer strides in bytes, including each record's 16-byte header.
     /// These remain zero for targets without a compiler-owned structural record buffer.

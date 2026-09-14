@@ -981,8 +981,12 @@ static IRStringLit* _lowerStructuralRayTracingCanonicalTypeIdentity(
     Type* type)
 {
     SLANG_RELEASE_ASSERT(type);
-    auto identity = getMangledTypeName(context->astBuilder, type->getCanonicalType());
+    auto canonicalType = type->getCanonicalType();
+    auto identity = getMangledTypeName(context->astBuilder, canonicalType);
     SLANG_RELEASE_ASSERT(identity.getLength() != 0);
+    context->getLinkage()->getStructuralRayTracingDeclRegistry().registerReflectionType(
+        identity.getUnownedSlice(),
+        canonicalType);
     return context->irBuilder->getStringValue(identity.getUnownedSlice());
 }
 
@@ -1629,28 +1633,11 @@ struct StructuralRayTracingProgramLayoutInfo
 
 static StructuralRayTracingProgramLayoutInfo _getStructuralRayTracingProgramLayoutInfo(
     IRGenContext* context,
-    FunctionDeclBase* functionDecl,
-    DeclRef<Decl> funcDeclRef)
+    Type* candidateType,
+    SubtypeWitness* candidateWitness)
 {
     StructuralRayTracingProgramLayoutInfo result;
     auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
-    // A trace method can have both a method generic (`Payload` or `maxLevelCount`) and an enclosing
-    // extension generic (`Schema`). Registration records the latter explicitly, so this lookup
-    // cannot mistake a method argument and its witness for the program schema.
-    auto methodInfo = registry.getRayTracerMethodInfo(functionDecl);
-    SLANG_RELEASE_ASSERT(methodInfo);
-    auto schemaApplication =
-        SubstitutionSet(funcDeclRef).findGenericAppDeclRef(methodInfo->schemaGenericDecl);
-    SLANG_RELEASE_ASSERT(
-        schemaApplication && methodInfo->schemaTypeArgumentIndex >= 0 &&
-        methodInfo->schemaTypeArgumentIndex < schemaApplication->getArgCount() &&
-        methodInfo->schemaWitnessArgumentIndex >= 0 &&
-        methodInfo->schemaWitnessArgumentIndex < schemaApplication->getArgCount());
-
-    auto candidateType =
-        as<Type>(schemaApplication->getArg(methodInfo->schemaTypeArgumentIndex)->resolve());
-    auto candidateWitness = as<SubtypeWitness>(
-        schemaApplication->getArg(methodInfo->schemaWitnessArgumentIndex)->resolve());
     SLANG_RELEASE_ASSERT(candidateType && candidateWitness);
 
     // Retain the schema identity even if one of its associated types is still open. The
@@ -1729,6 +1716,136 @@ static StructuralRayTracingProgramLayoutInfo _getStructuralRayTracingProgramLayo
                 : getStructuralRayTracingEntryPack(context->astBuilder, result.callableShadersType);
     }
     return result;
+}
+
+static StructuralRayTracingProgramLayoutInfo _getStructuralRayTracingProgramLayoutInfo(
+    IRGenContext* context,
+    FunctionDeclBase* functionDecl,
+    DeclRef<Decl> funcDeclRef)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    // A trace method can have both a method generic (`Payload` or `maxLevelCount`) and an enclosing
+    // extension generic (`Schema`). Registration records the latter explicitly, so this lookup
+    // cannot mistake a method argument and its witness for the program schema.
+    auto methodInfo = registry.getRayTracerMethodInfo(functionDecl);
+    SLANG_RELEASE_ASSERT(methodInfo);
+    auto schemaApplication =
+        SubstitutionSet(funcDeclRef).findGenericAppDeclRef(methodInfo->schemaGenericDecl);
+    SLANG_RELEASE_ASSERT(
+        schemaApplication && methodInfo->schemaTypeArgumentIndex >= 0 &&
+        methodInfo->schemaTypeArgumentIndex < schemaApplication->getArgCount() &&
+        methodInfo->schemaWitnessArgumentIndex >= 0 &&
+        methodInfo->schemaWitnessArgumentIndex < schemaApplication->getArgCount());
+
+    auto schemaType =
+        as<Type>(schemaApplication->getArg(methodInfo->schemaTypeArgumentIndex)->resolve());
+    auto schemaWitness = as<SubtypeWitness>(
+        schemaApplication->getArg(methodInfo->schemaWitnessArgumentIndex)->resolve());
+    SLANG_RELEASE_ASSERT(schemaType && schemaWitness);
+    return _getStructuralRayTracingProgramLayoutInfo(context, schemaType, schemaWitness);
+}
+
+static IRMakeValuePack* _lowerStructuralRayTracingEntryIdentityPack(
+    IRGenContext* context,
+    const StructuralRayTracingEntryPack& entries)
+{
+    List<IRInst*> identities;
+    if (entries.types)
+    {
+        for (Index i = 0; i < entries.types->getTypeCount(); ++i)
+        {
+            identities.add(_lowerStructuralRayTracingCanonicalTypeIdentity(
+                context,
+                entries.types->getElementType(i)));
+        }
+    }
+    return cast<IRMakeValuePack>(
+        context->irBuilder->emitMakeValuePack(identities.getCount(), identities.getBuffer()));
+}
+
+// Emits the schema-scoped request consumed by whole-program open-section completion.
+//
+// Consider a client that composes an unused `OpenSchema : ITraceProgramSchema` and asks for its
+// reflection before requesting code. No trace operation exists to carry the open markers in that
+// case. The exact schema conformance component is nevertheless part of the program, so it emits
+// this one root with the same listed-entry metadata used by trace lowering. The linker appends
+// selected identities to its three packs and reflection reads that finalized record directly.
+static void _addStructuralRayTracingProgramSchemaInfo(
+    IRGenContext* context,
+    Type* schemaType,
+    SubtypeWitness* schemaWitness)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto interfaceType = as<DeclRefType>(schemaWitness->getSup()->resolve());
+    auto interfaceDecl =
+        interfaceType ? interfaceType->getDeclRef().as<InterfaceDecl>() : DeclRef<InterfaceDecl>();
+    if (!interfaceDecl || registry.getMetadataKind(interfaceDecl.getDecl()) !=
+                              StructuralRayTracingMetadataKind::TraceProgramSchema)
+    {
+        return;
+    }
+
+    auto layout = _getStructuralRayTracingProgramLayoutInfo(context, schemaType, schemaWitness);
+    SLANG_RELEASE_ASSERT(layout.isComplete());
+    if (!(layout.hasOpenHitGroups || layout.hasOpenMissShaders || layout.hasOpenCallableShaders))
+    {
+        return;
+    }
+
+    IRInst* operands[] = {
+        lowerType(context, schemaType),
+        _lowerStructuralRayTracingSourceTypeName(context, schemaType),
+        _lowerStructuralRayTracingCanonicalTypeIdentity(context, schemaType),
+        lowerType(context, layout.traceContextType),
+        context->irBuilder->getBoolValue(layout.hasOpenHitGroups),
+        context->irBuilder->getBoolValue(layout.hasOpenMissShaders),
+        context->irBuilder->getBoolValue(layout.hasOpenCallableShaders),
+        _lowerStructuralRayTracingEntryIdentityPack(context, layout.hitGroupEntries),
+        _lowerStructuralRayTracingEntryIdentityPack(context, layout.missShaderEntries),
+        _lowerStructuralRayTracingEntryIdentityPack(context, layout.callableShaderEntries),
+    };
+    auto schema = cast<IRStructuralRayTracingProgramSchema>(context->irBuilder->emitIntrinsicInst(
+        nullptr,
+        kIROp_StructuralRayTracingProgramSchema,
+        SLANG_COUNT_OF(operands),
+        operands));
+
+    StructuralRayTracingFunctionIndexAllocator functionIndices;
+    _addStructuralRayTracingHitGroupInfo(context, schema, layout.hitGroupEntries, functionIndices);
+    _addStructuralRayTracingMissShaderInfo(
+        context,
+        schema,
+        layout.missShaderEntries,
+        functionIndices);
+    _addStructuralRayTracingCallableShaderInfo(
+        context,
+        schema,
+        layout.callableShaderEntries,
+        functionIndices);
+    if (layout.hasOpenHitGroups)
+    {
+        _addStructuralRayTracingOpenSectionInfo(
+            context,
+            schema,
+            layout.openHitGroups,
+            StructuralRayTracingSectionKind::HitGroups);
+    }
+    if (layout.hasOpenMissShaders)
+    {
+        _addStructuralRayTracingOpenSectionInfo(
+            context,
+            schema,
+            layout.openMissShaders,
+            StructuralRayTracingSectionKind::MissShaders);
+    }
+    if (layout.hasOpenCallableShaders)
+    {
+        _addStructuralRayTracingOpenSectionInfo(
+            context,
+            schema,
+            layout.openCallableShaders,
+            StructuralRayTracingSectionKind::CallableShaders);
+    }
 }
 
 struct StructuralRayTracingCallableContextInfo
@@ -18057,6 +18174,10 @@ struct TypeConformanceIRGenContext
             witness,
             subtypeWitness->getSub(),
             subtypeWitness->getSup(),
+            subtypeWitness);
+        _addStructuralRayTracingProgramSchemaInfo(
+            context,
+            subtypeWitness->getSub(),
             subtypeWitness);
         builder->addKeepAliveDecoration(witness);
         builder->addHLSLExportDecoration(witness);

@@ -2094,6 +2094,29 @@ StructuralRayTracingMetadataKind StructuralRayTracingDeclRegistry::getMetadataKi
     return StructuralRayTracingMetadataKind::Count;
 }
 
+void StructuralRayTracingDeclRegistry::registerReflectionType(
+    UnownedStringSlice identity,
+    Type* type)
+{
+    SLANG_RELEASE_ASSERT(identity.getLength() != 0 && type);
+    auto canonicalType = type->getCanonicalType();
+    std::lock_guard<std::mutex> lock(m_reflectionTypesMutex);
+    auto& registeredType = m_reflectionTypes.getOrAddValue(String(identity), canonicalType);
+
+    // The mangler is the producer of this opaque key. A collision here would make both target
+    // metadata and reflection ambiguous, so reject it at that producer boundary instead of asking
+    // a downstream consumer to invent a structural equivalence relation.
+    SLANG_RELEASE_ASSERT(registeredType == canonicalType);
+}
+
+Type* StructuralRayTracingDeclRegistry::findReflectionType(UnownedStringSlice identity) const
+{
+    std::lock_guard<std::mutex> lock(m_reflectionTypesMutex);
+    Type* result = nullptr;
+    m_reflectionTypes.tryGetValue(String(identity), result);
+    return result;
+}
+
 InterfaceDecl* StructuralRayTracingDeclRegistry::getMetadataInterface(
     StructuralRayTracingMetadataKind kind) const
 {

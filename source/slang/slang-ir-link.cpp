@@ -1268,6 +1268,9 @@ static void _stampStructuralRayTracingPayloadLocations(
 
 static bool _containsStructuralRayTracingPayloadMetadata(IRInst* root)
 {
+    if (as<IRStructuralRayTracingProgramSchema>(root))
+        return true;
+
     // Open callable-only schemas have no Vulkan payload metadata, but they still require the
     // whole-component manifest so the linker can select tagged conformances before ordinary DCE.
     // The request marker is emitted only for an exact compiler-owned open-list declaration.
@@ -2398,7 +2401,8 @@ static LinkedIR _linkIR(
     CodeGenContext* codeGenContext,
     const CodeGenContext::EntryPointIndices& entryPointIndices,
     IRModule* structuralRayTracingProgramManifest,
-    bool assignStructuralPayloadLocations)
+    bool assignStructuralPayloadLocations,
+    bool includeStructuralRayTracingProgramSchemas)
 {
     SLANG_PROFILE;
 
@@ -2612,6 +2616,20 @@ static LinkedIR _linkIR(
         }
     };
 
+    // A schema summary is deliberately not an export, because backend links must never receive
+    // reflection-only roots. Manifest construction opts in here and clones all exact schema
+    // requests before examining tagged conformances. Cloning their open markers first makes tag
+    // selection independent of the order in which component modules are enumerated.
+    if (includeStructuralRayTracingProgramSchemas)
+    {
+        for (IRModule* irModule : irModules)
+        {
+            auto linkingInfo = irModule->_getOrCreateLinkingInfo();
+            for (auto schema : linkingInfo->getStructuralRayTracingProgramSchemas())
+                cloneAndKeepAlive(schema);
+        }
+    }
+
     auto isRequestedStructuralRayTracingConformance = [&](IRInst* conformanceOwner)
     {
         for (auto decoration : conformanceOwner->getDecorations())
@@ -2785,7 +2803,7 @@ static RefPtr<IRModule> _getOrCreateStructuralRayTracingProgramManifest(
     for (Index i = 0; i < allEntryPointIndices.getCount(); ++i)
         allEntryPointIndices[i] = i;
 
-    auto linked = _linkIR(codeGenContext, allEntryPointIndices, nullptr, false);
+    auto linked = _linkIR(codeGenContext, allEntryPointIndices, nullptr, false, true);
 
     // A generic helper can contain `trace<Payload>` and be instantiated with several payload types
     // by one entry point. Preserve the semantic IR type operand through linking, then use Slang's
@@ -2823,6 +2841,23 @@ static RefPtr<IRModule> _getOrCreateStructuralRayTracingProgramManifest(
     return targetProgram->publishStructuralRayTracingProgramManifest(linked.module);
 }
 
+RefPtr<IRModule> getOrCreateStructuralRayTracingProgramManifest(
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
+{
+    SLANG_RELEASE_ASSERT(targetProgram && sink);
+
+    // Reflection can request an otherwise-unused open schema. Materialize the composite target's
+    // normal layout IR first, then enter the same manifest path used by code generation. The empty
+    // entry-point selection is intentional when the host program has none; the schema root and
+    // selected tagged conformances provide all reflection metadata without invoking a backend.
+    targetProgram->getOrCreateIRModuleForLayout(sink);
+    CodeGenContext::EntryPointIndices entryPointIndices;
+    CodeGenContext::Shared shared(targetProgram, entryPointIndices, sink, nullptr);
+    CodeGenContext codeGenContext(&shared);
+    return _getOrCreateStructuralRayTracingProgramManifest(&codeGenContext);
+}
+
 LinkedIR linkIR(CodeGenContext* codeGenContext)
 {
     RefPtr<IRModule> structuralRayTracingProgramManifest;
@@ -2839,7 +2874,8 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         codeGenContext,
         codeGenContext->getEntryPointIndices(),
         structuralRayTracingProgramManifest,
-        structuralRayTracingProgramManifest != nullptr);
+        structuralRayTracingProgramManifest != nullptr,
+        false);
 }
 
 

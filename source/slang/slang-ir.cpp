@@ -5105,6 +5105,9 @@ void ModuleLinkingInfo::_build(IRModule* module)
             m_structuralRayTracingTaggedConformances.add(inst);
         }
 
+        if (as<IRStructuralRayTracingProgramSchema>(inst))
+            m_structuralRayTracingProgramSchemas.add(inst);
+
         bool isHLSLExported = false;
         bool isKnownBuiltin = false;
         for (auto decoration : inst->getDecorations())

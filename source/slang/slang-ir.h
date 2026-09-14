@@ -2121,6 +2121,15 @@ struct ModuleLinkingInfo : RefObject
         return m_structuralRayTracingTaggedConformances.getArrayView();
     }
 
+    /// Query schema-scoped open-section requests emitted by exact type conformances.
+    ///
+    /// These roots are not ordinary exports: only whole-program manifest construction clones
+    /// them, which prevents reflection-only summaries from reaching target emission.
+    ArrayView<IRInst*> getStructuralRayTracingProgramSchemas()
+    {
+        return m_structuralRayTracingProgramSchemas.getArrayView();
+    }
+
     /// Query the acceleration cache for global shader parameters.
     /// The result is only valid while the module is unchanged from when this info was built.
     ArrayView<IRInst*> getGlobalParams() { return m_globalParams.getArrayView(); }
@@ -2145,6 +2154,7 @@ private:
     // Acceleration caches for linker decisions that previously scanned all global instructions.
     List<IRInst*> m_hlslExports;
     List<IRInst*> m_structuralRayTracingTaggedConformances;
+    List<IRInst*> m_structuralRayTracingProgramSchemas;
     List<IRInst*> m_globalParams;
     List<IRInst*> m_knownBuiltins;
 

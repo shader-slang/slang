@@ -189,11 +189,15 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(UnownedStringSlice(schema->getName()) == "ReflectedSchema");
     SLANG_CHECK(UnownedStringSlice(schema->getType()->getName()) == "ReflectedSchema");
     SLANG_CHECK(UnownedStringSlice(schema->getTraceContextType()->getName()) == "TraceContext");
+    SLANG_CHECK(!schema->isHitGroupSectionOpen());
+    SLANG_CHECK(!schema->isMissShaderSectionOpen());
+    SLANG_CHECK(!schema->isCallableShaderSectionOpen());
 
     SLANG_CHECK(schema->getPayloadCount() == 2);
     auto payloadA = schema->getPayload(0);
     SLANG_CHECK(payloadA != nullptr);
     SLANG_CHECK(UnownedStringSlice(payloadA->getType()->getName()) == "PayloadA");
+    SLANG_CHECK(payloadA->getTypeLayout() != nullptr);
     SLANG_CHECK(payloadA->getHitGroupCount() == 2);
     auto hitGroupA0 = payloadA->getHitGroup(0);
     auto hitGroupA1 = payloadA->getHitGroup(1);
@@ -203,6 +207,8 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(hitGroupA1->getFunctionIndex() == 1);
     SLANG_CHECK(UnownedStringSlice(hitGroupA0->getType()->getName()) == "HitGroupA0");
     SLANG_CHECK(UnownedStringSlice(hitGroupA0->getRecordType()->getName()) == "HitRecordA");
+    SLANG_CHECK(hitGroupA0->getRecordTypeLayout() != nullptr);
+    SLANG_CHECK(!hitGroupA0->isLinked());
     SLANG_CHECK(
         UnownedStringSlice(hitGroupA0->getPrimitiveType()->getName()) == "TrianglePrimitive");
     SLANG_CHECK(
@@ -237,6 +243,8 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(missA1->getFunctionIndex() == 1);
     SLANG_CHECK(UnownedStringSlice(missA0->getType()->getName()) == "MissA0");
     SLANG_CHECK(UnownedStringSlice(missA0->getRecordType()->getName()) == "MissRecordA");
+    SLANG_CHECK(missA0->getRecordTypeLayout() != nullptr);
+    SLANG_CHECK(!missA0->isLinked());
     SLANG_CHECK(missA0->getMiss()->getStage() == SLANG_STAGE_MISS);
     SLANG_CHECK(missA0->getMiss()->getEntryPointName() != nullptr);
     SLANG_CHECK(UnownedStringSlice(missA0->getMiss()->getEntryPointName()) != "MissA0");
@@ -244,6 +252,7 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     auto payloadB = schema->getPayload(1);
     SLANG_CHECK(payloadB != nullptr);
     SLANG_CHECK(UnownedStringSlice(payloadB->getType()->getName()) == "PayloadB");
+    SLANG_CHECK(payloadB->getTypeLayout() != nullptr);
     SLANG_CHECK(payloadB->getHitGroupCount() == 1);
     SLANG_CHECK(payloadB->getHitGroup(0)->getFunctionIndex() == 0);
     SLANG_CHECK(payloadB->getMissShaderCount() == 1);
@@ -260,6 +269,8 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(callable1->getFunctionIndex() == 1);
     SLANG_CHECK(UnownedStringSlice(callable0->getType()->getName()) == "Callable0");
     SLANG_CHECK(UnownedStringSlice(callable0->getRecordType()->getName()) == "CallableRecord");
+    SLANG_CHECK(callable0->getRecordTypeLayout() != nullptr);
+    SLANG_CHECK(!callable0->isLinked());
     SLANG_CHECK(UnownedStringSlice(callable0->getDataType()->getName()) == "CallableData");
     SLANG_CHECK(callable0->getCallable()->getStage() == SLANG_STAGE_CALLABLE);
     SLANG_CHECK(callable0->getCallable()->getEntryPointName() != nullptr);
@@ -1181,4 +1192,269 @@ SLANG_UNIT_TEST(structuralRayTracingMetalTargetMetadataOperationOrder)
     SLANG_CHECK(
         (forwardSignatures[1] &
          uint32_t(slang::MetalIntersectionFunctionSignature::TriangleData)) == 0);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingOpenSchemaReflection)
+{
+    // This test models the host workflow open schemas are designed for. The schema module names
+    // only tag interfaces, while an independently composed module contributes concrete entries.
+    // The host asks the ordinary composite program for reflection; it does not construct or add a
+    // TypeConformance component for `Schema` itself.
+    const char* contextSource = R"(
+        module structural_open_reflection_context;
+
+        import slang.raytracing;
+
+        public struct ListedPayload { uint value; }
+        public struct LinkedPayload { float2 value; }
+        public struct ListedRecord { uint value; }
+        public struct LinkedRecord { float4 value; }
+        public struct CallableData { uint value; }
+
+        public struct TraceContext : rt::ITraceContext
+        {
+            typealias AccelerationStructure = rt::AccelerationStructure;
+            typealias Motion = rt::NoMotion;
+        }
+
+        public typealias CommonTraceContext = TraceContext;
+        public typealias CommonCallableData = CallableData;
+
+        public struct ListedHitContext : rt::IHitContext
+        {
+            typealias TraceContext = CommonTraceContext;
+            typealias Payload = ListedPayload;
+            typealias Primitive = rt::TrianglePrimitive;
+            typealias Record = ListedRecord;
+        }
+
+        public struct LinkedHitContext : rt::IHitContext
+        {
+            typealias TraceContext = CommonTraceContext;
+            typealias Payload = LinkedPayload;
+            typealias Primitive = rt::TrianglePrimitive;
+            typealias Record = LinkedRecord;
+        }
+
+        public struct ListedMissContext : rt::IPayloadContext
+        {
+            typealias TraceContext = CommonTraceContext;
+            typealias Payload = ListedPayload;
+            typealias Record = ListedRecord;
+        }
+
+        public struct LinkedMissContext : rt::IPayloadContext
+        {
+            typealias TraceContext = CommonTraceContext;
+            typealias Payload = LinkedPayload;
+            typealias Record = LinkedRecord;
+        }
+
+        public struct ListedCallableContext : rt::ICallableContext
+        {
+            typealias TraceContext = CommonTraceContext;
+            typealias CallableData = CommonCallableData;
+            typealias Record = ListedRecord;
+        }
+
+        public struct LinkedCallableContext : rt::ICallableContext
+        {
+            typealias TraceContext = CommonTraceContext;
+            typealias CallableData = CommonCallableData;
+            typealias Record = LinkedRecord;
+        }
+
+        public interface IHitTag : rt::IHitGroup {}
+        public interface IMissTag : rt::IMissShader {}
+        public interface ICallableTag : rt::ICallableShader {}
+    )";
+
+    const char* schemaSource = R"(
+        module structural_open_reflection_schema;
+
+        import slang.raytracing;
+        import structural_open_reflection_context;
+
+        typealias SchemaTraceContext = TraceContext;
+
+        struct ListedClosestHit : rt::IClosestHitShader
+        {
+            typealias Context = ListedHitContext;
+            void invoke(rt::ClosestHitInput<Context> input) {}
+        }
+
+        struct ListedHitGroup : IHitTag
+        {
+            typealias Context = ListedHitContext;
+            typealias ClosestHit = ListedClosestHit;
+            typealias AnyHit = rt::NoAnyHit<Context>;
+            typealias Intersection = rt::NoIntersection<Context>;
+        }
+
+        struct ListedMiss : IMissTag
+        {
+            typealias Context = ListedMissContext;
+            void invoke(rt::MissInput<Context> input) {}
+        }
+
+        struct ListedCallable : ICallableTag
+        {
+            typealias Context = ListedCallableContext;
+            void invoke(rt::CallableInput<Context> input) {}
+        }
+
+        public struct Schema : rt::ITraceProgramSchema
+        {
+            typealias TraceContext = SchemaTraceContext;
+            typealias HitGroups = rt::OpenHitGroups<IHitTag, ListedHitGroup>;
+            typealias MissShaders = rt::OpenMissShaders<IMissTag, ListedMiss>;
+            typealias CallableShaders = rt::OpenCallableShaders<ICallableTag, ListedCallable>;
+        }
+    )";
+
+    const char* pluginSource = R"(
+        module structural_open_reflection_plugin;
+
+        import slang.raytracing;
+        import structural_open_reflection_context;
+
+        struct LinkedClosestHit : rt::IClosestHitShader
+        {
+            typealias Context = LinkedHitContext;
+            void invoke(rt::ClosestHitInput<Context> input) {}
+        }
+
+        struct LinkedHitGroup : IHitTag
+        {
+            typealias Context = LinkedHitContext;
+            typealias ClosestHit = LinkedClosestHit;
+            typealias AnyHit = rt::NoAnyHit<Context>;
+            typealias Intersection = rt::NoIntersection<Context>;
+        }
+
+        struct LinkedMiss : IMissTag
+        {
+            typealias Context = LinkedMissContext;
+            void invoke(rt::MissInput<Context> input) {}
+        }
+
+        struct LinkedCallable : ICallableTag
+        {
+            typealias Context = LinkedCallableContext;
+            void invoke(rt::CallableInput<Context> input) {}
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry experimentalOption = {};
+    experimentalOption.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalOption.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalOption.value.intValue0 = 1;
+
+    slang::TargetDesc target = {};
+    target.format = SLANG_HLSL;
+    target.profile = globalSession->findProfile("sm_6_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &target;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &experimentalOption;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    auto loadModule = [&](const char* moduleName, const char* source) -> ComPtr<slang::IModule>
+    {
+        ComPtr<slang::IBlob> diagnostics;
+        ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+            moduleName,
+            moduleName,
+            source,
+            diagnostics.writeRef()));
+        if (!module && diagnostics)
+            fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+        return module;
+    };
+
+    auto contextModule = loadModule("structural_open_reflection_context", contextSource);
+    SLANG_CHECK_ABORT(contextModule != nullptr);
+    auto schemaModule = loadModule("structural_open_reflection_schema", schemaSource);
+    SLANG_CHECK_ABORT(schemaModule != nullptr);
+    auto pluginModule = loadModule("structural_open_reflection_plugin", pluginSource);
+    SLANG_CHECK_ABORT(pluginModule != nullptr);
+
+    slang::IComponentType* components[] = {schemaModule, pluginModule};
+    ComPtr<slang::IComponentType> program;
+    ComPtr<slang::IBlob> diagnostics;
+    auto composeResult = session->createCompositeComponentType(
+        components,
+        SLANG_COUNT_OF(components),
+        program.writeRef(),
+        diagnostics.writeRef());
+    if (SLANG_FAILED(composeResult) && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(composeResult));
+
+    auto layout = program->getLayout(0, diagnostics.writeRef());
+    if (!layout && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(layout != nullptr);
+    auto schema = layout->findTraceProgramSchema("Schema");
+    SLANG_CHECK_ABORT(schema != nullptr);
+
+    // Open flags report the source contract, while all returned collections are already finalized
+    // for the composed program. Listed entries retain index zero and linked entries follow them.
+    SLANG_CHECK(schema->isHitGroupSectionOpen());
+    SLANG_CHECK(schema->isMissShaderSectionOpen());
+    SLANG_CHECK(schema->isCallableShaderSectionOpen());
+    SLANG_CHECK(schema->getPayloadCount() == 2);
+    auto listedPayload = schema->getPayload(0);
+    auto linkedPayload = schema->getPayload(1);
+    SLANG_CHECK_ABORT(listedPayload && linkedPayload);
+    SLANG_CHECK(UnownedStringSlice(listedPayload->getType()->getName()) == "ListedPayload");
+    SLANG_CHECK(UnownedStringSlice(linkedPayload->getType()->getName()) == "LinkedPayload");
+    SLANG_CHECK(listedPayload->getTypeLayout() != nullptr);
+    SLANG_CHECK(linkedPayload->getTypeLayout() != nullptr);
+
+    SLANG_CHECK(listedPayload->getHitGroupCount() == 1);
+    SLANG_CHECK(linkedPayload->getHitGroupCount() == 1);
+    auto listedHit = listedPayload->getHitGroup(0);
+    auto linkedHit = linkedPayload->getHitGroup(0);
+    SLANG_CHECK_ABORT(listedHit && linkedHit);
+    SLANG_CHECK(!listedHit->isLinked());
+    SLANG_CHECK(linkedHit->isLinked());
+    SLANG_CHECK(UnownedStringSlice(listedHit->getType()->getName()) == "ListedHitGroup");
+    SLANG_CHECK(UnownedStringSlice(linkedHit->getType()->getName()) == "LinkedHitGroup");
+    SLANG_CHECK(listedHit->getRecordTypeLayout() != nullptr);
+    SLANG_CHECK(linkedHit->getRecordTypeLayout() != nullptr);
+
+    SLANG_CHECK(listedPayload->getMissShaderCount() == 1);
+    SLANG_CHECK(linkedPayload->getMissShaderCount() == 1);
+    auto listedMiss = listedPayload->getMissShader(0);
+    auto linkedMiss = linkedPayload->getMissShader(0);
+    SLANG_CHECK_ABORT(listedMiss && linkedMiss);
+    SLANG_CHECK(!listedMiss->isLinked());
+    SLANG_CHECK(linkedMiss->isLinked());
+    SLANG_CHECK(UnownedStringSlice(listedMiss->getType()->getName()) == "ListedMiss");
+    SLANG_CHECK(UnownedStringSlice(linkedMiss->getType()->getName()) == "LinkedMiss");
+    SLANG_CHECK(listedMiss->getRecordTypeLayout() != nullptr);
+    SLANG_CHECK(linkedMiss->getRecordTypeLayout() != nullptr);
+
+    SLANG_CHECK(schema->getCallableShaderCount() == 2);
+    auto listedCallable = schema->getCallableShader(0);
+    auto linkedCallable = schema->getCallableShader(1);
+    SLANG_CHECK_ABORT(listedCallable && linkedCallable);
+    SLANG_CHECK(!listedCallable->isLinked());
+    SLANG_CHECK(linkedCallable->isLinked());
+    SLANG_CHECK(UnownedStringSlice(listedCallable->getType()->getName()) == "ListedCallable");
+    SLANG_CHECK(UnownedStringSlice(linkedCallable->getType()->getName()) == "LinkedCallable");
+    SLANG_CHECK(listedCallable->getRecordTypeLayout() != nullptr);
+    SLANG_CHECK(linkedCallable->getRecordTypeLayout() != nullptr);
+
+    // The completed schema is cached on the ordinary program layout, so repeated host queries do
+    // not relink or construct a second reflection object.
+    SLANG_CHECK(layout->findTraceProgramSchema("Schema") == schema);
 }

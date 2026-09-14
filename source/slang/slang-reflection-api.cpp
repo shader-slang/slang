@@ -5441,6 +5441,27 @@ SLANG_API SlangReflectionType* spReflectionTraceProgramSchema_getTraceContextTyp
     return reflectedSchema ? convert(reflectedSchema->traceContextType) : nullptr;
 }
 
+SLANG_API bool spReflectionTraceProgramSchema_isHitGroupSectionOpen(
+    SlangReflectionTraceProgramSchema* schema)
+{
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    return reflectedSchema && reflectedSchema->hitGroupSectionOpen;
+}
+
+SLANG_API bool spReflectionTraceProgramSchema_isMissShaderSectionOpen(
+    SlangReflectionTraceProgramSchema* schema)
+{
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    return reflectedSchema && reflectedSchema->missShaderSectionOpen;
+}
+
+SLANG_API bool spReflectionTraceProgramSchema_isCallableShaderSectionOpen(
+    SlangReflectionTraceProgramSchema* schema)
+{
+    auto reflectedSchema = (StructuralRayTracingProgramSchemaReflection*)schema;
+    return reflectedSchema && reflectedSchema->callableShaderSectionOpen;
+}
+
 SLANG_API SlangUInt
 spReflectionTraceProgramSchema_getPayloadCount(SlangReflectionTraceProgramSchema* schema)
 {
@@ -5541,6 +5562,13 @@ SLANG_API SlangReflectionType* spReflectionRayTracingPayload_getType(
 {
     auto reflectedPayload = (StructuralRayTracingPayloadReflection*)payload;
     return reflectedPayload ? convert(reflectedPayload->payloadType) : nullptr;
+}
+
+SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingPayload_getTypeLayout(
+    SlangReflectionRayTracingPayload* payload)
+{
+    auto reflectedPayload = (StructuralRayTracingPayloadReflection*)payload;
+    return reflectedPayload ? convert(reflectedPayload->typeLayout) : nullptr;
 }
 
 SLANG_API SlangUInt
@@ -5688,6 +5716,19 @@ SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getRecordType(
     return reflectedGroup ? convert(reflectedGroup->recordType) : nullptr;
 }
 
+SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingHitGroup_getRecordTypeLayout(
+    SlangReflectionRayTracingHitGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingHitGroupReflection*)group;
+    return reflectedGroup ? convert(reflectedGroup->recordTypeLayout) : nullptr;
+}
+
+SLANG_API bool spReflectionRayTracingHitGroup_isLinked(SlangReflectionRayTracingHitGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingHitGroupReflection*)group;
+    return reflectedGroup && reflectedGroup->isLinked;
+}
+
 SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getPrimitiveType(
     SlangReflectionRayTracingHitGroup* group)
 {
@@ -5762,6 +5803,20 @@ SLANG_API SlangReflectionType* spReflectionRayTracingMissShader_getRecordType(
     return reflectedShader ? convert(reflectedShader->recordType) : nullptr;
 }
 
+SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingMissShader_getRecordTypeLayout(
+    SlangReflectionRayTracingMissShader* shader)
+{
+    auto reflectedShader = (StructuralRayTracingMissShaderReflection*)shader;
+    return reflectedShader ? convert(reflectedShader->recordTypeLayout) : nullptr;
+}
+
+SLANG_API bool spReflectionRayTracingMissShader_isLinked(
+    SlangReflectionRayTracingMissShader* shader)
+{
+    auto reflectedShader = (StructuralRayTracingMissShaderReflection*)shader;
+    return reflectedShader && reflectedShader->isLinked;
+}
+
 SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingMissShader_getMiss(
     SlangReflectionRayTracingMissShader* shader)
 {
@@ -5795,6 +5850,20 @@ SLANG_API SlangReflectionType* spReflectionRayTracingCallableShader_getRecordTyp
 {
     auto reflectedShader = (StructuralRayTracingCallableShaderReflection*)shader;
     return reflectedShader ? convert(reflectedShader->recordType) : nullptr;
+}
+
+SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingCallableShader_getRecordTypeLayout(
+    SlangReflectionRayTracingCallableShader* shader)
+{
+    auto reflectedShader = (StructuralRayTracingCallableShaderReflection*)shader;
+    return reflectedShader ? convert(reflectedShader->recordTypeLayout) : nullptr;
+}
+
+SLANG_API bool spReflectionRayTracingCallableShader_isLinked(
+    SlangReflectionRayTracingCallableShader* shader)
+{
+    auto reflectedShader = (StructuralRayTracingCallableShaderReflection*)shader;
+    return reflectedShader && reflectedShader->isLinked;
 }
 
 SLANG_API SlangReflectionType* spReflectionRayTracingCallableShader_getDataType(
