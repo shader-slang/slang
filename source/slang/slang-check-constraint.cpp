@@ -975,21 +975,6 @@ static bool isDeferredValidationWitness(Val* witness)
            as<ConcreteVariadicPackCountWitness>(witness) || as<DiffTypeInfoWitness>(witness);
 }
 
-// Return the outermost generic declaration in a nested generic declaration
-// chain.
-GenericDecl* getOutermostGenericDecl(GenericDecl* genericDecl)
-{
-    if (!genericDecl)
-        return nullptr;
-
-    for (auto parentGenericDecl = as<GenericDecl>(genericDecl->parentDecl); parentGenericDecl;
-         parentGenericDecl = as<GenericDecl>(parentGenericDecl->parentDecl))
-    {
-        genericDecl = parentGenericDecl;
-    }
-    return genericDecl;
-}
-
 // Owns one generic-application solve. The class collects ordinary constraints,
 // default generic arguments, and witness constraints into solver constraints,
 // runs the work-list loop, and stores the current argument arrays used to build
@@ -3424,10 +3409,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveGenericArguments(
     if (providedOrdinaryArgs.getCount() != 0)
     {
         auto genericDecl = genericDeclRef.getDecl();
-        auto outermostGenericDecl = getOutermostGenericDecl(genericDecl);
-        SLANG_ASSERT(outermostGenericDecl == genericDecl);
-
-        if (!solver.setProvidedArg(outermostGenericDecl, providedOrdinaryArgs))
+        if (!solver.setProvidedArg(genericDecl, providedOrdinaryArgs))
             return DeclRef<Decl>();
     }
 
