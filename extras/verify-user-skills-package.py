@@ -137,10 +137,18 @@ def _verify_zip(
 
     with zipfile.ZipFile(archive_path) as archive:
         entries: dict[str, zipfile.ZipInfo] = {}
+        seen_paths: set[str] = set()
         for entry in archive.infolist():
+            normalized_name = _normalize_archive_path(entry.filename)
+            if normalized_name in seen_paths:
+                raise VerificationError(f"duplicate archive path: {normalized_name}")
+            seen_paths.add(normalized_name)
             if entry.is_dir():
                 continue
-            normalized_name = _normalize_archive_path(entry.filename)
+            # Unix-origin ZIP entries encode a file type in external_attr; zero means that no
+            # type bits were supplied. Other ZIP creators expose no portable symlink bit here,
+            # so their members are treated as file data. As with TAR, only bundle paths are in
+            # scope for the non-regular-entry guarantee.
             unix_file_type = stat.S_IFMT(entry.external_attr >> 16)
             if (
                 entry.create_system == 3
@@ -150,8 +158,6 @@ def _verify_zip(
                 raise VerificationError(
                     f"bundle contains a non-regular archive entry: {normalized_name}"
                 )
-            if normalized_name in entries:
-                raise VerificationError(f"duplicate archive path: {normalized_name}")
             entries[normalized_name] = entry
         return _verify_entries(
             archive_path,
@@ -169,8 +175,12 @@ def _verify_tar(
 
     with tarfile.open(archive_path, "r:*") as archive:
         entries: dict[str, tarfile.TarInfo] = {}
+        seen_paths: set[str] = set()
         for entry in archive.getmembers():
             normalized_name = _normalize_archive_path(entry.name)
+            if normalized_name in seen_paths:
+                raise VerificationError(f"duplicate archive path: {normalized_name}")
+            seen_paths.add(normalized_name)
             if (
                 not entry.isfile()
                 and not entry.isdir()
@@ -182,8 +192,6 @@ def _verify_tar(
                 )
             if not entry.isfile():
                 continue
-            if normalized_name in entries:
-                raise VerificationError(f"duplicate archive path: {normalized_name}")
             entries[normalized_name] = entry
 
         def read_entry(name: str) -> bytes:

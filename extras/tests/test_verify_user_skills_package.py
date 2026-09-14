@@ -154,6 +154,21 @@ class TestUserSkillsPackageVerifier(unittest.TestCase):
                 with self.assertRaisesRegex(verifier.VerificationError, expected_message):
                     verifier._verify_zip(archive_path, self.expected_files, EXPECTED_COMMIT)
 
+    def test_rejects_invalid_and_missing_provenance(self) -> None:
+        """Provenance must appear exactly once and contain UTF-8 JSON."""
+
+        invalid = self._valid_entries()
+        invalid[verifier.PROVENANCE_PATH] = b"{not-json"
+        invalid_path = self._write_zip("invalid-provenance.zip", list(invalid.items()))
+        with self.assertRaisesRegex(verifier.VerificationError, "invalid provenance"):
+            verifier._verify_zip(invalid_path, self.expected_files, EXPECTED_COMMIT)
+
+        missing = self._valid_entries()
+        missing.pop(verifier.PROVENANCE_PATH)
+        missing_path = self._write_zip("missing-provenance.zip", list(missing.items()))
+        with self.assertRaisesRegex(verifier.VerificationError, "expected one"):
+            verifier._verify_zip(missing_path, self.expected_files, EXPECTED_COMMIT)
+
     def test_rejects_unsafe_archive_paths(self) -> None:
         """Absolute paths and parent traversal are rejected before bundle inspection."""
 
@@ -193,6 +208,48 @@ class TestUserSkillsPackageVerifier(unittest.TestCase):
         for archive_path, verify in cases:
             with self.subTest(archive=archive_path.name):
                 with self.assertRaisesRegex(verifier.VerificationError, "unsafe path"):
+                    verify(archive_path, self.expected_files, EXPECTED_COMMIT)
+
+        unsafe_directory_path = self.root / "unsafe-directory.zip"
+        with zipfile.ZipFile(unsafe_directory_path, "w") as archive:
+            for entry_name, content in self._valid_entries().items():
+                archive.writestr(entry_name, content)
+            archive.writestr("../escape/", b"")
+        with self.assertRaisesRegex(verifier.VerificationError, "unsafe path"):
+            verifier._verify_zip(
+                unsafe_directory_path, self.expected_files, EXPECTED_COMMIT
+            )
+
+    def test_rejects_directory_file_path_collisions(self) -> None:
+        """Directories and files cannot share one normalized path in either format."""
+
+        collision_name = f"{verifier.BUNDLE_ROOT}/skills/example/collision"
+        zip_path = self.root / "collision.zip"
+        with zipfile.ZipFile(zip_path, "w") as archive:
+            for entry_name, content in self._valid_entries().items():
+                archive.writestr(entry_name, content)
+            archive.writestr(f"{collision_name}/", b"")
+            archive.writestr(collision_name, b"collision\n")
+
+        tar_path = self.root / "collision.tar.gz"
+        with tarfile.open(tar_path, "w:gz") as archive:
+            for entry_name, content in self._valid_entries().items():
+                entry = tarfile.TarInfo(entry_name)
+                entry.size = len(content)
+                archive.addfile(entry, io.BytesIO(content))
+            directory = tarfile.TarInfo(f"{collision_name}/")
+            directory.type = tarfile.DIRTYPE
+            archive.addfile(directory)
+            file_entry = tarfile.TarInfo(collision_name)
+            file_entry.size = 1
+            archive.addfile(file_entry, io.BytesIO(b"x"))
+
+        for archive_path, verify in (
+            (zip_path, verifier._verify_zip),
+            (tar_path, verifier._verify_tar),
+        ):
+            with self.subTest(archive=archive_path.name):
+                with self.assertRaisesRegex(verifier.VerificationError, "duplicate archive path"):
                     verify(archive_path, self.expected_files, EXPECTED_COMMIT)
 
     def test_rejects_non_regular_zip_bundle_entries(self) -> None:
@@ -249,6 +306,18 @@ class TestUserSkillsPackageVerifier(unittest.TestCase):
         )
         self.assertEqual(verifier._expected_files(self.source_dir), self.expected_files)
 
+    def test_rejects_source_tree_without_skill_files(self) -> None:
+        """README and license files cannot make an empty skills tree valid."""
+
+        source_dir = self.root / "empty-source"
+        hidden_dir = source_dir / "skills" / ".hidden"
+        hidden_dir.mkdir(parents=True)
+        (source_dir / "README.md").write_text("readme\n", encoding="utf-8")
+        (source_dir / "LICENSE").write_text("license\n", encoding="utf-8")
+        (hidden_dir / "ignored.md").write_text("ignored\n", encoding="utf-8")
+        with self.assertRaisesRegex(verifier.VerificationError, "no skill files found"):
+            verifier._expected_files(source_dir)
+
     def test_main_dispatches_both_archive_formats(self) -> None:
         """The command-line entry point recognizes and verifies ZIP and TAR archives."""
 
@@ -269,6 +338,49 @@ class TestUserSkillsPackageVerifier(unittest.TestCase):
         with mock.patch.object(sys, "argv", arguments), contextlib.redirect_stdout(output):
             self.assertEqual(verifier.main(), 0)
         self.assertEqual(output.getvalue().count("Verified Slang user skills"), 2)
+
+    def test_main_rejects_malformed_expected_commit(self) -> None:
+        """The command-line entry point requires a full hexadecimal commit SHA."""
+
+        archive_path = self._write_zip(
+            "malformed-sha.zip", list(self._valid_entries().items())
+        )
+        arguments = [
+            str(VERIFIER_PATH),
+            "--source-dir",
+            str(self.source_dir),
+            "--expected-commit",
+            "not-a-commit",
+            str(archive_path),
+        ]
+        error_output = io.StringIO()
+        with mock.patch.object(sys, "argv", arguments), contextlib.redirect_stderr(
+            error_output
+        ):
+            with self.assertRaises(SystemExit) as exit_context:
+                verifier.main()
+        self.assertEqual(exit_context.exception.code, 2)
+        self.assertIn("full 40-character Git commit SHA", error_output.getvalue())
+
+    def test_main_reports_unsupported_archive(self) -> None:
+        """Unsupported files use the verifier's diagnostic and failure return path."""
+
+        archive_path = self.root / "not-an-archive.txt"
+        archive_path.write_text("not an archive\n", encoding="utf-8")
+        arguments = [
+            str(VERIFIER_PATH),
+            "--source-dir",
+            str(self.source_dir),
+            "--expected-commit",
+            EXPECTED_COMMIT,
+            str(archive_path),
+        ]
+        error_output = io.StringIO()
+        with mock.patch.object(sys, "argv", arguments), contextlib.redirect_stderr(
+            error_output
+        ):
+            self.assertEqual(verifier.main(), 1)
+        self.assertIn("unsupported release archive", error_output.getvalue())
 
 
 if __name__ == "__main__":
