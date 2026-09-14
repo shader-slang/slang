@@ -17344,7 +17344,7 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
     return info;
 }
 
-static void _lowerStructuralRayTracingEntryPointBody(
+static void _lowerStructuralRayTracingEntryPointInfo(
     IRGenContext* context,
     EntryPoint* entryPoint,
     IRFunc* entryPointFunc);
@@ -17397,7 +17397,7 @@ static void lowerFrontEndEntryPointToIR(
     if (instToDecorate->findDecoration<IREntryPointDecoration>())
         return;
 
-    _lowerStructuralRayTracingEntryPointBody(context, entryPoint, as<IRFunc>(instToDecorate));
+    _lowerStructuralRayTracingEntryPointInfo(context, entryPoint, as<IRFunc>(instToDecorate));
 
     {
 
@@ -17447,7 +17447,12 @@ static void lowerFrontEndEntryPointToIR(
         builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(instToDecorate);
 }
 
-static void _lowerStructuralRayTracingEntryPointBody(
+/// Lowers the checked structural stage contract onto an IR entry-point declaration.
+///
+/// The declaration can be either the source-module definition or the selected target program's
+/// layout-IR import. Keeping both producers here gives the linker one canonical IR representation
+/// to preserve and specialize.
+static void _lowerStructuralRayTracingEntryPointInfo(
     IRGenContext* context,
     EntryPoint* entryPoint,
     IRFunc* entryPointFunc)
@@ -17455,6 +17460,7 @@ static void _lowerStructuralRayTracingEntryPointBody(
     auto invokeMethod = entryPoint->getStructuralRayTracingInvokeMethod();
     if (!invokeMethod)
         return;
+    SLANG_RELEASE_ASSERT(entryPointFunc);
 
     auto& structuralInfo = entryPoint->getStructuralRayTracingInfo();
     auto invokeDeclRef = makeDeclRef(invokeMethod);
@@ -17516,7 +17522,7 @@ static void lowerProgramEntryPointToIR(
     auto loweredEntryPointFunc =
         getSimpleVal(context, emitDeclRef(context, entryPointFuncDeclRef, entryPointFuncType));
 
-    _lowerStructuralRayTracingEntryPointBody(
+    _lowerStructuralRayTracingEntryPointInfo(
         context,
         entryPoint,
         as<IRFunc>(loweredEntryPointFunc));
@@ -18688,21 +18694,15 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     auto latestSpirvAtom = getLatestSpirvAtom();
     auto latestMetalAtom = getLatestMetalAtom();
 
-    // Map each entry-point function declaration to the capability set inferred for it *as an entry
-    // point*, which can exceed the function declaration's own requirements (see
-    // `EntryPoint::getInferredCapabilityRequirements`). The layout list below is keyed by
-    // `DeclRef<FuncDecl>`, so we look up the owning `EntryPoint` here to read its stored set.
-    Dictionary<FuncDecl*, CapabilitySetVal*> entryPointInferredCaps;
-    for (Index i = 0; i < program->getEntryPointCount(); ++i)
+    // Parameter binding and `ComponentType` enumeration intentionally use the same entry-point
+    // order. Keep that index here: unlike a `FuncDecl*` lookup, it distinguishes two specialized
+    // entry points that originate from the same generic declaration.
+    auto entryPointCount = program->getEntryPointCount();
+    SLANG_RELEASE_ASSERT(programLayout->entryPoints.getCount() == entryPointCount);
+    for (Index entryPointIndex = 0; entryPointIndex < entryPointCount; ++entryPointIndex)
     {
-        auto entryPoint = program->getEntryPoint(i);
-        if (auto entryPointFuncDecl = entryPoint->getFuncDecl())
-            entryPointInferredCaps[entryPointFuncDecl] =
-                entryPoint->getInferredCapabilityRequirements();
-    }
-
-    for (auto entryPointLayout : programLayout->entryPoints)
-    {
+        auto entryPoint = program->getEntryPoint(entryPointIndex);
+        auto entryPointLayout = programLayout->entryPoints[entryPointIndex];
         auto funcDeclRef = entryPointLayout->entryPoint;
 
         // HACK: skip over entry points that came from deserialization,
@@ -18726,14 +18726,17 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
                 getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
         }
 
-        auto asFuncDecl = as<FuncDecl>(funcDeclRef.getDecl());
-        SLANG_ASSERT(asFuncDecl);
-        // Every layout entry point is one of the program's entry points (both come from the same
-        // component-type walk), so its inferred capability set — which can exceed the function
-        // declaration's own requirements — is always in the map.
-        auto found = entryPointInferredCaps.tryGetValue(asFuncDecl);
-        SLANG_RELEASE_ASSERT(found);
-        CapabilitySet set{*found};
+        // A structural stage can be selected after its source module has already been lowered and
+        // cached. Its ordinary module definition therefore has no checked stage contract. The
+        // target program's layout IR is the canonical IR that knows which entry points were
+        // selected, so attach the contract to this imported declaration. Linking merges it onto
+        // the ordinary definition with the layout decoration below; downstream synthesis never
+        // has to reconstruct checked AST information.
+        _lowerStructuralRayTracingEntryPointInfo(context, entryPoint, as<IRFunc>(irFunc));
+
+        // Entry-point capability requirements can exceed the function declaration's own
+        // requirements because they include stage-dependent contributions such as semantics.
+        CapabilitySet set{entryPoint->getInferredCapabilityRequirements()};
         for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)
