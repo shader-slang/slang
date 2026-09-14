@@ -2,7 +2,9 @@
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <atomic>
 #include <stdio.h>
+#include <thread>
 
 using namespace Slang;
 
@@ -2057,4 +2059,555 @@ SLANG_UNIT_TEST(structuralRayTracingSerializedOpenSchemaReflection)
     }
     SLANG_CHECK(foundLinkedGroup);
     SLANG_CHECK(foundGenericGroup);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingEntryCatalogueWithoutSchema)
+{
+    // This module deliberately declares structural stages without declaring an
+    // `ITraceProgramSchema`. `CatalogueHitGroup` also reaches `IHitGroup` through two tag
+    // interfaces. Lowering records every matching tag on the one conformance, but the public
+    // declaration catalogue must contain the semantic hit-group type exactly once.
+    const char* source = R"(
+        module structural_entry_catalogue_no_schema;
+
+        import slang.raytracing;
+
+        public struct CataloguePayload { uint value; }
+        public struct CatalogueHitRecord { uint hitValue; }
+        public struct CatalogueMissRecord { uint missValue; }
+        public struct CatalogueCallableRecord { uint callableValue; }
+        public struct CatalogueCallableData { uint value; }
+
+        public struct CatalogueTraceContext : rt::ITraceContext
+        {
+            typealias AccelerationStructure = rt::AccelerationStructure;
+            typealias Motion = rt::NoMotion;
+        }
+
+        public struct CatalogueHitContext : rt::IHitContext
+        {
+            typealias TraceContext = CatalogueTraceContext;
+            typealias Payload = CataloguePayload;
+            typealias Primitive = rt::TrianglePrimitive;
+            typealias Record = CatalogueHitRecord;
+        }
+
+        public struct CatalogueMissContext : rt::IPayloadContext
+        {
+            typealias TraceContext = CatalogueTraceContext;
+            typealias Payload = CataloguePayload;
+            typealias Record = CatalogueMissRecord;
+        }
+
+        public struct CatalogueCallableContext : rt::ICallableContext
+        {
+            typealias TraceContext = CatalogueTraceContext;
+            typealias CallableData = CatalogueCallableData;
+            typealias Record = CatalogueCallableRecord;
+        }
+
+        [noinline]
+        uint catalogueUnusedHitSentinel() { return 0x10203040u; }
+
+        [noinline]
+        uint catalogueUnusedMissSentinel() { return 0x50607080u; }
+
+        [noinline]
+        uint catalogueUnusedCallableSentinel() { return 0x90a0b0c0u; }
+
+        public struct CatalogueClosestHit : rt::IClosestHitShader
+        {
+            typealias Context = CatalogueHitContext;
+            void invoke(rt::ClosestHitInput<Context> input)
+            {
+                input.payload.value = catalogueUnusedHitSentinel();
+            }
+        }
+
+        public interface ICatalogueHitTag : rt::IHitGroup {}
+        public interface IDerivedCatalogueHitTag : ICatalogueHitTag {}
+
+        public struct CatalogueHitGroup : IDerivedCatalogueHitTag
+        {
+            typealias Context = CatalogueHitContext;
+            typealias ClosestHit = CatalogueClosestHit;
+            typealias AnyHit = rt::NoAnyHit<Context>;
+            typealias Intersection = rt::NoIntersection<Context>;
+        }
+
+        public struct CatalogueMiss : rt::IMissShader
+        {
+            typealias Context = CatalogueMissContext;
+            void invoke(rt::MissInput<Context> input)
+            {
+                input.payload.value = catalogueUnusedMissSentinel();
+            }
+        }
+
+        public struct CatalogueCallable : rt::ICallableShader
+        {
+            typealias Context = CatalogueCallableContext;
+            void invoke(rt::CallableInput<Context> input)
+            {
+                input.data.value = catalogueUnusedCallableSentinel();
+            }
+        }
+
+        RWStructuredBuffer<uint> output;
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void main() { output[0] = 1; }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry experimentalOption = {};
+    experimentalOption.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalOption.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalOption.value.intValue0 = 1;
+
+    slang::TargetDesc target = {};
+    target.format = SLANG_METAL;
+    target.profile = globalSession->findProfile("metal_3_1");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &target;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &experimentalOption;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+        "structural_entry_catalogue_no_schema",
+        "structural-entry-catalogue-no-schema.slang",
+        source,
+        diagnostics.writeRef()));
+    if (!module && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findEntryPointByName("main", entryPoint.writeRef())));
+    slang::IComponentType* components[] = {module, entryPoint};
+    ComPtr<slang::IComponentType> composite;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+        components,
+        SLANG_COUNT_OF(components),
+        composite.writeRef(),
+        diagnostics.writeRef())));
+    ComPtr<slang::IComponentType> program;
+    auto linkResult = composite->link(program.writeRef(), diagnostics.writeRef());
+    if (SLANG_FAILED(linkResult) && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(linkResult));
+
+    auto layout = program->getLayout(0, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(layout != nullptr);
+
+    // All workers begin their first query together. Before cache publication was serialized, two
+    // workers could both construct different cache owners; the last assignment released the first
+    // owner while its worker still held raw entry pointers. Every worker must instead observe the
+    // one stable catalogue and its three independently owned entry objects.
+    static const int kThreadCount = 8;
+    std::atomic<int> readyThreadCount(0);
+    std::atomic<bool> startQueries(false);
+    SlangUInt hitGroupCounts[kThreadCount] = {};
+    SlangUInt missShaderCounts[kThreadCount] = {};
+    SlangUInt callableShaderCounts[kThreadCount] = {};
+    slang::RayTracingHitGroupReflection* hitGroups[kThreadCount] = {};
+    slang::RayTracingMissShaderReflection* missShaders[kThreadCount] = {};
+    slang::RayTracingCallableShaderReflection* callableShaders[kThreadCount] = {};
+    std::thread queryThreads[kThreadCount];
+    for (int i = 0; i < kThreadCount; ++i)
+    {
+        queryThreads[i] = std::thread(
+            [&, i]
+            {
+                readyThreadCount.fetch_add(1, std::memory_order_release);
+                while (!startQueries.load(std::memory_order_acquire))
+                    std::this_thread::yield();
+                // Capture the very first cache owner's raw entry pointer before any subsequent
+                // query can converge on whichever unsynchronized publication happened last.
+                hitGroups[i] = layout->getStructuralRayTracingHitGroup(0);
+                hitGroupCounts[i] = layout->getStructuralRayTracingHitGroupCount();
+                missShaderCounts[i] = layout->getStructuralRayTracingMissShaderCount();
+                callableShaderCounts[i] = layout->getStructuralRayTracingCallableShaderCount();
+                missShaders[i] = layout->getStructuralRayTracingMissShader(0);
+                callableShaders[i] = layout->getStructuralRayTracingCallableShader(0);
+            });
+    }
+    while (readyThreadCount.load(std::memory_order_acquire) != kThreadCount)
+        std::this_thread::yield();
+    startQueries.store(true, std::memory_order_release);
+    for (auto& thread : queryThreads)
+        thread.join();
+
+    for (int i = 0; i < kThreadCount; ++i)
+    {
+        SLANG_CHECK(hitGroupCounts[i] == 1);
+        SLANG_CHECK(missShaderCounts[i] == 1);
+        SLANG_CHECK(callableShaderCounts[i] == 1);
+        SLANG_CHECK(hitGroups[i] == hitGroups[0]);
+        SLANG_CHECK(missShaders[i] == missShaders[0]);
+        SLANG_CHECK(callableShaders[i] == callableShaders[0]);
+    }
+
+    auto hitGroup = hitGroups[0];
+    auto missShader = missShaders[0];
+    auto callableShader = callableShaders[0];
+    SLANG_CHECK_ABORT(hitGroup && missShader && callableShader);
+    SLANG_CHECK(layout->getStructuralRayTracingHitGroup(1) == nullptr);
+    SLANG_CHECK(layout->getStructuralRayTracingMissShader(1) == nullptr);
+    SLANG_CHECK(layout->getStructuralRayTracingCallableShader(1) == nullptr);
+
+    SLANG_CHECK(UnownedStringSlice(hitGroup->getType()->getName()) == "CatalogueHitGroup");
+    SLANG_CHECK(UnownedStringSlice(hitGroup->getContextType()->getName()) == "CatalogueHitContext");
+    SLANG_CHECK(UnownedStringSlice(hitGroup->getRecordType()->getName()) == "CatalogueHitRecord");
+    SLANG_CHECK(hitGroup->getRecordTypeLayout() != nullptr);
+    SLANG_CHECK(hitGroup->getFunctionIndex() == -1);
+    SLANG_CHECK(!hitGroup->isLinked());
+    SLANG_CHECK(hitGroup->getClosestHit() != nullptr);
+    SLANG_CHECK(hitGroup->getAnyHit() == nullptr);
+    SLANG_CHECK(hitGroup->getIntersection() == nullptr);
+    SLANG_CHECK(hitGroup->getClosestHitEntryPointName() == nullptr);
+    SLANG_CHECK(hitGroup->getClosestHit()->getEntryPointName() == nullptr);
+
+    SLANG_CHECK(UnownedStringSlice(missShader->getType()->getName()) == "CatalogueMiss");
+    SLANG_CHECK(
+        UnownedStringSlice(missShader->getContextType()->getName()) == "CatalogueMissContext");
+    SLANG_CHECK(
+        UnownedStringSlice(missShader->getRecordType()->getName()) == "CatalogueMissRecord");
+    SLANG_CHECK(missShader->getRecordTypeLayout() != nullptr);
+    SLANG_CHECK(missShader->getFunctionIndex() == -1);
+    SLANG_CHECK(!missShader->isLinked());
+    SLANG_CHECK(missShader->getMiss() != nullptr);
+    SLANG_CHECK(missShader->getMiss()->getEntryPointName() == nullptr);
+
+    SLANG_CHECK(UnownedStringSlice(callableShader->getType()->getName()) == "CatalogueCallable");
+    SLANG_CHECK(
+        UnownedStringSlice(callableShader->getContextType()->getName()) ==
+        "CatalogueCallableContext");
+    SLANG_CHECK(
+        UnownedStringSlice(callableShader->getRecordType()->getName()) ==
+        "CatalogueCallableRecord");
+    SLANG_CHECK(
+        UnownedStringSlice(callableShader->getDataType()->getName()) == "CatalogueCallableData");
+    SLANG_CHECK(callableShader->getRecordTypeLayout() != nullptr);
+    SLANG_CHECK(callableShader->getFunctionIndex() == -1);
+    SLANG_CHECK(!callableShader->isLinked());
+    SLANG_CHECK(callableShader->getCallable() != nullptr);
+    SLANG_CHECK(callableShader->getCallable()->getEntryPointName() == nullptr);
+
+    // The catalogue owns stable cached objects. Repeating a count or get query must not rebuild
+    // the catalogue, and no later schema query can mutate these declaration-only entries.
+    SLANG_CHECK(layout->getStructuralRayTracingHitGroup(0) == hitGroup);
+    SLANG_CHECK(layout->getStructuralRayTracingMissShader(0) == missShader);
+    SLANG_CHECK(layout->getStructuralRayTracingCallableShader(0) == callableShader);
+
+    // Catalogue discovery reads the pre-DCE conformance index but does not add a keep-alive root.
+    // Only the unrelated compute entry point should reach target emission.
+    ComPtr<slang::IBlob> generatedCode;
+    auto codeResult =
+        program->getEntryPointCode(0, 0, generatedCode.writeRef(), diagnostics.writeRef());
+    if (SLANG_FAILED(codeResult) && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(codeResult));
+    SLANG_CHECK_ABORT(generatedCode != nullptr);
+    UnownedStringSlice code(
+        (const char*)generatedCode->getBufferPointer(),
+        (const char*)generatedCode->getBufferPointer() + generatedCode->getBufferSize());
+    SLANG_CHECK(code.indexOf(toSlice("catalogueUnusedHitSentinel")) == -1);
+    SLANG_CHECK(code.indexOf(toSlice("catalogueUnusedMissSentinel")) == -1);
+    SLANG_CHECK(code.indexOf(toSlice("catalogueUnusedCallableSentinel")) == -1);
+
+    // A fresh session has no source-time reflection-type registry entries for this module. The
+    // serialized catalogue must recover exported nominal types through the producer's declaration
+    // lookup key and then verify their canonical identities before returning them.
+    ComPtr<slang::IBlob> serializedModule;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->serialize(serializedModule.writeRef())));
+    ComPtr<slang::ISession> loadedSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, loadedSession.writeRef()) == SLANG_OK);
+    ComPtr<slang::IModule> loadedModule(slang_loadModuleFromIRBlob(
+        loadedSession,
+        "structural_entry_catalogue_no_schema",
+        "structural-entry-catalogue-no-schema.slang-module",
+        serializedModule->getBufferPointer(),
+        serializedModule->getBufferSize(),
+        diagnostics.writeRef()));
+    if (!loadedModule && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(loadedModule != nullptr);
+    auto loadedLayout = loadedModule->getLayout(0, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(loadedLayout != nullptr);
+    SLANG_CHECK(loadedLayout->getStructuralRayTracingHitGroupCount() == 1);
+    SLANG_CHECK(loadedLayout->getStructuralRayTracingMissShaderCount() == 1);
+    SLANG_CHECK(loadedLayout->getStructuralRayTracingCallableShaderCount() == 1);
+    SLANG_CHECK(
+        UnownedStringSlice(
+            loadedLayout->getStructuralRayTracingHitGroup(0)->getType()->getName()) ==
+        "CatalogueHitGroup");
+    SLANG_CHECK(
+        UnownedStringSlice(
+            loadedLayout->getStructuralRayTracingMissShader(0)->getType()->getName()) ==
+        "CatalogueMiss");
+    SLANG_CHECK(
+        UnownedStringSlice(
+            loadedLayout->getStructuralRayTracingCallableShader(0)->getType()->getName()) ==
+        "CatalogueCallable");
+}
+
+SLANG_UNIT_TEST(structuralRayTracingEntryCatalogueIsSchemaIndependent)
+{
+    // The two schemas below intentionally select disjoint trace contexts and callable-data types.
+    // The catalogue describes both declaration families without applying either schema's
+    // cross-entry restrictions. Each schema query then constructs its own indexed objects.
+    const char* source = R"(
+        import slang.raytracing;
+
+        struct PayloadA { uint value; }
+        struct PayloadB { float value; }
+        struct HitRecordA { uint value; }
+        struct HitRecordB { float2 value; }
+        struct MissRecordA { uint value; }
+        struct MissRecordB { float value; }
+        struct CallableRecordA { uint value; }
+        struct CallableRecordB { float4 value; }
+        struct CallableDataA { uint value; }
+        struct CallableDataB { float2 value; }
+
+        struct TraceContextA : rt::ITraceContext
+        {
+            typealias AccelerationStructure = rt::AccelerationStructure;
+            typealias Motion = rt::NoMotion;
+        }
+
+        struct TraceContextB : rt::ITraceContext
+        {
+            typealias AccelerationStructure = rt::AccelerationStructure;
+            typealias Motion = rt::NoMotion;
+        }
+
+        struct HitContextA : rt::IHitContext
+        {
+            typealias TraceContext = TraceContextA;
+            typealias Payload = PayloadA;
+            typealias Primitive = rt::TrianglePrimitive;
+            typealias Record = HitRecordA;
+        }
+
+        struct HitContextB : rt::IHitContext
+        {
+            typealias TraceContext = TraceContextB;
+            typealias Payload = PayloadB;
+            typealias Primitive = rt::TrianglePrimitive;
+            typealias Record = HitRecordB;
+        }
+
+        struct MissContextA : rt::IPayloadContext
+        {
+            typealias TraceContext = TraceContextA;
+            typealias Payload = PayloadA;
+            typealias Record = MissRecordA;
+        }
+
+        struct MissContextB : rt::IPayloadContext
+        {
+            typealias TraceContext = TraceContextB;
+            typealias Payload = PayloadB;
+            typealias Record = MissRecordB;
+        }
+
+        struct CallableContextA : rt::ICallableContext
+        {
+            typealias TraceContext = TraceContextA;
+            typealias CallableData = CallableDataA;
+            typealias Record = CallableRecordA;
+        }
+
+        struct CallableContextB : rt::ICallableContext
+        {
+            typealias TraceContext = TraceContextB;
+            typealias CallableData = CallableDataB;
+            typealias Record = CallableRecordB;
+        }
+
+        struct ClosestHitA : rt::IClosestHitShader
+        {
+            typealias Context = HitContextA;
+            void invoke(rt::ClosestHitInput<Context> input) {}
+        }
+
+        struct ClosestHitB : rt::IClosestHitShader
+        {
+            typealias Context = HitContextB;
+            void invoke(rt::ClosestHitInput<Context> input) {}
+        }
+
+        struct HitGroupB : rt::IHitGroup
+        {
+            typealias Context = HitContextB;
+            typealias ClosestHit = ClosestHitB;
+            typealias AnyHit = rt::NoAnyHit<Context>;
+            typealias Intersection = rt::NoIntersection<Context>;
+        }
+
+        struct HitGroupA : rt::IHitGroup
+        {
+            typealias Context = HitContextA;
+            typealias ClosestHit = ClosestHitA;
+            typealias AnyHit = rt::NoAnyHit<Context>;
+            typealias Intersection = rt::NoIntersection<Context>;
+        }
+
+        struct MissB : rt::IMissShader
+        {
+            typealias Context = MissContextB;
+            void invoke(rt::MissInput<Context> input) {}
+        }
+
+        struct MissA : rt::IMissShader
+        {
+            typealias Context = MissContextA;
+            void invoke(rt::MissInput<Context> input) {}
+        }
+
+        struct CallableB : rt::ICallableShader
+        {
+            typealias Context = CallableContextB;
+            void invoke(rt::CallableInput<Context> input) {}
+        }
+
+        struct CallableA : rt::ICallableShader
+        {
+            typealias Context = CallableContextA;
+            void invoke(rt::CallableInput<Context> input) {}
+        }
+
+        struct SchemaA : rt::ITraceProgramSchema
+        {
+            typealias TraceContext = TraceContextA;
+            typealias HitGroups = rt::HitGroupList<HitGroupA>;
+            typealias MissShaders = rt::MissShaderList<MissA>;
+            typealias CallableShaders = rt::CallableShaderList<CallableA>;
+        }
+
+        struct SchemaB : rt::ITraceProgramSchema
+        {
+            typealias TraceContext = TraceContextB;
+            typealias HitGroups = rt::HitGroupList<HitGroupB>;
+            typealias MissShaders = rt::MissShaderList<MissB>;
+            typealias CallableShaders = rt::CallableShaderList<CallableB>;
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry experimentalOption = {};
+    experimentalOption.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalOption.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalOption.value.intValue0 = 1;
+
+    slang::TargetDesc target = {};
+    target.format = SLANG_HLSL;
+    target.profile = globalSession->findProfile("sm_6_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &target;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &experimentalOption;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+        "structuralEntryCatalogueSchemas",
+        "structural-entry-catalogue-schemas.slang",
+        source,
+        diagnostics.writeRef()));
+    if (!module && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto layout = module->getLayout(0, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(layout != nullptr);
+    SLANG_CHECK(layout->getStructuralRayTracingHitGroupCount() == 2);
+    SLANG_CHECK(layout->getStructuralRayTracingMissShaderCount() == 2);
+    SLANG_CHECK(layout->getStructuralRayTracingCallableShaderCount() == 2);
+
+    // Canonical type identity gives a deterministic order independent of module and declaration
+    // enumeration. Each B declaration appears before A in the source, but these same-length names
+    // have canonical identity order A, B.
+    auto catalogueHitA = layout->getStructuralRayTracingHitGroup(0);
+    auto catalogueHitB = layout->getStructuralRayTracingHitGroup(1);
+    auto catalogueMissA = layout->getStructuralRayTracingMissShader(0);
+    auto catalogueMissB = layout->getStructuralRayTracingMissShader(1);
+    auto catalogueCallableA = layout->getStructuralRayTracingCallableShader(0);
+    auto catalogueCallableB = layout->getStructuralRayTracingCallableShader(1);
+    SLANG_CHECK_ABORT(
+        catalogueHitA && catalogueHitB && catalogueMissA && catalogueMissB && catalogueCallableA &&
+        catalogueCallableB);
+    SLANG_CHECK(UnownedStringSlice(catalogueHitA->getType()->getName()) == "HitGroupA");
+    SLANG_CHECK(UnownedStringSlice(catalogueHitB->getType()->getName()) == "HitGroupB");
+    SLANG_CHECK(UnownedStringSlice(catalogueMissA->getType()->getName()) == "MissA");
+    SLANG_CHECK(UnownedStringSlice(catalogueMissB->getType()->getName()) == "MissB");
+    SLANG_CHECK(UnownedStringSlice(catalogueCallableA->getType()->getName()) == "CallableA");
+    SLANG_CHECK(UnownedStringSlice(catalogueCallableB->getType()->getName()) == "CallableB");
+    SLANG_CHECK(catalogueHitA->getClosestHit()->getEntryPointName() != nullptr);
+    SLANG_CHECK(catalogueMissA->getMiss()->getEntryPointName() != nullptr);
+    SLANG_CHECK(catalogueCallableA->getCallable()->getEntryPointName() != nullptr);
+
+    // A declaration catalogue is allowed to contain unrelated contexts and callable signatures.
+    // Those compatibility checks belong to whichever concrete schema selects an entry.
+    SLANG_CHECK(UnownedStringSlice(catalogueHitA->getContextType()->getName()) == "HitContextA");
+    SLANG_CHECK(UnownedStringSlice(catalogueHitB->getContextType()->getName()) == "HitContextB");
+    SLANG_CHECK(
+        UnownedStringSlice(catalogueCallableA->getDataType()->getName()) == "CallableDataA");
+    SLANG_CHECK(
+        UnownedStringSlice(catalogueCallableB->getDataType()->getName()) == "CallableDataB");
+    SLANG_CHECK(catalogueHitA->getFunctionIndex() == -1);
+    SLANG_CHECK(catalogueHitB->getFunctionIndex() == -1);
+    SLANG_CHECK(!catalogueHitA->isLinked());
+    SLANG_CHECK(!catalogueHitB->isLinked());
+
+    auto schemaA = layout->findTraceProgramSchema("SchemaA");
+    auto schemaB = layout->findTraceProgramSchema("SchemaB");
+    SLANG_CHECK_ABORT(schemaA && schemaB);
+    SLANG_CHECK(schemaA->getPayloadCount() == 1);
+    SLANG_CHECK(schemaB->getPayloadCount() == 1);
+    auto schemaHitA = schemaA->getPayload(0)->getHitGroup(0);
+    auto schemaHitB = schemaB->getPayload(0)->getHitGroup(0);
+    auto schemaMissA = schemaA->getPayload(0)->getMissShader(0);
+    auto schemaMissB = schemaB->getPayload(0)->getMissShader(0);
+    auto schemaCallableA = schemaA->getCallableShader(0);
+    auto schemaCallableB = schemaB->getCallableShader(0);
+    SLANG_CHECK_ABORT(
+        schemaHitA && schemaHitB && schemaMissA && schemaMissB && schemaCallableA &&
+        schemaCallableB);
+
+    // Schema entries have independent ownership and can safely acquire dense indices. Querying
+    // both schemas must not mutate the previously cached declaration catalogue.
+    SLANG_CHECK(schemaHitA != catalogueHitA);
+    SLANG_CHECK(schemaHitB != catalogueHitB);
+    SLANG_CHECK(schemaMissA != catalogueMissA);
+    SLANG_CHECK(schemaMissB != catalogueMissB);
+    SLANG_CHECK(schemaCallableA != catalogueCallableA);
+    SLANG_CHECK(schemaCallableB != catalogueCallableB);
+    SLANG_CHECK(schemaHitA->getFunctionIndex() == 0);
+    SLANG_CHECK(schemaHitB->getFunctionIndex() == 0);
+    SLANG_CHECK(schemaMissA->getFunctionIndex() == 0);
+    SLANG_CHECK(schemaMissB->getFunctionIndex() == 0);
+    SLANG_CHECK(schemaCallableA->getFunctionIndex() == 0);
+    SLANG_CHECK(schemaCallableB->getFunctionIndex() == 0);
+    SLANG_CHECK(catalogueHitA->getFunctionIndex() == -1);
+    SLANG_CHECK(catalogueMissA->getFunctionIndex() == -1);
+    SLANG_CHECK(catalogueCallableA->getFunctionIndex() == -1);
 }
