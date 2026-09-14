@@ -1894,10 +1894,11 @@ Result linkAndOptimizeIR(
     {
         if (isCUDATarget(targetRequest))
         {
-            // Unlike D3D and Vulkan, OptiX exposes report-intersection attributes as up to eight
-            // explicit uint registers. Lower the structural aggregate through the shared OptiX
-            // transport plan before the target-independent fallback expansion consumes its marker.
-            SLANG_PASS(lowerOptiXStructuralRayTracingReportHitOperations, sink);
+            // OptiX exposes shader records through its SBT-data pointer and report-intersection
+            // attributes as explicit uint registers. Materialize those native operations before
+            // portable lowering turns the same structural markers into stage parameters or calls
+            // their standard-module fallbacks.
+            SLANG_PASS(lowerOptiXStructuralRayTracingStageInputOperations, sink);
         }
         SLANG_PASS(lowerPortableStructuralRayTracingStageInputOperations);
 

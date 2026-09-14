@@ -34,8 +34,8 @@ void synthesizePortableStructuralRayTracingEntryPoints(
 /// Lower structural stage-input operations through their portable standard-module bodies.
 void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module);
 
-/// Lower structural intersection-stage report-hit operations to OptiX register arguments.
-void lowerOptiXStructuralRayTracingReportHitOperations(IRModule* module, DiagnosticSink* sink);
+/// Lower structural stage-input operations that have native OptiX representations.
+void lowerOptiXStructuralRayTracingStageInputOperations(IRModule* module, DiagnosticSink* sink);
 
 /// Thread compiler-provided payload parameters through generated Metal visible-stage adapters.
 void lowerMetalStructuralRayTracingStageInputOperations(
