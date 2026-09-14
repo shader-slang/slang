@@ -68,17 +68,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.pr_number.outputs.number }}
         run: |
-          files="$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')"
-          {
-            echo "files<<EOF"
-            echo "$files"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          filesPath="${RUNNER_TEMP}/changed-files.txt"
+          gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename' > "$filesPath"
+          echo "files-path=$filesPath" >> "$GITHUB_OUTPUT"
       - id: filter
         if: steps.pr_number.outputs.number != ''
         uses: ./.github/actions/docs-only-filter
         with:
-          files: ${{ steps.changed_files.outputs.files }}
+          files-path: ${{ steps.changed_files.outputs.files-path }}
 
   trigger-slangpy-tests:
     needs: [filter]
