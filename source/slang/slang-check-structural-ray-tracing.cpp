@@ -141,6 +141,76 @@ void SemanticsVisitor::registerStructuralRayTracingStageConformance(
         stageKind);
 }
 
+static const char* _getStructuralRayTracingSchemaSectionName(
+    const StructuralRayTracingDeclRegistry& registry,
+    AssocTypeDecl* requirement)
+{
+    if (requirement == registry.getAssociatedTypeRequirement(
+                           StructuralRayTracingAssociatedTypeKind::ProgramHitGroups))
+    {
+        return "hit-group";
+    }
+    if (requirement == registry.getAssociatedTypeRequirement(
+                           StructuralRayTracingAssociatedTypeKind::ProgramMissShaders))
+    {
+        return "miss-shader";
+    }
+    if (requirement == registry.getAssociatedTypeRequirement(
+                           StructuralRayTracingAssociatedTypeKind::ProgramCallableShaders))
+    {
+        return "callable-shader";
+    }
+    return nullptr;
+}
+
+void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
+    Type* entryListType,
+    AssocTypeDecl* associatedTypeRequirement,
+    Type* schemaType,
+    Decl* satisfyingDecl)
+{
+    auto& registry = getLinkage()->getStructuralRayTracingDeclRegistry();
+    if (!registry.isInitialized())
+        return;
+
+    auto section = _getStructuralRayTracingSchemaSectionName(registry, associatedTypeRequirement);
+    if (!section)
+        return;
+
+    SLANG_RELEASE_ASSERT(entryListType && schemaType && satisfyingDecl);
+
+    // Consider this example:
+    //
+    //     typealias HitGroups = OpenHitGroups<IHitTag, OpaqueHit, OpaqueHit>;
+    //
+    // The type pack in this checked associated-type witness is the source declaration's exact
+    // list of known implementations. Each implementation receives one dense function index; it
+    // does not stand for a physical SBT record. A host can therefore reuse `OpaqueHit` in any
+    // number of records, but listing it twice here would assign one implementation two indices and
+    // make reflection ambiguous. Reject that source contract before lowering, because the IR and
+    // reflection representations intentionally rely on unique entries.
+    //
+    // This check concerns only repeated explicit pack elements. If a listed open-section entry
+    // also conforms to the section tag, link completion still forms a union and retains that type
+    // once. Canonical AST identity makes aliases name the same entry without reconstructing or
+    // structurally comparing types here.
+    auto entries =
+        getStructuralRayTracingEntryPack(getASTBuilder(), entryListType->getCanonicalType());
+    HashSet<Type*> seenEntries;
+    for (Index i = 0; i < entries.types->getTypeCount(); ++i)
+    {
+        auto entryType = entries.types->getElementType(i)->getCanonicalType();
+        if (seenEntries.add(entryType))
+            continue;
+
+        getSink()->diagnose(Diagnostics::DuplicateStructuralRayTracingEntry{
+            .section = section,
+            .entry = entryType,
+            .schema = schemaType->getCanonicalType(),
+            .location = satisfyingDecl->loc});
+    }
+}
+
 static bool _isLegacyRayTracingStage(Stage stage)
 {
     switch (stage)

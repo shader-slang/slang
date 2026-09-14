@@ -4452,7 +4452,7 @@ err(
     "duplicate-structural-ray-tracing-entry",
     38074,
     "duplicate structural ray-tracing entry",
-    span { loc = "location", message = "~section entry '~entry:IRInst' is listed more than once in schema '~schema:IRInst'" }
+    span { loc = "location", message = "~section entry '~entry:Type' is listed more than once in schema '~schema:Type'" }
 )
 
 err(
@@ -4530,6 +4530,13 @@ err(
     38086,
     "structural ray-tracing world-space candidate data requires instancing",
     span { loc = "location", message = "Metal cannot provide world-space data to intersection or any-hit logic when tracing a direct primitive acceleration structure" }
+)
+
+err(
+    "duplicate-structural-ray-tracing-entry-ir",
+    38087,
+    "duplicate structural ray-tracing entry",
+    span { loc = "location", message = "~section entry '~entry:IRInst' is listed more than once in schema '~schema:IRInst'" }
 )
 
 err(

@@ -2391,7 +2391,8 @@ public:
     bool doesTypeSatisfyAssociatedTypeRequirement(
         Type* satisfyingType,
         DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef,
-        RefPtr<WitnessTable> witnessTable);
+        RefPtr<WitnessTable> witnessTable,
+        Decl* satisfyingDecl);
 
     // Does the given `memberDecl` work as an implementation
     // to satisfy the requirement `requiredMemberDeclRef`
@@ -2710,6 +2711,11 @@ public:
     void registerStructuralRayTracingStageConformance(
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         WitnessTable* witnessTable);
+    void diagnoseDuplicateStructuralRayTracingSchemaEntries(
+        Type* entryListType,
+        AssocTypeDecl* associatedTypeRequirement,
+        Type* schemaType,
+        Decl* satisfyingDecl);
     void diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl);
     void diagnoseInvalidStructuralRayTracingCallableResult(CallableDecl* callableDecl);
     void diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl);
