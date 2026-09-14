@@ -77,6 +77,28 @@ struct GenericSchema<Tag> : rt::ITraceProgramSchema
     typealias CallableShaders = rt::NoCallableShaders;
 }
 
+// `This` is also unresolved until a concrete type conforms to this interface. Slang gives it a
+// dedicated semantic `ThisType`, so source validation must defer it just as it defers `Tag` above.
+interface IThisTagSchema : rt::ITraceProgramSchema, rt::IHitGroup
+{
+    __constraint TraceContext == ::TraceContext;
+    __constraint HitGroups == rt::OpenHitGroups<This>;
+    __constraint MissShaders == rt::NoMissShaders;
+    __constraint CallableShaders == rt::NoCallableShaders;
+}
+
+// A generic application needs no special deferral when its outer declaration is an interface:
+// substituting `T` cannot turn `IGenericHitTag<T>` into a concrete struct.
+interface IGenericHitTag<T> : rt::IHitGroup {}
+
+struct GenericInterfaceSchema<T> : rt::ITraceProgramSchema
+{
+    typealias TraceContext = ::TraceContext;
+    typealias HitGroups = rt::OpenHitGroups<IGenericHitTag<T>>;
+    typealias MissShaders = rt::NoMissShaders;
+    typealias CallableShaders = rt::NoCallableShaders;
+}
+
 struct InvalidSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
