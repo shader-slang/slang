@@ -22,23 +22,26 @@ public interface IHitGroup
     __constraint Intersection.Context == Context;
 }
 
-/// Marks the closed set of hit groups available to a trace program schema.
+/// Marks the hit-group section of a trace program schema.
 ///
-/// The interface is sealed so the compiler only needs to decode the standard list forms.
+/// The interface is sealed so the compiler only needs to decode the standard closed-list and
+/// open-section forms.
 [sealed]
 public interface IHitGroupList
 {}
 
-/// Marks the closed set of miss shaders available to a trace program schema.
+/// Marks the miss-shader section of a trace program schema.
 ///
-/// A miss SBT record binds one shader, so miss entries do not need a wrapper group type.
+/// The interface is sealed so the compiler only needs to decode the standard section forms. A miss
+/// SBT record binds one shader, so miss entries do not need a wrapper group type.
 [sealed]
 public interface IMissShaderList
 {}
 
-/// Marks the closed set of callable shaders available to a trace program schema.
+/// Marks the callable-shader section of a trace program schema.
 ///
-/// A callable SBT record binds one shader, so callable entries do not need a wrapper group type.
+/// The interface is sealed so the compiler only needs to decode the standard section forms. A
+/// callable SBT record binds one shader, so callable entries do not need a wrapper group type.
 [sealed]
 public interface ICallableShaderList
 {}

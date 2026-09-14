@@ -16,14 +16,16 @@ class TargetRequest;
 bool validateStructuralRayTracingEntryPoint(IRFunc* entryPoint, DiagnosticSink* sink);
 
 /// Validate the target-independent relationships encoded by one structural trace or callable
-/// operation after linking and specialization have made its complete schema available.
+/// operation after linking and specialization have made its complete linked schema entries
+/// available.
 bool validateStructuralRayTracingSchemaOperation(IRInst* operation, DiagnosticSink* sink);
 
 /// Replace selected logical stage methods with zero-parameter native entry-point adapters before
 /// generic entry-point legalization examines their signatures.
 void preparePortableStructuralRayTracingEntryPoints(IRModule* module, List<IRFunc*>& ioEntryPoints);
 
-/// Generate native D3D/Vulkan entry-point adapters for stages selected by structural layouts.
+/// Generate native D3D/Vulkan entry-point adapters for stages selected by linked structural
+/// schemas.
 void synthesizePortableStructuralRayTracingEntryPoints(
     IRModule* module,
     List<IRFunc*>& ioEntryPoints,

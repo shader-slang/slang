@@ -350,8 +350,9 @@ static bool _insertStructuralRayTracingEntry(
 //
 // AST-to-IR lowering puts the concrete `%MaterialRecord` type directly on each
 // `structuralRayTracingHitGroupInfo` decoration. Generic specialization runs before this file
-// validates those decorations, so a concrete schema reaches this helper as basic, aggregate, enum,
-// or disallowed opaque IR types rather than as source declarations that need to be rediscovered.
+// validates those decorations, so a finalized schema reaches this helper as basic, aggregate,
+// enum, or disallowed opaque IR types rather than as source declarations that need to be
+// rediscovered.
 // Keeping this check on those canonical decoration operands gives descriptor lowering and native
 // entry-point synthesis one target-independent contract.
 static bool _isStructuralRayTracingPlainDataTypeImpl(
