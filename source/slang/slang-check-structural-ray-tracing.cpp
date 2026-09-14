@@ -937,7 +937,7 @@ static StructuralRayTracingRuntimeTypeKind _getDirectStructuralRuntimeTypeKind(
 static StructuralRayTracingRuntimeTypeKind _findStructuralRuntimeType(
     SemanticsVisitor* visitor,
     Type* type,
-    HashSet<Decl*>& seenDecls)
+    HashSet<Type*>& seenTypes)
 {
     if (!type || as<ErrorType>(type))
         return StructuralRayTracingRuntimeTypeKind::None;
@@ -958,7 +958,7 @@ static StructuralRayTracingRuntimeTypeKind _findStructuralRuntimeType(
     {
         for (Index i = 0; i < typePack->getTypeCount(); ++i)
         {
-            auto kind = _findStructuralRuntimeType(visitor, typePack->getElementType(i), seenDecls);
+            auto kind = _findStructuralRuntimeType(visitor, typePack->getElementType(i), seenTypes);
             if (kind != StructuralRayTracingRuntimeTypeKind::None)
                 return kind;
         }
@@ -966,37 +966,51 @@ static StructuralRayTracingRuntimeTypeKind _findStructuralRuntimeType(
 
     if (auto structType = as<DeclRefType>(type))
     {
-        if (auto structDecl = structType->getDeclRef().as<StructDecl>().getDecl())
+        if (auto structDeclRef = structType->getDeclRef().as<StructDecl>())
         {
-            if (!seenDecls.add(structDecl))
+            // Consider this example:
+            //
+            //     struct Box<T> { T value; }
+            //     Box<Box<ClosestHitInput<C>>> value;
+            //
+            // The outer and inner `Box` refer to the same `StructDecl`, but they are different
+            // specialized types. Treating the declaration as the recursion key mistakes the
+            // inner `Box` for a cycle and never reaches `ClosestHitInput<C>`. A canonical `Type`
+            // preserves the specialization arguments while still giving equivalent spellings one
+            // identity. Keep it only for this active recursion path so sibling fields can reuse the
+            // same specialization without being skipped.
+            auto canonicalStructType = type->getCanonicalType();
+            if (!seenTypes.add(canonicalStructType))
                 return StructuralRayTracingRuntimeTypeKind::None;
-            for (auto field : structDecl->getFields())
+
+            auto result = StructuralRayTracingRuntimeTypeKind::None;
+            for (auto fieldDeclRef :
+                 getFields(visitor->getASTBuilder(), structDeclRef, MemberFilterStyle::Instance))
             {
+                auto field = fieldDeclRef.getDecl();
                 visitor->ensureDecl(field, DeclCheckState::CanUseTypeOfValueDecl);
-                auto fieldDeclRef = visitor->getASTBuilder()
-                                        ->getMemberDeclRef(structType->getDeclRef(), field)
-                                        .as<VarDeclBase>();
-                auto fieldType = fieldDeclRef ? getType(visitor->getASTBuilder(), fieldDeclRef)
-                                              : field->type.type;
-                auto kind = _findStructuralRuntimeType(visitor, fieldType, seenDecls);
-                if (kind != StructuralRayTracingRuntimeTypeKind::None)
-                    return kind;
+                auto fieldType = getType(visitor->getASTBuilder(), fieldDeclRef);
+                result = _findStructuralRuntimeType(visitor, fieldType, seenTypes);
+                if (result != StructuralRayTracingRuntimeTypeKind::None)
+                    break;
             }
-            seenDecls.remove(structDecl);
+            seenTypes.remove(canonicalStructType);
+            if (result != StructuralRayTracingRuntimeTypeKind::None)
+                return result;
         }
     }
 
     if (auto arrayType = as<ArrayExpressionType>(type))
-        return _findStructuralRuntimeType(visitor, arrayType->getElementType(), seenDecls);
+        return _findStructuralRuntimeType(visitor, arrayType->getElementType(), seenTypes);
     if (auto optionalType = as<OptionalType>(type))
-        return _findStructuralRuntimeType(visitor, optionalType->getValueType(), seenDecls);
+        return _findStructuralRuntimeType(visitor, optionalType->getValueType(), seenTypes);
     if (auto pointerType = as<PtrTypeBase>(type))
-        return _findStructuralRuntimeType(visitor, pointerType->getValueType(), seenDecls);
+        return _findStructuralRuntimeType(visitor, pointerType->getValueType(), seenTypes);
     if (auto tupleType = as<TupleType>(type))
     {
         for (Index i = 0; i < tupleType->getMemberCount(); ++i)
         {
-            auto kind = _findStructuralRuntimeType(visitor, tupleType->getMember(i), seenDecls);
+            auto kind = _findStructuralRuntimeType(visitor, tupleType->getMember(i), seenTypes);
             if (kind != StructuralRayTracingRuntimeTypeKind::None)
                 return kind;
         }
@@ -1010,8 +1024,8 @@ static StructuralRayTracingRuntimeTypeKind _findStructuralRuntimeType(
 {
     if (!type || as<ErrorType>(type))
         return StructuralRayTracingRuntimeTypeKind::None;
-    HashSet<Decl*> seenDecls;
-    return _findStructuralRuntimeType(visitor, type, seenDecls);
+    HashSet<Type*> seenTypes;
+    return _findStructuralRuntimeType(visitor, type, seenTypes);
 }
 
 static void _diagnoseInvalidStructuralRayTracingRuntimeType(
