@@ -1591,3 +1591,177 @@ SLANG_UNIT_TEST(structuralRayTracingInvalidOpenSchemaManifestIsNotCached)
     expectAmbiguousPayloadDiagnostic();
     expectAmbiguousPayloadDiagnostic();
 }
+
+SLANG_UNIT_TEST(structuralRayTracingSerializedOpenSchemaReflection)
+{
+    // A standard or plugin module is normally shipped as serialized AST and IR. Compile the three
+    // independently composable pieces first, then discard that session so no transient compiler
+    // registry can make reflection pass accidentally.
+    const char* contextSource = R"(
+        module structural_serialized_reflection_context;
+
+        import slang.raytracing;
+
+        public struct Payload { uint value; }
+        public struct Record { uint4 value; }
+
+        public struct TraceContext : rt::ITraceContext
+        {
+            typealias AccelerationStructure = rt::AccelerationStructure;
+            typealias Motion = rt::NoMotion;
+        }
+
+        public typealias CommonTraceContext = TraceContext;
+        public typealias CommonPayload = Payload;
+        public typealias CommonRecord = Record;
+
+        public struct HitContext : rt::IHitContext
+        {
+            typealias TraceContext = CommonTraceContext;
+            typealias Payload = CommonPayload;
+            typealias Primitive = rt::TrianglePrimitive;
+            typealias Record = CommonRecord;
+        }
+
+        public interface IHitTag : rt::IHitGroup {}
+    )";
+
+    const char* schemaSource = R"(
+        module structural_serialized_reflection_schema;
+
+        import slang.raytracing;
+        import structural_serialized_reflection_context;
+
+        typealias SchemaTraceContext = TraceContext;
+
+        public struct Schema : rt::ITraceProgramSchema
+        {
+            typealias TraceContext = SchemaTraceContext;
+            typealias HitGroups = rt::OpenHitGroups<IHitTag>;
+            typealias MissShaders = rt::NoMissShaders;
+            typealias CallableShaders = rt::NoCallableShaders;
+        }
+    )";
+
+    const char* pluginSource = R"(
+        module structural_serialized_reflection_plugin;
+
+        import slang.raytracing;
+        import structural_serialized_reflection_context;
+
+        struct LinkedClosestHit : rt::IClosestHitShader
+        {
+            typealias Context = HitContext;
+            void invoke(rt::ClosestHitInput<Context> input) {}
+        }
+
+        struct LinkedHitGroup : IHitTag
+        {
+            typealias Context = HitContext;
+            typealias ClosestHit = LinkedClosestHit;
+            typealias AnyHit = rt::NoAnyHit<Context>;
+            typealias Intersection = rt::NoIntersection<Context>;
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry experimentalOption = {};
+    experimentalOption.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalOption.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalOption.value.intValue0 = 1;
+
+    slang::TargetDesc target = {};
+    target.format = SLANG_HLSL;
+    target.profile = globalSession->findProfile("sm_6_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &target;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &experimentalOption;
+
+    ComPtr<slang::IBlob> contextBlob;
+    ComPtr<slang::IBlob> schemaBlob;
+    ComPtr<slang::IBlob> pluginBlob;
+    {
+        ComPtr<slang::ISession> sourceSession;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, sourceSession.writeRef()) == SLANG_OK);
+
+        auto compileAndSerialize =
+            [&](const char* moduleName, const char* source, ComPtr<slang::IBlob>& outBlob)
+        {
+            ComPtr<slang::IBlob> diagnostics;
+            ComPtr<slang::IModule> module(sourceSession->loadModuleFromSourceString(
+                moduleName,
+                moduleName,
+                source,
+                diagnostics.writeRef()));
+            if (!module && diagnostics)
+                fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+            SLANG_CHECK_ABORT(module != nullptr);
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->serialize(outBlob.writeRef())));
+        };
+
+        compileAndSerialize("structural_serialized_reflection_context", contextSource, contextBlob);
+        compileAndSerialize("structural_serialized_reflection_schema", schemaSource, schemaBlob);
+        compileAndSerialize("structural_serialized_reflection_plugin", pluginSource, pluginBlob);
+    }
+
+    ComPtr<slang::ISession> loadedSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, loadedSession.writeRef()) == SLANG_OK);
+
+    auto loadSerialized = [&](const char* moduleName, ISlangBlob* blob) -> ComPtr<slang::IModule>
+    {
+        ComPtr<slang::IBlob> diagnostics;
+        ComPtr<slang::IModule> module(slang_loadModuleFromIRBlob(
+            loadedSession,
+            moduleName,
+            moduleName,
+            blob->getBufferPointer(),
+            blob->getBufferSize(),
+            diagnostics.writeRef()));
+        if (!module && diagnostics)
+            fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+        return module;
+    };
+
+    auto contextModule = loadSerialized("structural_serialized_reflection_context", contextBlob);
+    SLANG_CHECK_ABORT(contextModule != nullptr);
+    auto schemaModule = loadSerialized("structural_serialized_reflection_schema", schemaBlob);
+    SLANG_CHECK_ABORT(schemaModule != nullptr);
+    auto pluginModule = loadSerialized("structural_serialized_reflection_plugin", pluginBlob);
+    SLANG_CHECK_ABORT(pluginModule != nullptr);
+
+    slang::IComponentType* components[] = {schemaModule, pluginModule};
+    ComPtr<slang::IComponentType> program;
+    ComPtr<slang::IBlob> diagnostics;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(loadedSession->createCompositeComponentType(
+        components,
+        SLANG_COUNT_OF(components),
+        program.writeRef(),
+        diagnostics.writeRef())));
+    auto layout = program->getLayout(0, diagnostics.writeRef());
+    if (!layout && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(layout != nullptr);
+
+    // Reflection must recover the exact checked type selected by the linked identity. Parsing the
+    // source name here would be incorrect because two modules can declare the same qualified name
+    // and generic specializations do not have a source spelling that encodes their identity.
+    auto schema = layout->findTraceProgramSchema("Schema");
+    SLANG_CHECK_ABORT(schema != nullptr);
+    SLANG_CHECK(schema->isHitGroupSectionOpen());
+    SLANG_CHECK(schema->getPayloadCount() == 1);
+    auto payload = schema->getPayload(0);
+    SLANG_CHECK_ABORT(payload != nullptr);
+    SLANG_CHECK(payload->getHitGroupCount() == 1);
+    auto group = payload->getHitGroup(0);
+    SLANG_CHECK_ABORT(group != nullptr);
+    SLANG_CHECK(group->isLinked());
+    SLANG_CHECK(UnownedStringSlice(group->getType()->getName()) == "LinkedHitGroup");
+    SLANG_CHECK(group->getRecordTypeLayout() != nullptr);
+}
