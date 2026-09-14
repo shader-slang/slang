@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T16:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#lowerbuiltintypesforkernelentrypoints-removetorchkernels-handleautobindnames
-//META: doc_section_digest=8395af4f0b26d3fcc84d23080f14f58fbfb44b12a02306327f726485b8a8edae
+//META: doc_section_digest=246bf07ed71d14a356c41520656ee728c1a0baf7965fc4757d0ec6a3ff4a4a0c
 //META: purpose=A [TorchEntryPoint] returning a non-tensor-mappable type (String) is rejected with E55101.
 //META: intent=characterization
 //META: covers=source/slang/slang-ir-pytorch-cpp-binding.cpp

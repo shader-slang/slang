@@ -1,0 +1,95 @@
+name: Nightly Falcor Test
+
+# Runs the Falcor CI bridge test against origin/master on a schedule,
+# without the falcor-ci approval gate that PR-triggered runs require.
+#
+# ci.yml's test-falcor job sits behind falcor-build-approval-gate because
+# a pull_request-triggered run executes the workflow YAML from the PR's
+# own branch: a hostile PR could edit ci.yml to strip the gate before it
+# ever reaches the internal KernelVM bridge, so approval (required
+# reviewers = the ci-approvers team, auto-approved by
+# slang-ci-approver-bot once the PR carries a matching-SHA approval
+# review) is mandatory. A schedule-triggered workflow has no such
+# PR-controlled input: GitHub always resolves a schedule event's workflow
+# file from the default branch, and this workflow only ever checks out
+# origin/master, so there is no way for untrusted code to reach the
+# bridge through this trigger. The trust boundary the gate defends does
+# not exist here, so this workflow omits it by design (see
+# falcor-build-approval-gate's comment in ci.yml and
+# slang-ci-docs/plans/falcor1-ci-bridge.md § Approval gate).
+#
+# This exists because test-falcor is not a required check on PRs (see
+# check-ci in ci.yml): PR approval is treated as covering vet+approve for
+# Falcor CI too, so PRs can merge without ever having run the Falcor
+# bridge. This nightly run is master's backstop -- it is the only place
+# Falcor CI runs unconditionally.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run nightly at 5:00 AM UTC, after the other nightly-* Windows/Linux
+    # suites so it isn't competing with them for the same self-hosted
+    # runner pools (falcor-bridge and the Windows GPU build runner).
+    - cron: "0 5 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # No filter/should-run gating here (unlike ci.yml's PR-scoped jobs):
+  # every scheduled run always builds and tests master, regardless of
+  # which files last changed.
+  build-windows-release-cl-x86_64-gpu-falcor:
+    permissions:
+      id-token: write # Required for Workload Identity
+      contents: read
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "build"]'
+      artifact-name-suffix: "-falcor"
+
+  test-falcor:
+    needs: [build-windows-release-cl-x86_64-gpu-falcor]
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/ci-falcor-test.yml
+    with:
+      slang-artifact-name: slang-tests-windows-x86_64-cl-release-falcor
+
+  # Post the nightly's result to Slack. Scheduled runs only, so manual
+  # workflow_dispatch verification runs stay quiet.
+  notify:
+    needs: [test-falcor]
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Success notification
+        if: needs.test-falcor.result == 'success'
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          payload: |
+            {
+              "Falcor-Nightly": ":green-check-mark: Falcor nightly: clean (${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_FALCOR_NIGHTLY }}
+
+      - name: Failure notification
+        if: needs.test-falcor.result != 'success'
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          payload: |
+            {
+              "Falcor-Nightly": ":alert: Falcor nightly: ${{ needs.test-falcor.result }}\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_FALCOR_NIGHTLY }}

@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T15:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#generics-ambiguity
-//META: doc_section_digest=1d69c6377e76dbde08b14056d074bcc495099f7ebad74b5fa5cca67d869f272a
+//META: doc_section_digest=eb0fd6263e6c05fcda56c26f5dbe0c80c738c9165b8bfd51abc3dc4235097f39
 //META: purpose=Verifies the parser splits a trailing `>>` into two generic-argument closers rather than a right-shift operator.
 //META: intent=characterization
 //META: covers=source/slang/slang-parser.cpp

@@ -236,6 +236,17 @@ if(SLANG_ENABLE_GFX)
     )
 endif()
 if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
+    # ---- spvdb integration for SPVDB_DEBUGGER tests -------------------------
+    # spvdb (vendored at tests/spvdb) is a SPIR-V interpreter and source-level
+    # debugger. Build libspvdb here and link it into slang-test so that
+    # .slang test files under tests/debuginfo can drive the debugger
+    # in-process and validate its output with FileCheck.
+    add_subdirectory(
+        "${slang_SOURCE_DIR}/tests/spvdb"
+        "${CMAKE_CURRENT_BINARY_DIR}/spvdb"
+        EXCLUDE_FROM_ALL
+    )
+
     # The test executables and runtime-loaded modules
     slang_add_target(
         test-server
@@ -264,9 +275,11 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             compiler-core
             slang
             stb
+            spvdb
             ${CMAKE_DL_LIBS}
             Threads::Threads
         INCLUDE_FROM_PRIVATE prelude slang-rhi
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_ENABLE_SPVDB=1
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         REQUIRES
             # Shared libraries dlopened by slang-test
@@ -433,6 +446,17 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             $<TARGET_PROPERTY:slang-capability-defs,INTERFACE_INCLUDE_DIRECTORIES>
             $<TARGET_PROPERTY:slang-fiddle-output,INTERFACE_INCLUDE_DIRECTORIES>
     )
+    if(SLANG_ENABLE_OPTIX)
+        target_compile_definitions(
+            slang-unit-test
+            PRIVATE SLANG_UNIT_TEST_ENABLE_OPTIX=1
+        )
+        target_include_directories(
+            slang-unit-test
+            SYSTEM
+            PRIVATE ${OptiX_INCLUDE_DIRS}
+        )
+    endif()
     slang_add_target(
         slang-reflection-test
         MODULE
@@ -467,5 +491,51 @@ if(SLANG_ENABLE_REPLAYER)
             ${slang_SOURCE_DIR}/source/slang-record-replay
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         FOLDER test
+    )
+endif()
+
+#
+# Unit tests that call non-exported `source/slang` entry points directly.
+#
+# These are separate from `slang-unit-test` because of how they link, not what they
+# test. `slang-unit-test` is a shared library loaded by `slang-test`, so it can reach
+# only the symbols libslang-compiler exports — and the entry points these tests need
+# carry no export annotation, so they are not among them. Linking the compiler
+# statically into an executable resolves them at link time instead, with no annotation
+# and no change to `source/slang`.
+#
+# The target is therefore only defined for a static build. Under
+# SLANG_LIB_TYPE=SHARED the link would fail by design, so guarding the
+# definition here — rather than marking it EXCLUDE_FROM_ALL — means it is part
+# of `all` exactly where it can work.
+#
+# The SLANG_ENABLE_SLANG_RHI condition mirrors the guard on the `unit-test`
+# object library this target links against, even though these tests do not use
+# the RHI themselves.
+if(
+    SLANG_ENABLE_TESTS
+    AND SLANG_ENABLE_SLANG_RHI
+    AND SLANG_LIB_TYPE STREQUAL "STATIC"
+)
+    slang_add_target(
+        slang-static-unit-test
+        EXECUTABLE
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
+        INCLUDE_DIRECTORIES_PRIVATE
+            ${slang_SOURCE_DIR}/source
+            ${slang_SOURCE_DIR}/tools
+        PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
+        FOLDER test
+    )
+    # The tests include internal slang headers that transitively pull in the
+    # FIDDLE and capability generated headers. The `slang` target consumes those
+    # as PRIVATE link dependencies so their include directories do not
+    # propagate; expose them here, as `slang-unit-test` does.
+    target_include_directories(
+        slang-static-unit-test
+        PRIVATE
+            $<TARGET_PROPERTY:slang-capability-defs,INTERFACE_INCLUDE_DIRECTORIES>
+            $<TARGET_PROPERTY:slang-fiddle-output,INTERFACE_INCLUDE_DIRECTORIES>
     )
 endif()

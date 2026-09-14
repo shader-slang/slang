@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#diagnosed-failures-during-binding
-//META: doc_section_digest=7be614a0462c62207f70cd7d5a1d37fc1ba9d18f1198a952e2b8d3e90274ac95
+//META: doc_section_digest=210845004e453a7583de469b0de24d48d58f75a96ce4c3d08e88229e3bb5eb0d
 //META: purpose=A ray-tracing entry-point parameter on a target with no layout rules for it is diagnosed with error E39032 instead of crashing.
 //META: intent=negative
 //META: pipeline_stage=layout

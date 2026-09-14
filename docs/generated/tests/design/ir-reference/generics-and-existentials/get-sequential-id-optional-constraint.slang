@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#getsequentialid-and-the-rtti-opcodes
-//META: doc_section_digest=6cc3f5eec6bb51967081fde8b552a0d2379a75f949f4364094036e58264ef186
+//META: doc_section_digest=c6932c779e6b7ce0b79c57daf536a4c05b33003e381d410c327ed5ffe0c10c37
 //META: purpose=An optional-constraint check lowers to GetSequentialID on the constraint's witness table, yielding a UInt compared against the sentinel none id.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -14,7 +14,7 @@
 // witness-table-typed generic parameter, the `GetSequentialID` whose result is
 // a `UInt`, and the inequality against the all-ones sentinel that encodes
 // "no conformance".
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#profile-predicates-hlsl-specific
-//META: doc_section_digest=fb9dcb4d551f588b6e304eea8a06c4476152ee03506272230b2dd0f61c24e840
+//META: doc_section_digest=3b767d82e05efb8308d4a6e6105f6ce6ede6054c8a92534c2ff2258e80563bdb
 //META: purpose=Boundary: `[shader("compute")]` is emitted at the DX shader-model 6.1 profile but not at 6.0 — 6.1 is the documented lower edge of the profile predicate that selects the attribute.
 //META: intent=boundary
 //META: pipeline_stage=emit

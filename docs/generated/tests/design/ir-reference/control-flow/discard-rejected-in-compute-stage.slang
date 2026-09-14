@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#discard
-//META: doc_section_digest=6a5608a206f750dd04fa2d1029419418beb4607b6026071a262da03fd96ab75b
+//META: doc_section_digest=0772e4d9559e7c0aa30a097a054020db1d3ad67e21b2e96e8c76633db7bb3b82
 //META: purpose=Negative: `discard` is fragment-only per the doc ("HLSL discard for fragment shaders") — using it from a compute entry point is rejected with E36107 "unavailable features in entry point" for the compute stage.
 //META: intent=negative
 //META: pipeline_stage=check

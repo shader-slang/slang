@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T14:10:58Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: b05183b09ce7aed8128e45e31d4986249932ca45431a04b94d0ca99f3d163135
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: e3b167a7b5a8744a5ce8c1f92bde754b9f8fe285c549d34e941e9e49a45542f2
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -140,13 +140,13 @@ Abstract intermediates: `ArithmeticExpressionType`, `Fp8Type`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `OverloadGroupType` | `Type` | (operand-encoded) | (none) | The pseudo-type of an unresolved overload set; collapsed by checking. |
-| `InitializerListType` | `Type` | (operand-encoded) | (none) | The pseudo-type of an initializer list before it has been matched to a target type. |
-| `ErrorType` | `Type` | (operand-encoded) | (none) | The type of expressions that failed checking; lets checking continue without cascading errors. |
-| `BottomType` | `Type` | (operand-encoded) | (none) | Bottom type representing "no value"; used in the type lattice. |
+| `OverloadGroupType` | `Type` | (operand-encoded) | (none) | The pseudo-type of a reference to an overloaded name, i.e. one that lookup resolved to several candidates; collapsed by checking. |
+| `InitializerListType` | `Type` | (operand-encoded) | (none) | The pseudo-type of an initializer-list expression such as `{ a, b }`, before it has been coerced to a target type. |
+| `ErrorType` | `Type` | (operand-encoded) | (none) | The type of an expression that was erroneous, such as a use of an undeclared name; lets checking continue without cascading errors. |
+| `BottomType` | `Type` | (operand-encoded) | (none) | The bottom/empty type that has no values; the result type of a function that can never return and the error type of one that cannot fail. |
 | `DeclRefType` | `Type` | `declRef: DeclRef<Decl>` | [type ref](../syntax-reference/grammar.md#types) | A type defined by reference to a declaration (`StructDecl`, `InterfaceDecl`, `EnumDecl`, ...). |
 | `TypeType` | `Type` | `type: Type*` | (none) | The type *of* a type expression (i.e. the "kind" `Type`); `float` in `float(2)` has type `TypeType(float)`. |
-| `NamedExpressionType` | `Type` | `declRef: DeclRef<TypeDefDecl>` | [typedef ref](../syntax-reference/grammar.md#types) | A typedef'd / typealias'd type that preserves the original name for diagnostics. |
+| `NamedExpressionType` | `Type` | `declRef: DeclRef<TypeDefDecl>` | [typedef ref](../syntax-reference/grammar.md#types) | A `typedef` / `typealias` alias. Its `_toTextOverride` ([slang-ast-type.cpp](../../../../source/slang/slang-ast-type.cpp) line 1414) prints the alias's `declRef`, so any consumer that formats *this* node shows the alias name — but `_createCanonicalTypeOverride` (line 1422) resolves it to the aliased type, and a consumer that canonicalizes first shows the resolved type instead. The distinction is canonicalization, not two printing paths. Type-mismatch diagnostics and emitted target code are both in the second category: given `typealias Celsius = float`, they say `float`, never `Celsius`. |
 | `NamespaceType` | `Type` | `declRef: DeclRef<NamespaceDeclBase>` | (none) | The type of a namespace or module expression. |
 | `GenericDeclRefType` | `Type` | `declRef: DeclRef<GenericDecl>` | (none) | A reference to a generic declaration without its arguments applied. |
 | `FuncType` | `Type` | leading param `Type*` operands, then `result: Type*`, then `error: Type*` | [function type](../syntax-reference/grammar.md#types) | Function type with parameter types, result type, and error type. |
@@ -162,7 +162,7 @@ Abstract intermediates: `ArithmeticExpressionType`, `Fp8Type`,
 | `ArrayExpressionType` | `DeclRefType` | `elementType: Type*, elementCount: IntVal*` | [array type](../syntax-reference/grammar.md#types) | Sized or unsized array of elements. |
 | `TupleType` | `DeclRefType` | `members: Type*` (`getMemberCount()` / `getMember(i)`), `typePack: Type*` | [tuple type](../syntax-reference/grammar.md#types) | `(T1, T2, ...)` tuple. |
 | `ConditionalType` | `DeclRefType` | `valueType: Type*, hasValue: IntVal*` | (none) | Compile-time conditional type. |
-| `AtomicType` | `DeclRefType` | `elementType: Type*` | (none) | Atomic wrapper type. |
+| `AtomicType` | `DeclRefType` | `elementType: Type*` | [type ref](../syntax-reference/grammar.md#types) | `Atomic<T>`, the user-spellable wrapper over an `IAtomicable` element; its members are atomic intrinsics, so an update lowers to the target's atomic instruction rather than a load / modify / store. |
 | `OptionalType` | `BuiltinType` | `valueType: Type*` | [optional type](../syntax-reference/grammar.md#types) | `Optional<T>`. |
 | `NativeRefType` | `BuiltinType` | `valueType: Type*` (`getValueType()`) | (none) | Raw-pointer reference to a managed value. |
 | `EnumTypeType` | `BuiltinType` | (operand-encoded) | (none) | The type of an `enum` type itself (its "kind"). |
@@ -317,6 +317,20 @@ dedicated subclasses exist so that arithmetic-specific helper APIs
 (scalar-type-of, element-count, layout) can be exposed without
 crawling the decl-ref.
 
+Value boundaries belong to the leaf, not to the AST node. Each scalar
+leaf is one fixed-width machine type, emitted once per `BaseType` tag
+by the `__builtin_type` loop in
+[core.meta.slang](../../../../source/slang/core.meta.slang), and its
+operators are intrinsic ops, so arithmetic is the target's native
+arithmetic at that width: an unsigned add past the top of the range
+wraps rather than saturating or being diagnosed, so a `uint` holding
+`0xFFFFFFFF` plus `1u` is `0`. The front end does step in for integer
+*literals*: `_determineIntegerLiteralType` in
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp) picks
+the narrowest type that holds the value — `int`, then `int64`, for an
+unsuffixed decimal — and diagnoses `IntegerLiteralTooLarge` for a
+decimal literal past the range of `int64` instead of truncating it.
+
 ### ErrorType and BottomType
 
 `ErrorType` is the type of any expression that failed to check, so
@@ -359,7 +373,17 @@ parameter-mode type (`OutParamType` for `out T`,
 `BorrowInOutParamType` for `inout T`, `RefParamType` for `ref T`), which
 a caller must unwrap to recover the plain type and the passing mode. The
 error-type slot is always present rather than optional: a callable that
-cannot fail records the bottom type `Never` there, so only the failure
+cannot fail records the bottom type there — spelled `never` when
+printed (`BottomType::_toTextOverride`,
+[slang-ast-type.cpp](../../../../source/slang/slang-ast-type.cpp) line
+124) and represented by the C++ class `BottomType`
+([slang-ast-type.h](../../../../source/slang/slang-ast-type.h) line
+50). Neither spelling is surface syntax: no declaration of the name
+exists in
+[core.meta.slang](../../../../source/slang/core.meta.slang), so writing
+it in a `.slang` program is just an undefined identifier. It is a type
+the compiler forms, not one a user names. With the bottom type in the
+error slot only the failure
 modes the type system models explicitly appear as a real error type.
 Function-typed values
 arise from `FuncTypeExpr`, from taking the address of a function, or
@@ -402,7 +426,13 @@ Only those two result types are magic: they are bound to
 `UntypedResourceHandleType` and `UntypedSamplerHandleType` by
 `__magic_type` in
 [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang), while the
-two heap structs themselves are plain `DeclRefType`s. Each handle wraps
+two heap structs themselves are plain `DeclRefType`s. The surface is
+capability-gated: both heap subscripts and both handle constructors
+carry `[require(glsl_hlsl_spirv_wgsl, descriptor_handle)]`, so writing
+`ResourceDescriptorHeap[i]` outside that target set or without the
+`descriptor_handle` capability is diagnosed. The gate is deliberately
+repeated on the subscript so the diagnostic lands at the indexing site
+rather than inside the core module. Each handle wraps
 a single `uint` heap index and is deliberately untyped; the concrete
 resource or sampler type is recovered from the target of the implicit
 conversion, and the resource and sampler families are kept disjoint

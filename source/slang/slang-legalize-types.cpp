@@ -1138,8 +1138,13 @@ static LegalType wrapLegalType(
 
     case LegalType::Flavor::implicitDeref:
         {
-            return LegalType::implicitDeref(
-                wrapLegalType(context, legalType, ordinaryWrapper, specialWrapper));
+            // Wrap the pointed-to value type and restore the `implicitDeref`. Recursing on
+            // `legalType` itself (rather than its `valueType`) would not terminate.
+            return LegalType::implicitDeref(wrapLegalType(
+                context,
+                legalType.getImplicitDeref()->valueType,
+                ordinaryWrapper,
+                specialWrapper));
         }
         break;
 
@@ -1184,6 +1189,25 @@ static LegalType wrapLegalType(
         UNREACHABLE_RETURN(LegalType());
         break;
     }
+}
+
+// An array of a parameter group whose element still needs decomposition must not take the
+// "resource types are legal as-is" shortcut in `legalizeTypeImpl`: `isResourceType` strips array
+// wrappers and treats the pointer-like group as a resource, so without this the array would stay
+// unlegalized while its element type legalizes to a non-simple form — the inconsistency that
+// crashes `GetElement`. Route such arrays to the array branch instead.
+static bool isArrayOfParameterGroupsNeedingLegalization(
+    TypeLegalizationContext* context,
+    IRType* type)
+{
+    if (!as<IRArrayTypeBase>(type))
+        return false;
+
+    auto paramGroupType = as<IRUniformParameterGroupType>(unwrapArray(type));
+    if (!paramGroupType)
+        return false;
+
+    return legalizeType(context, paramGroupType).flavor != LegalType::Flavor::simple;
 }
 
 // Legalize a type, including any nested types
@@ -1353,7 +1377,7 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
             bufferType->getOperandCount(),
             operands.getArrayView().getBuffer()));
     }
-    else if (isResourceType(type))
+    else if (isResourceType(type) && !isArrayOfParameterGroupsNeedingLegalization(context, type))
     {
         // We assume that any resource types not handled above
         // are legal as-is.

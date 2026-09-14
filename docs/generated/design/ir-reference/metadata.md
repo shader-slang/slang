@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T14:16:09Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 6ca22e11b1ae848bc68390906f1d20589efa4eb3e3366532aa60f8ccaecd4b6c
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: bc45969655fca14f848b9f10dbc8a6f0eeed657a9b4a93c9e1c2c099e0511f30
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -31,10 +31,10 @@ disagree, a callout in
 
 The four families live in distinct Lua entry groups in
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
-`Layout` at line 2876, `Attr` at line 2909, the `Debug*` opcodes
-between lines 2974 and 3009 (with `EmbeddedDownstreamIR` immediately
-after at line 3011), and the inline-asm group starting with the
-parent `SPIRVAsm` at line 3013 and `SPIRVAsmOperand` at line 3016.
+`Layout` at line 2880, `Attr` at line 2913, the `Debug*` opcodes
+between lines 2978 and 3009 (with `EmbeddedDownstreamIR` immediately
+after at line 3015), and the inline-asm group starting with the
+parent `SPIRVAsm` at line 3017 and `SPIRVAsmOperand` at line 3020.
 
 Every opcode on this page has a C++ wrapper struct, and 38 of the 59
 are hand-written in
@@ -44,8 +44,8 @@ than generated. Those 38 are marked with a trailing `‡` in the
 wrappers (`IRAttr` at line 989, `IRParameterGroupTypeLayout` at
 line 1240, `IRVarLayout` at line 1677, `IRAlignedAttr` at line 1810
 and their neighbours), the eleven `IRDebug*` structs (lines
-2711-2819), the inline-asm wrappers (`IRSPIRVAsmOperand` at line 2836,
-`IRSPIRVAsm` at line 2901) and `IREmbeddedDownstreamIR` (line 2959).
+2711-2819), the inline-asm wrappers (`IRSPIRVAsmOperand` at line 2845,
+`IRSPIRVAsm` at line 2910) and `IREmbeddedDownstreamIR` (line 2968).
 The other 21 — `IRTypeLayoutBase`, the three `Attributed`-type marker
 attributes, `IRNonUniformAttr`, and the sixteen concrete
 `IRSPIRVAsmOperand*` leaves — are emitted by the FIDDLE template at
@@ -57,16 +57,16 @@ gets no generated accessors, which is why the hand-written structs
 exist.
 
 Layout and layout-attribute opcodes are produced by AST-to-IR
-lowering, not by an IR pass: `lowerTypeLayout` (line 16060),
-`_lowerTypeLayoutCommon` (line 16023) and `lowerVarLayout`
-(line 16235) in
+lowering, not by an IR pass: `lowerTypeLayout` (line 16388),
+`_lowerTypeLayoutCommon` (line 16351) and `lowerVarLayout`
+(line 16563) in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
 translate the front-end's `TypeLayout` / `VarLayout` / `EntryPointLayout`
 objects into IR, all reached from
-`TargetProgram::createIRModuleForLayout` (line 16353) — see
+`TargetProgram::createIRModuleForLayout` (line 16681) — see
 [../pipeline/04c-layout-ir.md](../pipeline/04c-layout-ir.md). The
 whole `SPIRVAsm*` group comes from one visitor,
-`visitSPIRVAsmExpr` (line 6137), in the same file. The `Debug*`
+`visitSPIRVAsmExpr` (line 6150), in the same file. The `Debug*`
 opcodes are split: lowering emits `DebugSource`,
 `DebugCompilationUnit`, `DebugLine`, `DebugFunction`, `DebugVar`
 and `DebugValue`; `slang-ir-inline.cpp` adds `DebugScope`,
@@ -74,13 +74,13 @@ and `DebugValue`; `slang-ir-inline.cpp` adds `DebugScope`,
 `slang-ir-insert-debug-value-store.cpp` and
 `slang-ir-legalize-types.cpp` add further `DebugVar` / `DebugValue`
 pairs; and `linkAndOptimizeIR` in
-[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (line 1032)
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (line 1062)
 creates the single `DebugBuildIdentifier`. `DebugInlinedVariable` has
 no producer at HEAD.
 
 The builder side lives in
 [slang-ir.cpp](../../../../source/slang/slang-ir.cpp):
-`IRTypeLayout::Builder::addAttrs` (line 1147) is where a type
+`IRTypeLayout::Builder::addAttrs` (line 1148) is where a type
 layout's size and alignment attributes are materialized, and the
 `IRBuilder::get*Attr` / `IRBuilder::emitDebug*` families (lines
 3535-3680 and 7395-7510) are the canonical creation points. Op
@@ -143,13 +143,31 @@ point. A laid-out instruction is connected to its layout by the
 | `parameterGroupTypeLayout` | `IRParameterGroupTypeLayout`‡ | `containerVarLayout, elementVarLayout, offsetElementTypeLayout`, + attrs | H | `ParameterGroupTypeLayout` | Layout for a constant buffer / parameter block. |
 | `arrayTypeLayout` | `IRArrayTypeLayout`‡ | `elementTypeLayout`, + attrs | H | `ArrayTypeLayout` | Layout for an array type; element stride is derived, not stored. |
 | `streamOutputTypeLayout` | `IRStreamOutputTypeLayout`‡ | `elementTypeLayout`, + attrs | H | `StreamOutputTypeLayout` | Layout for a geometry-shader stream-output type. |
-| `matrixTypeLayout` | `IRMatrixTypeLayout`‡ | `mode: IRIntLit`, + attrs | H | `MatrixTypeLayout` | Layout for a matrix type; operand 0 is a `MatrixLayoutMode`. |
+| `matrixTypeLayout` | `IRMatrixTypeLayout`‡ | `mode: IRIntLit`, + attrs | H | `MatrixTypeLayout` | Layout for a matrix type; operand 0 is a `MatrixLayoutMode` — `1` row-major, `2` column-major. |
 | `existentialTypeLayout` | `IRExistentialTypeLayout`‡ | + attrs only | H | `ExistentialTypeLayout` | Layout for an existential / interface-typed value. |
 | `structTypeLayout` | `IRStructTypeLayout`‡ | + `structFieldLayout` attrs | H | `StructTypeLayout` | Layout for a struct; one field attr per field, in declaration order. |
 | `tupleTypeLayout` | `IRTupleTypeLayout`‡ | + `tupleFieldLayout` attrs | H | **no producer at HEAD** | Layout for a tuple type; nothing calls `IRTupleTypeLayout::Builder` at `source_commit`. |
 | `structuredBufferTypeLayout` | `IRStructuredBufferTypeLayout`‡ | `elementTypeLayout`, + attrs | H | `StructuredBufferTypeLayout` | Layout for a structured-buffer resource. |
 | `ptrTypeLayout` | `IRPointerTypeLayout`‡ | + attrs only | H | `PointerTypeLayout` | Layout for a pointer type; the pointee layout is deliberately not stored. |
-| `EntryPointLayout` | `IREntryPointLayout`‡ | `paramsLayout: IRVarLayout, resultLayout: IRVarLayout` | H | `EntryPointLayout` (via `lowerEntryPointLayout`, line 16307) | Layout for an entry point: parameter-struct layout plus result layout. |
+| `EntryPointLayout` | `IREntryPointLayout`‡ | `paramsLayout: IRVarLayout, resultLayout: IRVarLayout` | H | `EntryPointLayout` (via `lowerEntryPointLayout`, line 16635) | Layout for an entry point: parameter-struct layout plus result layout. |
+
+The `AST origin` column names the front-end class each row is lowered
+from, which does not say what a shader author writes to reach it. The
+minimal Slang surface for each is: any shader parameter for
+`varLayout`, and every entry point for `EntryPointLayout`; a
+`cbuffer` block or a `ConstantBuffer<T>` for
+`parameterGroupTypeLayout`; a `struct` used as a laid-out type for
+`structTypeLayout`; a `RWStructuredBuffer<T>` for
+`structuredBufferTypeLayout`, whose element type `T` gets the
+fallback `typeLayout`; an array field such as `float arr[4]` for
+`arrayTypeLayout`; a matrix field such as `float4x4 m` for
+`matrixTypeLayout`; a pointer field such as `float* p` for
+`ptrTypeLayout`; an interface-typed field such as `ILight light` for
+`existentialTypeLayout`; and an `inout TriangleStream<T>` parameter of
+a geometry entry point for `streamOutputTypeLayout`.
+`matrixTypeLayout` is the one row whose shape depends on a compile
+option rather than on the declaration: `-matrix-layout-row-major` and
+`-matrix-layout-column-major` select the `1` and `2` mode operands.
 
 ### Attr family
 
@@ -160,24 +178,36 @@ in the operand tail of a layout opcode (`size`, `offset`,
 documented in [types.md](types.md); and `Aligned` / `MemoryScope`
 appear in the operand tail of a `load` / `store`.
 
+The public Slang surface for that last pair is the core-module
+`loadAligned` / `storeAligned` and `loadCoherent` / `storeCoherent`
+wrappers; `__align_attr` and `__memoryscope_attr` are `internal`
+helpers those wrappers call, not something a shader author writes.
+The coherent pair is declared `[require(SPV_KHR_vulkan_memory_model)]`
+([core.meta.slang](../../../../source/slang/core.meta.slang)
+lines 1570 and 1582), and
+`getMemoryAccessOperandsOfLoadStore`
+([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)
+line 8871) fails an assertion if a `MemoryScope` reaches it without
+the Vulkan memory model selected.
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `stage` | `IRStageAttr`‡ | `stageOperand: IRIntLit` | H | `VarLayout::stage` (via `IRVarLayout::Builder::setStage`) | Tags a `varLayout` with the pipeline stage it belongs to. |
+| `stage` | `IRStageAttr`‡ | `stageOperand: IRIntLit` | H | `VarLayout::stage` (via `IRVarLayout::Builder::setStage`) | Tags a `varLayout` with the pipeline stage it belongs to; the literal is a `Stage` enumerator, so a compute entry point prints as `stage(6 : Int)`. |
 | `structFieldLayout` | `IRStructFieldLayoutAttr`‡ | `fieldKey, layout: IRVarLayout` | H | `StructTypeLayout` field list | One field's layout inside a `structTypeLayout`. |
 | `tupleFieldLayout` | `IRTupleFieldLayoutAttr`‡ | `layout: IRTypeLayout` | H | **no producer at HEAD** | One field's layout inside a `tupleTypeLayout`; its only construction site is the uncalled `IRTupleTypeLayout::Builder::addAttrsImpl`, see the callout below. |
 | `caseLayout` | `IRCaseTypeLayoutAttr`‡ | `typeLayout: IRTypeLayout` | H | **no producer at HEAD** | Per-case layout for a union-style layout; `getCaseTypeLayoutAttr` has no caller at `source_commit`. |
-| `unorm` | `IRUNormAttr` | — | H | `UNormModifierVal` (line 3017) | Marks a type as the UNORM-normalized form. |
-| `snorm` | `IRSNormAttr` | — | H | `SNormModifierVal` (line 3023) | Marks a type as the SNORM-normalized form. |
-| `no_diff` | `IRNoDiffAttr` | — | H | `NoDiffModifierVal` (line 3029) | Marks a type as not contributing to derivative computation. |
-| `nonuniform` | `IRNonUniformAttr` | — | H | Call specialization (`slang-ir-specialize-function-call.cpp`, line 618) | Marks a resource index as non-uniform. |
-| `Aligned` | `IRAlignedAttr`‡ | `alignment` | H | Core-module `__align_attr` (`__intrinsic_op`, `core.meta.slang` line 1515); also `IRBuilder::emitLoad` / `emitStore` (`slang-ir.cpp` lines 5557, 5626) | Access alignment of a `load` / `store`, not of a type layout. |
-| `MemoryScope` | `IRMemoryScopeAttr`‡ | `memoryScope` | H | Core-module `__memoryscope_attr` (`__intrinsic_op`, `core.meta.slang` line 1556); also `IRBuilder::emitStore` (`slang-ir.cpp` line 5641) | Memory scope of a `store`; read by `getMemoryScope()`. |
+| `unorm` | `IRUNormAttr` | — | H | `UNormModifierVal` (line 3052) | Marks a type as the UNORM-normalized form. |
+| `snorm` | `IRSNormAttr` | — | H | `SNormModifierVal` (line 3058) | Marks a type as the SNORM-normalized form. |
+| `no_diff` | `IRNoDiffAttr` | — | H | `NoDiffModifierVal` (line 3064) | Marks a type as not contributing to derivative computation. |
+| `nonuniform` | `IRNonUniformAttr` | — | H | Call specialization (`slang-ir-specialize-function-call.cpp`, line 618) | Marks a resource index as non-uniform; a specialization-key-only value that never reaches a dump, see the callout below. |
+| `Aligned` | `IRAlignedAttr`‡ | `alignment` | H | Core-module `loadAligned` / `storeAligned` (`core.meta.slang` lines 1542, 1550), via the internal `__align_attr` (`__intrinsic_op`, line 1522); also `IRBuilder::emitLoad` / `emitStore` (`slang-ir.cpp` lines 5639, 5627) | Access alignment of a `load` / `store`, not of a type layout. |
+| `MemoryScope` | `IRMemoryScopeAttr`‡ | `memoryScope` | H | Core-module `loadCoherent` / `storeCoherent` (`core.meta.slang` lines 1606, 1573), via the internal `__memoryscope_attr` (`__intrinsic_op`, line 1577); also `IRBuilder::emitStore` (`slang-ir.cpp` line 5716) | Memory scope of a coherent `load` / `store`; read by `getMemoryScope()`. |
 | `userSemantic` | `IRUserSemanticAttr`‡ | `name: IRStringLit, index: IRIntLit` | H | `VarLayout::semanticName` | User-defined HLSL semantic on a parameter or field. |
 | `systemValueSemantic` | `IRSystemValueSemanticAttr`‡ | `name: IRStringLit, index: IRIntLit` | H | `VarLayout::systemValueSemantic` | System-value semantic (`SV_*`) on a parameter or field. |
 | `size` | `IRTypeSizeAttr`‡ | `kind: IRIntLit, size: IRIntLit` | H | `TypeLayout::resourceInfos` | Resource usage of a type layout for one `LayoutResourceKind`. |
 | `offset` | `IRVarOffsetAttr`‡ | `kind: IRIntLit, offset: IRIntLit, space: IRIntLit?` | H | `VarLayout::resourceInfos` | Binding offset of a `varLayout` for one `LayoutResourceKind`. |
 | `TypeAlignment` | `IRTypeAlignmentAttr`‡ | `alignment: IRIntLit, kind: IRIntLit?` | H | `TypeLayout::uniformAlignment` (via `_lowerTypeLayoutCommon`) | Alignment of a type layout in one layout unit; **alignment-first**, see below. |
-| `FuncThrowType` | `IRFuncThrowTypeAttr`‡ | `errorType: IRType` | H | Throwing-function lowering (lines 2736, 4808) | Records the error type of a function declared `throws`. |
+| `FuncThrowType` | `IRFuncThrowTypeAttr`‡ | `errorType: IRType` | H | Throwing-function lowering (lines 2759, 4808) | Records the error type of a function declared `throws`. |
 
 ### Debug info family
 
@@ -190,19 +220,43 @@ inlines a call; `slang-ir-insert-debug-value-store.cpp` and
 `slang-ir-legalize-types.cpp` add further `DebugVar` / `DebugValue`
 pairs. Only `DebugSource` and `DebugCompilationUnit` are hoistable.
 
+None of these opcodes exist unless debug information is requested, and
+the requested `DebugInfoLevel` selects *which* of them exist, so a
+reader looking for a particular record has to compile at a high enough
+level to see it. `-g` with no suffix is `Standard`; `-g0`..`-g3` name
+the level explicitly. At `None` (`-g0`) lowering emits nothing —
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+line 15786 gates the whole `DebugSource` loop, and `linkAndOptimizeIR`
+additionally runs `stripDebugInfo` over anything that arrived from a
+linked module
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 1084).
+`Minimal` (`-g1`) produces `DebugSource` (with an **empty** text
+operand), `DebugLine`, `DebugFunction`, and — once the inliner has run
+— `DebugScope`, `DebugNoScope` and `DebugInlinedAt`. `Standard` (`-g`,
+`-g2`) and `Maximal` (`-g3`) add two records' worth of detail:
+`DebugSource` carries the file's text (line 15799), and each
+non-included source file gets a `DebugCompilationUnit` (line 15809).
+Those two levels are also what enable the variable-level records —
+the `insertDebugValueStore` pass runs only at `Standard` or above
+(line 15924), as does the `DebugVar` emitted for a `let` declaration
+(line 12061), so `DebugVar` and `DebugValue` never appear at `-g1`.
+`-debug-info-include-source` is the one exception to
+the level rule: it embeds the source text into `DebugSource` even at
+`Minimal`.
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `DebugSource` | `IRDebugSource`‡ | `fileName, source, isIncludedFile` | H | `getOrEmitDebugSource` in lowering | Records a source file's path, optional embedded text, and include status. |
+| `DebugSource` | `IRDebugSource`‡ | `fileName, source, isIncludedFile` | H | `getOrEmitDebugSource` in lowering | Records a source file's path, embedded text, and include status; operand 1 is the *whole* file, empty at `-g1`. |
 | `DebugCompilationUnit` | `IRDebugCompilationUnit`‡ | `source` | H | Lowering (`emitDebugCompilationUnit`) | Declares the compilation unit, referencing a `DebugSource`. |
-| `DebugLine` | `IRDebugLine`‡ | `source, lineStart, lineEnd, colStart, colEnd` | | `maybeEmitDebugLine` in lowering (line 9907) | Pins an instruction to a source line/column range. |
-| `DebugVar` | `IRDebugVar`‡ | `source, line, col, argIndex?` | | Lowering (line 11975) and the debug-value-store pass | Declares a user-visible variable; result type is `Ptr<T>`. |
-| `DebugValue` | `IRDebugValue`‡ | `debugVar, value` | | Lowering (line 11986) and the debug-value-store pass | Reports the current value of a `DebugVar`. |
+| `DebugLine` | `IRDebugLine`‡ | `source, lineStart, lineEnd, colStart, colEnd` | | `maybeEmitDebugLine` in lowering (line 9991) | Pins an instruction to a source line/column range. |
+| `DebugVar` | `IRDebugVar`‡ | `source, line, col, argIndex?` | | Lowering (line 12059) and the debug-value-store pass | Declares a user-visible variable; result type is `Ptr<T>`. |
+| `DebugValue` | `IRDebugValue`‡ | `debugVar, value` | | Lowering (line 12070) and the debug-value-store pass | Reports the current value of a `DebugVar`. |
 | `DebugInlinedAt` | `IRDebugInlinedAt`‡ | `line, col, file, debugFunc, outerInlinedAt?` | | `slang-ir-inline.cpp` | Records one frame of an inlining chain. |
-| `DebugFunction` | `IRDebugFunction`‡ | `name, line, col, file, debugType` | | Lowering (line 14687) and `slang-ir-inline.cpp` | Declares a function for the debugger; linked by `DebugFuncDecoration`. |
+| `DebugFunction` | `IRDebugFunction`‡ | `name, line, col, file, debugType, parentScope?` | | Lowering (line 15035) and `slang-ir-inline.cpp` | Declares a function for the debugger; linked by `DebugFuncDecoration`. |
 | `DebugInlinedVariable` | `IRDebugInlinedVariable`‡ | `variable, inlinedAt` | | **no producer at HEAD** | Variable inside an inlined instance; `emitDebugInlinedVariable` has no caller at `source_commit`. |
 | `DebugScope` | `IRDebugScope`‡ | `scope, inlinedAt` | | `slang-ir-inline.cpp` | Opens a debug lexical scope. |
 | `DebugNoScope` | `IRDebugNoScope`‡ | (emitted with none; see below) | | `slang-ir-inline.cpp` | Marks that following instructions are outside any debug scope. |
-| `DebugBuildIdentifier` | `IRDebugBuildIdentifier`‡ | `buildIdentifier, flags` | | `linkAndOptimizeIR` (`slang-emit.cpp`, line 1032) | Records the build identifier of the compilation. |
+| `DebugBuildIdentifier` | `IRDebugBuildIdentifier`‡ | `buildIdentifier, flags` | | `linkAndOptimizeIR` (`slang-emit.cpp`, line 1061), only under `-separate-debug-info` | Records the build identifier of the compilation. |
 | `EmbeddedDownstreamIR` | `IREmbeddedDownstreamIR`‡ | `targetOperand: IRIntLit, blob: IRBlobLit` | | Precompilation of a translation unit (`slang-compiler-tu.cpp`, line 230) | Embeds a precompiled downstream blob for one `CodeGenTarget`. |
 
 ### SPIR-V inline asm
@@ -216,6 +270,29 @@ operands as the remaining operands
 group is produced by `visitSPIRVAsmExpr`, so the AST origin for all
 of them is `SPIRVAsmExpr`; the column below names the
 `SPIRVAsmOperand` *kind* in the AST expression that selects each one.
+
+The block's printed form follows from those two facts. `SPIRVAsm` is
+dumped by `dumpIRParentInst`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 8103) as a
+typed one-line header followed by an indented brace block, and every
+`SPIRVAsmOperand` is folded into its use site by
+`shouldFoldInstIntoUses` (line 7884), so the operand instructions
+print *inside* their `SPIRVAsmInst` rather than as separately numbered
+definitions above it. A two-instruction block
+(`%tmp : $$float = OpFMul $x $x; result:$$float = OpExtInst glsl450
+Sqrt %tmp`) reaches the dump as:
+
+```
+SPIRVAsm %8 : Float
+{
+  SPIRVAsmInst(133 : UInt, Float, %"tmp", ...)
+  SPIRVAsmInst(12 : UInt, Float, result, SPIRVAsmOperandGLSL450Set, 31 : UInt, %"tmp")
+}
+```
+
+Operand 0 of each child is the SPIR-V opcode number (`133` is
+`OpFMul`, `12` is `OpExtInst`), and the tokens after it are the folded
+operand instructions in source order.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -253,6 +330,22 @@ concrete `Layout` children above (`IRLayoutDecoration::getLayout()`,
 line 1778). A reader walking IR therefore follows a layout decoration
 to reach the offset, size and alignment data.
 
+In a dump that walk is two hops between distant lines, because a
+decoration prints as a bracketed line above the instruction it
+decorates while its operand is a separate module-scope definition:
+
+```
+[layout(%12)]
+let  %5 : ... = global_param
+...
+let  %12 : Void = varLayout(%13, %14)
+let  %14 : Void = offset(...)
+```
+
+The layout insts carry a `Void` result type — they are records, not
+values — and are never folded into their use sites, so the `%N` in the
+decoration is always a reference to a definition printed elsewhere.
+
 ### `varLayout` and `EntryPointLayout`
 
 `varLayout` has one fixed operand — the type layout, read by
@@ -260,7 +353,7 @@ to reach the offset, size and alignment data.
 `offset` records keyed by resource kind, at most one semantic
 attribute, and at most one `stage`. `IRVarLayout::Builder` in
 [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) is what enforces
-"at most one semantic": `lowerVarLayout` (line 16235 of
+"at most one semantic": `lowerVarLayout` (line 16563 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp))
 checks the system-value semantic first and only falls back to the
 user semantic, because the AST-level `VarLayout` encodes both when a
@@ -296,14 +389,14 @@ the optional tail.
 An absent `TypeAlignment` means alignment `1`, mirroring the way an
 absent `size` means size `0` — `IRTypeLayout::getAlignment` returns
 `1` on a miss. `IRTypeLayout::Builder::addAttrs`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 1147)
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 1148)
 therefore emits an attribute only when the alignment exceeds 1 *and*
 the unit is occupied, and it emits all `size` attributes before all
 `TypeAlignment` attributes: `getSizeAttrs()` and `getAlignmentAttrs()`
 both use `findAttrs`, which stops at the first operand of a different
 type, so interleaving the two kinds would truncate the enumeration.
 The value comes from the front end via `_lowerTypeLayoutCommon`
-(line 16023 of
+(line 16351 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)),
 which forwards `TypeLayout::uniformAlignment` whenever the layout
 occupies the byte unit.
@@ -320,13 +413,31 @@ though the element reports 4.
 ### `size` and `offset`
 
 Both are `LayoutResourceInfoAttr` children and both put the
-`LayoutResourceKind` in operand 0. `size` stores a `LayoutSize` raw
-value in operand 1, which is why `IRTypeSizeAttr::getSize()` goes
-through `LayoutSize::fromRaw` — the encoding distinguishes a finite
-size from an unsized (infinite) or unknown extent, and
-`getFiniteSize()` asserts finiteness. `offset` stores the offset in
-operand 1 and, only when it is non-zero, a register space in operand
-2; `getSpace()` returns 0 when that operand is missing.
+`LayoutResourceKind` in operand 0. Neither operand prints as anything
+but a bare integer, so both encodings have to be known to read a dump.
+
+`LayoutResourceKind` is a typedef of `slang::ParameterCategory`, and
+the values that turn up in practice are `2` constant buffer, `3`
+shader resource, `4` unordered access, `5` varying input, `6` varying
+output, `7` sampler state, `8` uniform (plain bytes), `9`
+descriptor-table slot and `12` register space. So a
+`size(8 : Int, 16 : Int)` is sixteen *bytes*, while a
+`size(9 : Int, 2 : Int)` beside it is two *descriptor slots* — the
+second number changes unit with the first.
+
+`size` stores a `LayoutSize` raw value in operand 1, which is why
+`IRTypeSizeAttr::getSize()` goes through `LayoutSize::fromRaw` — the
+encoding distinguishes a finite size from an unsized (infinite) or
+unknown extent, and `getFiniteSize()` asserts finiteness.
+`IRBuilder::getTypeSizeAttr`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 7413)
+writes `unsafeGetRaw()` straight into a signed `IRIntLit`, so the two
+non-finite cases surface as negative literals: an unsized extent
+prints as `-1` and an invalid one as `-2`. An unbounded array such as
+`Texture2D gTex[]` reports `-1` there; it is a sentinel, not a
+negative count. `offset` stores the offset in operand 1 and, only when
+it is non-zero, a register space in operand 2; `getSpace()` returns 0
+when that operand is missing.
 
 ### `tupleFieldLayout` and `caseLayout`
 
@@ -336,7 +447,7 @@ the tree at `source_commit`: nothing calls
 `IRBuilder::getCaseTypeLayoutAttr`. The dormancy has left an
 inconsistency worth knowing about before reviving them:
 `IRBuilder::getTupleFieldLayoutAttr`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 7466)
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 7475)
 creates the attribute with the layout as its *only* operand, while
 `IRTupleFieldLayoutAttr::getLayout()`
 ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h)
@@ -355,6 +466,64 @@ choose between user-defined naming and built-in slot assignment
 without parsing the string at emit time. `IRVarLayout` exposes a
 direct `findSystemValueSemanticAttr()` for the common query.
 
+### `nonuniform`
+
+`nonuniform` is the one attribute on this page that never reaches a
+dump. It has a single producer and no consumer: `getCallInfoForArg`
+([slang-ir-specialize-function-call.cpp](../../../../source/slang/slang-ir-specialize-function-call.cpp)
+line 618) creates it when an argument of a call being specialized is
+an element access whose index traces back — through `intCast`s — to a
+`nonUniformResourceIndex` (`findNonuniformIndexInst`, line 678). Line
+621 wraps it in an `Attributed` type over the index's own data type,
+and line 622 adds that type to the call's specialization key, which is
+only ever a `Dictionary<Key, IRFunc*>` lookup (lines 335, 384 and
+402). That key holds plain `IRInst*` list entries, so neither the
+attribute nor its wrapper becomes an operand of an emitted
+instruction, and nothing in the tree reads the attribute back.
+
+Its only visible effect is on how many specialized functions a call
+site produces. In
+
+```
+ConstantBuffer<Params> gCB[64];
+float4 f(ConstantBuffer<Params> cb) { return cb.v; }
+...
+gOut[0] = f(gCB[NonUniformResourceIndex(i)]) + f(gCB[i]);
+```
+
+`specializeResourceUsage` splits `f` into two specialized functions
+with the identical signature `Func(Vec(Float, 4 : Int), UInt)` —
+their keys differ only by this attribute — while no pass dump of that
+compile contains either `nonuniform` or an `Attributed` type.
+
+### `DebugSource`
+
+`DebugSource` is not just a path record: operand 1 holds the *entire
+text* of the file, copied in by `getOrEmitDebugSource`
+([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+line 9819) and by the per-source-file loop at line 15799. A `-dump-ir`
+of a `-g` compile therefore contains a verbatim copy of its own input,
+which is worth knowing when the dump is being pattern-matched: the
+compiler's output already contains the patterns being matched against
+it. Compiling at `-g1` leaves the operand an empty string, which is why
+a debug test that only needs line records is usually written that way.
+
+### `DebugFunction`
+
+`DebugFunction` carries an optional sixth operand that the Lua entry's
+`min_operands = 5` does not show. `IRBuilder::emitDebugFunction`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 3656)
+picks the five- or six-operand form rather than storing a null, and
+`IRDebugFunction::getParentScope()`
+([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h)
+line 2836) returns null when the count is 5. The operand is the
+`DebugCompilationUnit` of the source file the function is *defined*
+in, so an imported function resolves to its own module's unit rather
+than to the entry point's. It is therefore absent at `Minimal`, where
+no compilation unit is built at all, and also when the function's
+source is an `#include`d or `#line`-remapped file, which never gets a
+compilation unit of its own.
+
 ### `DebugVar`
 
 `DebugVar` is the clearest case where the Lua operand names and the
@@ -362,7 +531,7 @@ real operand meanings disagree. The Lua entry declares
 `operands = { { "name" }, { "type" }, { "scope" }, { "location" } }`,
 so the generator emits `getName()`, `getType()`, `getScope()` and
 `getLocation()`. What `IRBuilder::emitDebugVar`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 3603)
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 3604)
 actually passes is `(source, line, col)` plus an optional
 `argIndex`, and the hand-written accessors on `IRDebugVar`
 ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h)
@@ -396,7 +565,7 @@ context, so scopes nest by chaining operand 0 up to the owning
 `DebugFunction`. `slang-ir-inline.cpp` is what builds these chains
 when it inlines a call. Note that `DebugNoScope` is declared with
 `min_operands = 1` and `IRDebugNoScope::getScope()` reads operand 0,
-but `IRBuilder::emitDebugNoScope` (line 3677 of
+but `IRBuilder::emitDebugNoScope` (line 3686 of
 [slang-ir.cpp](../../../../source/slang/slang-ir.cpp)) creates it with
 zero operands, so that accessor must not be called on an
 instruction from that emitter.
@@ -416,16 +585,41 @@ blob is stored under one of these, keyed by an `IRIntLit` that
 `SPIRVAsmOperand` is not itself an emittable opcode: it is the
 abstract parent declared at
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
-line 3016, and each concrete kind under it wraps exactly one token of
+line 3020, and each concrete kind under it wraps exactly one token of
 an inline-asm instruction — a literal, an enum name, a builtin
 variable, a reference to a Slang IR value, the result id, or one of
 the type functions. `visitSPIRVAsmExpr`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 6137) picks the kind for each parsed token, and the resulting
+line 6150) picks the kind for each parsed token, and the resulting
 instructions become the SPIR-V operands of the enclosing
 `SPIRVAsmInst`. Carrying each token as a typed instruction rather
 than as text is what lets later passes substitute a Slang value or a
 computed type into raw SPIR-V.
+
+Because each kind is folded into its use site, the kind is only as
+visible as its printed form makes it, and `dumpInstExpr`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) lines
+8222-8280) special-cases most of them:
+
+- `SPIRVAsmOperandLiteral`, `SPIRVAsmOperandEnum` and
+  `SPIRVAsmOperandInst` print **only their wrapped operand**, with
+  nothing naming the kind. A literal and a named enumerator therefore
+  both appear as a bare `31 : UInt` and are not distinguishable from
+  the dump alone; an `SPIRVAsmOperandInst` shows whatever its
+  referenced Slang value or type prints as.
+- `SPIRVAsmOperandId` prints `%"name"`, `SPIRVAsmOperandResult` prints
+  `result`, and `__truncate` prints `__truncate`.
+- The three type functions print as calls — `__sampledType(...)`,
+  `__imageType(...)`, `__sampledImageType(...)` — as do the three
+  late-resolving location kinds, spelled
+  `__rayPayloadFromLocation(...)`, `__rayAttributeFromLocation(...)`
+  and `__rayCallableFromLocation(...)`.
+- Everything else falls through to the generic path and prints by its
+  own opcode mnemonic followed by its operands:
+  `SPIRVAsmOperandBuiltinVar(36 : Int)`,
+  `SPIRVAsmOperandConvertTexel(...)`, and the nullary
+  `SPIRVAsmOperandGLSL450Set`, `SPIRVAsmOperandDebugPrintfSet` and
+  `__entryPoint` with no parentheses at all.
 
 ### `SPIRVAsmOperandInst` (non-hoistable)
 
@@ -452,17 +646,25 @@ is related but different: it is a pseudo-opcode, and
 
 Several claims on this page are anchored outside the manifest's
 `watched_paths` for it, so changes there will not mark this page
-stale: the IR passes that produce most `Debug*` opcodes
-(`slang-ir-inline.cpp`, `slang-ir-insert-debug-value-store.cpp`,
-`slang-ir-legalize-types.cpp`), the `nonuniform` producer
-(`slang-ir-specialize-function-call.cpp`, line 618), the core-module
-`__intrinsic_op` declarations behind `Aligned` and `MemoryScope`
-(`core.meta.slang`, lines 1515 and 1556), and the
-`EmbeddedDownstreamIR` producer (`slang-compiler-tu.cpp`, line 230).
-Those six paths should be added to this document's `watched_paths`.
-The `DebugBuildIdentifier` producer in `slang-emit.cpp` and the
-inline-asm type-function evaluation in `slang-emit-spirv.cpp` are both
-already watched.
+stale. Three producers are still unwatched: the IR passes behind most
+`Debug*` opcodes (`slang-ir-inline.cpp`,
+`slang-ir-insert-debug-value-store.cpp`,
+`slang-ir-legalize-types.cpp`). Those three paths should be added to
+this document's `watched_paths`.
+
+The enumerator values quoted for `stage`, `matrixTypeLayout` and the
+`size` / `offset` resource kinds come from the public `SLANG_STAGE_*`,
+`SlangMatrixLayoutMode` and `SlangParameterCategory` enums in
+`include/slang.h`, reached through the `LayoutResourceKind` typedef
+and the `LayoutSize` sentinels in `slang-type-layout.h`; the `-g`,
+`-g0`..`-g3` and `-separate-debug-info` spellings come from
+`slang-options.cpp`; and the SPIR-V opcode numbers in the inline-asm
+excerpt come from `external/spirv-headers`. `core.meta.slang`,
+`slang-compiler-tu.cpp`, the `DebugBuildIdentifier` producer in
+`slang-emit.cpp`, the `nonuniform` producer in
+`slang-ir-specialize-function-call.cpp` and the inline-asm
+type-function evaluation in `slang-emit-spirv.cpp` are all already
+watched.
 
 ## See also
 

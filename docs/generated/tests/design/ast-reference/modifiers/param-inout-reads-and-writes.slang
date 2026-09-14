@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#parameter-direction-and-storage-class-modifiers
-//META: doc_section_digest=96a720a22bcbf95fd50a791728387696a93f2171d6c726d180d1b7d56de54df4
+//META: doc_section_digest=acb151a083ad11459c8dc1bd5b90cc232de73c42a6dc1e1771f0fabb823d2ec8
 //META: purpose=An `inout` parameter both reads the caller's value and writes back to it.
 //META: intent=functional
 //META: pipeline_stage=check

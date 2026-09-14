@@ -130,7 +130,7 @@ the reason.
   `kMaxIRLayoutLoweringRecursionDepth` guard in layout lowering. Exhaustive
   switch defaults and impossible-state guards. Defensive.
 - **Vector / matrix / struct arms of `visitInitializerListExpr`** — probed
-  with `float2x2 m = {{1,2},{3,4}}`, `float3 v = {1,2,3}`, `P p = {3,4}`,
+  with `float2x2 m = { {1,2},{3,4} }`, `float3 v = {1,2,3}`, `P p = {3,4}`,
   empty `{}` forms, and each of those nested inside an array initializer. In
   all of them the checker rewrites the initializer list into a constructor
   call, so only the _array_ arm reaches lowering. The struct-with-base arm

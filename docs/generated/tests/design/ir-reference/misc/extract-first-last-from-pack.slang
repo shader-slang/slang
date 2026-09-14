@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#pack-and-expansion
-//META: doc_section_digest=bee2a58322e072cc00e82140814df0fcca180d4ab4d912ad3941f22a06a1ccff
+//META: doc_section_digest=23248f45180c2ed6ca7d90a9cde90609e58c45a8a68d6fc6c5245f5bc4c2e1df
 //META: purpose=`__first(pack)` and `__last(pack)` lower to `ExtractFirstFromPack` / `ExtractLastFromPack`, each taking the pack plus a `NonEmptyPackWitness` built for it.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -16,7 +16,7 @@
 // the generic bodies in the IR dump and pin the witness line immediately
 // feeding each extract.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 

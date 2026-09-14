@@ -45,10 +45,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // MTL: void sumOfReads_{{[0-9]+}}(int val_{{[0-9]+}}
 // MTL: val_{{[0-9]+}} + val_{{[0-9]+}} + val_{{[0-9]+}}
 
-// CUDA: __device__ void sumOfReads_{{[0-9]+}}(int val_{{[0-9]+}})
+// CUDA: void sumOfReads_{{[0-9]+}}(int val_{{[0-9]+}})
 // CUDA: val_{{[0-9]+}} + val_{{[0-9]+}} + val_{{[0-9]+}}
 
-// CPP: static void sumOfReads_{{[0-9]+}}(int32_t val_{{[0-9]+}}
+// CPP: void sumOfReads_{{[0-9]+}}(int32_t val_{{[0-9]+}}
 // CPP: val_{{[0-9]+}} + val_{{[0-9]+}} + val_{{[0-9]+}}
 
 // WGSL: fn sumOfReads_{{[0-9]+}}( val_{{[0-9]+}} : i32)

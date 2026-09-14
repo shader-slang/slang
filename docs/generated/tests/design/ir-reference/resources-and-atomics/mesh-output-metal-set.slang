@@ -15,7 +15,7 @@
 // `set` accessor's target switch select the Metal opcodes, and the
 // order-independent CHECKs pin all three.
 
-//TEST:SIMPLE(filecheck=IR):-target metal -dump-ir -o /dev/null -stage mesh -entry main
+//TEST:SIMPLE(filecheck=IR):-target metal -dump-ir -o - -stage mesh -entry main
 
 struct MeshVertex
 {

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#loop-transformations
-//META: doc_section_digest=39b16ddaf934d7d1113295e5d32175dd04362dd53d6fdc0bf63ddf66a80ed159
+//META: doc_section_digest=5346083df587dd61328c503d8394df501ae34fed3523d17881e22225881336af
 //META: purpose=Boundary: a `[ForceUnroll]` loop with zero static iterations is removed entirely by the loop-unroll pass and emits a documented `E30514` warning.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

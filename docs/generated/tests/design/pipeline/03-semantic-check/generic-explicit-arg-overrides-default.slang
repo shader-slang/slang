@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#generic-specialization-and-constraints
-//META: doc_section_digest=57d9f151be60063d08c61244f7768487d8eaebc83717628353b6150f280dd55a
+//META: doc_section_digest=9f957015017e5369dca04b3ddeac3c5f9b0cfdeca3888bbec30602504004bdac
 //META: purpose=An explicitly written generic argument for a parameter that also has a default is kept, because only the explicit argument prefix is handed to the constraint solver as fixed input.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -475,12 +475,30 @@ void WinProcess::kill(int32_t returnCode)
                     &securityAttributes,
                     bufferSize));
             }
-            // create stdin pipe for child process
-            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(
-                childStdInRead.writeRef(),
-                childStdInWriteTmp.writeRef(),
-                &securityAttributes,
-                bufferSize));
+            if (flags & Process::Flag::UnreadableStdin)
+            {
+                // Hand the child a write-only NUL handle as its stdin, so reads from it error out
+                // rather than reaching EOF. It is deliberately GENERIC_WRITE even though it becomes
+                // the child's read end (hStdInput).
+                const HANDLE nulWrite = CreateFileW(
+                    L"NUL",
+                    GENERIC_WRITE,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    &securityAttributes,
+                    OPEN_EXISTING,
+                    0,
+                    nullptr);
+                SLANG_RETURN_FAIL_ON_FALSE(nulWrite != INVALID_HANDLE_VALUE);
+                childStdInRead = nulWrite;
+            }
+            else
+            {
+                SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(
+                    childStdInRead.writeRef(),
+                    childStdInWriteTmp.writeRef(),
+                    &securityAttributes,
+                    bufferSize));
+            }
 
             const HANDLE currentProcess = GetCurrentProcess();
 
@@ -506,14 +524,18 @@ void WinProcess::kill(int32_t returnCode)
                     FALSE,
                     DUPLICATE_SAME_ACCESS));
             // create a non-inheritable duplicate of the stdin writer
-            SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(
-                currentProcess,
-                childStdInWriteTmp,
-                currentProcess,
-                childStdInWrite.writeRef(),
-                0,
-                FALSE,
-                DUPLICATE_SAME_ACCESS));
+            // Skipped when there is no writer (UnreadableStdin), which leaves childStdInWrite null
+            // and so skips the parent-side In stream at the end of this function. This mirrors the
+            // childStdErrReadTmp guard above for DisableStdErrRedirection.
+            if (childStdInWriteTmp)
+                SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(
+                    currentProcess,
+                    childStdInWriteTmp,
+                    currentProcess,
+                    childStdInWrite.writeRef(),
+                    0,
+                    FALSE,
+                    DUPLICATE_SAME_ACCESS));
         }
 
         // TODO: switch to proper wide-character versions of these...
@@ -610,8 +632,9 @@ void WinProcess::kill(int32_t returnCode)
             new WinPipeStream(childStdErrRead.detach(), FileAccess::Read);
     streams[Index(StdStreamType::Out)] =
         new WinPipeStream(childStdOutRead.detach(), FileAccess::Read);
-    streams[Index(StdStreamType::In)] =
-        new WinPipeStream(childStdInWrite.detach(), FileAccess::Write);
+    if (childStdInWrite)
+        streams[Index(StdStreamType::In)] =
+            new WinPipeStream(childStdInWrite.detach(), FileAccess::Write);
     outProcess = new WinProcess(processHandle.detach(), streams[0].readRef());
 
     return SLANG_OK;

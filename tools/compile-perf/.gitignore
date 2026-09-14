@@ -4,7 +4,8 @@
 *.pyc
 *.svg
 __pycache__/
-corpus/
+# no trailing slash: the local dir may be a SYMLINK, which corpus/ does not match
+corpus
 gen/
 releases/
 results/

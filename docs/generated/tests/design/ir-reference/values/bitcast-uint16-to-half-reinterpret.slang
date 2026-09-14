@@ -12,7 +12,7 @@
 // 16-bit half-width reinterpret. Verifies `bitCast` is the same
 // opcode at the half-precision tier.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint16_t u16a;
 uniform RWStructuredBuffer<half> buf;

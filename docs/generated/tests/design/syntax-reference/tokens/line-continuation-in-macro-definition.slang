@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/tokens.md#token-flags
-//META: doc_section_digest=6901d6c021276bf769746171133d7d2c946108cbbbc00e8366e085d4a2927225
+//META: doc_section_digest=8fe6488c7be4132d8fb4865bd94f376537bdb8628cd9f0ce009cc94d674aea9b
 //META: purpose=A folded `\\`-newline emits no `NewLine` token, so the token after it is not marked as starting a logical line and a macro body can span two physical lines.
 //META: intent=functional
 //META: pipeline_stage=preprocess

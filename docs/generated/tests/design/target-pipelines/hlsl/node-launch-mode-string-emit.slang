@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#emitting-hlsl-named-constants-rather-than-integers
-//META: doc_section_digest=d4f75e0916ecd748a0aa9042c7a027c3f7560681b96694b8a6f4e2edbc24668f
+//META: doc_section_digest=788bc7519655c8e116120260bbcac10f921c9993b6dbc20665b3dec1d2d85f1b
 //META: purpose=A node entry point's launch mode is emitted as the verbatim string `[NodeLaunch("broadcasting")]`, while `[NodeMaxDispatchGrid(x, y, z)]`, whose operands really are integers, keeps its numeric spelling.
 //META: intent=functional
 //META: pipeline_stage=emit

@@ -14,7 +14,7 @@
 // to a `uniform bool` keeps the operand non-constant, so CHECK observes
 // `not(%c)` rather than a folded literal.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform bool c;
 uniform RWStructuredBuffer<int> buf;

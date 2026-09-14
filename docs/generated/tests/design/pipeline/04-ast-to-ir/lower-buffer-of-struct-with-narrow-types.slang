@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=37a00b76a98a13c2f3cd47117e12f237fbf042ab8ec479231f23490859cc4497
+//META: doc_section_digest=1195a752790819415908e083ce9656a353d4764f2fab38cc5aa27d92f184c486
 //META: purpose=A `RWStructuredBuffer<Narrow>` over a struct with narrow integer fields lowers so the per-element `Ptr(%Narrow)` is returned by `rwstructuredBufferGetElementPtr`, and the struct's narrow-typed `field(...)` rows survive.
 //META: intent=expansion
 //META: pipeline_stage=lower
@@ -14,7 +14,7 @@
 // pointer type and the embedded struct's field IR types both
 // surface in the dump.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Narrow { int8_t i8; uint16_t u16; }
 

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#module-and-namespace
-//META: doc_section_digest=66e95bef72b71123f8c26c9d474bc27387f02bb7f3d1da7825ec57b318af2eef
+//META: doc_section_digest=cc12c20b9797d05d866e6ea2e2ea4412387e14ae52059ede92e3c563abaeca67
 //META: purpose=Multiple same-named namespace blocks under one parent parse into a single namespace decl, so one using declaration makes members from every block reachable unqualified.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#ifelse
-//META: doc_section_digest=9107af33a205c736447b4c02d66c4032cb7ffae2ebc1f3e72dc1132780edf3e5
+//META: doc_section_digest=58ff39ee4b5eb63d9fd7dd839e0f9f67e7ef5727cd278b7eee0411b98e5d64fe
 //META: purpose=A loop-condition test lowers to a degenerate ifElse whose afterBlock operand names the loop body (its trueBlock) and whose falseBlock is the loop's break label.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -16,7 +16,7 @@
 // to be that break label and its afterBlock to be the same block as its
 // trueBlock. A pass that assumed four distinct operands would be wrong here.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;

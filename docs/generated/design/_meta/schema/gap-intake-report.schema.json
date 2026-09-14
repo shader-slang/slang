@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shader-slang.github.io/generated/design/gap-intake-report.schema.json",
+  "title": "LLM-generated docs gap-intake report front-matter",
+  "description": "Shape of the YAML front-matter for a gap-intake report under docs/generated/design/_meta/gap-intake/. A gap-intake report records what was decided about the doc gaps the agentic test suite reported against one document; `mark-gap-intake` reads it and writes those decisions into doc-gap-state.json. The body of the report (Summary, optional Escalated gaps, Actions table) is not covered by this schema; it is enforced by the lint pass in regenerate.py.",
+  "type": "object",
+  "required": [
+    "gap_intake_report",
+    "intake_model",
+    "intake_at",
+    "target_doc",
+    "target_doc_source_commit_before",
+    "target_doc_source_commit_after",
+    "gap_count",
+    "actions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "gap_intake_report": {
+      "type": "boolean",
+      "const": true,
+      "description": "Sentinel marking the file as a gap-intake report."
+    },
+    "intake_model": {
+      "type": "string",
+      "description": "Identifier of the model that performed the intake. The lower-cased value MUST start with 'claude' or 'anthropic': intake edits the generated documents, so it runs in the same family that generated them. The bookkeeping gate refuses other families."
+    },
+    "intake_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "target_doc": {
+      "type": "string",
+      "description": "Manifest key of the document the gaps are anchored to (e.g. pipeline/05-ir-passes.md)."
+    },
+    "target_doc_source_commit_before": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,64}$",
+      "description": "The source_commit in the target document's front-matter at the start of intake."
+    },
+    "target_doc_source_commit_after": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,64}$",
+      "description": "The source_commit in the target document's front-matter after intake; equal to _before when no edits were made."
+    },
+    "gap_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of gaps acted on. Must equal the number of rows in the Actions table, and the sum of the action counts."
+    },
+    "actions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixed",
+        "rejected_bogus",
+        "rejected_out_of_scope",
+        "deferred",
+        "escalated_to_finding"
+      ],
+      "properties": {
+        "fixed": { "type": "integer", "minimum": 0 },
+        "rejected_bogus": { "type": "integer", "minimum": 0 },
+        "rejected_out_of_scope": { "type": "integer", "minimum": 0 },
+        "deferred": { "type": "integer", "minimum": 0 },
+        "escalated_to_finding": { "type": "integer", "minimum": 0 }
+      },
+      "description": "The five counts must sum to gap_count; the lint pass enforces this."
+    }
+  }
+}

@@ -15,7 +15,7 @@
 // witness_table_t(%IShape)(%Square)` with one `witness_table_entry`
 // per requirement.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IShape { float area(); }
 struct Square : IShape { float side; float area() { return side * side; } }

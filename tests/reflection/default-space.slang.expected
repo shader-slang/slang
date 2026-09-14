@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
         {
             "name": "a",
@@ -96,10 +97,112 @@ standard output = {
             }
         }
     ],
+    "globalScope": {
+        "kind": "none",
+        "parameters": [
+            {
+                "name": "a",
+                "binding": {"kind": "shaderResource", "space": 99, "index": 0},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "resultType": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "b",
+                "binding": {"kind": "subElementRegisterSpace", "index": 0},
+                "type": {
+                    "kind": "parameterBlock",
+                    "elementType": {
+                        "kind": "struct",
+                        "name": "B",
+                        "fields": [
+                            {
+                                "name": "b",
+                                "type": {
+                                    "kind": "resource",
+                                    "baseShape": "texture2D",
+                                    "resultType": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        }
+                                    },
+                                    "sizes": [
+                                        {"kind": "shaderResource", "value": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "shaderResource", "index": 0}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "shaderResource", "value": 1}
+                        ]
+                    },
+                    "containerVarLayout": {
+                        "binding": {"kind": "subElementRegisterSpace", "index": 0}
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "struct",
+                            "name": "B",
+                            "fields": [
+                                {
+                                    "name": "b",
+                                    "type": {
+                                        "kind": "resource",
+                                        "baseShape": "texture2D",
+                                        "resultType": {
+                                            "kind": "vector",
+                                            "elementCount": 4,
+                                            "elementType": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            }
+                                        },
+                                        "sizes": [
+                                            {"kind": "shaderResource", "value": 1}
+                                        ]
+                                    },
+                                    "binding": {"kind": "shaderResource", "index": 0}
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "shaderResource", "value": 1}
+                            ]
+                        },
+                        "binding": {"kind": "shaderResource", "index": 0}
+                    },
+                    "sizes": [
+                        {"kind": "subElementRegisterSpace", "value": 1}
+                    ]
+                }
+            }
+        ]
+    },
     "entryPoints": [
         {
             "name": "main",
             "stage": "fragment",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+
+                ]
+            },
             "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},

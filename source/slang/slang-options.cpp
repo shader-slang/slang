@@ -460,7 +460,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::DepFile,
          "-depfile",
          "-depfile <path>",
-         "Save the source file dependency list in a file.\n"
+         "Save the dependency list in a file. Lists source files and any imported precompiled\n"
+         ".slang-module files.\n"
          "Uses Makefile dependency syntax: <output>: <dep> <dep...>\n"
          "When no -o is given, - is used as the make target (output goes to stdout)."},
         {OptionKind::EntryPointName,
@@ -584,7 +585,10 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::DisableWarnings,
          "-warnings-disable",
          "-warnings-disable <id>[,<id>...]",
-         "Disable specific warning ids."},
+         "Disable specific warnings, given by numeric id or name. A numeric id that this compiler "
+         "version does not recognize is silently ignored, so one option value can be shared across "
+         "compiler versions that do not all define the warning; an unrecognized warning name is "
+         "still reported as an error."},
         {OptionKind::WarningLevel,
          "-Wall,-Wextra,-Wpedantic",
          "-Wall | -Wextra | -Wpedantic",
@@ -623,6 +627,11 @@ void initCommandOptions(CommandOptions& options)
          "-trace-coverage",
          nullptr,
          "Instrument the shader with per-statement line coverage counters. "
+         "Statements that provably execute together share one counter and one "
+         "runtime probe, which keeps instrumented shader code small without "
+         "changing reported per-line results; the manifest therefore reports "
+         "no more counters than source entries, and fewer whenever a "
+         "straight-line region is coalesced. "
          "When writing compiled output to a file, slangc also emits "
          "`<output>.coverage-manifest.json` mapping source coverage entries to counters."},
         {OptionKind::TraceFunctionCoverage,
@@ -655,6 +664,26 @@ void initCommandOptions(CommandOptions& options)
          "(register index, space) instead of auto-allocating a slot. "
          "Useful when the host needs the binding fixed at compile time "
          "before any host metadata reads run. Implies `-trace-coverage`."},
+        {OptionKind::TraceCoverageBindlessIndex,
+         "-trace-coverage-bindless-index",
+         "-trace-coverage-bindless-index <index>",
+         "Synthesize `__slang_coverage` as an unbounded descriptor "
+         "array of structured buffers rather than a single buffer, and index it "
+         "with <index>: `__slang_coverage[<index>][slot]`. Many separately "
+         "compiled shaders sharing one pipeline then occupy a single descriptor "
+         "binding rather than one binding each, and each shader's buffer is "
+         "sized independently by the host. "
+         "Place the array with `-trace-coverage-binding <index> <space>`, or "
+         "leave it to auto-allocation. If the host declares the descriptor "
+         "array with a VARIABLE descriptor count, Vulkan requires it to be the "
+         "highest-numbered binding in its set; a fixed descriptor count carries "
+         "no such restriction. That is the host's layout to satisfy, and the "
+         "compiler cannot see it. "
+         "<index> is a compile-time constant and so becomes part of the "
+         "compiled output: a host that keys a shader cache on that output must "
+         "derive <index> from a stable shader identity rather than from load "
+         "order, or an unchanged shader recompiles whenever that order shifts. "
+         "SPIR-V and GLSL only. Implies `-trace-coverage`."},
         {OptionKind::TraceCoverageReservedSpace,
          "-trace-coverage-reserved-space",
          "-trace-coverage-reserved-space <space>",
@@ -1026,19 +1055,19 @@ void initCommandOptions(CommandOptions& options)
         StringBuilder names;
         for (auto name : namesList)
         {
-            names << "-" << name << "-version,";
+            names << "-get-" << name << "-path,";
         }
         // remove last ,
         names.reduceLength(names.getLength() - 1);
 
         options.add(
             names.getBuffer(),
-            "-<compiler>-version",
-            "Print the version of the downstream <compiler> that Slang would load for that "
-            "pass-through, then continue. Reports \"not found\" if the compiler cannot be "
-            "located. Takes no value.\n",
-            UserValue(OptionKind::CompilerVersion),
-            "-<compiler>-version");
+            "-get-<compiler>-path",
+            "Print the on-disk path of the downstream <compiler> that Slang would load for that "
+            "pass-through, then continue. Reports \"not found\" if the compiler cannot be located, "
+            "or \"not available\" if it has no recoverable shared-library path. Takes no value.\n",
+            UserValue(OptionKind::GetCompilerPath),
+            "-get-<compiler>-path");
     }
 
     const Option downstreamOpts[] = {
@@ -3220,6 +3249,29 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 linkage->m_optionSet.set(OptionKind::TraceCoverage, true);
                 break;
             }
+        case OptionKind::TraceCoverageBindlessIndex:
+            {
+                // -trace-coverage-bindless-index <index>
+                // Negative is rejected up front: -1 is the internal "not
+                // requested" sentinel, so accepting it would silently mean the
+                // single-buffer form.
+                Int bindlessIndex;
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindlessIndex));
+                if (bindlessIndex > std::numeric_limits<int>::max())
+                {
+                    m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                        .option = arg.value,
+                        .parsedValue = bindlessIndex,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
+                linkage->m_optionSet.set(
+                    OptionKind::TraceCoverageBindlessIndex,
+                    (int)bindlessIndex);
+                linkage->m_optionSet.set(OptionKind::TraceCoverage, true);
+                break;
+            }
         case OptionKind::TraceCoverageReservedSpace:
             {
                 // -trace-coverage-reserved-space <space>
@@ -3766,52 +3818,57 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
                 break;
             }
-        case OptionKind::CompilerVersion:
+        case OptionKind::GetCompilerPath:
             {
-                // `-<compiler>-version` is a print-and-continue query option. It has the same
-                // "-<compiler>-..." shape as -<compiler>-path, but instead of consuming a value it
-                // prints the version of the downstream compiler Slang would actually load for that
-                // pass-through, then lets parsing continue (like -version). Recover <compiler> as
-                // the text between the leading '-' and the trailing "-version", exactly as the
-                // CompilerPath case recovers the name before "-path".
-                const Index index = argValue.lastIndexOf('-');
-                if (index >= 0)
+                // `-get-<compiler>-path` is a print-and-continue query option: it prints the
+                // resolved on-disk path of the downstream compiler Slang would load for that
+                // pass-through, then lets parsing continue (like -version). Recover <compiler> by
+                // stripping the fixed "-get-" prefix and "-path" suffix, which -- unlike a
+                // lastIndexOf('-') scan -- also handles compiler names that contain '-' (e.g.
+                // spirv-dis).
+                const UnownedStringSlice getPrefix = UnownedStringSlice("-get-");
+                const UnownedStringSlice pathSuffix = UnownedStringSlice("-path");
+                const UnownedStringSlice argSlice = argValue.getUnownedSlice();
+                const UnownedStringSlice passThroughSlice =
+                    argSlice.tail(getPrefix.getLength())
+                        .head(
+                            argSlice.getLength() - getPrefix.getLength() - pathSuffix.getLength());
+
+                SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
+                if (SLANG_FAILED(TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
                 {
-                    UnownedStringSlice passThroughSlice =
-                        argValue.getUnownedSlice().head(index).tail(1);
-
-                    SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                    if (SLANG_FAILED(TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
-                    {
-                        m_sink->diagnose(Diagnostics::UnknownDownstreamCompiler{
-                            .compiler = passThroughSlice,
-                            .location = arg.loc});
-                        return SLANG_FAIL;
-                    }
-
-                    // getDownstreamCompilerVersion shares the same lazy-discovery funnel used
-                    // during compilation, so the reported version is the library that would
-                    // actually be used for this pass-through (it honors -<compiler>-path and the
-                    // standard search order). It returns SLANG_OK once the compiler is located and
-                    // loaded -- major/minor are then valid, and a loaded-but-versionless compiler
-                    // such as glslang reports 0.0 -- and SLANG_E_NOT_FOUND when it cannot be
-                    // loaded (e.g. the toolchain is not installed).
-                    int major = 0;
-                    int minor = 0;
-                    StringBuilder versionStr;
-                    versionStr << passThroughSlice << " version: ";
-                    if (SLANG_SUCCEEDED(
-                            m_session->getDownstreamCompilerVersion(passThrough, &major, &minor)))
-                    {
-                        versionStr << major << "." << minor;
-                    }
-                    else
-                    {
-                        versionStr << "not found";
-                    }
-                    versionStr << "\n";
-                    m_sink->diagnoseRaw(Severity::Note, versionStr.getUnownedSlice());
+                    m_sink->diagnose(Diagnostics::UnknownDownstreamCompiler{
+                        .compiler = passThroughSlice,
+                        .location = arg.loc});
+                    return SLANG_FAIL;
                 }
+
+                // getDownstreamCompilerPath shares the same lazy-discovery funnel used during
+                // compilation, so the reported path is the library that would actually be used for
+                // this pass-through (it honors -<compiler>-path and the standard search order). It
+                // returns SLANG_OK with the resolved shared-library path, SLANG_E_NOT_AVAILABLE
+                // when the compiler is loaded but has no recoverable on-disk path (an
+                // executable-backed command-line compiler, or a target without shared-library
+                // introspection), and SLANG_E_NOT_FOUND when it cannot be located or loaded.
+                ComPtr<ISlangBlob> pathBlob;
+                const SlangResult pathResult =
+                    m_session->getDownstreamCompilerPath(passThrough, pathBlob.writeRef());
+                StringBuilder pathStr;
+                pathStr << passThroughSlice << " path: ";
+                if (SLANG_SUCCEEDED(pathResult) && pathBlob)
+                {
+                    pathStr << (const char*)pathBlob->getBufferPointer();
+                }
+                else if (pathResult == SLANG_E_NOT_AVAILABLE)
+                {
+                    pathStr << "not available";
+                }
+                else
+                {
+                    pathStr << "not found";
+                }
+                pathStr << "\n";
+                m_sink->diagnoseRaw(Severity::Note, pathStr.getUnownedSlice());
                 break;
             }
         case OptionKind::InputFilesRemain:

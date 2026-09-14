@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination
-//META: doc_section_digest=0e5b4c31fb3cb504b87417d8391d1c84f2175e1be41f81660fa7556568fce3ac
+//META: doc_section_digest=61b9f1fa9e25e0a1a331e30835332c142e930cea0b3de2b952f901beda9edd64
 //META: purpose=collectCooperativeMetadata fires when the program uses a cooperative-vector type — the SPIR-V emit declares OpCapability CooperativeVectorNV and routes coopVecLoad/coopVecMatMul through cooperative-vector opcodes.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

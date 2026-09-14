@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/overview.md#ast--ir-lowering
-//META: doc_section_digest=d2bb343d99876dfd1d05e29a3d730266a1a5c82ccace506601773d10ac4885df
+//META: doc_section_digest=58d6fa34e989046b10c5c18ce14f1e0e4d1c1f389944592cfe513724b2c60cae
 //META: purpose=Five levels of nested if/else lower to five nested conditional branches that all survive to the emitted target text.
 //META: intent=boundary
 //META: pipeline_stage=lower

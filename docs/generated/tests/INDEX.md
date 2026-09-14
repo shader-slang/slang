@@ -9,16 +9,16 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 ## Suite totals
 
 - **Bundles:** 79
-- **Total `.slang` tests:** 3692
+- **Total `.slang` tests:** 4103
 
 | Intent | Count |
 | --- | --- |
-| `functional` | 1797 |
-| `negative` | 721 |
-| `boundary` | 711 |
-| `expansion` | 276 |
-| `characterization` | 101 |
-| `stress` | 83 |
+| `functional` | 1936 |
+| `negative` | 791 |
+| `boundary` | 775 |
+| `expansion` | 299 |
+| `characterization` | 215 |
+| `stress` | 84 |
 | `regression` | 3 |
 
 ## Bundles by section
@@ -57,12 +57,12 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
 | [`design/pipeline/01-lex-preprocess`](design/pipeline/01-lex-preprocess/README.md) | 75 | [`docs/generated/design/pipeline/01-lex-preprocess.md`](../design/pipeline/01-lex-preprocess.md) |
-| [`design/pipeline/02-parse-ast`](design/pipeline/02-parse-ast/README.md) | 60 | [`docs/generated/design/pipeline/02-parse-ast.md`](../design/pipeline/02-parse-ast.md) |
-| [`design/pipeline/03-semantic-check`](design/pipeline/03-semantic-check/README.md) | 80 | [`docs/generated/design/pipeline/03-semantic-check.md`](../design/pipeline/03-semantic-check.md) |
-| [`design/pipeline/04-ast-to-ir`](design/pipeline/04-ast-to-ir/README.md) | 150 | [`docs/generated/design/pipeline/04-ast-to-ir.md`](../design/pipeline/04-ast-to-ir.md) |
-| [`design/pipeline/04b-pre-link-passes`](design/pipeline/04b-pre-link-passes/README.md) | 30 | [`docs/generated/design/pipeline/04b-pre-link-passes.md`](../design/pipeline/04b-pre-link-passes.md) |
-| [`design/pipeline/04c-layout-ir`](design/pipeline/04c-layout-ir/README.md) | 30 | [`docs/generated/design/pipeline/04c-layout-ir.md`](../design/pipeline/04c-layout-ir.md) |
-| [`design/pipeline/05-ir-passes`](design/pipeline/05-ir-passes/README.md) | 120 | [`docs/generated/design/pipeline/05-ir-passes.md`](../design/pipeline/05-ir-passes.md) |
+| [`design/pipeline/02-parse-ast`](design/pipeline/02-parse-ast/README.md) | 76 | [`docs/generated/design/pipeline/02-parse-ast.md`](../design/pipeline/02-parse-ast.md) |
+| [`design/pipeline/03-semantic-check`](design/pipeline/03-semantic-check/README.md) | 91 | [`docs/generated/design/pipeline/03-semantic-check.md`](../design/pipeline/03-semantic-check.md) |
+| [`design/pipeline/04-ast-to-ir`](design/pipeline/04-ast-to-ir/README.md) | 160 | [`docs/generated/design/pipeline/04-ast-to-ir.md`](../design/pipeline/04-ast-to-ir.md) |
+| [`design/pipeline/04b-pre-link-passes`](design/pipeline/04b-pre-link-passes/README.md) | 37 | [`docs/generated/design/pipeline/04b-pre-link-passes.md`](../design/pipeline/04b-pre-link-passes.md) |
+| [`design/pipeline/04c-layout-ir`](design/pipeline/04c-layout-ir/README.md) | 34 | [`docs/generated/design/pipeline/04c-layout-ir.md`](../design/pipeline/04c-layout-ir.md) |
+| [`design/pipeline/05-ir-passes`](design/pipeline/05-ir-passes/README.md) | 144 | [`docs/generated/design/pipeline/05-ir-passes.md`](../design/pipeline/05-ir-passes.md) |
 | [`design/pipeline/06-emit`](design/pipeline/06-emit/README.md) | 39 | [`docs/generated/design/pipeline/06-emit.md`](../design/pipeline/06-emit.md) |
 | [`design/pipeline/overview`](design/pipeline/overview/README.md) | 15 | [`docs/generated/design/pipeline/overview.md`](../design/pipeline/overview.md) |
 
@@ -70,7 +70,7 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`design/syntax-reference/grammar`](design/syntax-reference/grammar/README.md) | 80 | [`docs/generated/design/syntax-reference/grammar.md`](../design/syntax-reference/grammar.md) |
+| [`design/syntax-reference/grammar`](design/syntax-reference/grammar/README.md) | 97 | [`docs/generated/design/syntax-reference/grammar.md`](../design/syntax-reference/grammar.md) |
 | [`design/syntax-reference/keywords-and-builtins`](design/syntax-reference/keywords-and-builtins/README.md) | 60 | [`docs/generated/design/syntax-reference/keywords-and-builtins.md`](../design/syntax-reference/keywords-and-builtins.md) |
 | [`design/syntax-reference/tokens`](design/syntax-reference/tokens/README.md) | 50 | [`docs/generated/design/syntax-reference/tokens.md`](../design/syntax-reference/tokens.md) |
 
@@ -78,74 +78,74 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`design/cross-cutting/core-module`](design/cross-cutting/core-module/README.md) | 30 | [`docs/generated/design/cross-cutting/core-module.md`](../design/cross-cutting/core-module.md) |
-| [`design/cross-cutting/diagnostics`](design/cross-cutting/diagnostics/README.md) | 59 | [`docs/generated/design/cross-cutting/diagnostics.md`](../design/cross-cutting/diagnostics.md) |
+| [`design/cross-cutting/core-module`](design/cross-cutting/core-module/README.md) | 32 | [`docs/generated/design/cross-cutting/core-module.md`](../design/cross-cutting/core-module.md) |
+| [`design/cross-cutting/diagnostics`](design/cross-cutting/diagnostics/README.md) | 65 | [`docs/generated/design/cross-cutting/diagnostics.md`](../design/cross-cutting/diagnostics.md) |
 | [`design/cross-cutting/diagnostics-catalog`](design/cross-cutting/diagnostics-catalog/README.md) | 339 | [`docs/generated/design/cross-cutting/diagnostics.md`](../design/cross-cutting/diagnostics.md) |
 | [`design/cross-cutting/ir-instructions`](design/cross-cutting/ir-instructions/README.md) | 52 | [`docs/generated/design/cross-cutting/ir-instructions.md`](../design/cross-cutting/ir-instructions.md) |
-| [`design/cross-cutting/serialization`](design/cross-cutting/serialization/README.md) | 12 | [`docs/generated/design/cross-cutting/serialization.md`](../design/cross-cutting/serialization.md) |
-| [`design/cross-cutting/targets`](design/cross-cutting/targets/README.md) | 40 | [`docs/generated/design/cross-cutting/targets.md`](../design/cross-cutting/targets.md) |
+| [`design/cross-cutting/serialization`](design/cross-cutting/serialization/README.md) | 13 | [`docs/generated/design/cross-cutting/serialization.md`](../design/cross-cutting/serialization.md) |
+| [`design/cross-cutting/targets`](design/cross-cutting/targets/README.md) | 42 | [`docs/generated/design/cross-cutting/targets.md`](../design/cross-cutting/targets.md) |
 
 ### AST reference
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`design/ast-reference/base`](design/ast-reference/base/README.md) | 23 | [`docs/generated/design/ast-reference/base.md`](../design/ast-reference/base.md) |
-| [`design/ast-reference/declarations`](design/ast-reference/declarations/README.md) | 79 | [`docs/generated/design/ast-reference/declarations.md`](../design/ast-reference/declarations.md) |
-| [`design/ast-reference/expressions`](design/ast-reference/expressions/README.md) | 134 | [`docs/generated/design/ast-reference/expressions.md`](../design/ast-reference/expressions.md) |
-| [`design/ast-reference/modifiers`](design/ast-reference/modifiers/README.md) | 60 | [`docs/generated/design/ast-reference/modifiers.md`](../design/ast-reference/modifiers.md) |
+| [`design/ast-reference/base`](design/ast-reference/base/README.md) | 24 | [`docs/generated/design/ast-reference/base.md`](../design/ast-reference/base.md) |
+| [`design/ast-reference/declarations`](design/ast-reference/declarations/README.md) | 84 | [`docs/generated/design/ast-reference/declarations.md`](../design/ast-reference/declarations.md) |
+| [`design/ast-reference/expressions`](design/ast-reference/expressions/README.md) | 144 | [`docs/generated/design/ast-reference/expressions.md`](../design/ast-reference/expressions.md) |
+| [`design/ast-reference/modifiers`](design/ast-reference/modifiers/README.md) | 62 | [`docs/generated/design/ast-reference/modifiers.md`](../design/ast-reference/modifiers.md) |
 | [`design/ast-reference/statements`](design/ast-reference/statements/README.md) | 70 | [`docs/generated/design/ast-reference/statements.md`](../design/ast-reference/statements.md) |
-| [`design/ast-reference/types`](design/ast-reference/types/README.md) | 45 | [`docs/generated/design/ast-reference/types.md`](../design/ast-reference/types.md) |
-| [`design/ast-reference/values`](design/ast-reference/values/README.md) | 28 | [`docs/generated/design/ast-reference/values.md`](../design/ast-reference/values.md) |
+| [`design/ast-reference/types`](design/ast-reference/types/README.md) | 49 | [`docs/generated/design/ast-reference/types.md`](../design/ast-reference/types.md) |
+| [`design/ast-reference/values`](design/ast-reference/values/README.md) | 31 | [`docs/generated/design/ast-reference/values.md`](../design/ast-reference/values.md) |
 
 ### Name resolution
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`design/name-resolution/lookup`](design/name-resolution/lookup/README.md) | 45 | [`docs/generated/design/name-resolution/lookup.md`](../design/name-resolution/lookup.md) |
-| [`design/name-resolution/overload-resolution`](design/name-resolution/overload-resolution/README.md) | 59 | [`docs/generated/design/name-resolution/overload-resolution.md`](../design/name-resolution/overload-resolution.md) |
-| [`design/name-resolution/scopes`](design/name-resolution/scopes/README.md) | 50 | [`docs/generated/design/name-resolution/scopes.md`](../design/name-resolution/scopes.md) |
-| [`design/name-resolution/visibility`](design/name-resolution/visibility/README.md) | 39 | [`docs/generated/design/name-resolution/visibility.md`](../design/name-resolution/visibility.md) |
+| [`design/name-resolution/lookup`](design/name-resolution/lookup/README.md) | 53 | [`docs/generated/design/name-resolution/lookup.md`](../design/name-resolution/lookup.md) |
+| [`design/name-resolution/overload-resolution`](design/name-resolution/overload-resolution/README.md) | 90 | [`docs/generated/design/name-resolution/overload-resolution.md`](../design/name-resolution/overload-resolution.md) |
+| [`design/name-resolution/scopes`](design/name-resolution/scopes/README.md) | 57 | [`docs/generated/design/name-resolution/scopes.md`](../design/name-resolution/scopes.md) |
+| [`design/name-resolution/visibility`](design/name-resolution/visibility/README.md) | 42 | [`docs/generated/design/name-resolution/visibility.md`](../design/name-resolution/visibility.md) |
 
 ### IR reference
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`design/ir-reference/control-flow`](design/ir-reference/control-flow/README.md) | 59 | [`docs/generated/design/ir-reference/control-flow.md`](../design/ir-reference/control-flow.md) |
+| [`design/ir-reference/control-flow`](design/ir-reference/control-flow/README.md) | 60 | [`docs/generated/design/ir-reference/control-flow.md`](../design/ir-reference/control-flow.md) |
 | [`design/ir-reference/decorations`](design/ir-reference/decorations/README.md) | 78 | [`docs/generated/design/ir-reference/decorations.md`](../design/ir-reference/decorations.md) |
-| [`design/ir-reference/differentiation`](design/ir-reference/differentiation/README.md) | 24 | [`docs/generated/design/ir-reference/differentiation.md`](../design/ir-reference/differentiation.md) |
-| [`design/ir-reference/generics-and-existentials`](design/ir-reference/generics-and-existentials/README.md) | 56 | [`docs/generated/design/ir-reference/generics-and-existentials.md`](../design/ir-reference/generics-and-existentials.md) |
-| [`design/ir-reference/metadata`](design/ir-reference/metadata/README.md) | 50 | [`docs/generated/design/ir-reference/metadata.md`](../design/ir-reference/metadata.md) |
+| [`design/ir-reference/differentiation`](design/ir-reference/differentiation/README.md) | 36 | [`docs/generated/design/ir-reference/differentiation.md`](../design/ir-reference/differentiation.md) |
+| [`design/ir-reference/generics-and-existentials`](design/ir-reference/generics-and-existentials/README.md) | 60 | [`docs/generated/design/ir-reference/generics-and-existentials.md`](../design/ir-reference/generics-and-existentials.md) |
+| [`design/ir-reference/metadata`](design/ir-reference/metadata/README.md) | 69 | [`docs/generated/design/ir-reference/metadata.md`](../design/ir-reference/metadata.md) |
 | [`design/ir-reference/misc`](design/ir-reference/misc/README.md) | 30 | [`docs/generated/design/ir-reference/misc.md`](../design/ir-reference/misc.md) |
-| [`design/ir-reference/resources-and-atomics`](design/ir-reference/resources-and-atomics/README.md) | 98 | [`docs/generated/design/ir-reference/resources-and-atomics.md`](../design/ir-reference/resources-and-atomics.md) |
+| [`design/ir-reference/resources-and-atomics`](design/ir-reference/resources-and-atomics/README.md) | 108 | [`docs/generated/design/ir-reference/resources-and-atomics.md`](../design/ir-reference/resources-and-atomics.md) |
 | [`design/ir-reference/structure`](design/ir-reference/structure/README.md) | 47 | [`docs/generated/design/ir-reference/structure.md`](../design/ir-reference/structure.md) |
-| [`design/ir-reference/types`](design/ir-reference/types/README.md) | 147 | [`docs/generated/design/ir-reference/types.md`](../design/ir-reference/types.md) |
-| [`design/ir-reference/values`](design/ir-reference/values/README.md) | 150 | [`docs/generated/design/ir-reference/values.md`](../design/ir-reference/values.md) |
+| [`design/ir-reference/types`](design/ir-reference/types/README.md) | 150 | [`docs/generated/design/ir-reference/types.md`](../design/ir-reference/types.md) |
+| [`design/ir-reference/values`](design/ir-reference/values/README.md) | 160 | [`docs/generated/design/ir-reference/values.md`](../design/ir-reference/values.md) |
 
 ### Target pipelines
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`design/target-pipelines/cuda`](design/target-pipelines/cuda/README.md) | 78 | [`docs/generated/design/target-pipelines/cuda.md`](../design/target-pipelines/cuda.md) |
-| [`design/target-pipelines/hlsl`](design/target-pipelines/hlsl/README.md) | 150 | [`docs/generated/design/target-pipelines/hlsl.md`](../design/target-pipelines/hlsl.md) |
-| [`design/target-pipelines/metal`](design/target-pipelines/metal/README.md) | 64 | [`docs/generated/design/target-pipelines/metal.md`](../design/target-pipelines/metal.md) |
-| [`design/target-pipelines/spirv`](design/target-pipelines/spirv/README.md) | 114 | [`docs/generated/design/target-pipelines/spirv.md`](../design/target-pipelines/spirv.md) |
-| [`design/target-pipelines/wgsl`](design/target-pipelines/wgsl/README.md) | 77 | [`docs/generated/design/target-pipelines/wgsl.md`](../design/target-pipelines/wgsl.md) |
+| [`design/target-pipelines/cuda`](design/target-pipelines/cuda/README.md) | 93 | [`docs/generated/design/target-pipelines/cuda.md`](../design/target-pipelines/cuda.md) |
+| [`design/target-pipelines/hlsl`](design/target-pipelines/hlsl/README.md) | 170 | [`docs/generated/design/target-pipelines/hlsl.md`](../design/target-pipelines/hlsl.md) |
+| [`design/target-pipelines/metal`](design/target-pipelines/metal/README.md) | 78 | [`docs/generated/design/target-pipelines/metal.md`](../design/target-pipelines/metal.md) |
+| [`design/target-pipelines/spirv`](design/target-pipelines/spirv/README.md) | 125 | [`docs/generated/design/target-pipelines/spirv.md`](../design/target-pipelines/spirv.md) |
+| [`design/target-pipelines/wgsl`](design/target-pipelines/wgsl/README.md) | 81 | [`docs/generated/design/target-pipelines/wgsl.md`](../design/target-pipelines/wgsl.md) |
 
 ### Coverage (white-box characterization)
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
 | [`coverage/autodiff`](coverage/autodiff/README.md) | 9 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
-| [`coverage/check-decl`](coverage/check-decl/README.md) | 15 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
-| [`coverage/check-expr`](coverage/check-expr/README.md) | 10 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
-| [`coverage/cli-options`](coverage/cli-options/README.md) | 11 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
-| [`coverage/emit`](coverage/emit/README.md) | 6 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
-| [`coverage/legalize`](coverage/legalize/README.md) | 6 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
-| [`coverage/lower-to-ir`](coverage/lower-to-ir/README.md) | 9 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
-| [`coverage/parser`](coverage/parser/README.md) | 15 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
-| [`coverage/specialize`](coverage/specialize/README.md) | 7 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
+| [`coverage/check-decl`](coverage/check-decl/README.md) | 29 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
+| [`coverage/check-expr`](coverage/check-expr/README.md) | 22 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
+| [`coverage/cli-options`](coverage/cli-options/README.md) | 30 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
+| [`coverage/emit`](coverage/emit/README.md) | 13 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
+| [`coverage/legalize`](coverage/legalize/README.md) | 23 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
+| [`coverage/lower-to-ir`](coverage/lower-to-ir/README.md) | 19 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
+| [`coverage/parser`](coverage/parser/README.md) | 30 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
+| [`coverage/specialize`](coverage/specialize/README.md) | 10 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
 | [`coverage/torch`](coverage/torch/README.md) | 8 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
-| [`coverage/type-layout`](coverage/type-layout/README.md) | 5 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
+| [`coverage/type-layout`](coverage/type-layout/README.md) | 22 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
 
 ## Catalog snapshot
 

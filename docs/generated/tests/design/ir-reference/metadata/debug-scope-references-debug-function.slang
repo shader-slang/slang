@@ -16,7 +16,7 @@
 // id and the inlining-frame id created at the call site, then requires the
 // scope instruction to carry exactly those two ids in that order.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after performForceInlining -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after performForceInlining -o - -entry main -stage compute -g1
 
 uniform RWStructuredBuffer<int> buf;
 

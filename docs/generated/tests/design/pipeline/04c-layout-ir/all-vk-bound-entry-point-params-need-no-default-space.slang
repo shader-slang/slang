@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#explicit-vkbinding-on-entry-point-parameters
-//META: doc_section_digest=10008d1172c4455fc3ac51b30827a25eff107363f644dd3c90a136102fc13971
+//META: doc_section_digest=d594d25adb697c7a448d8fd4e5af2ada74a9ee315fdd20515276d88cbf22323f
 //META: purpose=An entry point whose parameters are all explicitly vk::binding-bound no longer forces a default descriptor space, leaving set 0 available.
 //META: intent=functional
 //META: pipeline_stage=layout

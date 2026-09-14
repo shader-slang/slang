@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomic-operations
-//META: doc_section_digest=534618adad82acb65da181567998c07a77381ecf27996abdf7535de5b49ec7b3
+//META: doc_section_digest=e0b71e7cc30a0e069a5833b7fdc7038f02b6ab982bbba6656983e3a65dcba7ce
 //META: purpose=`Atomic<int>::and(0)` (clear-all-bits mask) still lowers to the documented `atomicAnd` opcode shape.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -12,7 +12,7 @@
 // Boundary probe: AND with zero clears every bit; the opcode is
 // emitted regardless of the constant's annihilating property.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<Atomic<int>> abuf;
 uniform RWStructuredBuffer<int> rwbuf;

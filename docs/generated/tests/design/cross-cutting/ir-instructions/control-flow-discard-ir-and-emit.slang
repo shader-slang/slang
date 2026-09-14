@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#control-flow-instructions
-//META: doc_section_digest=0b68b77b6156c67db4c587635b263df5f1c7f5c3d702914334c92fc6b5e88c90
+//META: doc_section_digest=c0238650e6ba499ae56294af00d41ede4ea9a7b4f8215393080c0974a1553619
 //META: purpose=A `discard` statement terminates its block with the `discard` exit terminator and emits as each target's fragment-kill form.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -18,7 +18,7 @@
 // discard is guarded by a `uniform` comparison so the branch survives to
 // emission instead of being folded away.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage fragment -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage fragment -entry main
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage fragment -entry main
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage fragment -entry main
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage fragment -entry main

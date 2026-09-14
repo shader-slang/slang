@@ -13,7 +13,7 @@
 // A `RWStructuredBuffer<int16_t>` exposes the narrow signed scalar as
 // the buffer's element-type operand.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int16_t> buf;
 

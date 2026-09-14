@@ -1439,6 +1439,19 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             return false;
         }
 
+    case kIROp_MakeArray:
+    case kIROp_MakeArrayFromElement:
+        {
+            // A Slang array lowers to `struct FixedArray<T,N> { T m_data[N]; }`, so its initializer
+            // needs two brace levels — the struct and its `m_data` member — whereas the base
+            // emitter emits one and relies on brace-elision, which is ambiguous for nested arrays.
+            // MakeStruct is a genuine struct and stays on the base single-brace path.
+            m_writer->emit("{ ");
+            defaultEmitInstExpr(inst, inOuterPrec);
+            m_writer->emit(" }");
+            return true;
+        }
+
     case kIROp_InOutImplicitCast:
     case kIROp_OutImplicitCast:
         {

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#vm
-//META: doc_section_digest=47a31d88f5e4a9a4d57c5e8f4d6fc2c7a5335138fdf6bece9212c0bea3e5e845
+//META: doc_section_digest=d88e5991fabadc3c3b8e0b33895fac31d24dbf358696153641375ca3aee01159
 //META: purpose=The VM bytecode emitter detects any function that references a global shader parameter and reports the interpreter-unsupported diagnostic once per parameter instead of handing back malformed bytecode.
 //META: intent=negative
 //META: pipeline_stage=emit

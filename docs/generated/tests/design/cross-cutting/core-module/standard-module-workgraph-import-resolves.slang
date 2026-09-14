@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#standard-modules
-//META: doc_section_digest=d64fe737834983844ed7939a74943fc37884d9afbd7fcd1aa49239095501c0e5
+//META: doc_section_digest=abb9a956a43e4e1ea596ed4360d78f64fbdfe46832376c6ddcc947f7b31c37c1
 //META: purpose=import experimental.workgraph resolves the separately compiled workgraph standard module and brings its record types and Barrier flag enums into scope.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -725,6 +725,16 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitType((IRType*)type->getOperand(0));
             return;
         }
+    case kIROp_AttributedType:
+        {
+            // An attribute (`unorm`/`snorm`, `no_diff`) is a semantic marker that
+            // does not change representation and has no WGSL spelling, so the type
+            // is emitted as its base. Without this, a `unorm float` used as a
+            // struct member or structured-buffer element type reaches here and the
+            // `default` arm emits nothing, producing invalid WGSL (`array<>`).
+            emitType(cast<IRAttributedType>(type)->getBaseType());
+            return;
+        }
     default:
         break;
     }
@@ -1419,34 +1429,6 @@ void WGSLSourceEmitter::emitCallArg(IRInst* inst)
 
 bool WGSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
-    // WGSL emits MakeArray/MakeStruct as constructor expressions, valid in any expression context
-    // (the base class never folds them because C/HLSL initializer lists are not). Fold a
-    // module-scope aggregate constant inline when it is used only as a constituent of another
-    // aggregate, so a nested `static const` (e.g. `int g[2][3]`) does not emit its inner arrays as
-    // separate named decls that the outermost array's `var<private>` initializer would illegally
-    // reference; the outermost (used directly, e.g. runtime-indexed) one stays a declaration.
-    switch (inst->getOp())
-    {
-    case kIROp_MakeArray:
-    case kIROp_MakeStruct:
-    case kIROp_MakeArrayFromElement:
-        if (inst->getParent() && inst->getParent()->getOp() == kIROp_ModuleInst)
-        {
-            bool onlyConstituent = inst->firstUse != nullptr;
-            for (auto use = inst->firstUse; onlyConstituent && use; use = use->nextUse)
-            {
-                auto userOp = use->getUser()->getOp();
-                onlyConstituent = userOp == kIROp_MakeArray || userOp == kIROp_MakeStruct ||
-                                  userOp == kIROp_MakeArrayFromElement;
-            }
-            if (onlyConstituent)
-                return true;
-        }
-        break;
-    default:
-        break;
-    }
-
     bool result = CLikeSourceEmitter::shouldFoldInstIntoUseSites(inst);
     if (result)
     {
@@ -1708,7 +1690,9 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_GetStringHash:
         {
             auto getStringHashInst = as<IRGetStringHash>(inst);
-            auto stringLit = getStringHashInst->getStringLit();
+            // Checked, unlike `getStringLit()`, so a non-literal operand reaches the
+            // unhandled-inst path below instead of being read as string data.
+            auto stringLit = as<IRStringLit>(getStringHashInst->getOperand(0));
 
             if (stringLit)
             {
@@ -1774,12 +1758,20 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto opType = inst->getOperand(0)->getDataType();
             if (as<IRMatrixType>(opType) || as<IRVectorType>(opType))
             {
-                // WGSL does not support negate operator on matrices and vectors,
-                // we should emit "(type(0) - op0)" instead.
+                // Lower every vector/matrix negation uniformly to "(type(0) - op0)". (WGSL has a
+                // native unary '-' only for signed float/int vectors; matrices and unsigned
+                // vectors have none, and the subtraction matches '-x' for the signed cases too.)
+                // The explicit parentheses wrap the whole subtraction, so its outer context is
+                // effectively lowest-precedence: pass EmitOp::General (not the incoming outerPrec)
+                // and emit op0 as the subtraction's right-hand side. This wraps an operand that
+                // binds no tighter than '-' -- the additive "a + b" (its left-associative RHS, at
+                // equal precedence) -- but not a multiplicative "a * b" or an atomic.
                 m_writer->emit("(");
                 emitType(inst->getDataType());
                 m_writer->emit("(0) - ");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitOperand(
+                    inst->getOperand(0),
+                    rightSide(getInfo(EmitOp::General), getInfo(EmitOp::Sub)));
                 m_writer->emit(")");
                 return true;
             }

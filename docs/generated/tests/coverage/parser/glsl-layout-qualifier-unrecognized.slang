@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T15:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#modifier-parsing
-//META: doc_section_digest=0b97346b4f21e449b53cfd070b4f2eee57742cdfe1e7938ff5629e665e2795a0
+//META: doc_section_digest=c08befb0cda99dc013ab0ceb9ba3b786beb2359fadcd06a399a784137456d81d
 //META: purpose=Verifies an unrecognized identifier inside a `layout(...)` qualifier list is rejected with E31217.
 //META: intent=characterization
 //META: covers=source/slang/slang-parser.cpp

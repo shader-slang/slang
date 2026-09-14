@@ -1,0 +1,77 @@
+schema_version: 1
+id: getlegalizedspirvglobalparamaddr-reaches-emit-ice
+bundle: design/ir-reference/misc
+suspected_kind: wrong-diagnostic
+title: "__getLegalizedSPIRVGlobalParamAddr is user-callable and aborts every backend"
+observed_at: "2026-08-12T00:00:00+00:00"
+scope: ir
+evidence:
+  command: "SLANG_ASSERT=release-assert-only build-arm64/Debug/bin/slangc -target hlsl -stage compute -entry main /tmp/glp/repro.slang -o /tmp/glp/out"
+  source_slang: docs/generated/tests/design/ir-reference/misc/treat-as-dynamic-uniform.slang
+  repro_source: |
+    uniform float gVal;
+    RWStructuredBuffer<float> gOut;
+
+    [shader("compute")]
+    [numthreads(1,1,1)]
+    void main()
+    {
+        let p = __getLegalizedSPIRVGlobalParamAddr(gVal);
+        gOut[0] = *p;
+    }
+  observed_summary: |
+    `__getLegalizedSPIRVGlobalParamAddr` is declared in core.meta.slang with neither an
+    `internal` modifier nor a capability gate, so a direct call from user code passes the
+    checker. The resulting inst then survives to code emit and aborts the compiler on every
+    target tried -- including spirv, the one target the intrinsic is named for:
+
+      hlsl / glsl / wgsl / cuda / cpp:
+        internal error[E99999]: unimplemented feature in Slang compiler:
+        unexpected IR opcode during code emit
+      metal:
+        error[E99997]: ... InternalError ... unexpected: Unknown addressspace encountered.
+      spirv:
+        error[E99997]: ... InternalError ... unimplemented: Unhandled local inst in
+        spirv-emit: let %1 : %2 = GetLegalizedSPIRVGlobalParamAddr(%3)
+
+    All seven targets exit 255.
+
+    Whether the result is used changes which targets survive, but not the bug. With the call's
+    result dead (`let a = __getLegalizedSPIRVGlobalParamAddr(gVal);` and nothing reading `a`),
+    hlsl, glsl and wgsl compile clean while metal, spirv, cuda and cpp still abort with the
+    same diagnostics. Dereferencing the returned pointer, as in the repro above, reproduces on
+    all seven. So the three C-like targets that DCE the dead inst are the only ones a dead call
+    hides the problem on -- it is not the case that only spirv is affected in that form.
+
+    Every legitimate call site is inside a `case spirv:` arm of a `__target_switch` in
+    glsl.meta.slang (for example `imageAtomicAdd` at glsl.meta.slang:4718), where the result is
+    consumed by `__imageTexelPointer` inside a `spirv_asm` block and legalized away. That
+    target switch is the only thing currently keeping the intrinsic away from other backends;
+    nothing in the declaration enforces it.
+
+    Note this repro is a hand-written scratch shader, not a variant of the `source_slang`
+    file above -- no committed test exercises this intrinsic. `source_slang` names the nearest
+    committed relative, the sibling `asDynamicUniform` case in the same bundle.
+  exit_code: 255
+  stderr_tail: "internal error[E99999]: unimplemented feature in Slang compiler: unexpected IR opcode during code emit"
+expected:
+  claim: |
+    A core-module intrinsic that only has meaning inside the SPIR-V arm of a `__target_switch`
+    should not be callable from user code at all. `__frem`, declared four lines above it in
+    core.meta.slang, carries `internal` for exactly this reason. Either
+    `__getLegalizedSPIRVGlobalParamAddr` should be marked `internal` (or capability-gated to
+    spirv), so the call is rejected at check time with a real diagnostic, or the inst should be
+    legalized away before emit. Reaching a backend and aborting with an internal error is
+    neither.
+  citation_kind: doc
+  citation: docs/generated/design/ir-reference/misc.md
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 6122d03def6340257dfe90e2181372e5019fc60d
+  doc_anchor: docs/generated/design/ir-reference/misc.md#tensor-and-runtime-helpers
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Intended as a user-callable intrinsic: ruled out -- it takes no capability decl, appears in no documentation or test, and every in-tree call site is inside a `case spirv:` arm of a `__target_switch` in glsl.meta.slang."
+    - "Only non-SPIR-V backends are affected: ruled out by direct test. spirv aborts too -- it is among the four targets that abort even when the call's result is dead. The intrinsic's name makes this the easiest wrong assumption to make about it, and it was the initial reading before the targets were tested one by one."
+    - "Same root cause as as-dynamic-uniform-reaches-emit-ice, filed from the same bundle: plausible and worth checking together. Both are marker-style intrinsics, declared without `internal`, whose inst reaches emit unremoved and produces the identical E99999 text on the C-like targets. Recorded as an observation, not a merge -- the two have different declarations and different legalization paths, so a fix for one need not fix the other."

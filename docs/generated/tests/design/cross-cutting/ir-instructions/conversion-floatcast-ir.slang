@@ -13,7 +13,7 @@
 // constructor-style `float(d)` narrowing a non-constant `double`
 // produces `floatCast` in the IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform double d;
 uniform RWStructuredBuffer<float> buf;

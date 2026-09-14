@@ -40,7 +40,7 @@ normative rules live in [`prompts/_common.md`](prompts/_common.md),
                        NIGHTLY CI  (slang-test -test-dir docs/generated/tests)
                                       │
    FEEDBACK CHANNELS  ◄───────────────┴──────────────────────────────────────►
-   • ## Doc gaps observed  → regenerate.py doc-gaps   → documentation regeneration
+   • ## Doc gaps observed  → regenerate.py doc-gaps   → design/_meta gap-status → doc fixes
    • findings/*.yaml        → regenerate.py findings file → compiler tracking issues
    • source/watched digests → regenerate.py list-stale → regenerate drifted bundles
    • lang-ref-coverage / expansion-candidates → choose what to generate next
@@ -118,7 +118,7 @@ how that doc's claims were extracted. Shared prompts —
 - **`_meta/expected-failures.txt`** — tests that fail because of a filed
   (or pending) compiler bug, kept out of the CI failure gate.
 - **`_meta/agentic-coverage-excludes.txt`** — the narrower list of tests
-  the *coverage* run must not execute at all. `nightly-slang-coverage-test.yml`
+  the _coverage_ run must not execute at all. `nightly-slang-coverage-test.yml`
   runs the suite in-process (`-server-count 1`, no test server) so that the
   compiler's own lines are instrumented, which means a test that segfaults
   `slangc` segfaults `slang-test` and the rest of the suite never runs —
@@ -157,10 +157,18 @@ autonomous:
 The suite is designed to _improve its own inputs_:
 
 - **Doc gaps → docs.** `regenerate.py doc-gaps` aggregates every
-  `## Doc gaps observed` row by source doc; the doc-regeneration workflow
-  consumes them to fix `docs/generated/design/` and to flag
-  language-reference gaps. A test anchored to the spec that fails is the
-  honest signal that the spec or the compiler is wrong.
+  `## Doc gaps observed` row, grouped by the document the row's `Anchor`
+  cell points at — which is not the same as the reporting bundle's
+  `source_doc`, since a `coverage/` bundle has none and still reports
+  gaps against design pages. Each merged row carries a `gap_id` derived
+  from (anchored document, heading, kind, normalized prose). The doc side
+  records decisions against those ids in
+  `docs/generated/design/_meta/doc-gap-state.json` and reports what is
+  left with `docs/generated/design/_meta/regenerate.py gap-status`;
+  `--tree language-reference` separates the gaps against the
+  human-written spec, which no agent may edit, into a human triage
+  queue. A test anchored to the spec that fails is the honest signal
+  that the spec or the compiler is wrong.
 - **Findings → compiler.** Triaged findings become tracking issues; fixes
   remove the matching `expected-failures.txt` entry.
 - **Drift detection → regeneration.** `source_doc_digest` and
@@ -190,6 +198,6 @@ The suite is designed to _improve its own inputs_:
 | `index --write`                          | regenerate `INDEX.md`                                                 |
 | `lang-ref-coverage`                      | spec coverage odometer                                                |
 | `expansion-candidates` / `coverage-gaps` | rank under-coverage (ranking only)                                    |
-| `doc-gaps`                               | aggregate `## Doc gaps observed` rows for doc regeneration            |
+| `doc-gaps`                               | aggregate `## Doc gaps observed` rows, by anchored doc, with gap ids  |
 | `mark-fresh <bundle>`                    | clear the stale flag after regenerating                               |
 | `findings list/show/file/dup`            | triage + file suspected-compiler-bug findings                         |
