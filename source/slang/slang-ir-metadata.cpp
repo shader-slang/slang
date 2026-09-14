@@ -201,9 +201,10 @@ static bool doesInstAndChildrenUseBindlessResourceHeap(IRInst* inst, SlangInt bi
     return false;
 }
 
-// Preserves the Metal ABI fact produced by structural ray-tracing lowering. The decoration lives
-// on the schema-specific physical descriptor type, so its schema identity cannot be confused with
-// another descriptor that started from the same erased source placeholder type.
+// Preserves the Metal ABI facts produced by structural ray-tracing lowering. They live on the
+// target module because later legalization can replace the synthesized physical descriptor type.
+// Each record carries its schema name and payload index, so sharing this stable owner does not
+// erase the public lookup identity.
 static void _collectStructuralRayTracingMetalPayloadMetadata(
     IRInst* inst,
     ArtifactPostEmitMetadata& outMetadata)
@@ -316,10 +317,9 @@ void collectMetadata(
     // Scan the instructions looking for global resource declarations
     // and exported functions.
     bool usesBindlessResourceHeap = false;
+    _collectStructuralRayTracingMetalPayloadMetadata(irModule->getModuleInst(), outMetadata);
     for (const auto& inst : irModule->getGlobalInsts())
     {
-        _collectStructuralRayTracingMetalPayloadMetadata(inst, outMetadata);
-
         if (bindlessSpaceIndex >= 0 && !usesBindlessResourceHeap)
         {
             if (doesInstAndChildrenUseBindlessResourceHeap(inst, bindlessSpaceIndex))

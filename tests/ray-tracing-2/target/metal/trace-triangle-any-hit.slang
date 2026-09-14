@@ -86,7 +86,7 @@ void main()
 // METAL: bool continueSearch_0 {{\[\[}}continue_search]];
 // METAL: using namespace metal::raytracing;
 // METAL: {{\[\[}}intersection(triangle, metal::raytracing::instancing)]]
-// METAL-SAME: StructuralRayTracingFilterResult_0 _slang_structural_rt_{{[0-9a-f]+}}_{{[0-9]+}}(
+// METAL-SAME: StructuralRayTracingFilterResult_0 __slang_structural_rt_{{[0-9a-f]+}}(
 // METAL-SAME: ray_data Schema_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
 // METAL: (&(&rayDataStorage_0)->payload_{{[0-9]+}})->visitCount_0 =
 // METAL: ->accept_0 = false;

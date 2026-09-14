@@ -1153,6 +1153,21 @@ static void _rebindMetalCallableDispatches(
     }
 }
 
+// Gives a host-looked-up Metal function the exact physical name shared with reflection.
+// `CLikeSourceEmitter` deliberately scrubs and uniquifies ordinary name hints, but gives an
+// `IRExternCppDecoration` precedence as an exact external spelling. Keep the name hint for IR
+// readability and the export for liveness/link identity; the exact-name decoration prevents both
+// underscore collapsing and an allocation-order suffix from changing the host ABI.
+static void _addMetalPhysicalFunctionName(
+    IRBuilder& builder,
+    IRFunc* function,
+    UnownedStringSlice physicalName)
+{
+    builder.addNameHintDecoration(function, physicalName);
+    builder.addExportDecoration(function, physicalName);
+    builder.addExternCppDecoration(function, physicalName);
+}
+
 static IRFunc* _generateVisibleStageAdapter(
     IRModule* module,
     Dictionary<KeyValuePair<IRInst*, IRInst*>, IRFunc*>& generated,
@@ -1191,8 +1206,7 @@ static IRFunc* _generateVisibleStageAdapter(
     // These functions are looked up by the host and inserted into a schema-specific VFT. Export
     // the shared reflection name exactly; a name hint alone would let Metal emission append a
     // collision-order suffix and break the reflected ABI.
-    builder.addNameHintDecoration(adapter, physicalName);
-    builder.addExportDecoration(adapter, physicalName);
+    _addMetalPhysicalFunctionName(builder, adapter, physicalName);
     builder.addKeepAliveDecoration(adapter);
     IRInst* visibleDecorationOperands[] = {
         builder.getIntValue(builder.getIntType(), IRIntegerValue(stageKind)),
@@ -1390,8 +1404,7 @@ static IRFunc* _generateCallableStageAdapter(
         builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3));
     adapter->setFullType(callableFunctionTableType->getFunctionType());
 
-    builder.addNameHintDecoration(adapter, physicalName);
-    builder.addExportDecoration(adapter, physicalName);
+    _addMetalPhysicalFunctionName(builder, adapter, physicalName);
     builder.addKeepAliveDecoration(adapter);
     IRInst* visibleDecorationOperands[] = {
         builder.getIntValue(
@@ -3120,8 +3133,7 @@ static IRFunc* _generateMetalCandidateDispatcher(
     }
     dispatcher->setFullType(builder.getFuncType(parameterTypes, resultInfo.type));
 
-    builder.addNameHintDecoration(dispatcher, physicalName);
-    builder.addExportDecoration(dispatcher, physicalName);
+    _addMetalPhysicalFunctionName(builder, dispatcher, physicalName);
     builder.addKeepAliveDecoration(dispatcher);
     IRInst* intersectionOperands[] = {
         builder.getIntValue(builder.getIntType(), IRIntegerValue(geometryKind)),
@@ -5155,9 +5167,10 @@ static void _collectMetalPayloadPartitionRequirements(
     }
 }
 
-// Records the finalized IFT signature on the schema's nominal physical descriptor. The generic
-// post-emit metadata collector reads this decoration after all target lowering; it does not know
-// how to infer Metal tags itself.
+// Records each finalized IFT signature on the target module. The module is the stable owner of
+// post-emit facts: resource and empty-type legalization may replace the synthesized physical
+// descriptor type, but they do not replace the module whose artifact receives this metadata. The
+// generic collector only preserves these records; it does not infer Metal tags itself.
 static void _addMetalPayloadMetadataDecorations(IRModule* module, MetalProgramDescriptorInfo* info)
 {
     IRBuilder builder(module);
@@ -5173,7 +5186,7 @@ static void _addMetalPayloadMetadataDecorations(IRModule* module, MetalProgramDe
                     partition.maxLevels))),
         };
         builder.addDecoration(
-            info->physicalDescriptorType,
+            module->getModuleInst(),
             kIROp_StructuralRayTracingMetalPayloadMetadataDecoration,
             operands,
             SLANG_COUNT_OF(operands));

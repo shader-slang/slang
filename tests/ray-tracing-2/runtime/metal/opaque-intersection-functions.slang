@@ -141,5 +141,5 @@ void main()
 // METAL: intersection_function_table<metal::raytracing::instancing{{.*}}>
 // The visible functions comprise one miss adapter, the real bounding-box closest-hit adapter, and
 // two closest-hit placeholders that keep all three reflected hit-group indices addressable.
-// METAL-COUNT-4: {{\[\[visible\]\]}} void _slang_structural_rt_
+// METAL-COUNT-4: {{\[\[visible\]\]}} void __slang_structural_rt_
 // METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing{{.*}})]]

@@ -211,9 +211,9 @@ struct SyntheticResourceRecord
 
 /// Final target-ABI requirements for one structural ray-tracing payload partition.
 ///
-/// Metal lowering writes this record to the target IR after it has normalized all reachable trace
-/// requirements for the schema. The post-emit metadata collector merely preserves that result; it
-/// must not attempt to reconstruct Metal tags from frontend reflection.
+/// Metal lowering writes this record to the target module after it has normalized all reachable
+/// trace requirements for the schema. The post-emit metadata collector merely preserves that
+/// result; it must not attempt to reconstruct Metal tags from frontend reflection.
 struct StructuralRayTracingMetalPayloadRecord
 {
     String schemaName;
