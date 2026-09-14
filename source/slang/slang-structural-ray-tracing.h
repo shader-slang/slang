@@ -477,14 +477,13 @@ String getStructuralRayTracingMetalClosestHitFunctionName(
 
 /// Returns the exact exported Metal name for a synthesized no-op closest-hit table entry.
 ///
-/// A payload partition uses one dense visible-function table. If any group has a real closest-hit
-/// stage, groups using `NoClosestHit` still need a signature-compatible function in their slots;
-/// this helper gives lowering and reflection one shared identity for that physical placeholder.
+/// A payload partition uses one dense visible-function table, so every group using `NoClosestHit`
+/// needs a signature-compatible physical function at its function index. The no-op has the
+/// payload table's common signature and can therefore be shared by every placeholder index,
+/// including when the partition contains no source closest-hit stage at all.
 String getStructuralRayTracingMetalNoOpClosestHitFunctionName(
     UnownedStringSlice schemaSourceTypeName,
-    Index payloadIndex,
-    Index functionIndex,
-    UnownedStringSlice groupSourceTypeName);
+    Index payloadIndex);
 
 /// Returns the exact exported Metal name for one schema-wide callable table entry.
 String getStructuralRayTracingMetalCallableFunctionName(

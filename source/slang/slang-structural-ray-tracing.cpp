@@ -179,6 +179,7 @@ enum class StructuralRayTracingMetalFunctionRole
 {
     Miss,
     ClosestHit,
+    ClosestHitNoOp,
     Callable,
     Candidate,
 };
@@ -243,6 +244,12 @@ static String _getStructuralRayTracingMetalFunctionName(
         _appendStructuralRayTracingMetalNamePart(key, groupSourceTypeName);
         _appendStructuralRayTracingMetalNamePart(key, stageSourceTypeName);
         break;
+    case StructuralRayTracingMetalFunctionRole::ClosestHitNoOp:
+        SLANG_RELEASE_ASSERT(payloadIndex >= 0);
+        key << "|closestHitNoOp";
+        _appendStructuralRayTracingMetalNamePart(key, schemaSourceTypeName);
+        key << "|" << payloadIndex;
+        break;
     case StructuralRayTracingMetalFunctionRole::Callable:
         SLANG_RELEASE_ASSERT(functionIndex >= 0 && stageSourceTypeName.getLength() != 0);
         key << "|callable";
@@ -297,19 +304,18 @@ String getStructuralRayTracingMetalClosestHitFunctionName(
 
 String getStructuralRayTracingMetalNoOpClosestHitFunctionName(
     UnownedStringSlice schemaSourceTypeName,
-    Index payloadIndex,
-    Index functionIndex,
-    UnownedStringSlice groupSourceTypeName)
+    Index payloadIndex)
 {
-    // This spelling is not user-visible source metadata. It is only the stable final component of
-    // the compiler-owned physical name and deliberately lives beside the shared naming algorithm.
+    // Use one schema-and-payload identity rather than a group identity. All closest-hit functions
+    // in a payload partition have the same physical signature, so the host can install this one
+    // no-op at every `NoClosestHit` function index without linking redundant functions.
     return _getStructuralRayTracingMetalFunctionName(
-        StructuralRayTracingMetalFunctionRole::ClosestHit,
+        StructuralRayTracingMetalFunctionRole::ClosestHitNoOp,
         schemaSourceTypeName,
         payloadIndex,
-        functionIndex,
-        groupSourceTypeName,
-        UnownedStringSlice::fromLiteral("NoClosestHit"));
+        -1,
+        UnownedStringSlice(),
+        UnownedStringSlice());
 }
 
 String getStructuralRayTracingMetalCallableFunctionName(

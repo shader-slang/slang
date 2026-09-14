@@ -1553,7 +1553,13 @@ static IRFunc* _generateVisibleStageAdapter(
     auto invoke = as<IRFunc>(invokeValue);
     if (!invoke && stageKind != StructuralRayTracingStageKind::ClosestHit)
         return nullptr;
-    KeyValuePair<IRInst*, IRInst*> generatedKey(entryType, rayDataInfo->type);
+    // Every physical closest-hit function in one payload partition has the same table-wide
+    // signature. A `NoClosestHit` adapter has no source entry identity or record-dependent work,
+    // so key it only by the ray-data type and reuse one no-op at every placeholder function index.
+    // Real adapters retain their entry identity because their bodies and records can differ.
+    KeyValuePair<IRInst*, IRInst*> generatedKey(
+        invoke ? entryType : rayDataInfo->type,
+        rayDataInfo->type);
     if (auto existing = generated.tryGetValue(generatedKey))
         return *existing;
 
@@ -1655,9 +1661,9 @@ static IRFunc* _generateVisibleStageAdapter(
     if (tableRequirements.callableDispatch)
         descriptorResources = emitNamedParam(descriptorResourcesPointerType, "descriptorResources");
 
-    // A dense Metal VFT cannot leave a `NoClosestHit` slot uninitialized when another group in the
-    // payload partition enables post-traversal closest-hit dispatch. Its no-op accepts the exact
-    // table-wide signature but intentionally has no source-stage metadata or input operations.
+    // A dense Metal VFT cannot leave a `NoClosestHit` slot uninitialized. Its shared no-op accepts
+    // the exact table-wide signature but intentionally has no source-stage metadata or input
+    // operations, including when every hit group in the payload partition is a placeholder.
     if (!invoke)
     {
         builder.emitReturn();
@@ -2265,7 +2271,11 @@ static void _lowerMetalCandidateInputOperations(
     }
 }
 
-static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
+// Creates one ordinary candidate-dispatch arm for a triangle or curve group. A group with a
+// source AnyHit stage lowers that stage into the arm; a `NoAnyHit` group still needs an explicit
+// accepting arm so an out-of-contract runtime function index can be rejected by the dispatcher's
+// default case instead of being mistaken for fixed-function geometry.
+static IRFunc* _generateBuiltInCandidateAdapter(
     IRModule* module,
     Dictionary<KeyValuePair<KeyValuePair<IRInst*, UInt>, IRInst*>, IRFunc*>& generated,
     Dictionary<IRFunc*, IRInst*>& payloadValues,
@@ -2278,8 +2288,6 @@ static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
 {
     auto invoke =
         getStructuralRayTracingHitGroupStageInvoke(group, StructuralRayTracingStageKind::AnyHit);
-    if (!invoke)
-        return nullptr;
     auto groupType = group->getGroupType();
     KeyValuePair<KeyValuePair<IRInst*, UInt>, IRInst*> generatedKey(
         KeyValuePair<IRInst*, UInt>(groupType, tagMask),
@@ -2335,19 +2343,22 @@ static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
     auto name = _getMetalCandidateName(group->getGroupSourceTypeName(), toSlice(".arm"));
     builder.addNameHintDecoration(adapter, name.getUnownedSlice());
     builder.addForceInlineDecoration(adapter);
-    _addStructuralStageInfo(
-        builder,
-        adapter,
-        StructuralRayTracingStageKind::AnyHit,
-        invoke,
-        group->getAnyHitType(),
-        group->getAnyHitSourceTypeName(),
-        group->getAnyHitTypeIdentity(),
-        group->getContextType(),
-        group->getPayloadType(),
-        group->getRecordType(),
-        group->getHitAttributesType(),
-        hitAttributesKind);
+    if (invoke)
+    {
+        _addStructuralStageInfo(
+            builder,
+            adapter,
+            StructuralRayTracingStageKind::AnyHit,
+            invoke,
+            group->getAnyHitType(),
+            group->getAnyHitSourceTypeName(),
+            group->getAnyHitTypeIdentity(),
+            group->getContextType(),
+            group->getPayloadType(),
+            group->getRecordType(),
+            group->getHitAttributesType(),
+            hitAttributesKind);
+    }
 
     builder.setInsertInto(adapter);
     builder.emitBlock();
@@ -2520,16 +2531,25 @@ static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
             inputs.hitKind = builder.getIntValue(builder.getUIntType(), 0);
         }
     }
-    List<IRInst*> arguments;
-    for (UInt i = 0; i < invoke->getParamCount(); ++i)
-        arguments.add(builder.emitDefaultConstruct(invoke->getParamType(i)));
-    builder
-        .emitCallInst(invoke->getResultType(), invoke, arguments.getCount(), arguments.getBuffer());
+    if (invoke)
+    {
+        List<IRInst*> arguments;
+        for (UInt i = 0; i < invoke->getParamCount(); ++i)
+            arguments.add(builder.emitDefaultConstruct(invoke->getParamType(i)));
+        builder.emitCallInst(
+            invoke->getResultType(),
+            invoke,
+            arguments.getCount(),
+            arguments.getBuffer());
+    }
     builder.emitReturn(_emitMetalCandidateResult(builder, resultInfo, true, true));
 
-    _inlineCandidateOperationCalls(adapter);
-    _lowerMetalCandidateInputOperations(adapter, inputs);
-    _lowerAnyHitTerminations(adapter, resultInfo);
+    if (invoke)
+    {
+        _inlineCandidateOperationCalls(adapter);
+        _lowerMetalCandidateInputOperations(adapter, inputs);
+        _lowerAnyHitTerminations(adapter, resultInfo);
+    }
     generated.add(generatedKey, adapter);
     return adapter;
 }
@@ -3489,9 +3509,6 @@ static IRFunc* _generateMetalCandidateDispatcher(
     IRInst* schemaIdentity,
     UnownedStringSlice physicalName)
 {
-    if (arms.getCount() == 0)
-        return nullptr;
-
     // The exact export name and candidate arms are schema-owned. Keep that semantic identity in
     // the dedup key even though each partition currently also receives a fresh nominal ray-data
     // type; this prevents a future carrier canonicalization from cross-reusing physical symbols.
@@ -3500,18 +3517,29 @@ static IRFunc* _generateMetalCandidateDispatcher(
     if (auto existing = generated.tryGetValue(key))
         return *existing;
 
-    auto signature = cast<IRFuncType>(arms[0].helper->getDataType());
-    SLANG_RELEASE_ASSERT(signature->getParamCount() >= 2);
-    auto helperRecordParameterIndex = signature->getParamCount() - 2;
-
     IRBuilder builder(module);
     builder.setInsertInto(module->getModuleInst());
     auto dispatcher = builder.createFunc();
     List<IRType*> parameterTypes;
-    for (UInt i = 0; i < signature->getParamCount(); ++i)
+    IRFuncType* signature = nullptr;
+    UInt helperRecordParameterIndex = 0;
+    if (arms.getCount() == 0)
     {
-        if (i != helperRecordParameterIndex)
-            parameterTypes.add(signature->getParamType(i));
+        // An absent primitive kind has no source arm from which to derive demand-driven native
+        // parameters. It only needs the payload-partition ray data to match the table selected by
+        // the trace; its body rejects immediately without touching the SBT record buffer.
+        parameterTypes.add(builder.getPtrType(rayDataInfo->type, AddressSpace::ThreadLocal));
+    }
+    else
+    {
+        signature = cast<IRFuncType>(arms[0].helper->getDataType());
+        SLANG_RELEASE_ASSERT(signature->getParamCount() >= 2);
+        helperRecordParameterIndex = signature->getParamCount() - 2;
+        for (UInt i = 0; i < signature->getParamCount(); ++i)
+        {
+            if (i != helperRecordParameterIndex)
+                parameterTypes.add(signature->getParamType(i));
+        }
     }
     dispatcher->setFullType(builder.getFuncType(parameterTypes, resultInfo.type));
 
@@ -3530,6 +3558,21 @@ static IRFunc* _generateMetalCandidateDispatcher(
 
     builder.setInsertInto(dispatcher);
     auto entryBlock = builder.emitBlock();
+    if (arms.getCount() == 0)
+    {
+        auto rayData = builder.emitParam(parameterTypes[0]);
+        builder.addNameHintDecoration(rayData, UnownedTerminatedStringSlice("rayData"));
+        candidateRayDataParams[dispatcher] = rayData;
+        builder.emitReturn(_emitMetalCandidateResult(
+            builder,
+            resultInfo,
+            false,
+            true,
+            resultInfo.distanceKey ? builder.getFloatValue(builder.getFloatType(), 0.0) : nullptr));
+        generated.add(key, dispatcher);
+        return dispatcher;
+    }
+
     List<IRInst*> dispatcherParameters;
     List<IRParam*> sourceParameters;
     for (auto parameter : arms[0].helper->getParams())
@@ -3622,12 +3665,28 @@ static IRFunc* _generateMetalCandidateDispatcher(
         builder.emitReturn(candidateResult);
     }
 
+    // An empty fixed-function record names no source stage but still represents the hardware
+    // triangle or curve candidate. Preserve that explicit sentinel as an accepting case. A
+    // procedural empty record has no intersection stage to report a candidate and therefore
+    // shares the rejecting default below.
+    if (geometryKind != MetalStructuralRayTracingGeometryKind::BoundingBox)
+    {
+        auto emptyRecordBlock = builder.createBlock();
+        dispatcher->addBlock(emptyRecordBlock);
+        switchCases.add(builder.getIntValue(uintType, IRIntegerValue(0xffffffffu)));
+        switchCases.add(emptyRecordBlock);
+        builder.setInsertInto(emptyRecordBlock);
+        builder.emitReturn(_emitMetalCandidateResult(builder, resultInfo, true, true));
+    }
+
+    // Every valid group has an explicit switch arm. Rejection is therefore the only safe result
+    // for an unknown function index: accepting it could run candidate behavior for one primitive
+    // kind with a record that belongs to another payload or to corrupt host data.
     builder.setInsertInto(defaultBlock);
-    bool defaultAccept = geometryKind != MetalStructuralRayTracingGeometryKind::BoundingBox;
     builder.emitReturn(_emitMetalCandidateResult(
         builder,
         resultInfo,
-        defaultAccept,
+        false,
         true,
         builder.getFloatValue(builder.getFloatType(), 0.0)));
     builder.setInsertInto(breakBlock);
@@ -4596,6 +4655,7 @@ static bool _materializeMetalPayloadPartition(
     bool hasMissFunctions = false;
     bool hasClosestHitFunctions = false;
     bool hasIntersectionFunctions = false;
+    bool hasCandidateLogic = false;
     List<IRStructuralRayTracingHitGroupInfoDecoration*> triangleCandidateGroups;
     List<IRStructuralRayTracingHitGroupInfoDecoration*> curveCandidateGroups;
     List<IRStructuralRayTracingHitGroupInfoDecoration*> boundingBoxCandidateGroups;
@@ -4608,40 +4668,41 @@ static bool _materializeMetalPayloadPartition(
         auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration);
         if (!group || !_isStructuralHitGroupForPayload(group, payloadType))
             continue;
-        auto closestHitInvoke = getStructuralRayTracingHitGroupStageInvoke(
-            group,
-            StructuralRayTracingStageKind::ClosestHit);
         auto anyHitInvoke = getStructuralRayTracingHitGroupStageInvoke(
             group,
             StructuralRayTracingStageKind::AnyHit);
         auto intersectionInvoke = getStructuralRayTracingHitGroupStageInvoke(
             group,
             StructuralRayTracingStageKind::Intersection);
-        hasClosestHitFunctions |= closestHitInvoke != nullptr;
         auto attributesKind =
             StructuralRayTracingHitAttributesKind(group->getHitAttributesKind()->getValue());
         if (attributesKind == StructuralRayTracingHitAttributesKind::Triangle)
         {
-            if (!anyHitInvoke)
-                continue;
             triangleCandidateGroups.add(group);
-            triangleCandidateRequirements = _combineMetalStageRequirements(
-                triangleCandidateRequirements,
-                _getMetalStageRequirements(anyHitInvoke));
+            if (anyHitInvoke)
+            {
+                hasCandidateLogic = true;
+                triangleCandidateRequirements = _combineMetalStageRequirements(
+                    triangleCandidateRequirements,
+                    _getMetalStageRequirements(anyHitInvoke));
+            }
         }
         else if (attributesKind == StructuralRayTracingHitAttributesKind::Curve)
         {
-            if (!anyHitInvoke)
-                continue;
             curveCandidateGroups.add(group);
-            curveCandidateRequirements = _combineMetalStageRequirements(
-                curveCandidateRequirements,
-                _getMetalStageRequirements(anyHitInvoke));
+            if (anyHitInvoke)
+            {
+                hasCandidateLogic = true;
+                curveCandidateRequirements = _combineMetalStageRequirements(
+                    curveCandidateRequirements,
+                    _getMetalStageRequirements(anyHitInvoke));
+            }
         }
         else if (attributesKind == StructuralRayTracingHitAttributesKind::Custom)
         {
             if (!intersectionInvoke)
                 continue;
+            hasCandidateLogic = true;
             boundingBoxCandidateGroups.add(group);
             boundingBoxCandidateRequirements = _combineMetalStageRequirements(
                 boundingBoxCandidateRequirements,
@@ -4703,10 +4764,9 @@ static bool _materializeMetalPayloadPartition(
         {
             if (!_isStructuralHitGroupForPayload(group, payloadType))
                 continue;
-            // No table is required when every group uses `NoClosestHit`. Once any real stage
-            // enables the dense table, however, every group must contribute a physical entry.
-            if (!hasClosestHitFunctions)
-                continue;
+            // The Metal table is dense over reflected hit-group function indices. Generate an
+            // entry for every group even when the entire payload partition uses `NoClosestHit`;
+            // those indices all reference one shared, signature-compatible no-op function.
             auto hitAttributesKind =
                 StructuralRayTracingHitAttributesKind(group->getHitAttributesKind()->getValue());
             auto closestHitInvoke = getStructuralRayTracingHitGroupStageInvoke(
@@ -4723,9 +4783,7 @@ static bool _materializeMetalPayloadPartition(
                           group->getClosestHitSourceTypeName()->getStringSlice())
                     : getStructuralRayTracingMetalNoOpClosestHitFunctionName(
                           programInfo->programLayoutSourceTypeName->getStringSlice(),
-                          payloadPartition->payloadIndex,
-                          Index(group->getFunctionIndex()->getValue()),
-                          group->getGroupSourceTypeName()->getStringSlice());
+                          payloadPartition->payloadIndex);
             if (_generateVisibleStageAdapter(
                     module,
                     generatedClosestHitAdapters,
@@ -4761,7 +4819,7 @@ static bool _materializeMetalPayloadPartition(
         List<MetalCandidateDispatcherArm> arms;
         for (auto group : groups)
         {
-            if (auto helper = _generateBuiltInAnyHitCandidateAdapter(
+            if (auto helper = _generateBuiltInCandidateAdapter(
                     module,
                     generatedCandidateHelpers,
                     payloadValues,
@@ -4798,56 +4856,66 @@ static bool _materializeMetalPayloadPartition(
             candidateAdapterSet.add(dispatcher);
         }
     };
-    generateBuiltInDispatcher(
-        triangleCandidateGroups,
-        triangleCandidateRequirements,
-        MetalStructuralRayTracingGeometryKind::Triangle);
-    generateBuiltInDispatcher(
-        curveCandidateGroups,
-        curveCandidateRequirements,
-        MetalStructuralRayTracingGeometryKind::Curve);
-
-    List<MetalCandidateDispatcherArm> boundingBoxArms;
-    for (auto group : boundingBoxCandidateGroups)
+    if (hasCandidateLogic)
     {
-        if (auto helper = _generateBoundingBoxCandidateAdapter(
-                module,
-                generatedCandidateHelpers,
-                candidateHelperSet,
-                payloadValues,
-                dispatchValues,
-                filterResultInfo,
-                proceduralResultInfo,
-                group,
-                boundingBoxCandidateRequirements,
-                boundingBoxHasAnyHit,
-                tagMask,
-                rayDataInfo))
+        // Once a payload needs an IFT, the primitive kind selected by the acceleration structure
+        // must always resolve to a defined entry. Triangle and bounding-box occupy fixed indices
+        // zero and one; an absent kind gets a reject-all dispatcher. Curve index two exists only
+        // when the payload schema actually contains a curve group.
+        generateBuiltInDispatcher(
+            triangleCandidateGroups,
+            triangleCandidateRequirements,
+            MetalStructuralRayTracingGeometryKind::Triangle);
+        if (curveCandidateGroups.getCount() != 0)
         {
-            boundingBoxArms.add({group, helper});
-            candidateHelperSet.add(helper);
+            generateBuiltInDispatcher(
+                curveCandidateGroups,
+                curveCandidateRequirements,
+                MetalStructuralRayTracingGeometryKind::Curve);
         }
-    }
-    auto boundingBoxPhysicalName = getStructuralRayTracingMetalCandidateDispatcherName(
-        programInfo->programLayoutSourceTypeName->getStringSlice(),
-        payloadPartition->payloadIndex,
-        StructuralRayTracingMetalCandidateKind::BoundingBox);
-    if (auto dispatcher = _generateMetalCandidateDispatcher(
-            module,
-            generatedCandidateDispatchers,
-            candidateRayDataParams,
-            proceduralResultInfo,
-            boundingBoxArms,
-            MetalStructuralRayTracingGeometryKind::BoundingBox,
-            tagMask,
-            maxLevels,
-            programInfo->hitRecordStride,
-            rayDataInfo,
-            programInfo->programLayout,
-            boundingBoxPhysicalName.getUnownedSlice()))
-    {
-        hasIntersectionFunctions = true;
-        candidateAdapterSet.add(dispatcher);
+
+        List<MetalCandidateDispatcherArm> boundingBoxArms;
+        for (auto group : boundingBoxCandidateGroups)
+        {
+            if (auto helper = _generateBoundingBoxCandidateAdapter(
+                    module,
+                    generatedCandidateHelpers,
+                    candidateHelperSet,
+                    payloadValues,
+                    dispatchValues,
+                    filterResultInfo,
+                    proceduralResultInfo,
+                    group,
+                    boundingBoxCandidateRequirements,
+                    boundingBoxHasAnyHit,
+                    tagMask,
+                    rayDataInfo))
+            {
+                boundingBoxArms.add({group, helper});
+                candidateHelperSet.add(helper);
+            }
+        }
+        auto boundingBoxPhysicalName = getStructuralRayTracingMetalCandidateDispatcherName(
+            programInfo->programLayoutSourceTypeName->getStringSlice(),
+            payloadPartition->payloadIndex,
+            StructuralRayTracingMetalCandidateKind::BoundingBox);
+        if (auto dispatcher = _generateMetalCandidateDispatcher(
+                module,
+                generatedCandidateDispatchers,
+                candidateRayDataParams,
+                proceduralResultInfo,
+                boundingBoxArms,
+                MetalStructuralRayTracingGeometryKind::BoundingBox,
+                tagMask,
+                maxLevels,
+                programInfo->hitRecordStride,
+                rayDataInfo,
+                programInfo->programLayout,
+                boundingBoxPhysicalName.getUnownedSlice()))
+        {
+            hasIntersectionFunctions = true;
+            candidateAdapterSet.add(dispatcher);
+        }
     }
 
     if (!lowerTrace)

@@ -88,6 +88,12 @@ void main()
 // METAL: {{\[\[}}intersection(triangle, metal::raytracing::instancing)]]
 // METAL-SAME: StructuralRayTracingFilterResult_0 __slang_structural_rt_{{[0-9a-f]+}}(
 // METAL-SAME: ray_data Schema_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
+// Every valid record function index has an explicit arm. The default must reject an index that
+// does not belong to this payload instead of treating it as fixed-function triangle geometry.
+// METAL: switch(
+// METAL: default:
+// METAL: = { false, true };
+// METAL: case int(0):
 // METAL: (&(&rayDataStorage_0)->payload_{{[0-9]+}})->visitCount_0 =
 // METAL: ->accept_0 = false;
 // METAL: ->continueSearch_0 = true;
@@ -95,3 +101,7 @@ void main()
 // METAL: ->continueSearch_0 = false;
 // METAL: (&(&rayDataStorage_0)->payload_{{[0-9]+}})->visitCount_0 =
 // METAL: rayData_{{[0-9]+}} = rayDataStorage_0;
+// Candidate logic activates fixed IFT indices zero and one. This schema has no bounding-box group,
+// so index one is still an exported, payload-typed reject-all function.
+// METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing)]]
+// METAL: = { false, true, 0.0f };
