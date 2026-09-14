@@ -234,7 +234,6 @@ static String _getStructuralRayTracingMetalFunctionName(
     UnownedStringSlice schemaSourceTypeName,
     Index payloadIndex,
     Index functionIndex,
-    UnownedStringSlice groupSourceTypeName,
     UnownedStringSlice stageSourceTypeName,
     StructuralRayTracingMetalCandidateKind candidateKind =
         StructuralRayTracingMetalCandidateKind::Count)
@@ -254,13 +253,10 @@ static String _getStructuralRayTracingMetalFunctionName(
         _appendStructuralRayTracingMetalNamePart(key, stageSourceTypeName);
         break;
     case StructuralRayTracingMetalFunctionRole::ClosestHit:
-        SLANG_RELEASE_ASSERT(
-            payloadIndex >= 0 && functionIndex >= 0 && groupSourceTypeName.getLength() != 0 &&
-            stageSourceTypeName.getLength() != 0);
+        SLANG_RELEASE_ASSERT(payloadIndex >= 0 && stageSourceTypeName.getLength() != 0);
         key << "|closestHit";
         _appendStructuralRayTracingMetalNamePart(key, schemaSourceTypeName);
-        key << "|" << payloadIndex << "|" << functionIndex;
-        _appendStructuralRayTracingMetalNamePart(key, groupSourceTypeName);
+        key << "|" << payloadIndex;
         _appendStructuralRayTracingMetalNamePart(key, stageSourceTypeName);
         break;
     case StructuralRayTracingMetalFunctionRole::ClosestHitNoOp:
@@ -301,23 +297,23 @@ String getStructuralRayTracingMetalMissFunctionName(
         schemaSourceTypeName,
         payloadIndex,
         functionIndex,
-        UnownedStringSlice(),
         stageSourceTypeName);
 }
 
 String getStructuralRayTracingMetalClosestHitFunctionName(
     UnownedStringSlice schemaSourceTypeName,
     Index payloadIndex,
-    Index functionIndex,
-    UnownedStringSlice groupSourceTypeName,
     UnownedStringSlice stageSourceTypeName)
 {
+    // A closest-hit source type fixes its Context and therefore its Record, Payload, and primitive
+    // attributes. The enclosing schema and payload partition fix the table-wide Metal ray-data
+    // ABI. Logical hit-group indices do not change either part of the generated function, so they
+    // must not create distinct host-visible symbols for the same concrete stage.
     return _getStructuralRayTracingMetalFunctionName(
         StructuralRayTracingMetalFunctionRole::ClosestHit,
         schemaSourceTypeName,
         payloadIndex,
-        functionIndex,
-        groupSourceTypeName,
+        -1,
         stageSourceTypeName);
 }
 
@@ -333,7 +329,6 @@ String getStructuralRayTracingMetalNoOpClosestHitFunctionName(
         schemaSourceTypeName,
         payloadIndex,
         -1,
-        UnownedStringSlice(),
         UnownedStringSlice());
 }
 
@@ -347,7 +342,6 @@ String getStructuralRayTracingMetalCallableFunctionName(
         schemaSourceTypeName,
         -1,
         functionIndex,
-        UnownedStringSlice(),
         stageSourceTypeName);
 }
 
@@ -361,7 +355,6 @@ String getStructuralRayTracingMetalCandidateDispatcherName(
         schemaSourceTypeName,
         payloadIndex,
         -1,
-        UnownedStringSlice(),
         UnownedStringSlice(),
         candidateKind);
 }

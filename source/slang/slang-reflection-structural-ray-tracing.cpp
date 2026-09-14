@@ -821,10 +821,6 @@ static bool _populateMetalFunctionReflection(
         bool hasCandidateLogic = false;
         for (auto group : payload->hitGroups)
         {
-            auto groupSourceTypeName =
-                getStructuralRayTracingSourceTypeName(astBuilder, group->groupType);
-            if (groupSourceTypeName.getLength() == 0)
-                return false;
             if (group->closestHit)
             {
                 auto stageSourceTypeName =
@@ -835,8 +831,6 @@ static bool _populateMetalFunctionReflection(
                     getStructuralRayTracingMetalClosestHitFunctionName(
                         schemaSourceTypeName,
                         payloadIndex,
-                        group->functionIndex,
-                        groupSourceTypeName.getUnownedSlice(),
                         stageSourceTypeName.getUnownedSlice());
                 group->closestHitEntryPointName = group->closestHit->entryPointName;
             }

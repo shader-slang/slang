@@ -474,13 +474,12 @@ String getStructuralRayTracingMetalMissFunctionName(
 
 /// Returns the exact exported Metal name for one closest-hit visible-function-table entry.
 ///
-/// The group identity is included because two hit groups can reuse one closest-hit stage while
-/// requiring different record or custom-attribute lowering.
+/// The concrete stage name identifies the executable code. Its schema and payload partition
+/// identify the generated Metal ray-data ABI, so repeated hit groups using that stage share one
+/// physical visible function.
 String getStructuralRayTracingMetalClosestHitFunctionName(
     UnownedStringSlice schemaSourceTypeName,
     Index payloadIndex,
-    Index functionIndex,
-    UnownedStringSlice groupSourceTypeName,
     UnownedStringSlice stageSourceTypeName);
 
 /// Returns the exact exported Metal name for a synthesized no-op closest-hit table entry.
