@@ -181,6 +181,15 @@ class TestUserSkillsPackageVerifier(unittest.TestCase):
         with self.assertRaisesRegex(verifier.VerificationError, "expected one"):
             verifier._verify_zip(missing_path, self.expected_files, EXPECTED_COMMIT)
 
+    def test_rejects_non_object_provenance(self) -> None:
+        """Valid JSON must still use the provenance object schema."""
+
+        entries = self._valid_entries()
+        entries[verifier.PROVENANCE_PATH] = b"[]"
+        archive_path = self._write_zip("non-object-provenance.zip", list(entries.items()))
+        with self.assertRaisesRegex(verifier.VerificationError, "must be a JSON object"):
+            verifier._verify_zip(archive_path, self.expected_files, EXPECTED_COMMIT)
+
     def test_rejects_unsafe_archive_paths(self) -> None:
         """Absolute paths and parent traversal are rejected before bundle inspection."""
 

@@ -124,6 +124,8 @@ def _verify_entries(
         provenance = json.loads(read_entry(provenance_name).decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise VerificationError(f"invalid provenance in {archive_path}: {error}") from error
+    if not isinstance(provenance, dict):
+        raise VerificationError(f"provenance in {archive_path} must be a JSON object")
     expected_provenance = {
         "schemaVersion": 1,
         "sourceRepository": SOURCE_REPOSITORY,
