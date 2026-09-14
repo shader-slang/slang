@@ -204,6 +204,13 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingOpenSectionTag(
     }
 
     auto tagType = openSection.tagType->getCanonicalType();
+    if (as<ThisType>(tagType))
+    {
+        // Slang represents an interface's abstract `This` as `ThisType`, never as a
+        // `DeclRefType<ThisTypeDecl>`. The concrete declaration is therefore not known until a
+        // conformance substitutes `This`; retain the checked type for the existing IR validation.
+        return;
+    }
     auto tagDeclRefType = as<DeclRefType>(tagType);
     auto tagDecl = tagDeclRefType ? tagDeclRefType->getDeclRef().getDecl() : nullptr;
     if (tagDecl && (isGenericParam(tagDecl) || as<GlobalGenericParamDecl>(tagDecl) ||
