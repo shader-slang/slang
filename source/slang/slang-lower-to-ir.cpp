@@ -1794,13 +1794,16 @@ static IRMakeValuePack* _lowerStructuralRayTracingEntryIdentityPack(
         context->irBuilder->emitMakeValuePack(identities.getCount(), identities.getBuffer()));
 }
 
-// Emits the schema-scoped request consumed by whole-program open-section completion.
+// Emits the schema-scoped request consumed by whole-program structural reflection.
 //
-// Consider a client that composes an unused `OpenSchema : ITraceProgramSchema` and asks for its
-// reflection before requesting code. No trace operation exists to carry the open markers in that
-// case. The exact schema conformance component is nevertheless part of the program, so it emits
-// this one root with the same listed-entry metadata used by trace lowering. The linker appends
-// selected identities to its three packs and reflection reads that finalized record directly.
+// Consider a client that declares `ClosedSchema : ITraceProgramSchema`, never calls `trace`, and
+// asks reflection for the target ABI size of its payload. The reflection path composes an exact
+// `ClosedSchema : ITraceProgramSchema` conformance component so this producer emits one private
+// schema root with the same listed-entry metadata used by trace lowering. Target-manifest linking
+// retains that root and specializes its entry types before reflection computes their ABI sizes.
+// An open schema uses the same root; open-section completion additionally appends the selected
+// identities to its three packs. Ordinary backend links do not opt into schema roots, so producing
+// a closed-schema request here does not retain otherwise-unused stages in emitted code.
 static void _addStructuralRayTracingProgramSchemaInfo(
     IRGenContext* context,
     Type* schemaType,
@@ -1818,10 +1821,6 @@ static void _addStructuralRayTracingProgramSchemaInfo(
 
     auto layout = _getStructuralRayTracingProgramLayoutInfo(context, schemaType, schemaWitness);
     SLANG_RELEASE_ASSERT(layout.isComplete());
-    if (!(layout.hasOpenHitGroups || layout.hasOpenMissShaders || layout.hasOpenCallableShaders))
-    {
-        return;
-    }
 
     IRInst* operands[] = {
         lowerType(context, schemaType),

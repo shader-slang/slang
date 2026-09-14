@@ -2625,8 +2625,10 @@ static LinkedIR _linkIR(
 
     // A schema summary is deliberately not an export, because backend links must never receive
     // reflection-only roots. Manifest construction opts in here and clones all exact schema
-    // requests before examining tagged conformances. Cloning their open markers first makes tag
-    // selection independent of the order in which component modules are enumerated.
+    // requests. Closed schemas retain target-specialized entry types for ABI reflection, while
+    // open schemas additionally provide the markers that select tagged conformances. Cloning the
+    // requests before examining tagged conformances makes that selection independent of the order
+    // in which component modules are enumerated.
     if (includeStructuralRayTracingProgramSchemas)
     {
         for (IRModule* irModule : irModules)
