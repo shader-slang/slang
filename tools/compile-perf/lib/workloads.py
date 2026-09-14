@@ -654,14 +654,19 @@ def gen_generic_builtin_operator(n):
     """One generic function constrained to a sealed builtin marker interface (`T
     : __BuiltinFloatingPointType`), with `n` repeated arithmetic/unary
     expressions over `T`-typed locals -- the shape reported in #12458
-    (thousands of `T(literal)` and `vector<T,C> * T` sites inside one generic
-    function, ~11x slower than the same code with `T` replaced by a concrete
-    `float`). Isolates `SemanticsExprVisitor::convertToBuiltinArithmeticOp`'s
-    builtin-operator fast path specifically for an ABSTRACT generic element
-    type, distinct from sema_generics (breadth of separate generic
-    declarations against the non-sealed `IArithmetic`, each instantiated a few
-    times) and operator_typecheck (concrete mixed-type operators, no generics
-    at all).
+    (thousands of `T(literal)` sites inside one generic function, ~11x slower
+    than the same code with `T` replaced by a concrete `float`). Every
+    operator here has same-type `T` operands (`T(c) * T`, `T + T`, unary `-T`):
+    the widened fast path only fires when both operands share a type, so a
+    MIXED shape like `vector<T,C> * T` is a different, still-unaccelerated
+    case (see the regression test's own note,
+    tests/bugs/gh-12458-generic-builtin-operator-fast-path.slang) and is not
+    what this workload measures. Isolates
+    `SemanticsExprVisitor::convertToBuiltinArithmeticOp`'s builtin-operator
+    fast path specifically for an ABSTRACT generic element type, distinct from
+    sema_generics (breadth of separate generic declarations against the
+    non-sealed `IArithmetic`, each instantiated a few times) and
+    operator_typecheck (concrete mixed-type operators, no generics at all).
 
     Scaling null: n scales repeated operator expressions against ONE generic
     function; ideal checking cost is O(n). #12458 measured ~1.36 ms per
