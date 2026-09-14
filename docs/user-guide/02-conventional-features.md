@@ -966,10 +966,12 @@ struct DefaultConstructorParameterValues
 **Slang 2025 and previous language versions only:** If the struct inherits from a base struct, the base struct
 members are initialized by the generated constructor if the base struct has at least the same visibility as
 the derived struct. The parameters for the base struct constructor invocation are included in the derived
-struct constructor, and they come before the parameters for the derived member fields.
+struct constructor, and they come before the parameters for the derived member fields. However, a constructor
+is not generated if the base struct has a user-defined constructor. See GitHub issue
+[#13064](https://github.com/shader-slang/slang/issues/13064) for details.
 
-> Note: Struct-from-struct inheritance is removed in Slang 2026. The feature is considered unstable in Slang
-> 2025 and previous versions.
+> ⚠️ **Warning:** Struct-from-struct inheritance is unstable in Slang 2025 and earlier language versions, and
+> has been removed in Slang 2026. Use composition (a struct as a member) instead.
 
 Initializer Lists
 ----------
