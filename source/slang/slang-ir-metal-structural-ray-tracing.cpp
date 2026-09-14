@@ -5987,7 +5987,7 @@ static void _prepareMetalProgramDescriptors(
         SLANG_RELEASE_ASSERT(info->programLayout && info->physicalDescriptorType);
         physicalTypesBySchema.add(cast<IRType>(info->programLayout), info->physicalDescriptorType);
     }
-    lowerStructuralRayTracingProgramDescriptorTypes(module, physicalTypesBySchema);
+    lowerStructuralRayTracingProgramDescriptorTypes(module, physicalTypesBySchema, nullptr);
 
     // Layouts are rebuilt after type replacement. One paired type/layout walk handles all schemas
     // at once, so a field key shared by two generic struct specializations can never make one
@@ -6044,7 +6044,7 @@ void prepareMetalStructuralRayTracing(
         // ParameterBlock-compatible source storage rather than guessing a physical table shape,
         // and ensure the compiler-only wrapper never reaches general Metal legalization.
         Dictionary<IRType*, IRType*> noTargetDescriptorTypes;
-        lowerStructuralRayTracingProgramDescriptorTypes(module, noTargetDescriptorTypes);
+        lowerStructuralRayTracingProgramDescriptorTypes(module, noTargetDescriptorTypes, nullptr);
         return;
     }
     if (hasInvalidStructuralEntryPoint)
