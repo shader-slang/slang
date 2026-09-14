@@ -101,7 +101,7 @@ void main()
 // IR-DAG: [[PHYSICAL_DESCRIPTOR_LAYOUT]]{{.*}}= structTypeLayout({{[^,]+}}, [[RESOURCES_FIELD_LAYOUT:%[0-9]+]])
 // IR-DAG: [[RESOURCES_FIELD_LAYOUT]]{{.*}}= structFieldLayout(%resources{{[0-9]*}}, [[RESOURCES_VAR_LAYOUT:%[0-9]+]])
 // IR-DAG: [[RESOURCES_VAR_LAYOUT]]{{.*}}= varLayout([[PARAMETER_GROUP_LAYOUT:%[0-9]+]]
-// IR-DAG: [[PARAMETER_GROUP_LAYOUT]]{{.*}}= parameterGroupTypeLayout({{[^,]+}}, [[ELEMENT_VAR_LAYOUT:%[0-9]+]], [[PHYSICAL_RESOURCES_LAYOUT:%[0-9]+]], {{[^)]+}})
+// IR-DAG: [[PARAMETER_GROUP_LAYOUT]]{{.*}}= parameterGroupTypeLayout({{[^,]+}}, [[ELEMENT_VAR_LAYOUT:%[0-9]+]], [[PHYSICAL_RESOURCES_LAYOUT:%[0-9]+]])
 // IR-DAG: [[ELEMENT_VAR_LAYOUT]]{{.*}}= varLayout([[PHYSICAL_RESOURCES_LAYOUT]]
 // IR-DAG: [[PHYSICAL_RESOURCES_LAYOUT]]{{.*}}= structTypeLayout([[ARGUMENT_BUFFER_SIZE:%[0-9]+]]
 // IR-DAG: [[ARGUMENT_BUFFER_SIZE]]{{.*}}= size(22 : Int, 8 : Int)
