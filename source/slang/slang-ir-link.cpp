@@ -534,9 +534,9 @@ IRGlobalVar* cloneGlobalVarImpl(
 ///
 /// Structural stage selection has the same shape. Consider a client that calls
 /// `module->getLayout()` before selecting `MyMiss` as an entry point. The cached module owns the
-/// preferred definition of `MyMiss.invoke`, while the later entry-point component owns its checked
-/// `structuralRayTracingEntryPointInfo`. Linking must merge that decoration onto the selected body
-/// so target synthesis sees the semantic stage contract regardless of request order.
+/// preferred definition of `MyMiss.invoke`, while the selected target program's layout IR owns its
+/// checked `structuralRayTracingEntryPointInfo`. Linking must merge that decoration onto the
+/// selected body so target synthesis sees the semantic stage contract regardless of request order.
 ///
 /// This function scans through all the `originalValues` that were considered for `clonedInst`,
 /// and copies over any decorations that are allowed to come from a non-"best" definition.
