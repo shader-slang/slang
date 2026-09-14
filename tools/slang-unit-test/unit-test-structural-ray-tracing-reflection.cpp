@@ -836,7 +836,7 @@ SLANG_UNIT_TEST(structuralRayTracingMetalTargetMetadata)
             typealias Context = BoundingBoxContext;
             void invoke(rt::ClosestHitInput<Context> input)
             {
-                input.payload.value = input.hitAttributes.value;
+                input.payload.value = input.attributes.value;
             }
         }
 
@@ -1457,4 +1457,133 @@ SLANG_UNIT_TEST(structuralRayTracingOpenSchemaReflection)
     // The completed schema is cached on the ordinary program layout, so repeated host queries do
     // not relink or construct a second reflection object.
     SLANG_CHECK(layout->findTraceProgramSchema("Schema") == schema);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingInvalidOpenSchemaManifestIsNotCached)
+{
+    const char* source = R"(
+        import slang.raytracing;
+
+        struct EmptyPayloadA {}
+        struct EmptyPayloadB {}
+
+        struct TraceContext : rt::ITraceContext
+        {
+            typealias AccelerationStructure = rt::AccelerationStructure;
+            typealias Motion = rt::NoMotion;
+        }
+
+        interface IMissTag : rt::IMissShader {}
+
+        struct MissContextA : rt::IPayloadContext
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias Payload = EmptyPayloadA;
+            typealias Record = void;
+        }
+
+        struct MissContextB : rt::IPayloadContext
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias Payload = EmptyPayloadB;
+            typealias Record = void;
+        }
+
+        struct MissA : IMissTag
+        {
+            typealias Context = MissContextA;
+            void invoke(rt::MissInput<Context> input) {}
+        }
+
+        struct MissB : IMissTag
+        {
+            typealias Context = MissContextB;
+            void invoke(rt::MissInput<Context> input) {}
+        }
+
+        struct Schema : rt::ITraceProgramSchema
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias HitGroups = rt::NoHitGroups;
+            typealias MissShaders = rt::OpenMissShaders<IMissTag>;
+            typealias CallableShaders = rt::NoCallableShaders;
+        }
+
+        rt::AccelerationStructure scene;
+        rt::TraceProgramDescriptor<Schema> program;
+
+        [shader("raygeneration")]
+        void main()
+        {
+            rt::RayTracer<Schema> tracer;
+            tracer.trace({}, scene, program);
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry experimentalOption = {};
+    experimentalOption.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalOption.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalOption.value.intValue0 = 1;
+
+    slang::TargetDesc target = {};
+    target.format = SLANG_HLSL;
+    target.profile = globalSession->findProfile("sm_6_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &target;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &experimentalOption;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+        "structuralInvalidOpenManifest",
+        "structural-invalid-open-manifest.slang",
+        source,
+        diagnostics.writeRef()));
+    if (!module && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findEntryPointByName("main", entryPoint.writeRef())));
+    slang::IComponentType* components[] = {module, entryPoint};
+    ComPtr<slang::IComponentType> program;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+        components,
+        SLANG_COUNT_OF(components),
+        program.writeRef(),
+        diagnostics.writeRef())));
+    ComPtr<slang::IComponentType> linkedProgram;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(program->link(linkedProgram.writeRef(), diagnostics.writeRef())));
+
+    auto expectAmbiguousPayloadDiagnostic = [&]()
+    {
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> requestDiagnostics;
+        auto result =
+            linkedProgram->getEntryPointCode(0, 0, code.writeRef(), requestDiagnostics.writeRef());
+        SLANG_CHECK(SLANG_FAILED(result));
+        SLANG_CHECK_ABORT(requestDiagnostics != nullptr);
+        UnownedStringSlice text(
+            (const char*)requestDiagnostics->getBufferPointer(),
+            (const char*)requestDiagnostics->getBufferPointer() +
+                requestDiagnostics->getBufferSize());
+        SLANG_CHECK(
+            text.indexOf(
+                toSlice("linked structural ray-tracing schema has multiple empty payloads")) != -1);
+    };
+
+    // Both requests share one TargetProgram. The first invalid manifest must not enter that
+    // program's cache; otherwise the second request would reuse a trace-less module and lose the
+    // link-time ambiguity diagnostic.
+    expectAmbiguousPayloadDiagnostic();
+    expectAmbiguousPayloadDiagnostic();
 }

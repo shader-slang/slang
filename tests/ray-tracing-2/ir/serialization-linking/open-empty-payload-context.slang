@@ -201,7 +201,9 @@ public void traceCallableOnly(
     tracer.trace({}, scene, program);
 }
 
-public void traceGeneric(
+// Keeping the trace inside a generic verifies that link-time resolution acts on the specialized
+// clone and leaves the retained template untouched.
+public void traceGeneric<T>(
     rt::AccelerationStructure scene,
     rt::TraceProgramDescriptor<GenericSchema> program)
 {

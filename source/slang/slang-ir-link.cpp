@@ -2817,8 +2817,15 @@ static RefPtr<IRModule> _getOrCreateStructuralRayTracingProgramManifest(
         codeGenContext->getSink(),
         specializationOptions);
 
-    completeOpenStructuralRayTracingSchemas(linked.module, codeGenContext->getSink());
-    resolveDeferredStructuralRayTracingEmptyPayloads(linked.module, codeGenContext->getSink());
+    bool isValid =
+        completeOpenStructuralRayTracingSchemas(linked.module, codeGenContext->getSink());
+    // Do not short-circuit here. Open-section completion can diagnose one malformed linked entry
+    // while another deferred trace still needs to be resolved or removed to leave this request's
+    // candidate module internally safe.
+    if (!resolveDeferredStructuralRayTracingEmptyPayloads(linked.module, codeGenContext->getSink()))
+    {
+        isValid = false;
+    }
 
     // Resolving a deferred implicit-payload trace creates the ordinary specialization of its
     // paired payload-taking fallback. Materialize that specialization before payload assignment
@@ -2838,6 +2845,11 @@ static RefPtr<IRModule> _getOrCreateStructuralRayTracingProgramManifest(
     linked.module->buildMangledNameToGlobalInstMap();
     linked.module->_invalidateLinkingInfo();
     linked.module->_ensureLinkingInfo();
+    // An invalid candidate has already served the current diagnostic request, but caching it would
+    // suppress the same link-time error on a later independent code or reflection request. Return
+    // the now-safe module only to this caller and let the next request rebuild the manifest.
+    if (!isValid)
+        return linked.module;
     return targetProgram->publishStructuralRayTracingProgramManifest(linked.module);
 }
 

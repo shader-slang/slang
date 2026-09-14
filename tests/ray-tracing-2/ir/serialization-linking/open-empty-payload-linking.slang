@@ -69,7 +69,7 @@ void main()
 #elif defined(TEST_CALLABLE_ONLY)
     traceCallableOnly(scene, program);
 #elif defined(TEST_GENERIC)
-    traceGeneric(scene, program);
+    traceGeneric<uint>(scene, program);
 #elif defined(TEST_MULTILEVEL)
     rt::RayTracer<MultilevelSchema> tracer;
     tracer.trace({}, scene, program);
