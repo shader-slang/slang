@@ -205,7 +205,7 @@ void runStructuralRayTracingTriangleHitMiss(IDevice* device)
 
     ComPtr<IShaderProgram> program;
     static const EntryDesc kEntries[] = {
-        {"main", SLANG_STAGE_RAY_GENERATION},
+        {"rayGenerationMain", SLANG_STAGE_RAY_GENERATION},
         {"RuntimeClosestHit", SLANG_STAGE_CLOSEST_HIT},
         {"RuntimeMiss", SLANG_STAGE_MISS},
     };
@@ -232,7 +232,7 @@ void runStructuralRayTracingTriangleHitMiss(IDevice* device)
     ComPtr<IRayTracingPipeline> pipeline;
     GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
 
-    static const char* kRayGenerationNames[] = {"main"};
+    static const char* kRayGenerationNames[] = {"rayGenerationMain"};
     static const char* kMissNames[] = {"RuntimeMiss"};
     ShaderTableDesc shaderTableDesc = {};
     shaderTableDesc.program = program;
@@ -302,7 +302,7 @@ void runStructuralRayTracingProceduralHitFilter(IDevice* device)
     SLANG_CHECK_ABORT(schema != nullptr);
 
     static const EntryDesc kEntries[] = {
-        {"main", SLANG_STAGE_RAY_GENERATION},
+        {"rayGenerationMain", SLANG_STAGE_RAY_GENERATION},
         {"RuntimeIntersection", SLANG_STAGE_INTERSECTION},
         {"RuntimeAnyHit", SLANG_STAGE_ANY_HIT},
         {"RuntimeClosestHit", SLANG_STAGE_CLOSEST_HIT},
@@ -329,7 +329,7 @@ void runStructuralRayTracingProceduralHitFilter(IDevice* device)
     ComPtr<IRayTracingPipeline> pipeline;
     GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
 
-    static const char* kRayGenerationNames[] = {"main"};
+    static const char* kRayGenerationNames[] = {"rayGenerationMain"};
     static const char* kMissNames[] = {"RuntimeMiss"};
     ShaderTableDesc shaderTableDesc = {};
     shaderTableDesc.program = program;
@@ -393,7 +393,7 @@ void runStructuralRayTracingCallableRecord(IDevice* device)
     SLANG_CHECK_ABORT(queue != nullptr);
 
     static const EntryDesc kEntries[] = {
-        {"main", SLANG_STAGE_RAY_GENERATION},
+        {"rayGenerationMain", SLANG_STAGE_RAY_GENERATION},
         {"RuntimeCallable", SLANG_STAGE_CALLABLE},
     };
     ComPtr<IShaderProgram> program;
@@ -412,7 +412,7 @@ void runStructuralRayTracingCallableRecord(IDevice* device)
     ComPtr<IRayTracingPipeline> pipeline;
     GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
 
-    static const char* kRayGenerationNames[] = {"main"};
+    static const char* kRayGenerationNames[] = {"rayGenerationMain"};
     static const char* kCallableNames[] = {"RuntimeCallable"};
     ShaderRecordOverwrite callableRecord = {};
     callableRecord.offset = 32;
@@ -467,18 +467,23 @@ void runStructuralRayTracingRecursiveTrace(IDevice* device)
     SLANG_CHECK_ABORT(queue != nullptr);
     StructuralRayTracingTriangleScene scene(device, queue);
 
+    auto slangSession = device->getSlangSession();
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(
+        slangSession->loadModule("recursive-trace", diagnostics.writeRef()));
+    diagnoseIfNeeded(diagnostics);
+    SLANG_CHECK_ABORT(module != nullptr);
+    auto schema = module->getLayout()->findTraceProgramSchema("Schema");
+    SLANG_CHECK_ABORT(schema != nullptr);
+
     static const EntryDesc kEntries[] = {
-        {"main", SLANG_STAGE_RAY_GENERATION},
+        {"rayGenerationMain", SLANG_STAGE_RAY_GENERATION},
         {"RuntimeClosestHit", SLANG_STAGE_CLOSEST_HIT},
         {"RuntimeMiss", SLANG_STAGE_MISS},
     };
     ComPtr<IShaderProgram> program;
-    GFX_CHECK_CALL_ABORT(loadProgram(
-        device,
-        "recursive-trace",
-        kEntries,
-        SLANG_COUNT_OF(kEntries),
-        program.writeRef()));
+    GFX_CHECK_CALL_ABORT(
+        loadProgram(device, module, kEntries, SLANG_COUNT_OF(kEntries), program.writeRef()));
 
     static const char* kHitGroupNames[] = {"hitGroup0"};
     HitGroupDesc hitGroup = {};
@@ -490,13 +495,15 @@ void runStructuralRayTracingRecursiveTrace(IDevice* device)
     pipelineDesc.hitGroups = &hitGroup;
     pipelineDesc.hitGroupCount = 1;
     pipelineDesc.maxRecursion = 2;
-    pipelineDesc.maxRayPayloadSize = sizeof(uint32_t) * 2;
-    pipelineDesc.maxAttributeSizeInBytes = sizeof(float) * 2;
+    // The structural payload contains internal launch-state fields in addition to the two values
+    // copied to the result buffer. Derive the native transport size from schema reflection so the
+    // OptiX payload-register count stays in lockstep with compiler lowering.
+    applyNativeRayTracingABISizes(schema, pipelineDesc);
 
     ComPtr<IRayTracingPipeline> pipeline;
     GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
 
-    static const char* kRayGenerationNames[] = {"main"};
+    static const char* kRayGenerationNames[] = {"rayGenerationMain"};
     static const char* kMissNames[] = {"RuntimeMiss"};
     ShaderTableDesc shaderTableDesc = {};
     shaderTableDesc.program = program;
@@ -612,7 +619,7 @@ void runStructuralRayTracingRepeatedRecords(IDevice* device)
     }
 
     const EntryDesc kEntries[] = {
-        {"main", SLANG_STAGE_RAY_GENERATION},
+        {"rayGenerationMain", SLANG_STAGE_RAY_GENERATION},
         {closestHitEntryPointNames[0], SLANG_STAGE_CLOSEST_HIT},
         {closestHitEntryPointNames[1], SLANG_STAGE_CLOSEST_HIT},
         {reflectedMissEntryPointNames[0], SLANG_STAGE_MISS},
@@ -632,7 +639,7 @@ void runStructuralRayTracingRepeatedRecords(IDevice* device)
     ComPtr<IRayTracingPipeline> pipeline;
     GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
 
-    static const char* kRayGenerationNames[] = {"main"};
+    static const char* kRayGenerationNames[] = {"rayGenerationMain"};
     const char* kHitGroupNames[] = {
         kReflectedHitGroupNames[0],
         kReflectedHitGroupNames[0],
@@ -809,7 +816,7 @@ void runStructuralRayTracingSelectorAddressing(IDevice* device)
     SLANG_CHECK_ABORT(closestHitEntryPointName != nullptr);
     SLANG_CHECK_ABORT(missEntryPointName != nullptr);
     const EntryDesc kEntries[] = {
-        {"main", SLANG_STAGE_RAY_GENERATION},
+        {"rayGenerationMain", SLANG_STAGE_RAY_GENERATION},
         {closestHitEntryPointName, SLANG_STAGE_CLOSEST_HIT},
         {missEntryPointName, SLANG_STAGE_MISS},
     };
@@ -836,7 +843,7 @@ void runStructuralRayTracingSelectorAddressing(IDevice* device)
     ComPtr<IRayTracingPipeline> pipeline;
     GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
 
-    static const char* kRayGenerationNames[] = {"main"};
+    static const char* kRayGenerationNames[] = {"rayGenerationMain"};
     const char* hitGroupNames[5] = {};
     uint32_t hitRecordValues[5] = {};
     ShaderRecordData hitRecords[5] = {};
@@ -1125,7 +1132,7 @@ void runStructuralRayTracingTriangleAttributesFlags(IDevice* device)
         AccelerationStructureInstanceFlags::None);
 
     static const EntryDesc kEntries[] = {
-        {"main", SLANG_STAGE_RAY_GENERATION},
+        {"rayGenerationMain", SLANG_STAGE_RAY_GENERATION},
         {"RuntimeClosestHit", SLANG_STAGE_CLOSEST_HIT},
         {"RuntimeAnyHit", SLANG_STAGE_ANY_HIT},
         {"RuntimeMiss", SLANG_STAGE_MISS},
@@ -1154,7 +1161,7 @@ void runStructuralRayTracingTriangleAttributesFlags(IDevice* device)
     ComPtr<IRayTracingPipeline> pipeline;
     GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
 
-    static const char* kRayGenerationNames[] = {"main"};
+    static const char* kRayGenerationNames[] = {"rayGenerationMain"};
     static const char* kMissNames[] = {"RuntimeMiss"};
     static const char* kHitGroupNames[] = {"hitGroup0"};
     ShaderTableDesc shaderTableDesc = {};
@@ -1247,7 +1254,7 @@ void runStructuralRayTracingStageInputState(IDevice* device)
         kScaleXTransform);
 
     static const EntryDesc kEntries[] = {
-        {"main", SLANG_STAGE_RAY_GENERATION},
+        {"rayGenerationMain", SLANG_STAGE_RAY_GENERATION},
         {"RuntimeClosestHit", SLANG_STAGE_CLOSEST_HIT},
         {"RuntimeMiss", SLANG_STAGE_MISS},
     };
@@ -1274,7 +1281,7 @@ void runStructuralRayTracingStageInputState(IDevice* device)
     ComPtr<IRayTracingPipeline> pipeline;
     GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
 
-    static const char* kRayGenerationNames[] = {"main"};
+    static const char* kRayGenerationNames[] = {"rayGenerationMain"};
     static const char* kMissNames[] = {"RuntimeMiss"};
     static const char* kHitGroupNames[] = {"hitGroup0"};
     ShaderTableDesc shaderTableDesc = {};

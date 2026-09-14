@@ -22,6 +22,11 @@ SLANG_UNIT_TEST(structuralRayTracingTriangleHitMissVulkan)
     runTriangleHitMiss(unitTestContext, DeviceType::Vulkan);
 }
 
+SLANG_UNIT_TEST(structuralRayTracingTriangleHitMissOptiX)
+{
+    runTriangleHitMiss(unitTestContext, DeviceType::CUDA);
+}
+
 static void runProceduralHitFilter(UnitTestContext* context, DeviceType deviceType)
 {
     auto device = createStructuralRayTracingTestDevice(context, deviceType);
@@ -36,6 +41,11 @@ SLANG_UNIT_TEST(structuralRayTracingProceduralHitFilterD3D12)
 SLANG_UNIT_TEST(structuralRayTracingProceduralHitFilterVulkan)
 {
     runProceduralHitFilter(unitTestContext, DeviceType::Vulkan);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingProceduralHitFilterOptiX)
+{
+    runProceduralHitFilter(unitTestContext, DeviceType::CUDA);
 }
 
 static void runCallableRecord(UnitTestContext* context, DeviceType deviceType)
@@ -75,6 +85,11 @@ SLANG_UNIT_TEST(structuralRayTracingRecursiveTraceVulkan)
     runRecursiveTrace(unitTestContext, DeviceType::Vulkan);
 }
 
+SLANG_UNIT_TEST(structuralRayTracingRecursiveTraceOptiX)
+{
+    runRecursiveTrace(unitTestContext, DeviceType::CUDA);
+}
+
 static void runRepeatedRecords(UnitTestContext* context, DeviceType deviceType)
 {
     auto device = createStructuralRayTracingTestDevice(context, deviceType);
@@ -91,6 +106,11 @@ SLANG_UNIT_TEST(structuralRayTracingRepeatedRecordsVulkan)
     runRepeatedRecords(unitTestContext, DeviceType::Vulkan);
 }
 
+SLANG_UNIT_TEST(structuralRayTracingRepeatedRecordsOptiX)
+{
+    runRepeatedRecords(unitTestContext, DeviceType::CUDA);
+}
+
 static void runSelectorAddressing(UnitTestContext* context, DeviceType deviceType)
 {
     auto device = createStructuralRayTracingTestDevice(context, deviceType);
@@ -105,6 +125,11 @@ SLANG_UNIT_TEST(structuralRayTracingSelectorAddressingD3D12)
 SLANG_UNIT_TEST(structuralRayTracingSelectorAddressingVulkan)
 {
     runSelectorAddressing(unitTestContext, DeviceType::Vulkan);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingSelectorAddressingOptiX)
+{
+    runSelectorAddressing(unitTestContext, DeviceType::CUDA);
 }
 
 static void runMultiplePayloads(UnitTestContext* context, DeviceType deviceType)

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -experimental-feature -target spirv -emit-spirv-directly -entry main -stage raygeneration -g2 -enable-experimental-passes
+//TEST:SIMPLE(filecheck=CHECK): -experimental-feature -target spirv -emit-spirv-directly -entry rayGenerationMain -stage raygeneration -g2 -enable-experimental-passes
 
 // Structural tracing must keep native ray-tracing globals outside an explicit context, while also
 // preserving acceleration-structure debug information.

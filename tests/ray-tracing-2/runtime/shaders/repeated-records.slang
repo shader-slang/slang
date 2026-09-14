@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=HLSL): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5
-//TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
-//TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
+//TEST:SIMPLE(filecheck=HLSL): -experimental-feature -entry rayGenerationMain -stage raygeneration -target hlsl -profile sm_6_5
+//TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry rayGenerationMain -stage raygeneration -target spirv-assembly -emit-spirv-directly
+//TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry rayGenerationMain -stage raygeneration -target metal
 
 import slang.raytracing;
 
@@ -112,7 +112,7 @@ rt::TraceProgramDescriptor<Schema> program;
 RWStructuredBuffer<RuntimeResult> results;
 
 [shader("raygeneration")]
-void main()
+void rayGenerationMain()
 {
     uint rayIndex = DispatchRaysIndex().x;
     uint physicalRecordIndex = rayIndex & 1;

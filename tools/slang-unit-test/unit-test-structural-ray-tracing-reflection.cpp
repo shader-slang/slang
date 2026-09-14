@@ -225,8 +225,11 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(hitGroupA0->getAnyHit()->getEntryPointName() == nullptr);
     SLANG_CHECK(hitGroupA0->getIntersection() == nullptr);
 
-    SLANG_CHECK(payloadA->getIntersectionFunctionTableSize() == 1);
-    SLANG_CHECK(payloadA->getIntersectionFunctionCount() == 1);
+    // Once a payload needs candidate logic, Metal traversal can encounter either native triangle
+    // or bounding-box geometry regardless of which primitive kinds this schema declares. The
+    // compiler therefore reflects both fixed IFT entries; an absent kind uses a reject-all stub.
+    SLANG_CHECK(payloadA->getIntersectionFunctionTableSize() == 2);
+    SLANG_CHECK(payloadA->getIntersectionFunctionCount() == 2);
     auto triangleIntersection = payloadA->getIntersectionFunction(0);
     SLANG_CHECK(triangleIntersection != nullptr);
     SLANG_CHECK(triangleIntersection->getIntersectionFunctionTableIndex() == 0);
@@ -236,6 +239,16 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
         triangleIntersection->getImplementationKind() ==
         SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_EXPORTED_FUNCTION);
     SLANG_CHECK(triangleIntersection->getEntryPointName() != nullptr);
+    auto boundingBoxIntersection = payloadA->getIntersectionFunction(1);
+    SLANG_CHECK(boundingBoxIntersection != nullptr);
+    SLANG_CHECK(boundingBoxIntersection->getIntersectionFunctionTableIndex() == 1);
+    SLANG_CHECK(
+        boundingBoxIntersection->getGeometryKind() ==
+        SLANG_STRUCTURAL_RAY_TRACING_GEOMETRY_BOUNDING_BOX);
+    SLANG_CHECK(
+        boundingBoxIntersection->getImplementationKind() ==
+        SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_EXPORTED_FUNCTION);
+    SLANG_CHECK(boundingBoxIntersection->getEntryPointName() != nullptr);
 
     SLANG_CHECK(payloadA->getMissShaderCount() == 2);
     auto missA0 = payloadA->getMissShader(0);
@@ -435,10 +448,10 @@ SLANG_UNIT_TEST(structuralRayTracingNativeABISizeReflection)
     static const TargetExpectation kTargets[] = {
         {SLANG_HLSL, "sm_6_5", "structuralNativeABID3D", 24, 24, 12, 132, 0},
         {SLANG_SPIRV, "spirv_1_5", "structuralNativeABIVulkan", 16, 16, 12, 132, 0},
-        // OptiX transports the nested value in six 32-bit payload registers, but flattens the
-        // same three scalar attribute leaves to three registers. A 33-word payload switches to
-        // the compiler's two-register pointer representation.
-        {SLANG_PTX, nullptr, "structuralNativeABIOptiX", 24, 12, 12, 8, 8},
+        // OptiX transports the nested value in six 32-bit payload registers. Its custom-attribute
+        // ABI flattens the same fields to four registers: two for the double and one for each
+        // float. A 33-word payload switches to the compiler's two-register pointer representation.
+        {SLANG_PTX, nullptr, "structuralNativeABIOptiX", 24, 16, 12, 8, 8},
     };
 
     ComPtr<slang::IGlobalSession> globalSession;

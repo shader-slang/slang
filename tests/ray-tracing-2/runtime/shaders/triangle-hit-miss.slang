@@ -1,10 +1,10 @@
-//TEST:SIMPLE(filecheck=HLSL): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5
-//TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
-//TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
+//TEST:SIMPLE(filecheck=HLSL): -experimental-feature -entry rayGenerationMain -stage raygeneration -target hlsl -profile sm_6_5
+//TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry rayGenerationMain -stage raygeneration -target spirv-assembly -emit-spirv-directly
+//TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry rayGenerationMain -stage raygeneration -target metal
 //TEST:SIMPLE(filecheck=METAL_CLOSEST): -experimental-feature -entry RuntimeClosestHit -stage closesthit -target metal
 //TEST:SIMPLE(filecheck=METAL_MISS): -experimental-feature -entry RuntimeMiss -stage miss -target metal
 
-//HLSL: [shader("raygeneration")]void main()
+//HLSL: [shader("raygeneration")]void rayGenerationMain()
 //HLSL: [shader("miss")]void RuntimeMiss(
 //HLSL: [shader("closesthit")]void RuntimeClosestHit(
 //SPIRV: OpEntryPoint RayGenerationKHR {{.*}} "main"
@@ -101,7 +101,7 @@ struct FrameParameters
 ParameterBlock<FrameParameters> frame;
 
 [shader("raygeneration")]
-void main()
+void rayGenerationMain()
 {
     uint rayIndex = DispatchRaysIndex().x;
     uint dispatchWidth = DispatchRaysDimensions().x;
