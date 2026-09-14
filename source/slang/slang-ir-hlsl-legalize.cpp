@@ -374,9 +374,10 @@ void legalizeEmptyVulkanCallablePayloads(IRModule* module)
     // resource whose zero-size layout must not change. The decorated global is the producer-owned
     // native ABI object, so give only that object an `int` backing type. Its source copies carry no
     // bits: stores into the object can be removed, and loads from it produce the unique default
-    // value of the original empty struct. Non-memory uses are the native ABI consumers (most
-    // importantly the SPIR-V assembly operand), and observe the global's new physical pointer
-    // type directly.
+    // value of the original empty struct. The SPIR-V assembly operand is a typed forwarding node:
+    // `emitSPIRVAsmOperandInst` snapshots the wrapped value's type when it creates the node. Retag
+    // that node alongside the global so type legalization sees one consistent physical pointer
+    // representation all the way from the variable to `OpExecuteCallableKHR`.
     List<IRGlobalVar*> emptyPayloadStorageVars;
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -404,6 +405,8 @@ void legalizeEmptyVulkanCallablePayloads(IRModule* module)
     {
         auto originalPointerType = cast<IRPtrTypeBase>(globalVar->getDataType());
         auto originalPayloadType = cast<IRStructType>(originalPointerType->getValueType());
+        builder.setInsertInto(module->getModuleInst());
+        auto physicalPointerType = builder.getPtrType(builder.getIntType(), originalPointerType);
 
         // Rewrite source-level transfers before changing the global's type. Keep evaluating any
         // value that fed a removed store: its producing instruction remains in place, so unrelated
@@ -423,11 +426,20 @@ void legalizeEmptyVulkanCallablePayloads(IRModule* module)
                 load->replaceUsesWith(emptyValue);
                 load->removeAndDeallocate();
             }
+            else if (auto asmOperand = as<IRSPIRVAsmOperandInst>(user))
+            {
+                // Inline-SPIR-V lowering creates this direct typed wrapper around the global.
+                // Changing only the wrapped value leaves the wrapper as `Ptr<EmptyData>` while its
+                // operand has become `Ptr<int>`, and existential type legalization then sees a
+                // non-simple result with a simple operand. Preserve the wrapper's defining
+                // invariant instead of teaching that downstream pass about callable payloads.
+                SLANG_RELEASE_ASSERT(asmOperand->getValue() == globalVar);
+                asmOperand->setFullType(physicalPointerType);
+            }
             use = nextUse;
         }
 
-        builder.setInsertInto(module->getModuleInst());
-        globalVar->setFullType(builder.getPtrType(builder.getIntType(), originalPointerType));
+        globalVar->setFullType(physicalPointerType);
     }
 }
 

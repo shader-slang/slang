@@ -28,9 +28,9 @@ void rgen()
 
 // The callable ABI uses a role-local scalar backing store. The ordinary record still contains only
 // `value`; mutating SharedEmpty itself would leave another member in this physical layout.
-// SPIRV-DAG: OpMemberName %LayoutSensitiveRecord 0 "value"
-// SPIRV-DAG: OpMemberDecorate %LayoutSensitiveRecord 0 Offset 0
-// SPIRV-DAG: %LayoutSensitiveRecord = OpTypeStruct %int
+// SPIRV-DAG: OpMemberName %[[RECORD:LayoutSensitiveRecord[^ ]*]] 0 "value"
+// SPIRV-DAG: OpMemberDecorate %[[RECORD]] 0 Offset 0
+// SPIRV-DAG: %[[RECORD]] = OpTypeStruct %int
 // SPIRV-DAG: %[[CALLABLE_PTR:[A-Za-z0-9_]+]] = OpTypePointer CallableDataKHR %int
 // SPIRV-DAG: %[[CALLABLE_STORAGE:[A-Za-z0-9_]+]] = OpVariable %[[CALLABLE_PTR]] CallableDataKHR
 // SPIRV: OpExecuteCallableKHR
