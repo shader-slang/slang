@@ -38,6 +38,21 @@ public:
 };
 
 
+// What to do when `deduplicate` finds a previously-recorded inst `existing` with the same
+// structural key as the current `value`.
+enum class DedupMatchAction
+{
+    // Reuse `existing`: replace `value` with it (the default, unconditional GVN behavior).
+    Reuse,
+    // Do not reuse, but record `value` as the new representative for its key, so that later insts
+    // deduplicate against `value` (the nearer occurrence) rather than the older `existing`.
+    ReplaceRepresentative,
+    // Do not reuse, and leave `existing` as the recorded representative. Used when `value` is not a
+    // valid successor of `existing` (e.g. an earlier inst reached through the operand recursion),
+    // so recording it would rewind the representative to a non-dominating inst.
+    KeepRepresentative,
+};
+
 struct DeduplicateContext
 {
     Dictionary<IRInstKey, IRInst*> deduplicateMap;
@@ -45,23 +60,65 @@ struct DeduplicateContext
     template<typename TFunc>
     IRInst* deduplicate(IRInst* value, const TFunc& shouldDeduplicate)
     {
+        return deduplicate(
+            value,
+            shouldDeduplicate,
+            [](IRInst*, IRInst*) { return DedupMatchAction::Reuse; });
+    }
+
+    // Deduplicate `value` against previously seen structurally-equal insts. `shouldDeduplicate`
+    // decides whether `value` (and its operands, recursively) are eligible to participate at all.
+    // `onMatch(existing, value)` is consulted whenever a structurally-equal `existing` is found and
+    // returns a `DedupMatchAction`. Both callbacks are threaded through the recursive operand walk,
+    // so `onMatch` fires for every structurally-equal sub-operand hit too -- but only insts that
+    // passed `shouldDeduplicate` are ever recorded as `existing`, so `onMatch` only ever sees
+    // (eligible, eligible) pairs. The default `onMatch` always returns `Reuse`, giving plain GVN; a
+    // caller that reuses only under a condition depending on BOTH insts (e.g. that no
+    // side-effecting instruction lies between a dominating `existing` and `value`, which the
+    // single-inst `shouldDeduplicate` cannot express) uses the other actions to decline reuse while
+    // controlling which inst remains the representative for future lookups.
+    template<typename TFunc, typename TOnMatch>
+    IRInst* deduplicate(IRInst* value, const TFunc& shouldDeduplicate, const TOnMatch& onMatch)
+    {
         if (!value)
             return nullptr;
         if (!shouldDeduplicate(value))
             return value;
         IRInstKey key = {value};
         if (auto newValue = deduplicateMap.tryGetValue(key))
-            return *newValue;
+            return applyMatchAction(key, *newValue, value, onMatch);
         for (UInt i = 0; i < value->getOperandCount(); i++)
         {
-            auto deduplicatedOperand = deduplicate(value->getOperand(i), shouldDeduplicate);
+            auto deduplicatedOperand =
+                deduplicate(value->getOperand(i), shouldDeduplicate, onMatch);
             if (deduplicatedOperand != value->getOperand(i))
                 value->unsafeSetOperand(i, deduplicatedOperand);
         }
         if (auto newValue = deduplicateMap.tryGetValue(key))
-            return *newValue;
+            return applyMatchAction(key, *newValue, value, onMatch);
         deduplicateMap[key] = value;
         return value;
+    }
+
+private:
+    template<typename TOnMatch>
+    IRInst* applyMatchAction(
+        const IRInstKey& key,
+        IRInst* existing,
+        IRInst* value,
+        const TOnMatch& onMatch)
+    {
+        switch (onMatch(existing, value))
+        {
+        case DedupMatchAction::Reuse:
+            return existing;
+        case DedupMatchAction::ReplaceRepresentative:
+            deduplicateMap[key] = value;
+            return value;
+        case DedupMatchAction::KeepRepresentative:
+        default:
+            return value;
+        }
     }
 };
 
@@ -343,6 +400,16 @@ bool canAddressesPotentiallyAlias(
     IRInst* addr1,
     IRInst* addr2);
 
+// Returns true if `op` is one of the resource-load instruction forms (structured / byte-address
+// buffer loads, image / subpass loads) that read from a resource rather than an ordinary pointer,
+// so a caller reasoning about memory reads must handle them explicitly. This classifies the op form
+// ONLY; it says nothing about side-effect-freedom or immutability. The set is heterogeneous: the
+// status-returning loads (`StructuredBufferLoadStatus`/`RWStructuredBufferLoadStatus`) write an
+// out-param, `ImageLoad`/`SubpassLoad` are treated as side-effecting by `mightHaveSideEffects()`,
+// and `RWStructuredBufferLoad` reads mutable memory. A caller must still apply its own
+// side-effect / immutability checks (e.g. `mightHaveSideEffects()`, `isRepeatableReadLocation`).
+bool isResourceLoad(IROp op);
+
 String dumpIRToString(
     IRInst* root,
     IRDumpOptions options = {IRDumpOptions::Mode::Simplified, IRDumpOptions::Flag::DumpDebugIds});
@@ -593,6 +660,24 @@ IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
 // e.g. a `ptrInst` of type `Ptr<T, Access.Read>` may still point to a mutable location,
 // so this function returns false in that case.
 bool isPointerToImmutableLocation(IRInst* ptrInst);
+
+// Returns true if `loc` is an immutable location (per isPointerToImmutableLocation) whose reads
+// are additionally REPEATABLE. Peeling its access chain must reach a module-scope global
+// (`global_param`/`global_var`) with no `globallycoherent`/`volatile` qualifier on the resource or
+// on any field key along the way (those must be re-read on every access even though the resource
+// type is read-only). A resource reached instead through a parameter / phi / `select` / a load from
+// memory not provably immutable is conservatively rejected (fail-closed), since its qualifier is
+// not recoverable here. Use this, not the bare immutable check, when deciding whether a read may be
+// reused/commoned.
+bool isRepeatableReadLocation(IRInst* loc);
+
+// True if `type` is, or transitively contains, a struct member whose field key is qualified
+// `globallycoherent`/`volatile`. Complements `isRepeatableReadLocation` (which checks the qualifier
+// on an accessed location / its field keys): this catches a qualified member loaded by value inside
+// an aggregate -- e.g. `buf[i].coherentMember`, where the whole element struct is loaded and the
+// member is then extracted -- which a location/provenance-based check cannot see. Recurses through
+// nested struct members and array element types.
+bool typeContainsNonRepeatableQualifiedMember(IRType* type);
 
 // Check if `use` is the `baseAddr` operand of a GetElement/FieldExtract inst.
 // This is true if `use` is the first operand of the user inst.

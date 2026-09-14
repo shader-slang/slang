@@ -15,23 +15,6 @@ public:
     virtual bool propagate(IRBuilder& builder, IRFunc* func) = 0;
 };
 
-static bool isResourceLoad(IROp op)
-{
-    switch (op)
-    {
-    case kIROp_ImageLoad:
-    case kIROp_StructuredBufferLoad:
-    case kIROp_ByteAddressBufferLoad:
-    case kIROp_StructuredBufferLoadStatus:
-    case kIROp_RWStructuredBufferLoad:
-    case kIROp_RWStructuredBufferLoadStatus:
-    case kIROp_SubpassLoad:
-        return true;
-    default:
-        return false;
-    }
-}
-
 static bool isKnownOpCodeWithSideEffect(IROp op)
 {
     switch (op)
