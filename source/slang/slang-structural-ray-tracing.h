@@ -27,6 +27,14 @@ class GenericDecl;
 class ExtensionDecl;
 class GenericTypeParamDecl;
 
+/// Returns whether `functionDecl` is one of the top-level legacy pipeline intrinsics in `core`.
+///
+/// The check deliberately excludes methods such as `RayQuery.TraceRayInline` and
+/// `HitObject.TraceRay`: those are separate APIs that may coexist with a structural pipeline.
+/// Both semantic checking and AST-to-IR lowering use this query so the linked IR can retain an
+/// exact marker for calls originating in serialized modules.
+bool isCoreLegacyRayTracingPipelineMethod(FunctionDeclBase* functionDecl);
+
 enum class StructuralRayTracingStageKind
 {
     ClosestHit,

@@ -120,6 +120,7 @@
 #include "slang-ir-strip-debug-info.h"
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-synthesize-structural-ray-tracing.h"
 #include "slang-ir-thread-switch-on-constant-phi.h"
@@ -1558,6 +1559,18 @@ Result linkAndOptimizeIR(
     SLANG_PASS(diagnoseCircularConformances, sink);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
+
+    if (requiredLoweringPassSet.structuralRayTracingTrace ||
+        requiredLoweringPassSet.structuralRayTracingStageInput)
+    {
+        // Module-local semantic checking catches source modules that use both APIs. Perform the
+        // corresponding linked-IR check before specialization so a selected structural entry
+        // point cannot hide a legacy TraceRay/TraceMotionRay/CallShader call in a serialized
+        // helper module.
+        SLANG_PASS(diagnoseMixedRayTracingAPIsInReachableIR, irEntryPoints, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
 
     if (!codeGenContext->isSpecializationDisabled())
     {

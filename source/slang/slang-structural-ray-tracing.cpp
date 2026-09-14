@@ -11,6 +11,25 @@
 namespace Slang
 {
 
+bool isCoreLegacyRayTracingPipelineMethod(FunctionDeclBase* functionDecl)
+{
+    if (!functionDecl || !functionDecl->getName())
+        return false;
+
+    auto name = functionDecl->getName()->text.getUnownedSlice();
+    if (name != "TraceRay" && name != "TraceMotionRay" && name != "CallShader")
+        return false;
+
+    for (auto parent = functionDecl->parentDecl; parent; parent = parent->parentDecl)
+    {
+        if (as<AggTypeDecl>(parent))
+            return false;
+        if (auto moduleDecl = as<ModuleDecl>(parent))
+            return moduleDecl->hasModifier<FromCoreModuleModifier>();
+    }
+    return false;
+}
+
 String getStructuralRayTracingMetalDescriptorResourceName(
     StructuralRayTracingDescriptorResourceKind kind,
     Index payloadIndex,

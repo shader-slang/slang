@@ -4428,6 +4428,14 @@ err(
 )
 
 err(
+    "mixed-ray-tracing-apis-in-reachable-code",
+    38089,
+    "cannot mix legacy and structural ray-tracing APIs in one selected entry point",
+    span { loc = "legacyLocation", message = "legacy ray-tracing API is called here" },
+    note { message = "the same selected entry point reaches the structural API", span { loc = "structuralLocation" } }
+)
+
+err(
     "structural-ray-tracing-metal-candidate-global-parameter",
     38071,
     "global parameter is unavailable from a Metal intersection function",

@@ -108,6 +108,7 @@ bool isCompilerOwnedStructuralRayTracingIROp(IROp op)
     case kIROp_StructuralRayTracingTrace:
     case kIROp_StructuralRayTracingCallShader:
     case kIROp_StructuralRayTracingProgramSchema:
+    case kIROp_StructuralRayTracingLegacyAPIUseDecoration:
     case kIROp_MetalStructuralRayTracingTrace:
     case kIROp_MetalStructuralRayTracingCallShader:
     case kIROp_MetalStructuralRayTracingDispatchRaysIndex:
@@ -130,6 +131,74 @@ bool isCompilerOwnedStructuralRayTracingIROp(IROp op)
         return true;
     default:
         return false;
+    }
+}
+
+struct ReachableRayTracingAPIUses
+{
+    SourceLoc structuralLocation;
+    SourceLoc legacyLocation;
+};
+
+static void _collectReachableRayTracingAPIUses(
+    IRFunc* function,
+    HashSet<IRFunc*>& visitedFunctions,
+    ReachableRayTracingAPIUses& uses)
+{
+    if (!function || !visitedFunctions.add(function))
+        return;
+
+    if (function->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+        uses.structuralLocation = function->sourceLoc;
+
+    // Consider a separately compiled helper containing `TraceRay`, called by a ray-generation
+    // entry point that also calls `RayTracer.trace`. Linking resolves the helper's call target but
+    // does not restore its checked AST. Walking direct IR calls from the selected entry point lets
+    // us observe both compiler-owned markers without treating types, metadata, or other
+    // non-executable operands as call-graph edges.
+    List<IRFunc*> callees;
+    for (auto block : function->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (inst->getOp() == kIROp_StructuralRayTracingTrace ||
+                inst->getOp() == kIROp_StructuralRayTracingCallShader)
+            {
+                uses.structuralLocation = inst->sourceLoc;
+            }
+
+            auto call = as<IRCall>(inst);
+            if (!call)
+                continue;
+            if (call->findDecoration<IRStructuralRayTracingLegacyAPIUseDecoration>())
+                uses.legacyLocation = call->sourceLoc;
+            if (auto callee = as<IRFunc>(getResolvedInstForDecorations(call->getCallee())))
+                callees.add(callee);
+        }
+    }
+
+    for (auto callee : callees)
+        _collectReachableRayTracingAPIUses(callee, visitedFunctions, uses);
+}
+
+void diagnoseMixedRayTracingAPIsInReachableIR(
+    IRModule* module,
+    List<IRFunc*> const& entryPoints,
+    DiagnosticSink* sink)
+{
+    SLANG_RELEASE_ASSERT(module && sink);
+    for (auto entryPoint : entryPoints)
+    {
+        HashSet<IRFunc*> visitedFunctions;
+        ReachableRayTracingAPIUses uses;
+        _collectReachableRayTracingAPIUses(entryPoint, visitedFunctions, uses);
+        if (uses.structuralLocation.isValid() && uses.legacyLocation.isValid())
+        {
+            sink->diagnose(Diagnostics::MixedRayTracingApisInReachableCode{
+                .legacyLocation = uses.legacyLocation,
+                .structuralLocation = uses.structuralLocation});
+            return;
+        }
     }
 }
 

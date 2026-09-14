@@ -2326,6 +2326,14 @@ local insts = {
 					},
 				},
 			},
+			-- Marks a call whose checked source callee is a top-level legacy ray-tracing pipeline
+			-- intrinsic from core. The marker survives module serialization so linked-program
+			-- validation can distinguish the legacy API without matching source or mangled names.
+			{
+				structuralRayTracingLegacyAPIUse = {
+					struct_name = "StructuralRayTracingLegacyAPIUseDecoration",
+				},
+			},
 			{
 				structuralRayTracingProgramPayloadLocation = {
 					struct_name = "StructuralRayTracingProgramPayloadLocationDecoration",
