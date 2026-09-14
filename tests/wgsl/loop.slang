@@ -16,11 +16,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     uint i = 0;
     uint sum = 0;
-    for (;;)
+    for (;; i++)
     {
         if (i >= limits[tid.x])
             break;
-        i++;
         if ((i & 1) == 0)
             continue;
         if (i == 7)
@@ -30,10 +29,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     results[tid.x] = sum + i;
 }
 
-// WGSL-NOT: for(;;)
+// WGSL: var [[I:i_[0-9]+]] : u32 = u32(0);
 // WGSL: loop
 // WGSL: break;
-// WGSL: continue;
+// WGSL: [[I]] = [[I]] + u32(1);
+// WGSL-NEXT: continue;
 // WGSL: break;
 
 // SPIRV: OpEntryPoint GLCompute
