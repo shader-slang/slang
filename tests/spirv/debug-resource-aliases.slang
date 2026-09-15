@@ -20,9 +20,14 @@ SamplerState inputSampler;
 RWStructuredBuffer<float4> results;
 
 // A helper taking opaque resources by value, kept as a real function so its parameters exercise
-// the parameter gate in insertDebugValueStore (which runs before general inlining).
+// the parameter gate in insertDebugValueStore (which runs before general inlining). texParam and
+// sampParam are supported debug handle types, so each gets a DebugLocalVariable + DebugValue at its
+// source parameter position.
 [noinline]
-float4 sampleThroughParams(Texture2D<float4> texParam, SamplerState sampParam, float2 uv)
+float4 sampleThroughParams(
+    Texture2D<float4> texParam,
+    SamplerState sampParam,
+    float2 uv)
 {
     return texParam.SampleLevel(sampParam, uv, 0.0);
 }
@@ -77,7 +82,11 @@ void debugResourceAliases(uint3 threadId : SV_DispatchThreadID)
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[TEXLETVAR]]
 // CHECK-DAG: %[[SMPLETVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[SMPLETNAME]]
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[SMPLETVAR]]
-// CHECK-DAG: %[[TEXPVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[TEXPNAME]]
+
+// The by-value resource parameters get DebugLocalVariable + DebugValue. The trailing operand is the
+// DebugLocalVariable ArgNumber; texParam is the first parameter (%uint_1) and sampParam the second
+// (%uint_2). A regression of the narrowed type predicate would instead drop these records entirely.
+// CHECK-DAG: %[[TEXPVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[TEXPNAME]] {{.*}} %uint_0 %uint_1
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[TEXPVAR]]
-// CHECK-DAG: %[[SMPPVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[SMPPNAME]]
+// CHECK-DAG: %[[SMPPVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[SMPPNAME]] {{.*}} %uint_0 %uint_2
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[SMPPVAR]]
