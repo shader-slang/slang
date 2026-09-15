@@ -6025,7 +6025,7 @@ warning(
 )
 
 --
--- Ray tracing (40000-40001)
+-- Ray tracing (40000-40001, 40022)
 --
 
 err(
@@ -6040,6 +6040,13 @@ err(
     40001,
     "invalid stage name in ray payload access qualifier",
     span { loc = "location", message = "invalid stage name '~stageName' in ray payload access qualifier; valid stages are 'anyhit', 'closesthit', 'miss', and 'caller'" }
+)
+
+err(
+    "ray-payload-nested-field-has-access-qualifiers",
+    40022,
+    "ray payload field of ray payload struct type must not have access qualifiers",
+    span { loc = "field:Decl", message = "field '~field' has a ray payload struct type and inherits that type's access qualifiers; it must not declare its own 'read' or 'write' qualifiers" }
 )
 
 --
