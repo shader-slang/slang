@@ -3743,10 +3743,18 @@ struct TypeFlowSpecializationContext
             return makeElementOfSetType(tableSet);
         }
 
-        // An UntaggedUnionType carries only a payload TypeSet and no witness-table set, so there is
-        // no witness-table set to recover -- regardless of whether the payload is a singleton.
-        // Leave it unrefined (none()); the existential's witness table, when needed, is resolved
-        // from the concrete type recovered by analyzeExtractExistentialType, not from this info.
+        // An UntaggedUnionType has only a payload TypeSet and no witness-table set of its own (that
+        // set lives on a TaggedUnionType), so there is nothing for this analyzer to recover from
+        // it; return none(). That does not strand the ExtractExistentialWitnessTable.
+        // Specialization runs to a fixed point -- specializeModule reruns this pass until nothing
+        // changes -- and it rewrites the operand's type on the way there: getEffectiveFuncType
+        // lowers the operand's producing call (e.g. the unpack() whose result this existential is)
+        // return info through getLoweredType, which unwraps a singleton UntaggedUnionType to its
+        // element type, and specializeCall writes that onto the call. When that element is a
+        // TaggedUnionType, a later iteration's tryGetInfo reads the refined operand type directly,
+        // the tagged branch above yields a singleton element-of-set, and
+        // specializeExtractExistentialWitnessTable replaces the extraction with the sole concrete
+        // witness table -- all before lowerExistentials runs lowerExtractExistentialWitnessTable.
         if (as<IRUntaggedUnionType>(operandInfo))
             return none();
 
