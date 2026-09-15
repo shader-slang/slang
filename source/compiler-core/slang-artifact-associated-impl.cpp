@@ -388,21 +388,31 @@ static constexpr size_t kCoverageBufferInfoV1MinSize =
 static constexpr size_t kSyntheticResourceInfoV1MinSize =
     offsetof(slang::SyntheticResourceInfo, debugName) + sizeof(const char*);
 
-#define SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, fieldName, value)              \
-    do                                                                                    \
-    {                                                                                     \
-        if ((outInfo)->structSize >=                                                      \
-            offsetof(slang::CoverageEntryInfo, fieldName) + sizeof((outInfo)->fieldName)) \
-            (outInfo)->fieldName = (value);                                               \
+// Write a field that lives past a struct's v1 size, but only when the
+// caller's `structSize` shows it has room for it. A caller compiled
+// against an older header keeps its own layout and must be left
+// untouched, so every tail field goes through here.
+//
+// The three named macros below exist so call sites do not repeat the
+// struct type; the versioned-write rule itself lives only here, so
+// adding a fourth ABI-versioned struct cannot introduce a fourth copy
+// of it that drifts from the others.
+#define SLANG_WRITE_OPTIONAL_ABI_FIELD(structType, outInfo, fieldName, value) \
+    do                                                                        \
+    {                                                                         \
+        if ((outInfo)->structSize >=                                          \
+            offsetof(structType, fieldName) + sizeof((outInfo)->fieldName))   \
+            (outInfo)->fieldName = (value);                                   \
     } while (0)
 
-#define SLANG_WRITE_OPTIONAL_COVERAGE_BUFFER_FIELD(outInfo, fieldName, value)              \
-    do                                                                                     \
-    {                                                                                      \
-        if ((outInfo)->structSize >=                                                       \
-            offsetof(slang::CoverageBufferInfo, fieldName) + sizeof((outInfo)->fieldName)) \
-            (outInfo)->fieldName = (value);                                                \
-    } while (0)
+#define SLANG_WRITE_OPTIONAL_SYNTHETIC_RESOURCE_FIELD(outInfo, fieldName, value) \
+    SLANG_WRITE_OPTIONAL_ABI_FIELD(slang::SyntheticResourceInfo, outInfo, fieldName, value)
+
+#define SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, fieldName, value) \
+    SLANG_WRITE_OPTIONAL_ABI_FIELD(slang::CoverageEntryInfo, outInfo, fieldName, value)
+
+#define SLANG_WRITE_OPTIONAL_COVERAGE_BUFFER_FIELD(outInfo, fieldName, value) \
+    SLANG_WRITE_OPTIONAL_ABI_FIELD(slang::CoverageBufferInfo, outInfo, fieldName, value)
 
 SlangResult ArtifactPostEmitMetadata::getEntryInfo(
     uint32_t index,
@@ -522,6 +532,9 @@ SlangResult ArtifactPostEmitMetadata::getResourceInfo(
     outInfo->uniformOffset = record.uniformOffset;
     outInfo->uniformStride = record.uniformStride;
     outInfo->debugName = record.debugName.getLength() ? record.debugName.getBuffer() : nullptr;
+    // Past the v1 size, so only written when the caller's struct has room
+    // for it. A v1 caller keeps its own layout and is left untouched.
+    SLANG_WRITE_OPTIONAL_SYNTHETIC_RESOURCE_FIELD(outInfo, bindlessIndex, record.bindlessIndex);
     return SLANG_OK;
 }
 

@@ -274,36 +274,38 @@ SlangResult Session::checkPassThroughSupport(SlangPassThrough inPassThrough)
     return checkExternalCompilerSupport(this, PassThroughMode(inPassThrough));
 }
 
-SlangResult Session::getDownstreamCompilerVersion(
-    SlangPassThrough inPassThrough,
-    int* outMajor,
-    int* outMinor)
+SlangResult Session::getDownstreamCompilerPath(SlangPassThrough inPassThrough, ISlangBlob** outPath)
 {
+    // getPath writes the result through outPath on success, so it must be a valid non-null pointer;
+    // a null argument is a programming error, not a runtime not-found condition. Fail loudly on
+    // out-of-contract input.
+    SLANG_ASSERT(outPath);
+
     // Validate at the public boundary: only a real (non-None), in-range pass-through can name a
-    // loadable compiler. getOrLoadDownstreamCompiler indexes per-type arrays by the enum value, so
-    // reject out-of-range values here rather than indexing out of bounds.
+    // loadable compiler, and getOrLoadDownstreamCompiler indexes per-type arrays by the enum value.
     if (inPassThrough <= SLANG_PASS_THROUGH_NONE || inPassThrough >= SLANG_PASS_THROUGH_COUNT_OF)
         return SLANG_E_NOT_FOUND;
 
-    // Route through the same lazy-discovery funnel that compilation uses, so the reported version
-    // is guaranteed to be the library that will actually be used for this pass-through (it shares
-    // the memoized cache and honors setDownstreamCompilerPath + the standard search order).
+    // Route through the same lazy-discovery funnel compilation uses, so the reported path is the
+    // library that will actually be used for this pass-through (shared memoized cache; honors
+    // setDownstreamCompilerPath + the standard search order).
     IDownstreamCompiler* compiler =
         getOrLoadDownstreamCompiler(PassThroughMode(inPassThrough), nullptr);
     if (!compiler)
         return SLANG_E_NOT_FOUND;
 
-    // Read the version from the loaded compiler's descriptor: it is the uniform numeric source
-    // across pass-throughs, populated at load (e.g. NVRTC via nvrtcVersion in its init). For some
-    // compilers it is the only place the version is exposed — NVRTC, for one, never implements
-    // getVersionString — while others (glslang, Tint) leave it at (0,0). Hence the desc, not the
-    // version string.
-    const SemanticVersion& version = compiler->getDesc().version;
-    if (outMajor)
-        *outMajor = version.m_major;
-    if (outMinor)
-        *outMinor = version.m_minor;
-    return SLANG_OK;
+    // The path capability is an optional extension queried via castAs, so it does not touch the
+    // IDownstreamCompiler vtable (which is a frozen cross-binary contract with the prebuilt
+    // slang-llvm module). A compiler that predates the capability returns null here.
+    auto pathProvider = as<IDownstreamCompilerPathProvider>(compiler);
+    if (!pathProvider)
+        return SLANG_E_NOT_AVAILABLE;
+
+    // getPath returns SLANG_E_NOT_AVAILABLE for a loaded compiler with no recoverable on-disk path
+    // (executable-based command-line compilers, or targets without shared-library introspection
+    // such as WASM); that stays distinct from the SLANG_E_NOT_FOUND returned above when the
+    // compiler could not be loaded at all.
+    return pathProvider->getPath(outPath);
 }
 
 void Session::writeCoreModuleDoc(String config)

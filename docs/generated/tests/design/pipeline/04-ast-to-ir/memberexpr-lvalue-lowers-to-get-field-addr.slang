@@ -14,7 +14,7 @@
 // result type is `Ptr(<FieldType>)` and which feeds into a
 // subsequent `store`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Pair { int x; int y; }
 

@@ -14,7 +14,7 @@
 // children inside it; the field rows are what `getFields()` reads back, so
 // their presence under the struct header is the structural claim.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 uniform int seed;

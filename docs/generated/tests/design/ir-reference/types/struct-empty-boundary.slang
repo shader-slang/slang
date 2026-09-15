@@ -13,7 +13,7 @@
 // field children). A struct with zero fields still emits the parent
 // `struct %Name` IR opcode — the container exists even when empty.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Empty {}
 

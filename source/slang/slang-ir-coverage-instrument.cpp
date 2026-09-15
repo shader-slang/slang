@@ -666,8 +666,20 @@ static IRVarLayout* createCoverageBufferVarLayout(
 // Synthesize the coverage buffer as a fresh `IRGlobalParam` in the
 // linked module. No AST decl exists for this buffer; it enters the
 // pipeline at IR time so user-facing AST/reflection paths never see
-// it. Backend emit treats it identically to any other
-// `RWStructuredBuffer<uint>` global param.
+// it.
+//
+// `bindlessIndex` selects between two shapes of global, and it is the
+// only parameter here that changes the synthesized TYPE rather than
+// just where it binds:
+//
+//   < 0   one `RWStructuredBuffer<T>`. Backend emit treats it
+//         identically to any other structured-buffer global param.
+//   >= 0  an UNBOUNDED ARRAY of those buffers. Emit does not treat this
+//         identically: on SPIR-V it pulls in `RuntimeDescriptorArray`
+//         and every counter access becomes a two-level index,
+//         `__slang_coverage[bindlessIndex][slot]`. The array is unsized
+//         deliberately, so the shader does not constrain how many
+//         descriptors the host supplies.
 static IRGlobalParam* synthesizeCoverageBuffer(
     IRModule* module,
     TargetRequest* targetRequest,
@@ -677,6 +689,7 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     const int* reservedSpaces,
     int reservedSpaceCount,
     int counterByteWidth,
+    int bindlessIndex,
     int& outSpace,
     int& outBinding)
 {
@@ -716,7 +729,17 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     IRInst* typeOperands[2] = {counterElementType, builder.getType(kIROp_DefaultBufferLayoutType)};
     auto bufferType = (IRType*)builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
 
-    auto param = builder.createGlobalParam(bufferType);
+    // Bindless form: the global becomes an UNBOUNDED array of buffers, so
+    // one (space, binding) covers every shader in the pipeline and each
+    // shader reaches its own buffer through its index. Unsized rather than
+    // sized because the count is a host runtime decision — it is the
+    // descriptor array's `descriptorCount`, which the shader must not
+    // constrain. On SPIR-V this is what pulls in `RuntimeDescriptorArray`.
+    IRType* globalType = bufferType;
+    if (bindlessIndex >= 0)
+        globalType = builder.getUnsizedArrayType(bufferType);
+
+    auto param = builder.createGlobalParam(globalType);
     builder.addNameHintDecoration(param, UnownedTerminatedStringSlice(kCoverageBufferName));
 
     auto varLayout = createCoverageBufferVarLayout(builder, targetRequest, kind, space, binding);
@@ -840,6 +863,339 @@ static bool isCoverageMarkerOp(IROp op)
     }
 }
 
+// Return the function body that `callee` will actually enter, or null
+// when the target cannot be resolved statically — an interface method
+// dispatched through a witness table, for instance. Callers must treat
+// null conservatively, since an unresolvable body could do anything.
+//
+// Generic calls resolve here without any special handling on our part.
+// Coverage instrumentation runs before `specializeModule`, so a call to
+// a generic such as `dot(a, b)` still arrives as
+// `call specialize(%dot, Float, 3)(...)`; `getResolvedInstForDecorations`
+// loops, unwrapping every `IRSpecialize` through its base and every
+// `IRGeneric` through its return value, and only stops once the
+// candidate is neither. Nested multi-parameter generics fall out of the
+// same loop. Reporting such a call as unresolvable would split a
+// coalescing region at every generic call — which is most numeric code —
+// for no correctness benefit.
+static IRFunc* getStaticallyResolvedCallee(IRInst* callee)
+{
+    return as<IRFunc>(getResolvedInstForDecorations(callee));
+}
+
+// Decides whether a call can fail to return to its caller, so that
+// coverage coalescing knows when a straight-line run of markers is
+// really straight-line.
+//
+// Coalescing replaces several line markers with a single probe, which
+// is only sound when reaching the probe proves every marker it stands
+// for also executed. Inside one basic block that holds automatically
+// for ordinary code, because a block has a single entry and a single
+// exit. It stops holding when an instruction in the middle of the
+// block can abandon the invocation, since the instructions after it
+// then execute fewer times than the ones before it. Consider:
+//
+//     void maybeKill(float v) { if (v < 0.5f) discard; }
+//
+//     float4 main(float2 uv : TEXCOORD) : SV_Target
+//     {
+//         float a = uv.x + 1.0f;   // marker 1
+//         maybeKill(a);            // marker 2
+//         float c = a + 3.0f;      // marker 3
+//         return float4(c);        // marker 4
+//     }
+//
+// All four markers sit in `main`'s entry block, but when `maybeKill`
+// discards, markers 1 and 2 have executed and markers 3 and 4 have
+// not. Coalescing all four onto one counter would misreport one side
+// or the other, so the run must be split at the call.
+//
+// Results are memoized per function, and the analysis is a depth-first
+// walk of the call graph — not an iterated fixpoint — so an exit deep in
+// a callee still splits the caller's run. Cycles are broken by reporting
+// the re-entered function as possibly not returning, which keeps the
+// walk terminating without letting an optimistic answer escape into
+// other functions' cached results.
+//
+// Known gap: any core-module intrinsic that abandons the invocation —
+// the ray-tracing hit terminators `IgnoreHit` and `AcceptHitAndEndSearch`
+// are the concrete examples today — lowers to a `GenericAsm` terminator
+// like every other intrinsic, and `mayNotReturn` treats `GenericAsm` as
+// a normal exit (see the comment on that case below). So this is not a
+// gap specific to those two names: it is general to any present or
+// future abandoning intrinsic modeled the same way. Slang's IR has no
+// `[noreturn]` concept to key off instead. Marking them in the
+// core module is the principled fix and is tracked separately.
+// Returns true when every block reachable from `func`'s entry can still
+// reach a normal exit — an `IRReturn`, or an `IRGenericAsm`, which is how
+// `__intrinsic_asm` lowers and which ends the function the same way.
+//
+// Asking whether a normal exit is *present* is not enough, and the
+// difference is a real under-reporting bug rather than imprecision.
+// Consider:
+//
+//     void h(bool c) { if (c) { for (;;) { } } }
+//
+// The else path lowers to a reachable `return_val`, so a presence check
+// concludes `h` returns and a caller coalesces across the call to it. When
+// `c` is true `h` diverges instead, so a probe placed after the call never
+// fires and the statements before it — which did execute — report zero
+// hits. Reachability catches it: the `for (;;)` block is reachable from
+// entry and can reach no exit at all.
+//
+// The same walk covers the case where lowering leaves a dead `IRReturn` in
+// a body that cannot return, since an unreachable block is never
+// considered.
+static bool everyReachablePathCanExit(IRFunc* func)
+{
+    auto entry = func->getFirstBlock();
+    if (!entry)
+        return true;
+
+    // Blocks that can reach a normal exit, found by walking predecessors
+    // back from every block that terminates in one.
+    HashSet<IRBlock*> canExit;
+    List<IRBlock*> workList;
+    for (auto block : func->getBlocks())
+    {
+        auto terminator = block->getTerminator();
+        if (!terminator)
+            continue;
+        if (terminator->getOp() == kIROp_Return || terminator->getOp() == kIROp_GenericAsm)
+        {
+            if (canExit.add(block))
+                workList.add(block);
+        }
+    }
+    while (workList.getCount())
+    {
+        auto block = workList.getLast();
+        workList.removeLast();
+        for (auto pred : block->getPredecessors())
+        {
+            if (canExit.add(pred))
+                workList.add(pred);
+        }
+    }
+
+    // Walk forward from the entry; any block reached that cannot itself
+    // reach an exit means some execution never returns.
+    HashSet<IRBlock*> visited;
+    visited.add(entry);
+    workList.add(entry);
+    while (workList.getCount())
+    {
+        auto block = workList.getLast();
+        workList.removeLast();
+        if (!canExit.contains(block))
+            return false;
+        for (auto succ : block->getSuccessors())
+        {
+            if (visited.add(succ))
+                workList.add(succ);
+        }
+    }
+    return true;
+}
+
+struct CoverageFunctionExitAnalysis
+{
+    // `true` when the function may abandon the invocation instead of
+    // returning normally to its caller.
+    Dictionary<IRFunc*, bool> mayNotReturnCache;
+    // Functions currently being computed, used to break call cycles.
+    HashSet<IRFunc*> inProgress;
+
+    // Returns true when executing `inst` may fail to reach the next
+    // instruction in its own block.
+    bool mayNotFallThrough(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Discard:
+        case kIROp_Abort:
+            return true;
+        case kIROp_Call:
+            {
+                auto callee = getStaticallyResolvedCallee(cast<IRCall>(inst)->getCallee());
+                // An unresolved callee is an indirect or not-yet-
+                // specialized dispatch (coverage instrumentation runs
+                // before `specializeModule`). We cannot see its body,
+                // so assume the worst and split the run: an extra
+                // probe costs emitted code, a missing split costs
+                // correctness.
+                if (!callee)
+                    return true;
+                return mayNotReturn(callee);
+            }
+        default:
+            return false;
+        }
+    }
+
+    // Returns true when `func` may abandon the invocation rather than
+    // returning to its caller.
+    bool mayNotReturn(IRFunc* func)
+    {
+        if (auto found = mayNotReturnCache.tryGetValue(func))
+            return *found;
+
+        // A function with no body is an unlinked declaration. Every
+        // core-module function that can exit an invocation carries a
+        // body by the time this pass runs (linking happens earlier in
+        // `emitEntryPoints`), so a body-less callee here is an
+        // external/host symbol that returns normally.
+        if (!func->getFirstBlock())
+        {
+            mayNotReturnCache[func] = false;
+            return false;
+        }
+
+        // Break call cycles conservatively: a function we are still in the
+        // middle of analyzing is reported as possibly not returning.
+        //
+        // Returning `false` here instead would be unsound, not merely
+        // imprecise. The optimistic answer does not stay local — a
+        // *different* function analyzed while this one is in progress
+        // consumes it and then caches its own result below, so one partner
+        // of a mutually recursive pair can be memoized as "returns
+        // normally" when it does not, and the outcome depends on which
+        // function the traversal happened to reach first. `true` cannot go
+        // wrong in that direction: it only ever adds a split.
+        //
+        // Recursion is not ruled out before this point. It is diagnosed by
+        // `checkForRecursiveFunctions`, which runs far later in
+        // `linkAndOptimizeIR` and, more to the point, only for non-CPU
+        // targets (`slang-ir-check-recursion.cpp`) — and CPU is a target
+        // coverage supports.
+        if (!inProgress.add(func))
+            return true;
+
+        bool result = false;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
+            {
+                if (!result && mayNotFallThrough(inst))
+                    result = true;
+            }
+        }
+        // A path that cannot reach a normal exit means the function may
+        // not return, even when other paths do.
+        if (!everyReachablePathCanExit(func))
+            result = true;
+
+        inProgress.remove(func);
+        mayNotReturnCache[func] = result;
+        return result;
+    }
+};
+
+// Assign a counter slot to every collected marker op, coalescing line
+// markers that provably execute together.
+//
+// Line markers in the same basic block, with nothing between them that
+// can abandon the invocation, all execute exactly the same number of
+// times, so they can share one counter and one runtime probe. That is
+// what shrinks emitted shader code: probe count, not counter width, is
+// what scales SPIR-V size.
+//
+// `outSlots[i]` is the counter index for `markerOps[i]`, and
+// `outEmitsProbe[i]` selects the single marker per group that emits
+// the runtime counter update. The probe is placed at the *last* marker
+// of the group so that reaching it proves every earlier marker in the
+// group executed; placing it first would over-report when the group is
+// entered but abandoned partway.
+//
+// Function and branch markers always take a dedicated slot: they are
+// already one probe per function or per arm, and their counts carry
+// per-site meaning that sharing would destroy.
+static void assignCoverageCounterSlots(
+    List<IRInst*> const& markerOps,
+    List<UInt>& outSlots,
+    List<bool>& outEmitsProbe,
+    UInt& outCounterCount)
+{
+    CoverageFunctionExitAnalysis exitAnalysis;
+
+    outSlots.setCount(markerOps.getCount());
+    outEmitsProbe.setCount(markerOps.getCount());
+    for (Index i = 0; i < markerOps.getCount(); ++i)
+        outEmitsProbe[i] = true;
+
+    UInt nextSlot = 0;
+    // Index of the marker that currently owns the open group, or -1
+    // when no group is open.
+    Index openGroup = -1;
+
+    for (Index i = 0; i < markerOps.getCount(); ++i)
+    {
+        auto markerOp = markerOps[i];
+        if (markerOp->getOp() != kIROp_IncrementCoverageCounter)
+        {
+            // Non-line markers neither join nor continue a group, and
+            // they cannot break one: they lower to a counter update,
+            // which always falls through.
+            outSlots[i] = nextSlot++;
+            continue;
+        }
+
+        bool joinsOpenGroup = false;
+        if (openGroup >= 0)
+        {
+            auto previousOp = markerOps[openGroup];
+            if (previousOp->getParent() == markerOp->getParent())
+            {
+                // Same block: the run continues unless something
+                // between the two markers can abandon the invocation.
+                // The scan below relies on a precondition from
+                // `collectCoverageMarkerOps`, which walks each function's
+                // blocks in order and each block's insts in position
+                // order: markers from one block arrive contiguously and
+                // in position order, so `markerOp` is reachable by
+                // scanning forward from `previousOp`. The assert after
+                // the loop checks that invariant directly — that the
+                // forward scan actually reached `markerOp` whenever it
+                // did not already stop at a split — rather than the
+                // weaker `previousOp != markerOp`, which a reversed pair
+                // would also satisfy while still running off the end of
+                // the block and silently skipping the split check.
+                joinsOpenGroup = true;
+                bool foundMarkerOp = false;
+                for (auto inst = previousOp->getNextInst(); inst; inst = inst->getNextInst())
+                {
+                    if (inst == markerOp)
+                    {
+                        foundMarkerOp = true;
+                        break;
+                    }
+                    if (exitAnalysis.mayNotFallThrough(inst))
+                    {
+                        joinsOpenGroup = false;
+                        break;
+                    }
+                }
+                SLANG_ASSERT(foundMarkerOp || !joinsOpenGroup);
+            }
+        }
+
+        if (joinsOpenGroup)
+        {
+            // Hand the probe forward to this marker: the group's probe
+            // always sits at its last marker.
+            outSlots[i] = outSlots[openGroup];
+            outEmitsProbe[openGroup] = false;
+        }
+        else
+        {
+            outSlots[i] = nextSlot++;
+        }
+        openGroup = i;
+    }
+
+    outCounterCount = nextSlot;
+}
+
 // Collect every coverage marker op in the module. Deterministic traversal:
 // module-scope insts in declaration order, then each function's blocks in
 // order, then each block's insts in position order.
@@ -953,6 +1309,12 @@ struct CoverageInstrumenter
     IRType* counterElementType;
     IRType* counterElementPtrType;
     IRType* intType;
+    // The `RWStructuredBuffer<T>` type itself: the global's own type in the
+    // single-buffer form, and the descriptor array's element type in the
+    // bindless form. Deliberately not named for either nesting level --
+    // `counterElementType` above is `T`, one level further in, and a name
+    // like `structuredBufferType` reads as though this were the inner one.
+    IRType* structuredBufferType = nullptr;
     // Caller opted in to boolean recording (`-trace-coverage-boolean`): each
     // counter is written with a plain non-atomic store of 1 instead of an
     // atomic add, recording whether the entry executed (0 / non-zero) rather
@@ -961,24 +1323,41 @@ struct CoverageInstrumenter
     List<BranchSiteRemap> branchSiteRemaps;
     uint32_t nextBranchSiteID = 1;
 
+    // `-trace-coverage-bindless-index`, or -1 for the single-buffer form.
+    // When set, `coverageBuffer` is an unbounded ARRAY of buffers and every
+    // access indexes it first.
+    int bindlessIndex = -1;
+
     CoverageInstrumenter(
         IRModule* m,
         IRGlobalParam* buf,
         SourceManager* sm,
         ArtifactPostEmitMetadata& md,
-        bool booleanMode)
+        bool booleanMode,
+        int bindlessIndex)
         : module(m)
         , coverageBuffer(buf)
         , sourceManager(sm)
         , outMetadata(md)
         , booleanMode(booleanMode)
+        , bindlessIndex(bindlessIndex)
     {
         IRBuilder tmpBuilder(module);
-        // The unchecked `cast` is safe: this instrumenter only ever runs
-        // on the buffer synthesized by `synthesizeCoverageBuffer`, which
-        // creates it as a structured-buffer type. We never construct a
+        // The unchecked `cast`s are safe: this instrumenter only ever runs
+        // on the global synthesized by `synthesizeCoverageBuffer`, which
+        // creates it as a structured-buffer type, or as an unbounded array
+        // of one in the bindless form. We never construct a
         // `CoverageInstrumenter` over a caller-provided buffer.
-        auto bufferType = cast<IRHLSLStructuredBufferTypeBase>(coverageBuffer->getDataType());
+        IRType* globalType = coverageBuffer->getDataType();
+        if (bindlessIndex >= 0)
+            globalType = cast<IRArrayTypeBase>(globalType)->getElementType();
+        auto bufferType = cast<IRHLSLStructuredBufferTypeBase>(globalType);
+        // Kept for the bindless element extract below: the two-operand
+        // `emitElementExtract` (`slang-ir.cpp`) infers an element type only
+        // through `IRArrayType`, not `IRUnsizedArrayType`, and hits a
+        // `SLANG_RELEASE_ASSERT` on the latter -- so the explicit-type
+        // overload is required here and needs this type kept.
+        structuredBufferType = (IRType*)bufferType;
         counterElementType = bufferType->getElementType();
         counterElementPtrType = tmpBuilder.getPtrType(counterElementType);
         intType = tmpBuilder.getIntType();
@@ -1037,21 +1416,48 @@ struct CoverageInstrumenter
         }
     }
 
-    // Lower a single coverage marker op to an atomic add on
-    // `coverageBuffer[slot]`. Appends the source-entry metadata that
-    // currently points at this direct counter slot, then removes the
-    // marker op.
-    void lowerMarkerOp(IRInst* markerOp, UInt slot)
+    // Lower a single coverage marker op, recording its source-entry
+    // metadata against `slot` and then removing the marker op.
+    //
+    // `emitRuntimeProbe` selects whether this marker also emits the
+    // counter update. Coalesced line markers share one slot and one
+    // probe, so only the last marker of a group emits it while the
+    // others contribute metadata alone — that is what removes probe
+    // sequences from the emitted shader. Every marker still produces
+    // its own entry, so per-line reporting is unchanged.
+    void lowerMarkerOp(IRInst* markerOp, UInt slot, bool emitRuntimeProbe)
     {
         CoverageTracingEntry entry;
         populateEntryForMarker(markerOp, slot, entry);
         outMetadata.m_coverageEntries.add(entry);
 
+        if (!emitRuntimeProbe)
+        {
+            SLANG_ASSERT(!markerOp->hasUses());
+            markerOp->removeAndDeallocate();
+            return;
+        }
+
         IRBuilder builder(module);
         builder.setInsertBefore(markerOp);
 
+        // Bindless form: select this shader's buffer out of the descriptor
+        // array first, then index within it. The array index is uniform by
+        // construction — it is one compile-time constant for the whole
+        // module — so this deliberately does NOT mark the access
+        // non-uniform: doing so would push every counter increment onto the
+        // non-uniform descriptor-indexing path for no reason.
+        IRInst* bufferInst = coverageBuffer;
+        if (bindlessIndex >= 0)
+        {
+            bufferInst = builder.emitElementExtract(
+                structuredBufferType,
+                coverageBuffer,
+                builder.getIntValue(intType, (IRIntegerValue)bindlessIndex));
+        }
+
         IRInst* getElemArgs[] = {
-            coverageBuffer,
+            bufferInst,
             builder.getIntValue(intType, (IRIntegerValue)slot),
         };
         IRInst* slotPtr = builder.emitIntrinsicInst(
@@ -1109,7 +1515,11 @@ struct CoverageInstrumenter
 
     void run(List<IRInst*> const& markerOps)
     {
-        const auto counterCount = markerOps.getCount();
+        List<UInt> slots;
+        List<bool> emitsProbe;
+        UInt coalescedCounterCount = 0;
+        assignCoverageCounterSlots(markerOps, slots, emitsProbe, coalescedCounterCount);
+        const auto counterCount = (Index)coalescedCounterCount;
         // This concerns the counter *index* type, which is independent of
         // the per-slot storage width recorded just below: the public
         // metadata stores counter indices as uint32_t because the
@@ -1144,14 +1554,14 @@ struct CoverageInstrumenter
         default:
             SLANG_UNEXPECTED("coverage counter element type must be uint or uint64_t");
         }
-        outMetadata.m_coverageEntries.reserve(counterCount);
-        // Each marker op gets its own slot: the op's identity IS the
-        // UID, and we assign a consecutive index in traversal order.
-        // Several source entries may later share counters when region
-        // coverage is added; this pass already keeps entry count and
-        // counter count separate through the public metadata API.
-        for (Index slot = 0; slot < counterCount; ++slot)
-            lowerMarkerOp(markerOps[slot], UInt(slot));
+        outMetadata.m_coverageEntries.reserve(markerOps.getCount());
+        // Every marker produces one source entry, but line markers that
+        // provably execute together share a counter slot, so entry count
+        // and counter count now genuinely differ. The public metadata API
+        // has always kept the two separate; hosts size the readback buffer
+        // from the counter count and attribute results per entry.
+        for (Index i = 0; i < markerOps.getCount(); ++i)
+            lowerMarkerOp(markerOps[i], slots[i], emitsProbe[i]);
     }
 };
 
@@ -1305,6 +1715,7 @@ void instrumentCoverage(
     int reservedSpaceCount,
     int counterByteWidth,
     bool booleanMode,
+    int bindlessIndex,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata)
@@ -1347,6 +1758,18 @@ void instrumentCoverage(
         if (sink)
             sink->diagnose(Diagnostics::CoverageReservedSpaceIgnored{});
     }
+
+    // The bindless form needs descriptor indexing, which only the Khronos
+    // targets have here: an unbounded array of buffers has no meaning on
+    // CPU/CUDA (no descriptors to index) and no verified lowering on the
+    // others.
+    //
+    // The user-facing rejection lives in `linkAndOptimizeIR`, which validates
+    // the option before this pass is gated on having marker ops at all, so an
+    // empty module still diagnoses. By the time we get here the combination
+    // has already been rejected, and reaching it means a caller skipped that
+    // validation rather than that a user asked for something unsupported.
+    SLANG_RELEASE_ASSERT(bindlessIndex < 0 || isKhronosTarget(targetRequest));
 
     // Reject a user-declared global parameter named `__slang_coverage`.
     // The IR coverage pass synthesizes its own hidden buffer with that
@@ -1406,6 +1829,7 @@ void instrumentCoverage(
         reservedSpaces,
         reservedSpaceCount,
         counterByteWidth,
+        bindlessIndex,
         chosenSpace,
         chosenBinding);
 
@@ -1455,13 +1879,35 @@ void instrumentCoverage(
     syntheticResource.binding = chosenBinding;
     syntheticResource.uniformOffset = -1;
     syntheticResource.uniformStride = 0;
+    // Report the array element this shader was compiled to use, so a host
+    // can recover it from the metadata rather than tracking the value it
+    // passed to `-trace-coverage-bindless-index`. Stays -1 in the
+    // single-buffer form, matching the sentinel used by space/binding.
+    syntheticResource.bindlessIndex = bindlessIndex;
+    // The bindless form declares `__slang_coverage` as an UNSIZED array,
+    // precisely so the shader does not constrain the host's descriptor
+    // count. Reporting `1` here would describe it as a scalar binding and
+    // invite a host to size a one-element descriptor array; report the
+    // unbounded sentinel instead. The single-buffer form really is scalar
+    // and keeps the `1` set at record construction.
+    if (bindlessIndex >= 0)
+        syntheticResource.arraySize = slang::kUnboundedSyntheticResourceArraySize;
+    // `slang.h` promises consumers these two move together, so either one
+    // identifies the bindless form. Nothing else enforces that: the index is
+    // assigned unconditionally just above and the sentinel only under the
+    // branch, so an edit touching one and not the other would quietly break a
+    // contract callers are told they can rely on.
+    SLANG_ASSERT(
+        (bindlessIndex >= 0) ==
+        (syntheticResource.arraySize == slang::kUnboundedSyntheticResourceArraySize));
 
     CoverageInstrumenter instrumenter(
         module,
         buffer,
         sink ? sink->getSourceManager() : nullptr,
         outMetadata,
-        booleanMode);
+        booleanMode,
+        bindlessIndex);
     instrumenter.run(markerOps);
 }
 

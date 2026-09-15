@@ -14,7 +14,7 @@
 // rather than being inlined as a raw `42 : Int` operand. Verifies
 // both the global definition and the named reference in `main`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 static const int N = 42;
 

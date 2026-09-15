@@ -19,7 +19,7 @@
 // body has been substituted at the call site as a multiply, while the
 // ordinary callee is still reached through a `call`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 uniform int a;

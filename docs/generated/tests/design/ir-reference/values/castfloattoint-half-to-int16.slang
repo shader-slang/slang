@@ -13,7 +13,7 @@
 // under the same `castFloatToInt` opcode as the standard rank
 // pair.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform half ha;
 uniform RWStructuredBuffer<int16_t> buf;

@@ -12,7 +12,7 @@
 // a struct field of Int64 lowers to a field(...) row carrying Int64.
 // Two `int64_t` fields surface two `field(%key, Int64)` rows.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Range64 { int64_t lo; int64_t hi; }
 

@@ -11,7 +11,7 @@
 
 // Boundary: storage axis — `half` element inside a fixed-size array.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform half arr[3];
 uniform RWStructuredBuffer<half> buf;

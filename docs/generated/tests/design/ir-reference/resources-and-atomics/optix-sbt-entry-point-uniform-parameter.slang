@@ -20,7 +20,7 @@
 // `collectOptiXEntryPointUniformParams`, so a text-only check would not
 // distinguish it from any other route to the same call.
 
-//TEST:SIMPLE(filecheck=IR):-target cuda -dump-ir -o /dev/null -stage closesthit -entry ch
+//TEST:SIMPLE(filecheck=IR):-target cuda -dump-ir -o - -stage closesthit -entry ch
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -stage closesthit -entry ch
 
 struct Payload

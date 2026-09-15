@@ -13,7 +13,7 @@
 // element type in the IR dump. A struct field of type `Atomic<uint>`
 // surfaces an `Atomic(UInt)` operand on the field row in the IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Counter { Atomic<uint> n; }
 

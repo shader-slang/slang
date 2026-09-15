@@ -13,7 +13,7 @@
 // — the doc's "MemberExpr → IRFieldAddress / IRFieldExtract (lvalue
 // vs rvalue)" claim, rvalue branch.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Pair { int x; int y; }
 

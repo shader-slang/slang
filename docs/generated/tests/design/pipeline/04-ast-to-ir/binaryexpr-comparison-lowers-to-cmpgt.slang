@@ -13,7 +13,7 @@
 // Int)` in the IR. The doc lists `IREq` as the example for the row;
 // `cmpGT` is the comparison opcode for the `>` operator.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

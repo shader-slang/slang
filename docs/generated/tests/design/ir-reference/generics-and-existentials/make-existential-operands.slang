@@ -12,7 +12,7 @@
 // Initialising an `IFoo` local from an `A` value is the cast; the CHECK pins
 // the resulting `makeExistential` and its two operands, the value and the
 // conformance witness.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

@@ -14,7 +14,7 @@
 // `uint64_t` value produces a `Cast` instruction whose result type is
 // `UInt16`, pulling the value down from the largest unsigned scalar.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint64_t v;
 uniform RWStructuredBuffer<uint> buf;

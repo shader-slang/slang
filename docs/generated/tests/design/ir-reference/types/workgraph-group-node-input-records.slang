@@ -17,7 +17,7 @@
 // for the maxRecords decoration sitting on the parameter, which shows the
 // record count is a decoration rather than a type operand.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -dump-ir -o -
 
 import experimental.workgraph;
 

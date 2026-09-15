@@ -15,7 +15,7 @@
 // wrapper in `func %main` — evidence that the information is carried to
 // the backend rather than discarded during checking.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<uint> rwbuf;
 

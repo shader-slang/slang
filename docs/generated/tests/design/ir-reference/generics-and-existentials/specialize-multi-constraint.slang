@@ -12,7 +12,7 @@
 // `where` constraints contributes one witness argument each. The CHECK pins a
 // four-element argument list (base, type, witness, witness), so dropping or
 // merging either conformance would fail it.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 interface IBar { int meta(); };

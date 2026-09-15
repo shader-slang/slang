@@ -11,7 +11,7 @@
 
 // Off-diagonal mid-ladder case in the int-to-float matrix.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int16_t i16a;
 uniform RWStructuredBuffer<double> buf;

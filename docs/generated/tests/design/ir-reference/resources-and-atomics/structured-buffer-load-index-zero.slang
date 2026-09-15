@@ -11,7 +11,7 @@
 
 // Boundary probe: index 0 on the read-only structured-buffer path.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform StructuredBuffer<int> sbuf;
 uniform RWStructuredBuffer<int> rwbuf;

@@ -17,7 +17,7 @@
 // decoration is checked alongside it to show the whole node-attribute group
 // takes the same route.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -stage node -entry main -profile lib_6_8 -experimental-feature
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -stage node -entry main -profile lib_6_8 -experimental-feature
 
 import experimental.workgraph;
 

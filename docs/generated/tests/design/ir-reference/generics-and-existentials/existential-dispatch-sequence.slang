@@ -13,7 +13,7 @@
 // interface-typed local is made, and the ordered CHECKs assert all five insts
 // appear in the order the dispatch needs them: recover the type, recover the
 // value, recover the witness, resolve the requirement, call it.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

@@ -163,6 +163,10 @@ public:
     }
     SlangResult sendResult(const RttiInfo* rttiInfo, const void* result, const JSONValue& id);
 
+    /// Cannot reuse the RTTI `sendResult` path: an empty native struct serializes to the object
+    /// `{}`, never `null`, which is invalid for LSP methods whose result is nullable.
+    SlangResult sendNullResult(const JSONValue& id);
+
     /// Try to read a message. Will return if message is not available.
     SlangResult tryReadMessage();
 

@@ -16,7 +16,7 @@
 // shows the variable's type is carried by the result rather than by an
 // operand.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g
 
 uniform RWStructuredBuffer<int> buf;
 

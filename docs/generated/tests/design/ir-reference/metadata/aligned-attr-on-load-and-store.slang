@@ -15,7 +15,7 @@
 // each and then require the store to carry the 16 one and the load to carry
 // the 8 one in its trailing operand.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry computeMain -stage compute
 
 uniform float4* data;
 

@@ -65,7 +65,7 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   sibling. The run label and `meta.json` date are derived from the checked-out
   commit's author date, so backfill points sort correctly in the tracking
   series.
-- **`compile-perf-release-sweep.yml`** (`workflow_dispatch`) — downloads prebuilt
+- **`perf-compile-release-sweep.yml`** (`workflow_dispatch`) — downloads prebuilt
   release `slangc` for the runner's platform, sweeps each into `releases/<tag>/`,
   writes `index.json`, stamps `runner.json`, rebuilds, and pushes. **Run with
   `force=true` to re-measure the whole history onto a new runner.** Inputs:
@@ -191,7 +191,7 @@ skipped. Distinguishing them in Slack needs a sixth state carried out of
 ### Runner-change procedure
 
 When the benchmark runner is replaced or updated, `track.py runner-id` changes and
-the stored `runner.json` no longer matches. Re-run **compile-perf-release-sweep**
+the stored `runner.json` no longer matches. Re-run **perf-compile-release-sweep**
 with `force=true` to re-measure every release on the new machine and re-stamp
 `runner.json`; until then daily-vs-history comparisons mix runners and are invalid.
 
@@ -245,7 +245,7 @@ secret already covers pushes to that repo.
 - Create the `shader-slang/slang-compile-perf` results repo + a
   `SLANG_COMPILE_PERF_PAT` secret with push access (mirrors the MDL
   `slang-material-modules-benchmark` + `SLANG_MDL_BENCHMARK_RESULTS_PAT` pattern).
-- Seed the history once via a manual **compile-perf-release-sweep** run, then —
+- Seed the history once via a manual **perf-compile-release-sweep** run, then —
   when ready — uncomment the nightly `schedule`.
 
 ## Design decisions
@@ -335,7 +335,7 @@ from `--slangc`) and a build-once step for the driver; everything downstream
 workloads" section, stacked by driver phase with `apiTotal` as the top edge
 (they have no `compileInner`, so they are excluded from the compiler grid).
 The release history baseline backfills through the normal
-**compile-perf-release-sweep** dispatch: `sweep.py --api` counts the api
+**perf-compile-release-sweep** dispatch: `sweep.py --api` counts the api
 workloads as required, so releases measured before they existed are simply
 re-benched (full suite, same runner) on the next run — no `force` needed.
 

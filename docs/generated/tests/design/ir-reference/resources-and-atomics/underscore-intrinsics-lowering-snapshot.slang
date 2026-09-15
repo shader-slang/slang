@@ -24,7 +24,7 @@
 // `__getStructuredBufferPtr` is gated to `cpp_cuda_spirv` and
 // `__getByteAddressBufferPtr` to `cpp_cuda`.
 
-//TEST:SIMPLE(filecheck=IR):-target cuda -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target cuda -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<uint> outBuf;
 ByteAddressBuffer ba;
