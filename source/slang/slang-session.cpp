@@ -899,10 +899,19 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
         SemanticsVisitor visitor(sharedSemanticsContext);
         visitor = visitor.withSink(&sink);
 
-        auto witness = visitor.isSubtype(
-            (Slang::Type*)type,
-            (Slang::Type*)interfaceType,
-            IsSubTypeOptions::None);
+        // `interfaceType` names an interface, but a caller may pass one obtained
+        // from a value/field/parameter position, where an interface reflects as
+        // its existential box `dyn IFoo` (still `Kind::Interface`). Normalize a
+        // top-level box to the interface so `isSubtype(concrete, IFoo)` finds the
+        // conformance witness. (The `getTypeFromString` name-resolution path is
+        // already normalized; this guards the boxes that reach this public API
+        // through other reflection paths.)
+        Slang::Type* baseInterfaceType = (Slang::Type*)interfaceType;
+        if (auto wrappedInterfaceType = getExistentialInterfaceType(baseInterfaceType))
+            baseInterfaceType = wrappedInterfaceType;
+
+        auto witness =
+            visitor.isSubtype((Slang::Type*)type, baseInterfaceType, IsSubTypeOptions::None);
         if (auto subtypeWitness = as<SubtypeWitness>(witness))
         {
             result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
@@ -2220,6 +2229,29 @@ SlangResult Linkage::loadSerializedModuleContents(
     auto irChunk = moduleChunk->findIR();
     if (!irChunk)
         return SLANG_FAIL;
+
+    // Reject a module written by an incompatible compiler version before we
+    // decode its AST. AST nodes are serialized by their positional `ASTNodeType`
+    // tag, so a module written before a node type was inserted mid-hierarchy
+    // would silently mis-decode (or crash) if we read it. The container's
+    // serialization version lives in the IR chunk and is present in every module
+    // ever written, so we can check it here without touching the AST.
+    {
+        UInt64 foundVersion = 0;
+        const UInt64 expectedVersion = getSupportedModuleSerializationVersion();
+        if (SLANG_FAILED(readSerializedModuleSerializationVersion(irChunk, foundVersion)) ||
+            foundVersion != expectedVersion)
+        {
+            if (sink)
+            {
+                sink->diagnose(Diagnostics::IncompatibleSerializedModuleVersion{
+                    .path = moduleFilePathInfo.foundPath,
+                    .foundVersion = String(foundVersion),
+                    .expectedVersion = String(expectedVersion)});
+            }
+            return SLANG_FAIL;
+        }
+    }
 
     auto astBuilder = getASTBuilder();
     auto session = getSessionImpl();

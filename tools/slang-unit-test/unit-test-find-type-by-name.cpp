@@ -53,6 +53,45 @@ SLANG_UNIT_TEST(findTypeByName)
     spDestroySession(session);
 }
 
+// Resolving an interface by name for reflection must return the interface
+// itself (named `IFoo`), not its existential box `dyn IFoo`. The AST-level
+// existential work boxes an interface in every proper-type position; the
+// reflection / `-conformance` name-resolution path names the interface *as an
+// interface*, so `findTypeByName("IFoo")` must keep its name and
+// `isSubType(S, IFoo)` (S conforms to IFoo) must hold.
+SLANG_UNIT_TEST(findInterfaceTypeByNameConformance)
+{
+    const char* testSource = "interface IFoo { int f(); }\n"
+                             "struct S : IFoo { int f() { return 1; } }\n";
+    auto session = spCreateSession();
+    auto request = spCreateCompileRequest(session);
+    spAddCodeGenTarget(request, SLANG_DXBC);
+    int tuIndex = spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "tu1");
+    spAddTranslationUnitSourceString(request, tuIndex, "internalFile", testSource);
+    spCompile(request);
+
+    auto testBody = [&]()
+    {
+        auto reflection = slang::ShaderReflection::get(request);
+
+        auto interfaceType = reflection->findTypeByName("IFoo");
+        SLANG_CHECK_ABORT(interfaceType != nullptr);
+        auto interfaceName = interfaceType->getName();
+        SLANG_CHECK(interfaceName != nullptr && strcmp(interfaceName, "IFoo") == 0);
+        SLANG_CHECK(interfaceType->getKind() == slang::TypeReflection::Kind::Interface);
+
+        auto structType = reflection->findTypeByName("S");
+        SLANG_CHECK_ABORT(structType != nullptr);
+
+        SLANG_CHECK(reflection->isSubType(structType, interfaceType));
+    };
+
+    testBody();
+
+    spDestroyCompileRequest(request);
+    spDestroySession(session);
+}
+
 SLANG_UNIT_TEST(findTypeByNameExtensionTypeAlias)
 {
     const char* vectorizeSource = R"(

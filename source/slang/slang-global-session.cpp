@@ -666,6 +666,21 @@ SlangResult Session::_readBuiltinModule(
     if (!astChunk)
         return SLANG_FAIL;
 
+    // Reject a builtin module written by an incompatible compiler version before
+    // decoding its AST (whose `ASTNodeType` tags are positional; see
+    // `Linkage::loadSerializedModuleContents`). This path is reachable with a
+    // user-supplied module blob via `loadCoreModule` / `-load-core-module`, so a
+    // stale module must be rejected rather than mis-decoded. No `DiagnosticSink`
+    // is available here, so we fail without a diagnostic and let the caller report.
+    {
+        UInt64 foundVersion = 0;
+        if (SLANG_FAILED(readSerializedModuleSerializationVersion(irChunk, foundVersion)) ||
+            foundVersion != getSupportedModuleSerializationVersion())
+        {
+            return SLANG_FAIL;
+        }
+    }
+
     // Source location information is stored as a distinct
     // chunk from the IR and AST, so we need to search for
     // that chunk and then set up the information for use
