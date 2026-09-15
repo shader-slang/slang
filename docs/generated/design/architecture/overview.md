@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:08:24Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 696515884e297ba8af6c8c7765c2f7fdc0119fd11e6bc325c1982bfa8a8062d2
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 95ff3cab526c686528a630d76f0bf7e9952fec44677b796b3e89d2d11ae228ae
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -46,7 +46,14 @@ The compiler is built with CMake. The full build configuration for the
 core library lives in
 [source/slang/CMakeLists.txt](../../../../source/slang/CMakeLists.txt);
 each peer subdirectory under [source/](../../../../source) has its own
-`CMakeLists.txt` that contributes to the same build.
+`CMakeLists.txt` that contributes to the same build. Paths in that file
+are written relative to `slang_BINARY_DIR` rather than
+`CMAKE_BINARY_DIR` — the `copy_slang_headers` target stages
+[include/](../../../../include) plus the generated
+`slang-tag-version.h` into `${slang_BINARY_DIR}/$<CONFIG>/include`
+(lines 225-236) — so that a parent project embedding Slang with
+`add_subdirectory` collects the staged headers under Slang's own build
+directory instead of the top-level one.
 
 ## Top-level decomposition
 
@@ -130,9 +137,35 @@ everything else as an immutable boundary.
 - [source/slang-glslang/](../../../../source/slang-glslang) — bridge to
   Khronos `glslang` for SPIR-V generation via GLSL
   ([slang-glslang.cpp](../../../../source/slang-glslang/slang-glslang.cpp)).
+  Exports from this shim are not determined by the C++ alone: an entry
+  point must also be listed in `slang-glslang.version-script`, from
+  which both the ELF and macOS builds derive their export list, or the
+  client's symbol lookup returns null and the entry point is silently
+  unavailable.
 - [source/slang-dispatcher/](../../../../source/slang-dispatcher) —
   shared support for dispatching to downstream tools
   ([main.cpp](../../../../source/slang-dispatcher/main.cpp)).
+
+A downstream compiler is reached through `IDownstreamCompiler`, declared
+in
+[slang-downstream-compiler.h](../../../../source/compiler-core/slang-downstream-compiler.h).
+Capabilities that only some of them have are modelled as separate
+interfaces rather than as extra methods on that one: for instance
+`IDownstreamCompilerPathProvider` (line 403), whose single `getPath`
+returns the on-disk path of the loaded compiler library.
+`DownstreamCompilerBase` supplies a default that returns
+`SLANG_E_NOT_AVAILABLE`, and only the shared-library-backed compilers
+override it — an executable-based command-line compiler found on `PATH`,
+or a platform without shared-library introspection, has no such path.
+Note that this interface is deliberately *not* `ICastable`-derived and
+is handed out only as a borrowed object through `castAs` / `getObject`,
+never through `getInterface`: `getInterface` also backs the
+ref-counting `queryInterface`, so it must return only releasable
+`ISlangUnknown`-derived interfaces, and giving the capability a second
+`ICastable` base would leave the concrete compiler class with two
+ambiguous `ISlangUnknown` subobjects.
+[slang-llvm.cpp](../../../../source/slang-llvm/slang-llvm.cpp)
+implements the pattern on `LLVMDownstreamCompiler`.
 
 ### Runtime and bindings
 
@@ -147,6 +180,10 @@ everything else as an immutable boundary.
 - [source/slang-wasm/](../../../../source/slang-wasm) — WebAssembly
   bindings
   ([slang-wasm-bindings.cpp](../../../../source/slang-wasm/slang-wasm-bindings.cpp)).
+  The Emscripten binding block is the authoritative list of what
+  JavaScript can reach: `GlobalSession` currently exposes
+  `createSession` and `getBuiltinModuleSource`, the latter handing back
+  the source text of a built-in module by name.
 
 ### Driver and tooling
 
@@ -269,24 +306,70 @@ Anything under [source/](../../../../source) is implementation. The
 public-header rules in [CLAUDE.md](../../../../CLAUDE.md) (no enum
 re-ordering, no virtual-method changes mid-vtable, no removal) reflect
 the fact that this surface must keep ABI compatibility with older
-callers. New API is therefore added by *appending*: methods are
-appended to the end of an interface (e.g.
-`IGlobalSession::saveBuiltinModule`), new capabilities arrive
-as fresh UUID'd interfaces obtained via `castAs` /
-`queryInterface` (e.g. `IBindlessResourceMetadata`), and new
-`CompilerOptionName` enumerators are appended with an explicit integer
-value before the `CountOf` sentinel, which is the one enumerator that
-deliberately has no explicit value — all visible in
-[include/slang.h](../../../../include/slang.h).
+callers. New API is therefore added by *appending*, and the header shows
+four distinct mechanisms for growing without moving anything a compiled
+caller already depends on:
 
-Superseded entry points are deprecated rather than deleted. When a
-replacement lands, the old declaration stays at its original vtable /
-overload position and is annotated `SLANG_DEPRECATED`, so existing
+- **Appending a method to an interface.** New methods go at the end of
+  the vtable (e.g. `IGlobalSession::saveBuiltinModule`).
+- **A fresh UUID'd interface.** A capability that not every
+  implementation has becomes its own interface, obtained via `castAs` /
+  `queryInterface` (e.g. `IBindlessResourceMetadata`,
+  `ICoverageTracingMetadata`, `ISyntheticResourceMetadata`), rather
+  than a method on an existing one.
+- **Appending an enumerator.** New `CompilerOptionName` values are
+  appended with an explicit integer before the `CountOf` sentinel, which
+  is the one enumerator that deliberately has no explicit value — the
+  two most recent are `TraceCoverageBindlessIndex = 158` and
+  `GetCompilerPath = 159`.
+- **Tail-extending a plain struct behind `structSize`.** A struct passed
+  across the boundary carries its own size as its leading field, and new
+  trailing members are written only when the caller's `structSize`
+  covers them. `SyntheticResourceInfo::bindlessIndex` is the current
+  example: it sits past the v1 struct size, so a caller compiled against
+  an older header keeps its own layout and never sees the field.
+
+Superseded entry points are normally deprecated rather than deleted.
+When a replacement lands, the old declaration stays at its original
+vtable / overload position and is annotated deprecated, so existing
 callers keep compiling and linking. `VariableReflection` shows the
 pattern: `getDefaultValueBlob` returns a variable's default initializer
 as a packed byte blob, while the narrower `hasDefaultValue`,
 `getDefaultValueInt`, and `getDefaultValueFloat` it replaces remain
-declared and marked deprecated.
+declared and marked deprecated. `IGlobalSession::addBuiltins` is
+annotated the same way — `[[deprecated]]` on the declaration, which
+keeps the vtable slot occupied and so preserves the position of every
+method after it.
+
+Two departures from that pattern are worth knowing about, because
+reading the header alone would otherwise suggest the rules are absolute.
+
+`IGlobalSession`'s final method was *replaced in place* rather than
+appended to: `getDownstreamCompilerVersion(SlangPassThrough, int*, int*)`
+became `getDownstreamCompilerPath(SlangPassThrough, ISlangBlob**)` in
+commit `b9a17f86b1`, occupying the same last vtable slot with a
+different name and signature. The replacement answers a different
+question — where the library Slang selected actually lives on disk, so a
+client can load it and query capabilities itself — rather than a version
+pair that several downstream compilers could only report as `(0, 0)`.
+Being the last slot, and having been introduced only shortly before, the
+change perturbs no earlier method's position.
+
+Correspondingly, the `CompilerOptionName` enumerator that drove the old
+CLI query, `CompilerVersion = 153`, was removed outright rather than
+renamed to `REMOVED_CompilerVersion`. The integer `153` is now a hole in
+the sequence — `SPIRVUnifiedDescriptorHeapStride = 154` follows the gap —
+so the retired value is at least not reused, which is the part of the
+rule that protects a caller holding a stale integer.
+
+The versioning of the *language* accepted by the compiler is separate
+from this ABI surface and is enumerated by `SlangLanguageVersion`.
+Alongside the year-numbered `SLANG_LANGUAGE_VERSION_2025` / `_2026`
+there are now letter-suffixed aliases for the same integers
+(`_202A = 2025`, `_202B = 2026`) plus `_202C = 2027` for the in-progress
+version, whose numeric value the header explicitly warns may change once
+that version is given an official name. `SLANG_LANGUAGE_VERSION_LATEST`
+names the latest stable version and `_NEXT` the development one.
 
 ## Reading guide
 
