@@ -57,6 +57,55 @@ struct LoadMethod
     }
 };
 
+// Return true if `addr` points into the CUDA global uniform parameter group, i.e. the
+// entry-point/global uniform parameters that `CUDASourceEmitter::emitParameterGroupImpl`
+// emits as the single `extern "C" __constant__ GlobalParams_0 SLANG_globalParams;` block.
+// Consider this example:
+// ```
+// uniform uint gValue;
+// RWStructuredBuffer<uint> outBuf;
+// void main() { outBuf[0] = gValue; }
+// ```
+// The front end collects `gValue` into a synthesized `ConstantBuffer<GlobalParams>`
+// global, and `emitParameterGroupImpl` emits its contents inline as fields of
+// `SLANG_globalParams`, which CUDA places in `__constant__` memory. A load of
+// `gValue` therefore has an address chain of `FieldAddress(globalParam, gValue)`;
+// this helper peels the address chain and finds `globalParam` itself, an `IRGlobalParam`
+// whose type is an `IRUniformParameterGroupType`. That root is memory Slang classifies
+// as immutable (see `isPointerToImmutableLocation`), but it is not CUDA global memory:
+// `__ldg` lowers to PTX `ld.global.nc`, which the PTX ISA requires to address global
+// memory, not `__constant__` memory, so loading `gValue` through `__ldg` is illegal
+// codegen even though `gValue` never changes.
+//
+// A pointer *stored inside* the group, e.g. a `StructuredBuffer<T>` field, is a
+// different case: reading through it loads the pointer value out of
+// `SLANG_globalParams` first, and that `Load` — not the group's `IRGlobalParam` — is
+// the root of any subsequent access through the pointer, so genuine buffer reads are
+// unaffected by this check and keep the `__ldg` optimization. Accordingly, this walk
+// deliberately stops at `Load` while peeling pointer-forwarding operations introduced
+// by storage legalization.
+static bool isAddressIntoCudaConstantParameterGroup(IRInst* addr)
+{
+    for (;;)
+    {
+        switch (addr->getOp())
+        {
+        case kIROp_FieldAddress:
+        case kIROp_GetElementPtr:
+        case kIROp_GetOffsetPtr:
+        case kIROp_NodeOutputRecordGetElementPtr:
+        case kIROp_BitCast:
+        case kIROp_Reinterpret:
+        case kIROp_PtrCast:
+            addr = addr->getOperand(0);
+            continue;
+        default:
+            auto globalParam = as<IRGlobalParam>(addr);
+            return globalParam && as<IRUniformParameterGroupType>(globalParam->getDataType());
+        }
+    }
+}
+
 struct ImmutableBufferLoadLoweringContext : InstPassBase
 {
     Dictionary<IRType*, LoadMethod> loadFuncs;
@@ -300,11 +349,14 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
         case kIROp_Load:
             {
                 auto load = as<IRLoad>(inst);
-                if (isPointerToImmutableLocation(getRootAddr(load->getPtr())))
+                auto ptr = load->getPtr();
+                auto rootAddr = getRootAddr(ptr);
+                if (!isAddressIntoCudaConstantParameterGroup(ptr) &&
+                    isPointerToImmutableLocation(rootAddr))
                 {
                     IRBuilder builder(load);
                     builder.setInsertBefore(load);
-                    if (auto newLoad = emitImmutableLoad(builder, load->getPtr()))
+                    if (auto newLoad = emitImmutableLoad(builder, ptr))
                     {
                         load->replaceUsesWith(newLoad);
                         load->removeAndDeallocate();
