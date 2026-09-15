@@ -2051,7 +2051,7 @@ err(
 )
 
 err(
-    "generic-argument-does-not-satisfy-constraint",
+    "generic-argument-does-not-satisfy-constraint", -- span message kept in sync with note E40023
     30440,
     "generic constraint not satisfied",
     span { loc = "location", message = "could not satisfy the generic constraint '~constraint:String'" }
@@ -4058,6 +4058,26 @@ standalone_note(
     span { loc = "location" }
 )
 
+-- Note-severity companions to the E38029 / E30440 constraint-failure errors, attached to the
+-- "no overload applicable" error for a rejected generic candidate. The DSL binds severity at
+-- definition time, so a note cannot reuse an error's text; each message string below is
+-- intentionally identical to the *span* message of E38029 / E30440 respectively (not that error's
+-- top-level header) and MUST be kept in sync — rewording either error's span message should update
+-- its companion note here (and vice versa).
+standalone_note(
+    "overload-candidate-type-argument-does-not-conform", -- keep in sync with E38029's span message
+    40022,
+    "type argument '~typeArg:Type' does not conform to the required interface '~interface:Type'",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "overload-candidate-generic-constraint-not-satisfied", -- keep in sync with E30440's span message
+    40023,
+    "could not satisfy the generic constraint '~constraint:String'",
+    span { loc = "location" }
+)
+
 warning(
     "deprecated-generic-parameter-count-overload-tie-breaker",
     40021,
@@ -4449,7 +4469,7 @@ err(
 )
 
 err(
-    "type-argument-does-not-conform-to-interface",
+    "type-argument-does-not-conform-to-interface", -- span message kept in sync with note E40022
     38029,
     "type argument doesn't conform to interface",
     span { loc = "location", message = "type argument '~typeArg:Type' does not conform to the required interface '~interface:Type'" }
