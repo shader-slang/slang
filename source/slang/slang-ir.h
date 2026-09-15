@@ -896,14 +896,6 @@ public:
     /// in the same list, to conserve space in the instruction itself
     /// (rather than storing distinct lists for decorations and children).
     ///
-    // Note on layout: `typeUse` below is required to be the last member of `IRInst`, so
-    // that the tail-allocated `IRUse` values representing operands come right after it.
-    // This field is `private` while `typeUse` is `public`, and [class.mem] leaves the
-    // relative order of members in *different* access-control regions unspecified. Every
-    // toolchain this builds with lays members out in declaration order regardless, so
-    // the requirement holds in practice -- but it is no longer guaranteed by the
-    // standard, which it was while both members shared one region.
-    //
     /// The decorations and children of this instruction, as a list.
     ///
     /// Private for the same reason as `next`/`prev`: the head of this list is the other
