@@ -577,6 +577,18 @@ WORKLOADS = [
         sweep_sizes=[100, 200, 400, 800],
     ),
     WorkloadSpec(
+        name="vector_ops_ptx",
+        bucket="codegen_downstream",
+        gen=workloads.gen_vector_ops,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "ptx"],
+        primary_timers=["generateOutput", "compileInner"],
+        platforms=["win32"],
+        downstream_required=True,
+        sweep_sizes=[100, 200, 400, 800],
+    ),
+    WorkloadSpec(
         name="codegen_ptx",
         bucket="codegen_downstream",
         gen=workloads.gen_codegen,
