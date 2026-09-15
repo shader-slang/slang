@@ -662,6 +662,11 @@ SlangResult Session::_readBuiltinModule(
     if (!irChunk)
         return SLANG_FAIL;
 
+    UInt64 moduleVersion = 0;
+    SLANG_RETURN_ON_FAIL(readSerializedModuleInfo(irChunk, nullptr, moduleVersion, nullptr));
+    if (!IRModule::isModuleVersionSupported(moduleVersion))
+        return SLANG_FAIL;
+
     auto astChunk = moduleChunk->findAST();
     if (!astChunk)
         return SLANG_FAIL;

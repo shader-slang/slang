@@ -75,7 +75,7 @@ Two types of versions are tracked:
 
 2. **Serialization Version** (`IRModuleInfo::serializationVersion`)
    - Version of the serialization format itself
-   - Currently version 0
+   - Currently version 2
    - Allows future changes to serialization structure
 
 ### Compiler Version Tracking
@@ -109,7 +109,8 @@ The module version must be updated when:
 1. **Adding Instructions** (Minor Version Bump)
 
    - Increment `k_maxSupportedModuleVersion`
-   - Older compilers can still load modules that don't use new instructions
+   - Modules written with the new version are rejected by older compilers, even if they do not use
+     the new instruction
 
 2. **Removing Instructions** (Major Version Bump)
 
@@ -135,28 +136,42 @@ Changes to how data is serialized (not what data) require updating `serializatio
 
 ### Module Loading Flow
 
-1. **Version Check**
+1. **Serialization Format Check**
 
    ```cpp
-   if (fossilizedModuleInfo->serializationVersion != IRModuleInfo::kSupportedSerializationVersion)
+   if (fossilizedModuleInfo->serializationVersion !=
+       IRModuleInfo::kSupportedSerializationVersion)
        return SLANG_FAIL;
    ```
 
-2. **Instruction Deserialization**
+2. **Semantic Module Version Check**
+
+   - Reject module versions outside the inclusive range from `k_minSupportedModuleVersion` to
+     `k_maxSupportedModuleVersion` before deserializing debug information, the AST, or instructions
+   - Explicit IR-blob and module-library loads report diagnostic E00117 immediately
+   - Automatic imports report diagnostic `E00118` as a warning when ignoring an incompatible
+     serialized module, then continue probing source and other candidates
+   - Metadata inspection still reports the recorded version without enforcing the semantic range
+
+3. **Instruction Deserialization**
 
    - Stable IDs are converted to runtime opcodes
    - Unknown IDs become `kIROp_Unrecognized`
 
-3. **Validation Pass**
+4. **Validation Pass**
    - After deserialization, check for any `kIROp_Unrecognized` instructions
    - Fail loading if any are found
 
 ### Error Handling
 
-- Incompatible serialization versions: Immediate failure
+- Incompatible serialization versions: Fail before module deserialization; explicit IR-blob and
+  module-library loads report diagnostic `E00119` as an error, while speculative imports report
+  diagnostic `E00120` as a warning
+- Module version out of range: Fail before module deserialization; explicit IR-blob and
+  module-library loads report diagnostic `E00117` as an error, while speculative imports report
+  diagnostic `E00118` as a warning
 - Unknown instructions: Mark as unrecognized, fail after full deserialization
   (this should be caught by the next check)
-- Module version out of range: Fail after deserialization
 
 ## Future Considerations
 
