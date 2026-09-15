@@ -7287,10 +7287,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             // (the element is materialized by `kIROp_ExtractFirstFromPack`/`ExtractLastFromPack`),
             // so the projection to a concrete `superType` is governed by the pattern witness that
             // relates that element type to `superType`. The wrapper's super-type is its pattern
-            // witness's super-type by construction (getFirst/LastSubtypeWitness), so `superType`
-            // passes through the recursion unchanged; assert that invariant since the downstream
-            // `extractField(superType, ...)` depends on it.
-            SLANG_RELEASE_ASSERT(lowerType(context, firstSubtypeWitness->getSup()) == superType);
+            // witness's super-type by construction (see `FirstSubtypeWitness`), so `superType`
+            // passes through the recursion unchanged. That is an internal lowering invariant, not
+            // out-of-contract input, so a debug `SLANG_ASSERT` is the right tier; the
+            // side-effecting `lowerType` is hoisted out of the assertion so it is never a hidden
+            // side effect in a release build.
+            auto loweredSup = lowerType(context, firstSubtypeWitness->getSup());
+            SLANG_ASSERT(loweredSup == superType);
             return emitCastToConcreteSuperTypeRec(
                 value,
                 superType,
@@ -7298,7 +7301,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto lastSubtypeWitness = as<LastSubtypeWitness>(subTypeWitness))
         {
-            SLANG_RELEASE_ASSERT(lowerType(context, lastSubtypeWitness->getSup()) == superType);
+            // Same reasoning as the `First` arm above, mirrored for `__last`.
+            auto loweredSup = lowerType(context, lastSubtypeWitness->getSup());
+            SLANG_ASSERT(loweredSup == superType);
             return emitCastToConcreteSuperTypeRec(
                 value,
                 superType,

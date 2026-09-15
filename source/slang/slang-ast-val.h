@@ -1392,6 +1392,17 @@ inline bool isTypeEqualityWitness(Val* witness)
     {
         return isTypeEqualityWitness(trimLastWitness->getPatternTypeWitness());
     }
+    // Every other `SubtypeWitness` kind -- `Transitive`, `ExtractExistential`, `Dynamic`,
+    // `DiffTypeInfo`, `HigherOrderDiffTypeTranslation`, `PackBranch` -- denotes a genuine,
+    // non-equality subtype relationship, for which `false` is the correct answer; a catch-all
+    // abort here would wrongly reject valid input. Equality is witnessed only by a
+    // `TypeEqualityWitness`, an equality `DeclaredSubtypeWitness`, or one of the pack-projection
+    // wrappers above that delegates to such a witness through `getPatternTypeWitness`.
+    //
+    // Maintainer note: a *new* pack-projection/wrapper witness (one carrying a pattern witness
+    // it should delegate to) added without an arm above will silently answer `false` here --
+    // that omission is exactly what crashed #12494 when `First`/`LastSubtypeWitness` were
+    // missing from this chain. Add an arm above for any such new witness kind.
     return false;
 }
 
