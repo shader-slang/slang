@@ -6871,8 +6871,19 @@ Stmt* parseCompileTimeForStmt(Parser* parser)
     CompileTimeForStmt* stmt = parser->astBuilder->create<CompileTimeForStmt>();
     stmt->scopeDecl = scopeDecl;
 
+    Token forTok = parser->ReadToken("for");
 
-    parser->ReadToken("for");
+    if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_202C)
+    {
+        // $for has been removed in Slang 202c
+        parser->sink->diagnose(Diagnostics::CompileTimeForIsRemoved{.location = forTok.loc});
+    }
+    else if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025)
+    {
+        // we'll warn about the deprecation of $for in Slang 2025 and 2026
+        parser->sink->diagnose(Diagnostics::CompileTimeForIsDeprecated{.location = forTok.loc});
+    }
+
     parser->ReadToken(TokenType::LParent);
 
     NameLoc varNameAndLoc = expectIdentifier(parser);

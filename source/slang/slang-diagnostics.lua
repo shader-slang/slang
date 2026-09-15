@@ -3404,6 +3404,20 @@ err(
     span { loc = "location", message = "loops inside a differentiable function need to provide either '[MaxIters(n)]' or '[ForceUnroll]' attribute." }
 )
 
+warning(
+    "compile-time-for-is-deprecated",
+    30525,
+    "compile-time for is deprecated",
+    span { loc = "location", message = "compile-time for is deprecated and will be removed in Slang 202c. Use '[ForceUnroll] for' instead." }
+)
+
+err(
+    "compile-time-for-is-removed",
+    30526,
+    "compile-time for has been removed",
+    span { loc = "location", message = "compile-time for has been removed from the language. Use '[ForceUnroll] for' instead." }
+)
+
 -- Switch (306xx)
 
 err(
