@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cpu
 
 // Regression guard for shader-slang/slang#12604: memoizing the specialization work list's
 // forward-use-closure walk must be output-neutral. Mixes generic specialization, autodiff,

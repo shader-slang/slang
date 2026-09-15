@@ -2138,19 +2138,26 @@ struct SpecializationContext
     {
         // Handle a special case of `StructuredBuffer.operator[]/Load/Consume`
         // calls first. These calls on builtin generic types should be handled
-        // the same way as a `load` inst.
+        // the same way as a `load` inst. A successful rewrite here deleted and
+        // replaced the call, so report it as a specialization.
         if (maybeSpecializeBufferLoadCall(inst))
-            return false;
+            return true;
 
-        // If any arguments are value packs, we need to flatten them.
+        // If any arguments are value packs, we need to flatten them. Report whether the callee's
+        // parameter pack or the call's argument pack was actually rewritten: flattening a pack
+        // mutates the IR even though no generic was specialized, and the work-list fixpoint drains
+        // on `hasSpecialization`, so an under-reported mutation here could stop a drain before the
+        // follow-up work it enables is reconsidered.
         bool isCalleeFullyExpanded = false;
-        tryExpandParameterPack(as<IRFunc>(inst->getCallee()), &isCalleeFullyExpanded);
+        bool changed =
+            tryExpandParameterPack(as<IRFunc>(inst->getCallee()), &isCalleeFullyExpanded);
         if (isCalleeFullyExpanded)
         {
-            inst = tryExpandArgPack((IRCall*)inst);
+            auto newInst = tryExpandArgPack(inst);
+            changed |= newInst != inst;
         }
 
-        return false;
+        return changed;
     }
 
     // The above `maybeSpecializeExistentialsForCall` routine needed
