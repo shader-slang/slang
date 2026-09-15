@@ -20,8 +20,9 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=MTL):-target metal -stage compute -entry computeMain -conformance "Literal:IValue=1" -conformance "LeafNode:INode=1" -conformance "IndirectNode:INode=2"
 
-// On Metal, both halves of the stored pointer are combined into a 64-bit value before the cast.
+// On Metal, pointers go through a 64-bit value when packed into or read out of a uint2.
 // MTL-NOT: device*)(uint2(
+// MTL: as_type<uint2>((ulong)(
 // MTL: device*)(as_type<ulong>(uint2(
 // MTL-NOT: device*)(uint2(
 
@@ -73,8 +74,24 @@ uniform IValue* valueBuf;
 //TEST_INPUT: set nodeBuf = ubuffer(data=[0 0 2 0 valueBuf 5 0], stride=4)
 uniform INode* nodeBuf;
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
+
+// Build a node inside the shader. The id is only known at runtime, so the
+// pointer field is packed into the existential's payload.
+INode makeNode(int id)
+{
+    if (id == 0)
+    {
+        LeafNode leaf;
+        leaf.value = 0;
+        return leaf;
+    }
+    IndirectNode node;
+    node.source = valueBuf;
+    node.offset = 7;
+    return node;
+}
 
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -94,4 +111,8 @@ void computeMain()
     INode leafInterface = leaf;
     // CHECK: 99
     outputBuffer[2] = leafInterface.evaluate();
+
+    // Pointer packed in the shader, then read back: 10 + 7 = 17
+    // CHECK: 17
+    outputBuffer[3] = makeNode(valueBuf.get()).evaluate();
 }
