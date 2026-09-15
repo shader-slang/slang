@@ -7,7 +7,9 @@ permalink: /user-guide/language-version
 
 Like many programming languages, Slang experiences a tension between the desire for rapid innovation/evolution and stability. One of the benefits that users of Slang have so far enjoyed has been the rapid pace of innovation in the language and its standard library. However, as developers start to have larger bodies of Slang code, they may become concerned that changes to the language could break existing code. There is no magical way to keep innovating while also keeping the language static.
 
-Slang supports using the `#language` preprocessor directive, as well as the `-std` compiler option (`CompilerOptionName::LanguageVersion`) to specify the language version that a source file is written against. The source file will then be parsed and checked by the compiler using the rules from the specified language version.
+Slang supports using the `#language` preprocessor directive, as well as the `-std` compiler option (`CompilerOptionName::LanguageVersion`) to specify the language version that a translation unit is written against.
+The translation unit will then be parsed and checked by the compiler using the rules from the specified language version.
+If a translation unit has multiple primary source files, a `#language` directive in any of them selects the version for the complete module, and all such directives must agree.
 
 Users are advised to provide a `#language` directive as the first non-whitespace line in their source file, such as:
 

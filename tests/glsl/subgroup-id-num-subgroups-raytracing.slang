@@ -10,7 +10,9 @@
 // their getters) so that a property read, which resolves to the PropertyDecl,
 // propagates the requirement to the entry point.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive): -target spirv -entry main -stage raygeneration -emit-spirv-directly -allow-glsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive): -target spirv -entry main -stage raygeneration -emit-spirv-directly
+
+import glsl;
 
 RWStructuredBuffer<uint> output;
 
