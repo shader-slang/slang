@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T15:44:20Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 908d68e75b69302955968bbdfcb859a23def6d820df3e4565050f206b89519c1
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 2336e319fa15cdc524950d5da1d4ef153c1c96105f931dc9fee17d22569555fa
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -56,7 +56,7 @@ Four further pieces of machinery round out the source inventory and
 are cited below: the
 `Facet` / `FacetList` / `InheritanceInfo` declarations in
 [slang-check-impl.h](../../../../source/slang/slang-check-impl.h)
-(lines 525-763); the post-lookup narrowing and filtering steps in
+(lines 526-763); the post-lookup narrowing and filtering steps in
 [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
 (`resolveOverloadedLookup`, `filterLookupResultByCheckedOptional`,
 `diagnoseAmbiguousReference`); the `CompareLookupResultItems`
@@ -96,7 +96,7 @@ begins, in
   optional-constraint filters) need to accumulate items the same way.
 - `LookupRequest`
   ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-  lines 1562-1582) — the parameter bundle threaded through the lookup
+  lines 1563-1582) — the parameter bundle threaded through the lookup
   implementation: `semantics`, `scope`, `endScope`, `declToExclude`,
   `mask`, `options`, plus the two predicates `isCompletionRequest()`
   and `shouldConsiderAllLocalNames()`. Built by `initLookupRequest`
@@ -109,14 +109,14 @@ begins, in
   - `declToExclude` is threaded from
     `SemanticsContext::getDeclToExcludeFromLookup`
     ([slang-check-impl.h](../../../../source/slang/slang-check-impl.h)
-    lines 1469-1481) and exists so that a declaration being checked
+    lines 1562-1574) and exists so that a declaration being checked
     cannot find itself — the header's example is `typedef Foo Foo;`.
   - `semantics` may be null. Lookup performed from the parser has no
     `SemanticsVisitor` yet, and that changes behavior in two places
     (see step 4 of "Unqualified lookup" and "Member lookup" below).
 - `LookupMask`
   ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-  lines 1307-1316) — a `uint8_t` bitset selecting which categories
+  lines 1308-1316) — a `uint8_t` bitset selecting which categories
   of decl pass the filter. The bits are:
   - `type = 0x1` — `AggTypeDecl` / `SimpleTypeDecl`.
   - `Function = 0x2` — `FunctionDeclBase` subclasses.
@@ -134,8 +134,8 @@ begins, in
     asks for this bit on its own when reading the modifier list of a
     parameter declaration, so that only a keyword decl can begin a
     modifier there
-    ([slang-parser.cpp lines 5059 and
-    7655](../../../../source/slang/slang-parser.cpp)).
+    ([slang-parser.cpp lines 5073 and
+    7680](../../../../source/slang/slang-parser.cpp)).
   - `Semantic = 0x20` — `SemanticDecl`, the
     `semantic sv_position { ... }` declarations in
     [core.meta.slang](../../../../source/slang/core.meta.slang) (line
@@ -164,7 +164,7 @@ begins, in
   consulted, and `FileDecl` is hard-coded never to pass (lines 79-83).
 - `LookupOptions`
   ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-  lines 1319-1334) — a `uint8_t` bitset of behavior flags. Besides
+  lines 1320-1334) — a `uint8_t` bitset of behavior flags. Besides
   `None = 0` there are six:
   - `IgnoreBaseInterfaces` (1 << 0) — skip inherited interface
     members.
@@ -182,15 +182,15 @@ begins, in
     injection.
 - `LookupResultItem`
   ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-  lines 1425-1503) — one found decl plus an optional breadcrumb
+  lines 1426-1503) — one found decl plus an optional breadcrumb
   chain (`DeclRef<Decl> declRef`,
   `RefPtr<LookupResultItem_Breadcrumb> breadcrumbs`). It exposes
   `Breadcrumb` as a nested typedef for the free-standing
   `LookupResultItem_Breadcrumb` class.
 - `LookupResultItem_Breadcrumb`
   ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-  lines 1341-1422) — a navigation step recorded during lookup. Its
-  `Kind` enum (lines 1344-1370) has four values:
+  lines 1342-1422) — a navigation step recorded during lookup. Its
+  `Kind` enum (lines 1345-1370) has four values:
   - `Member` — lookup saw a transparent in-scope decl and looked
     through it, so the final expression needs `obj.field`.
   - `Deref` — lookup auto-dereferenced a pointer-like type, so the
@@ -203,21 +203,21 @@ begins, in
 
   Breadcrumb instances chain via
   `RefPtr<LookupResultItem_Breadcrumb> next` and carry a
-  `ThisParameterMode` (lines 1378-1385) describing whether `this` is
+  `ThisParameterMode` (lines 1379-1385) describing whether `this` is
   `ImmutableValue`, `MutableValue`, or the `This` `Type`.
 - `LookupResult`
   ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-  lines 1509-1556) — single-or-multi container for found items. A
+  lines 1510-1556) — single-or-multi container for found items. A
   result is *valid* when `item.declRef.getDecl()` is non-null, and
   *overloaded* when `items.getCount() > 1`. The invariant documented
-  at lines 1518-1520 is that when `items` is in use it holds *all* the
+  at lines 1519-1520 is that when `items` is in use it holds *all* the
   items and `item` duplicates one of them (in practice the first);
   `items` is left entirely empty in the single-result case so that no
   heap allocation happens. `begin()`/`end()` hide the distinction from
   callers.
 - `Facet` / `FacetList` / `InheritanceInfo`
   ([slang-check-impl.h](../../../../source/slang/slang-check-impl.h)
-  lines 525-763) — the linearized inheritance information member
+  lines 526-763) — the linearized inheritance information member
   lookup iterates. A facet is a `(kind, directness, origin,
   subtypeWitness, declRefForMemberLookup)` record; `origin` is the
   type and/or `DeclRef` whose members the facet contributes. `kind`
@@ -226,7 +226,7 @@ begins, in
   `FacetImpl::next` and is deduplicated by origin at construction
   time — `originsMatch` / `FacetList::containsMatchFor`
   ([slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp)
-  lines 1877-1976) — so a base interface reached through two
+  lines 1890-1976) — so a base interface reached through two
   inheritance paths yields exactly one facet.
 
 ## Algorithm
@@ -298,7 +298,12 @@ builds a `LookupRequest`, and calls `_lookUpInScopes`
    scope, the loop updates `thisParameterMode` based on the
    container it just left: `ConstructorDecl` and `SetterDecl` give a
    mutable `this`; a `FunctionDeclBase` consults
-   `isEffectivelyStatic`, `[mutating]`, and `[ref]`; and stepping out
+   `isEffectivelyStatic`, `[mutating]`, and `[__ref]` — note the two
+   leading underscores, since the attribute is declared
+   `attribute_syntax [__ref] : RefAttribute;`
+   ([core.meta.slang](../../../../source/slang/core.meta.slang) line
+   4729, marked `@internal` and targeted at `FunctionDeclBase`), so a
+   bare `[ref]` is an unknown attribute; and stepping out
    of a nested `AggTypeDeclBase` leaves only the `This` type
    ([slang-lookup.cpp lines
    976-1049](../../../../source/slang/slang-lookup.cpp)).
@@ -402,8 +407,8 @@ That function is where the dispatch on type shape happens:
   240](../../../../source/slang/slang-check-expr.cpp)) rewrites a
   member-access base whose type is a `DeclRefType` of an
   `InterfaceDecl` into an `ExtractExistentialValueExpr` typed
-  `ExtractExistentialType` (lines 197-206), and it runs on the base of
-  every member access (line 8824) and static member access (line
+  `ExtractExistentialType` (lines 198-206), and it runs on the base of
+  every member access (line 8880) and static member access (line
   8744).
 
   ```
@@ -421,14 +426,14 @@ That function is where the dispatch on type shape happens:
 **Lookup in a decl.** `_lookUpMembersInSuperTypeDeclImpl` (lines
 513-576) handles three cases in order. First, the name `This` in
 anything other than an `InterfaceDecl` resolves to the decl-ref
-itself (lines 522-529). Second, if `request.semantics` is null — the
+itself (lines 523-529). Second, if `request.semantics` is null — the
 parse-time case — it does a direct-members-only lookup on an
 `AggTypeDeclBase` and returns, without consulting bases or
-extensions (lines 531-549). Otherwise it drives the decl to
-`DeclCheckState::ReadyForLookup` via `ensureDecl` (line 551), asks
+extensions (lines 532-549). Otherwise it drives the decl to
+`DeclCheckState::ReadyForLookup` via `ensureDecl` (line 552), asks
 `SharedSemanticsContext::getInheritanceInfo` for the linearized facet
 list — keyed on the `ExtensionDecl` decl-ref for an extension, and on
-the canonical self type otherwise (lines 556-566) — and hands off to
+the canonical self type otherwise (lines 557-566) — and hands off to
 the facet walk.
 
 **Facet walk.** `_lookupMembersInSuperTypeFacets`
@@ -537,9 +542,27 @@ parser's tables introduces one. The single site that creates a
 ([slang-parser.cpp lines
 10727-10728](../../../../source/slang/slang-parser.cpp)) and the GLSL
 interface-block forms that route to the same helper from
-`ParseDeclWithModifiers` (lines 5868-5891). Every transparent member
+`ParseDeclWithModifiers` (lines 5882-5891). Every transparent member
 in a user program therefore comes from one of those buffer-block
 declarations.
+
+Two details decide whether a given block actually produces one. First,
+the transparent modifier is attached only when the block has **no
+instance name**: the `else` branch that creates it
+([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+4165) is reached only after the named and bindless-array forms have
+been ruled out, so `cbuffer C { float a; } c;` is *not* transparent
+while `cbuffer C { float a; };` is. Second, the GLSL form needs
+`ParserOptions::allowGLSLInput`, which `-allow-glsl` sets (or a module
+carrying `GLSLModuleModifier`):
+
+```slang
+// slangc -allow-glsl ...
+uniform MyBlock { float a; };   // transparent: `a` is visible unqualified
+```
+
+Without that option the same text does not reach the interface-block
+path at all.
 
 `ContainerDecl::getTransparentDirectMemberDecls`
 ([slang-ast-decl.h line
@@ -563,7 +586,15 @@ prepends a `Member` breadcrumb, and recurses via
 - the request's `options` include `IgnoreTransparentMembers`. The one
   context that sets that option is the check of a declaration's base
   clause when the declaration itself carries `TransparentModifier`,
-  where looking back through the transparent member would be circular
+  where looking back through the transparent member would be circular.
+  That combination is **not reachable from user source**: the sole
+  producer of `TransparentModifier`
+  ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+  4165) attaches it to the synthesized *variable* declaration of an
+  unnamed buffer block, and a `VarDecl` has no base clause for
+  `checkInheritanceDecl` to be checking. Read the option as a guard for
+  compiler-internal lookups rather than as something a program can
+  provoke
   (`excludeTransparentMembersFromLookup`,
   [slang-check-decl.cpp lines
   4798-4804](../../../../source/slang/slang-check-decl.cpp)); it
@@ -593,7 +624,7 @@ breadcrumb is `SuperType` and carries the witness as its `val`. That
 field is also what
 `SemanticsVisitor::filterLookupResultByCheckedOptional`
 ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
-lines 1349-1373) inspects: it walks each item's breadcrumb chain and
+lines 1361-1373) inspects: it walks each item's breadcrumb chain and
 drops the item when any `SubtypeWitness` on it comes from an
 `optional` constraint that the surrounding code has not yet checked.
 
@@ -618,7 +649,7 @@ lines 82-119) sets the flag on every `DeclStmt` in the block's
 `SeqStmt` body before checking that body (lines 106-116), and
 `visitDeclStmt` (lines 58-80) clears it as the checker walks past each
 declaration (line 73). The flag is only ever written by these two
-statement visitors plus `visitCatchStmt` (line 670), which clears it
+statement visitors plus `visitCatchStmt` (line 676), which clears it
 on a `catch` clause's error variable.
 
 Lookup honors the flag via `_isUncheckedLocalVar`
@@ -646,10 +677,10 @@ overload set. The chain is implemented by the
 lazily when a container's lookup accelerators are rebuilt —
 `ContainerDeclDirectMemberDecls::_ensureLookupAcceleratorsAreValid`
 ([slang-ast-decl.cpp](../../../../source/slang/slang-ast-decl.cpp)
-lines 260-343, writing the field at line 331) — and not by
-`addDirectMemberDecl` (line 409), which only appends to the member
+lines 259-343, writing the field at line 330) — and not by
+`addDirectMemberDecl` (line 408), which only appends to the member
 list. The same pass deliberately skips a `GenericDecl`'s `inner`
-member (lines 312-320) so that a generic and its inner decl do not
+member (lines 311-320) so that a generic and its inner decl do not
 both answer to the generic's name. `getDirectMemberDeclsOfName`
 ([slang-ast-decl.cpp line
 372](../../../../source/slang/slang-ast-decl.cpp)) exposes the chain
@@ -681,14 +712,14 @@ other layers:
   satisfies it. Narrowing is the caller's job:
   `SemanticsVisitor::_resolveOverloadedExprImpl`
   ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
-  lines 1519-1537) first calls `refineLookup` to drop items that do
+  lines 1531-1537) first calls `refineLookup` to drop items that do
   not match the contextually expected `LookupMask`, then
-  `resolveOverloadedLookup` (lines 1396-1473), which keeps only the
+  `resolveOverloadedLookup` (lines 1408-1473), which keeps only the
   pairwise-incomparable items under `CompareLookupResultItems`. That
   comparator is where a concrete method beats the interface
   requirement it satisfies
   ([slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp)
-  lines 1944-1958); see
+  lines 1953-1958); see
   [overload-resolution.md#tie-breaking-comparator](overload-resolution.md#tie-breaking-comparator).
 
 Keeping every breadcrumb path visible through lookup is what lets
@@ -706,11 +737,11 @@ siblings, and
 the inner loop of step 2 above is what makes them reachable. The
 wiring happens in `SemanticsDeclScopeWiringVisitor`
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-lines 17325-17427), a dedicated check phase that runs to
+lines 17336-17427), a dedicated check phase that runs to
 `DeclCheckState::ScopesWired`, which sits between `ModifiersChecked` and
 `SignatureChecked`
 ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-lines 492-506). The whole module is driven to `ScopesWired` before any
+lines 493-506). The whole module is driven to `ScopesWired` before any
 declaration advances past it — the state loop at
 [slang-check-decl.cpp lines
 5244-5321](../../../../source/slang/slang-check-decl.cpp) runs
@@ -732,9 +763,9 @@ using namespace NS;
 1192](../../../../source/slang/slang-ast-decl.h), called at
 [slang-check-decl.cpp line
 17416](../../../../source/slang/slang-check-decl.cpp) for namespaces
-and line 17355 for `using`) is the constructor for those links, and
-`importModuleIntoScope` (line 17032) filters what an `import`
-re-exports through `isOwnModuleOrIncludedFileScope` (line 17066).
+and line 17366 for `using`) is the constructor for those links, and
+`importModuleIntoScope` (line 17043) filters what an `import`
+re-exports through `isOwnModuleOrIncludedFileScope` (line 17077).
 [scopes.md#sibling-scopes](scopes.md#sibling-scopes) owns the details;
 [visibility.md](visibility.md) owns the reachability rules the filter
 upholds.
@@ -813,7 +844,7 @@ does not pass through the `GenericDecl`.
   one candidate and the context needs exactly one, the checker calls
   `diagnoseAmbiguousReference`
   ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
-  lines 1489-1504), which emits `Diagnostics::AmbiguousReference`
+  lines 1501-1504), which emits `Diagnostics::AmbiguousReference`
   (`ambiguous-reference`, code 39999,
   [slang-diagnostics.lua lines
   4036-4041](../../../../source/slang/slang-diagnostics.lua)) followed
@@ -821,7 +852,7 @@ does not pass through the `GenericDecl`.
   single-argument `diagnoseAmbiguousReference` wrapper (lines
   1506-1517) is what sets the expression's type to the error type. A
   `NamespaceDecl` first item is
-  exempted (lines 1475-1487) because an overloaded namespace reference
+  exempted (lines 1500-1512) because an overloaded namespace reference
   is legitimate.
 - **Forward reference inside a `BlockStmt`.** Using `b` before its
   `DeclStmt` reaches the lookup with `hiddenFromLookup = true`;
@@ -893,7 +924,7 @@ does not pass through the `GenericDecl`.
   otherwise-valid result, the diagnosing wrapper reports
   `Diagnostics::RequiredConstraintIsNotChecked`
   ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
-  lines 1383-1402), except in language-server mode where the
+  lines 1395-1402), except in language-server mode where the
   unfiltered result is returned instead. The constraint is written
   with `optional` after `where`
   ([slang-parser.cpp line
