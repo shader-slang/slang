@@ -727,7 +727,7 @@ public T rsqrt<T : IRootFunctions>(T value)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-9)]
-public T min<T : IRealOrderingFunctions>(T left, T right)
+public T min<T : INumericalExtrema>(T left, T right)
 {
     return left.minimum(right);
 }
@@ -735,7 +735,7 @@ public T min<T : IRealOrderingFunctions>(T left, T right)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-9)]
-public T max<T : IRealOrderingFunctions>(T left, T right)
+public T max<T : INumericalExtrema>(T left, T right)
 {
     return left.maximum(right);
 }
@@ -743,7 +743,7 @@ public T max<T : IRealOrderingFunctions>(T left, T right)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T clamp<T : IRealOrderingFunctions>(T value, T minimumValue, T maximumValue)
+public T clamp<T : INumericalExtrema>(T value, T minimumValue, T maximumValue)
 {
     return value.maximum(minimumValue).minimum(maximumValue);
 }
@@ -790,7 +790,7 @@ public T lerp<T : IFractional>(T x, T y, T factor)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T max3<T : IRealOrderingFunctions>(T x, T y, T z)
+public T max3<T : INumericalExtrema>(T x, T y, T z)
 {
     return x.maximum(y.maximum(z));
 }
@@ -798,7 +798,7 @@ public T max3<T : IRealOrderingFunctions>(T x, T y, T z)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T min3<T : IRealOrderingFunctions>(T x, T y, T z)
+public T min3<T : INumericalExtrema>(T x, T y, T z)
 {
     return x.minimum(y.minimum(z));
 }
@@ -806,7 +806,7 @@ public T min3<T : IRealOrderingFunctions>(T x, T y, T z)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T median3<T : IRealOrderingFunctions>(T x, T y, T z)
+public T median3<T : INumericalExtrema>(T x, T y, T z)
 {
     T lower = y.minimum(z);
     T upper = y.maximum(z);

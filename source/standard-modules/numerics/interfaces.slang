@@ -459,15 +459,19 @@ public typealias IElementaryFunctions =
 /// Scalar refinement of `IElementaryFunctions`.
 public typealias IScalarElementaryFunctions = IElementaryFunctions & IScalarShapedType;
 
-/// Supports operations whose conventional definitions depend on a real ordering.
-public interface IRealOrderingFunctions
+/// Supports component-wise numerical extrema operations.
+public interface INumericalExtrema
 {
     /// Computes the component-wise minimum.
     This minimum(This other);
 
     /// Computes the component-wise maximum.
     This maximum(This other);
+}
 
+/// Supports operations whose conventional definitions depend on a real ordering.
+public interface IRealOrderingFunctions : INumericalExtrema
+{
     /// Returns the component-wise step result: zero where this value is less than `edge`, and one
     /// otherwise.
     This step(This edge);
