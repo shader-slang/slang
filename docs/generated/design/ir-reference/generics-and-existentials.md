@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T15:13:26Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 2609b92831f6f38e2366db21542208170c71ccf5375c99accf220652a1c5035e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -34,7 +34,7 @@ rather than living in one contiguous group:
   [structure.md](structure.md) owns.
 - The existential construction and destructuring cluster runs from
   `makeExistential` (2708) to `extractTaggedUnionPayload` (2733).
-- `GetDynamicResourceHeap` is at line 2815.
+- `GetDynamicResourceHeap` is at line 2819.
 - The type-flow specialization opcodes run from the abstract `SetBase`
   group (3125) through `SpecializeExistentialsInType` (3384).
 
@@ -74,14 +74,14 @@ for how that generation works.
 
 Lowering from the AST is in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
-The producers this page cites are `emitDeclRef` (line 14979), which
-emits `specialize` for a `GenericAppDeclRef` (15086) and
+The producers this page cites are `emitDeclRef` (line 15302), which
+emits `specialize` for a `GenericAppDeclRef` (15351) and
 `lookupWitness` for an interface requirement reached through a
-`LookupDeclRef` (15144); `visitCastToSuperTypeExpr` (7275) for
-`makeExistential`; `visitExtractExistentialValueExpr` (7679),
-`visitExtractExistentialType` (2922) and
-`visitExtractExistentialSubtypeWitness` (2931) for the three
-existential projections; `visitTypeEqualityWitness` (2398);
+`LookupDeclRef` (15425); `visitCastToSuperTypeExpr` (7312) for
+`makeExistential`; `visitExtractExistentialValueExpr` (7716),
+`visitExtractExistentialType` (2935) and
+`visitExtractExistentialSubtypeWitness` (2944) for the three
+existential projections; `visitTypeEqualityWitness` (2411);
 `visitIsTypeExpr` (7420) for `GetSequentialID`; and
 `visitGlobalGenericParamDecl` (10878) for `global_generic_param`.
 Everything else on this page is introduced by an IR pass —
@@ -93,7 +93,7 @@ or by a core-module `__intrinsic_op` declaration.
 `createExistentialObject` and `GetDynamicResourceHeap` are produced
 from a core-module `__intrinsic_op` declaration rather than from a
 `visit*` method, and `createExistentialObject` is additionally rebuilt
-by `slang-ir-lower-dynamic-dispatch-insts.cpp` (line 1167).
+by `slang-ir-lower-dynamic-dispatch-insts.cpp` (line 1239).
 Seven opcodes have **no producer at all** at `source_commit`:
 `rtti_object`, `makeExistentialWithRTTI`, `extractTaggedUnionTag`,
 `extractTaggedUnionPayload`, `UnboundedGenericElement`,
@@ -112,7 +112,7 @@ documented here as their operands — see
 Besides the IR core, this page rests on
 [slang-ir.h.lua](../../../../source/slang/slang-ir.h.lua) (the wrapper
 and enumerator generation rules),
-[slang-ir-util.h](../../../../source/slang/slang-ir-util.h) (line 397,
+[slang-ir-util.h](../../../../source/slang/slang-ir-util.h) (line 411,
 `findWitnessTableEntry`),
 [slang-ir-specialize.h](../../../../source/slang/slang-ir-specialize.h)
 (line 19, `SpecializationOptions::lowerWitnessLookups`), and the
@@ -174,10 +174,10 @@ Flag codes are `H` hoistable, `P` parent, `G` global.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `specialize` | `IRSpecialize`‡ | `base, args...`† | H | any decl-ref carrying a `GenericAppDeclRef`, via `emitDeclRef` (line 15086) | Applies generic arguments to a generic value (function, type, or witness table); hoistable, so identical specializations dedupe. |
-| `global_generic_param` | `IRGlobalGenericParam`‡ | — | G | `GlobalGenericParamDecl` (`visitGlobalGenericParamDecl`, line 10878) and `GlobalGenericValueParamDecl` (10885), plus each constraint decl parented by one | Declares a generic parameter at module scope; also documented as module-scope state in [structure.md](structure.md). |
-| `bind_global_generic_param` | `IRBindGlobalGenericParam`‡ | `param: IRGlobalGenericParam, val: IRInst` | | `SpecializedComponentTypeIRGenContext::visitModule` (line 15844) | Binds a global generic parameter to a concrete value when a specialized component type is generated. |
-| `globalValueRef` | `IRGlobalValueRef`‡ | `value` | | [slang-ir-legalize-global-values.cpp](../../../../source/slang/slang-ir-legalize-global-values.cpp) line 229 | Non-hoistable "pin" that keeps a global value referenced from inside a function body, so dependent computation can be emitted locally on targets (e.g. SPIR-V) that forbid it at global scope. |
+| `specialize` | `IRSpecialize`‡ | `base, args...`† | H | any decl-ref carrying a `GenericAppDeclRef`, via `emitDeclRef` (line 15351) | Applies generic arguments to a generic value (function, type, or witness table); hoistable, so identical specializations dedupe. |
+| `global_generic_param` | `IRGlobalGenericParam`‡ | — | G | `GlobalGenericParamDecl` (`visitGlobalGenericParamDecl`, line 10962) and `GlobalGenericValueParamDecl` (10885), plus each constraint decl parented by one | Declares a generic parameter at module scope; also documented as module-scope state in [structure.md](structure.md). |
+| `bind_global_generic_param` | `IRBindGlobalGenericParam`‡ | `param: IRGlobalGenericParam, val: IRInst` | | `SpecializedComponentTypeIRGenContext::visitModule` (line 16032) | Binds a global generic parameter to a concrete value when a specialized component type is generated. |
+| `globalValueRef` | `IRGlobalValueRef`‡ | `value` | | [slang-ir-legalize-global-values.cpp](../../../../source/slang/slang-ir-legalize-global-values.cpp) line 239 | Non-hoistable "pin" that keeps a global value referenced from inside a function body, so dependent computation can be emitted locally on targets (e.g. SPIR-V) that forbid it at global scope. |
 
 The Slang spelling that declares a `global_generic_param` is
 `type_param T;` at module scope. Adding a constraint —
@@ -203,7 +203,7 @@ witness parameters unless they are the only ones left with a use.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `lookupWitness` | `IRLookupWitnessMethod`‡ | `witnessTable, requirementKey`† (`min_operands = 2`) | H | an interface requirement reached through a `LookupDeclRef`, via `emitDeclRef` (line 15144); also `visitWitnessLookupIntVal` (1980), `visitTransitiveSubtypeWitness` (2438) and `emitCastToInterfaceSuperTypeRec` (7255) | Resolves an interface requirement through a witness table; the two operands are read back by `getWitnessTable()` / `getRequirementKey()`. |
+| `lookupWitness` | `IRLookupWitnessMethod`‡ | `witnessTable, requirementKey`† (`min_operands = 2`) | H | an interface requirement reached through a `LookupDeclRef`, via `emitDeclRef` (line 15425); also `visitWitnessLookupIntVal` (1980), `visitTransitiveSubtypeWitness` (2438) and `emitCastToInterfaceSuperTypeRec` (7255) | Resolves an interface requirement through a witness table; the two operands are read back by `getWitnessTable()` / `getRequirementKey()`. |
 
 ### Existential construction
 
@@ -219,12 +219,12 @@ interface-typed global parameter, entry-point parameter or buffer
 element — depends on the *linkage* for the set of types it can hold.
 `collectExistentialTables`
 ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp)
-line 8173) gathers the global `witness_table` insts of the interface's
+line 8373) gathers the global `witness_table` insts of the interface's
 `witness_table_t` type that survived linking; when it comes back empty
 at a site that has to resolve the existential — an interface-typed
-global parameter (line 1583), an interface-typed entry-point parameter
-(line 3541), a `lookupWitness` still unresolved after specialization
-(line 3506) — the pass reports `NoTypeConformancesFoundForInterface`
+global parameter (line 1640), an interface-typed entry-point parameter
+(line 3656), a `lookupWitness` still unresolved after specialization
+(line 3621) — the pass reports `NoTypeConformancesFoundForInterface`
 (`E50100`, "no type conformances found") and code generation stops. A
 conformance that nothing else in the program references is forced into
 the link with `slangc -conformance <Type>:<Interface>[=<id>]`; that is
@@ -232,9 +232,9 @@ what makes a `createDynamicObject` program compile.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `makeExistential` | `IRMakeExistential`‡ | `value, witness` | | `CastToSuperTypeExpr` (`visitCastToSuperTypeExpr`, line 7275); also `assign` (10237) when storing back into an opened existential | Packs `value` plus the witness that its concrete type conforms to the target interface; accessors are `getWrappedValue()` / `getWitnessTable()`. |
-| `makeExistentialWithRTTI` | `IRMakeExistentialWithRTTI`‡ | `value, witness, typeRTTI` | | **no producer at HEAD** | Same as `makeExistential` but carrying the value's type as an explicit operand. `IRBuilder::emitMakeExistentialWithRTTI` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4972) has no caller at `source_commit`, though several passes still recognize the opcode. |
-| `createExistentialObject` | `IRCreateExistentialObject`‡ | `typeID, value` | | core-module `createDynamicObject<T, U>(uint typeId, U value)` in [core.meta.slang](../../../../source/slang/core.meta.slang) (line 3382), declared with `__intrinsic_op($(kIROp_CreateExistentialObject))`; also rebuilt by [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) (lines 1167, 1187) | Builds an existential from a runtime type id plus a value, rather than from a static witness. |
+| `makeExistential` | `IRMakeExistential`‡ | `value, witness` | | `CastToSuperTypeExpr` (`visitCastToSuperTypeExpr`, line 7312); also `assign` (10237) when storing back into an opened existential | Packs `value` plus the witness that its concrete type conforms to the target interface; accessors are `getWrappedValue()` / `getWitnessTable()`. |
+| `makeExistentialWithRTTI` | `IRMakeExistentialWithRTTI`‡ | `value, witness, typeRTTI` | | **no producer at HEAD** | Same as `makeExistential` but carrying the value's type as an explicit operand. `IRBuilder::emitMakeExistentialWithRTTI` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4981) has no caller at `source_commit`, though several passes still recognize the opcode. |
+| `createExistentialObject` | `IRCreateExistentialObject`‡ | `typeID, value` | | core-module `createDynamicObject<T, U>(uint typeId, U value)` in [core.meta.slang](../../../../source/slang/core.meta.slang) (line 3374), declared with `__intrinsic_op($(kIROp_CreateExistentialObject))`; also rebuilt by [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) (lines 1239, 1187) | Builds an existential from a runtime type id plus a value, rather than from a static witness. |
 | `wrapExistential` | `IRWrapExistential`‡ | `wrappedValue, slotArgs...`† | | [slang-ir-bind-existentials.cpp](../../../../source/slang/slang-ir-bind-existentials.cpp) line 350 and [slang-ir-specialize.cpp](../../../../source/slang/slang-ir-specialize.cpp) | Converts a value of type `BindExistentials<T, ...>` back to `T`; the `(type, witness)` slot pairs after operand 0 are read with `getSlotOperandCount()` / `getSlotOperand(i)`. |
 
 ### Existential destructuring
@@ -244,13 +244,13 @@ handful of helpers for downstream processing.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `extractExistentialValue` | `IRExtractExistentialValue`‡ | `existential` | | `ExtractExistentialValueExpr` (`visitExtractExistentialValueExpr`, line 7679); also `visitCastToSuperTypeExpr` (7330) | Reads the packed concrete-typed value from an existential. |
-| `extractExistentialType` | `IRExtractExistentialType`‡ | `existential` | H | the `ExtractExistentialType` AST type (`visitExtractExistentialType`, line 2922) | Reads the packed concrete type from an existential. |
-| `extractExistentialWitnessTable` | `IRExtractExistentialWitnessTable`‡ | `existential` | H | `ExtractExistentialSubtypeWitness` (`visitExtractExistentialSubtypeWitness`, line 2931) | Reads the packed witness table from an existential. |
-| `getValueFromBoundInterface` | `IRGetValueFromBoundInterface`‡ | `value` | | `IRBuilder::emitWrapExistential` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 5013), which unwraps the box before rebuilding the existential | Reads the concrete-typed value out of a `BoundInterface<I, T, w>` value. |
+| `extractExistentialValue` | `IRExtractExistentialValue`‡ | `existential` | | `ExtractExistentialValueExpr` (`visitExtractExistentialValueExpr`, line 7716); also `visitCastToSuperTypeExpr` (7330) | Reads the packed concrete-typed value from an existential. |
+| `extractExistentialType` | `IRExtractExistentialType`‡ | `existential` | H | the `ExtractExistentialType` AST type (`visitExtractExistentialType`, line 2935) | Reads the packed concrete type from an existential. |
+| `extractExistentialWitnessTable` | `IRExtractExistentialWitnessTable`‡ | `existential` | H | `ExtractExistentialSubtypeWitness` (`visitExtractExistentialSubtypeWitness`, line 2944) | Reads the packed witness table from an existential. |
+| `getValueFromBoundInterface` | `IRGetValueFromBoundInterface`‡ | `value` | | `IRBuilder::emitWrapExistential` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 5022), which unwraps the box before rebuilding the existential | Reads the concrete-typed value out of a `BoundInterface<I, T, w>` value. |
 | `isNullExistential` | `IRIsNullExistential`‡ | `val` | | [slang-ir-lower-optional-type.cpp](../../../../source/slang/slang-ir-lower-optional-type.cpp) line 229 | True when an existential holds the "null" placeholder; used to lower `Optional<ISomeInterface>`'s has-value test. |
-| `extractTaggedUnionTag` | `IRExtractTaggedUnionTag` | `val` | | **no producer at HEAD** | Reads the discriminator of a tagged-union existential representation. No caller of `IRBuilder::emitExtractTaggedUnionTag` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 6609) at `source_commit`. |
-| `extractTaggedUnionPayload` | `IRExtractTaggedUnionPayload` | `unionVal, tag`† | | **no producer at HEAD** | Reads the payload of a tagged-union existential representation. The Lua entry declares only `unionVal`, but `IRBuilder::emitExtractTaggedUnionPayload` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 6617) builds it with a second `tag` operand. Also uncalled at `source_commit`. |
+| `extractTaggedUnionTag` | `IRExtractTaggedUnionTag` | `val` | | **no producer at HEAD** | Reads the discriminator of a tagged-union existential representation. No caller of `IRBuilder::emitExtractTaggedUnionTag` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 6618) at `source_commit`. |
+| `extractTaggedUnionPayload` | `IRExtractTaggedUnionPayload` | `unionVal, tag`† | | **no producer at HEAD** | Reads the payload of a tagged-union existential representation. The Lua entry declares only `unionVal`, but `IRBuilder::emitExtractTaggedUnionPayload` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 6626) builds it with a second `tag` operand. Also uncalled at `source_commit`. |
 
 ### Witness tables and witness facts
 
@@ -266,7 +266,7 @@ only the part a reader of a *dispatch* site needs.
 | --- | --- | --- |
 | `witness_table` | [structure.md](structure.md#witness-tables-and-witness-facts) | Operand 0 of a `lookupWitness`. Operand 0 of the table itself is the conforming concrete type; the interface it satisfies lives in the table's result type (`WitnessTableType`), read with `getConformanceType()`. |
 | `witness_table_entry` | [structure.md](structure.md#witness-tables-and-witness-facts) | The keyed child that holds the satisfying value; resolving a `lookupWitness` substitutes that value, not the entry itself (`findWitnessTableEntry` returns `entry->getSatisfyingVal()`). Read it by key, never by position (below). |
-| `interface_req_entry` | [structure.md](structure.md#interface-internals) | The interface-side half of the same key. An `InterfaceType` gets one entry per lowered interface *requirement*, which is not the same as per member — `shouldDeclBeTreatedAsInterfaceRequirement` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 1676) excludes subscript, property and default-implementation declarations while their accessors are requirements in their own right. An associated-type bound such as `associatedtype A : IBar` is a *sibling* requirement carrying a `WitnessTableType(bound)` value rather than a nested one. |
+| `interface_req_entry` | [structure.md](structure.md#interface-internals) | The interface-side half of the same key. An `InterfaceType` gets one entry per lowered interface *requirement*, which is not the same as per member — `shouldDeclBeTreatedAsInterfaceRequirement` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 1689) excludes subscript, property and default-implementation declarations while their accessors are requirements in their own right. An associated-type bound such as `associatedtype A : IBar` is a *sibling* requirement carrying a `WitnessTableType(bound)` value rather than a nested one. |
 | `key` / `StructKey`, `builtinRequirementKey` | [structure.md](structure.md#struct-internals) | The two spellings a `requirementKey` operand can take. Because either can appear, the Lua schema and the generated accessors type the key operand as `IRInst`, not `IRStructKey`; the two `IRBuilder` dispatcher helpers still narrow their parameter to `IRStructKey*`. |
 | `thisTypeWitness` | [structure.md](structure.md#witness-tables-and-witness-facts) | The abstract witness that `ThisType` conforms to the enclosing interface; a `lookupWitness` through it stays abstract until specialization. |
 | `TypeEqualityWitness` | [structure.md](structure.md#witness-tables-and-witness-facts) | The witness form used when a constraint is discharged by a type-equality fact instead of an interface implementation. See the callout below for the generics angle. |
@@ -286,11 +286,11 @@ interface IHasProp
 This lowers to an `interface` with exactly three `interface_req_entry`
 children — keyed by `%IHasPropx5Fvalx5Fget`, `%IHasPropx5Fvalx5Fset`
 and `%IHasPropx5Fplain` — and none for `val` itself:
-`shouldDeclBeTreatedAsInterfaceRequirement` (line 1676) returns false
-for a `PropertyDecl`, and the interface-lowering loop (line 12275)
+`shouldDeclBeTreatedAsInterfaceRequirement` (line 1689) returns false
+for a `PropertyDecl`, and the interface-lowering loop (line 12576)
 then descends into the property's accessors and keys an entry off each
 one. The `x5F` in those names is `scrubName`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 7667)
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 7729)
 escaping the `.` that a name hint uses as its separator.
 
 Matching entries by name does not work for every requirement, though.
@@ -298,7 +298,7 @@ The sibling entry that a bound such as `associatedtype A : IBar`
 produces is keyed off the synthesized constraint decl, which carries
 no name, so `addNameHint`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 1657) adds no `NameHint` decoration and the key prints as a bare
+line 1670) adds no `NameHint` decoration and the key prints as a bare
 `%N` — unlike the associated type's own key, which prints under its
 hint.
 
@@ -306,7 +306,7 @@ Three rules govern how this page's opcodes read those structures.
 
 **A witness table is an unordered key-to-value map.** Read an entry
 with `findWitnessTableEntry(table, key)`, declared in
-[slang-ir-util.h](../../../../source/slang/slang-ir-util.h) (line 397),
+[slang-ir-util.h](../../../../source/slang/slang-ir-util.h) (line 411),
 never by child position. Entry order is not part of the representation
 and lowering does not guarantee it matches the `interface_req_entry`
 order on the interface type.
@@ -320,9 +320,8 @@ and how it is resolved, see
 is a `GenericDecl` — most commonly a differentiability constraint on a
 generic interface method — lowering stores a requirement-local
 `IRGeneric` as the witness-table entry value
-(`lowerWitnessEntryValueInGenericWitnessTable`, line 11030, together
-with the matching decl-side rule in `canDeclLowerToAGeneric`, line
-14886). A use of such a requirement therefore reads
+(`lowerWitnessEntryValueInGenericWitnessTable`, line 11102, together
+with the matching decl-side rule in `canDeclLowerToAGeneric`, line 15183). A use of such a requirement therefore reads
 `specialize(lookupWitness(table, key), methodArgs...)` rather than a
 flat `lookupWitness`. The intermediate lookup is typed `Generic`, not
 a function type: `emitDeclRef` lowers the `specialize`'s base with
@@ -337,9 +336,9 @@ lowering path.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `rtti_object` | `IRRTTIObject`‡ | `type`† | | **no producer at HEAD** | Materialized runtime type-info record for the type in operand 0, with the details carried as `RTTI*Decoration`s. The Lua entry declares no operand; the header comment and `IRBuilder::emitMakeRTTIObject` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4681) supply it. Nothing calls that emitter at `source_commit`, so the opcode is currently produced by no pass, though the C++ and C-like emitters still handle it. |
-| `GetSequentialID` | `IRGetSequentialID`‡ | `RTTIOperand` | H | `IsTypeExpr` for an optional-constraint check (`visitIsTypeExpr`, line 7420; the opcode is emitted at line 7437); also [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | Returns a stable `uint` ID for its operand. Despite the operand's Lua name, every caller passes a **witness table**, not an `rtti_object`. |
-| `GetDynamicResourceHeap` | `IRGetDynamicResourceHeap` | `bindingIndex: IRIntLit`† | H | core-module `__getDynamicResourceHeap<T : IOpaqueDescriptor>(constexpr uint bindingIndex = 0)` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) (line 27663), declared with `__intrinsic_op($(kIROp_GetDynamicResourceHeap))` | Yields the bindless descriptor-heap array of a given binding index; its result type is an array of the descriptor type. `lowerDynamicResourceHeap` ([slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/slang-ir-lower-dynamic-resource-heap.cpp) line 48) replaces it with a laid-out `global_param`, so it never reaches emit. |
+| `rtti_object` | `IRRTTIObject`‡ | `type`† | | **no producer at HEAD** | Materialized runtime type-info record for the type in operand 0, with the details carried as `RTTI*Decoration`s. The Lua entry declares no operand; the header comment and `IRBuilder::emitMakeRTTIObject` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4690) supply it. Nothing calls that emitter at `source_commit`, so the opcode is currently produced by no pass, though the C++ and C-like emitters still handle it. |
+| `GetSequentialID` | `IRGetSequentialID`‡ | `RTTIOperand` | H | `IsTypeExpr` for an optional-constraint check (`visitIsTypeExpr`, line 7457; the opcode is emitted at line 7474); also [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | Returns a stable `uint` ID for its operand. Despite the operand's Lua name, every caller passes a **witness table**, not an `rtti_object`. |
+| `GetDynamicResourceHeap` | `IRGetDynamicResourceHeap` | `bindingIndex: IRIntLit`† | H | core-module `__getDynamicResourceHeap<T : IOpaqueDescriptor>(constexpr uint bindingIndex = 0)` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) (line 27903), declared with `__intrinsic_op($(kIROp_GetDynamicResourceHeap))` | Yields the bindless descriptor-heap array of a given binding index; its result type is an array of the descriptor type. `lowerDynamicResourceHeap` ([slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/slang-ir-lower-dynamic-resource-heap.cpp) line 48) replaces it with a laid-out `global_param`, so it never reaches emit. |
 
 ### AnyValue marshalling
 
@@ -365,28 +364,28 @@ functions, or generics.
 #### Sets and set elements
 
 Every set is hoistable, so set equality is inst identity. The Lua
-comment on `SetBase` (line 3125) states the invariants the
+comment on `SetBase` (line 3193) states the invariants the
 representation depends on: a set has at least one operand, operands
 must be concrete non-set insts, and operand order must be consistent.
 `IRBuilder::getSet(IROp, const HashSet<IRInst*>&)`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 7541)
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 7550)
 maintains those invariants through a persistent unique-ID map; sets
 should never be built operand-by-operand.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `TypeSet` | `IRTypeSet`‡ | `elements...`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 728, via `IRBuilder::getSingletonSet`) | Closed set of conforming types discovered by type-flow analysis. |
-| `FuncSet` | `IRFuncSet` | `elements...`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 746-780, via `IRBuilder::getSet`) | Closed set of functions sharing a func-type. |
-| `WitnessTableSet` | `IRWitnessTableSet`‡ | `elements...`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 1601, via `IRBuilder::getSet`) | Closed set of witness tables for a common interface. |
-| `GenericSet` | `IRGenericSet` | `elements...`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 748 and 770) | Closed set of generic values for a common interface. |
-| `UnboundedTypeElement` | `IRUnboundedTypeElement` | `baseInterfaceType` | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 913 and 3652) | Element standing for an unbounded family of types conforming to an interface. |
-| `UnboundedFuncElement` | `IRUnboundedFuncElement` | — | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 3397 and 4061) | Element standing for an unbounded family of functions. The Lua entry declares a `funcType` operand, but `IRBuilder::getUnboundedFuncElement` ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 4604) creates it with zero operands and no other producer supplies one. |
-| `UnboundedWitnessTableElement` | `IRUnboundedWitnessTableElement` | `baseInterfaceType` | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 3399 and 3601) | Element standing for an unbounded family of witness tables of a given interface. |
-| `UnboundedGenericElement` | `IRUnboundedGenericElement` | — | H | **no producer at HEAD** | Element standing for an unbounded family of generics; `IRBuilder::getUnboundedGenericElement` ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 4610) has no caller, and the remaining references only classify or consume it. |
-| `UninitializedTypeElement` | `IRUninitializedTypeElement` | `baseInterfaceType` | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 920) | Element standing for a possibly-garbage type (e.g. from `LoadFromUninitializedMemory`), kept so the pass can diagnose rather than mis-specialize. |
-| `UninitializedWitnessTableElement` | `IRUninitializedWitnessTableElement` | `baseInterfaceType` | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 921 and 2417) | Uninitialized-witness-table counterpart. |
-| `NoneTypeElement` | `IRNoneTypeElement` | — | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 925 and 7944) | Default "none" type element, used with `OptionalType`. |
-| `NoneWitnessTableElement` | `IRNoneWitnessTableElement` | — | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 3245) | Default "none" witness-table element, used with `OptionalType`. |
+| `TypeSet` | `IRTypeSet`‡ | `elements...`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 706, via `IRBuilder::getSingletonSet`) | Closed set of conforming types discovered by type-flow analysis. |
+| `FuncSet` | `IRFuncSet` | `elements...`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 724-780, via `IRBuilder::getSet`) | Closed set of functions sharing a func-type. |
+| `WitnessTableSet` | `IRWitnessTableSet`‡ | `elements...`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 1658, via `IRBuilder::getSet`) | Closed set of witness tables for a common interface. |
+| `GenericSet` | `IRGenericSet` | `elements...`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 726 and 770) | Closed set of generic values for a common interface. |
+| `UnboundedTypeElement` | `IRUnboundedTypeElement` | `baseInterfaceType` | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 924 and 3652) | Element standing for an unbounded family of types conforming to an interface. |
+| `UnboundedFuncElement` | `IRUnboundedFuncElement` | — | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 3465 and 4061) | Element standing for an unbounded family of functions. The Lua entry declares a `funcType` operand, but `IRBuilder::getUnboundedFuncElement` ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 4614) creates it with zero operands and no other producer supplies one. |
+| `UnboundedWitnessTableElement` | `IRUnboundedWitnessTableElement` | `baseInterfaceType` | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 3467 and 3601) | Element standing for an unbounded family of witness tables of a given interface. |
+| `UnboundedGenericElement` | `IRUnboundedGenericElement` | — | H | **no producer at HEAD** | Element standing for an unbounded family of generics; `IRBuilder::getUnboundedGenericElement` ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 4620) has no caller, and the remaining references only classify or consume it. |
+| `UninitializedTypeElement` | `IRUninitializedTypeElement` | `baseInterfaceType` | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 931) | Element standing for a possibly-garbage type (e.g. from `LoadFromUninitializedMemory`), kept so the pass can diagnose rather than mis-specialize. |
+| `UninitializedWitnessTableElement` | `IRUninitializedWitnessTableElement` | `baseInterfaceType` | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 932 and 2417) | Uninitialized-witness-table counterpart. |
+| `NoneTypeElement` | `IRNoneTypeElement` | — | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 936 and 7944) | Default "none" type element, used with `OptionalType`. |
+| `NoneWitnessTableElement` | `IRNoneWitnessTableElement` | — | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 3313) | Default "none" witness-table element, used with `OptionalType`. |
 
 The four `Unbounded*` opcodes and the two `Uninitialized*` opcodes are
 not sets — they are *elements* of one. `IRSetBase::isUnbounded()` and
@@ -402,7 +401,7 @@ reaching an `extractExistentialWitnessTable` carries one — because
 some path into the interface object leaves it unassigned —
 `analyzeExtractExistentialWitnessTable`
 ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp)
-line 3554) reports
+line 3669) reports
 `DynamicDispatchOnPotentiallyUninitializedExistential` (`E50101`, line
 3592) and yields no info, instead of specializing against a set that
 includes garbage. An interface local must therefore be assigned on
@@ -412,35 +411,35 @@ every path that reaches a dynamic dispatch on it.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `MakeTaggedUnion` | `IRMakeTaggedUnion` | `tag, value` | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 7185, 7301 and 7950) | Builds a `TaggedUnionType` value from a `SetTagType` tag and an `UntaggedUnionType` payload. |
-| `CastInterfaceToTaggedUnionPtr` | `IRCastInterfaceToTaggedUnionPtr` | `ptr, witnessTableSet, typeSet` | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 7360, 7650 and 7756) | Casts an interface-typed pointer to a tagged-union pointer; the two sets are carried on the cast so they survive replacement of the `TaggedUnionType` itself. |
-| `GetTagFromTaggedUnion` | `IRGetTagFromTaggedUnion` | `taggedUnionValue` | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 5910 and 8017) | Extracts the witness-table tag; result type is `SetTagType(witnessTableSet)`. |
-| `GetTypeTagFromTaggedUnion` | `IRGetTypeTagFromTaggedUnion` | `taggedUnionValue` | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 5995) and [slang-ir-typeflow-set.cpp](../../../../source/slang/slang-ir-typeflow-set.cpp) (line 134) | Extracts the type tag; result type is `SetTagType(typeSet)`. |
-| `GetValueFromTaggedUnion` | `IRGetValueFromTaggedUnion` | `taggedUnionValue` | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 5934 and 7565) | Extracts the payload; result type is `UntaggedUnionType(typeSet)`, or the single element type when the type set is a singleton. |
+| `MakeTaggedUnion` | `IRMakeTaggedUnion` | `tag, value` | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 7304, 7301 and 7950) | Builds a `TaggedUnionType` value from a `SetTagType` tag and an `UntaggedUnionType` payload. |
+| `CastInterfaceToTaggedUnionPtr` | `IRCastInterfaceToTaggedUnionPtr` | `ptr, witnessTableSet, typeSet` | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 7479, 7650 and 7756) | Casts an interface-typed pointer to a tagged-union pointer; the two sets are carried on the cast so they survive replacement of the `TaggedUnionType` itself. |
+| `GetTagFromTaggedUnion` | `IRGetTagFromTaggedUnion` | `taggedUnionValue` | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 6029 and 8017) | Extracts the witness-table tag; result type is `SetTagType(witnessTableSet)`. |
+| `GetTypeTagFromTaggedUnion` | `IRGetTypeTagFromTaggedUnion` | `taggedUnionValue` | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 6114) and [slang-ir-typeflow-set.cpp](../../../../source/slang/slang-ir-typeflow-set.cpp) (line 134) | Extracts the type tag; result type is `SetTagType(typeSet)`. |
+| `GetValueFromTaggedUnion` | `IRGetValueFromTaggedUnion` | `taggedUnionValue` | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 6053 and 7565) | Extracts the payload; result type is `UntaggedUnionType(typeSet)`, or the single element type when the type set is a singleton. |
 | `GetTagForSuperSet` | `IRGetTagForSuperSet` | `tag`† | | Set-conversion emission in [slang-ir-typeflow-set.cpp](../../../../source/slang/slang-ir-typeflow-set.cpp) (line 159) | Translates a tag to its equivalent in a super-set; source and destination sets are implied by the operand and result types. |
-| `GetTagForSubSet` | `IRGetTagForSubSet` | `tag`† | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 8020) | Translates a tag to its equivalent in a sub-set. |
-| `GetTagForMappedSet` | `IRGetTagForMappedSet` | `tag, lookupKey`† | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 5846) | Translates a witness-table-set tag through the mapping a requirement key induces — the tag-domain replacement for a `lookupWitness`. |
-| `GetTagForSpecializedSet` | `IRGetTagForSpecializedSet` | `tag, specializationArgs...`† | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 7461 and 7523) | Translates a generic-set tag into the corresponding specialized set. |
-| `GetTagFromSequentialID` | `IRGetTagFromSequentialID` | `interfaceType, sequentialID`† | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 7282) and dynamic-dispatch lowering ([slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) lines 1005 and 1135) | Converts a global sequential ID plus an interface type into a set-local tag. |
-| `GetSequentialIDFromTag` | `IRGetSequentialIDFromTag` | `interfaceType, tag`† | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 7879) and dynamic-dispatch lowering ([slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) lines 1009 and 1180) | The inverse: a set-local tag back to a global sequential ID. |
+| `GetTagForSubSet` | `IRGetTagForSubSet` | `tag`† | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 8219) | Translates a tag to its equivalent in a sub-set. |
+| `GetTagForMappedSet` | `IRGetTagForMappedSet` | `tag, lookupKey`† | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 5965) | Translates a witness-table-set tag through the mapping a requirement key induces — the tag-domain replacement for a `lookupWitness`. |
+| `GetTagForSpecializedSet` | `IRGetTagForSpecializedSet` | `tag, specializationArgs...`† | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 7580 and 7523) | Translates a generic-set tag into the corresponding specialized set. |
+| `GetTagFromSequentialID` | `IRGetTagFromSequentialID` | `interfaceType, sequentialID`† | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 7401) and dynamic-dispatch lowering ([slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) lines 1077 and 1135) | Converts a global sequential ID plus an interface type into a set-local tag. |
+| `GetSequentialIDFromTag` | `IRGetSequentialIDFromTag` | `interfaceType, tag`† | | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) line 8078) and dynamic-dispatch lowering ([slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) lines 1081 and 1180) | The inverse: a set-local tag back to a global sequential ID. |
 | `GetElementFromTag` | `IRGetElementFromTag` | `tag` | | The specialization pass ([slang-ir-specialize.cpp](../../../../source/slang/slang-ir-specialize.cpp) line 3721) | Resolves a tag to its concrete set element; result type is `ElementOfSetType(set)`. |
-| `GetTagOfElementInSet` | `IRGetTagOfElementInSet` | `element, set`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 6518, 7163 and 7906) | Returns the tag for a concrete element of a set; the element must resolve to a concrete inst before lowering. |
+| `GetTagOfElementInSet` | `IRGetTagOfElementInSet` | `element, set`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 6637, 7163 and 7906) | Returns the tag for a concrete element of a set; the element must resolve to a concrete inst before lowering. |
 
 #### Dispatchers and existential specialization
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `GetDispatcher` | `IRGetDispatcher` | `witnessTableSet, lookupKey, paramBindings...`† | H | **no producer at HEAD** | Returns a `FuncType`-typed dispatcher for one requirement key over a witness-table set; the dispatcher's first parameter is a `SetTagType(witnessTableSet)`. `lookupKey` is typed `IRInst`, not `IRStructKey`, because a built-in requirement reached through dynamic dispatch uses a `BuiltinRequirementKey`. `IRBuilder::emitGetDispatcher` ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 4526) has no caller at `source_commit`. |
-| `GetSpecializedDispatcher` | `IRGetSpecializedDispatcher` | `witnessTableSet, lookupKey, specializationArgs...`† | H | **no producer at HEAD** | Same, for a key that points at a generic; `IRBuilder::emitGetSpecializedDispatcher` ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 4547) has no caller at `source_commit` either, though `lowerGetSpecializedDispatcher` still consumes the opcode. |
-| `SpecializeExistentialsInFunc` | `IRSpecializeExistentialsInFunc` | `func, bindings...`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 4219 and 6589) | Reference to a function with specific existential-parameter bindings; one binding per parameter, `VoidLit` for "any". |
+| `GetDispatcher` | `IRGetDispatcher` | `witnessTableSet, lookupKey, paramBindings...`† | H | **no producer at HEAD** | Returns a `FuncType`-typed dispatcher for one requirement key over a witness-table set; the dispatcher's first parameter is a `SetTagType(witnessTableSet)`. `lookupKey` is typed `IRInst`, not `IRStructKey`, because a built-in requirement reached through dynamic dispatch uses a `BuiltinRequirementKey`. `IRBuilder::emitGetDispatcher` ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 4536) has no caller at `source_commit`. |
+| `GetSpecializedDispatcher` | `IRGetSpecializedDispatcher` | `witnessTableSet, lookupKey, specializationArgs...`† | H | **no producer at HEAD** | Same, for a key that points at a generic; `IRBuilder::emitGetSpecializedDispatcher` ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 4557) has no caller at `source_commit` either, though `lowerGetSpecializedDispatcher` still consumes the opcode. |
+| `SpecializeExistentialsInFunc` | `IRSpecializeExistentialsInFunc` | `func, bindings...`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 4334 and 6589) | Reference to a function with specific existential-parameter bindings; one binding per parameter, `VoidLit` for "any". |
 | `SpecializeExistentialsInType` | `IRSpecializeExistentialsInType` | `baseType, bindings...`† | H | The specialization pass ([slang-ir-specialize.cpp](../../../../source/slang/slang-ir-specialize.cpp) line 3061) | Compiler-dictionary key for a specialized `BindExistentialsType` result. |
-| `WeakUse` | `IRWeakUse` | `inst`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 1383 and 1411, via `IRBuilder::getWeakUse`) | Marker for a use that must not pin its operand; `IRBuilder::getWeakUse` ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 3628) supplies the single operand the Lua entry omits. |
-| `FuncTypeOf` | `IRFuncTypeOf` | `funcAsType`† | H | `FwdDiffFuncType`, `BwdDiffFuncType`, `ApplyForBwdFuncType` and `BwdCallableFuncType`, all via `lowerFuncDependentType` (line 2498) | Compile-time projection of a function's type, used so a func-dependent type can name a callable without embedding the callable itself. |
+| `WeakUse` | `IRWeakUse` | `inst`† | H | The type-flow specialization pass ([slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp) lines 1440 and 1411, via `IRBuilder::getWeakUse`) | Marker for a use that must not pin its operand; `IRBuilder::getWeakUse` ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 3637) supplies the single operand the Lua entry omits. |
+| `FuncTypeOf` | `IRFuncTypeOf` | `funcAsType`† | H | `FwdDiffFuncType`, `BwdDiffFuncType`, `ApplyForBwdFuncType` and `BwdCallableFuncType`, all via `lowerFuncDependentType` (line 2505) | Compile-time projection of a function's type, used so a func-dependent type can name a callable without embedding the callable itself. |
 
 `FuncTypeOf` is the one row in this table that the type-flow
 specialization pass does not produce. `lowerFuncDependentType`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 2498) is its only construction site anywhere in `source/`, so it
+line 2511) is its only construction site anywhere in `source/`, so it
 appears at lowering time and is reachable from ordinary source:
 calling `fwd_diff` on a `[Differentiable]` function gives the result a
 `FwdDiffFuncType`, and lowering that type wraps the original callable
@@ -463,7 +462,7 @@ the one that looks unlike the other two. A conformance declared on a
 generic type — `struct Box<T> : IFoo` — puts the `InheritanceDecl`
 under the generic, and `canDeclLowerToAGeneric`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 14886) returns true for one, so the conformance lowers to a
+line 15209) returns true for one, so the conformance lowers to a
 `generic %N : witness_table_t(%IFoo)`. Calling a constrained helper
 `int use<U : IFoo>(U u, int x)` with `Box<int>` therefore emits a
 *nested* `specialize` in the outer call's argument list —
@@ -471,7 +470,7 @@ line 14886) returns true for one, so the conformance lowers to a
 — where the second argument is the specialized type and the third the
 specialized witness table. Note that a `generic` body ends in
 `return_val`, not `yield` — `findGenericReturnVal`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 9888)
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 9950)
 casts the last block's terminator to an `IRReturn`. See
 [structure.md](structure.md) for `generic` itself and
 [control-flow.md](control-flow.md) for the `yield` terminator, which
@@ -491,7 +490,7 @@ itself generic, the value the lookup yields is an `IRGeneric` that the
 use site must wrap in a `specialize`. A lookup whose table is a
 `thisTypeWitness` stays abstract — `isAbstractWitnessTable`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 14940) recognizes that shape and recurses through nested lookups.
+line 15263) recognizes that shape and recurses through nested lookups.
 
 ### `makeExistential`
 
@@ -503,7 +502,7 @@ the same node that models any widening cast, not a dedicated
 interface-cast class — so the lowering entry point is
 `visitCastToSuperTypeExpr` rather than anything existential-specific.
 When the cast crosses more than one inheritance step,
-`emitCastToInterfaceSuperTypeRec` (line 7255) walks the transitive
+`emitCastToInterfaceSuperTypeRec` (line 7292) walks the transitive
 witness first and feeds the resulting table in as operand 1.
 
 ### `wrapExistential`
@@ -517,7 +516,7 @@ suggests — operand 0 is the wrapped value and the remaining operands
 are `(concrete type, witness table)` slot pairs, read with
 `getSlotOperandCount()` / `getSlotOperand(i)`.
 `IRBuilder::emitWrapExistential`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4982)
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4991)
 short-circuits two cases at construction time: with zero slot
 arguments it returns the value unchanged, and when the target type is
 an `InterfaceType` it produces a `makeExistential` instead, so those
@@ -550,8 +549,8 @@ an associated type identical to a concrete type. Unlike most witness
 facts on this page it is not pass-introduced: the checker's
 `TypeEqualityWitness` `Val` lowers through `visitTypeEqualityWitness`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 2398), which calls `IRBuilder::getTypeEqualityWitness`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 5308) with
+line 2411), which calls `IRBuilder::getTypeEqualityWitness`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 5317) with
 the two types in that order. The opcode is hoistable, so a given
 `subType` / `superType` pair resolves to a single witness inst.
 [structure.md](structure.md) documents its structural row.
@@ -577,7 +576,7 @@ either side relying on entry order. Because either key spelling can
 appear, `GetDispatcher`'s `lookupKey` operand and
 `getInterfaceRequirementKey`'s return type
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 1713) are both `IRInst`, not `IRStructKey`.
+line 1726) are both `IRInst`, not `IRStructKey`.
 
 ### `GetSequentialID` and the RTTI opcodes
 
@@ -587,14 +586,14 @@ by pointer comparison. Its Lua operand is named `RTTIOperand`, but
 every caller at `source_commit` passes a **witness table**:
 `visitIsTypeExpr`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 7426) uses it for the *optional-constraint* form, whose surface
+line 7463) uses it for the *optional-constraint* form, whose surface
 has two halves — a constraint written `where optional T : IFoo` on the
 generic, plus a `T is IFoo` test in the body. That pair lowers to a
 `GetSequentialID` on the constraint's witness-table parameter compared
-for inequality against the all-ones "none" sentinel (line 7443). A
+for inequality against the all-ones "none" sentinel (line 7480). A
 run-time type test on an ordinary existential — `i is A` where `i` has
 interface type — takes the other arm of the same visitor and emits
-`IsType` instead (line 7452), with no `GetSequentialID` involved. The
+`IsType` instead (line 7489), with no `GetSequentialID` involved. The
 other caller,
 [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp),
 assigns and reads per-table IDs through

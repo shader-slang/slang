@@ -6653,6 +6653,22 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return innerType;
     }
 
+    // True when this aggregate's concrete fields already exist at this point in lowering. Fields
+    // that only materialize during linking — a bodyless `extern struct X;` (`!hasBody`) or a
+    // link-time alias `export struct Foo : IFoo = Bar;` (`aliasedType`) — must not build a
+    // field-wise IRMakeStruct here, or it is emitted over an empty field list and reads out of
+    // bounds once specialization resolves the real fields (shader-slang/slang#12708).
+    // `SynthesizedStructDecl` is excluded for the same reason: it lowers to an autodiff-context
+    // type, not `VarDecl` fields.
+    static bool isConcreteFieldOwningAggregate(DeclRef<AggTypeDecl> aggTypeDeclRef)
+    {
+        auto decl = aggTypeDeclRef.getDecl();
+        if (!decl->hasBody || decl->aliasedType)
+            return false;
+        return aggTypeDeclRef.as<StructDecl>() || aggTypeDeclRef.as<ClassDecl>() ||
+               aggTypeDeclRef.as<GLSLInterfaceBlockDecl>();
+    }
+
     LoweredValInfo getDefaultVal(Type* type)
     {
         type = getOriginalTypeFromModifiedType(type);
@@ -6717,7 +6733,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
             }
-            else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
+            else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>();
+                     aggTypeDeclRef && isConcreteFieldOwningAggregate(aggTypeDeclRef))
             {
                 List<IRInst*> args;
 

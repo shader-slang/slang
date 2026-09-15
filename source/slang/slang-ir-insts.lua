@@ -1215,12 +1215,16 @@ local insts = {
 	-- has no operands; its source position is carried on the standard
 	-- per-instruction `sourceLoc` field, which is always preserved and
 	-- never stripped by `stripDebugInfo`. The coverage-instrument IR pass
-	-- later rewrites each coverage marker into an atomic add on the IR-
-	-- synthesized `__slang_coverage` buffer. The current line/function/
-	-- branch producers assign one direct counter per marker; future
-	-- source-region coverage can keep using marker metadata without
-	-- preserving that one-to-one lowering. Host-side tooling reads
-	-- source coverage entries and projects them to LCOV records.
+	-- later rewrites coverage markers into an atomic add on the IR-
+	-- synthesized `__slang_coverage` buffer, or a plain store under
+	-- `-trace-coverage-boolean`. Line markers that provably execute
+	-- together -- same basic block, nothing between them that can abandon
+	-- the invocation -- are coalesced onto a single counter, and only the
+	-- last marker of such a region emits the runtime update; the rest are
+	-- removed without emitting one. The lowering is therefore not
+	-- one-to-one, though each marker still produces its own source
+	-- entry. Host-side tooling reads source
+	-- coverage entries and projects them to LCOV records.
 	-- Inherent side-effect semantics keep the optimizer from deleting or
 	-- hoisting these ops.
 	{ IncrementCoverageCounter = {} },

@@ -796,6 +796,31 @@ struct SubtypeWitnessCacheEntry
     UInt superTypeGeneration = 0;
 };
 
+/// Key for the `_specializeInterfaceInheritanceWitness` result cache.
+///
+/// The three fields are exactly that function's parameters (see its declaration below), so this
+/// key captures its complete input.
+struct SpecializeInterfaceInheritanceWitnessKey
+{
+    InterfaceDecl* baseInterfaceDecl = nullptr;
+    SubtypeWitness* selfIsSubtypeOfBase = nullptr;
+    SubtypeWitness* baseIsSubtypeOfFacet = nullptr;
+
+    HashCode getHashCode() const
+    {
+        return combineHash(
+            Slang::getHashCode(baseInterfaceDecl),
+            Slang::getHashCode(selfIsSubtypeOfBase),
+            Slang::getHashCode(baseIsSubtypeOfFacet));
+    }
+    bool operator==(const SpecializeInterfaceInheritanceWitnessKey& other) const
+    {
+        return baseInterfaceDecl == other.baseInterfaceDecl &&
+               selfIsSubtypeOfBase == other.selfIsSubtypeOfBase &&
+               baseIsSubtypeOfFacet == other.baseIsSubtypeOfFacet;
+    }
+};
+
 /// Cached information about how to convert between two types.
 struct ImplicitCastMethod
 {
@@ -853,6 +878,78 @@ private:
     Dictionary<int, int64_t> bindingToByteOffset;
 };
 
+/// Describes whether semantic checking has traversed one concrete interface witness table.
+enum class ConformanceInterfaceCheckStatus
+{
+    /// The table may contain lazily prepared entries, but whole-interface checking has not begun.
+    Unchecked,
+
+    /// An enclosing semantic operation is checking the table.
+    Checking,
+
+    /// Whole-interface traversal completed without a failed requirement.
+    Succeeded,
+
+    /// At least one requirement in the interface failed.
+    Failed,
+};
+
+/// Stores the declaration-context inputs needed to check one concrete interface witness table.
+///
+/// A witness table is shared by every specialization of its declaring conformance, so all fields
+/// are deliberately unspecialized. This state retains its `owner`, so an ephemeral child context
+/// used during generic-witness synthesis cannot leave the table with a dangling semantic context.
+/// A table has exactly one authoritative state even when synthesis creates such a child context.
+struct ConformanceInterfaceCheckingState : public RefObject
+{
+    /// The conformance context that owns the table's declaration-context state.
+    RefPtr<struct ConformanceCheckingContext> owner;
+
+    /// The type whose conformance this table witnesses.
+    Type* conformingType = nullptr;
+
+    /// The interface type implemented by `conformingType`.
+    Type* interfaceType = nullptr;
+
+    /// The declared conformance or inherited-interface requirement that introduced this table.
+    InheritanceDecl* inheritanceDecl = nullptr;
+
+    /// The declaration-context reference to the interface implemented by this table.
+    DeclRef<InterfaceDecl> interfaceDeclRef;
+
+    /// The unspecialized table whose entries are checked by this state.
+    RefPtr<WitnessTable> witnessTable;
+
+    /// The witness used to project interface requirements into `conformingType`.
+    SubtypeWitness* conformingWitness = nullptr;
+
+    /// Distinguishes registration or lazy preparation from whole-interface validation.
+    ConformanceInterfaceCheckStatus status = ConformanceInterfaceCheckStatus::Unchecked;
+};
+
+/// Stores semantic state shared by whole and on-demand checking of one declared conformance.
+///
+/// The context is keyed by its root `InheritanceDecl`. Its interface map contains the root table
+/// and any canonical inherited-interface tables already encountered while checking that
+/// conformance.
+struct ConformanceCheckingContext : public RefObject
+{
+    /// The declaration-context type whose conformance is being checked.
+    Type* conformingType = nullptr;
+
+    /// The witness for `conformingType` and the root interface.
+    SubtypeWitness* conformingWitness = nullptr;
+
+    /// The type or extension declaration that owns the root conformance.
+    ContainerDecl* parentDecl = nullptr;
+
+    /// The inheritance clause that declared the root conformance.
+    InheritanceDecl* rootInheritanceDecl = nullptr;
+
+    /// Maps each encountered interface application to its declaration-context witness table.
+    Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
+};
+
 /// Shared state for a semantics-checking session.
 struct SharedSemanticsContext : public RefObject
 {
@@ -860,6 +957,13 @@ struct SharedSemanticsContext : public RefObject
 
     /// The (optional) "primary" module that is the parent to everything that will be checked.
     Module* m_module = nullptr;
+
+    /// The Slang language version whose rules apply to this checking session.
+    ///
+    /// Normal module checking derives this value from the primary module. Ad hoc checking that
+    /// has no primary module must instead choose a version explicitly when it constructs the
+    /// context.
+    SlangLanguageVersion m_languageVersion = SLANG_LANGUAGE_VERSION_UNKNOWN;
 
     DiagnosticSink* m_sink = nullptr;
 
@@ -907,6 +1011,14 @@ struct SharedSemanticsContext : public RefObject
     // buffer allocation.
     Dictionary<Val*, List<Decl*>> m_genericSolverValToDependentDeclsCache;
 
+    // On-demand and whole-conformance checking must reuse the same declaration-context state. The
+    // inheritance map owns root contexts, and the table map lets a forceful lookup recover the
+    // exact semantic inputs needed to check one missing entry.
+    Dictionary<InheritanceDecl*, RefPtr<ConformanceCheckingContext>>
+        m_mapInheritanceDeclToConformanceCheckingContext;
+    Dictionary<WitnessTable*, RefPtr<ConformanceInterfaceCheckingState>>
+        m_mapWitnessTableToConformanceInterfaceCheckingState;
+
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
@@ -926,6 +1038,13 @@ public:
                m_isGLSLModuleImported;
     }
 
+private:
+    static SlangLanguageVersion _getModuleLanguageVersion(Module* module)
+    {
+        SLANG_RELEASE_ASSERT(module);
+        return module->getModuleDecl()->languageVersion;
+    }
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,
@@ -935,10 +1054,35 @@ public:
         TranslationUnitRequest* translationUnit = nullptr)
         : m_linkage(linkage)
         , m_module(module)
+        , m_languageVersion(_getModuleLanguageVersion(module))
         , m_sink(sink)
         , m_environmentModules(environmentModules)
         , m_translationUnitRequest(translationUnit)
     {
+    }
+
+    SharedSemanticsContext(
+        Linkage* linkage,
+        SlangLanguageVersion languageVersion,
+        DiagnosticSink* sink)
+        : m_linkage(linkage), m_languageVersion(languageVersion), m_sink(sink)
+    {
+        SLANG_RELEASE_ASSERT(languageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN);
+    }
+
+    /// Creates a context for an ad hoc checking operation whose primary module may be absent.
+    ///
+    /// A present module supplies the source-language policy and the moduleless version is ignored.
+    /// Otherwise, the caller must provide the version for the ad hoc operation.
+    static RefPtr<SharedSemanticsContext> createForOptionalModule(
+        Linkage* linkage,
+        Module* module,
+        SlangLanguageVersion modulelessLanguageVersion,
+        DiagnosticSink* sink)
+    {
+        if (module)
+            return new SharedSemanticsContext(linkage, module, sink);
+        return new SharedSemanticsContext(linkage, modulelessLanguageVersion, sink);
     }
 
     Session* getSession() { return m_linkage->getSessionImpl(); }
@@ -946,6 +1090,8 @@ public:
     Linkage* getLinkage() { return m_linkage; }
 
     Module* getModule() { return m_module; }
+
+    SlangLanguageVersion getLanguageVersion() const { return m_languageVersion; }
 
     TranslationUnitRequest* getTranslationUnitRequest() { return m_translationUnitRequest; }
 
@@ -1223,6 +1369,27 @@ private:
     Dictionary<Type*, InheritanceInfoCacheEntry> m_mapTypeToInheritanceInfo;
     Dictionary<DeclRef<Decl>, InheritanceInfoCacheEntry> m_mapDeclRefToInheritanceInfo;
     Dictionary<TypePair, SubtypeWitnessCacheEntry> m_mapTypePairToSubtypeWitness;
+
+    /// Cache for `_specializeInterfaceInheritanceWitness`, keyed on its full input.
+    ///
+    /// That function is a pure transformation of an already-resolved witness (a substitution,
+    /// not a conformance query), so unlike the caches above it needs no generation/epoch
+    /// tracking: the same three inputs always produce the same output regardless of what
+    /// extensions are registered later. `_calcInheritanceInfo` calls it once per inheritance
+    /// level while composing a type's transitive facets, so on a deep, non-diamond-shared
+    /// inheritance chain (e.g. `interface I64 : I63 : ... : I0`) the same
+    /// `(baseInterfaceDecl, selfIsSubtypeOfBase, baseIsSubtypeOfFacet)` triple recurs across many
+    /// separate `_calcInheritanceInfo` calls -- each one otherwise re-running a full `Val`
+    /// substitution from scratch. See #12139 (the `interface_depth` case left unresolved by that
+    /// issue's ShortDictionary fix).
+    ///
+    /// Unsynchronized, like every other cache on this type: front-end work including
+    /// specialization is documented as non-reentrant and requiring external synchronization when
+    /// a `SharedSemanticsContext` is shared across threads (docs/user-guide/08-compiling.md,
+    /// "Multithreading"), so this needs no lock any more than `m_mapDeclRefToInheritanceInfo`
+    /// above does.
+    Dictionary<SpecializeInterfaceInheritanceWitnessKey, SubtypeWitness*>
+        m_specializeInterfaceInheritanceWitnessCache;
     Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
     Dictionary<Type*, bool> m_isCStyleTypeCache;
     Dictionary<Decl*, UInt> m_mapDeclToExtensionEpoch;
@@ -1255,6 +1422,11 @@ public:
                 CompilerOptionName::DisableShortCircuit);
         }
     }
+
+    // This context stores a non-owning pointer. Reject a temporary owner so that its destruction
+    // cannot leave `m_shared` dangling. An lvalue `RefPtr` intentionally reaches the raw-pointer
+    // constructor through its implicit conversion while the caller keeps that owner in a local.
+    SemanticsContext(RefPtr<SharedSemanticsContext>&&) = delete;
 
     SharedSemanticsContext* getShared() { return m_shared; }
     CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
@@ -1601,6 +1773,10 @@ struct SemanticsVisitor : public SemanticsContext
         : Super(shared)
     {
     }
+
+    // Keep direct visitor construction subject to the ownership rule on `SemanticsContext`; an
+    // lvalue `RefPtr` still reaches the raw-pointer constructor through its implicit conversion.
+    SemanticsVisitor(RefPtr<SharedSemanticsContext>&&) = delete;
 
     SemanticsVisitor(SemanticsContext const& context)
         : Super(context)
@@ -2296,18 +2472,82 @@ public:
     // or an extension of that type) conforms to the interfaces it claims
     // via its inheritance clauses.
     //
-    struct ConformanceCheckingContext
+    using ConformanceCheckingContext = Slang::ConformanceCheckingContext;
+    using ConformanceInterfaceCheckingState = Slang::ConformanceInterfaceCheckingState;
+
+    // Requirement resolution reports state at several adjacent layers:
+    //
+    // * `RequirementCheckState` persists the state of one entry in a `WitnessTable`, while
+    //   `ConformanceInterfaceCheckStatus` persists whole-table traversal state.
+    // * `RequirementWitnessLookupFrontierStatus` describes how far passive structural lookup got.
+    // * `ConformanceRequirementCheckResult` reports one semantic attempt to populate an entry.
+    // * `RequirementLookupStatus` reports forceful traversal of a complete witness path.
+    // * `RequirementProjectionResolutionStatus` reports whether the resulting value is concrete,
+    //   remains a valid symbolic projection, or belongs to a failed concrete conformance.
+    //
+    // The first three types live with their persistent or structural data; the semantic result
+    // types are declared below beside the operations that convert between these layers.
+
+    /// The result of requesting one interface-requirement witness.
+    enum class ConformanceRequirementCheckResult
     {
-        /// The type for which conformances are being checked
-        Type* conformingType;
+        /// The table contains a final witness for this requirement.
+        Satisfied,
 
-        Witness* conformingWitness;
+        /// An enclosing semantic operation owns the check and has not published a final witness.
+        InProgress,
 
-        /// The outer declaration for the conformances being checked (either a type or `extension`
-        /// declaration)
-        ContainerDecl* parentDecl;
+        /// Checking proved that the concrete type does not satisfy this requirement.
+        Failed,
+    };
 
-        Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
+    /// Selects whether an inherited-interface requirement is only made traversable or is fully
+    /// checked after its witness has been published.
+    enum class InheritedInterfaceRequirementMode
+    {
+        PrepareForLookup,
+        CheckConformance,
+    };
+
+    /// The result of looking up a requirement through a conformance witness.
+    enum class RequirementLookupStatus
+    {
+        /// A structural witness is available; its conformance may still be under validation.
+        Found,
+        /// No existing witness was found and this witness path cannot be forced here.
+        Unavailable,
+        /// The same entry is recursively requested and has not published a structural witness.
+        Recursive,
+
+        /// Semantic checking proved that the concrete requirement cannot be satisfied.
+        Failed,
+    };
+
+    struct RequirementLookupResult
+    {
+        RequirementLookupStatus status = RequirementLookupStatus::Unavailable;
+        RequirementWitness witness;
+    };
+
+    /// Describes the result of forcefully resolving a possible requirement projection.
+    enum class RequirementProjectionResolutionStatus
+    {
+        /// The returned value is structurally resolved, whether or not the input was a projection.
+        Resolved,
+
+        /// A valid abstract, external, or recursively owned projection remains symbolic.
+        Unchanged,
+
+        /// Checking a concrete conformance requirement failed.
+        Failed,
+    };
+
+    /// The result of forcefully resolving a value that may project an interface requirement.
+    struct RequirementProjectionResolutionResult
+    {
+        RequirementProjectionResolutionStatus status =
+            RequirementProjectionResolutionStatus::Unchanged;
+        Val* value = nullptr;
     };
 
     /// Reasons why witness synthesis can fail
@@ -2545,9 +2785,16 @@ public:
 
     // Find the default implementation of an interface requirement,
     // and insert it to the witness table, if it exists.
+    //
+    // `subTypeConformsToInterfaceWitness` is the witness that the conforming type satisfies the
+    // interface whose requirement is being witnessed here. It is the witness for the *specific*
+    // (possibly nested base-interface) table being populated, not necessarily the outer conformance
+    // being checked; the default-impl generic is specialized against it so its interior
+    // `lookupWitness` calls resolve against the correct table (see #12814).
     bool findDefaultInterfaceImpl(
         ConformanceCheckingContext* context,
         DeclRef<Decl> requiredMemberDeclRef,
+        SubtypeWitness* subTypeConformsToInterfaceWitness,
         RefPtr<WitnessTable> witnessTable);
 
     // Find the appropriate member of a declared type to
@@ -2572,6 +2819,74 @@ public:
         DeclRef<Decl> requiredMemberDeclRef,
         RefPtr<WitnessTable> witnessTable,
         SubtypeWitness* subTypeConformsToSuperInterfaceWitness);
+
+    /// Ensures that an inherited-interface requirement has a structural witness and optionally
+    /// checks the nested conformance selected by `mode`.
+    bool ensureInheritedInterfaceRequirement(
+        ConformanceCheckingContext* context,
+        Type* subType,
+        DeclRef<InheritanceDecl> requiredInheritanceDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        InheritedInterfaceRequirementMode mode);
+
+    /// Ensures that one requirement in a concrete interface conformance has been checked.
+    ConformanceRequirementCheckResult ensureConformanceRequirement(
+        ConformanceCheckingContext* context,
+        Type* subType,
+        Type* superInterfaceType,
+        InheritanceDecl* inheritanceDecl,
+        DeclRef<InterfaceDecl> superInterfaceDeclRef,
+        DeclRef<Decl> requiredMemberDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        SubtypeWitness* subTypeConformsToSuperInterfaceWitness);
+
+    /// Returns the persistent declaration-context state for a concrete conformance.
+    ConformanceCheckingContext* getOrCreateConformanceCheckingContext(
+        Type* conformingType,
+        InheritanceDecl* inheritanceDecl,
+        ContainerDecl* parentDecl);
+
+    /// Registers the semantic information needed to force entries in one interface table.
+    ConformanceInterfaceCheckingState* registerConformanceInterfaceCheckingState(
+        ConformanceCheckingContext* context,
+        Type* conformingType,
+        Type* interfaceType,
+        InheritanceDecl* inheritanceDecl,
+        DeclRef<InterfaceDecl> interfaceDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        SubtypeWitness* conformingWitness);
+
+    /// Ensures one entry using the persistent state registered for its witness table.
+    ConformanceRequirementCheckResult ensureConformanceRequirement(
+        WitnessTable* witnessTable,
+        DeclRef<Decl> requiredMemberDeclRef);
+
+    /// Ensures and returns one specialized witness when its lookup path reaches concrete tables.
+    ///
+    /// A missing entry on an abstract, existential, dynamic, serialized, or external path cannot be
+    /// synthesized here and remains unavailable. The specialized requirement stays a `DeclRef` at
+    /// this boundary; only the final lookup into a known witness table converts it to that table's
+    /// identity key.
+    RequirementLookupResult ensureAndLookupRequirementWitness(
+        SubtypeWitness* conformanceWitness,
+        DeclRef<Decl> requirementDeclRef);
+
+    /// Resolves a projected conformance path and continues one requirement lookup through it.
+    RequirementLookupResult ensureAndLookupRequirementWitnessThroughProjectedConformance(
+        SubtypeWitness* projectedConformanceWitness,
+        DeclRef<Decl> requirementDeclRef);
+
+    /// Resolves one endpoint needed to reconstruct a concrete projected conformance.
+    ///
+    /// `Found` guarantees that `outType` is populated. `Unavailable` means the endpoint remains a
+    /// valid symbolic projection, and `Failed` means its concrete conformance could not be
+    /// satisfied. This operation never returns `Recursive`: recursive projection resolution is
+    /// represented as an unchanged endpoint and therefore maps to `Unavailable` here.
+    RequirementLookupStatus ensureConcreteConformanceEndpoint(Type* type, Type*& outType);
+
+    /// Resolves ordinary aliases and then forcefully resolves one remaining concrete requirement
+    /// projection. Valid projections that cannot be forced remain unchanged.
+    RequirementProjectionResolutionResult ensureAndResolveRequirementProjection(Val* value);
 
     // Check that the type declaration `typeDecl`, which
     // declares conformance to the interface `interfaceDeclRef`,
@@ -3405,10 +3720,24 @@ public:
     // so that the better candidate compares as less-than the other
     int CompareOverloadCandidates(OverloadCandidate* left, OverloadCandidate* right);
 
-    /// If `declRef` representations a specialization of a generic, returns the number of
-    /// specialized generic arguments. Otherwise, returns zero.
+    /// Applies the pre-202c generic-parameter-count tie-breaker after all ordinary ranking rules.
+    /// On success, copies the unique selected candidate into `context.bestCandidateStorage`, points
+    /// `context.bestCandidate` at that storage, clears `context.bestCandidates`, and returns true.
+    /// When `warningSink` is non-null, also emits the deprecation warning at `warningLocation`.
+    /// On failure, leaves `context` unchanged and returns false.
     ///
-    Int getSpecializedParamCount(DeclRef<Decl> const& declRef);
+    /// The final source-level call sites are `ResolveInvoke` and `_coerce`. `ResolveInvoke` always
+    /// materializes an expression and passes its sink. `_coerce` passes its sink only when it also
+    /// receives `outToExpr`; a speculative conversion-cost probe passes null so that the eventual
+    /// materialization reports the warning.
+    bool tryResolveOverloadUsingLegacyGenericParameterCountFallback(
+        OverloadResolveContext& context,
+        SourceLoc warningLocation,
+        DiagnosticSink* warningSink);
+
+    /// Returns the required parameter count of the generic whose inner declaration `declRef`
+    /// names, or zero when `declRef` does not name a generic's inner declaration.
+    Int getRequiredGenericParameterCount(DeclRef<Decl> const& declRef);
 
     /// Compare items `left` and `right` produced by lookup, to see if one should be favored for
     /// overloading.

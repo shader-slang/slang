@@ -1381,30 +1381,37 @@ even before specialization has determined which branch is taken.
 
 ## Builtin Interfaces
 
-Slang supports the following builtin interfaces:
+Slang's core module provides several interfaces for generic programming.
+The experimental [`slang.numerics`](a3-02-numerics.md) module provides a more systematic set of numeric interfaces for builtin and user-defined scalar and shaped types.
 
-- `IComparable`, provides methods for comparing two values of the conforming type. Supported by all basic data types, vector types, and matrix types.
-- `IRangedValue`, provides methods for retrieving the minimum and maximum value expressed by the range of the type. Supported by all integer and floating-point scalar types.
-- `IArithmetic`, provides methods for the `+`, `-`, `*`, `/`, `%`, and negating operations. Also provides a method for explicit conversion from `int`. Implemented by all builtin integer and floating-point scalar, vector, and matrix types.
-- `ILogical`, provides methods for all bit operations and logical `and`, `or`, `not` operations. Also provides a method for explicit conversion from `int`. Implemented by all builtin integer scalar, vector, and matrix types.
-- `IInteger`, represents a logical integer that supports both `IArithmetic` and `ILogical` operations. Implemented by all builtin integer scalar types.
-- `IDifferentiable`, represents a value that is differentiable.
-- `IFloat`, represents a logical float that supports `IArithmetic`, `ILogical`, and `IDifferentiable` operations. Also provides methods to convert to and from `float`. Implemented by all builtin floating-point scalar, vector, and matrix types.
-- `IArray<T>`, represents a logical array that supports retrieving an element of type `T` from an index. Implemented by array types, vectors, matrices, and `StructuredBuffer`.
-- `IRWArray<T>`, represents a logical array whose elements are mutable. Implemented by array types, vectors, matrices, `RWStructuredBuffer`, and `RasterizerOrderedStructuredBuffer`.
-- `IFunc<TResult, TParams...>`, represents a callable object (with `operator()`) that returns `TResult` and takes `TParams...` as argument.
-- `IMutatingFunc<TResult, TParams...>`, similar to `IFunc`, but the `operator()` method is `[mutating]`.
-- `IDifferentiableFunc<TResult, TParams...>`, similar to `IFunc`, but the `operator()` method is `[Differentiable]`.
-- `IDifferentiableMutatingFunc<TResult, TParams...>`, similar to `IFunc`, but the `operator()` method is `[Differentiable]` and `[mutating]`.
-- `__EnumType`, implemented by all enum types.
-- `__BuiltinIntegerType`, implemented by all integer scalar types.
-- `__BuiltinFloatingPointType`, implemented by all floating-point scalar types.
-- `__BuiltinArithmeticType`, implemented by all integer and floating-point scalar types.
-- `__BuiltinLogicalType`, implemented by all integer types and the `bool` type.
+### General-Purpose Interfaces
 
-Operator overloads are defined for `IArithmetic`, `ILogical`, `IInteger`, `IFloat`, `__BuiltinIntegerType`, `__BuiltinFloatingPointType`, `__BuiltinArithmeticType`, and `__BuiltinLogicalType` types, so the following code is valid:
+- `IComparable` provides methods for comparing two values of the conforming type.
+  All basic data types, vector types, and matrix types implement it.
+- `IRangedValue` provides methods for retrieving the minimum and maximum values in the range of a type.
+  All integer and floating-point scalar types implement it.
+- `IArray<T>` represents a logical array from which code can retrieve an element of type `T` by index.
+  Arrays, vectors, matrices, and `StructuredBuffer` implement it.
+- `IRWArray<T>` represents a logical array whose elements are mutable.
+  Arrays, vectors, matrices, `RWStructuredBuffer`, and `RasterizerOrderedStructuredBuffer` implement it.
+- `IFunc<TResult, TParams...>` represents a callable object whose `operator()` returns `TResult` and takes `TParams...` as arguments.
+- `IMutatingFunc<TResult, TParams...>` is the mutating counterpart of `IFunc`.
 
-```csharp
+### Legacy Numeric Interfaces
+
+The following interfaces remain supported for compatibility, but new generic numeric code should prefer the interfaces in [`slang.numerics`](a3-02-numerics.md) when experimental modules are acceptable.
+They are not deprecated, and existing code does not need to migrate immediately.
+
+- `IArithmetic` provides methods for the `+`, `-`, `*`, `/`, `%`, and negation operations, plus explicit conversion from `int`.
+  All builtin integer and floating-point scalar, vector, and matrix types implement it.
+- `ILogical` provides methods for bitwise and logical operations, plus explicit conversion from `int`.
+  All builtin integer scalar, vector, and matrix types implement it.
+- `IInteger` combines `IArithmetic` and `ILogical` for builtin integer scalar types.
+- `IFloat` combines `IArithmetic`, `ILogical`, and `IDifferentiable` for builtin floating-point scalar, vector, and matrix types, and provides conversions to and from `float`.
+
+Operator overloads are defined for these interfaces, so existing generic code such as the following remains valid:
+
+```slang
 T f<T:IFloat>(T x, T y)
 {
     if (x > T(0))
@@ -1417,3 +1424,26 @@ void test()
     let rs = f(float3(4), float3(5)); // rs = float3(9,9,9)
 }
 ```
+
+### Differentiation Interfaces
+
+- `IDifferentiable` represents a value that is differentiable.
+- `IDifferentiableFunc<TResult, TParams...>` is the differentiable counterpart of `IFunc`.
+- `IDifferentiableMutatingFunc<TResult, TParams...>` is both differentiable and mutating.
+
+See [Automatic Differentiation](07-autodiff.md) for the differentiation model and [Generic Numerics](a3-02-numerics.md) for the numeric interfaces that provide differentiable operations.
+
+### Internal-Use-Only Interfaces
+
+The following double-underscored interfaces support the implementation of Slang's builtin types and standard modules.
+They are not public API contracts.
+Some user code has historically relied on them, but such use is unsupported and may break as the compiler and standard modules evolve.
+
+- `__EnumType` is implemented by all enum types.
+- `__BuiltinIntegerType` is implemented by all builtin integer scalar types.
+- `__BuiltinFloatingPointType` is implemented by all builtin floating-point scalar types.
+- `__BuiltinArithmeticType` is implemented by all builtin integer and floating-point scalar types.
+- `__BuiltinLogicalType` is implemented by all builtin integer scalar types and `bool`.
+
+The core module defines operator overloads using these interfaces as an implementation detail.
+User code should constrain generic parameters with supported public interfaces instead.
