@@ -4697,6 +4697,63 @@ Type* SemanticsExprVisitor::coerceOperandsOfBuiltinBinaryExpr(
     return commonType;
 }
 
+SemanticsExprVisitor::BuiltinArithmeticElementFamily SemanticsExprVisitor::
+    classifyBuiltinArithmeticElementType(Type* elementType)
+{
+    if (auto basicType = as<BasicExpressionType>(elementType))
+    {
+        auto baseType = basicType->getBaseType();
+        auto flags = BaseTypeInfo::getInfo(baseType).flags;
+        BuiltinArithmeticElementFamily family;
+        family.isInteger = (flags & BaseTypeInfo::Flag::Integer) != 0;
+        family.isFloat = (flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+        family.isBool = (baseType == BaseType::Bool);
+        return family;
+    }
+
+    // Not a concrete builtin scalar. Check whether a generic parameter's declared constraint
+    // (or, in principle, any other type) conforms to one of the sealed builtin marker
+    // interfaces; see the declaration comment on `BuiltinArithmeticElementFamily` for why that
+    // is a sound basis for the fast path. `tryGetInterfaceConformanceWitness` goes through
+    // `SharedSemanticsContext::tryGetSubtypeWitnessFromCache`, so repeated calls for the same
+    // `elementType` -- exactly what a generic type parameter reused across many call sites
+    // produces -- are cache hits after the first.
+    //
+    // A constraint declared `where optional T : I` (`OptionalConstraintModifier`) is not proof
+    // that `T` conforms to `I`: the whole point of an optional constraint is that a given
+    // instantiation of `T` may or may not satisfy it, and code outside a `if (T is I)` guard
+    // must not assume it does (see `isWitnessUncheckedOptional`, which the same "is this
+    // conformance actually established here" question already relies on for member lookup).
+    // Treating an unchecked optional witness as sufficient here would let a generic function
+    // like `compute<T>(T a, T b) where optional T : __BuiltinFloatingPointType { return a + b;
+    // }` take the builtin fast path and emit `a + b` verbatim for a `T` that never proved it
+    // supports `+`, instead of falling through to overload resolution the way it must.
+    auto isProvenConformance = [this](SubtypeWitness* witness)
+    { return witness && !isWitnessUncheckedOptional(witness); };
+
+    // Each accessor returns null before the core module is available to search (see
+    // `SharedASTBuilder::getBuiltinIntegerType` and its siblings); the classification for that
+    // family is then left unknown rather than querying conformance against a null interface type.
+    auto astBuilder = getASTBuilder();
+    BuiltinArithmeticElementFamily family;
+    if (auto integerInterface = astBuilder->getBuiltinIntegerType())
+        family.isInteger =
+            isProvenConformance(tryGetInterfaceConformanceWitness(elementType, integerInterface));
+    if (auto floatInterface = astBuilder->getBuiltinFloatingPointType())
+        family.isFloat =
+            isProvenConformance(tryGetInterfaceConformanceWitness(elementType, floatInterface));
+    // `__BuiltinLogicalType` is implemented by `bool` AND every builtin integer type (it also
+    // backs bitwise-operator codegen elsewhere), so proving conformance to it does not prove the
+    // element is `bool` -- only `family.isLogical`, not `family.isBool`, may be set here. A
+    // generic parameter can never prove `isBool`: there is no sealed marker interface `bool`
+    // alone implements, so only the concrete-type branch above (`baseType == BaseType::Bool`)
+    // ever sets it.
+    if (auto logicalInterface = astBuilder->getBuiltinLogicalType())
+        family.isLogical =
+            isProvenConformance(tryGetInterfaceConformanceWitness(elementType, logicalInterface));
+    return family;
+}
+
 Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
 {
     // Recognize a builtin arithmetic (`+ - * / %`), comparison (`< > <= >=`), equality
@@ -4706,6 +4763,15 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     // lowering / constant folding, skipping generic `operator OP` overload resolution. Returns
     // null to leave the expression for normal resolution. The operator-name is mapped to a
     // `BuiltinOperationKind` once (here), and everything downstream keys off the kind.
+    //
+    // "Builtin" element type is not limited to a concrete `BasicExpressionType`:
+    // `classifyBuiltinArithmeticElementType` also recognizes a generic type parameter
+    // constrained to a sealed builtin marker interface (`T : __BuiltinFloatingPointType`, as in
+    // issue #12458's reproducer), because every legal instantiation of such a parameter is
+    // guaranteed to be a concrete builtin scalar too. Without that, an operator on a
+    // generic-typed operand falls through to full generic overload resolution on every visible
+    // `operator OP` overload -- measured at ~83% of semantic-checking time on that reproducer,
+    // because the wrong candidates it rejects each still pay for generic argument inference.
 
     // Unary prefix operators: `-x` (negate), `!x` (logical-not, bool), `~x` (bitwise-not, int).
     if (as<PrefixExpr>(expr) && expr->arguments.getCount() == 1)
@@ -4735,14 +4801,17 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
             uElementType = v->getElementType();
         else if (auto m = as<MatrixExpressionType>(uOperandType))
             uElementType = m->getElementType();
-        auto uBasic = as<BasicExpressionType>(uElementType);
-        if (!uBasic)
+        auto uFamily = classifyBuiltinArithmeticElementType(uElementType);
+        if (!uFamily.isKnown())
             return nullptr;
-        auto uBaseType = uBasic->getBaseType();
-        auto uFlags = BaseTypeInfo::getInfo(uBaseType).flags;
-        bool uInt = (uFlags & BaseTypeInfo::Flag::Integer) != 0;
-        bool uFloat = (uFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
-        bool uBool = (uBaseType == BaseType::Bool);
+        bool uInt = uFamily.isInteger;
+        bool uFloat = uFamily.isFloat;
+        // Deliberately `isBool` (strict: concrete `bool` only), not `isLogical`: `!` must
+        // produce a `bool`-shaped result, and a generic parameter constrained only to
+        // `__BuiltinLogicalType` may be instantiated with an integer, for which `isBool` is
+        // false (see `BuiltinArithmeticElementFamily`'s field comments) -- correctly declining
+        // the fast path here, the same way a concrete non-bool operand already does.
+        bool uBool = uFamily.isBool;
         // `-` => signed/float negate; `~` => integer bitwise-not; `!` => bool logical-not.
         bool uEligible = isNeg ? (uInt || uFloat) : (isBitNot ? uInt : /*isLogicalNot*/ uBool);
         if (!uEligible)
@@ -4865,14 +4934,31 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         elementType = vecType->getElementType();
     else if ((matType = as<MatrixExpressionType>(operandType)))
         elementType = matType->getElementType();
-    auto basicElementType = as<BasicExpressionType>(elementType);
-    if (!basicElementType)
+
+    // `vector<T,N> == vector<T,N>` / `!=` has a stdlib overload
+    // (`glsl.meta.slang`'s `operator==<T:__BuiltinArithmeticType/__BuiltinLogicalType,N>`,
+    // `[OverloadRank(15/14)]`) that reduces the per-component comparison to a single `bool`
+    // via `all(equal(...))`/`any(notEqual(...))`. Its `[require(...)]` list spans every target
+    // Slang emits to, so it is visible to overload resolution regardless of
+    // `isGLSLOperatorScope()` -- unlike the matrix-operator and concrete-vector-equality cases
+    // handled by the `isGLSLOperatorScope()` check above, which really are GLSL-scope-specific.
+    // For a GENERIC element type there is no competing builtin form to prefer instead: the raw
+    // per-component comparison this fast path would otherwise produce is only ever reachable by
+    // constructing a `BuiltinOperatorExpr` directly, never through a declarable stdlib overload,
+    // so before this function recognized generic element types, `vector<T,N> == vector<T,N>`
+    // for an abstract `T` had nowhere else to resolve to and always went through that stdlib
+    // overload. Decline here so it still does -- only a *concrete* element type keeps this
+    // function's pre-existing (GLSL-scope-gated) `==`/`!=` behavior on vectors unchanged.
+    if (isEquality && vecType && !as<BasicExpressionType>(elementType))
         return nullptr;
-    auto baseType = basicElementType->getBaseType();
-    auto baseFlags = BaseTypeInfo::getInfo(baseType).flags;
-    bool isIntegerBase = (baseFlags & BaseTypeInfo::Flag::Integer) != 0;
-    bool isFloatBase = (baseFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
-    bool isBoolBase = (baseType == BaseType::Bool);
+
+    auto family = classifyBuiltinArithmeticElementType(elementType);
+    if (!family.isKnown())
+        return nullptr;
+    bool isIntegerBase = family.isInteger;
+    bool isFloatBase = family.isFloat;
+    bool isBoolBase = family.isBool;
+    bool isLogicalBase = family.isLogical;
     // Some operators do not apply to every element type. For example, it is invalid to apply a
     // bitwise operator to a floating-point operand, and arithmetic does not apply to `bool`. When
     // the element type is not valid for the operator family we return null, so the expression
@@ -4881,13 +4967,17 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     // (Floating-point bitwise/shift operands are rejected earlier with a dedicated diagnostic, so
     // a non-integer bitwise operand reaching here is `bool`, which still resolves via `ILogical`.)
     //   - bitwise/shift (`& | ^ << >> ~`): integer only;
-    //   - equality (`== !=`): integer, floating-point, or bool;
+    //   - equality (`== !=`): integer, floating-point, bool, or (for a generic element type)
+    //     anything conforming to `__BuiltinLogicalType` -- `isLogicalBase` is checked here, not
+    //     just `isBoolBase`, because `kIROp_Eql`/`kIROp_Neq` are valid on that whole family
+    //     uniformly, unlike unary logical-not (see `uBool` above, which deliberately does NOT
+    //     accept `isLogical`);
     //   - arithmetic (`+ - * / %`) and ordering comparison (`< > <= >=`): integer or float.
     bool eligible;
     if (isBitwise)
         eligible = isIntegerBase;
     else if (isEquality)
-        eligible = isIntegerBase || isFloatBase || isBoolBase;
+        eligible = isIntegerBase || isFloatBase || isBoolBase || isLogicalBase;
     else
         eligible = isIntegerBase || isFloatBase;
     if (!eligible)
@@ -4927,6 +5017,10 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     node->arguments.add(rightArg);
     node->type = resultType;
     node->loc = expr->loc;
+    // Only `Mod` reads this (to choose `FRem` over `IRem`), but it is resolved here regardless of
+    // `kind`: `elementType` may be an abstract generic parameter by the time IR lowering runs,
+    // which no longer carries a concrete `BaseType` to classify.
+    node->elementTypeIsFloatingPoint = isFloatBase;
 
     // Register the operand/result types in a differentiable scope, regardless of the operator
     // family, matching the breadth of the pre-fast-path `visitInvokeExpr` (which walked all

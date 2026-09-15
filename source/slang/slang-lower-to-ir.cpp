@@ -5421,19 +5421,12 @@ struct ExprLoweringContext
         for (Index i = 0; i < argCount; ++i)
             args[i] = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[i]));
 
-        // Determine whether the operand element type is floating-point (selects FRem vs
-        // IRem for `%`).
-        bool isFloatingPoint = false;
-        {
-            Type* elementType = expr->arguments[0]->type.type;
-            if (auto vecType = as<VectorExpressionType>(elementType))
-                elementType = vecType->getElementType();
-            else if (auto matType = as<MatrixExpressionType>(elementType))
-                elementType = matType->getElementType();
-            if (auto basicType = as<BasicExpressionType>(elementType))
-                isFloatingPoint = (BaseTypeInfo::getInfo(basicType->getBaseType()).flags &
-                                   BaseTypeInfo::Flag::FloatingPoint) != 0;
-        }
+        // Selects FRem vs IRem for `%`, resolved by `convertToBuiltinArithmeticOp` at check time
+        // and stored on the node rather than re-derived here: the operand element type can still
+        // be an abstract, unspecialized generic parameter at this point (see
+        // `elementTypeIsFloatingPoint`'s declaration comment), which carries no concrete
+        // `BaseType` to inspect.
+        bool isFloatingPoint = expr->elementTypeIsFloatingPoint;
 
         IROp op = kIROp_Add;
         switch (expr->op)
