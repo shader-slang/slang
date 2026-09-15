@@ -589,6 +589,10 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
         returnType = stmt->expression->type.type;
         if (!stmt->expression->type->equals(m_astBuilder->getErrorType()))
         {
+            // A return inside a nested lambda is not a return from the enclosing `ref`
+            // accessor, so only apply the accessor check to the accessor's own returns.
+            if (!m_parentLambdaExpr)
+                checkNonmutatingRefAccessorReturn(function, stmt->expression);
             if (!m_parentLambdaExpr && expectedReturnType)
             {
                 stmt->expression =
