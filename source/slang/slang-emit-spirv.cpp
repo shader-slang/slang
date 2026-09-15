@@ -3730,6 +3730,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     UnownedStringSlice("SPV_EXT_descriptor_indexing"));
                 requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArray);
                 break;
+            case kIROp_GLSLPatchDecoration:
+                emitOpDecorate(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    decor,
+                    varInst,
+                    SpvDecorationPatch);
+                break;
             }
         }
     }

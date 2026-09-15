@@ -1179,13 +1179,15 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
                 createPatchConstantFuncResultTypeLayout(context, irBuilder, fieldType);
             IRVarLayout::Builder fieldVarLayoutBuilder(&irBuilder, fieldTypeLayout);
             auto decoration = field->getKey()->findDecoration<IRSemanticDecoration>();
-            if (decoration)
+            if (decoration && decoration->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
             {
-                if (decoration->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
-                    fieldVarLayoutBuilder.setSystemValueSemantic(decoration->getSemanticName(), 0);
+                fieldVarLayoutBuilder.setSystemValueSemantic(decoration->getSemanticName(), 0);
             }
             else
             {
+                // A field with a user semantic (non-sv_) is an ordinary varying output: give it a
+                // real location instead of leaving it at the default (which would collide with
+                // per-control-point outputs, see #12726).
                 auto varLayoutForKind =
                     fieldVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
 
@@ -1226,7 +1228,7 @@ ScalarizedVal legalizeEntryPointReturnValueForGLSL(
     IRFunc* func,
     IRVarLayout* resultLayout);
 
-void invokePathConstantFuncInHullShader(
+void invokePatchConstantFuncInHullShader(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
     ScalarizedVal outputPatchVal)
@@ -1357,7 +1359,7 @@ void invokePathConstantFuncInHullShader(
 
     context->entryPointFunc = constantFunc;
     context->stage = Stage::Unknown;
-    legalizeEntryPointReturnValueForGLSL(
+    auto patchConstantFuncOutputVal = legalizeEntryPointReturnValueForGLSL(
         context,
         codeGenContext,
         builder,
@@ -1365,6 +1367,11 @@ void invokePathConstantFuncInHullShader(
         resultVarLayoutBuilder.build());
     context->entryPointFunc = entryPoint;
     context->stage = Stage::Hull;
+
+    for (auto leafAddr : patchConstantFuncOutputVal.leafAddresses())
+    {
+        builder.addGLSLPatchDecoration(leafAddr);
+    }
 
     fixUpFuncType(constantFunc);
 }
@@ -4349,6 +4356,28 @@ void legalizeEntryPointParameterForGLSL(
             stage,
             pp);
         tryReplaceUsesOfStageInput(context, globalValue, pp);
+
+        // Domain shader patch constant inputs: a varying input that isn't
+        // InputPatch/OutputPatch (handled by legalizePatchParam above).
+        // Patch constants are always passed by const reference
+        // (translateEntryPointInParamToBorrow). System values are skipped
+        // here: the emitter already adds Patch to the SV_TessFactor/
+        // SV_InsideTessFactor globals (gl_TessLevel*), and other system
+        // values such as gl_TessCoord must not get it.
+        if (stage == Stage::Domain)
+        {
+            SLANG_ASSERT(!as<IRHLSLPatchType>(valueType));
+            for (auto addr : globalValue.leafAddresses())
+            {
+                if (auto leafLayout = findVarLayout(addr))
+                {
+                    if (leafLayout->findAttr<IRSystemValueSemanticAttr>())
+                        continue;
+                }
+                builder->addGLSLPatchDecoration(addr);
+            }
+        }
+
         for (auto dec : pp->getDecorations())
         {
             if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
@@ -4422,7 +4451,6 @@ void legalizeEntryPointParameterForGLSL(
             LayoutResourceKind::VaryingInput,
             stage,
             pp);
-
         tryReplaceUsesOfStageInput(context, globalValue, pp);
 
         // we have a simple struct which represents all materialized GlobalParams, this
@@ -4913,7 +4941,7 @@ void legalizeEntryPointForGLSL(
     // at the end of the entrypoint now.
     if (stage == Stage::Hull)
     {
-        invokePathConstantFuncInHullShader(&context, codeGenContext, scalarizedGlobalOutput);
+        invokePatchConstantFuncInHullShader(&context, codeGenContext, scalarizedGlobalOutput);
     }
 
     // Special handling for ray tracing shaders

@@ -5024,6 +5024,16 @@ $(type_info.return_type) $(type_info.method_name)(
         addDecoration(value, kIROp_PatchConstantFuncDecoration, patchConstantFunc);
     }
 
+    void addGLSLPatchDecoration(IRInst* value)
+    {
+        // A decoration that marks a global variable as belonging to
+        // the patch constant interface of a tessellation shader:
+        // - Hull (tessellation control) shader: patch constant function outputs
+        // - Domain (tessellation evaluation) shader: patch constant inputs
+        // This is needed for SPIR-V/GLSL where patch constant variables require the `Patch` decoration.
+        addDecoration(value, kIROp_GLSLPatchDecoration);
+    }
+
     void addImportDecoration(IRInst* value, UnownedStringSlice const& mangledName)
     {
         addDecoration(value, kIROp_ImportDecoration, getStringValue(mangledName));
