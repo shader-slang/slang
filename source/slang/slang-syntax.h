@@ -383,6 +383,148 @@ DeclRef<StructDecl> findBaseStructDeclRef(
 
 SubtypeWitness* findThisTypeWitness(SubstitutionSet substs, InterfaceDecl* interfaceDecl);
 
+/// Describes how far a passive requirement-witness lookup can proceed.
+enum class RequirementWitnessLookupFrontierStatus
+{
+    /// The originally requested requirement witness was found.
+    Found,
+
+    /// A declaration-context witness table exists, but the next required entry is absent.
+    MissingEntry,
+
+    /// The next concrete inheritance declaration has not published its witness table yet.
+    MissingConcreteTable,
+
+    /// The next path segment is a projected conformance whose concrete subtype must be resolved.
+    NeedsConcreteConformance,
+
+    /// The witness path does not currently identify a unique concrete lookup frontier.
+    Indeterminate,
+};
+
+/// The result of locating the next frontier in a requirement-witness lookup.
+///
+/// A `MissingEntry` or `MissingConcreteTable` result does not necessarily identify the originally
+/// requested, leaf-most requirement. It identifies the first missing structural step on the path
+/// to that requirement. A client that materializes the missing table or entry must restart lookup
+/// from the original subtype witness and requirement decl-ref; it must not form the final result
+/// directly from this frontier.
+class RequirementWitnessLookupFrontier
+{
+public:
+    static RequirementWitnessLookupFrontier makeFound(RequirementWitness witness)
+    {
+        RequirementWitnessLookupFrontier result;
+        result.m_status = RequirementWitnessLookupFrontierStatus::Found;
+        result.m_witness = witness;
+        return result;
+    }
+
+    static RequirementWitnessLookupFrontier makeMissingEntry(
+        RefPtr<WitnessTable> witnessTable,
+        DeclRef<Decl> requirementDeclRef)
+    {
+        SLANG_RELEASE_ASSERT(witnessTable && requirementDeclRef);
+        RequirementWitnessLookupFrontier result;
+        result.m_status = RequirementWitnessLookupFrontierStatus::MissingEntry;
+        result.m_witnessTable = witnessTable;
+        result.m_requirementDeclRef = requirementDeclRef;
+        return result;
+    }
+
+    static RequirementWitnessLookupFrontier makeMissingConcreteTable(
+        DeclRef<InheritanceDecl> concreteConformanceDeclRef)
+    {
+        SLANG_RELEASE_ASSERT(concreteConformanceDeclRef);
+        RequirementWitnessLookupFrontier result;
+        result.m_status = RequirementWitnessLookupFrontierStatus::MissingConcreteTable;
+        result.m_concreteConformanceDeclRef = concreteConformanceDeclRef;
+        return result;
+    }
+
+    static RequirementWitnessLookupFrontier makeNeedsConcreteConformance(
+        SubtypeWitness* projectedConformanceWitness)
+    {
+        SLANG_RELEASE_ASSERT(projectedConformanceWitness);
+        RequirementWitnessLookupFrontier result;
+        result.m_status = RequirementWitnessLookupFrontierStatus::NeedsConcreteConformance;
+        result.m_projectedConformanceWitness = projectedConformanceWitness;
+        return result;
+    }
+
+    RequirementWitnessLookupFrontierStatus getStatus() const { return m_status; }
+
+    /// The fully specialized result. Valid when `status == Found`.
+    RequirementWitness getWitness() const
+    {
+        SLANG_RELEASE_ASSERT(m_status == RequirementWitnessLookupFrontierStatus::Found);
+        return m_witness;
+    }
+
+    void setFoundWitness(RequirementWitness witness)
+    {
+        SLANG_RELEASE_ASSERT(m_status == RequirementWitnessLookupFrontierStatus::Found);
+        m_witness = witness;
+    }
+
+    /// The declaration-context table containing the missing entry. Valid for `MissingEntry`.
+    RefPtr<WitnessTable> getWitnessTable() const
+    {
+        SLANG_RELEASE_ASSERT(m_status == RequirementWitnessLookupFrontierStatus::MissingEntry);
+        return m_witnessTable;
+    }
+
+    /// The requirement at the current frontier. Valid for `MissingEntry`.
+    DeclRef<Decl> getRequirementDeclRef() const
+    {
+        SLANG_RELEASE_ASSERT(m_status == RequirementWitnessLookupFrontierStatus::MissingEntry);
+        return m_requirementDeclRef;
+    }
+
+    /// The declaration that can publish the missing root table. Valid for `MissingConcreteTable`.
+    DeclRef<InheritanceDecl> getConcreteConformanceDeclRef() const
+    {
+        SLANG_RELEASE_ASSERT(
+            m_status == RequirementWitnessLookupFrontierStatus::MissingConcreteTable);
+        return m_concreteConformanceDeclRef;
+    }
+
+    /// The projected relation that must be made concrete. Valid for `NeedsConcreteConformance`.
+    SubtypeWitness* getProjectedConformanceWitness() const
+    {
+        SLANG_RELEASE_ASSERT(
+            m_status == RequirementWitnessLookupFrontierStatus::NeedsConcreteConformance);
+        return m_projectedConformanceWitness;
+    }
+
+private:
+    RequirementWitnessLookupFrontierStatus m_status =
+        RequirementWitnessLookupFrontierStatus::Indeterminate;
+    RequirementWitness m_witness;
+    RefPtr<WitnessTable> m_witnessTable;
+    DeclRef<Decl> m_requirementDeclRef;
+    DeclRef<InheritanceDecl> m_concreteConformanceDeclRef;
+    SubtypeWitness* m_projectedConformanceWitness = nullptr;
+};
+
+/// Passively locates the next frontier in a requirement-witness lookup.
+///
+/// This operation never performs semantic checking or mutates a witness table. In particular, a
+/// missing result is the first missing structural step and might be an inherited-interface entry
+/// above the requested leaf. After making progress on a missing table or entry, a forceful client
+/// must call this operation again with the original `subtypeWitness` and `requirementDeclRef`. A
+/// `NeedsConcreteConformance` result instead gives the projected relation through which the client
+/// must continue the original requirement lookup after resolving that relation's subtype.
+RequirementWitnessLookupFrontier locateNextRequirementWitnessLookupFrontier(
+    ASTBuilder* astBuilder,
+    SubtypeWitness* subtypeWitness,
+    DeclRef<Decl> requirementDeclRef);
+
+/// Passively looks up an existing requirement witness for ordinary value resolution.
+///
+/// Unlike `locateNextRequirementWitnessLookupFrontier`, this operation does not report why a lookup
+/// failed. An intermediate witness table remains in declaration-context form; value and declaration
+/// witnesses are specialized along the subtype-witness path before being returned.
 RequirementWitness tryLookUpRequirementWitness(
     ASTBuilder* astBuilder,
     SubtypeWitness* subtypeWitness,
