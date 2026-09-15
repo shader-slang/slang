@@ -4,7 +4,7 @@
 // Before the fix, DebugValue pointed to an SSA value that went out of scope
 // after the loop back-edge, causing the debugger to show the initial value
 // on iterations 2 and beyond.
-//TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage compute
+//DISABLE_TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage compute
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -49,3 +49,7 @@ void main(uniform RWStructuredBuffer<uint> input, uniform RWStructuredBuffer<uin
 // Loop exits (iter==3 fails condition), entry finishes
 // SPVDB: stopped: EntryFinished
 // SPVDB: read[0][1]: [0, 3, 6, 9]
+
+// Disabled: compiling with `-g2` intermittently trips a SPIRV-Tools assertion
+// (`unique_id_ != 0`) on macOS-aarch64 Debug. Tracked by shader-slang/slang#13024;
+// re-enable once that is fixed.
