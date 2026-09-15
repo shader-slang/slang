@@ -13,7 +13,7 @@
 // "`MakeTupleExpr`". Using the `makeTuple(...)` builtin with two
 // uniform operands produces a value of `tuple_type(Int, Float)`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform float fa;

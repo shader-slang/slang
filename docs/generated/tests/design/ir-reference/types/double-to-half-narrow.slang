@@ -14,7 +14,7 @@
 // produces a `floatCast` instruction whose result type is `Half`,
 // pulling from the widest to the narrowest float.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform double v;
 uniform RWStructuredBuffer<float> buf;

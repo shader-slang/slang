@@ -17,7 +17,7 @@
 // the generic emitted for `S.apply` and require the same id to appear as the
 // value operand of the `witness_table_entry` row in `S`'s table.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IOps
 {

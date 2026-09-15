@@ -11,7 +11,7 @@
 // Boundary on payload size: packing does not decompose the value. A three-field
 // struct is widened to `IFoo`, and the CHECK asserts the same single
 // two-operand inst as the trivial payload case — no per-field packing appears.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 

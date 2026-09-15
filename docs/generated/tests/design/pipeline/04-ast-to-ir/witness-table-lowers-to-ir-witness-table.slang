@@ -15,7 +15,7 @@
 // see a `witness_table %{{.*}} : witness_table_t(%IFoo)(%A)`
 // declaration with a `witness_table_entry(%req, %impl)` row.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IFoo { int doIt(int x); }
 struct A : IFoo { int doIt(int x) { return x + 1; } }

@@ -17,7 +17,7 @@
 // Float is still operand 0 and the modifier rides along as a trailing
 // attribute operand.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o -
 
 struct Norms
 {

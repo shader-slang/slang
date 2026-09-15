@@ -17,7 +17,7 @@
 // unwrap + element coercion on the true edge, and the none-value on the false
 // edge — a shape only an if/else diamond can produce.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<float> buf;

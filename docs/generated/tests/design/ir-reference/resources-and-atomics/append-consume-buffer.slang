@@ -15,7 +15,7 @@
 // CHECKs under `func %main` pin two operands for the first and one for
 // the second — the operand counts that distinguish the pair.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform AppendStructuredBuffer<int> abuf;
 uniform ConsumeStructuredBuffer<int> cbuf;

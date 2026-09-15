@@ -15,7 +15,7 @@
 // arithmetic on the smallest multi-element half vector preserves both
 // width and shape.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform half2 a;
 uniform half2 b;

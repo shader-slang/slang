@@ -16,7 +16,7 @@
 // sequence proves the orchestrator invoked it at least twice; a single
 // invocation would leave the second CHECK-LABEL unmatched.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after performForceInlining -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after performForceInlining -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

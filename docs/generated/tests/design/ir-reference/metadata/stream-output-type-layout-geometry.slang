@@ -14,7 +14,7 @@
 // emitted `streamOutputTypeLayout` must reach a `structTypeLayout`; that is
 // what distinguishes the stored element layout from a bare attribute tail.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage geometry
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage geometry
 
 struct GsIn
 {

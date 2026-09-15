@@ -13,7 +13,7 @@
 // argument. The documented opcode shape is unchanged; the operand
 // just carries the maximum positive 32-bit signed integer value.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> rwbuf;
 

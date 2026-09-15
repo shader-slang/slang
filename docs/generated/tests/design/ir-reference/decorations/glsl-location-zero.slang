@@ -14,7 +14,7 @@
 // `[glslLocation(0 : Int)]` to show the decoration is emitted with an
 // explicit zero operand rather than omitted.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<float> buf;
 

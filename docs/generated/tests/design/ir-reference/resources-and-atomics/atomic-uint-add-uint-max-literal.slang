@@ -13,7 +13,7 @@
 // Runtime wrap semantics are well-defined for unsigned but the
 // IR-opcode doc does not encode this — only the opcode shape.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<Atomic<uint>> abuf;
 uniform RWStructuredBuffer<uint> rwbuf;

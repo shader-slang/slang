@@ -15,7 +15,7 @@
 // than an `add` of the two source literals. The CHECK-NOT pins the second
 // half of that -- the unfolded add must not be present.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

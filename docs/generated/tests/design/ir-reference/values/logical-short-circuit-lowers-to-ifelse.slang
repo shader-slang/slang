@@ -18,7 +18,7 @@
 // than beside the left-hand one — that block split is exactly what a
 // `logicalAnd` opcode would not produce.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform int b;

@@ -16,7 +16,7 @@
 // snapshot shows the raw `add` opcode at the use site instead of a call to
 // the operator function.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform int b;

@@ -14,7 +14,7 @@
 // dump. A hull-shader parameter `InputPatch<VS_OUT, 4>` surfaces the
 // `InputPatch` opcode in the IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage hull -entry hullMain -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage hull -entry hullMain -dump-ir -o -
 
 struct VS_OUT
 {

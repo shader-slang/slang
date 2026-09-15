@@ -13,7 +13,7 @@
 // reinterprets a `float`'s bits as a `uint`. Verifies that lowering keeps both
 // directions under one `bitCast` opcode.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform RWStructuredBuffer<uint> buf;

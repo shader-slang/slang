@@ -41,6 +41,10 @@ static void _escapeDependencyString(const char* string, StringBuilder& outBuilde
 // Writes a "<output-file>: <dep> <dep...>" line to the stream.
 // When outputPath is empty (output to stdout), "-" is used as the make target placeholder.
 // writtenStdoutSentinel prevents duplicate "-: ..." lines across multiple call sites.
+//
+// Each dependency is written as " <escaped-path>" (separator first) and the statement is
+// newline-terminated, so the count of dependencies need not be known in advance — the module
+// dependencies below are filtered as they are emitted rather than pre-collected into a list.
 static void _writeDependencyStatement(
     Stream& stream,
     EndToEndCompileRequest* compileRequest,
@@ -61,16 +65,48 @@ static void _writeDependencyStatement(
         _writeString(stream, builder.begin());
         builder.clear();
     }
-    _writeString(stream, ": ");
+    _writeString(stream, ":");
 
+    auto writeDependency = [&](const char* path)
+    {
+        builder.clear();
+        _escapeDependencyString(path, builder);
+        _writeString(stream, " ");
+        _writeString(stream, builder.begin());
+    };
+
+    // Track the paths already written so a module whose `.slang-module` identity coincides with a
+    // listed source (a module imported from source) is not emitted twice.
+    HashSet<String> alreadyListedPaths;
     int dependencyCount = compileRequest->getDependencyFileCount();
     for (int dependencyIndex = 0; dependencyIndex < dependencyCount; ++dependencyIndex)
     {
-        builder.clear();
-        _escapeDependencyString(compileRequest->getDependencyFilePath(dependencyIndex), builder);
-        _writeString(stream, builder.begin());
-        _writeString(stream, (dependencyIndex + 1 < dependencyCount) ? " " : "\n");
+        const char* dependencyPath = compileRequest->getDependencyFilePath(dependencyIndex);
+        alreadyListedPaths.add(dependencyPath);
+        writeDependency(dependencyPath);
     }
+
+    // A compiled `.slang-module` an `import` loads is recorded only as a module dependency, never a
+    // file dependency, so `-depfile` would otherwise omit it and a consumer would miss the rebuild
+    // edge to the importer. Append each such module file, skipping any path already listed as a
+    // source. Draw the modules from the same unspecialized program the file dependencies come from
+    // (`getDependencyFilePath`), so the module set and the dedup set share one dependency closure.
+    auto program = compileRequest->getUnspecializedGlobalAndEntryPointsComponentType();
+    for (auto module : program->getModuleDependencies())
+    {
+        // Classify on the file path; a source-loaded module has a `.slang` path already emitted.
+        const char* filePath = module->getFilePath();
+        if (!filePath || !UnownedStringSlice(filePath).endsWith(toSlice(".slang-module")))
+            continue;
+        // Emit the same identity representation `getDependencyFilePath` uses for file dependencies.
+        const char* emitPath = module->getUniqueIdentity();
+        if (!emitPath)
+            emitPath = filePath;
+        if (alreadyListedPaths.add(String(emitPath)))
+            writeDependency(emitPath);
+    }
+
+    _writeString(stream, "\n");
 }
 
 // Writes a file with dependency info, with one line in the output file per compile product.

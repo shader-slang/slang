@@ -15,7 +15,7 @@
 // shows alignment attributes are being emitted in this module, and the
 // CHECK-NOT asserts the redundant `TypeAlignment(1 : Int)` form never appears.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 struct S
 {

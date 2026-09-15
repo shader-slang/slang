@@ -14,7 +14,7 @@
 // at module scope". A constant `int` and a constant `float` show
 // up as `globalConstant(<literal>)` lines in the IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 static const int K = 42;
 static const float PI = 3.14159;

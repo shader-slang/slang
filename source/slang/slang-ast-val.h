@@ -1395,16 +1395,6 @@ inline bool isTypeEqualityWitness(Val* witness)
     return false;
 }
 
-RequirementWitness getUnspecializedLookupRec(
-    ASTBuilder* astBuilder,
-    Decl* requirementKey,
-    SubtypeWitness* witness);
-
-RequirementWitness specializeLookedUpRec(
-    ASTBuilder* astBuilder,
-    SubtypeWitness* witness,
-    RequirementWitness lookedUpVal);
-
 bool isValuePack(Val* val);
 bool isAbstractValuePack(Val* val);
 

@@ -1,0 +1,31 @@
+name: Issue Onboard
+
+# Thin caller for the reusable issue-board-onboard workflow. Declares the
+# issues:opened trigger (a reusable workflow cannot declare it itself) and
+# delegates classification + Slang-All board writes to issue-board-onboard.yml.
+# Other shader-slang repos use the cross-repo form:
+#
+#   uses: shader-slang/slang/.github/workflows/issue-board-onboard.yml@master
+#
+# See issue-board-onboard.yml for the board IDs, Source-classification teams,
+# and the required secret.
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to onboard as if newly opened"
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  onboard:
+    uses: ./.github/workflows/issue-board-onboard.yml
+    with:
+      issue_number: ${{ github.event.inputs.issue_number }}
+    secrets:
+      SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}

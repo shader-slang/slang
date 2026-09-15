@@ -16,7 +16,7 @@
 // `func %sumTrio` label; any reordering or hoisting of the params onto the
 // `func` itself would break the sequence.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int x;
 uniform int y;

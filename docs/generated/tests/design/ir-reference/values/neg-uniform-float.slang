@@ -14,7 +14,7 @@
 // covers `float`. (Float negation handles ±0.0, ±inf, and NaN per
 // IEEE-754; the IR opcode shape is the same.)
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform RWStructuredBuffer<float> buf;

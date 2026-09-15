@@ -14,7 +14,7 @@
 // lowered loop. The result is stored through a buffer so it survives,
 // and the CHECK looks for the opcode inside `func %main`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 using namespace linalg;
 

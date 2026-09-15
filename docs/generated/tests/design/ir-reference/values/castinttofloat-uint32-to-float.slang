@@ -13,7 +13,7 @@
 // admits one opcode `castIntToFloat`; the operand type carries
 // the signedness.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint a;
 uniform RWStructuredBuffer<float> buf;

@@ -12,7 +12,7 @@
 // Array of Double elements surfaces Array(Double, N : Int) in the IR
 // dump. A `double[3]` global_param surfaces `Array(Double, 3 : Int)`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform double v[3];
 uniform RWStructuredBuffer<double> buf;
