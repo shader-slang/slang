@@ -3892,6 +3892,15 @@ ParamPassingMode getDeclaredParamPassingModeForImplicitThisParam(
     {
         return ParamPassingMode::BorrowInOut;
     }
+    // A `ref` accessor yields a mutable reference into the referenced storage, so like
+    // `set` its implicit `this` must be `inout`; with a by-value `this` the address it
+    // returns would point into a callee-local copy and writes would be lost. Explicit
+    // `[nonmutating] ref` (handled above) keeps `this` by value, for a `ref` that returns
+    // storage not rooted in `this` (e.g. a global or storage reached through a pointer).
+    if (as<RefAccessorDecl>(declWithImplicitThisParam))
+    {
+        return ParamPassingMode::BorrowInOut;
+    }
 
     // Declarations that represent abstract storage (e.g., a `property`
     // or `subscript`) do not want to dictate anything about the mode
@@ -8899,6 +8908,32 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 // return this;
                 lowerRValueExprWithDestination(context, context->thisVal, expr);
                 getBuilder()->emitReturn(getSimpleVal(context, context->thisVal));
+                return;
+            }
+
+            if (as<RefAccessorDecl>(context->funcDecl))
+            {
+                // A `ref` accessor's IR function is declared to return a *pointer*
+                // to the referenced storage (its result type is set to `Ptr(T)` in
+                // `_lowerInfoFromFuncParameters`), so `return _v;` must return the
+                // *address* of the l-value. The ordinary path below would instead
+                // `getSimpleVal` it, emitting a load and returning the value `T`,
+                // which contradicts the `Ptr(T)` result type.
+                auto lvalue = lowerLValueExpr(context, expr);
+                if (IRInst* addr = getAddress(context, lvalue, expr->loc))
+                {
+                    getBuilder()->emitReturn(addr);
+                }
+                else
+                {
+                    // The body is not an l-value (e.g. `ref { return _v + 1; }`);
+                    // `getAddress` has already diagnosed it, so compilation will
+                    // fail before this reaches a backend. Emit a placeholder null
+                    // pointer purely to keep the block terminated, mirroring the
+                    // `ref`-parameter recovery path (see the `ParamPassingMode::Ref`
+                    // case in `addArg`).
+                    getBuilder()->emitReturn(getBuilder()->getNullVoidPtrValue());
+                }
                 return;
             }
 

@@ -120,23 +120,37 @@ docs/generated/tests/design/ast-reference/statements/switchstmt-case-decl-used-i
 # kernel argument. (Will become a tracking issue after human triage.)
 docs/generated/tests/design/target-pipelines/metal/append-buffer-params-carry-buffer-slots.slang
 
-# Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-metal-unknown-addressspace-abort.yaml
-# Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-spirv-invalid-funcall-return-type.yaml
-# The emission fan-out for the `ref`-accessor claim reaches the last two
-# shader targets and both are broken: `-target metal` (directive `.1`) aborts
-# with the internal error "Unknown addressspace encountered", and
-# `-target spirv-asm` (directive `.2`) declares the accessor helper as
-# `OpTypeFunction %int %_ptr_Function_Cell` while calling it as
-# `OpFunctionCall %_ptr_Function_int`, so the module fails spirv-val.
-# The entries name the two sub-tests rather than the file because the file's
-# first directive (`-target hlsl`) still passes and must keep reporting.
-# NOTE: `lint_expected_failures` resolves each entry as a path on disk, so it
-# flags these two sub-test names as unresolvable; the lint rule does not yet
-# know about slang-test's `<file>.<n>` sub-test naming. Remove these entries
-# when either back-end is fixed. (Will become a tracking issue after human
-# triage.)
-docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
+# shader-slang/slang#12492 fixes the `ref`-accessor lowering (#12487 / #9636): the
+# accessor's IR helper now returns a pointer to the referenced storage, so Metal no
+# longer aborts, SPIR-V compiles to a valid module, and on pointer-less targets
+# (HLSL, GLSL, WGSL) and SPIR-V the helper is inlined so the write stores through the
+# field directly. These generated tests use `[mutating] ref`, so it is that
+# lowering/inlining fix — not the separate implicit-mutability change for
+# *unannotated* `ref` — that changes their status. Two distinct effects here, which
+# must not be conflated:
+#   - The `-target metal` sub-test (`refaccessor-property.slang.1`) was listed for a
+#     genuine *compiler bug* (the "Unknown addressspace" abort). This PR fixes that
+#     bug, so the sub-test now passes and its entry is removed from this file.
+#   - The remaining three entries are NOT compiler bugs. The fixed compiler now emits
+#     *correct* output; they fail only because the frozen generated CHECK text still
+#     expects the un-inlined `Cell_value_ref` helper that the fix removes on these
+#     targets (the emitted result is otherwise correct — e.g. the SPIR-V function type
+#     already matches the call). They are stale-content failures, kept only until the
+#     generated bundles are regenerated.
+# Cleanup owner: the design-docs regeneration pass
+# (docs/generated/design/_meta/regenerate.md, run via the
+# `design-docs-incremental-update` skill) rebuilds these bundles from the current
+# compiler output; the run that regenerates `refaccessor-property{,-glsl,-wgsl}` must
+# refresh their CHECKs to the new shape and delete these three entries.
+# Only `refaccessor-property.slang.2` (`-target spirv-asm`) is a slang-test sub-test
+# (a `.<n>` directive within refaccessor-property.slang); `-glsl` and `-wgsl` are
+# separate whole files. NOTE: `lint_expected_failures` resolves each entry as a path
+# on disk, so it flags the `.2` sub-test name as unresolvable; the lint rule does not
+# yet know about slang-test's sub-test naming (the two whole-file entries resolve
+# fine).
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2
+docs/generated/tests/design/ast-reference/declarations/refaccessor-property-glsl.slang
+docs/generated/tests/design/ast-reference/declarations/refaccessor-property-wgsl.slang
 
 # https://github.com/shader-slang/slang/issues/12443 — `Size(N)` enum
 # construction is rejected inside a generic function's array bound with

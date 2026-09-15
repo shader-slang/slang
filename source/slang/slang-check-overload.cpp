@@ -1025,6 +1025,13 @@ bool isEffectivelyMutating(CallableDecl* decl)
     if (as<SetterDecl>(decl))
         return true;
 
+    // A `ref` accessor hands out a mutable reference to the referenced storage, so it
+    // must receive `this` by reference exactly like `set`; otherwise an unannotated `ref`
+    // takes `this` by value and a write through the returned reference targets a
+    // callee-local copy and is lost. `[nonmutating] ref` opts out via the check above.
+    if (as<RefAccessorDecl>(decl))
+        return true;
+
     return false;
 }
 
@@ -1078,6 +1085,91 @@ ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(Expr* inExpr)
 
         return nullptr;
     }
+}
+
+// Walks `inExpr` down to the root of its l-value storage and returns the `this` expression
+// at that root, or null when the storage is not physically part of `this`. The walk
+// descends through the l-value projections that keep storage inside the same object
+// (parentheses, vector/matrix swizzles, upcasts, stored-field member access, and built-in
+// array indexing). Two shapes deliberately stop it and return null because they reach
+// storage *outside* `this`:
+//   - a dereference (`*ptrMember`, `ptrMember->field`): only the pointer value lives in
+//     `this`, so the pointee is external. `DerefMemberExpr` is-a `MemberExpr`, so the
+//     dereference test comes before the stored-field member case.
+//   - a member that names a property/subscript rather than a stored field: that is an
+//     accessor call forwarding to wherever its own storage lives, not necessarily `this`.
+static ThisExpr* findReferenceRootThisExpr(Expr* inExpr)
+{
+    auto expr = inExpr;
+    for (;;)
+    {
+        if (auto parenExpr = as<ParenExpr>(expr))
+        {
+            expr = parenExpr->base;
+            continue;
+        }
+        if (auto swizzleExpr = as<SwizzleExpr>(expr))
+        {
+            expr = swizzleExpr->base;
+            continue;
+        }
+        if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(expr))
+        {
+            expr = matrixSwizzleExpr->base;
+            continue;
+        }
+        if (auto castToSuperExpr = as<CastToSuperTypeExpr>(expr))
+        {
+            expr = castToSuperExpr->valueArg;
+            continue;
+        }
+        if (as<DerefExpr>(expr) || as<DerefMemberExpr>(expr))
+            return nullptr;
+        if (auto memberExpr = as<MemberExpr>(expr))
+        {
+            if (!memberExpr->declRef.as<VarDeclBase>())
+                return nullptr;
+            expr = memberExpr->baseExpression;
+            continue;
+        }
+        if (auto indexExpr = as<IndexExpr>(expr))
+        {
+            expr = indexExpr->baseExpression;
+            continue;
+        }
+        break;
+    }
+    return as<ThisExpr>(expr);
+}
+
+void SemanticsVisitor::checkNonmutatingRefAccessorReturn(
+    FunctionDeclBase* parentFunc,
+    Expr* returnExpr)
+{
+    auto refAccessor = as<RefAccessorDecl>(parentFunc);
+    if (!refAccessor)
+        return;
+
+    // A mutating `ref` accessor already receives `this` by reference, so the address it
+    // returns denotes the caller's storage; only a `[nonmutating]` accessor can take
+    // `this` by value.
+    if (isEffectivelyMutating(refAccessor))
+        return;
+
+    auto rootThis = findReferenceRootThisExpr(returnExpr);
+    if (!rootThis)
+        return;
+
+    // A `class` is a reference type: its `this` is a reference even for a `[nonmutating]`
+    // accessor, so a class field is the caller's storage, not a temporary copy — only a
+    // value type (`struct`) loses the write. Testing the `this` expression's own type,
+    // rather than walking parent declarations, also covers a `[nonmutating] ref` declared
+    // in an `extension` of a class, whose `this` type is the extended type itself.
+    if (isDeclRefTypeOf<ClassDecl>(rootThis->type.type))
+        return;
+
+    getSink()->diagnose(
+        Diagnostics::NonmutatingRefAccessorReturnsThisStorage{.location = returnExpr->loc});
 }
 
 bool SemanticsVisitor::TryCheckOverloadCandidateDirections(

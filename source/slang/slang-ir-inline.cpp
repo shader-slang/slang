@@ -1039,6 +1039,12 @@ struct TypeInliningPass : InliningPassBase
 
     bool shouldInlineBorrowRefTypesForSPIRV = false;
 
+    // True on targets that cannot emit a function returning an address-space-less
+    // pointer (HLSL/GLSL/WGSL have no pointer type; SPIR-V Logical addressing
+    // cannot return a `Function`-storage pointer). Metal and CUDA can, so they are
+    // excluded and keep the helper.
+    bool shouldInlineGenericPtrReturnTypes = false;
+
     TypeInliningPass(IRModule* module, TargetProgram* inTargetProgram)
         : Super(module), targetProgram(inTargetProgram)
     {
@@ -1046,6 +1052,8 @@ struct TypeInliningPass : InliningPassBase
         {
             shouldInlineBorrowRefTypesForSPIRV = true;
         }
+        auto targetReq = targetProgram->getTargetReq();
+        shouldInlineGenericPtrReturnTypes = !isMetalTarget(targetReq) && !isCUDATarget(targetReq);
     }
 
     bool doesTypeRequireInline(IRType* type, IRInst* arg, IRFunc* callee)
@@ -1102,6 +1110,21 @@ struct TypeInliningPass : InliningPassBase
             }
         default:
             break;
+        }
+
+        // A `Generic`-address-space pointer *result* (`arg == nullptr`; params use
+        // the `Borrow*` cases above). This pass precedes `specializeAddressSpace`,
+        // so a `Function`-local return (a `ref` accessor over a local) is still
+        // `Generic`; an explicit address space (e.g. `GroupShared` under
+        // `VariablePointers`) is genuinely returnable and left alone. Force-inlines
+        // even a `[noinline]` callee — unavoidable, as the target cannot emit it.
+        if (shouldInlineGenericPtrReturnTypes && !arg)
+        {
+            if (auto ptrType = as<IRPtrType>(type))
+            {
+                if (ptrType->getAddressSpace() == AddressSpace::Generic)
+                    return true;
+            }
         }
 
         return false;

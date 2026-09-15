@@ -3685,6 +3685,15 @@ public:
     ///
     ParamDecl* isReferenceIntoFunctionInputParameter(Expr* expr);
 
+    /// Diagnose a `[nonmutating] ref` accessor whose body returns a reference
+    /// rooted in the by-value `this` (a member of `this`, or an element of an
+    /// array member of `this`), which would silently lose the caller's write.
+    /// A no-op for any other declaration, and for a return whose storage lies
+    /// outside `this` (a global, or storage reached through a pointer member),
+    /// which is the sound use of `[nonmutating] ref`.
+    ///
+    void checkNonmutatingRefAccessorReturn(FunctionDeclBase* parentFunc, Expr* returnExpr);
+
     // Create a witness that attests to the fact that `type`
     // is equal to itself.
     TypeEqualityWitness* createTypeEqualityWitness(Type* type);
