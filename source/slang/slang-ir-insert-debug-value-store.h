@@ -14,8 +14,6 @@ struct DebugValueStoreContext
 {
     Dictionary<IRType*, bool> m_mapTypeToDebugability;
     bool isDebuggableType(IRType* type);
-    // Whether a function local or parameter of this type should get a debug variable; see the
-    // definition for the supported-opaque-handle extension of isDebuggableType.
     bool isDebugVarTypeSupported(IRType* type);
     void insertDebugValueStore(IRFunc* func);
     bool isTypeKind(IRInst* inst);
