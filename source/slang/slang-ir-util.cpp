@@ -1708,13 +1708,24 @@ void forEachAssociatedCallee(IRInst* callee, TFunc callback)
     // (slang-ir-simplify-for-emit.cpp, the autodiff passes) pay it per query.
     //
     // A mutating callback belongs on `traverseUsers`, not here.
+    //
+    // The precondition isn't otherwise enforced, so a future mutating callback would silently
+    // walk a freed `use->nextUse`. Re-check `firstUse` after every callback invocation to turn
+    // the most common violation -- a use added or removed at the head of the list -- into a
+    // loud assert instead of a silent use-after-free. This doesn't catch every possible
+    // mutation (e.g. one that leaves `firstUse` unchanged but frees a later use), but it's a
+    // cheap guard rail for the shape a mutating callback is most likely to produce.
     for (auto use = callee->firstUse; use; use = use->nextUse)
     {
         if (use->usedValue != callee)
             continue;
         auto annotation = as<IRAnnotation>(use->getUser());
         if (annotation && annotation->getTarget() == callee)
+        {
+            auto expectedFirstUse = callee->firstUse;
             callback(annotation->getInst());
+            SLANG_ASSERT(callee->firstUse == expectedFirstUse);
+        }
     }
 }
 
