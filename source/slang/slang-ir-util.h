@@ -607,6 +607,19 @@ IRInst* peelAddressForwardingOps(IRInst* addr);
 // so this function returns false in that case.
 bool isPointerToImmutableLocation(IRInst* ptrInst);
 
+// Returns true if `value` reads a resource whose declaration carries a `coherent` or `volatile`
+// memory qualifier — a read that may observe writes from other invocations and so is not `readNone`
+// (movable / CSE-able). `value` may be any value: the caller passes every argument of a candidate
+// call, and a non-resource operand simply returns false. The check backward-slices the handle's
+// definition (aggregate access / load / phi) to the qualified declaration; the qualifier
+// (`IRMemoryQualifierSetDecoration`) can sit on a global resource or a parameter-block struct
+// field, and a qualifier-carrying value at any point on the slice — including an `IRParam` — is
+// detected. A value whose coherence the front end has already dropped from its type (a coherent
+// copy into local memory, or an argument bound to a plain-typed parameter) is out of scope; the
+// definition documents the exact boundary. See shader-slang/slang#13082 (and #13084 for the
+// front-end drop).
+bool resourceAccessTouchesCoherentOrVolatile(IRInst* value);
+
 // Check if `use` is the `baseAddr` operand of a GetElement/FieldExtract inst.
 // This is true if `use` is the first operand of the user inst.
 inline bool isUseBaseAddrOperand(IRUse* use, IRInst* user)
