@@ -143,7 +143,6 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
 
             for (const auto& value : values)
             {
-                // Validate that the feature name is recognized
                 if (!isValidFeatureName(value))
                 {
                     sink.diagnose(
