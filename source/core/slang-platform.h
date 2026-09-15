@@ -155,6 +155,22 @@ struct PlatformUtil
     /// Will return SLANG_E_NOT_FOUND if the variable is not set
     static SlangResult getEnvironmentVariable(const UnownedStringSlice& name, StringBuilder& out);
 
+    /// Sets an environment variable for this process, or removes it when `value` is null.
+    ///
+    /// Affects this process and anything it spawns afterwards, since a child inherits the
+    /// environment at creation. That is the point: it lets a test run the same executable
+    /// twice under different settings without a build-time switch.
+    ///
+    /// **An empty `value` is platform-dependent, so pass null to remove.** Windows
+    /// `_putenv_s` treats an empty string as a removal, leaving `getEnvironmentVariable`
+    /// reporting `SLANG_E_NOT_FOUND`; POSIX `setenv` stores the empty string, so the same
+    /// lookup succeeds and yields `""`. Callers that must treat the two alike have to say
+    /// so themselves -- `isOnDemandIRLoadEnabled` does, by reading a set-but-empty value
+    /// as "not specified".
+    static SlangResult setEnvironmentVariable(
+        const UnownedStringSlice& name,
+        const UnownedStringSlice* value);
+
     /// Get the path to this instance (the path to the dll/executable/shared library the call is in)
     /// NOTE! This is not supported on all platforms, and will return SLANG_E_NOT_IMPLEMENTED in
     /// that scenario
