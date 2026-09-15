@@ -17,6 +17,10 @@ namespace renderer_test
 {
 using namespace Slang;
 
+// Returns whether `featureName` is a recognized -render-feature name (an entry in
+// SLANG_RHI_FEATURES), not whether the current device supports it. A recognized-but-
+// unsupported feature is not rejected here: render-test-main.cpp returns
+// SLANG_E_NOT_AVAILABLE at device creation and the harness skips the test.
 static bool isValidFeatureName(const UnownedStringSlice& featureName)
 {
 #define SLANG_RHI_FEATURES_X(id, name) name,
