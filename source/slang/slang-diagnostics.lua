@@ -5923,6 +5923,16 @@ err(
     }
 )
 
+err(
+    "conflicting-return-pointer-storage-classes",
+    58005,
+    "function returns pointers in more than one storage class",
+    span {
+        loc = "location",
+        message = "this function returns pointers in more than one storage class (address space); a function has a single result type, so every return must yield a pointer in the same storage class. Restructure the code so all returned pointers live in the same storage class.",
+    }
+)
+
 -- Autodiff checkpoint reporting notes (-1)
 
 standalone_note(

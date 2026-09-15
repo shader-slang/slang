@@ -12,6 +12,11 @@
 // return processed win; otherwise the two returns would flip the result type on
 // every fixpoint drain and requeue the function forever. With a deterministic
 // choice the pass converges and reports E58004 cleanly instead of hanging.
+//
+// Here the reported error is E58004 because the first return's class ('Function')
+// is not returnable at all. When BOTH returns are in individually returnable but
+// different classes, the error is instead the conflict itself (E58005); see
+// conflicting-returnable-addrspace-12563.slang.
 
 RWStructuredBuffer<int> outputBuffer;
 
