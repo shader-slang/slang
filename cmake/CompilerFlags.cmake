@@ -83,6 +83,68 @@ function(add_supported_cxx_linker_flags target)
 endfunction()
 
 #
+# Add the AddressSanitizer (and, where available, UndefinedBehaviorSanitizer)
+# compile and link options to a target when SLANG_ENABLE_ASAN is on, and do
+# nothing otherwise.
+#
+# Slang targets normally get these through set_default_compile_options, which
+# calls this function. It is exposed separately so that targets which must not
+# inherit the rest of Slang's flags can still be sanitized: a vendored library
+# such as spvdb (tests/spvdb) brings its own warning configuration, but it is
+# linked into slang-test, and on MSVC every object in a binary must agree on
+# whether ASan is enabled. /fsanitize=address changes the ABI of the annotated
+# standard containers, so mixing a sanitized slang-test with an unsanitized
+# spvdb.lib fails the link with LNK2038 "mismatch detected for
+# 'annotate_string'".
+#
+function(add_sanitizer_options target)
+    if(NOT SLANG_ENABLE_ASAN)
+        return()
+    endif()
+
+    # -fno-sanitize-recover=undefined is intentionally omitted so that
+    # halt_on_error can be controlled at runtime via UBSAN_OPTIONS.
+    # For abort-on-first-UB locally, set UBSAN_OPTIONS=halt_on_error=1.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(
+            ${target}
+            PRIVATE
+                -fsanitize=address
+                -fsanitize=undefined
+                -fsanitize-ignorelist=${PROJECT_SOURCE_DIR}/cmake/sanitizer-ignorelist.txt
+        )
+        target_link_options(
+            ${target}
+            BEFORE
+            PRIVATE -fsanitize=address -fsanitize=undefined
+        )
+        if(NOT APPLE)
+            # Clang defaults to statically linking the sanitizer runtime,
+            # which is not compatible with `-Wl,--no-undefined`, so we need
+            # to use dynamic linking instead (`-shared-libsan`).
+            # On macOS/Darwin the sanitizer runtime is already dynamic.
+            target_compile_options(${target} PRIVATE -shared-libsan)
+            target_link_options(${target} BEFORE PRIVATE -shared-libsan)
+        endif()
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        target_compile_options(
+            ${target}
+            PRIVATE -fsanitize=address -fsanitize=undefined
+        )
+        target_link_options(
+            ${target}
+            BEFORE
+            PRIVATE -fsanitize=address -fsanitize=undefined
+        )
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+        target_compile_options(${target} PRIVATE /fsanitize=address)
+        target_link_options(${target} BEFORE PRIVATE /INCREMENTAL:NO)
+    else()
+        message(FATAL_ERROR "SLANG_ENABLE_ASAN: unsupported C++ compiler")
+    endif()
+endfunction()
+
+#
 # Add our default compiler flags to a target
 #
 # Pass USE_EXTRA_WARNINGS to enable -WExtra or /W3
@@ -227,53 +289,15 @@ function(set_default_compile_options target)
             SLANG_ENABLE_DXIL_SUPPORT=$<BOOL:${SLANG_ENABLE_DXIL}>
             SLANG_ENABLE_WEBGPU=$<BOOL:${SLANG_HAS_WEBGPU_SUPPORT}>
             SLANG_ENABLE_VALIDATION_VM_BYTECODE=$<BOOL:${SLANG_ENABLE_VALIDATION_VM_BYTECODE}>
-            $<$<BOOL:${SLANG_ENABLE_FULL_DEBUG_VALIDATION}>:SLANG_ENABLE_FULL_IR_VALIDATION>
+            SLANG_ENABLE_VALIDATION_FOSSIL=$<BOOL:${SLANG_ENABLE_VALIDATION_FOSSIL}>
+            $<$<BOOL:${SLANG_ENABLE_VALIDATION_IR}>:SLANG_ENABLE_VALIDATION_IR>
             $<$<BOOL:${SLANG_ENABLE_IR_BREAK_ALLOC}>:SLANG_ENABLE_IR_BREAK_ALLOC>
             $<$<BOOL:${SLANG_ENABLE_DX_ON_VK}>:SLANG_CONFIG_DX_ON_VK>
             $<$<STREQUAL:${SLANG_LIB_TYPE},STATIC>:STB_IMAGE_STATIC>
     )
 
-    if(SLANG_ENABLE_ASAN AND NOT ARG_SKIP_ASAN)
-        # -fno-sanitize-recover=undefined is intentionally omitted so that
-        # halt_on_error can be controlled at runtime via UBSAN_OPTIONS.
-        # For abort-on-first-UB locally, set UBSAN_OPTIONS=halt_on_error=1.
-        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-            target_compile_options(
-                ${target}
-                PRIVATE
-                    -fsanitize=address
-                    -fsanitize=undefined
-                    -fsanitize-ignorelist=${PROJECT_SOURCE_DIR}/cmake/sanitizer-ignorelist.txt
-            )
-            target_link_options(
-                ${target}
-                BEFORE
-                PRIVATE -fsanitize=address -fsanitize=undefined
-            )
-            if(NOT APPLE)
-                # Clang defaults to statically linking the sanitizer runtime,
-                # which is not compatible with `-Wl,--no-undefined`, so we need
-                # to use dynamic linking instead (`-shared-libsan`).
-                # On macOS/Darwin the sanitizer runtime is already dynamic.
-                target_compile_options(${target} PRIVATE -shared-libsan)
-                target_link_options(${target} BEFORE PRIVATE -shared-libsan)
-            endif()
-        elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-            target_compile_options(
-                ${target}
-                PRIVATE -fsanitize=address -fsanitize=undefined
-            )
-            target_link_options(
-                ${target}
-                BEFORE
-                PRIVATE -fsanitize=address -fsanitize=undefined
-            )
-        elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-            target_compile_options(${target} PRIVATE /fsanitize=address)
-            target_link_options(${target} BEFORE PRIVATE /INCREMENTAL:NO)
-        else()
-            message(FATAL_ERROR "SLANG_ENABLE_ASAN: unsupported C++ compiler")
-        endif()
+    if(NOT ARG_SKIP_ASAN)
+        add_sanitizer_options(${target})
     endif()
 
     if(SLANG_ENABLE_COVERAGE)
