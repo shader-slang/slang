@@ -1259,7 +1259,11 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
-bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, IRInst* addr)
+bool canInstHaveSideEffectAtAddress(
+    IRGlobalValueWithCode* func,
+    IRInst* inst,
+    IRInst* addr,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
     switch (inst->getOp())
     {
@@ -1282,7 +1286,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             if (!isChildInstOf(getRootAddr(addr), func))
             {
                 auto callee = call->getCallee();
-                if (callee && !doesCalleeHaveSideEffect(callee))
+                if (callee && !doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
                 {
                     // An exception is if the callee is side-effect free and is not reading from
                     // memory.

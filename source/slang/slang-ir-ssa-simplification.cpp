@@ -57,10 +57,14 @@ void simplifyIR(
 {
     SLANG_PROFILE;
 
-    // Callee-side-effect memo shared by every DCE invocation in this pass
-    // (see IRDeadCodeEliminationOptions::calleeSideEffectCache). Cleared each
-    // outer iteration so DCE sees the purity facts propagateFuncProperties
-    // proves that iteration.
+    // Callee-side-effect memo shared by every DCE invocation in this pass, and also by the
+    // removeRedundancyInFunc call below (see IRDeadCodeEliminationOptions::calleeSideEffectCache
+    // for the sharing contract, and slang-ir-redundancy-removal.h for why staleness is safe for
+    // that second consumer). Cleared each outer iteration so both consumers see the purity facts
+    // propagateFuncProperties proves that iteration. removeRedundancyInFunc itself runs inside
+    // the inner per-func loop, up to kMaxFuncIterations times per outer iteration, without an
+    // additional clear -- safe because propagateFuncProperties (the only thing in this pass that
+    // can change a callee's purity) runs once per outer iteration, before the inner loop starts.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
@@ -100,7 +104,10 @@ void simplifyIR(
                 funcChanged |= applySparseConditionalConstantPropagation(func, target, sink);
                 funcChanged |= peepholeOptimize(target, func);
                 if (options.removeRedundancy)
-                    funcChanged |= removeRedundancyInFunc(func, options.hoistLoopInvariantInsts);
+                    funcChanged |= removeRedundancyInFunc(
+                        func,
+                        options.hoistLoopInvariantInsts,
+                        options.deadCodeElimOptions.calleeSideEffectCache);
                 funcChanged |= simplifyCFG(func, options.cfgOptions);
                 // Note: we disregard the `changed` state from dead code elimination pass since
                 // SCCP pass could be generating temporarily evaluated constant values and never
@@ -126,6 +133,14 @@ void simplifyNonSSAIR(
     IRSimplificationOptions options,
     DiagnosticSink* sink)
 {
+    // Shared with removeRedundancy below, not just eliminateDeadCode -- see
+    // slang-ir-redundancy-removal.h for why a stale entry isn't automatically safe for that
+    // consumer the way it is for DCE. No step in this loop currently mutates callee purity, so
+    // the per-iteration `clear()` below is a defensive safeguard, not a live correctness
+    // requirement -- mirroring simplifyIR's clear so the loop doesn't come to depend on that
+    // staying true. It clears whichever cache is in effect, local or caller-supplied: if a
+    // future caller passes in `options.deadCodeElimOptions.calleeSideEffectCache` already
+    // populated, expecting entries to survive one call to this function, they won't.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
@@ -137,11 +152,15 @@ void simplifyNonSSAIR(
     while (changed && iterationCounter < kMaxIterations)
     {
         changed = false;
+        options.deadCodeElimOptions.calleeSideEffectCache->clear();
         changed |= applySparseConditionalConstantPropagationForGlobalScope(module, target, sink);
         changed |= peepholeOptimize(target, module, options.peepholeOptions);
 
         if (!options.minimalOptimization)
-            changed |= removeRedundancy(module, options.hoistLoopInvariantInsts);
+            changed |= removeRedundancy(
+                module,
+                options.hoistLoopInvariantInsts,
+                options.deadCodeElimOptions.calleeSideEffectCache);
         changed |= simplifyCFG(module, options.cfgOptions);
 
         // Note: we disregard the `changed` state from dead code elimination pass since
@@ -160,6 +179,9 @@ void simplifyFunc(
     IRSimplificationOptions options,
     DiagnosticSink* sink)
 {
+    // See the identical comment in simplifyNonSSAIR above: this cache is shared with
+    // removeRedundancyInFunc below, not just eliminateDeadCode, so it is cleared every
+    // iteration rather than relying on this loop never mutating callee purity.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
@@ -173,10 +195,14 @@ void simplifyFunc(
             break;
 
         changed = false;
+        options.deadCodeElimOptions.calleeSideEffectCache->clear();
         changed |= applySparseConditionalConstantPropagation(func, target, sink);
         changed |= peepholeOptimize(target, func);
         if (!options.minimalOptimization)
-            changed |= removeRedundancyInFunc(func, options.hoistLoopInvariantInsts);
+            changed |= removeRedundancyInFunc(
+                func,
+                options.hoistLoopInvariantInsts,
+                options.deadCodeElimOptions.calleeSideEffectCache);
         changed |= simplifyCFG(func, options.cfgOptions);
 
         // Note: we disregard the `changed` state from dead code elimination pass since

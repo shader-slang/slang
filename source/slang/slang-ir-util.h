@@ -375,7 +375,17 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
 
 bool isPtrLikeOrHandleType(IRInst* type);
 
-bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, IRInst* addr);
+// `calleeSideEffectCache` is optional; see `slang-ir-redundancy-removal.h` for its sharing and
+// staleness contract -- this function is the `canInstHaveSideEffectAtAddress` that contract
+// refers to, so a stale cache entry here can license forwarding a load/store across a call that
+// has since become impure (not the weaker, always-conservative DCE contract in slang-ir-dce.h).
+// Passing a cache turns the `kIROp_Call` case's `doesCalleeHaveSideEffect` query from O(#call
+// sites to that callee) into an O(1) cache hit after the first query for a given callee.
+bool canInstHaveSideEffectAtAddress(
+    IRGlobalValueWithCode* func,
+    IRInst* inst,
+    IRInst* addr,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);
 
 /// Get a unit-type (aka `void`) value using the `poison` instruction,
 /// which indicates an undefined (and potentially unstable) value.
