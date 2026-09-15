@@ -1214,9 +1214,9 @@ bool canAddressesPotentiallyAlias(
         // (Metal, and the CPU-like targets), because then every address in the
         // function shares a root and lands here -- at which point two heap
         // allocations per query, once per (address, instruction) scan step, are
-        // most of what the surrounding pass does. 8 covers every access chain
-        // that occurs in practice; deeper ones still work, they just spill to the
-        // heap as before.
+        // most of what the surrounding pass does. 8 is generous headroom for the access-chain
+        // depths seen in practice, not a hard limit -- nesting is user-controlled and unbounded,
+        // so deeper chains still work, they just spill to the heap as before.
         ShortList<IRInst*, 8> accessChain1;
         ShortList<IRInst*, 8> accessChain2;
 
@@ -1712,9 +1712,11 @@ void forEachAssociatedCallee(IRInst* callee, TFunc callback)
     // The precondition isn't otherwise enforced, so a future mutating callback would silently
     // walk a freed `use->nextUse`. Re-check `firstUse` after every callback invocation to turn
     // the most common violation -- a use added or removed at the head of the list -- into a
-    // loud assert instead of a silent use-after-free. This doesn't catch every possible
-    // mutation (e.g. one that leaves `firstUse` unchanged but frees a later use), but it's a
-    // cheap guard rail for the shape a mutating callback is most likely to produce.
+    // debug-build `SLANG_ASSERT` instead of a silent use-after-free. Release builds have no
+    // guard at all (`SLANG_ASSERT` compiles out); the precondition is a hard requirement there,
+    // not just in debug. This also doesn't catch every possible mutation (e.g. one that leaves
+    // `firstUse` unchanged but frees a later use) -- it's a cheap debug-build guard rail for the
+    // shape a mutating callback is most likely to produce, not a substitute for the precondition.
     for (auto use = callee->firstUse; use; use = use->nextUse)
     {
         if (use->usedValue != callee)
