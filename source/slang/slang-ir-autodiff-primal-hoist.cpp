@@ -1569,13 +1569,29 @@ void applyCheckpointSet(
     }
 }
 
+// Build the array type that checkpoints a per-iteration value across a nest of
+// `defBlockIndices` regions: one array dimension per enclosing loop. Dimension i
+// holds `defBlockIndices[i].maxIters + 1` iterations -- the `+ 1` because the
+// loop counter ranges over `0..maxIters` inclusive.
+//
+// Invariant: dimension i is both sized by and indexed by `defBlockIndices[i]`.
+// `defBlockIndices` is ordered innermost-loop-first (see `getAllAncestorRegions`),
+// so `defBlockIndices[0]` is the innermost enclosing loop. The store/load helpers
+// address the array with `emitElementAddress`, which peels the OUTERMOST array
+// dimension first using `defBlockIndices[0]`, then the next with
+// `defBlockIndices[1]`, and so on -- i.e. the innermost loop's counter indexes the
+// outermost array dimension. Because `getArrayType` wraps a new outermost
+// dimension each step, we fold `defBlockIndices` in reverse order so that
+// `defBlockIndices[0]`'s bound ends up as the outermost dimension, matching the
+// counter that peels it first.
 IRType* getTypeForLocalStorage(
     IRBuilder* builder,
     IRType* storageType,
     const List<IndexTrackingInfo>& defBlockIndices)
 {
-    for (auto& index : defBlockIndices)
+    for (Index i = defBlockIndices.getCount() - 1; i >= 0; --i)
     {
+        auto& index = defBlockIndices[i];
         SLANG_ASSERT(index.status == IndexTrackingInfo::CountStatus::Static);
         SLANG_ASSERT(index.maxIters >= 0);
 
@@ -1620,6 +1636,9 @@ IRInst* emitIndexedStoreAddressForVar(
     const List<IndexTrackingInfo>& defBlockIndices)
 {
     IRInst* storeAddr = localVar;
+    // Iterate `defBlockIndices` forward so the first `emitElementAddress` peels the
+    // outermost dimension with `defBlockIndices[0]`; this must stay in step with the
+    // reverse fold in `getTypeForLocalStorage` (see the invariant documented there).
     for (auto& index : defBlockIndices)
     {
         storeAddr = builder->emitElementAddress(storeAddr, index.primalCountParam);
@@ -1638,6 +1657,9 @@ IRInst* emitIndexedLoadAddressForVar(
 {
     IRInst* loadAddr = localVar;
 
+    // Iterate `defBlockIndices` forward so the first `emitElementAddress` peels the
+    // outermost dimension with `defBlockIndices[0]`; this must stay in step with the
+    // reverse fold in `getTypeForLocalStorage` (see the invariant documented there).
     for (auto index : defBlockIndices)
     {
         if (useBlockIndices.contains(index))
