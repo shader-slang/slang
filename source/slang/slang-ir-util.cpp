@@ -1,5 +1,6 @@
 #include "slang-ir-util.h"
 
+#include "slang-ast-modifier.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
@@ -993,6 +994,23 @@ IRInst* getRootBufferOrAddr(IRInst* addr)
         }
     }
     return rootAddr;
+}
+
+bool isResourceLoad(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_ImageLoad:
+    case kIROp_StructuredBufferLoad:
+    case kIROp_ByteAddressBufferLoad:
+    case kIROp_StructuredBufferLoadStatus:
+    case kIROp_RWStructuredBufferLoad:
+    case kIROp_RWStructuredBufferLoadStatus:
+    case kIROp_SubpassLoad:
+        return true;
+    default:
+        return false;
+    }
 }
 
 // The aliasing class of an address. This is used to determine
@@ -3162,6 +3180,140 @@ bool isPointerToImmutableLocation(IRInst* loc)
             return true;
     }
     return false;
+}
+
+// True if `inst` carries a `globallycoherent`/`volatile` memory qualifier -- the qualifiers that
+// make a read non-repeatable (its value may differ between two otherwise-identical reads). The
+// qualifier is stored as an `IRMemoryQualifierSetDecoration` on the resource, global, or field key.
+static bool isInstNonRepeatableQualified(IRInst* inst)
+{
+    const IRIntegerValue nonRepeatableBits =
+        MemoryQualifierSetModifier::Flags::kCoherent | MemoryQualifierSetModifier::Flags::kVolatile;
+    if (auto qualifiers = inst->findDecoration<IRMemoryQualifierSetDecoration>())
+        return (qualifiers->getMemoryQualifierBit() & nonRepeatableBits) != 0;
+    return false;
+}
+
+// True if `type` is, or transitively contains, a struct member whose field key is qualified
+// `globallycoherent`/`volatile`. Loading such a value -- even as part of a larger aggregate -- must
+// observe the qualified member on every occurrence, so two otherwise-identical loads must not be
+// commoned. Walks struct fields (checking each field key) and array element types. This complements
+// `isRepeatableReadLocation`, which checks the qualifier on the accessed location and its field
+// keys: this catches a qualified member loaded by value inside an aggregate, e.g.
+// `buf[i].coherentMember`, where the whole element struct is loaded (`structuredBufferLoad`) and
+// the member then extracted (`getField`) -- the extract is not itself a memory access, so only the
+// loaded type reveals the qualified member.
+bool typeContainsNonRepeatableQualifiedMember(IRType* type)
+{
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (isInstNonRepeatableQualified(field->getKey()))
+                return true;
+            if (typeContainsNonRepeatableQualifiedMember(field->getFieldType()))
+                return true;
+        }
+        return false;
+    }
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+        return typeContainsNonRepeatableQualifiedMember(arrayType->getElementType());
+    return false;
+}
+
+bool isRepeatableReadLocation(IRInst* loc)
+{
+    // The location's ROOT must be a read-only (immutable-typed) location: this rejects RW /
+    // rasterizer-ordered resources, mutable globals, and groupshared by type. We test the root
+    // (`getRootAddr` peels field / element access) rather than `loc` itself, so that a pointer INTO
+    // an immutable aggregate -- e.g. `fieldAddr(cb, scalarKey)`, whose own type is `Ptr(scalar)`
+    // and so is not immutable-typed -- still qualifies. The peel loop below still visits every
+    // field key on the way down, so this does not skip the coherent/volatile check (a `getRootAddr`
+    // here would strip those keys, hence we do NOT pre-strip at the call sites; see
+    // `calleeIsRepeatableReadOnly` in slang-ir-redundancy-removal.cpp). An immutable-TYPED handle
+    // of obscured provenance (e.g. a `StructuredBuffer` passed as a parameter) also passes this
+    // type check; it is rejected later, by the fail-closed global-root terminal at the end of this
+    // function.
+    if (!isPointerToImmutableLocation(getRootAddr(loc)))
+        return false;
+
+    // A read-only *type* can still be qualified `globallycoherent` / `volatile`, stored as an
+    // `IRMemoryQualifierSetDecoration` on the resource rather than in the type. Such a read must be
+    // performed on every occurrence, so it is not repeatable. Peel the immutable access chain to
+    // the resource and reject those qualifiers (`isInstNonRepeatableQualified`).
+    IRInst* resource = loc;
+    for (;;)
+    {
+        if (isInstNonRepeatableQualified(resource))
+            return false;
+        IRInst* next = nullptr;
+        switch (resource->getOp())
+        {
+        // A field access can carry the qualifier on its field key (a buffer-block / struct field
+        // declared `globallycoherent`/`volatile`) rather than on the aggregate.
+        case kIROp_FieldAddress:
+        case kIROp_FieldExtract:
+            if (isInstNonRepeatableQualified(resource->getOperand(1)))
+                return false;
+            [[fallthrough]];
+        // Peel both pointer-form and value-form aggregate access to reach the root resource: the
+        // qualifier decorates the resource (e.g. an array/struct of buffers), and the access may
+        // extract the element by value (`getElement`) rather than by pointer. The resource-pointer
+        // ops below (`GetStructuredBufferPtr`/`RWStructuredBufferGetElementPtr`/`ImageSubscript`)
+        // are the same ones `isPointerToImmutableLocation` recurses through -- which established,
+        // at the top of this function, that `loc` is immutable (so e.g.
+        // `RWStructuredBufferGetElementPtr` only reaches here over an immutable root) -- while the
+        // field / element / `Load` cases additionally continue the qualifier traversal. Keep that
+        // resource-pointer subset in sync with `isPointerToImmutableLocation` so a new immutable
+        // access op is qualifier-checked here.
+        case kIROp_GetStructuredBufferPtr:
+        case kIROp_RWStructuredBufferGetElementPtr:
+        case kIROp_ImageSubscript:
+        case kIROp_GetElementPtr:
+        case kIROp_GetElement:
+            next = resource->getOperand(0);
+            break;
+        // Peel a resource handle loaded from immutable memory. This is the standard lowering of a
+        // global resource binding on CPU/CUDA-style targets: a `globallycoherent StructuredBuffer`
+        // becomes a field of a uniform `GlobalParams` block reached through the entry-point context
+        // pointer, so the read is `structuredBufferLoad(load(fieldAddr(<uniform>, bufferKey)), i)`.
+        // Following the load reaches that field key (whose qualifier we check) and ultimately the
+        // uniform context. Only follow when the loaded-from pointer is itself immutable: a handle
+        // loaded from mutable memory could differ between calls, so it is left as the (rejected)
+        // root below.
+        case kIROp_Load:
+            if (isPointerToImmutableLocation(getRootAddr(resource->getOperand(0))))
+                next = resource->getOperand(0);
+            break;
+        default:
+            break;
+        }
+        if (!next)
+            break;
+        resource = next;
+    }
+
+    // The chain must bottom out at the resource's module-scope declaration, so this is an
+    // allow-list (fail closed): only a `global_param` / `global_var` root is accepted. Reaching it
+    // means the resource's `IRMemoryQualifierSetDecoration` -- and those on every field key peeled
+    // on the way down (including through the uniform `GlobalParams` / `ConstantBuffer` a global is
+    // collected into on CPU/CUDA-style targets) -- were all inspected above. Every other root is
+    // rejected: a resource-typed parameter / phi / `select` / call result, or even a
+    // *pointer*-typed one, has provenance the peel did not fully visit -- e.g. a phi that merges
+    // `getFieldAddr(gp, coherentKey)` with `getFieldAddr(gp, plainKey)` would reach a pointer-typed
+    // parameter without the coherent field key ever being checked -- and an unpeeled load or
+    // unknown producer is a handle from memory we could not prove immutable. A
+    // `globallycoherent`/`volatile` qualifier is not propagated across those edges, so we cannot
+    // prove the read repeatable and conservatively reject it here (a missed optimization, never a
+    // wrong result).
+    switch (resource->getOp())
+    {
+    case kIROp_GlobalParam:
+    case kIROp_GlobalVar:
+        return true;
+    default:
+        return false;
+    }
 }
 
 bool isGenericParameter(IRInst* inst)
