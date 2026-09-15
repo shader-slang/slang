@@ -14832,6 +14832,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
             }
+            else if (as<PostDepthCoverageAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRPostDepthCoverageDecoration>(irFunc);
+            }
             else if (auto domainAttr = as<DomainAttribute>(modifier))
             {
                 IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), domainAttr);
