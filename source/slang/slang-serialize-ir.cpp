@@ -303,7 +303,7 @@ struct IRSerialReadContext : SourceLocSerialContext, RefObject
     }
 
     ISlangBlob* getBlobHoldingSerializedData() const { return _blobHoldingSerializedData; }
-    ComPtr<ISlangBlob> _blobHoldingSerializedData;
+
     virtual void handleIRModule(IRReadSerializer const& serializer, IRModule*& value);
     virtual void handleName(IRReadSerializer const& serializer, Name*& value);
     virtual SerialSourceLocReader* getSourceLocReader() override { return _sourceLocReader; }
@@ -313,6 +313,11 @@ struct IRSerialReadContext : SourceLocSerialContext, RefObject
 
     //
     SerialSourceLocReader* _sourceLocReader;
+
+    // The blob the serialized bytes live in, or null when the caller read them from
+    // storage it owns itself. Retained, because deferred instruction bodies are decoded
+    // out of spans that point into these bytes long after the read returns.
+    ComPtr<ISlangBlob> _blobHoldingSerializedData;
 
     // The module in which we will allocate our instructions
     RefPtr<IRModule> _module;
@@ -548,10 +553,11 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
 /// default would mean nobody gets the reduction without knowing to ask, and the
 /// deferred path would go untested in ordinary runs.
 ///
-/// Read once: a global session is shared across threads, and the underlying
-/// environment lookup is not safe against a concurrent write. Uses
-/// `PlatformUtil::getEnvironmentVariable` rather than `getenv`, which MSVC
-/// deprecates and this build treats as an error.
+/// Read once, into a function-local static. The answer must not change part way
+/// through a process -- two modules loaded under different modes would not be
+/// comparable -- and the underlying environment lookup is not safe against a
+/// concurrent write. Uses `PlatformUtil::getEnvironmentVariable` rather than `getenv`,
+/// which MSVC deprecates and this build treats as an error.
 bool isOnDemandIRLoadEnabled()
 {
     static const bool enabled = []
@@ -571,19 +577,13 @@ bool isOnDemandIRLoadEnabled()
     return enabled;
 }
 
-// Decoding state for a module's flat instruction table.
+// ## Depths in the module's preorder walk
 //
-// The same walk serves two purposes, which is why it lives in an object rather
-// than a lambda: it runs once over the whole module at load time, and then again
-// over a single subtree each time a deferred body is asked for. Holding the flat
-// table and the instruction array keeps the second use possible -- a body's
-// operands are indices into that array, and may name any module-scope global.
-//
-// Depths in the module's preorder walk. The module inst is the root, its globals sit
-// directly under it, and a global's decorations and body children sit under those. Three
-// separate pieces of logic depend on this model agreeing -- the deferral test in
-// `decodeInst`, the eager-skeleton scan, and the depth a replayed body is decoded at --
-// so the numbers are named rather than written out at each site.
+// The module inst is the root, its globals sit directly under it, and a global's
+// decorations and body children sit under those. Three separate pieces of logic depend on
+// this model agreeing -- the deferral test in `decodeInst`, the eager-skeleton scan, and
+// the depth a replayed body is decoded at -- so the numbers are named rather than written
+// out at each site.
 static const Int64 kModuleInstDepth = 0;
 static const Int64 kGlobalValueDepth = 1;
 static const Int64 kBodyChildDepth = 2;
@@ -667,6 +667,13 @@ static void _computeEagerSkeleton(
     }
 }
 
+/// Decoding state for a module's flat instruction table.
+///
+/// The same walk serves two purposes, which is why it lives in an object rather than a
+/// lambda: it runs once over the whole module at load time, and then again over a single
+/// subtree each time a deferred body is asked for. Holding the flat table and the
+/// instruction array keeps the second use possible -- a body's operands are indices into
+/// that array, and may name any module-scope global.
 struct FlatModuleDecoder : IRDeferredBodyLoader
 {
     FlatInstTable flat;
@@ -845,6 +852,25 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     /// stay aligned for the instructions that are kept.
     IRInst* decodeInst(IRInst* parent, Int64 depth);
 
+    /// The opcode to decode instruction `index` as, mapping an opcode this build does
+    /// not know to `kIROp_Unrecognized` and recording that it happened.
+    ///
+    /// The single spelling of that mapping, used by both paths that allocate: the
+    /// load-time pass and the deferred materialization that allocates the same
+    /// instructions later. Having one also gives the flag one home -- a deferred decode
+    /// runs with no `IRSerialReadContext` to reach, so it has to be recorded here and
+    /// propagated once the load walk is done.
+    IROp getInstOpAndNoteIfUnrecognized(Int64 index)
+    {
+        const IROp op = flat.instAllocInfo[index].op;
+        if (op == kIROp_Invalid) [[unlikely]]
+        {
+            foundUnrecognizedInstructions = true;
+            return kIROp_Unrecognized;
+        }
+        return op;
+    }
+
     /// Allocates the instruction for a given index; see the definition.
     IRInst* allocateInstAt(Int64 instIndexToAlloc, Int64& inStringLengthCursor);
 
@@ -900,10 +926,10 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
     // Build the body as a detached chain first, then attach it with a single store.
     //
     // The children are unreachable by any other thread while they are being built, so
-    // linking them to each other needs no synchronization. Attaching is the only
-    // publication, and it is one store: previously the chain was spliced onto the last
-    // decoration on the first iteration, which let a concurrent decoration walk follow
-    // that link into a chain that was still being decoded.
+    // linking them to each other needs no synchronization. Attaching must then be the
+    // only publication, and exactly one store: splicing the chain on as it is built --
+    // linking the first child to the last decoration before the rest exist -- would let a
+    // concurrent decoration walk follow that link into a chain still being decoded.
     IRInst* const lastDecoration = inst->peekLastDecorationOrChild();
     IRInst* bodyFirst = nullptr;
     IRInst* bodyLast = nullptr;
@@ -948,11 +974,11 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
 /// Returns the allocation size an instruction of `op` needs beyond the base `IRInst`,
 /// advancing `stringLengthCursor` past the length entry of a string or blob constant.
 ///
-/// Shared by the load-time walk and by deferred materialization so the two cannot
-/// drift: an earlier version of the deferred path duplicated this switch and, in
-/// doing so, dropped both range checks below, which are what keep a corrupt or
-/// future-version table from truncating `numChars` or overflowing the allocation
-/// size that the subsequent `memcpy` writes into.
+/// Shared by the load-time walk and by deferred materialization, which must size the
+/// same instruction identically. Keeping one copy also keeps the two range checks below
+/// on both paths; they are what stop a corrupt or future-version table from truncating
+/// `numChars` or overflowing the allocation the subsequent `memcpy` writes into, and a
+/// duplicate of this switch is easy to write without them.
 static size_t _readInstMinSizeInBytes(IROp op, const FlatInstTable& flat, Int64& stringLengthCursor)
 {
     switch (op)
@@ -1003,16 +1029,7 @@ static size_t _readInstMinSizeInBytes(IROp op, const FlatInstTable& flat, Int64&
 IRInst* FlatModuleDecoder::allocateInstAt(Int64 instIndexToAlloc, Int64& inStringLengthCursor)
 {
     const auto& allocInfo = flat.instAllocInfo[instIndexToAlloc];
-    IROp op = allocInfo.op;
-    if (op == kIROp_Invalid) [[unlikely]]
-    {
-        // Report it the same way the load-time walk does. Without this a lazily
-        // materialized module would silently accept an opcode that an eager load
-        // reports, and the end-state checks keyed on this flag would not relax.
-        op = kIROp_Unrecognized;
-        foundUnrecognizedInstructions = true;
-    }
-
+    const IROp op = getInstOpAndNoteIfUnrecognized(instIndexToAlloc);
     const size_t minSizeInBytes = _readInstMinSizeInBytes(op, flat, inStringLengthCursor);
     return module->_allocateInst(op, allocInfo.operandCount, minSizeInBytes);
 }
@@ -1240,7 +1257,11 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 
     // Deferral is only safe if the blob is the storage these spans were parsed out of, not
     // merely a blob the caller happened to have. Otherwise a body is decoded out of freed
-    // memory, silently and long after the call that would be blamed for it. That is not
+    // memory, silently and long after the call that would be blamed for it.
+    //
+    // What is actually testable here is containment -- that every view's bytes lie within
+    // the blob's range -- which is a proxy for that, and the names below say containment
+    // rather than ownership so the two are not confused. That is not
     // hypothetical: `addLibraryReference` retained a copy while parsing the caller's
     // pointer, which was harmless until bodies stopped being materialized eagerly.
     if (onDemandIRLoad)
@@ -1280,8 +1301,15 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         //
         // Counts are non-negative by construction; a negative one means the table is
         // corrupt and is refused rather than multiplied.
-        auto arrayIsSafe = [&](auto const& array, uint64_t elementSize)
+        //
+        // The element size is taken from the array's own element type rather than passed
+        // in. A stride restated at each call site is one a later type change can silently
+        // invalidate -- and checking the wrong number of bytes is precisely the failure
+        // this guard exists to catch.
+        auto arrayIsInsideBlob = [&]<typename T>(SerializedArray<T> const& array)
         {
+            constexpr uint64_t elementSize = sizeof(T);
+
             if (!array.isView())
                 return true;
             const Count count = array.getCount();
@@ -1290,7 +1318,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             const uint64_t elementCount = (uint64_t)count;
             // Refuse rather than wrap: on a 64-bit target a large count times a stride
             // can still exceed 64 bits.
-            if (elementSize != 0 && elementCount > UINT64_MAX / elementSize)
+            if (elementCount > UINT64_MAX / elementSize)
                 return false;
             const uint64_t byteSize = elementCount * elementSize;
             // A span wider than the address space cannot be inside the blob, and must not
@@ -1303,13 +1331,12 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // Every view-capable array, not a sample: which ones are views depends on the
         // backend and on what the module contains, so a subset check passes whenever the
         // arrays it named happened to be the owned ones.
-        const bool spansAreOwnedByTheBlob = arrayIsSafe(flat.childCounts, sizeof(Int64)) &&
-                                            arrayIsSafe(flat.operandIndices, sizeof(Int64)) &&
-                                            arrayIsSafe(flat.stringLengths, sizeof(Int64)) &&
-                                            arrayIsSafe(flat.stringChars, sizeof(uint8_t)) &&
-                                            arrayIsSafe(flat.literals, sizeof(UInt64));
+        const bool everySpanIsInsideBlob =
+            arrayIsInsideBlob(flat.childCounts) && arrayIsInsideBlob(flat.operandIndices) &&
+            arrayIsInsideBlob(flat.stringLengths) && arrayIsInsideBlob(flat.stringChars) &&
+            arrayIsInsideBlob(flat.literals);
 
-        if (!spansAreOwnedByTheBlob)
+        if (!everySpanIsInsideBlob)
         {
             _noteDeferralDeclinedForSpanMismatch();
             // Fall back to an eager load rather than asserting. A caller that supplies an
@@ -1329,12 +1356,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     for (Int64 instIndex = 0; instIndex < numInsts; ++instIndex)
     {
         const auto& a = flat.instAllocInfo[instIndex];
-        IROp op = a.op;
-        if (op == kIROp_Invalid) [[unlikely]]
-        {
-            readContext._foundUnrecognizedInstructions = true;
-            op = kIROp_Unrecognized;
-        }
+        const IROp op = decoder->getInstOpAndNoteIfUnrecognized(instIndex);
         const size_t minSizeInBytes = _readInstMinSizeInBytes(op, flat, allocStringLengthCursor);
         // Under on-demand load the skipped instructions are never allocated; the
         // preorder walk below still consumes their operand and payload cursors so
@@ -1366,7 +1388,10 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     SLANG_RELEASE_ASSERT(decoder->operandCursor == operandIndicesCount);
     // Unknown future opcodes intentionally become a recoverable read failure later.
     // This reader cannot know whether those opcodes consume literal or string payloads.
-    // Propagate what the decode walk saw, while the context is still alive.
+    //
+    // Everything that allocates records this on the decoder, since a body decoded after
+    // this function returns has no context to reach. Propagate it here, while the context
+    // is still alive and before the end-state checks below consult it.
     readContext._foundUnrecognizedInstructions |= decoder->foundUnrecognizedInstructions;
 
     if (!readContext._foundUnrecognizedInstructions)

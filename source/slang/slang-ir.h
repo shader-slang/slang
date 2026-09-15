@@ -37,23 +37,21 @@ class Name;
 class TargetRequest;
 
 //
-// Publication of a deferred body, and the one link it attaches to.
+// Publication of a deferred body, and the links it attaches to.
 //
 // A deferred body is built as a detached chain and attached with a single release
 // store, so a reader either sees no body or sees one whose instructions are fully
-// written. The decoration walk is the only reader that can observe that link without
-// going through `ensureBodyMaterialized`, by design -- materializing during decoration
-// lookup would defeat on-demand loading entirely -- so it loads the link with acquire.
+// written. The decoration walk is the one reader that must *not* materialize before
+// following a link -- materializing during decoration lookup would defeat on-demand
+// loading entirely -- so it loads the link with acquire. Every other reader
+// materializes first and synchronizes on the deferred flag instead.
 //
-// Alternatives were implemented and measured before settling here. Relying on the
-// address dependency instead of acquire is free but formally a data race; taking the
-// loader's mutex in the walk is safe but serialises the hottest lookup in the compiler
-// on the very workload that motivates the laziness; and checking the deferred flag once
-// per walk to skip the barriers needs the *parent's* flag on every link, which costs a
-// `getParent()` load per step and gives back what it saves. On x86-64 all of them
-// measured within noise of each other, since an acquire load is a plain `mov` there.
-// If an ARM64 profile ever shows `ldar` mattering here, the fix is to have the
-// decoration iterator carry the decision once, not to consult the parent per link.
+// The acquire is paid on every link read rather than only on that walk, so the rule
+// can be "read a link through an accessor" with no second question about which
+// accessor is permitted where. On x86-64 an acquire load is a plain `mov`, so this
+// costs nothing there. If an ARM64 profile ever shows `ldar` mattering, the fix is to
+// have the decoration iterator carry the decision once, not to consult the parent's
+// flag on every link.
 //
 
 /// Release-stores `value` into `slot`, publishing everything written before it.
@@ -66,18 +64,19 @@ SLANG_FORCE_INLINE void irPublishInstLink(IRInst*& slot, IRInst* value)
 
 /// Acquire-loads a `next`/`first` link of an instruction list.
 ///
-/// Every read of a link goes through this, because every read of a link goes through an
-/// accessor: `getNextInst`/`getPrevInst` and the `peek` pair on `IRInst`, and
-/// `peekFirstDecorationOrChild`/`peekLastDecorationOrChild` on the child list. The
-/// acquire only has work to do for a reader that runs *without* materializing first,
-/// since only that reader can observe a publication in progress -- today the decoration
-/// walk, `IRDecorationList::Iterator`, is the one such reader. A reader that materialized
-/// has already synchronized on the deferred flag, whose release/acquire pair orders
-/// everything the writer wrote.
+/// Used by every accessor that hands back a link: `getNextInst`/`getPrevInst` and the
+/// `peek` pair on `IRInst`, and `peekFirstDecorationOrChild`/`peekLastDecorationOrChild`
+/// on the child list.
 ///
-/// Paying for it uniformly rather than only on that path is what lets the rule be "read
-/// the link through the accessor" with no second question about which accessor is
-/// permitted where.
+/// The acquire only has work to do for a reader that runs *without* materializing first,
+/// since only such a reader can observe a publication in progress. Those readers are the
+/// decoration walk and nothing else -- `IRInst::getFirstDecoration`,
+/// `IRDecoration::getNextDecoration`, and `IRDecorationList::Iterator::operator++`.
+///
+/// A reader that materialized has already synchronized on the deferred flag, whose
+/// release/acquire pair orders everything the writer wrote. That is why the accessors
+/// which materialize -- `getFirstDecorationOrChild` and friends -- may then read
+/// `m_decorationsAndChildren` directly rather than through this.
 SLANG_FORCE_INLINE IRInst* irLoadInstLink(IRInst* const& slot)
 {
     return std::atomic_ref<IRInst*>(const_cast<IRInst*&>(slot)).load(std::memory_order_acquire);
@@ -816,16 +815,16 @@ struct IRInst
     /// that loads one with a plain read can observe a link to an instruction whose
     /// contents are not yet visible to it. Making the members private moves that from
     /// something each call site has to remember into something it cannot get wrong:
-    /// there is no way to read the link except through an acquire load, and no way to
-    /// write it except through a release store.
+    /// outside this class there is no way to read a link except through an acquire
+    /// load, and no way to write one except through a release store.
     ///
-    /// The alternative -- leaving them public and wrapping each access at the call
-    /// site -- was what this replaced. It left roughly forty places where a plain
-    /// `->next` would compile and be wrong only on a weakly-ordered machine, under a
-    /// race that does not reproduce on x86-64.
+    /// The names are deliberately unchanged, for the same reason as
+    /// `m_decorationsAndChildren` below: `slang.natvis` and `slang_lldb.py` walk `next`
+    /// by name to display IR in a debugger, and neither is checked by the compiler, so
+    /// renaming it would break IR inspection silently.
 private:
-    IRInst* _next;
-    IRInst* _prev;
+    IRInst* next;
+    IRInst* prev;
 
 public:
     /// The next/previous instruction with the same parent.
@@ -839,12 +838,12 @@ public:
     IRInst* getNextInst()
     {
         _materializeParent();
-        return irLoadInstLink(_next);
+        return irLoadInstLink(next);
     }
     IRInst* getPrevInst()
     {
         _materializeParent();
-        return irLoadInstLink(_prev);
+        return irLoadInstLink(prev);
     }
 
     /// The same links *without* materializing.
@@ -854,15 +853,15 @@ public:
     /// lookup is the hottest walk in the compiler. Named `peek` so that reaching for it
     /// is a deliberate act rather than the path of least resistance -- `getNextInst`
     /// is what ordinary traversal should use.
-    IRInst* peekNextInst() { return irLoadInstLink(_next); }
-    IRInst* peekPrevInst() { return irLoadInstLink(_prev); }
+    IRInst* peekNextInst() { return irLoadInstLink(next); }
+    IRInst* peekPrevInst() { return irLoadInstLink(prev); }
 
     /// Publish `value` as this instruction's next/previous link.
     ///
     /// A release store, so everything written to `value` before this call is visible
     /// to any thread that reaches it by following the link.
-    void setNextInst(IRInst* value) { irPublishInstLink(_next, value); }
-    void setPrevInst(IRInst* value) { irPublishInstLink(_prev, value); }
+    void setNextInst(IRInst* value) { irPublishInstLink(next, value); }
+    void setPrevInst(IRInst* value) { irPublishInstLink(prev, value); }
 
     // An instruction can have zero or more children, although
     // only certain instruction opcodes are allowed to have
@@ -897,29 +896,42 @@ public:
     /// in the same list, to conserve space in the instruction itself
     /// (rather than storing distinct lists for decorations and children).
     ///
-    // Note: This field is *not* being declared `private` because doing so could
-    // mess with our required memory layout, where `typeUse` below is assumed
-    // to be the last field in `IRInst` and to come right before any additional
-    // `IRUse` values that represent operands.
-    //
-    // Because it cannot be made private, the rule it now carries has to be stated
-    // instead: **this field is read through the accessors below, never directly.** On a
-    // module loaded with deferred bodies, `.first`/`.last` describe only the
-    // decorations until `ensureBodyMaterialized()` has run, so a direct read of a
-    // global value's children sees an empty body and reports success. That failure
-    // is silent and surfaces far from its cause -- two such sites were found during
-    // the deferred-loading work, and only by running the whole test suite in both
-    // modes. Every accessor below materializes, so going through them is always
-    // correct; there is deliberately no non-materializing variant to reach for.
+    // Note on layout: `typeUse` below is required to be the last member of `IRInst`, so
+    // that the tail-allocated `IRUse` values representing operands come right after it.
+    // This field is `private` while `typeUse` is `public`, and [class.mem] leaves the
+    // relative order of members in *different* access-control regions unspecified. Every
+    // toolchain this builds with lays members out in declaration order regardless, so
+    // the requirement holds in practice -- but it is no longer guaranteed by the
+    // standard, which it was while both members shared one region.
     //
     /// The decorations and children of this instruction, as a list.
     ///
-    /// Private for the same reason as `_next`/`_prev`: the head of this list is the
-    /// other slot a deferred body is published into, so a plain read of it can observe
-    /// a link to instructions whose contents are not yet visible. Reads go through
-    /// `peekFirstDecorationOrChild()` (acquire) and writes through
-    /// `setFirstDecorationOrChild()` (release), so there is no spelling of an
-    /// unsynchronized access.
+    /// Private for the same reason as `next`/`prev`: the head of this list is the other
+    /// slot a deferred body is published into, so a plain read of it can observe a link
+    /// to instructions whose contents are not yet visible.
+    ///
+    /// Two kinds of reader are safe, and both are provided below:
+    ///
+    /// * A reader that has not materialized uses `peekFirstDecorationOrChild()` or
+    ///   `peekLastDecorationOrChild()`, whose acquire pairs with the release store that
+    ///   publishes a body. This is the decoration walk's path.
+    ///
+    /// * A reader that calls `ensureBodyMaterialized()` first may then read the members
+    ///   directly, as `getFirstDecorationOrChild()` and friends do. Observing
+    ///   `m_hasDeferredBody == false` is itself an acquire load, and it pairs with the
+    ///   release store that clears the flag *after* the chain is linked -- so by the
+    ///   time such a reader gets here, the publication is already visible to it.
+    ///
+    /// Writes always go through `setFirstDecorationOrChild()`/
+    /// `setLastDecorationOrChild()`, which release-store. What `private` buys is that no
+    /// code outside this class can reach the members without having taken one of those
+    /// paths.
+    ///
+    /// Ordering aside, a direct read from outside would be wrong for a plainer reason
+    /// too: on a module loaded with deferred bodies `.first`/`.last` describe only the
+    /// decorations until `ensureBodyMaterialized()` has run, so reading a global value's
+    /// children directly finds an empty body and reports success -- silently, and far
+    /// from the cause.
     ///
     /// The name is deliberately unchanged. `slang.natvis` and `slang_lldb.py` walk this
     /// member by name to display IR in a debugger, and neither is checked by the

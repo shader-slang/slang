@@ -59,11 +59,10 @@ SlangResult _compileWith(
         // Dumps the linked IR, builtin modules included -- which is where deferral
         // acts, and where a divergence shows up even when it never reaches codegen.
         //
-        // `-o` goes to a real file rather than a null device. `/dev/null` was hardcoded
-        // here, which is not a path on Windows: `-o` would fail, both runs would fail
-        // identically, and the comparison below would pass having compared two error
-        // messages. A temp file sidesteps the platform question entirely -- the file is
-        // never read, only the IR dump on stdout is.
+        // `-o` must name a real file rather than a null device, because there is no
+        // spelling of one that works on every platform this runs on. A failing `-o` would
+        // fail both runs identically and leave the comparison below matching two error
+        // messages. The file itself is never read; only the IR dump on stderr is.
         cmdLine.addArg("-dump-ir");
         cmdLine.addArg("-o");
         cmdLine.addArg(irSinkPath);

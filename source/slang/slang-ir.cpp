@@ -8900,10 +8900,24 @@ void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
     }
 }
 
+// ## Instrumentation for the on-demand IR load
+//
+// Four process-wide counters, declared in `slang-ir.h`, that let a test assert things the
+// usual safety nets do not cover: that a module was really released (a retain cycle stays
+// reachable from a live global session, so LeakSanitizer sees nothing unreachable to
+// report), that a run exercised the deferred path at all rather than passing on an eager
+// load, and that the blob-containment check really did reject a mismatched blob.
+//
+// Relaxed throughout. Each is a standalone count with nothing ordered against it; the
+// tests read them between phases, not concurrently with the work that moves them.
+
 namespace
 {
 std::atomic<Index> g_liveIRModuleCount{0};
-}
+std::atomic<Index> g_deferredBodyLoaderInstallCount{0};
+std::atomic<Index> g_deferredBodyMaterializationCount{0};
+std::atomic<Index> g_deferralDeclinedForSpanMismatchCount{0};
+} // namespace
 
 void _noteIRModuleCreated()
 {
@@ -8920,11 +8934,6 @@ Index getLiveIRModuleCount()
     return g_liveIRModuleCount.load(std::memory_order_relaxed);
 }
 
-namespace
-{
-std::atomic<Index> g_deferredBodyLoaderInstallCount{0};
-}
-
 void _noteDeferredBodyLoaderInstalled()
 {
     g_deferredBodyLoaderInstallCount.fetch_add(1, std::memory_order_relaxed);
@@ -8935,14 +8944,9 @@ Index getDeferredBodyLoaderInstallCount()
     return g_deferredBodyLoaderInstallCount.load(std::memory_order_relaxed);
 }
 
-namespace
+Index getDeferredBodyMaterializationCount()
 {
-std::atomic<Index> g_deferredBodyMaterializationCount{0};
-}
-
-namespace
-{
-std::atomic<Index> g_deferralDeclinedForSpanMismatchCount{0};
+    return g_deferredBodyMaterializationCount.load(std::memory_order_relaxed);
 }
 
 void _noteDeferralDeclinedForSpanMismatch()
@@ -8953,11 +8957,6 @@ void _noteDeferralDeclinedForSpanMismatch()
 Index getDeferralDeclinedForSpanMismatchCount()
 {
     return g_deferralDeclinedForSpanMismatchCount.load(std::memory_order_relaxed);
-}
-
-Index getDeferredBodyMaterializationCount()
-{
-    return g_deferredBodyMaterializationCount.load(std::memory_order_relaxed);
 }
 
 IRDecoration* IRInst::getFirstDecoration()
@@ -9013,9 +9012,6 @@ void IRDecorationList::Iterator::operator++()
 
 void IRInst::_materializeDeferredBody()
 {
-    // The flag is cleared by the loader, under its lock, once the children are
-    // linked -- not here. Clearing it first would let a second thread proceed to
-    // read children that are still being built.
     auto module = getModule();
     auto loader = module ? module->getDeferredBodyLoader() : nullptr;
 
@@ -9027,6 +9023,11 @@ void IRInst::_materializeDeferredBody()
     // later access repeats this slow path.
     SLANG_RELEASE_ASSERT(loader);
     g_deferredBodyMaterializationCount.fetch_add(1, std::memory_order_relaxed);
+
+    // Note that `m_hasDeferredBody` is cleared by the loader, under its lock, once the
+    // children are linked -- not here, and not before this call. Clearing it first would
+    // let a second thread past `ensureBodyMaterialized` and on to read children that are
+    // still being built.
     loader->materializeDeferredBody(this);
 }
 

@@ -616,11 +616,11 @@ SLANG_UNIT_TEST(irDeferredBodyKeepsDecorationChildren)
 
 // Checks that concurrent first-touch materialization of a deferred body is safe.
 //
-// A global session is shared across threads and holds the modules whose bodies are
-// deferred, so two compiles can reach the same body at once. That is what the loader's
-// mutex and the acquire/release publication of a body exist for: a body is built as a
-// detached chain and attached with a single release store, and every list traversal loads
-// those links with acquire, so a walker sees either no body or a complete one.
+// Several threads can reach the same deferred body at once, because the modules holding
+// those bodies are shared. That is what the loader's mutex and the acquire/release
+// publication of a body exist for: a body is built as a detached chain and attached with
+// a single release store, and every list traversal loads those links with acquire, so a
+// walker sees either no body or a complete one.
 //
 // The other tests here are single-threaded, which leaves that protocol unexercised.
 //
@@ -632,7 +632,9 @@ SLANG_UNIT_TEST(irDeferredBodyKeepsDecorationChildren)
 // than this mechanism, and would fail no matter what this PR did.
 //
 // The concurrency Slang does support is the serial-frontend/parallel-backend workflow in
-// docs/user-guide/08-compiling.md, and that is clean here at 16 threads in both modes.
+// docs/user-guide/08-compiling.md, which `irDeferredBodyMaterializesOnTheSupportedConcurrentPath`
+// covers; this test drives the same protocol directly. Both are clean at 16 threads in
+// either mode.
 SLANG_UNIT_TEST(irDeferredBodyConcurrentMaterialization)
 {
     ComPtr<slang::IGlobalSession> globalSession;
