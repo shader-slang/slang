@@ -75,15 +75,10 @@ struct LoadMethod
 // A pointer *stored inside* the group (e.g. a `StructuredBuffer<T>` field) is unaffected:
 // reading through it loads the pointer out of `SLANG_globalParams` first, and that `Load`
 // — not `globalParam` — roots the subsequent access, so genuine buffer reads keep `__ldg`.
-//
-// This uses `peelAddressForwardingOps` (the same walk `isAddressIntoOptiXShaderBindingTable`
-// uses) rather than `getRootAddr`, so a `BitCast`/`Reinterpret`/`PtrCast`/`GetOffsetPtr`
-// cannot make the check stop short of `globalParam` the way it did for the superseded #11152
-// SBT guard. For CUDA specifically, `shouldLegalizeExistentialAndResourceTypes` is off and
-// `lowerBufferElementTypeToStorageType`'s buffer-element legalization does not appear to
-// reach `SLANG_globalParams` (unlike the OptiX SBT record, which is buffer-backed storage),
-// so those extra cases are not known to be reachable here today; they are kept for
-// defense in depth against a future legalization pass touching this group.
+// Uses `peelAddressForwardingOps` (see its doc comment) rather than `getRootAddr`. Its
+// cast/offset cases aren't known to be reachable for this particular group today — CUDA
+// doesn't run the legalization pass that produces them for the analogous OptiX SBT case —
+// but are kept for defense in depth.
 static bool isAddressIntoCudaConstantParameterGroup(IRInst* addr)
 {
     auto globalParam = as<IRGlobalParam>(peelAddressForwardingOps(addr));
