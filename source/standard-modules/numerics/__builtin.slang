@@ -57,7 +57,7 @@ public bool __numericsBuiltinAll<let N : int>(vector<bool, N> value)
 
 [__readNone]
 [__unsafeForceInlineEarly]
-public bool __numericsBuiltinAny<let R : int, let C : int, let L : int>(
+public bool __numericsBuiltinAny<let R : int, let C : int, let L : MatrixLayoutMode>(
     matrix<bool, R, C, L> value)
 {
     [ForceUnroll]
@@ -75,7 +75,7 @@ public bool __numericsBuiltinAny<let R : int, let C : int, let L : int>(
 
 [__readNone]
 [__unsafeForceInlineEarly]
-public bool __numericsBuiltinAll<let R : int, let C : int, let L : int>(
+public bool __numericsBuiltinAll<let R : int, let C : int, let L : MatrixLayoutMode>(
     matrix<bool, R, C, L> value)
 {
     [ForceUnroll]

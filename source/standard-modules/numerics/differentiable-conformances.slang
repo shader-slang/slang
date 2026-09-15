@@ -361,7 +361,7 @@ public extension<
     T : __BuiltinFloatingPointType & IScalarDifferentiableFloatingPoint,
     let R : int,
     let C : int,
-    let L : int>
+    let L : MatrixLayoutMode>
     matrix<T, R, C, L> : IDifferentiableFloatingPoint
 {
     [Differentiable] [ForceInline]
@@ -385,7 +385,7 @@ public extension<
     T : __BuiltinFloatingPointType & IDifferentiableExponentialFunctions,
     let R : int,
     let C : int,
-    let L : int>
+    let L : MatrixLayoutMode>
     matrix<T, R, C, L> : IDifferentiableExponentialFunctions
 {
     SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_EXPONENTIAL_REQUIREMENTS
@@ -395,7 +395,7 @@ public extension<
     T : __BuiltinFloatingPointType & IDifferentiableTrigonometricFunctions,
     let R : int,
     let C : int,
-    let L : int>
+    let L : MatrixLayoutMode>
     matrix<T, R, C, L> : IDifferentiableTrigonometricFunctions
 {
     SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_TRIGONOMETRIC_REQUIREMENTS
@@ -405,7 +405,7 @@ public extension<
     T : __BuiltinFloatingPointType & IDifferentiableInverseTrigonometricFunctions,
     let R : int,
     let C : int,
-    let L : int>
+    let L : MatrixLayoutMode>
     matrix<T, R, C, L> : IDifferentiableInverseTrigonometricFunctions
 {
     SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_INVERSE_REQUIREMENTS
@@ -415,7 +415,7 @@ public extension<
     T : __BuiltinFloatingPointType & IDifferentiableHyperbolicFunctions,
     let R : int,
     let C : int,
-    let L : int>
+    let L : MatrixLayoutMode>
     matrix<T, R, C, L> : IDifferentiableHyperbolicFunctions
 {
     SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_HYPERBOLIC_REQUIREMENTS
@@ -425,7 +425,7 @@ public extension<
     T : __BuiltinFloatingPointType & IDifferentiableRootFunctions,
     let R : int,
     let C : int,
-    let L : int>
+    let L : MatrixLayoutMode>
     matrix<T, R, C, L> : IDifferentiableRootFunctions
 {
     SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_ROOT_REQUIREMENTS
@@ -435,7 +435,7 @@ public extension<
     T : __BuiltinFloatingPointType & IScalarDifferentiableReal,
     let R : int,
     let C : int,
-    let L : int>
+    let L : MatrixLayoutMode>
     matrix<T, R, C, L> : IDifferentiableRealOrderingFunctions
 {
     SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_ORDERING_REQUIREMENTS
