@@ -1,6 +1,8 @@
 // unit-test-replay-modes.cpp
 // Unit tests for ReplayContext mode and state management
 
+#include "scoped-env-var.h"
+#include "slang-record-replay/proxy/proxy-macros.h"
 #include "slang-record-replay/proxy/proxy-mutable-file-system.h"
 #include "unit-test-replay-common.h"
 
@@ -571,4 +573,94 @@ SLANG_UNIT_TEST(replayContextDtorLeavesSingletonClean)
     }
 
     checkReplayContextIsPristine();
+}
+
+// Report whether the guard produced by the real RECORD_STATIC_CALL() macro owns
+// the mutex. Exercises the macro itself, not just lockIfActive(), so a regression
+// to an unconditional lock is caught.
+namespace
+{
+bool recordStaticCallLocksMutex()
+{
+    RECORD_STATIC_CALL();
+    return _lock.owns_lock();
+}
+} // namespace
+
+SLANG_UNIT_TEST(replayContextRecordStaticCallSkipsLockWhenIdle)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    // Idle callers must not contend on the mutex; active callers must still be
+    // serialized by it.
+    ctx().reset();
+    SLANG_CHECK(ctx().isIdle());
+    SLANG_CHECK(!recordStaticCallLocksMutex());
+
+    ctx().setMode(Mode::Record);
+    SLANG_CHECK(ctx().isActive());
+    SLANG_CHECK(recordStaticCallLocksMutex());
+}
+
+SLANG_UNIT_TEST(replayContextLockIfActiveOwnership)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    SLANG_CHECK(ctx().isIdle());
+    SLANG_CHECK(!ctx().lockIfActive().owns_lock());
+
+    ctx().setMode(Mode::Record);
+    SLANG_CHECK(ctx().isActive());
+    SLANG_CHECK(ctx().lockIfActive().owns_lock());
+}
+
+// lockIfActive() must resolve the env-requested mode on the very first call, or a
+// process launched with SLANG_RECORD_LAYER=1 would silently skip the lock (and
+// recording) on its first wrapped call. Force a fresh context so ensureInitialized()
+// has not yet run, then confirm the first lockIfActive() both engages the lock and
+// leaves the context in Record.
+SLANG_UNIT_TEST(replayContextLockIfActiveResolvesEnvOnFirstCall)
+{
+    SlangUnitTest::ScopedEnvVar recordLayer("SLANG_RECORD_LAYER", "1");
+    ReplayContext::destroySingleton();
+
+    SLANG_CHECK(ctx().isIdle());
+    SLANG_CHECK(ctx().lockIfActive().owns_lock());
+    SLANG_CHECK(ctx().getMode() == Mode::Record);
+
+    // Leave the singleton clean for the next test, independent of SLANG_RECORD_LAYER.
+    // destroySingleton() above took the default playback handlers with it, so put
+    // them back (same restore the orphaned-proxy playback test does).
+    ctx().reset();
+    ctx().registerDefaultHandlers();
+}
+
+SLANG_UNIT_TEST(replayContextCreateGlobalSessionIdleLeavesContextPristine)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    bool wasActive = slang_isRecordLayerEnabled();
+    slang_enableRecordLayer(false);
+    SLANG_CHECK(slang_isRecordLayerEnabled() == false);
+
+    // Start from a known-clean singleton so the pristine check below reflects
+    // only what the idle createGlobalSession2 call did (or rather, did not) do.
+    ctx().reset();
+
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    SlangGlobalSessionDesc desc = {};
+    desc.apiVersion = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&desc, globalSession.writeRef())));
+    SLANG_CHECK(globalSession != nullptr);
+
+    // Idle path returns the raw session (no proxy) and must not have engaged any
+    // of the recording machinery the mutex used to guard.
+    SLANG_CHECK(dynamic_cast<GlobalSessionProxy*>(globalSession.get()) == nullptr);
+    checkReplayContextIsPristine();
+
+    slang_enableRecordLayer(wasActive);
 }

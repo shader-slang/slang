@@ -97,12 +97,12 @@ tools/slang-unit-test/
 
 The `ReplayContext` operates in one of four modes:
 
-| Mode | Description |
-|------|-------------|
-| **Idle** | No operations performed (default when env var not set) |
-| **Record** | Writing API calls to the stream |
-| **Sync** | Recording while verifying against a reference stream |
-| **Playback** | Reading and executing calls from a stream |
+| Mode         | Description                                            |
+| ------------ | ------------------------------------------------------ |
+| **Idle**     | No operations performed (default when env var not set) |
+| **Record**   | Writing API calls to the stream                        |
+| **Sync**     | Recording while verifying against a reference stream   |
+| **Playback** | Reading and executing calls from a stream              |
 
 ## Activation
 
@@ -127,6 +127,7 @@ slang_enableRecordLayer(false); // Disable
 ```
 
 When enabled, recordings are saved to timestamped folders under `.slang-replays/`:
+
 ```
 .slang-replays/
 └── 2026-02-04_14-30-45-123/
@@ -148,15 +149,15 @@ slang-replay [options] <path>
 
 ### Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--decode` | `-d` | Decode recording to human-readable text |
-| `--raw` | `-R` | Force raw value-by-value output (ignore index.bin) |
-| `--replay` | `-r` | Execute the recorded API calls |
-| `--verbose` | `-v` | Enable verbose output during replay |
-| `--output <file>` | `-o` | Write decoded output to file |
-| `--convert-json` | `-cj` | Convert record file to JSON format |
-| `--help` | `-h` | Show usage information |
+| Option            | Short | Description                                        |
+| ----------------- | ----- | -------------------------------------------------- |
+| `--decode`        | `-d`  | Decode recording to human-readable text            |
+| `--raw`           | `-R`  | Force raw value-by-value output (ignore index.bin) |
+| `--replay`        | `-r`  | Execute the recorded API calls                     |
+| `--verbose`       | `-v`  | Enable verbose output during replay                |
+| `--output <file>` | `-o`  | Write decoded output to file                       |
+| `--convert-json`  | `-cj` | Convert record file to JSON format                 |
+| `--help`          | `-h`  | Show usage information                             |
 
 ### Examples
 
@@ -177,6 +178,7 @@ slang-replay -r -v .slang-replays/2026-02-04_14-30-45-123/
 ### Input Formats
 
 The tool accepts either:
+
 - A folder containing `stream.bin` (e.g., `.slang-replays/2026-02-04_14-30-45-123/`)
 - A direct path to a `stream.bin` file
 
@@ -275,30 +277,30 @@ createSession(slang::SessionDesc const& desc, slang::ISession** outSession) over
 
 Each serialized value is prefixed with a `TypeId` byte:
 
-| TypeId | Value | Description |
-|--------|-------|-------------|
-| Int8-Int64 | 0x01-0x04 | Signed integers |
-| UInt8-UInt64 | 0x05-0x08 | Unsigned integers |
-| Float32, Float64 | 0x09-0x0A | Floating point |
-| Bool | 0x0B | Boolean |
-| String | 0x10 | Null-terminated string with length prefix |
-| Blob | 0x11 | Content-hash reference (blob stored in files/ directory) |
-| Array | 0x12 | Count + elements |
-| ObjectHandle | 0x13 | COM interface as uint64_t handle |
-| Null | 0x14 | Null pointer |
-| TypeReflectionRef | 0x15 | Type reflection reference (module handle + type name) |
-| Error | 0xEE | Error marker |
+| TypeId            | Value     | Description                                              |
+| ----------------- | --------- | -------------------------------------------------------- |
+| Int8-Int64        | 0x01-0x04 | Signed integers                                          |
+| UInt8-UInt64      | 0x05-0x08 | Unsigned integers                                        |
+| Float32, Float64  | 0x09-0x0A | Floating point                                           |
+| Bool              | 0x0B      | Boolean                                                  |
+| String            | 0x10      | Null-terminated string with length prefix                |
+| Blob              | 0x11      | Content-hash reference (blob stored in files/ directory) |
+| Array             | 0x12      | Count + elements                                         |
+| ObjectHandle      | 0x13      | COM interface as uint64_t handle                         |
+| Null              | 0x14      | Null pointer                                             |
+| TypeReflectionRef | 0x15      | Type reflection reference (module handle + type name)    |
+| Error             | 0xEE      | Error marker                                             |
 
 ### Handle System
 
 COM interface pointers are mapped to uint64_t handles:
 
-| Handle Value | Meaning |
-|--------------|---------|
-| 0 (kNullHandle) | Null pointer |
-| 2 (kCustomFileSystemHandle) | User-provided custom file system (not yet registered) |
-| 3 (kDefaultFileSystemHandle) | Default file system |
-| ≥256 (kFirstValidHandle) | Tracked object handle |
+| Handle Value                 | Meaning                                               |
+| ---------------------------- | ----------------------------------------------------- |
+| 0 (kNullHandle)              | Null pointer                                          |
+| 2 (kCustomFileSystemHandle)  | User-provided custom file system (not yet registered) |
+| 3 (kDefaultFileSystemHandle) | Default file system                                   |
+| ≥256 (kFirstValidHandle)     | Tracked object handle                                 |
 
 ### Call Structure
 
@@ -448,15 +450,15 @@ void ReplayContext::record(RecordFlag flags, NewStructType& value)
 
 Located in `tools/slang-unit-test/`:
 
-| File | Coverage |
-|------|----------|
-| `unit-test-replay-serialization.cpp` | Round-trip tests for all basic types, enums, structs |
-| `unit-test-replay-record.cpp` | End-to-end recording via child process launch of examples |
-| `unit-test-replay-playback.cpp` | Playback dispatcher, handler registration, `parseSignature` |
-| `unit-test-replay-modes.cpp` | Mode transitions, Idle/Record/Sync/Playback state machine |
-| `unit-test-replay-integration.cpp` | Byte-level stream verification of actual API calls |
-| `unit-test-replay-handles.cpp` | Blob hash serialization, null handles, TypeReflection |
-| `unit-test-replay-filesystem.cpp` | All MutableFileSystemProxy methods |
+| File                                 | Coverage                                                    |
+| ------------------------------------ | ----------------------------------------------------------- |
+| `unit-test-replay-serialization.cpp` | Round-trip tests for all basic types, enums, structs        |
+| `unit-test-replay-record.cpp`        | End-to-end recording via child process launch of examples   |
+| `unit-test-replay-playback.cpp`      | Playback dispatcher, handler registration, `parseSignature` |
+| `unit-test-replay-modes.cpp`         | Mode transitions, Idle/Record/Sync/Playback state machine   |
+| `unit-test-replay-integration.cpp`   | Byte-level stream verification of actual API calls          |
+| `unit-test-replay-handles.cpp`       | Blob hash serialization, null handles, TypeReflection       |
+| `unit-test-replay-filesystem.cpp`    | All MutableFileSystemProxy methods                          |
 
 ### Running Tests
 
@@ -470,5 +472,9 @@ cmake --workflow --preset debug
 
 ## Thread Safety
 
-The `ReplayContext` uses a recursive mutex. All recording operations acquire the lock
-via `RECORD_CALL()` which calls `ctx.lock()` and stores the RAII guard.
+The `ReplayContext` uses a recursive mutex. When the record layer is active,
+recording operations acquire it via `RECORD_CALL()` / `RECORD_STATIC_CALL()`, which
+call `ctx.lockIfActive()` and store the RAII guard. When the layer is inactive (the
+default), `lockIfActive()` returns an unlocked guard so idle calls do not contend on
+the mutex; enabling or disabling the layer while other threads are mid-call is not
+supported (see `slang_enableRecordLayer` in `include/slang.h`).
