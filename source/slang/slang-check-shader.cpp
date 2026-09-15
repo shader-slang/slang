@@ -1785,14 +1785,16 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // generic entry point. Two sentinel types both mean "nothing was declared": the bottom type
     // for an absent clause, and the error type for a clause whose type failed to check -- the
     // latter has already been diagnosed, so reporting this as well would only add noise.
-    auto astBuilder = linkage->getASTBuilder();
-    auto errorCodeType = getErrorCodeType(astBuilder, entryPoint->getFuncDeclRef());
-    if (!errorCodeType->equals(astBuilder->getBottomType()) &&
-        !errorCodeType->equals(astBuilder->getErrorType()))
     {
-        sink->diagnose(Diagnostics::EntryPointCannotThrow{
-            .entryPoint = entryPointName,
-            .location = entryPointFuncDecl->loc});
+        auto astBuilder = linkage->getASTBuilder();
+        auto errorCodeType = getErrorCodeType(astBuilder, entryPoint->getFuncDeclRef());
+        if (!errorCodeType->equals(astBuilder->getBottomType()) &&
+            !errorCodeType->equals(astBuilder->getErrorType()))
+        {
+            sink->diagnose(Diagnostics::EntryPointCannotThrow{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
     }
 
     // Check if the return type is valid for a shader entry point
