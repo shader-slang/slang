@@ -57,6 +57,49 @@ struct LoadMethod
     }
 };
 
+// True if `addr`'s pointer chain bottoms out at a CUDA constant-memory launch-parameter group: an
+// `IRGlobalParam` whose data type is an `IRUniformParameterGroupType`. The CUDA emitter renders
+// exactly such a global param as `extern "C" __constant__ SLANG_globalParams`
+// (`CUDASourceEmitter::emitParameterGroupImpl`). The type predicate here matches the one
+// `CLikeSourceEmitter::emitGlobalParam` uses to route a global param to `emitParameterGroup`, so
+// the guard fires exactly for the params CUDA emits into `__constant__` memory.
+//
+// A load of data stored *inline* in that group reads from constant memory. `__ldg` (NVRTC
+// `ld.global.nc`) requires a *global*-memory address operand, so lowering such a load to `__ldg` is
+// illegal PTX; immutability alone does not imply a global address. See shader-slang/slang#13088.
+//
+// This mirrors `isAddressIntoOptiXShaderBindingTable` (slang-ir-util.cpp): it peels every
+// pointer-forwarding op, including the `GetOffsetPtr`/`BitCast`/`Reinterpret`/`PtrCast` that
+// `getRootAddr` does not. That keeps the guard shape-independent: a storage-legalized access chain
+// (such as `lowerBufferElementTypeToStorageType` inserts for a `bool` field on the SPIR-V path)
+// cannot hide the group root behind a cast — the gap that sank the superseded #11152 SBT guard.
+// (CUDA's default path does not currently legalize those fields, but mirroring the walker keeps the
+// guard robust if it ever does.) It deliberately does NOT peel `Load`: a genuine buffer /
+// `ConstantBuffer<T>` / `ParameterBlock` read reaches its data through a pointer *loaded out of*
+// the group, so its chain bottoms out at that `Load`, not at the group `IRGlobalParam`, and
+// correctly keeps `__ldg`.
+static bool isAddressIntoCudaConstantParamGroup(IRInst* addr)
+{
+    for (;;)
+    {
+        switch (addr->getOp())
+        {
+        case kIROp_FieldAddress:
+        case kIROp_GetElementPtr:
+        case kIROp_GetOffsetPtr:
+        case kIROp_BitCast:
+        case kIROp_Reinterpret:
+        case kIROp_PtrCast:
+            addr = addr->getOperand(0);
+            continue;
+        case kIROp_GlobalParam:
+            return as<IRUniformParameterGroupType>(addr->getDataType()) != nullptr;
+        default:
+            return false;
+        }
+    }
+}
+
 struct ImmutableBufferLoadLoweringContext : InstPassBase
 {
     Dictionary<IRType*, LoadMethod> loadFuncs;
@@ -300,6 +343,12 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
         case kIROp_Load:
             {
                 auto load = as<IRLoad>(inst);
+                // A load of data stored inline in the CUDA `__constant__` launch-parameter group
+                // must not be lowered to `__ldg`: constant memory is not a global address, so
+                // `ld.global.nc` on it is illegal PTX. See shader-slang/slang#13088. (`break` exits
+                // only the switch, skipping just this load.)
+                if (isAddressIntoCudaConstantParamGroup(load->getPtr()))
+                    break;
                 if (isPointerToImmutableLocation(getRootAddr(load->getPtr())))
                 {
                     IRBuilder builder(load);
