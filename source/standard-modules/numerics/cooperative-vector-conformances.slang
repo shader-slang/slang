@@ -133,6 +133,30 @@ public extension<T : __BuiltinIntegerType & IScalarUnsignedIntegerType, let N : 
     CoopVec<T, N> : IUnsignedIntegerType
 {}
 
+public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
+    CoopVec<T, N> : INumericalExtrema
+{
+    [ForceInline] [require(cooperative_vector)]
+    This minimum(This other)
+    {
+        This result;
+        [ForceUnroll]
+        for (int index = 0; index < N; ++index)
+            result[index] = __numericsBuiltinMinimum(this[index], other[index]);
+        return result;
+    }
+
+    [ForceInline] [require(cooperative_vector)]
+    This maximum(This other)
+    {
+        This result;
+        [ForceUnroll]
+        for (int index = 0; index < N; ++index)
+            result[index] = __numericsBuiltinMaximum(this[index], other[index]);
+        return result;
+    }
+}
+
 public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int>
     CoopVec<T, N> : IComponentwiseOrdered
 {

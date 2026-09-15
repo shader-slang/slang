@@ -314,10 +314,42 @@ SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinAtan2, atan2)
 SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinCopySign, copysign)
 SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinPow, pow)
 SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinRemainder, fmod)
-SLANG_NUMERICS_BINARY_ADAPTER(__numericsBuiltinMaximum, max)
-SLANG_NUMERICS_BINARY_ADAPTER(__numericsBuiltinMinimum, min)
 
 #undef SLANG_NUMERICS_BINARY_ADAPTER
+
+#define SLANG_NUMERICS_EXTREMA_ADAPTER(NAME, BUILTIN)                                 \
+    [__readNone] [__unsafeForceInlineEarly]                                     \
+    public T NAME<T : __BuiltinIntegerType>(T left, T right)                    \
+    {                                                                            \
+        return ::BUILTIN(left, right);                                           \
+    }                                                                            \
+                                                                                 \
+    [__readNone] [__unsafeForceInlineEarly]                                     \
+    public vector<T, N> NAME<T : __BuiltinIntegerType, let N : int>(            \
+        vector<T, N> left,                                                       \
+        vector<T, N> right)                                                      \
+    {                                                                            \
+        return ::BUILTIN(left, right);                                           \
+    }                                                                            \
+                                                                                 \
+    [__readNone] [__unsafeForceInlineEarly]                                     \
+    public T NAME<T : __BuiltinFloatingPointType>(T left, T right)              \
+    {                                                                            \
+        return ::BUILTIN(left, right);                                           \
+    }                                                                            \
+                                                                                 \
+    [__readNone] [__unsafeForceInlineEarly]                                     \
+    public vector<T, N> NAME<T : __BuiltinFloatingPointType, let N : int>(      \
+        vector<T, N> left,                                                       \
+        vector<T, N> right)                                                      \
+    {                                                                            \
+        return ::BUILTIN(left, right);                                           \
+    }
+
+SLANG_NUMERICS_EXTREMA_ADAPTER(__numericsBuiltinMaximum, max)
+SLANG_NUMERICS_EXTREMA_ADAPTER(__numericsBuiltinMinimum, min)
+
+#undef SLANG_NUMERICS_EXTREMA_ADAPTER
 
 #define SLANG_NUMERICS_CLASSIFICATION_ADAPTER(NAME, BUILTIN)                          \
     [__readNone] [__unsafeForceInlineEarly]                                     \

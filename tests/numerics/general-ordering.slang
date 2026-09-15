@@ -1,6 +1,6 @@
-// General equality, ordering, and real-ordering-function contracts do not require numeric
-// arithmetic or a Scalar and Mask. Application types can use these operations without claiming
-// unrelated numeric capabilities.
+// General equality, ordering, numerical-extrema, and real-ordering-function contracts do not
+// require numeric arithmetic or a Scalar and Mask. Application types can use these operations
+// without claiming unrelated numeric capabilities.
 
 //TEST:SIMPLE: -target hlsl -entry main -stage compute -o numeric-interfaces-general-ordering.hlsl -experimental-feature
 //TEST:SIMPLE: -target spirv -entry main -stage compute -o numeric-interfaces-general-ordering.spv -experimental-feature
@@ -29,7 +29,7 @@ struct NotificationKind : IPartiallyOrdered
     }
 }
 
-struct ExtremaOnly : IRealOrderingFunctions
+struct ExtremaOnly : INumericalExtrema
 {
     int value;
 
@@ -41,11 +41,6 @@ struct ExtremaOnly : IRealOrderingFunctions
     This maximum(This other)
     {
         return {value > other.value ? value : other.value};
-    }
-
-    This step(This edge)
-    {
-        return {value < edge.value ? 0 : 1};
     }
 }
 
@@ -59,7 +54,7 @@ bool representsSameKind<T : IEquatable>(T left, T right)
     return left == right;
 }
 
-T boundedMedian<T : IRealOrderingFunctions>(T x, T y, T z)
+T boundedMedian<T : INumericalExtrema>(T x, T y, T z)
 {
     return clamp(median3(x, y, z), min(x, y), max(y, z));
 }
@@ -74,4 +69,6 @@ void main()
     outputBuffer[1] = int(representsSameKind(ordinary, ordinary));
     ExtremaOnly bounded = boundedMedian(ExtremaOnly(1), ExtremaOnly(3), ExtremaOnly(2));
     outputBuffer[2] = bounded.value;
+    int3 boundedInteger = clamp(int3(-2, 4, 9), int3(0, 1, 2), int3(3, 5, 7));
+    outputBuffer[3] = min(8, 5) + max3(boundedInteger.x, boundedInteger.y, boundedInteger.z);
 }

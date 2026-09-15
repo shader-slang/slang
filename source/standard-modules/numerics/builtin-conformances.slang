@@ -93,8 +93,19 @@ SLANG_NUMERICS_SIGNED_INTEGER_CONFORMANCE(intptr_t)
 #undef SLANG_NUMERICS_SIGNED_INTEGER_CONFORMANCE
 
 #define SLANG_NUMERICS_INTEGER_CONFORMANCE(TYPE)                                      \
-    public extension TYPE : ITotallyOrdered                                     \
-    {}                                                                           \
+    public extension TYPE : ITotallyOrdered, INumericalExtrema                  \
+    {                                                                            \
+        [__unsafeForceInlineEarly]                                               \
+        This minimum(This other)                                                 \
+        {                                                                        \
+            return __numericsBuiltinMinimum(this, other);                       \
+        }                                                                        \
+        [__unsafeForceInlineEarly]                                               \
+        This maximum(This other)                                                 \
+        {                                                                        \
+            return __numericsBuiltinMaximum(this, other);                       \
+        }                                                                        \
+    }                                                                            \
                                                                                  \
     public extension TYPE : IScalarIntegerType                                  \
     {                                                                            \
@@ -300,7 +311,7 @@ public extension<let R : int, let C : int, let L : MatrixLayoutMode>
     }
 }
 
-interface __IIntegerVectorDotProduct : IDotProduct, IIntegerType {}
+interface __IIntegerVectorDotProduct : IDotProduct, IIntegerType, INumericalExtrema {}
 
 public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     vector<T, N> : __IIntegerVectorDotProduct
@@ -334,6 +345,10 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     This multipliedBy(This other) { return this.mul(other); }
     [__unsafeForceInlineEarly]
     Scalar dotProductWith(This other) { return __numericsBuiltinDot(this, other); }
+    [__unsafeForceInlineEarly]
+    This minimum(This other) { return __numericsBuiltinMinimum(this, other); }
+    [__unsafeForceInlineEarly]
+    This maximum(This other) { return __numericsBuiltinMaximum(this, other); }
     [__unsafeForceInlineEarly]
     This quotientWhenDividedBy(This divisor)
     {

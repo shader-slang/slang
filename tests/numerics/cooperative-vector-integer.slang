@@ -13,8 +13,10 @@
 // CHECK-NEXT: 0
 // CHECK-NEXT: 14
 // CHECK-NEXT: 20
+// CHECK-NEXT: 6
+// CHECK-NEXT: 9
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 import slang.numerics;
 
 RWStructuredBuffer<int> outputBuffer;
@@ -55,6 +57,11 @@ T constructFromBuiltinInteger<T : INumeric, TSource : IBuiltinScalarIntegerType>
     return T(value);
 }
 
+T clampInteger<T : INumericalExtrema>(T value, T lower, T upper)
+{
+    return clamp(value, lower, upper);
+}
+
 void storeMask<T : IIntegerType>(T left, T right, uint offset)
 {
     T.Mask equalMask = left == right;
@@ -86,4 +93,7 @@ void computeMain()
     outputBuffer[7] = int(integerLessThan(left, right)[0]);
     outputBuffer[8] = shifted[0];
     outputBuffer[9] = shifted[1];
+    let bounded = clampInteger(left, CoopVec<int, 2>(4, 4), CoopVec<int, 2>(6, 9));
+    outputBuffer[10] = bounded[0];
+    outputBuffer[11] = bounded[1];
 }
