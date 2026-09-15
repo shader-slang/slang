@@ -21,7 +21,7 @@
 // in the same table is what makes the extra layer attributable to the base
 // specialization rather than to generic use in general.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IFoo<T> { T zero(); T twice() { return zero(); } }
 struct S : IFoo<int> { int zero() { return 0; } }

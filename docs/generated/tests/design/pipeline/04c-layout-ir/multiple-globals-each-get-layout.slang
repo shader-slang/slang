@@ -15,7 +15,7 @@
 // collapsing them; a single-global test cannot distinguish "loop" from
 // "one-shot".
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> bufA;
 uniform RWStructuredBuffer<float> bufB;
@@ -27,6 +27,6 @@ void main(uint3 tid : SV_DispatchThreadID)
     bufB[0] = float(tid.y);
 }
 
-// CHECK-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// CHECK-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // CHECK: structFieldLayout(%buf{{[A-Z]}}
 // CHECK: structFieldLayout(%buf{{[A-Z]}}

@@ -11,7 +11,7 @@
 // Boundary on the key operand: the same witness table serves several
 // requirements, so what distinguishes two dispatches is the key, not the
 // table. The CHECKs pin two lookups differing only in their second operand.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IMulti
 {

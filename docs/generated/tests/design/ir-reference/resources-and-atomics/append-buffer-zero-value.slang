@@ -12,7 +12,7 @@
 // Boundary probe: append a literal-zero element. The opcode shape
 // is preserved regardless of value.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform AppendStructuredBuffer<int> abuf;
 uniform RWStructuredBuffer<int> rwbuf;

@@ -2191,6 +2191,12 @@ UnownedStringSlice getBuiltinFuncName(IRInst* callee)
         return UnownedStringSlice::fromLiteral("IBwdCallable");
     case KnownBuiltinDeclName::NullDifferential:
         return UnownedStringSlice::fromLiteral("NullDifferential");
+    case KnownBuiltinDeclName::OperatorAddressOf:
+        return UnownedStringSlice::fromLiteral("OperatorAddressOf");
+    case KnownBuiltinDeclName::WaveIsFirstLane:
+        return UnownedStringSlice::fromLiteral("WaveIsFirstLane");
+    case KnownBuiltinDeclName::WaveReadLaneFirst:
+        return UnownedStringSlice::fromLiteral("WaveReadLaneFirst");
     default:
         return UnownedStringSlice();
     }
@@ -3077,16 +3083,12 @@ bool isIROpaqueType(IRType* type)
     }
 }
 
-// True if `addr`'s chain bottoms out at `GetOptiXSbtDataPtr` (the OptiX SBT), peeling every
-// forwarding op, including the `BitCast`/`GetOffsetPtr` that `getRootAddr` does not peel.
-static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
+IRInst* peelAddressForwardingOps(IRInst* addr)
 {
     for (;;)
     {
         switch (addr->getOp())
         {
-        case kIROp_GetOptiXSbtDataPtr:
-            return true;
         case kIROp_FieldAddress:
         case kIROp_GetElementPtr:
         case kIROp_GetOffsetPtr:
@@ -3096,9 +3098,16 @@ static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
             addr = addr->getOperand(0);
             continue;
         default:
-            return false;
+            return addr;
         }
     }
+}
+
+// True if `addr`'s chain bottoms out at `GetOptiXSbtDataPtr` (the OptiX SBT), peeling every
+// forwarding op, including the `BitCast`/`GetOffsetPtr` that `getRootAddr` does not peel.
+static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
+{
+    return peelAddressForwardingOps(addr)->getOp() == kIROp_GetOptiXSbtDataPtr;
 }
 
 bool isPointerToImmutableLocation(IRInst* loc)
@@ -3418,6 +3427,22 @@ IRType* getWorkGraphRecordElementType(IRType* type)
     }
 
     return nullptr;
+}
+
+bool isBindlessTextureNVEncodableResourceType(IRType* type)
+{
+    auto unwrapped = unwrapAttributedType(type);
+    return as<IRTextureType>(unwrapped) || as<IRSamplerStateTypeBase>(unwrapped);
+}
+
+bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool hasBindlessTextureNV)
+{
+    if (!hasBindlessTextureNV)
+        return false;
+    auto handleType = as<IRDescriptorHandleType>(descriptorHandleType);
+    if (!handleType)
+        return false;
+    return isBindlessTextureNVEncodableResourceType(handleType->getResourceType());
 }
 
 } // namespace Slang

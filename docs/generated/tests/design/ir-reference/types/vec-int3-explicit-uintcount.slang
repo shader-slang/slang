@@ -14,7 +14,7 @@
 // 3 surfaces `Vec(Int, 3 : Int)` — distinct from the existing
 // `Vec(UInt, 3 : Int)` covered by the smoke test.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int3 v;
 uniform RWStructuredBuffer<int> buf;

@@ -13,7 +13,7 @@
 // IR type TextureType with element-type and TextureShape2DType
 // operands. `TextureShapeBufferType`).
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform Texture2D<float4> tex;
 uniform SamplerState samp;

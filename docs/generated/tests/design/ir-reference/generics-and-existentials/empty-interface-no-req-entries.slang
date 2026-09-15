@@ -11,7 +11,7 @@
 // Boundary at zero requirements on the interface side. The CHECK matches the
 // interface line and the CHECK-NOT asserts no operand list follows it — an
 // opening parenthesis would mean at least one requirement entry was attached.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IEmpty { };
 struct E : IEmpty { int payload; };

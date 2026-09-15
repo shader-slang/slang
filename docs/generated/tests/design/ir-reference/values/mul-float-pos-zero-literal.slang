@@ -14,7 +14,7 @@
 // identity before the IR dump captures it; `mul(%fa, 0.0)` does
 // not, so the literal payload remains observable.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform RWStructuredBuffer<float> buf;

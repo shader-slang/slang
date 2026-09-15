@@ -206,6 +206,20 @@ IRType* getMatrixElementType(IRType* type);
 bool isResourceType(IRType* type);
 bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);
 
+// True if `type` (after unwrapping attributed types) is a texture or a sampler-state-family type,
+// i.e. one the `spvBindlessTextureNV` descriptor-handle-to-resource conversion can produce. This is
+// also the set of `DescriptorHandle` element types that are represented as `uint64` under that
+// capability; every other kind (buffers, acceleration structures) stays `uint2`.
+bool isBindlessTextureNVEncodableResourceType(IRType* type);
+
+// True if `descriptorHandleType` (an `IRDescriptorHandleType`) is represented as `uint64` rather
+// than `uint2` for SPIR-V. Under `spvBindlessTextureNV` (passed in as `hasBindlessTextureNV`, since
+// callers detect the capability in different ways) only the resource kinds that extension can
+// convert — see `isBindlessTextureNVEncodableResourceType` — use the wide form; buffers and
+// acceleration structures stay `uint2`. Returns false when the capability is absent or the type is
+// not a descriptor handle.
+bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool hasBindlessTextureNV);
+
 // True if type is a pointer to a resource
 bool isPointerToResourceType(IRType* type);
 
@@ -571,6 +585,19 @@ bool isIROpaqueType(IRType* type);
 IRInst* tryGetTranslation(IRModule* module, IRInst* inst);
 
 IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
+
+// Peel `addr` through instructions that forward the address of the same underlying
+// storage without changing which storage it refers to (field/element access, casts,
+// offset computation), stopping at the first instruction that is not one of these.
+// Returns that terminal instruction. This is the shape-independent counterpart to
+// `getRootAddr`: `getRootAddr` only peels `FieldAddress`/`GetElementPtr`/
+// `NodeOutputRecordGetElementPtr`, so a `BitCast`/`Reinterpret`/`PtrCast`/`GetOffsetPtr`
+// inserted by a later legalization pass (e.g. `lowerBufferElementTypeToStorageType`) can
+// make `getRootAddr` stop short of the address's true root. Callers that need to
+// recognize a specific root shape regardless of such legalization (e.g. "is this address
+// into the OptiX SBT" or "is this address into CUDA's `__constant__` global parameter
+// group") should peel with this function first, then test the terminal instruction.
+IRInst* peelAddressForwardingOps(IRInst* addr);
 
 // Returns true if the memory location pointed to by `ptrInst` is immutable.
 // An immutable location is the memory region that can't be modified by the user code.

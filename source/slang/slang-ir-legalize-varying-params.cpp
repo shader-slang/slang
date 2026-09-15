@@ -10,6 +10,7 @@
 #include "slang-ir-util.h"
 #include "slang-parameter-binding.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-type-layout.h"
 
 #include <set>
 
@@ -410,7 +411,7 @@ protected:
     Stage m_stage = Stage::Unknown;
 
 
-    void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
+    virtual void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
     {
         m_entryPointFunc = entryPointFunc;
 
@@ -554,7 +555,7 @@ protected:
         m_param = param;
 
         // We expect and require all entry-point parameters to have layout
-        // information assocaited with them at this point.
+        // information associated with them at this point.
         //
         auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
         SLANG_ASSERT(paramLayoutDecoration);
@@ -609,10 +610,10 @@ protected:
 
     void processMutableParam(IRParam* param, IROutParamTypeBase* paramPtrType)
     {
-        // The deafult handling of any mutable (`out` or `inout`) parameter
+        // The default handling of any mutable (`out` or `inout`) parameter
         // will be to introduce a local variable of the corresponding
         // type and to use that in place of the actual parameter during
-        // exeuction of the function.
+        // execution of the function.
 
         // The replacement variable will have the type of the original
         // parameter (the `T` in `Out<T>` or `InOut<T>`).
@@ -644,7 +645,7 @@ protected:
         }
 
         // Because the `out` or `inout` parameter is represented
-        // as a pointer, and our local variabel is also a pointer
+        // as a pointer, and our local variable is also a pointer
         // we can directly replace all uses of the original parameter
         // with uses of the variable.
         //
@@ -836,7 +837,7 @@ protected:
 
     LegalizedVaryingVal _createLegalVaryingVal(VaryingParamInfo const& info)
     {
-        // By default, when we seek to creating a legalized value
+        // By default, when we seek to create a legalized value
         // for a varying parameter, we will look at its type to
         // decide what to do.
         //
@@ -1135,6 +1136,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     };
     List<PayloadWritebackInfo> m_payloadWritebacks;
 
+    bool hasAlreadyRegisteredPayloadWriteback(IRType* payloadType) const
+    {
+        return m_payloadWritebacks.findFirstIndex(
+                   [&](const PayloadWritebackInfo& writeback)
+                   { return writeback.payloadType == payloadType; }) != -1;
+    }
+
     // Get C++ size and alignment of a type using CUDA layout rules.
     // Uses IRTypeLayoutRules::getCUDA() which extends C layout with CUDA-specific
     // vector alignment to match CUDA C++ compiler behavior and the prelude's layout.
@@ -1206,6 +1214,16 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
+
+                // Empty-type legalization preserves non-optimizable empty fields as `void` so
+                // that field indices stay stable. The field occupies no storage, but make-struct
+                // still needs a matching operand until void cleanup removes both of them.
+                if (as<IRVoidType>(fieldType))
+                {
+                    fieldVals.add(builder->getVoidValue());
+                    continue;
+                }
+
                 // Align to field alignment before reading
                 int fieldAlign = getTypeCppAlignment(fieldType, builder);
                 ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
@@ -1435,6 +1453,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
+
+                // A legalized empty field has no storage, so it contributes no alignment or data.
+                if (as<IRVoidType>(fieldType))
+                    continue;
+
                 // Align to field alignment before writing
                 int fieldAlign = getTypeCppAlignment(fieldType, builder);
                 ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
@@ -2155,6 +2178,18 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         return nullptr;
     }
 
+    void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
+        SLANG_OVERRIDE
+    {
+        // OptiX direct-callable programs use the CUDA function-call ABI, so their signatures
+        // should not undergo varying-parameter legalization. The CUDA emitter preserves the
+        // pointer-typed parameters and emits the callable as an ordinary __device__ function.
+        if (entryPointDecor->getProfile().getStage() == Stage::Callable)
+            return;
+
+        EntryPointVaryingParamLegalizeContext::processEntryPoint(entryPointFunc, entryPointDecor);
+    }
+
     void beginModuleImpl() SLANG_OVERRIDE
     {
         // Because many of the varying parameters are defined
@@ -2308,6 +2343,20 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             {
                 IRBuilder builder(m_module);
                 builder.setInsertBefore(m_firstOrdinaryInst);
+
+                // The incoming value of an `inout` register payload is read once,
+                // on the `VaryingInput` pass; its outgoing value is produced by the
+                // write-back registered on that same pass. The `VaryingOutput` pass
+                // therefore has no register read to perform, so return an empty
+                // value (making the output assignment a no-op) rather than emitting
+                // a redundant readback. Match by payload type so that a distinct
+                // payload using the pointer-packing fallback still reaches its own
+                // output assignment.
+                if (info.kind == LayoutResourceKind::VaryingOutput &&
+                    hasAlreadyRegisteredPayloadWriteback(info.type))
+                {
+                    return LegalizedVaryingVal();
+                }
 
                 // Only use register-based payload for hit/miss/anyhit shaders
                 // Raygen shaders pass payload TO TraceRay, not receive it FROM registers
@@ -2732,7 +2781,7 @@ protected:
         SLANG_UNUSED(entryPoint);
     }
 
-    virtual void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) const
+    virtual void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint)
     {
         SLANG_UNUSED(entryPoint);
     }
@@ -3742,12 +3791,14 @@ private:
         {
             auto parent = layoutDecor->parent;
             layoutDecor->removeAndDeallocate();
-            builder.addLayoutDecoration(parent, builder.getVarLayout(layoutOps));
+            return builder.addLayoutDecoration(parent, builder.getVarLayout(layoutOps));
         }
         return layoutDecor;
     }
 
-    // Find overlapping field semantics and legalize them
+protected:
+    // Canonicalize each field's semantic to a lowercase (name, index) pair and legalize
+    // overlapping indices
     void fixFieldSemanticsOfFlatStruct(IRStructType* structType)
     {
         // Goal is to ensure we do not have overlapping semantics for the user defined semantics:
@@ -3930,6 +3981,7 @@ private:
         }
     }
 
+private:
     void wrapReturnValueInStruct(EntryPointInfo entryPoint)
     {
         // Wrap return value into a struct if it is not already a struct.
@@ -4209,6 +4261,16 @@ protected:
                 break;
             }
         case SystemValueSemanticName::InstanceID:
+            {
+                // [[instance_id]] includes the base instance; SV_InstanceID does not. Unlike the
+                // other special values, the normal path still runs after the special handler:
+                // it decorates and converts the parameter, and the handler only adds the
+                // subtraction.
+                result.isSpecial = true;
+                result.systemValueName = toSlice("instance_id");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                break;
+            }
         case SystemValueSemanticName::VulkanInstanceID:
             {
                 result.systemValueName = toSlice("instance_id");
@@ -4275,6 +4337,8 @@ protected:
         case SystemValueSemanticName::VertexID:
         case SystemValueSemanticName::VulkanVertexID:
             {
+                // SV_VertexID still includes [[base_vertex]], the same mismatch SV_InstanceID
+                // corrects above.
                 result.systemValueName = toSlice("vertex_id");
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
                 break;
@@ -4419,6 +4483,22 @@ protected:
         return elementVarLayoutBuilder.build();
     }
 
+    // Find the entry point's parameter carrying the given system value semantic, if any. At most
+    // one parameter carries a given semantic, so the first match is the only one.
+    IRInst* findSystemValueParam(const EntryPointInfo& entryPoint, SystemValueSemanticName name)
+        const
+    {
+        for (auto item : collectSystemValFromEntryPoint(entryPoint))
+        {
+            UnownedStringSlice semanticName;
+            UnownedStringSlice semanticIndex;
+            splitNameAndIndex(item.attrName.getUnownedSlice(), semanticName, semanticIndex);
+            if (convertSystemValueSemanticNameToEnum(String(semanticName)) == name)
+                return item.var;
+        }
+        return nullptr;
+    }
+
     void handleSpecialSystemValue(
         const EntryPointInfo& entryPoint,
         SystemValLegalizationWorkItem& workItem,
@@ -4434,21 +4514,50 @@ protected:
             var->replaceUsesWith(val);
             var->removeAndDeallocate();
         }
+        else if (info.systemValueNameEnum == SystemValueSemanticName::InstanceID)
+        {
+            // `var` stays the [[instance_id]] parameter; its uses read `var - base_instance`.
+            // Snapshot the uses first so the subtraction's own operand is not redirected.
+            List<IRUse*> uses;
+            for (auto use = var->firstUse; use; use = use->nextUse)
+                uses.add(use);
+
+            // Reuse a declared SV_StartInstanceLocation: Metal rejects a second [[base_instance]].
+            IRInst* baseInstance =
+                findSystemValueParam(entryPoint, SystemValueSemanticName::StartInstanceLocation);
+
+            IRBuilder svBuilder(builder.getModule());
+            svBuilder.setInsertBefore(entryPoint.entryPointFunc->getFirstOrdinaryInst());
+            if (!baseInstance)
+            {
+                // Already the permitted uint, and the emitter reads the attribute from the
+                // decoration, so it needs neither a layout nor its own legalization;
+                // legalizeSystemValueParameters collected its work list before this loop, so
+                // the new parameter is never revisited either.
+                baseInstance = svBuilder.emitParam(svBuilder.getUIntType());
+                svBuilder.addTargetSystemValueDecoration(baseInstance, toSlice("base_instance"));
+                svBuilder.addNameHintDecoration(baseInstance, toSlice("base_instance"));
+            }
+            if (baseInstance->getFullType() != var->getFullType())
+            {
+                // The front end only admits scalar integers for SV_InstanceID, so this converts.
+                baseInstance = tryConvertValue(svBuilder, baseInstance, var->getFullType());
+                SLANG_ASSERT(baseInstance);
+            }
+            // The normal path still legalizes `var` (and a reused base declared after it) and
+            // redirects their uses here to the converted values.
+            auto baseRelativeInstanceId = svBuilder.emitSub(var->getFullType(), var, baseInstance);
+            for (auto use : uses)
+                svBuilder.replaceOperand(use, baseRelativeInstanceId);
+        }
         else if (info.systemValueNameEnum == SystemValueSemanticName::GroupIndex)
         {
             // Ensure we have a cached "sv_groupthreadid" in our entry point
             if (!entryPointToGroupThreadId.containsKey(entryPoint.entryPointFunc))
             {
-                auto systemValWorkItems = collectSystemValFromEntryPoint(entryPoint);
-                for (auto i : systemValWorkItems)
-                {
-                    auto indexAsStringGroupThreadId = String(i.attrIndex);
-                    if (getSystemValueInfo(i.attrName, &indexAsStringGroupThreadId, i.var)
-                            .systemValueNameEnum == SystemValueSemanticName::GroupThreadID)
-                    {
-                        entryPointToGroupThreadId[entryPoint.entryPointFunc] = i.var;
-                    }
-                }
+                if (auto groupThreadId =
+                        findSystemValueParam(entryPoint, SystemValueSemanticName::GroupThreadID))
+                    entryPointToGroupThreadId[entryPoint.entryPointFunc] = groupThreadId;
                 if (!entryPointToGroupThreadId.containsKey(entryPoint.entryPointFunc))
                 {
                     // Add the missing groupthreadid needed to compute sv_groupindex
@@ -4527,20 +4636,62 @@ protected:
         }
     }
 
+    // Inline every helper containing a DispatchMesh call into its callers until each call sits
+    // directly in an entry point, where the Metal intrinsic's `_slang_mesh_payload` and
+    // `_slang_mgp` parameters are in scope. This is module-wide and a no-op once done, so running
+    // it once per entry point is harmless. Each pass inlines each helper's current call sites
+    // once, moving every call one caller closer, so it converges unless a helper reaches itself;
+    // that recursion is normally rejected up front, but the check can be disabled, so it is
+    // asserted here rather than assumed.
+    void inlineHelpersCallingDispatchMesh(IRGlobalValueWithCode* dispatchMeshFunc) const
+    {
+        for (bool inlined = true; inlined;)
+        {
+            inlined = false;
+
+            HashSet<IRFunc*> helpers;
+            traverseUses(
+                dispatchMeshFunc,
+                [&](const IRUse* use)
+                {
+                    auto parent = getParentFunc(use->getUser());
+                    if (as<IRCall>(use->getUser()) && parent &&
+                        !parent->findDecoration<IREntryPointDecoration>())
+                        helpers.add(parent);
+                });
+            for (auto helper : helpers)
+            {
+                // Only calls of `helper`, not uses that pass it as a value.
+                traverseUses(
+                    helper,
+                    [&](const IRUse* use)
+                    {
+                        auto call = as<IRCall>(use->getUser());
+                        if (!call || call->getCallee() != helper)
+                            return;
+                        SLANG_RELEASE_ASSERT(getParentFunc(call) != helper);
+                        inlined |= inlineCall(call);
+                    });
+            }
+        }
+    }
+
     void legalizeAmplificationStageEntryPoint(const EntryPointInfo& entryPoint) const SLANG_OVERRIDE
     {
+        auto func = entryPoint.entryPointFunc;
+
         // Find out DispatchMesh function
         IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
-        for (const auto globalInst : entryPoint.entryPointFunc->getModule()->getGlobalInsts())
+        for (const auto globalInst : func->getModule()->getGlobalInsts())
         {
-            if (const auto func = as<IRGlobalValueWithCode>(globalInst))
+            if (const auto f = as<IRGlobalValueWithCode>(globalInst))
             {
-                if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
+                if (const auto dec = f->findDecoration<IRKnownBuiltinDecoration>())
                 {
                     if (dec->getName() == KnownBuiltinDeclName::DispatchMesh)
                     {
                         SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
-                        dispatchMeshFunc = func;
+                        dispatchMeshFunc = f;
                     }
                 }
             }
@@ -4549,52 +4700,47 @@ protected:
         if (!dispatchMeshFunc)
             return;
 
-        IRBuilder builder{entryPoint.entryPointFunc->getModule()};
+        inlineHelpersCallingDispatchMesh(dispatchMeshFunc);
 
-        // We'll rewrite the call to use mesh_grid_properties.set_threadgroups_per_grid
+        // A module has one DispatchMesh specialization (asserted above), so every call in an
+        // entry point writes the same [[payload]] type and any one will do.
+        IRCall* dispatchCall = nullptr;
         traverseUses(
             dispatchMeshFunc,
             [&](const IRUse* use)
             {
-                if (const auto call = as<IRCall>(use->getUser()))
-                {
-                    SLANG_ASSERT(call->getArgCount() == 4);
-                    const auto payload = call->getArg(3);
-
-                    const auto payloadPtrType =
-                        composeGetters<IRPtrType>(payload, &IRInst::getDataType);
-                    SLANG_ASSERT(payloadPtrType);
-                    const auto payloadType = payloadPtrType->getValueType();
-                    SLANG_ASSERT(payloadType);
-
-                    builder.setInsertBefore(
-                        entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
-                    const auto annotatedPayloadType = builder.getPtrType(
-                        kIROp_RefParamType,
-                        payloadPtrType->getValueType(),
-                        AddressSpace::MetalObjectData,
-                        payloadPtrType->getDataLayout());
-                    auto packedParam = builder.emitParam(annotatedPayloadType);
-                    builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));
-                    IRVarLayout::Builder varLayoutBuilder(
-                        &builder,
-                        IRTypeLayout::Builder{&builder}.build());
-
-                    // Add the MetalPayload resource info, so we can emit [[payload]]
-                    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
-                    auto paramVarLayout = varLayoutBuilder.build();
-                    builder.addLayoutDecoration(packedParam, paramVarLayout);
-
-                    // Now we replace the call to DispatchMesh with a call to the mesh grid
-                    // properties But first we need to create the parameter
-                    const auto meshGridPropertiesType = builder.getMetalMeshGridPropertiesType();
-                    auto mgp = builder.emitParam(meshGridPropertiesType);
-                    builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
-                }
+                auto call = as<IRCall>(use->getUser());
+                if (!dispatchCall && call && getParentFunc(call) == func)
+                    dispatchCall = call;
             });
+        if (!dispatchCall)
+            return; // nothing dispatches here; a helper no entry point reaches is never emitted
+
+        SLANG_ASSERT(dispatchCall->getArgCount() == 4);
+        const auto payloadPtrType = as<IRPtrTypeBase>(dispatchCall->getArg(3)->getDataType());
+        SLANG_ASSERT(payloadPtrType);
+
+        IRBuilder builder{func->getModule()};
+        builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+        const auto annotatedPayloadType = builder.getPtrType(
+            kIROp_RefParamType,
+            payloadPtrType->getValueType(),
+            AddressSpace::MetalObjectData,
+            payloadPtrType->getDataLayout());
+        auto packedParam = builder.emitParam(annotatedPayloadType);
+        builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));
+        IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
+
+        // Add the MetalPayload resource info, so we can emit [[payload]]
+        varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
+        builder.addLayoutDecoration(packedParam, varLayoutBuilder.build());
+
+        // The intrinsic sets the grid size through mesh_grid_properties.set_threadgroups_per_grid
+        auto mgp = builder.emitParam(builder.getMetalMeshGridPropertiesType());
+        builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
     }
 
-    void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) const SLANG_OVERRIDE
+    void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) SLANG_OVERRIDE
     {
         auto func = entryPoint.entryPointFunc;
 
@@ -4664,6 +4810,9 @@ protected:
 
                 verticesParam = param;
                 auto vertStruct = as<IRStructType>(vertexType);
+                // Neither an input nor the result, so nothing else canonicalizes the semantics;
+                // the case-insensitive sv_position match below still holds afterwards.
+                fixFieldSemanticsOfFlatStruct(vertStruct);
                 for (auto field : vertStruct->getFields())
                 {
                     auto key = field->getKey();
@@ -4695,6 +4844,8 @@ protected:
 
                 primitivesParam = param;
                 auto primStruct = as<IRStructType>(primitiveType);
+                // Lifted like the vertex struct above, so canonicalized the same way.
+                fixFieldSemanticsOfFlatStruct(primStruct);
                 for (auto field : primStruct->getFields())
                 {
                     auto key = field->getKey();
@@ -4894,6 +5045,8 @@ protected:
         case SystemValueSemanticName::InstanceID:
         case SystemValueSemanticName::VulkanInstanceID:
             {
+                // instance_index includes firstInstance, and WGSL has no base_instance builtin
+                // to subtract, so SV_InstanceID cannot be made HLSL-accurate here.
                 result.systemValueName = toSlice("instance_index");
                 result.permittedTypes.add(builder.getUIntType());
             }

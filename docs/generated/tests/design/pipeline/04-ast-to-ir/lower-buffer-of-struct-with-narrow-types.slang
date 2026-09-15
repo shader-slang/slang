@@ -14,7 +14,7 @@
 // pointer type and the embedded struct's field IR types both
 // surface in the dump.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Narrow { int8_t i8; uint16_t u16; }
 

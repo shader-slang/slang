@@ -12,7 +12,7 @@
 // value-parameter generic instantiated at `4` puts the integer literal
 // directly into the argument list, and the CHECK pins `4 : Int` in that
 // position.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 struct FixedArr<int N> { int data[N]; };
 

@@ -178,11 +178,29 @@ SLANG_CHECK(syntheticResources != nullptr);
 SLANG_CHECK(syntheticResources->getResourceCount() == 1);
 uint32_t coverageResourceIndex = 0;
 
-slang::SyntheticResourceInfo resourceInfo = {};
+// Default-construct (or `= {}`) so the struct's default member initializers
+// set `structSize` to the size of the definition you compiled against. The
+// implementation reads it for ABI versioning and returns
+// SLANG_E_INVALID_ARG if it is too small, so a struct zeroed with `memset`
+// is rejected.
+slang::SyntheticResourceInfo resourceInfo;
 if (SLANG_SUCCEEDED(syntheticResources->getResourceInfo(coverageResourceIndex, &resourceInfo)))
 {
     // Descriptor-backed targets: resourceInfo.space, resourceInfo.binding.
     // CPU/CUDA targets: resourceInfo.uniformOffset, resourceInfo.uniformStride.
+
+    // Bindless form (`-trace-coverage-bindless-index N`): which element of
+    // the descriptor array this shader was compiled to use. `-1` means the
+    // buffer is bound as a single descriptor, not as an array element, so
+    // there is no index to apply.
+    if (resourceInfo.bindlessIndex >= 0)
+    {
+        // The shader accesses `__slang_coverage[resourceInfo.bindlessIndex]`.
+        // `resourceInfo.arraySize` is
+        // `slang::kUnboundedSyntheticResourceArraySize` here: the array is
+        // unsized, so how many descriptors to supply is the host's decision
+        // and must not be read off this field as a count.
+    }
 }
 
 for (uint32_t i = 0; i < entryCount; ++i) {
@@ -204,13 +222,33 @@ where the width is capped automatically), binds it
 using the hidden binding information reported through
 `ISyntheticResourceMetadata`, dispatches the shader, reads the
 counters back, and consumes the source entries however it likes —
-direct telemetry, a custom LCOV writer, a dashboard, etc. In the
-current line/function/branch producers, entries and counters are
-one-to-one. Future source-region modes may expose source entries that
-are not identical to runtime counter slots, including entries with no
-direct runtime counter of their own. Hosts should use
-`entry.counterIndex` and be prepared for future extended entry data
-rather than assuming the entry index equals the counter index.
+direct telemetry, a custom LCOV writer, a dashboard, etc.
+
+**Entries and counters are not one-to-one.** Line coverage coalesces
+markers that provably execute together — those in one basic block with
+nothing between them that can abandon the invocation — onto a single
+counter and a single runtime probe. This is what keeps instrumented
+shader code small, since emitted size scales with probe count. Several
+entries therefore share a `counterIndex`, and `counterCount` is never
+larger than the entry count -- roughly half on the bundled demos.
+Function and branch entries keep a dedicated counter, so a compile that
+enables only those modes leaves the two counts equal; do not code
+against a strict inequality.
+
+Two consequences for hosts:
+
+- Size the readback buffer from `counterCount`, never from the entry
+  count. They are different numbers.
+- Accumulate per entry (`counters[entry.counterIndex]` for each entry),
+  never per counter. A counter no longer identifies one source
+  location, so iterating counters and attributing each to "its" line is
+  wrong.
+
+Both were already the documented contract; coalescing is what makes
+getting them wrong actually break. Future modes may additionally expose
+entries with no direct runtime counter, so hosts should keep using
+`entry.counterIndex` and be prepared for extended entry data rather
+than assuming the entry index equals the counter index.
 
 #### Producing the canonical manifest JSON in-process
 
@@ -329,9 +367,15 @@ effectively never wrap; uint32 slots wrap silently at 2^32 hits per
 slot and read back as small numbers.
 
 Counter slot indices are per-compile: slot `K` does not identify the
-same source location across two compiles or shader variants. Aggregate
-by the source attribution in the manifest or metadata, never by slot
-index.
+same source location across two compiles or shader variants, and one
+slot may serve several source locations. Aggregate by the source
+attribution in the manifest or metadata, never by slot index.
+
+The counter buffer and the manifest must come from the *same* compile.
+`slang-coverage-to-lcov.py` enforces this by requiring the buffer size
+to match `counter_count` exactly; a mismatch is an error rather than a
+silently truncated read, because a prefix of a stale buffer produces
+plausible but wrong hit counts.
 
 ---
 

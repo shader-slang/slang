@@ -18,7 +18,7 @@
 // builtins) — instead we check that the dump's preamble contains
 // `import(` decorations, which is how imported symbols are spelled.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

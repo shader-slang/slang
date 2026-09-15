@@ -14,7 +14,7 @@
 // `2.5f` shows up as `2.5 : Float` as the second operand of the
 // `mul` instruction.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;

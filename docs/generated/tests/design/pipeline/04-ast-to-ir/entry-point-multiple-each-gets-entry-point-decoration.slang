@@ -15,7 +15,7 @@
 // At count = 2, two distinct `entryPoint(...)` decorations appear
 // on two distinct `func %name` definitions.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -entry second -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -entry second -stage compute
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

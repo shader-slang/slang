@@ -13,7 +13,7 @@
 // does not explicitly list `Tuple`, but tuples are observable in
 // IR as `tuple_type(...)` with one operand per element type.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int8_t a;
 uniform float b;

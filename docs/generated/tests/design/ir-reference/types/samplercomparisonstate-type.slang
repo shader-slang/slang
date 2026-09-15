@@ -17,7 +17,7 @@
 // distinguishes it from the SamplerState opcode covered by the sibling
 // sampler test.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o -
 
 SamplerComparisonState cmpSampler;
 Texture2D<float> depthTex;

@@ -13,7 +13,7 @@
 // the plain `SamplerState` (see the sampling-and-combined-samplers
 // table). Both share the `global_param` opcode.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform Texture2D<float> tex;
 uniform SamplerComparisonState sampCmp;

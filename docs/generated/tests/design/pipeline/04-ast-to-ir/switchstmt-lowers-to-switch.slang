@@ -14,7 +14,7 @@
 // k1, %b1, ...)` terminator — the join (merge) block is an explicit
 // operand, matching the doc's structured-CFG claim.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int sel;
 uniform RWStructuredBuffer<int> buf;

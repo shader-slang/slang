@@ -13,7 +13,7 @@
 // repeated indices. This boundary probe takes M=4 from N=4 with
 // all four lanes referencing index 0 — the broadcast case.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float4 v;
 uniform RWStructuredBuffer<float4> buf;

@@ -13,7 +13,7 @@
 // smoke test bundles this with float-to-int; this isolates the
 // int-to-float direction with a clean single anchor.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<float> buf;

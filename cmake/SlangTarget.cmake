@@ -187,14 +187,14 @@ function(slang_add_target dir type)
     # slang_add_target is called from, so set it explicitly here.
     #
     if(DEFINED ARG_OUTPUT_DIR)
-        set(output_dir "${CMAKE_BINARY_DIR}/${ARG_OUTPUT_DIR}/$<CONFIG>")
+        set(output_dir "${slang_BINARY_DIR}/${ARG_OUTPUT_DIR}/$<CONFIG>")
     else()
         # Default to placing things in the cmake binary root.
         #
         # While it would be nice to place things according to their
         # subdirectory, Windows' inflexibility in being able to find DLLs makes
         # this tricky there.
-        set(output_dir "${CMAKE_BINARY_DIR}/$<CONFIG>")
+        set(output_dir "${slang_BINARY_DIR}/$<CONFIG>")
     endif()
     set(archive_subdir ${library_subdir})
     if(type STREQUAL "MODULE")

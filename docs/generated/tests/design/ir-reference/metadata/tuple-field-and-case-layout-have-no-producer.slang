@@ -17,7 +17,7 @@
 // The positive CHECK-DAG proves layout lowering ran; the two CHECK-NOTs assert
 // the attributes are still absent.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface ILight
 {

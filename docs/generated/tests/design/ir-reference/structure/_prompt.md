@@ -206,11 +206,11 @@ Structural-opcode claims are best observed through `-dump-ir`
 against the IR dump. The standard form used here is:
 
 ```
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 ```
 
 Per the universal `_common.md` rule: combine `-dump-ir` with
-**`-target <text-target>`** AND **`-o /dev/null`** so the IR dump
+**`-target <text-target>`** AND **`-o -`** so the IR dump
 goes to stdout uncontaminated by target text. Mostly use
 `pipeline_stage=lower` in `//META` — these are LOWER-TO-IR
 observations.
@@ -239,7 +239,7 @@ Do not use any GPU-only directive.
 - [ ] Every test's `doc_ref` resolves to an anchor in
       `ir-reference/structure.md` (or one of the listed secondary
       docs).
-- [ ] Every test uses `-target spirv-asm -dump-ir -o /dev/null
+- [ ] Every test uses `-target spirv-asm -dump-ir -o -
 -entry main -stage compute` per CLAUDE.md.
 - [ ] Outputs escape DCE: write to an `RWStructuredBuffer<T>` so
       the structural declaration stays linked.
@@ -259,7 +259,7 @@ Do not use any GPU-only directive.
 
 These bite hard in structural-opcode observation tests:
 
-- `-dump-ir` requires `-target <X>` and `-o /dev/null`.
+- `-dump-ir` requires `-target <X>` and `-o -`.
 - The IR dump prefixes user IR with a large preamble (capability
   tables, core-module annotations). Anchor patterns at user-named
   symbols (`struct %P`, `func %helper`, `let %gConst`).

@@ -15,7 +15,7 @@
 // so the match is anchored at user code rather than in the core-module
 // preamble.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage geometry
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage geometry
 
 uniform RWStructuredBuffer<float4> buf;
 
