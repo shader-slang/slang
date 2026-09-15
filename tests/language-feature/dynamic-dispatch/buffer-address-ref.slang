@@ -22,9 +22,11 @@
 
 // On Metal, pointers go through a 64-bit value when packed into or read out of a uint2.
 // MTL-NOT: device*)(uint2(
+// MTL-NOT: as_type<uint2>({{[^(]}}
 // MTL: as_type<uint2>((ulong)(
 // MTL: device*)(as_type<ulong>(uint2(
 // MTL-NOT: device*)(uint2(
+// MTL-NOT: as_type<uint2>({{[^(]}}
 
 [anyValueSize(8)]
 interface IValue
