@@ -2199,6 +2199,13 @@ err(
 )
 
 err(
+    "conjunction-type-as-value-type",
+    30133,
+    "a type conjunction cannot be used as the type of a value",
+    span { loc = "expr:Expr", message = "'~type:Type' is a type conjunction; it can only be used as a generic constraint or an inheritance clause." }
+)
+
+err(
     "parameter-pack-must-be-const",
     30107,
     "parameter pack must be 'const'",
