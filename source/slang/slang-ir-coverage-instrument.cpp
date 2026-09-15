@@ -1091,111 +1091,6 @@ struct CoverageFunctionExitAnalysis
     }
 };
 
-// Assign a counter slot to every collected marker op, coalescing line
-// markers that provably execute together.
-//
-// Line markers in the same basic block, with nothing between them that
-// can abandon the invocation, all execute exactly the same number of
-// times, so they can share one counter and one runtime probe. That is
-// what shrinks emitted shader code: probe count, not counter width, is
-// what scales SPIR-V size.
-//
-// `outSlots[i]` is the counter index for `markerOps[i]`, and
-// `outEmitsProbe[i]` selects the single marker per group that emits
-// the runtime counter update. The probe is placed at the *last* marker
-// of the group so that reaching it proves every earlier marker in the
-// group executed; placing it first would over-report when the group is
-// entered but abandoned partway.
-//
-// Function and branch markers always take a dedicated slot: they are
-// already one probe per function or per arm, and their counts carry
-// per-site meaning that sharing would destroy.
-static void assignCoverageCounterSlots(
-    List<IRInst*> const& markerOps,
-    List<UInt>& outSlots,
-    List<bool>& outEmitsProbe,
-    UInt& outCounterCount)
-{
-    CoverageFunctionExitAnalysis exitAnalysis;
-
-    outSlots.setCount(markerOps.getCount());
-    outEmitsProbe.setCount(markerOps.getCount());
-    for (Index i = 0; i < markerOps.getCount(); ++i)
-        outEmitsProbe[i] = true;
-
-    UInt nextSlot = 0;
-    // Index of the marker that currently owns the open group, or -1
-    // when no group is open.
-    Index openGroup = -1;
-
-    for (Index i = 0; i < markerOps.getCount(); ++i)
-    {
-        auto markerOp = markerOps[i];
-        if (markerOp->getOp() != kIROp_IncrementCoverageCounter)
-        {
-            // Non-line markers neither join nor continue a group, and
-            // they cannot break one: they lower to a counter update,
-            // which always falls through.
-            outSlots[i] = nextSlot++;
-            continue;
-        }
-
-        bool joinsOpenGroup = false;
-        if (openGroup >= 0)
-        {
-            auto previousOp = markerOps[openGroup];
-            if (previousOp->getParent() == markerOp->getParent())
-            {
-                // Same block: the run continues unless something
-                // between the two markers can abandon the invocation.
-                // The scan below relies on a precondition from
-                // `collectCoverageMarkerOps`, which walks each function's
-                // blocks in order and each block's insts in position
-                // order: markers from one block arrive contiguously and
-                // in position order, so `markerOp` is reachable by
-                // scanning forward from `previousOp`. The assert after
-                // the loop checks that invariant directly — that the
-                // forward scan actually reached `markerOp` whenever it
-                // did not already stop at a split — rather than the
-                // weaker `previousOp != markerOp`, which a reversed pair
-                // would also satisfy while still running off the end of
-                // the block and silently skipping the split check.
-                joinsOpenGroup = true;
-                bool foundMarkerOp = false;
-                for (auto inst = previousOp->getNextInst(); inst; inst = inst->getNextInst())
-                {
-                    if (inst == markerOp)
-                    {
-                        foundMarkerOp = true;
-                        break;
-                    }
-                    if (exitAnalysis.mayNotFallThrough(inst))
-                    {
-                        joinsOpenGroup = false;
-                        break;
-                    }
-                }
-                SLANG_ASSERT(foundMarkerOp || !joinsOpenGroup);
-            }
-        }
-
-        if (joinsOpenGroup)
-        {
-            // Hand the probe forward to this marker: the group's probe
-            // always sits at its last marker.
-            outSlots[i] = outSlots[openGroup];
-            outEmitsProbe[openGroup] = false;
-        }
-        else
-        {
-            outSlots[i] = nextSlot++;
-        }
-        openGroup = i;
-    }
-
-    outCounterCount = nextSlot;
-}
-
 // Collect every coverage marker op in the module. Deterministic traversal:
 // module-scope insts in declaration order, then each function's blocks in
 // order, then each block's insts in position order.
@@ -1704,6 +1599,96 @@ static bool tryGetCoverageUniformBindingInfo(
 }
 
 } // anonymous namespace
+
+// Defined at namespace scope, outside the anonymous namespace that holds its
+// siblings, so `slang-static-unit-test` can link against it directly; the
+// contract lives on the declaration in the header. It still uses the
+// file-local `CoverageFunctionExitAnalysis`, which stays private.
+void assignCoverageCounterSlots(
+    List<IRInst*> const& markerOps,
+    List<UInt>& outSlots,
+    List<bool>& outEmitsProbe,
+    UInt& outCounterCount)
+{
+    CoverageFunctionExitAnalysis exitAnalysis;
+
+    outSlots.setCount(markerOps.getCount());
+    outEmitsProbe.setCount(markerOps.getCount());
+    for (Index i = 0; i < markerOps.getCount(); ++i)
+        outEmitsProbe[i] = true;
+
+    UInt nextSlot = 0;
+    // Index of the marker that currently owns the open group, or -1
+    // when no group is open.
+    Index openGroup = -1;
+
+    for (Index i = 0; i < markerOps.getCount(); ++i)
+    {
+        auto markerOp = markerOps[i];
+        if (markerOp->getOp() != kIROp_IncrementCoverageCounter)
+        {
+            // Non-line markers neither join nor continue a group, and
+            // they cannot break one: they lower to a counter update,
+            // which always falls through.
+            outSlots[i] = nextSlot++;
+            continue;
+        }
+
+        bool joinsOpenGroup = false;
+        if (openGroup >= 0)
+        {
+            auto previousOp = markerOps[openGroup];
+            if (previousOp->getParent() == markerOp->getParent())
+            {
+                // Same block: the run continues unless something
+                // between the two markers can abandon the invocation.
+                // The scan below relies on a precondition from
+                // `collectCoverageMarkerOps`, which walks each function's
+                // blocks in order and each block's insts in position
+                // order: markers from one block arrive contiguously and
+                // in position order, so `markerOp` is reachable by
+                // scanning forward from `previousOp`. The assert after
+                // the loop checks that invariant directly — that the
+                // forward scan actually reached `markerOp` whenever it
+                // did not already stop at a split — rather than the
+                // weaker `previousOp != markerOp`, which a reversed pair
+                // would also satisfy while still running off the end of
+                // the block and silently skipping the split check.
+                joinsOpenGroup = true;
+                bool foundMarkerOp = false;
+                for (auto inst = previousOp->getNextInst(); inst; inst = inst->getNextInst())
+                {
+                    if (inst == markerOp)
+                    {
+                        foundMarkerOp = true;
+                        break;
+                    }
+                    if (exitAnalysis.mayNotFallThrough(inst))
+                    {
+                        joinsOpenGroup = false;
+                        break;
+                    }
+                }
+                SLANG_ASSERT(foundMarkerOp || !joinsOpenGroup);
+            }
+        }
+
+        if (joinsOpenGroup)
+        {
+            // Hand the probe forward to this marker: the group's probe
+            // always sits at its last marker.
+            outSlots[i] = outSlots[openGroup];
+            outEmitsProbe[openGroup] = false;
+        }
+        else
+        {
+            outSlots[i] = nextSlot++;
+        }
+        openGroup = i;
+    }
+
+    outCounterCount = nextSlot;
+}
 
 void instrumentCoverage(
     IRModule* module,
