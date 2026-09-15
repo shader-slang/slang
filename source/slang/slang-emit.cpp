@@ -1990,13 +1990,14 @@ Result linkAndOptimizeIR(
             SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
         }
 
-        // SPIR-V: an empty `CallShader` payload is backed by a `[__vulkanCallablePayload]` global
-        // whose address feeds `OpExecuteCallableKHR`; if it legalizes to `none`, type legalization
-        // aborts with "non-simple operand(s)!". Pad it so a real Callable Data variable survives.
+        // Vulkan (SPIR-V + GLSL): an empty `CallShader` payload is backed by a
+        // `[__vulkanCallablePayload]` global; if it legalizes to `none`, type legalization aborts
+        // with "non-simple operand(s)!" — via `OpExecuteCallableKHR` on SPIR-V, or
+        // `__callablePayloadLocation` on GLSL. Pad it so a real Callable Data variable survives.
         // Must run before legalizeResourceTypes erases the empty payload struct.
-        if (isSPIRV(targetRequest->getTarget()))
+        if (isKhronosTarget(targetRequest))
         {
-            SLANG_PASS(legalizeEmptyCallableDataPayloadsForSPIRV);
+            SLANG_PASS(legalizeEmptyCallableDataPayloadsForVulkan);
         }
 
         // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions

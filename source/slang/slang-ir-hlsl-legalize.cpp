@@ -136,20 +136,41 @@ static void addRayPayloadDecorationIfNeeded(IRBuilder& builder, IRType* type)
         builder.addRayPayloadDecoration(type);
 }
 
-// Give an empty struct a legal one-field physical layout by adding an `int _slang_dummy` field
-// and rewriting every `MakeStruct` of the type to supply a zero for it. DXC rejects a zero-field
-// struct where a ray-payload / callable-data parameter is required, so padding keeps the struct
-// non-empty and it survives type legalization. `addPayloadAccessQualifiers` is set only for ray
-// payloads, whose fields must carry HLSL payload access qualifiers at SM 6.7+; a callable-data
-// struct is a plain `inout` parameter and must not receive them.
+// A struct is "empty" when it has no fields. Type legalization erases such a struct (it legalizes
+// to `LegalType::Flavor::none`), which is what deletes empty ray-payload / callable-data structs.
+// The padding passes below all key on this single predicate so the collectors and the padder's
+// precondition stay in sync. (A struct whose fields *all* themselves legalize to `none` also
+// legalizes to `none` yet is not empty by this test — see the callable-data passes for that
+// documented limitation.)
+static bool isEmptyStruct(IRStructType* structType)
+{
+    return !structType->getFields().getFirst();
+}
+
+// Add `type` to `set` if it is an empty struct. Centralizes the "needs padding?" decision the
+// padding passes share; skipping non-empty structs also makes the passes idempotent (an
+// already-padded struct is non-empty and so is not re-collected on a re-run).
+static void addIfEmptyStruct(IRType* type, HashSet<IRStructType*>& set)
+{
+    if (auto structType = as<IRStructType>(type); structType && isEmptyStruct(structType))
+        set.add(structType);
+}
+
+// Give an empty struct a legal one-field physical layout by adding an `int _slang_dummy` field and
+// rewriting every `MakeStruct` of the type to supply a zero for it. This is a mechanical transform
+// that lets the struct survive type legalization, which would otherwise erase an empty struct; the
+// target-specific reason each caller needs that survival lives at the call sites.
+// `addPayloadAccessQualifiers` is set only for ray payloads, whose fields must carry HLSL payload
+// access qualifiers at SM 6.7+; callable data is a plain `inout` and must not receive them.
 static void padEmptyStructWithDummyField(
     IRBuilder& builder,
     IRStructType* structType,
     bool addPayloadAccessQualifiers)
 {
-    // The callers only ever pass an empty struct; padding a struct that already has fields would
-    // silently corrupt its layout, so assert rather than proceed.
-    SLANG_ASSERT(!structType->getFields().getFirst());
+    // Padding a struct that already has fields would silently corrupt its layout — out-of-contract
+    // input, so fail loudly even in release. All current callers filter via `isEmptyStruct`, so
+    // this is unreachable today; it guards a future caller added without that filter.
+    SLANG_RELEASE_ASSERT(isEmptyStruct(structType));
 
     // Insert the key BEFORE the struct type so it is defined before being referenced.
     builder.setInsertBefore(structType);
@@ -324,13 +345,7 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
             auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
             if (!ptrType)
                 continue;
-            structType = as<IRStructType>(ptrType->getValueType());
-            if (!structType)
-                continue;
-            // Check if the struct is empty
-            if (structType->getFields().begin() != structType->getFields().end())
-                continue;
-            emptyRayPayloadStructs.add(structType);
+            addIfEmptyStruct(ptrType->getValueType(), emptyRayPayloadStructs);
             continue;
         }
 
@@ -342,11 +357,7 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
         if (!isRayPayload)
             continue;
 
-        // Check if the struct is empty (has no fields)
-        if (structType->getFields().begin() != structType->getFields().end())
-            continue;
-
-        emptyRayPayloadStructs.add(structType);
+        addIfEmptyStruct(structType, emptyRayPayloadStructs);
     }
 
     // Now process the collected structs. Ray payload fields require stage access qualifiers.
@@ -356,23 +367,15 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
     }
 }
 
-// Add `type` to `set` if it is an empty (zero-field) struct. Centralizes the emptiness check the
-// callable-data passes share; `padEmptyStructWithDummyField` asserts emptiness, and the check also
-// makes the passes idempotent (an already-padded struct is non-empty and is skipped on a re-run).
-static void addIfEmptyStruct(IRType* type, HashSet<IRStructType*>& set)
-{
-    auto structType = as<IRStructType>(type);
-    if (!structType)
-        return;
-    if (structType->getFields().begin() != structType->getFields().end())
-        return;
-    set.add(structType);
-}
-
-// Return true if `call` invokes the `CallShader` target intrinsic. Uses the canonical recognizer
-// `findTargetIntrinsicDefinition`, which matches both the pre-link
+// Return true if `call` invokes the HLSL `CallShader` target intrinsic. Recognition uses the
+// canonical `findTargetIntrinsicDefinition` (which matches both the pre-link
 // `[targetIntrinsic("CallShader")]` decoration and the post-link `IRGenericAsm("CallShader")` body
-// the callee becomes, so it holds wherever this runs in the pipeline.
+// the callee becomes), then compares the returned definition against the intrinsic's HLSL codegen
+// string `"CallShader"`. The coupling to that string is intentional: on the D3D path — the only
+// path that reaches this pass — the definition IS the HLSL `__intrinsic_asm` text. It deliberately
+// does NOT match the CUDA arm (whose definition is `optixDirectCall<...>`, a different string);
+// covering CUDA needs a target-agnostic identity (`KnownBuiltinDeclName`) and is tracked
+// separately.
 static bool isCallShaderCall(IRCall* call, CapabilitySet const& targetCaps)
 {
     auto callee = getResolvedInstForDecorations(call->getCallee());
@@ -396,6 +399,12 @@ void legalizeEmptyCallableDataPayloadsForHLSL(IRModule* module, CapabilitySet ta
     // On the D3D path the callable-data struct carries no decoration to key on, so identify it
     // structurally at its two use sites. Collect first, because padding inserts new global
     // instructions (struct keys) that would invalidate a live `getGlobalInsts()` walk.
+    //
+    // Limitation: `isEmptyStruct` keys on zero fields, but the erasure it guards against triggers
+    // whenever the struct legalizes to `none` — which also happens for a struct whose fields *all*
+    // legalize to `none` (e.g. one holding only empty structs). Such a struct has a nonzero field
+    // count, so it is not padded and the original abort recurs. This matches the pre-existing
+    // behavior of `legalizeEmptyRayPayloadsForHLSL` and is left as a follow-up.
     HashSet<IRStructType*> emptyCallableDataStructs;
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -403,7 +412,10 @@ void legalizeEmptyCallableDataPayloadsForHLSL(IRModule* module, CapabilitySet ta
         if (!func)
             continue;
 
-        // Use site 1: the callable entry point's own data, an `out`/`inout` varying parameter.
+        // Use site 1: the callable entry point's own data, a varying parameter. On D3D — the only
+        // target this pass runs for — DXC requires callable data to be `inout`; it is lowered to an
+        // `IROutParamTypeBase` here, so scanning those parameters covers it. (`IROutParamTypeBase`
+        // spans both `out` and `inout`, the two mutable forms SPIR-V/CUDA additionally allow.)
         auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
         if (entryPointDecor && entryPointDecor->getProfile().getStage() == Stage::Callable)
         {
@@ -441,18 +453,28 @@ void legalizeEmptyCallableDataPayloadsForHLSL(IRModule* module, CapabilitySet ta
     }
 }
 
-void legalizeEmptyCallableDataPayloadsForSPIRV(IRModule* module)
+void legalizeEmptyCallableDataPayloadsForVulkan(IRModule* module)
 {
-    // On SPIR-V, a `CallShader` payload is a module-scope `[__vulkanCallablePayload]` global (the
-    // `static Payload p` in `CallShader`'s `spirv` arm), and `OpExecuteCallableKHR` takes its
-    // address. An empty payload struct legalizes to `LegalType::Flavor::none`, which erases the
-    // global's value type and leaves `OpExecuteCallableKHR ... &p` with a non-simple operand;
-    // `legalizeInst` then aborts type legalization with "non-simple operand(s)!". Pad the empty
-    // struct so a real Callable Data variable survives, which `OpExecuteCallableKHR` requires.
-    // This mirrors the global-var branch of `legalizeEmptyRayPayloadsForHLSL`; the callable-payload
-    // global is keyed on directly (rather than on the `CallShader` call) so the fix does not depend
-    // on the intrinsic call surviving un-inlined at this point. Callable data is a plain `inout`,
-    // not a `[raypayload]`, so the dummy field carries no payload access qualifiers.
+    // On the Vulkan targets (SPIR-V and GLSL), a `CallShader` payload is a module-scope
+    // `[__vulkanCallablePayload]` global — the `static Payload p` in `CallShader`'s `spirv`/`glsl`
+    // arms — whose address feeds the callable dispatch. An empty payload struct legalizes to
+    // `LegalType::Flavor::none`, which erases the global's value type. On SPIR-V that leaves
+    // `OpExecuteCallableKHR ... &p` with a non-simple operand and type legalization aborts with
+    // "non-simple operand(s)!"; on GLSL the erased `p` feeds `__callablePayloadLocation(p)` and
+    // hits the same abort via a different instruction. Pad the empty struct so a real Callable Data
+    // variable survives. This mirrors the global-var branch of `legalizeEmptyRayPayloadsForHLSL`;
+    // keying on the global (rather than the `CallShader` call) means the fix does not depend on the
+    // intrinsic call surviving un-inlined at this point. Callable data is a plain `inout`, not a
+    // `[raypayload]`, so the dummy field carries no payload access qualifiers.
+    //
+    // Both the outgoing `[__vulkanCallablePayload]` and the incoming `[__vulkanCallablePayloadIn]`
+    // decorations are matched. The outgoing form backs a `CallShader` caller (above) and is the one
+    // exercised by the tests. The incoming form (lowered from `VulkanCallablePayloadInAttribute`)
+    // marks incoming callable data; matching it is defensive — any module-scope global carrying
+    // that decoration with an empty struct would legalize to `none` and abort the same way, so
+    // padding it is the same correct fix. (A callable entry point's own empty payload parameter
+    // materializes no such global on this path — it compiles to a valid `CallableKHR` entry point
+    // with no variable — so this is not the entry-point case.)
     IRBuilder builder(module);
 
     HashSet<IRStructType*> emptyCallablePayloadStructs;
