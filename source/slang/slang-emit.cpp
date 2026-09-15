@@ -1935,7 +1935,7 @@ Result linkAndOptimizeIR(
         (isCPUTarget(targetRequest) && isKernelTarget(target)) ||
         options.shouldLegalizeExistentialAndResourceTypes)
     {
-        SLANG_PASS(inlineGlobalConstantsForLegalization);
+        SLANG_PASS(inlineGlobalConstantsForLegalization, target == CodeGenTarget::CUDASource, sink);
     }
 
     // We don't need the legalize pass for C/C++ based types

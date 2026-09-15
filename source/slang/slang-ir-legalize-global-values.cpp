@@ -1,6 +1,9 @@
 #include "slang-ir-legalize-global-values.h"
 
+#include "slang-ir-addr-inst-elimination.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-inline.h"
+#include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
 
 namespace Slang
@@ -246,8 +249,141 @@ IRInst* GlobalInstInliningContextGeneric::maybeInlineGlobalValue(
     return inlineInst(builder, cloneEnv, inst);
 }
 
+// CUDA accepts aggregate initializers made entirely from constants. It does not
+// accept calls or loads as device-variable initializers, even when their result type
+// contains only numeric fields.
+static bool isAggregateInitializerOperation(IRInst* value)
+{
+    if (as<IRConstant>(value))
+        return true;
+    switch (value->getOp())
+    {
+    case kIROp_MakeStruct:
+    case kIROp_MakeArray:
+    case kIROp_MakeArrayFromElement:
+    case kIROp_MakeVector:
+    case kIROp_MakeMatrix:
+    case kIROp_MakeVectorFromScalar:
+    case kIROp_MakeMatrixFromScalar:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static bool isStaticAggregateInitializer(IRInst* value)
+{
+    if (!isAggregateInitializerOperation(value))
+        return false;
+    for (UInt i = 0; i < value->getOperandCount(); ++i)
+        if (!isStaticAggregateInitializer(value->getOperand(i)))
+            return false;
+    return true;
+}
+
+// Return whether func is a synthesized value constructor used by a module initializer
+// whose body can be canonicalized without escaping local addresses or executing calls.
+// The resulting expression is checked separately after canonicalization.
+static bool canFoldAggregateConstructor(IRModule* module, IRFunc* func)
+{
+    if (!func || !as<IRStructType>(func->getResultType()) ||
+        as<IRClassType>(func->getResultType()) || func->findDecoration<IRNoInlineDecoration>())
+        return false;
+    auto ctor = func->findDecoration<IRConstructorDecoration>();
+    auto block = func->getFirstBlock();
+    if (!ctor || !ctor->getSynthesizedStatus() || !block || block->getNextBlock() ||
+        !as<IRReturn>(block->getTerminator()))
+        return false;
+
+    bool usedByModuleInitializer = false;
+    for (auto use = func->firstUse; use; use = use->nextUse)
+    {
+        if (auto call = as<IRCall>(use->getUser()))
+            usedByModuleInitializer |=
+                call->getCallee() == func && call->getParent() == module->getModuleInst();
+    }
+    if (!usedByModuleInitializer)
+        return false;
+
+    bool simple = true;
+    for (auto op = block->getFirstInst(); op != block->getTerminator(); op = op->getNextInst())
+    {
+        if (as<IRParam>(op))
+            continue;
+        switch (op->getOp())
+        {
+        case kIROp_Var:
+        case kIROp_FieldAddress:
+        case kIROp_Load:
+        case kIROp_Store:
+            break;
+        default:
+            if (!getIROpInfo(op->getOp()).isHoistable() && !isAggregateInitializerOperation(op))
+                simple = false;
+            break;
+        }
+        if (op->getOp() == kIROp_Var || op->getOp() == kIROp_FieldAddress)
+        {
+            for (auto use = op->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                if (as<IRLoad>(user) || as<IRFieldAddress>(user))
+                    continue;
+                if (auto store = as<IRStore>(user))
+                    if (use == &store->ptr)
+                        continue;
+                simple = false;
+            }
+        }
+    }
+    return simple;
+}
+
+// Turn compiler-generated value constructors into aggregate expressions, then inline
+// their module-scope calls. For example, Pair(a, b) becomes makeStruct(a, b), allowing
+// a literal table to be initialized without a device call. Canonicalization updates
+// the eligible constructor body, but function-local calls are not explicitly inlined.
+// Reuse address elimination and SSA simplification instead of inferring field order
+// from constructor arguments.
+static void foldAggregateConstructors(IRModule* module, DiagnosticSink* sink)
+{
+    List<IRFunc*> constructors;
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(inst);
+        if (canFoldAggregateConstructor(module, func))
+            constructors.add(func);
+    }
+    for (auto func : constructors)
+    {
+        if (SLANG_FAILED(eliminateAddressInsts(func, sink)))
+            return;
+        simplifyFunc(nullptr, func, IRSimplificationOptions::getDefault(nullptr), sink);
+        auto block = func->getFirstBlock();
+        bool expression = !block->getNextBlock() && as<IRReturn>(block->getTerminator());
+        for (auto op = block->getFirstInst(); op != block->getTerminator(); op = op->getNextInst())
+            if (!as<IRParam>(op) && !getIROpInfo(op->getOp()).isHoistable() &&
+                !isAggregateInitializerOperation(op))
+                expression = false;
+        if (!expression)
+            continue;
+        List<IRCall*> calls;
+        for (auto use = func->firstUse; use; use = use->nextUse)
+            if (auto call = as<IRCall>(use->getUser()))
+                // Only module-scope calls can contribute to a static global initializer.
+                // Folding function-local calls changes ordinary executable code and can
+                // greatly increase downstream compilation work.
+                if (call->getCallee() == func && call->getParent() == module->getModuleInst())
+                    calls.add(call);
+        for (auto call : calls)
+            inlineCall(call);
+    }
+}
+
 struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextGeneric
 {
+    bool preserveStaticAggregates = false;
+
     static bool isSimpleConstantType(IRType* type)
     {
         for (;;)
@@ -271,7 +407,8 @@ struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextG
     bool isLegalGlobalInstForTarget(IRInst* inst) override
     {
         auto type = inst->getDataType();
-        return isSimpleConstantType(type);
+        return isSimpleConstantType(type) ||
+               (preserveStaticAggregates && isStaticAggregateInitializer(inst));
     }
 
     bool isInlinableGlobalInstForTarget(IRInst* /* inst */) override { return false; }
@@ -281,9 +418,15 @@ struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextG
     IRInst* getOutsideASM(IRInst* beforeInst) override { return beforeInst; }
 };
 
-void inlineGlobalConstantsForLegalization(IRModule* module)
+void inlineGlobalConstantsForLegalization(
+    IRModule* module,
+    bool preserveStaticAggregates,
+    DiagnosticSink* sink)
 {
+    if (preserveStaticAggregates)
+        foldAggregateConstructors(module, sink);
     GlobalInstLegalizationInliningContext context;
+    context.preserveStaticAggregates = preserveStaticAggregates;
 
     context.wrapReferences = false;
     context.inlineGlobalValuesAndRemoveIfUnused(module);

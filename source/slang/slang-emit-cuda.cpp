@@ -581,6 +581,27 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
 
     switch (value->getOp())
     {
+    case kIROp_MakeStruct:
+        {
+            // Spell nested aggregate constants as initializers rather than referring
+            // to another device variable, which would require dynamic initialization.
+            auto structType = as<IRStructType>(dstType);
+            if (!structType || dstType != value->getDataType())
+                break;
+            emitType(dstType);
+            m_writer->emit("{");
+            UInt index = 0;
+            for (auto field : structType->getFields())
+            {
+                SLANG_ASSERT(index < value->getOperandCount());
+                if (index)
+                    m_writer->emit(", ");
+                _emitInitializerListValue(field->getFieldType(), value->getOperand(index++));
+            }
+            SLANG_ASSERT(index == value->getOperandCount());
+            m_writer->emit("}");
+            return;
+        }
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
         {
