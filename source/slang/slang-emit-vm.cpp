@@ -1205,18 +1205,50 @@ public:
             {
                 List<VMOperand> operands;
                 operands.add(ensureInst(inst->getOperand(0)));
+                // A printf argument operand can alias a sub-object of a larger value: FieldExtract
+                // and constant GetElement (see the cases above) keep the containing operand's size
+                // and only shift its offset, so `operand.size` can be wider than the scalar being
+                // printed. Pin a `float`/`double` argument's size to its own scalar width so the
+                // interpreter reads exactly that value: without it a `double` and a `float`-inside-
+                // a-struct both look 8 bytes wide and cannot be told apart (issue #12964). `half`
+                // is intentionally not pinned: printf formatting of `half` is out of scope here
+                // (the VM has no half arithmetic).
+                auto addPrintfArg = [&](IRInst* arg)
+                {
+                    VMOperand operand = ensureInst(arg);
+                    if (auto argType = arg->getDataType())
+                    {
+                        switch (argType->getOp())
+                        {
+                        case kIROp_FloatType:
+                        case kIROp_DoubleType:
+                            {
+                                IRSizeAndAlignment sizeAlignment = {};
+                                getNaturalSizeAndAlignment(
+                                    codeGenContext->getTargetReq(),
+                                    argType,
+                                    &sizeAlignment);
+                                operand.size = (uint32_t)sizeAlignment.size;
+                            }
+                            break;
+                        default:
+                            break;
+                        }
+                    }
+                    operands.add(operand);
+                };
                 auto tuple = inst->getOperand(1);
                 if (auto makeTuple = as<IRMakeStruct>(tuple))
                 {
                     for (UInt i = 0; i < makeTuple->getOperandCount(); i++)
                     {
-                        operands.add(ensureInst(makeTuple->getOperand(i)));
+                        addPrintfArg(makeTuple->getOperand(i));
                     }
                 }
                 else
                 {
                     // If not a tuple, it should be a single value.
-                    operands.add(ensureInst(tuple));
+                    addPrintfArg(tuple);
                 }
                 writeInst(funcBuilder, VMOp::Print, 0, operands.getArrayView());
             }
