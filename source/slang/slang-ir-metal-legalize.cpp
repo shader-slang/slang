@@ -214,7 +214,8 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
 // MSL rejects a direct cast between a vector and a pointer, but allows vector<->scalar
 // `as_type` and scalar<->pointer C-style casts — so split the bit-cast through a scalar
 // `uint64_t`. Such casts arise when a 64-bit value carried as `uint2` (a dynamic-dispatch
-// handle, or a pointer packed into an any-value payload) is reinterpreted as a pointer.
+// handle, or a pointer packed into an any-value payload) is reinterpreted as a pointer,
+// or when a pointer is packed into such a `uint2`.
 static void legalizeVectorPointerBitCast(IRInst* inst)
 {
     auto toType = inst->getDataType();
