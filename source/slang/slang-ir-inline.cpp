@@ -1355,6 +1355,8 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
             {
             case kIROp_SPIRVAsmOperandInst:
             case kIROp_SPIRVAsm:
+            case kIROp_SPIRVGroupNonUniformBallot:
+            case kIROp_SPIRVGroupNonUniformBallotBitCount:
                 hasSpvAsm = true;
                 continue;
             case kIROp_Load:

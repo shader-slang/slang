@@ -5121,6 +5121,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_BitfieldInsert:
             result = emitBitfieldInsert(parent, inst);
             break;
+        case kIROp_SPIRVGroupNonUniformBallot:
+            result = emitGroupNonUniformBallot(parent, inst);
+            break;
+        case kIROp_SPIRVGroupNonUniformBallotBitCount:
+            result = emitGroupNonUniformBallotBitCount(parent, inst);
+            break;
         case kIROp_MakeUInt64:
             result = emitMakeUInt64(parent, inst);
             break;
@@ -9703,6 +9709,46 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             emitIntConstant((IRIntegerValue)memoryScope, builder.getIntType()));
                 }
             });
+    }
+
+    // Emit `OpGroupNonUniformBallot` at Subgroup scope: a uint4 mask of the lanes for which the
+    // predicate is true. The execution scope is an <id> of a constant uint (Subgroup), not a
+    // literal enum word.
+    SpvInst* emitGroupNonUniformBallot(SpvInstParent* parent, IRInst* inst)
+    {
+        requireSPIRVCapability(SpvCapabilityGroupNonUniformBallot);
+        IRBuilder builder(m_irModule);
+        SpvInst* scope = emitIntConstant(SpvScopeSubgroup, builder.getUIntType());
+        return emitInst(
+            parent,
+            inst,
+            SpvOpGroupNonUniformBallot,
+            inst->getFullType(),
+            kResultID,
+            scope,
+            inst->getOperand(0));
+    }
+
+    SpvInst* emitGroupNonUniformBallotBitCount(SpvInstParent* parent, IRInst* inst)
+    {
+        // The GroupOperation (Reduce/ExclusiveScan) is a compile-time literal word that precedes
+        // the mask <id>, so it is read from the int-literal operand and emitted as a literal. The
+        // scope is an <id> of a constant uint (Subgroup), not a literal.
+        const IRIntegerValue groupOp = getIntVal(inst->getOperand(0));
+        SLANG_RELEASE_ASSERT(
+            groupOp == SpvGroupOperationReduce || groupOp == SpvGroupOperationExclusiveScan);
+        requireSPIRVCapability(SpvCapabilityGroupNonUniformBallot);
+        IRBuilder builder(m_irModule);
+        SpvInst* scope = emitIntConstant(SpvScopeSubgroup, builder.getUIntType());
+        return emitInst(
+            parent,
+            inst,
+            SpvOpGroupNonUniformBallotBitCount,
+            inst->getFullType(),
+            kResultID,
+            scope,
+            SpvWord(groupOp),
+            inst->getOperand(1));
     }
 
     SpvInst* emitBitfieldExtract(SpvInstParent* parent, IRInst* inst)
