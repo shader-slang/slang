@@ -13,7 +13,7 @@
 // as its type operand. A struct with two `int8_t` fields surfaces two
 // `field(%key, Int8)` rows in the dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Pair { int8_t a; int8_t b; }
 

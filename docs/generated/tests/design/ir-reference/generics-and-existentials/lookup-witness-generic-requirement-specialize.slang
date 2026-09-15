@@ -14,7 +14,7 @@
 // cannot be called directly. The CHECKs bind that value and assert the call
 // site applies `specialize` to it with the method's own type argument before
 // calling.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IGen { T twice<T : IArithmetic>(T x); };
 struct A : IGen { T twice<T : IArithmetic>(T x) { return x + x; } };

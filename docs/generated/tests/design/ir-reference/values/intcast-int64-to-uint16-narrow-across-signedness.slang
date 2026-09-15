@@ -13,7 +13,7 @@
 // Verifies that lowering keeps both steps under one `intCast` opcode keyed by
 // the result type.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int64_t i64a;
 uniform RWStructuredBuffer<uint16_t> buf;

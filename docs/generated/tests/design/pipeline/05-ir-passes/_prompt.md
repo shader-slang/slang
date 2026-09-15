@@ -37,7 +37,7 @@ is `linkAndOptimizeIR` … this document reflects categories, not
 order." The testable consequences of each row are:
 
 - **"Pass X removes opcode Y"** — compile with
-  `-dump-ir-before X -dump-ir-after X -target <text-target> -o /dev/null`
+  `-dump-ir-before X -dump-ir-after X -target <text-target> -o -`
   and FileCheck that Y appears in `### BEFORE X:` but not in
   `### AFTER X:`.
 - **"Pass X is target-specific to target T"** — compile to a text
@@ -285,7 +285,7 @@ Two primary modes, plus diagnostic tests for validation passes.
 1. **Pass-effect observation via `-dump-ir-before/-dump-ir-after`**:
 
    ```
-   //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-before <pass> -dump-ir-after <pass> -o /dev/null -stage compute -entry main
+   //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-before <pass> -dump-ir-after <pass> -o - -stage compute -entry main
    ```
 
    Anchor `CHECK` patterns to `### BEFORE <pass>:` and
@@ -293,7 +293,7 @@ Two primary modes, plus diagnostic tests for validation passes.
 <pass>:` with a `CHECK: <opcode>` that should be present, and
    `CHECK-LABEL: ### AFTER <pass>:` with a `CHECK-NOT: <opcode>`
    that should be removed (or vice versa). Per `_common.md`, use
-   `-o /dev/null` so target text does not mix with the IR dump.
+   `-o -` so target text does not mix with the IR dump.
 
 2. **Pass-consequence observation in emit text**:
 
@@ -379,7 +379,7 @@ These are in addition to the universal lessons in `_common.md`.
 - [ ] Every test's `doc_ref` resolves to an anchor in
       `pipeline/05-ir-passes.md` (or one of the listed secondary
       docs).
-- [ ] `-dump-ir`-based tests use `-target <text-target> -o /dev/null`
+- [ ] `-dump-ir`-based tests use `-target <text-target> -o -`
       per CLAUDE.md.
 - [ ] Multi-target SIMPLE tests use a distinct `filecheck=<NAME>`
       label per target and per-target CHECK prefixes.

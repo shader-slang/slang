@@ -12,7 +12,7 @@
 // `Texture2DMS<T>` flips the isMS slot (4th operand after element
 // type and shape) to `1` while keeping the array flag at `0`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform Texture2DMS<float4> tex;
 uniform RWStructuredBuffer<float4> outbuf;

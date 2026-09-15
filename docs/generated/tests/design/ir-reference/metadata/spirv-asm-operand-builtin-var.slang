@@ -15,7 +15,7 @@
 // integer operand, which is what lets a later pass materialise the actual
 // built-in variable.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -capability spvGroupNonUniform
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -capability spvGroupNonUniform
 
 uniform RWStructuredBuffer<uint> buf;
 

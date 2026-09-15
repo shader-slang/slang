@@ -974,10 +974,38 @@ emits …" — HLSL/GLSL/SPIRV-asm/Metal/WGSL/CUDA/CPP/Torch text. This is
 also what users see, so it is the most stable contract.
 
 **Combining `-dump-ir` with target emit** requires both
-`-target <text-target>` and `-o /dev/null`. Without `-target` the
-compile stops early; without `-o /dev/null` the target text mixes
-with IR on stdout and FileCheck fails. With both, IR goes to stdout
-and the target text is discarded.
+`-target <text-target>` and `-o -`. Without `-target` the compile
+stops early, so there is no target-specific IR to observe.
+
+Use `-o -`, never an absolute path. `slang-test` rejects an absolute
+output path in a directive because it cannot be reproduced on the
+other platforms the suite runs on — `/dev/null` has no Windows
+spelling — and a directive that uses one fails to parse at all,
+before the compiler runs. A relative path is allowed, but writes a
+scratch file next to the test, so prefer `-o -` unless the test is
+actually about the written artifact.
+
+`-o -` does not mix the two outputs, because they never share a
+stream: the `-dump-ir` dump is written to **stderr** and the target
+text to **stdout**, and `slang-test` composes the FileCheck input as
+
+```
+result code = <n>
+standard error = {
+  <the IR dump>
+}
+standard output = {
+  <the emitted target text>
+}
+```
+
+so the target text always lands in a block *after* the entire IR
+dump. An ordered `CHECK` / `CHECK-LABEL` / `CHECK-NEXT` anchored in
+the IR dump is therefore unaffected by it. The one thing to keep in
+mind: a `CHECK-NOT` or `CHECK-DAG` whose region runs to the end of
+the input now also scans the emitted target text, so bound such a
+directive with a following `CHECK-LABEL` when it is meant to cover
+only the IR.
 
 **Other -dump-ir hazards** that the agent must guard against:
 

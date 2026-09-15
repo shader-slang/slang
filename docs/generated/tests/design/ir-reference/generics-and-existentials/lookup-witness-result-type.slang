@@ -13,7 +13,7 @@
 // binding's declared type and asserts it is `Func(Int, %T, Int)` — return
 // type, the still-abstract receiver type parameter, then the declared
 // parameter.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

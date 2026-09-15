@@ -14,7 +14,7 @@
 // the common APIs accept; the CHECK pins it exactly, so a narrowing or
 // clamping of the operand would fail.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

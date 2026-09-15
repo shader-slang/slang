@@ -13,7 +13,7 @@
 // `vector<int64_t, 2>` exercises the largest documented signed scalar
 // inside a vector.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform vector<int64_t, 2> v;
 uniform RWStructuredBuffer<int> buf;

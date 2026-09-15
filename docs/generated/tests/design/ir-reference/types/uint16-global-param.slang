@@ -13,7 +13,7 @@
 // global_param. A bare `uniform uint16_t` exercises the scalar storage
 // form for the narrow unsigned type.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint16_t v;
 uniform RWStructuredBuffer<uint> buf;

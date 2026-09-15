@@ -19,7 +19,7 @@
 // `BuiltinRequirementDecoration` carrying that same ordinal on it. That
 // pairing is what makes a lookup key-addressable by role.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct MyVal : IDifferentiable
 {

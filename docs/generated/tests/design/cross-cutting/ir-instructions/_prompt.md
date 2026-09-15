@@ -47,7 +47,7 @@ Concretely:
 - **Arithmetic opcodes** (`add`/`sub`/`mul`/`div`) appear in the IR
   dump when two non-constant operands are combined. Use `uniform`
   globals to defeat constant folding, then dump IR with
-  `-target spirv-asm -dump-ir -o /dev/null` and FileCheck for
+  `-target spirv-asm -dump-ir -o -` and FileCheck for
   `sub(%`/`div(%`/etc. on a line.
 - **Comparison opcodes** (`cmpGT`, `cmpLT`, ...) appear in the IR for
   the obvious source comparison.
@@ -157,11 +157,16 @@ IR-instruction claims are best observed through one of two mechanisms.
    The standard form used here is:
 
    ```
-   //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+   //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
    ```
 
-   `-o /dev/null` ensures the target text is discarded and only the IR
-   dump (which goes to stdout) is FileChecked. Pattern lines should
+   `-o -` keeps the target text out of the way of the IR dump without
+   naming a file: the dump goes to stderr and the target text to
+   stdout, and `slang-test` puts the whole `standard error` block
+   ahead of `standard output`, so an ordered `CHECK` anchored in the
+   dump never reaches the target text. An absolute path such as
+   `/dev/null` is not an option — `slang-test` rejects it as
+   non-portable and the directive fails to parse. Pattern lines should
    use the `IR:` prefix (or any unique tag) so the same file can also
    carry a non-dump-ir target test. Anchor FileCheck patterns to
    `### LOWER-TO-IR:` first, then match opcodes that follow.
@@ -198,7 +203,7 @@ Do not use any GPU-only directive.
       secondary docs).
 - [ ] Every `-dump-ir` test uses `-target <text-target> -dump-ir -o
 /dev/null` per CLAUDE.md (target needed so compilation does not
-      stop early, `-o /dev/null` so target text does not mix with the
+      stop early, `-o -` so target text does not mix with the
       IR dump on stdout).
 - [ ] Constructor-style casts (`int(x)`, `float(y)`) — not C-style
       `(int)x`.
@@ -231,7 +236,7 @@ These apply here too:
   decoration to avoid false positives. `func %main` or
   `func %userFunc` is a reliable cursor.
 - `-dump-ir` writes the IR to stdout while target output normally
-  also goes to stdout. Always include `-o /dev/null` so the IR is the
+  also goes to stdout. Always include `-o -` so the IR is the
   only thing on stdout that FileCheck sees.
 - The opcode name in the IR dump generally matches the **lowercase
   Lua entry key**, not the C++ wrapper struct name. The doc cites

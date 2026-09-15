@@ -15,7 +15,7 @@
 // `2147483648`, which is the smallest value that overflows int.
 // The IR shows the folded payload as `-2147483648 : Int`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

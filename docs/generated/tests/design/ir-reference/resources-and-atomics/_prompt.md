@@ -209,11 +209,11 @@ keys for value opcodes (`atomicAdd`, `atomicMin`,
 The standard form used here is:
 
 ```
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 ```
 
 Per the universal `_common.md` rule: combine `-dump-ir` with
-**`-target <text-target>`** AND **`-o /dev/null`** so the IR dump
+**`-target <text-target>`** AND **`-o -`** so the IR dump
 goes to stdout uncontaminated by target text.
 
 Anchor patterns at `func %main` (or a user-named helper) where the
@@ -227,7 +227,7 @@ match the opcode globally and document this in `purpose`.
       `ir-reference/resources-and-atomics.md` (or one of the listed
       secondary docs).
 - [ ] Every `-dump-ir` test uses `-target <text-target> -dump-ir
--o /dev/null -stage compute -entry main`.
+-o - -stage compute -entry main`.
 - [ ] Operands are non-constant (`uniform` globals or values
       derived from `SV_DispatchThreadID`) so constant folding does
       not collapse the operator.

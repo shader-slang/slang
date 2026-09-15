@@ -14,7 +14,7 @@
 // — including a user struct — and the dump preserves the struct's IR
 // identity as that first operand.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Particle { float3 pos; float mass; int alive; }
 

@@ -16,7 +16,7 @@
 // witness-selecting form the pack-branch lowering produces (the type-selecting
 // form is typed as a kind instead).
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IStaticInt { static int get(); }
 struct IntConst<let N : int> : IStaticInt { static int get() { return N; } }

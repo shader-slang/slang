@@ -13,7 +13,7 @@
 // "sign/zero extension chosen by types". This case selects the
 // zero-extension branch because the source is unsigned.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint8_t u8a;
 uniform RWStructuredBuffer<int> buf;

@@ -17,7 +17,7 @@
 // also emitted for `%g` inside the LOWER-TO-IR section — the two families are
 // alternatives, not layers.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;

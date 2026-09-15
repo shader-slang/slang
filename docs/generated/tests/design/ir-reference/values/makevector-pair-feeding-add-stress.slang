@@ -17,7 +17,7 @@
 // which is only reachable if the aggregate constructor and the
 // componentwise arithmetic opcode compose without an intermediate.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform float fb;
