@@ -59,6 +59,8 @@ Slang language version 2026 brings these changes on top of Slang 2025:
   See GitHub issue [#12093](https://github.com/shader-slang/slang/issues/12093) for details.
 - Casting a literal `0` to a user-defined struct type (e.g., `(MyStruct)0`) triggers a warning about future
   compatibility (see _Slang 202c_).
+- A `struct` can no longer inherit from another `struct`. Use composition (struct as a member) instead. See
+  GitHub issue [#7420](https://github.com/shader-slang/slang/issues/7420) for details.
 
 ## Slang 202c (in development)
 
