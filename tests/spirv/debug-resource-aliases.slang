@@ -1,7 +1,7 @@
 // Regression test for https://github.com/shader-slang/slang/issues/12918
 // Function-local aliases of opaque resource types (Texture2D, SamplerState) must get
 // source-level debug records: an OpString name, a DebugLocalVariable, and a DebugValue
-// bound to the loaded opaque SSA handle. No backing Function OpVariable / DebugDeclare is
+// bound to the handle's lowered SSA value. No backing Function OpVariable / DebugDeclare is
 // expected (illegal in SPIR-V for opaque handles), matching how scalars differ from handles.
 //
 // Note: -g2 embeds the entire source as one OpString, so the CHECK lines below anchor on the
