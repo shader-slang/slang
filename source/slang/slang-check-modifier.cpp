@@ -13,6 +13,12 @@
 
 namespace Slang
 {
+bool isModuleGLSLFlavored(ModuleDecl* moduleDecl, CompilerOptionSet& options)
+{
+    return options.getBoolOption(CompilerOptionName::AllowGLSL) ||
+           getModuleSourceLanguage(moduleDecl) == SourceLanguage::GLSL;
+}
+
 IntVal* SemanticsVisitor::checkLinkTimeConstantIntVal(Expr* expr)
 {
     expr = CheckExpr(expr);
@@ -1968,10 +1974,7 @@ Modifier* SemanticsVisitor::checkModifier(
         }
 
         auto moduleDecl = getModuleDecl(decl);
-        bool isGLSLInput = getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
-
-        if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
-            isGLSLInput = true;
+        bool isGLSLInput = isModuleGLSLFlavored(moduleDecl, getOptionSet());
         if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))
         {
             if (!ignoreUnallowedModifier)

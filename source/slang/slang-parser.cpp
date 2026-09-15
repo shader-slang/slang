@@ -6362,12 +6362,29 @@ void Parser::parseSourceFile(ContainerDecl* program)
             importDecl->scope = currentScope;
             AddMember(currentScope, importDecl);
         }
-        auto glslModuleModifier = astBuilder->create<GLSLModuleModifier>();
-        addModifier(currentModule, glslModuleModifier);
     }
 
     parseDecls(this, program, MatchedTokenType::File);
     PopScope();
+
+    // Attach the module's dialect and language version to the module AST for the phases after
+    // parsing. The version is read here, after `parseDecls`, because in-source syntax (visibility
+    // modifiers, `module`, `__include`) can upgrade `languageVersion` while the body is parsed.
+    // A module can be built from several preprocessed segments with different dialects (a
+    // `#version` directive switches a segment to GLSL), so this runs once per segment: the record
+    // is created on the first and refreshed after. GLSL flavor is a module-wide property: once
+    // any segment is GLSL the whole module is GLSL-flavored, so a later non-GLSL segment must not
+    // downgrade the recorded dialect.
+    auto sourceLanguageModifier = currentModule->findModifier<ModuleSourceLanguageModifier>();
+    if (!sourceLanguageModifier)
+    {
+        sourceLanguageModifier = astBuilder->create<ModuleSourceLanguageModifier>();
+        addModifier(currentModule, sourceLanguageModifier);
+    }
+    if (sourceLanguageModifier->sourceLanguage != SourceLanguage::GLSL)
+        sourceLanguageModifier->sourceLanguage =
+            (sourceLanguage == SourceLanguage::Unknown) ? SourceLanguage::Slang : sourceLanguage;
+    sourceLanguageModifier->languageVersion = currentModule->languageVersion;
 
     SLANG_RELEASE_ASSERT(currentScope == outerScope);
     currentScope = nullptr;

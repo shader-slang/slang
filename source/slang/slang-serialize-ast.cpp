@@ -423,6 +423,7 @@ struct ContainerDeclDirectMemberDeclsInfo
 %   "ValNodeOperandKind",
 %   "SPIRVAsmOperand::Flavor",
 %   "SlangLanguageVersion",
+%   "SourceLanguage",
 %}
 %
 %for _,T in ipairs(enumTypeNames) do

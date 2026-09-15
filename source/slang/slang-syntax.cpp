@@ -1161,6 +1161,16 @@ ModuleDecl* getModuleDecl(Decl* decl)
     return nullptr;
 }
 
+SourceLanguage getModuleSourceLanguage(ModuleDecl* moduleDecl)
+{
+    if (moduleDecl)
+    {
+        if (auto modifier = moduleDecl->findModifier<ModuleSourceLanguageModifier>())
+            return modifier->sourceLanguage;
+    }
+    return SourceLanguage::Slang;
+}
+
 Module* getModule(Decl* decl)
 {
     auto moduleDecl = getModuleDecl(decl);

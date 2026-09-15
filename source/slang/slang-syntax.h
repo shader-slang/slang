@@ -742,6 +742,13 @@ const int kUnsizedArrayMagicLength = 0x7FFFFFFF;
 ModuleDecl* getModuleDecl(Decl* decl);
 ModuleDecl* getModuleDecl(Scope* scope);
 
+// Return the dialect `moduleDecl` was parsed as, from its `ModuleSourceLanguageModifier`. The
+// recorded dialect is sticky toward GLSL: any GLSL segment makes the whole module GLSL-flavored,
+// and for a module built only from non-GLSL segments the most recently parsed segment's language
+// is recorded. A null `moduleDecl`, or a module not produced by the parser (e.g. a synthesized
+// module), returns `SourceLanguage::Slang`.
+SourceLanguage getModuleSourceLanguage(ModuleDecl* moduleDecl);
+
 /// Get the module that a declaration is associated with, if any.
 Module* getModule(Decl* decl);
 

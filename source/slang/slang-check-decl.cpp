@@ -557,7 +557,11 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
             !hasSpecializationConstant && decl->initExpr)
         {
             auto moduleDecl = getModuleDecl(decl);
-            if (!moduleDecl || !moduleDecl->hasModifier<GLSLModuleModifier>())
+            // The `!moduleDecl` term is load-bearing, not just null-safety: `isModuleGLSLFlavored`
+            // is null-safe, so this keeps a decl with no owning module subject to the
+            // required-static rule even under `-allow-glsl`, whose option term is
+            // module-independent.
+            if (!moduleDecl || !isModuleGLSLFlavored(moduleDecl, getOptionSet()))
             {
                 getSink()->diagnose(
                     Diagnostics::ConstGlobalVarWithInitRequiresStatic{.decl = decl});
@@ -2881,7 +2885,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     if (as<NamespaceDeclBase>(varDecl->parentDecl))
     {
-        if (getModuleDecl(varDecl)->hasModifier<GLSLModuleModifier>())
+        if (isModuleGLSLFlavored(getModuleDecl(varDecl), getOptionSet()))
         {
             // If we are in GLSL compatiblity mode, we want to treat all global variables
             // without any `uniform` modifiers as true global variables by default.

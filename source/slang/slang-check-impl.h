@@ -52,6 +52,10 @@ bool isEffectivelyStatic(Decl* decl);
 
 bool isGlobalDecl(Decl* decl);
 
+// Return true when GLSL-flavored declaration behavior applies to `moduleDecl`: its source
+// language is GLSL, or the `-allow-glsl` option is enabled.
+bool isModuleGLSLFlavored(ModuleDecl* moduleDecl, CompilerOptionSet& options);
+
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 
 bool isUniformParameterType(Type* type);

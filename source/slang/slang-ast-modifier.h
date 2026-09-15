@@ -162,10 +162,23 @@ class GLSLPrecisionModifier : public Modifier
     FIDDLE(...)
 };
 
+// Records the dialect a module was parsed as, plus its Slang language version, so that phases
+// after parsing (semantic checking, IR lowering) can recover them from the AST. The front-end
+// `TranslationUnitRequest` that carries the source language does not survive onto the module.
 FIDDLE()
-class GLSLModuleModifier : public Modifier
+class ModuleSourceLanguageModifier : public Modifier
 {
     FIDDLE(...)
+    // The dialect the module was parsed as. Recorded per parsed segment and sticky toward GLSL
+    // (see `Parser::parseSourceFile`), and normalized so a parsed module is never `Unknown` —
+    // matching the `Slang` that `getModuleSourceLanguage` returns when the modifier is absent.
+    FIDDLE() SourceLanguage sourceLanguage = SourceLanguage::Unknown;
+    // The module's Slang language version. Meaningful only when `sourceLanguage` is
+    // `SourceLanguage::Slang`; for other dialects it carries no Slang-version semantics. It is a
+    // post-`parseDecls` snapshot of `ModuleDecl::languageVersion`, which remains the live source
+    // of truth, so the modifier is a complete language descriptor for later phases; do not treat
+    // this copy as independently mutable.
+    FIDDLE() SlangLanguageVersion languageVersion = SLANG_LANGUAGE_VERSION_DEFAULT;
 };
 
 // Marks that the definition of a decl is not yet synthesized.
