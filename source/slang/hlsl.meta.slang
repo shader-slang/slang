@@ -27989,8 +27989,8 @@ public enum BindlessDescriptorOptions
 }
 
 /// Look up `handleValue` in the Vulkan dynamic-resource heap and return the descriptor. This is the
-/// `uint2`-handle path used directly on plain SPIR-V / GLSL, and reused by the `spvBindlessTextureNV`
-/// arm of `defaultGetDescriptorFromHandle` for the kinds that extension does not convert (buffers and
+/// `uint2`-handle path used directly on plain SPIR-V / GLSL, and reused by the main-switch
+/// `spvBindlessTextureNV` arm of `defaultGetDescriptorFromHandle` for the kinds that extension does not convert (buffers and
 /// acceleration structures), so the heap lowering lives in exactly one place. Capabilities are
 /// inferred from the body (as for `defaultGetDescriptorFromHandle`) rather than declared, so the
 /// acceleration-structure path's `__asuint64` / ray-tracing requirements are picked up automatically.
@@ -28075,6 +28075,31 @@ $}
 [ForceInline]
 T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
 {
+    // The texture/sampler family's handle is a `uint64` under `spvBindlessTextureNV` and must use the
+    // native `__castDescriptorHandleToResource` conversion. Decide those kinds here, ahead of the main
+    // switch: the `spvDescriptorHeapEXT` arm below is more specialized (two capability atoms) and would
+    // otherwise be selected for the whole function, reinterpreting the `uint64` handle as a `uint2`
+    // heap index. This switch omits `spvDescriptorHeapEXT`, so it cannot be out-ranked; every other
+    // kind and target falls through to the main switch.
+    __target_switch
+    {
+    case spvBindlessTextureNV:
+        // Keep this set exactly in sync with the C++ classifier `isDescriptorHandleRepresentedAsUInt64`
+        // / `isBindlessTextureNVEncodableResourceType` (slang-ir-util.cpp) and the copies in
+        // `DescriptorHandle.lessThan`/`lessThanOrEquals`: these are the kinds whose handle is `uint64`
+        // under `spvBindlessTextureNV`. A kind present here but absent there (or vice versa) reads a
+        // `uint64` handle through the `uint2` heap path and miscompiles it.
+        if (T.kind == DescriptorKind.Texture ||
+            T.kind == DescriptorKind.Sampler ||
+            T.kind == DescriptorKind.CombinedTextureSampler ||
+            T.kind == DescriptorKind.UniformTexelBuffer ||
+            T.kind == DescriptorKind.StorageTexelBuffer)
+            return __castDescriptorHandleToResource<T>(handleValue);
+        break;
+    default:
+        break;
+    }
+
     __target_switch
     {
     case hlsl:
@@ -28088,19 +28113,10 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
     case glsl:
         return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
     case spvBindlessTextureNV:
-        // The texture/sampler-family kinds are converted with the dedicated NV opcode via
-        // `__castDescriptorHandleToResource` (their handle is a `uint64`); every other kind reuses
-        // the dynamic-resource-heap path (their handle is a `uint2`), including acceleration
-        // structures, whose `__asuint64((uint2)handle)` packing feeds
-        // `OpConvertUToAccelerationStructureKHR`.
-        if (T.kind == DescriptorKind.Texture ||
-            T.kind == DescriptorKind.Sampler ||
-            T.kind == DescriptorKind.CombinedTextureSampler ||
-            T.kind == DescriptorKind.UniformTexelBuffer ||
-            T.kind == DescriptorKind.StorageTexelBuffer)
-            return __castDescriptorHandleToResource<T>(handleValue);
-        else
-            return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
+        // Only the non-texture/sampler kinds reach here (the family returned from the hoisted switch);
+        // their handle is a `uint2` and uses the dynamic-resource-heap path, including acceleration
+        // structures via the `__asuint64((uint2)handle)` packing.
+        return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
     case spvDescriptorHeapEXT:
