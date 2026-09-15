@@ -3978,6 +3978,12 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
             _requireGLSLExtension(toSlice("GL_EXT_fragment_shader_barycentric"));
             prefix = toSlice("pervertex");
         }
+        else if (as<IRGLSLPatchDecoration>(decoration))
+        {
+            prefix = toSlice("patch");
+            // `patch` is a core GLSL keyword, no need for suffix like EXT
+            postfix = toSlice("");
+        }
         else
         {
             IRIntegerValue locationValue = -1;
