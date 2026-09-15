@@ -1935,6 +1935,10 @@ Result linkAndOptimizeIR(
         (isCPUTarget(targetRequest) && isKernelTarget(target)) ||
         options.shouldLegalizeExistentialAndResourceTypes)
     {
+        // Normalize synthesized member-wise constructor calls in module-scope
+        // constant initializers to `makeStruct` before deciding what must be
+        // inlined, so a `static const` struct table stays a global constant.
+        SLANG_PASS(legalizeConstantConstructorCallsForGlobalScope);
         SLANG_PASS(inlineGlobalConstantsForLegalization);
     }
 
