@@ -84,8 +84,8 @@ void debugResourceAliases(uint3 threadId : SV_DispatchThreadID)
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[SMPLETVAR]]
 
 // The by-value resource parameters get DebugLocalVariable + DebugValue. The trailing operand is the
-// DebugLocalVariable ArgNumber; texParam is the first parameter (%uint_1) and sampParam the second
-// (%uint_2). A regression of the narrowed type predicate would instead drop these records entirely.
+// DebugLocalVariable ArgNumber, encoding the source parameter position: texParam is the first
+// parameter (%uint_1) and sampParam the second (%uint_2).
 // CHECK-DAG: %[[TEXPVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[TEXPNAME]] {{.*}} %uint_0 %uint_1
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[TEXPVAR]]
 // CHECK-DAG: %[[SMPPVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[SMPPNAME]] {{.*}} %uint_0 %uint_2
