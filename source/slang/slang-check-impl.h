@@ -4219,6 +4219,7 @@ public:
 
     Expr* visitThisExpr(ThisExpr* expr);
     Expr* visitThisTypeExpr(ThisTypeExpr* expr);
+    Expr* visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr* expr);
     Expr* visitThisInterfaceExpr(ThisInterfaceExpr* expr);
     Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr);
     Expr* visitReturnValExpr(ReturnValExpr* expr);

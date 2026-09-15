@@ -1189,6 +1189,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitThisExpr(ThisExpr*) { return; }
 
     void visitThisTypeExpr(ThisTypeExpr*) { return; }
+    void visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr*) { return; }
     void visitThisInterfaceExpr(ThisInterfaceExpr*) { return; }
     void visitAndTypeExpr(AndTypeExpr* expr)
     {
