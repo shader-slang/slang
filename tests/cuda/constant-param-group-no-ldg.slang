@@ -15,6 +15,12 @@ uniform uint gArr[4];
 // It does not — so reusing `getRootAddr` suffices and no shape-independent peel-walker is needed.
 uniform bool gFlag;
 
+// 16-bit scalars are the other shape where storage legalization *could* splice a
+// `BitCast`/`GetOffsetPtr` between the load and the group root (the #10188/#11152 failure mode). It
+// does not on the CUDA `__constant__` path, so these too root at the group via `getRootAddr`.
+uniform half gHalf;
+uniform uint16_t gU16;
+
 struct Foo
 {
     uint a;
@@ -44,7 +50,8 @@ RWStructuredBuffer<uint> outBuf;
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     outBuf[0] = gScalar + gArr[tid.x] + gStruct.a + (uint)gStruct.b +
-                (gBool.flag ? gBool.value : 0u) + (gFlag ? 7u : 0u);
+                (gBool.flag ? gBool.value : 0u) + (gFlag ? 7u : 0u) +
+                (uint)gHalf + (uint)gU16;
 }
 
 // A read-only `StructuredBuffer` lives in global memory, reached through a pointer loaded out of
