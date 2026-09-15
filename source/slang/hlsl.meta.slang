@@ -27621,6 +27621,10 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     [ForceInline]
     __init(UntypedResourceHandle h)
     {
+        // A combined texture-sampler needs two heap indices (a resource and a sampler); a single
+        // `ResourceDescriptorHeap[i]` handle carries only one, so this conversion would silently
+        // default the sampler to slot 0. Reject it and steer the user to the explicit two-index form.
+        static_assert(isCombined == 0, "a combined texture-sampler requires separate resource and sampler heap indices, so it cannot be initialized from a single ResourceDescriptorHeap index; use an explicit '.Handle(uint2(resourceIndex, samplerIndex))' to specify both indices");
         return getDescriptorFromHandle(DescriptorHandle<This>(uint2(__getUntypedResourceHandleIndex(h), 0)));
     }
 }
@@ -27906,6 +27910,9 @@ extension DescriptorHandle<T>
     [ForceInline]
     __init(UntypedResourceHandle h)
     {
+        // Same restriction as the direct `_Texture` conversion above: a combined texture-sampler
+        // `T` needs a separate sampler index, which a single resource-heap handle does not carry.
+        static_assert(T.kind != DescriptorKind.CombinedTextureSampler, "a combined texture-sampler requires separate resource and sampler heap indices, so it cannot be initialized from a single ResourceDescriptorHeap index; use an explicit '.Handle(uint2(resourceIndex, samplerIndex))' to specify both indices");
         return DescriptorHandle<T>(uint2(__getUntypedResourceHandleIndex(h), 0));
     }
 }
