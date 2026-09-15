@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:32:49Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: a244dfa19ecf6d79ea826d9b14c775491f6a2445e1ddbc0c633a710605a2aec3
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 4d4dfc0a23d4b9278059883fb251ba8d4b24f87bccc211329ce352870e7f9718
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -29,7 +29,7 @@ Concretely, for
 
 ```slang
 interface IFoo { int base(); int twice() { return base() * 2; } }
-struct S : IFoo { int base() { return 6; } }
+struct S : IFoo { int base() { return 6; } static const int tag = 1; }
 int call<T : IFoo>(T v) { return v.twice(); }
 ```
 
@@ -43,8 +43,12 @@ carrying a type. Checking resolves `IFoo` in `S`'s base list and in
 witness for the interface's default body, which `S` never spelled
 (*default conformance witnesses synthesized*); and turns the
 `UnparsedStmt` into a checked `Stmt` tree (*function bodies fully
-parsed and checked*). Nothing here carries a modifier; the checks
-that would apply are described under
+parsed and checked*). The one modifier in the snippet is the `static`
+on `S::tag`: `checkModifier` asks `isModifierAllowedOnDecl` whether a
+`static` may sit on a struct field, which it may, and
+`getModifierConflictGroupKind` whether anything else on that decl has
+already claimed `static`'s group — `uniform` would have — which
+nothing has (*modifiers validated*). Both checks are described under
 [Modifier validation](#modifier-validation).
 
 The result is the input to AST → IR lowering
@@ -92,11 +96,35 @@ about loading a downstream compiler, not about the program.
 | [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp) | Overload resolution; ranks candidates produced by lookup | `E40018`, the note naming the argument that rejected a candidate |
 | [slang-check-conformance.cpp](../../../../source/slang/slang-check-conformance.cpp) | Verifies and synthesizes interface conformances | none; a missing requirement is reported as `E38100` by its caller in `slang-check-decl.cpp` |
 | [slang-check-conversion.cpp](../../../../source/slang/slang-check-conversion.cpp) | Implicit-conversion ranking and coercion site checks | `E30523`, too many initializers in an initializer list |
-| [slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp) | Inheritance and extension lookup; facet computation | `E30815`, a circular `extension` |
+| [slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp) | Inheritance and extension lookup; facet computation | `E30815`, a circular `extension` (see below) |
 | [slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp) | Validates modifier combinations and attribute arguments | `E31202`, two modifiers from one exclusive group on a decl |
 | [slang-check-constraint.cpp](../../../../source/slang/slang-check-constraint.cpp) | Generic constraint solving (`where`-clauses, witness inference) | `E30433`, a pack count that fails a `countof(...)` constraint |
 | [slang-check-resolve-val.cpp](../../../../source/slang/slang-check-resolve-val.cpp) | Resolves and canonicalizes `Type`, `DeclRef`, and witness values | none; a bad resolution result is reported at the use site |
 | [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp) | Entry-point checks: stage-specific signatures, parameter rules | `E38007`, an entry point with no stage |
+
+`E30815` in that table is narrower than "circular extension" suggests,
+and the name is easy to over-read. It is not a general cycle detector
+over extension target types; it fires only when *the same
+`ExtensionDecl`* is re-entered while its own inheritance information is
+still being computed. `getInheritanceInfo(DeclRef<ExtensionDecl>)`
+pushes an `InheritanceCircularityInfo` node naming the extension onto a
+linked stack and recurses;
+`_checkForCircularityInExtensionTargetType`
+([slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp)
+line 254) walks that stack on entry and, on finding the same `Decl*`
+already present, reports `CircularityInExtension` and returns an empty
+`InheritanceInfo` so the recursion terminates rather than overflowing.
+
+Cycles that never re-enter one extension are therefore *other*
+diagnostics, not this one — which is why the shapes a reader reaches
+for first (mutually-referential extension targets, a self-referential
+`typealias` inside an extension, an extension reached through `This`)
+report `E30027`, `E30813`, or the fatal `E40002` cyclic reference
+instead. Note also the deliberately benevolent case just above it:
+`_isInheritanceInfoBeingComputed` exists so that an equality constraint
+such as `__constraint A == B`, which makes each of `T.A` and `T.B` a
+base of the other, is skipped during linearization rather than reported
+as a cycle.
 
 ## Two-pass interaction with the parser
 
@@ -326,9 +354,36 @@ The dialect axis here is GLSL rather than HLSL. `checkModifier` (line
 (`CompilerOptionName::AllowGLSL`) or from a `GLSLModuleModifier` on
 the module, and passes it to `isModifierAllowedOnDecl` (line 1675); a
 modifier used in a position that predicate rejects is reported as
-`E31201`. Only a few entries actually branch on the flag —
-`globallycoherent` and `volatile`, for instance, are additionally
-allowed on the fields of a global struct when `isGLSLInput` holds.
+`E31201` (*modifier '<name>' is not allowed here*).
+
+A concrete pair that reaches it: `globallycoherent` on a **function
+parameter**, as in
+
+```slang
+void f(globallycoherent int x) { }
+```
+
+Without `-allow-glsl` the arm for `GloballyCoherentModifier` and
+`HLSLVolatileModifier` (line 1731) requires `as<VarDecl>(decl)` — and a
+parameter is a `ParamDecl`, which derives from `VarDeclBase` as a
+*sibling* of `VarDecl` rather than from `VarDecl`
+([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) lines
+321, 339, 597) — so the predicate returns false and the modifier is
+rejected. This is a position the parser is happy to produce, which is
+what makes it reachable; many combinations a reader might try instead
+are settled earlier, either by the parser or by plain acceptance, and
+so never reach `E31201` at all.
+
+That same arm is the clearest illustration of what the GLSL flag does
+and does not widen, because it is easy to read the two branches the
+wrong way round. Both branches already accept a *struct field*: the
+non-GLSL branch allows a `VarDecl` whose parent is any `StructDecl`,
+so `struct G { globallycoherent int a; }` is accepted with or without
+`-allow-glsl` and the flag makes no observable difference there. What
+`isGLSLInput` adds is the parameter case above (`as<ParamDecl>(decl)`),
+global declarations that are a `VarDeclBase` without being a `VarDecl`,
+and — redundantly with the non-GLSL branch — a field of a struct that
+is itself global. Only a handful of entries branch on the flag at all.
 
 ### Visibility scopes
 

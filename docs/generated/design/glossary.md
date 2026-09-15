@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T17:45:00Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 8033723409ecbf2551b9a4eb228a4e39356c3fa79164d7d057fb8526b4b0145a
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: bae895251b3106e15916b42965c0c503d5cfbfd673f03819aa78209b6ce07073
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -118,6 +118,18 @@ explicitly.
 
   See: [cross-cutting/core-module.md](cross-cutting/core-module.md)
 
+**standard module** `[Slang]`
+: A module compiled separately from the core module and shipped as a
+  `.slang-module` file in a versioned directory next to the compiler
+  shared library, loaded at runtime by an `import` whose qualified name
+  maps to a subdirectory of that directory. Distinct from the *core*
+  module, which is embedded in the library and needs no `import`. Three
+  exist at `source_commit` — `neural`, `experimental` (the work-graph
+  module) and `numerics` — and all three carry `[ExperimentalModule]`,
+  so importing one without `-experimental-feature` fails with `E00104`.
+
+  See: [cross-cutting/core-module.md](cross-cutting/core-module.md)
+
 **dataflow analysis** `[General]`
 : A family of techniques that computes facts about values at every
   program point by propagating information along the CFG. Slang uses
@@ -152,7 +164,7 @@ explicitly.
   been applied to one declaration, declared as an `enum class ... :
   uint8_t` at
   [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h)
-  line 475. In order the rungs are `Unchecked`,
+  line 476. In order the rungs are `Unchecked`,
   `ReadyForParserLookup`, `ModifiersChecked`, `ScopesWired`,
   `SignatureChecked`, `ReadyForReference`, `ReadyForLookup`,
   `ReadyForConformances`, `TypesFullyResolved`, `AttributesChecked`,
@@ -422,6 +434,17 @@ explicitly.
   below.
 
   See: [architecture/overview.md](architecture/overview.md)
+
+**link-time symbol alias** `[Slang]`
+: The `= Type` form of a `struct` declaration, as in
+  `export struct Foo : IFoo = Bar;`. Despite the syntax it is *not* a
+  type alias — `typealias` is that — but a name resolved when modules
+  are linked: lowering turns it into an `IRSymbolAlias`, and until the
+  link step supplies the aliased symbol the declaration owns no fields,
+  which is why field-wise construction is suppressed for it exactly as
+  it is for a bodyless `extern struct`.
+
+  See: [syntax-reference/grammar.md](syntax-reference/grammar.md)
 
 **lookup breadcrumb** `[Slang]`
 : A linked navigation step recorded during name lookup so that the
@@ -827,7 +850,7 @@ explicitly.
   ([slang-ir-spirv-legalize.cpp](../../../source/slang/slang-ir-spirv-legalize.cpp)).
   Where each one runs is a common confusion: the Metal and WGSL drivers
   are `SLANG_PASS` calls inside `linkAndOptimizeIR`
-  ([slang-emit.cpp](../../../source/slang/slang-emit.cpp) line 970),
+  ([slang-emit.cpp](../../../source/slang/slang-emit.cpp) line 1000),
   whereas the SPIR-V driver is *not* — it is called from
   `emitSPIRVFromIR` in
   [slang-emit-spirv.cpp](../../../source/slang/slang-emit-spirv.cpp),
@@ -971,11 +994,11 @@ quick map of the vocabulary you are about to encounter.
 | [pipeline/06-emit.md](pipeline/06-emit.md) | (consult cross-cutting/targets.md and pipeline/04-ast-to-ir.md) |
 | [syntax-reference/tokens.md](syntax-reference/tokens.md) | (consult pipeline/01-lex-preprocess.md) |
 | [syntax-reference/keywords-and-builtins.md](syntax-reference/keywords-and-builtins.md) | magic type, syntax-decl |
-| [syntax-reference/grammar.md](syntax-reference/grammar.md) | (consult pipeline/02-parse-ast.md) |
+| [syntax-reference/grammar.md](syntax-reference/grammar.md) | link-time symbol alias |
 | [cross-cutting/diagnostics.md](cross-cutting/diagnostics.md) | DiagnosticSink |
 | [cross-cutting/ir-instructions.md](cross-cutting/ir-instructions.md) | existential type, hoistable instruction, IRDecoration, IRFunc, IRInst, IRModule, IROp, single static assignment (SSA), witness table, wrapper struct |
 | [cross-cutting/targets.md](cross-cutting/targets.md) | capability atom, profile, target, target intrinsic |
-| [cross-cutting/core-module.md](cross-cutting/core-module.md) | core module, magic type, prelude |
+| [cross-cutting/core-module.md](cross-cutting/core-module.md) | core module, standard module, magic type, prelude |
 | [cross-cutting/serialization.md](cross-cutting/serialization.md) | fossil format, RIFF container |
 | [ir-reference/index.md](ir-reference/index.md) | IROp, IRInst, IRModule, no producer at HEAD, wrapper struct |
 | [ir-reference/types.md](ir-reference/types.md) | (no glossary entries originate here; consult cross-cutting/ir-instructions.md) |

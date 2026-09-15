@@ -785,12 +785,19 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         {
             if (as<IRMatrixType>(inst->getOperand(0)->getDataType()))
             {
-                // Metal does not support negate operator on matrices,
-                // we should emit "(matrix(0) - op0)" instead.
+                // Metal has no unary '-' on matrices, so lower matrix negation to
+                // "(matrix(0) - op0)". The explicit parentheses wrap the whole subtraction, so its
+                // outer context is effectively lowest-precedence: pass EmitOp::General (not the
+                // incoming outerPrec) and emit op0 as the subtraction's right-hand side. This wraps
+                // an operand that binds no tighter than '-' -- the additive "m1 + m2" (its
+                // left-associative RHS, at equal precedence) -- but not a tighter operand or an
+                // atomic.
                 m_writer->emit("(");
                 emitType(inst->getDataType());
                 m_writer->emit("(0) - ");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitOperand(
+                    inst->getOperand(0),
+                    rightSide(getInfo(EmitOp::General), getInfo(EmitOp::Sub)));
                 m_writer->emit(")");
                 return true;
             }

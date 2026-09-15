@@ -11,29 +11,34 @@ description: >
 inputs:
   files:
     description: "Newline-separated list of changed file paths"
-    required: true
+    required: false
+    default: ""
+  files-path:
+    description: "Path to a newline-separated list of changed file paths. Prefer this for large changes."
+    required: false
+    default: ""
 
 outputs:
   should-run:
     description: "'false' if the change set is documentation-only, 'true' otherwise"
-    value: ${{ steps.filter.outputs.should-run }}
+    value: ${{ steps.filter_from_path.outputs.should-run || steps.filter_from_input.outputs.should-run }}
 
 runs:
   using: composite
   steps:
-    - id: filter
+    - id: filter_from_path
+      if: inputs.files-path != ''
+      shell: bash
+      env:
+        FILES_PATH: ${{ inputs.files-path }}
+      run: |
+        bash "$GITHUB_ACTION_PATH/filter.sh" "$FILES_PATH"
+    - id: filter_from_input
+      if: inputs.files-path == ''
       shell: bash
       env:
         FILES: ${{ inputs.files }}
       run: |
-        shouldRun=true
-        if echo "$FILES" | grep -Eqx 'docs/(command-line-slangc-reference.md|user-guide/a4-02-reference-capability-atoms.md)'; then
-          echo "Generated reference document changed, running checks"
-          shouldRun=true
-        elif echo "$FILES" | grep -qvE '^(docs/|LICENSES/|LICENSE$|\.claude/|.*\.md$|\.coderabbit\.yaml$)'; then
-          shouldRun=true
-        else
-          echo "Only documentation files changed, skipping"
-          shouldRun=false
-        fi
-        echo "should-run=$shouldRun" >> "$GITHUB_OUTPUT"
+        filesPath="${RUNNER_TEMP:-.}/docs-only-filter-files.txt"
+        printf '%s\n' "$FILES" > "$filesPath"
+        bash "$GITHUB_ACTION_PATH/filter.sh" "$filesPath"
