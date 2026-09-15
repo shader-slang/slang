@@ -18,7 +18,7 @@
 // `globalConstant` carries its initializer as an operand rather than needing
 // a store, which is the difference between it and `global_var`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 static int counter = 0;
 static const int LIMIT = 7;

@@ -21,7 +21,7 @@
 // absence would be vacuous, since a program that ignored the attribute would
 // also contain no such opcode.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float a;
 uniform float d;

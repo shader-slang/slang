@@ -17,7 +17,7 @@
 // function type, and finally requires the record id to appear inside a
 // debug-function decoration -- the link from a function back to its record.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1
 
 uniform RWStructuredBuffer<int> buf;
 

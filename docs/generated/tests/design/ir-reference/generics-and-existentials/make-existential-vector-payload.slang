@@ -11,7 +11,7 @@
 // Boundary on payload *shape*: a vector-typed field is a legalization-sensitive
 // member on several targets, but existential packing happens before any of
 // that. The CHECK asserts the same two-operand shape and `%IFoo` result type.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 

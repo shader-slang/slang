@@ -62,6 +62,12 @@ default unless the user explicitly asks for the WSL/Linux version.
 - If a required `.exe` tool is unavailable, stop and report it instead of silently falling back
   to the WSL/Linux tool.
 
+## Native Linux and macOS Tooling
+
+When working in this repository on native Linux or macOS, use the platform-native tools without
+the Windows `.exe` extension. For example, use `git`, `gh`, `cmake`, and `python3`, not `git.exe`,
+`gh.exe`, `cmake.exe`, or `python.exe`.
+
 ## Build, Test, and Development Commands
 
 Slang build setup is platform-specific, especially under WSL. For compiler builds, use the

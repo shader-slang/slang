@@ -12,7 +12,7 @@
 // Verifies the `select` opcode is unchanged at the 64-bit
 // integer rank.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform bool c;
 uniform int64_t a;

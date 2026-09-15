@@ -14,7 +14,7 @@
 // exactly the value satisfying `IDerived`'s inheritance requirement in `A`'s
 // witness table; the CHECKs capture it from the `witness_table_entry` row and
 // then assert it is the second operand of the `makeExistential`.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IBase { int base(int x); };
 interface IDerived : IBase { int derived(int x); };

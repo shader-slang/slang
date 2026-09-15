@@ -17,7 +17,7 @@
 // the CHECK-NOTs assert neither legalization stage ever names a header —
 // which is what tells a reader not to go looking for one.
 
-//TEST:SIMPLE(filecheck=DUMP):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=DUMP):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outBuf;
 

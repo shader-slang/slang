@@ -14,7 +14,7 @@
 // to read `class %Counter : Type` (not `struct`) while the child row is the
 // same `field(key, type)` form a struct uses.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 uniform int seed;

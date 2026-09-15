@@ -13,7 +13,7 @@
 // Verifies that `!=` lowers to `cmpNE`; both operands being the
 // same SSA value does not collapse the instruction.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform RWStructuredBuffer<int> buf;

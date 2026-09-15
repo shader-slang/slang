@@ -16,8 +16,8 @@
 // block first computes the guard comparison and an `ifElse` around the
 // whole loop, which is the "outer if" the transform is described by.
 
-//TEST:SIMPLE(filecheck=DEFAULT):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=INVERT):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -loop-inversion
+//TEST:SIMPLE(filecheck=DEFAULT):-target spirv-asm -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=INVERT):-target spirv-asm -dump-ir -o - -entry main -stage compute -loop-inversion
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;

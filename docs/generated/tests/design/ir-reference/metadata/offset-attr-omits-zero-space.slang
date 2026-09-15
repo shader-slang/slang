@@ -15,7 +15,7 @@
 // immediately after the offset value and the CHECK-NOT asserts no
 // three-operand form appears anywhere in the dump.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

@@ -16,7 +16,7 @@
 // requires the inst's type to spell out two `witness_table_t` entries inside a
 // `TypePack`, not a single `witness_table_t` over a pack type.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IBar { int getValue(); }
 struct BarA : IBar { int v; int getValue() { return v; } }

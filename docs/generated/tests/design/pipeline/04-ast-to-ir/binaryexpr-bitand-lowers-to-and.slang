@@ -14,7 +14,7 @@
 // integer operators (`&`, `|`, `^`, `<<`, `>>`) belong to the same
 // family. Verifies `and` opcode for `&`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform int b;

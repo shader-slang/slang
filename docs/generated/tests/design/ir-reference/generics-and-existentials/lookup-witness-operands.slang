@@ -12,7 +12,7 @@
 // receiver's concrete type is unknown, so `t.run(x)` cannot name a callee
 // directly; the CHECK asserts it becomes a two-operand `lookupWitness` whose
 // second operand is the key named after the interface requirement.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

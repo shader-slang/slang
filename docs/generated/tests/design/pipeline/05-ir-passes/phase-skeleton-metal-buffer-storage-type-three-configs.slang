@@ -16,7 +16,7 @@
 // orchestrator invoked the pass three separate times; a Metal pipeline
 // with fewer configurations would leave a CHECK-LABEL unmatched.
 
-//TEST:SIMPLE(filecheck=CHECK):-target metal -dump-ir-after lowerBufferElementTypeToStorageType -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target metal -dump-ir-after lowerBufferElementTypeToStorageType -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

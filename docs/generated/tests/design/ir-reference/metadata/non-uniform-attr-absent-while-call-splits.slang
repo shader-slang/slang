@@ -19,7 +19,7 @@
 // identical `Func(Vec(Float, 4 : Int), UInt)` signature, distinguishable only
 // by a key that is never written into the IR.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after specializeResourceUsage -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after specializeResourceUsage -o - -entry main -stage compute
 
 struct Params
 {

@@ -26,7 +26,7 @@
 // prefix that only a real dumped instruction carries, which no echoed comment
 // line reproduces.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g
 
 RWStructuredBuffer<int> outBuf;
 

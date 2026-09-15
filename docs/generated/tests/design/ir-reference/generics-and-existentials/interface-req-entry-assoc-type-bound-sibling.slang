@@ -14,7 +14,7 @@
 // — the conformance every implementer must supply for its chosen `A`. The
 // CHECK-DAGs pin both, and the final one fixes the interface's operand list at
 // three sibling entries.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IBar { int bar(int x); };
 interface IHasAssoc { associatedtype A : IBar; A make(int x); };

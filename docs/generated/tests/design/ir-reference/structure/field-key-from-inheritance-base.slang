@@ -15,7 +15,7 @@
 // the first member. The final CHECK pins that `%base`'s key carries an
 // inheritance-derived linkage name, distinguishing it from a member key.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int seed;
 uniform RWStructuredBuffer<int> buf;

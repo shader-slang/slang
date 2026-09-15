@@ -14,7 +14,7 @@
 // CHECKs are order-independent because the two calls are independent
 // and the lowering is free to interleave them.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWByteAddressBuffer matrixOut;
 RWByteAddressBuffer reduceOut;

@@ -14,7 +14,7 @@
 // to ensure the opcode is the same shape regardless of how many
 // precision bits are added.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform half ha;
 uniform RWStructuredBuffer<float> buf;

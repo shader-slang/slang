@@ -17,7 +17,7 @@
 // non-constant operand. The CPP and CUDA CHECKs confirm the opcode reaches
 // emission as a real `printf` on the host-like targets.
 
-//TEST:SIMPLE(filecheck=IR):-target cpp -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target cpp -dump-ir -o - -stage compute -entry main
 //TEST:SIMPLE(filecheck=CPP):-target cpp -stage compute -entry main
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -stage compute -entry main
 
