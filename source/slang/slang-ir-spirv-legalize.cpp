@@ -2983,6 +2983,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             // introduce new loops that needs to be legalized.
             lowerCopyLogical(m_module);
         }
+        else
+        {
+            // On SPIR-V 1.4+ we keep `OpCopyLogical`, but a `copyLogical` through an untyped
+            // descriptor-heap pointer must still be lowered to per-field copies. Emitting it as a
+            // whole-aggregate `OpLoad` + `OpCopyLogical` on an untyped pointer lets spirv-opt's
+            // `LoadFeedingExtract` fold rewrite the resulting field reads into a typed
+            // `OpAccessChain` on the untyped base -- invalid SPIR-V (#13022). Lowering it here
+            // keeps every access to the untyped buffer element-wise (`OpUntypedAccessChainKHR`).
+            lowerCopyLogical(m_module, /*onlyUntypedPtrOperand*/ true);
+        }
 
         for (auto globalInst : m_module->getGlobalInsts())
         {
