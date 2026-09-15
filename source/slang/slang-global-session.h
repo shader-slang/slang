@@ -221,10 +221,23 @@ public:
     Scope* slangLanguageScope = nullptr;
     Scope* glslLanguageScope = nullptr;
     Name* glslModuleName = nullptr;
-    Name* neuralModuleName = nullptr;
+    Name* autodiffModuleName = nullptr;
 
     ModuleDecl* baseModuleDecl = nullptr;
+
+    /// Builtin modules whose declarations become part of the session's globally searched
+    /// declaration set once loaded: `Core` (always compiled eagerly) and `Autodiff` (compiled
+    /// lazily, on first use of a differentiability construct). See `belongsInCoreModulesList`.
+    /// `GLSL` is deliberately not a member of this list: its declarations stay visible only to
+    /// modules that explicitly `import glsl`.
     List<RefPtr<Module>> coreModules;
+
+    /// True for the duration of `compileBuiltinModule`, while a builtin module (`Core` or
+    /// `Autodiff`) is being compiled from source. `loadAutodiffModuleIfNeeded` reads this flag to
+    /// avoid a recursive load: a differentiability construct that appears inside a builtin
+    /// module's own source is already being checked as part of that same builtin compilation, so
+    /// it needs no separate on-demand load of the autodiff supplement.
+    bool m_isCompilingBuiltinModule = false;
 
     SourceManager builtinSourceManager;
 
@@ -259,16 +272,25 @@ public:
     String coreModulePath;
 
     ComPtr<ISlangBlob> coreLibraryCode;
-    // ComPtr<ISlangBlob> slangLibraryCode;
     ComPtr<ISlangBlob> hlslLibraryCode;
+    // Source for the eager base-surface segment (autodiff-base.meta.slang), concatenated into the
+    // `Core` builtin module. Distinct from `autodiffSupplementLibraryCode` below, which is the
+    // lazy supplement source (diff.meta.slang) compiled/deserialized only as the separate
+    // `Autodiff` builtin module. See `getBuiltinModuleSource`, which routes each to its own
+    // module.
+    ComPtr<ISlangBlob> autodiffBaseLibraryCode;
     ComPtr<ISlangBlob> glslLibraryCode;
-    ComPtr<ISlangBlob> autodiffLibraryCode;
+    ComPtr<ISlangBlob> autodiffSupplementLibraryCode;
 
     String getCoreModulePath();
 
     ComPtr<ISlangBlob> getCoreLibraryCode();
     ComPtr<ISlangBlob> getHLSLLibraryCode();
-    ComPtr<ISlangBlob> getAutodiffLibraryCode();
+    // Base-surface source folded into the `Core` module (eager); see `autodiffBaseLibraryCode`.
+    ComPtr<ISlangBlob> getAutodiffBaseLibraryCode();
+    // Supplement source for the standalone lazy `Autodiff` module; see
+    // `autodiffSupplementLibraryCode`.
+    ComPtr<ISlangBlob> getAutodiffSupplementLibraryCode();
     ComPtr<ISlangBlob> getGLSLLibraryCode();
 
     void getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName);
@@ -302,6 +324,19 @@ public:
     Linkage* getBuiltinLinkage() const { return m_builtinLinkage; }
 
     Module* getBuiltinModule(slang::BuiltinModuleName builtinModuleName);
+
+    /// Loads the autodiff builtin module if it has not already been loaded, and reports which
+    /// module (if any) the caller should now merge.
+    ///
+    /// `outModule` is set to null, with `SLANG_OK` returned, while a builtin module is being
+    /// source-compiled: starting another builtin compilation there would recurse, and that
+    /// compilation already checks the supplement's declarations itself, so there is no separate
+    /// module to merge. Success therefore does *not* imply a module — the out-parameter exists so
+    /// that a caller cannot read one without confronting the possibility that there is none.
+    SlangResult loadAutodiffModuleIfNeeded(Module*& outModule);
+
+    /// Returns whether this session is currently source-compiling a builtin module.
+    bool isCompilingBuiltinModule() const { return m_isCompilingBuiltinModule; }
 
     Name* getCompletionRequestTokenName() const { return m_completionTokenName; }
 
@@ -364,6 +399,12 @@ private:
     };
 
     BuiltinModuleInfo getBuiltinModuleInfo(slang::BuiltinModuleName name);
+
+    /// Does `name` identify a builtin module that belongs in `coreModules` once compiled? This is
+    /// `Core` and `Autodiff`: both become part of the session's globally searched declaration set
+    /// (see `coreModules`), unlike `GLSL`, which stays confined to modules that `import` it by
+    /// name.
+    bool belongsInCoreModulesList(slang::BuiltinModuleName name);
 
     void _initCodeGenTransitionMap();
 
