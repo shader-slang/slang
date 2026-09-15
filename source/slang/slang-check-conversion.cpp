@@ -1698,6 +1698,32 @@ ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
     return candidateCost;
 }
 
+bool SemanticsVisitor::isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType)
+{
+    // Only builtin scalars are eligible, and `bool` is excluded: it already has
+    // a dedicated implicit conversion from any `__EnumType` (core.meta.slang),
+    // so routing it through the enum->tag->bool composite would introduce a
+    // second, competing representation of the same conversion.
+    auto toBasicType = as<BasicExpressionType>(toType);
+    if (!toBasicType || toBasicType->getBaseType() == BaseType::Bool)
+        return false;
+
+    // The enum must be unscoped, tested through the shared `isUnscopedEnum`
+    // predicate (also used by the parser). It recognizes `UnscopedEnumAttribute`
+    // — attached for `-unscoped-enum` (non-generic enums only) or an explicit
+    // `[UnscopedEnum]` (any enum) — as well as a still-unchecked `[UnscopedEnum]`
+    // for parser-time callers; by the time coercion runs the attribute is checked.
+    if (!isUnscopedEnum(enumDecl))
+        return false;
+
+    // The widening is an HLSL-compatibility feature, so it applies only when the
+    // current translation unit is the HLSL-flavored dialect. The translation
+    // unit request is absent on some paths (e.g. entry-point specialization and
+    // reflection), which correctly reads as "not HLSL".
+    auto translationUnit = getShared()->getTranslationUnitRequest();
+    return translationUnit && translationUnit->sourceLanguage == SourceLanguage::HLSL;
+}
+
 bool SemanticsVisitor::_coerce(
     CoercionSite site,
     Type* toType,
@@ -2191,6 +2217,49 @@ bool SemanticsVisitor::_coerce(
                 *outToExpr = rsExpr;
             }
             return true;
+        }
+
+        // HLSL compatibility (shader-slang/slang#13075): an unscoped enum in an
+        // HLSL-dialect translation unit may also convert implicitly to any
+        // builtin scalar its tag type can reach, performed as two implicit
+        // rounds that mirror the reverse composite below: first enum -> tag,
+        // then tag -> destination. Consider `enum Color { Red, Green, Blue };
+        // float f = Color.Green;` in a `.hlsl` file compiled with
+        // `-unscoped-enum`: `Color` coerces to `int` (its tag), then `int` to
+        // `float`. This fires only at implicit sites; explicit casts such as
+        // `float(Color.Green)` already succeed through the target's initializer path.
+        if (site != CoercionSite::ExplicitCoercion &&
+            isEnumToBuiltinScalarConversionEnabled(enumDecl, toType))
+        {
+            Expr* tagExpr = nullptr;
+            if (fromExpr)
+            {
+                auto castToTag = getASTBuilder()->create<BuiltinCastExpr>();
+                castToTag->type = tagType;
+                castToTag->loc = fromExpr->loc;
+                castToTag->base = fromExpr;
+                tagExpr = castToTag;
+            }
+
+            Expr* convertedExpr = nullptr;
+            ConversionCost innerCost = kConversionCost_None;
+            if (_coerce(
+                    site,
+                    toType,
+                    outToExpr ? &convertedExpr : nullptr,
+                    QualType(tagType),
+                    tagExpr,
+                    sink,
+                    &innerCost,
+                    nullptr))
+            {
+                if (outCost)
+                    *outCost = kConversionCost_RankPromotion + innerCost;
+                if (outToExpr)
+                    *outToExpr = convertedExpr;
+                setWitnessOfConversionToBuiltinConversion();
+                return true;
+            }
         }
     }
 

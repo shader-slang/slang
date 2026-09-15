@@ -5655,30 +5655,6 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
     }
 }
 
-static EnumDecl* isUnscopedEnum(Decl* decl)
-{
-    EnumDecl* enumDecl = as<EnumDecl>(decl);
-    if (!enumDecl)
-        return nullptr;
-    for (auto mod : enumDecl->modifiers)
-    {
-        if (as<UnscopedEnumAttribute>(mod))
-        {
-            return enumDecl;
-        }
-        else if (auto uncheckedAttribute = as<UncheckedAttribute>(mod))
-        {
-            // We have to perform an ugly string comparison here, because the attributes
-            // haven't been checked during parsing.
-            if (getText(uncheckedAttribute->keywordName) == "UnscopedEnum")
-            {
-                return enumDecl;
-            }
-        }
-    }
-    return nullptr;
-}
-
 // Finish up work on a declaration that was parsed
 static void CompleteDecl(
     Parser* parser,
