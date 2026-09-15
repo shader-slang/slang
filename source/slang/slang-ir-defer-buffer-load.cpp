@@ -214,23 +214,19 @@ struct DeferBufferLoadContext
 
     // Shared across every function in the module (see
     // `IRDeadCodeEliminationOptions::calleeSideEffectCache` for the sharing contract): the
-    // `removeRedundancyInFunc` call below re-runs the load/store redundancy walk on every
-    // function this pass touches, and without a shared cache each function pays its own
-    // O(#call sites to that callee) cost to answer the same "does this callee have side
-    // effects" question for callees shared across the module (e.g. a resource `Sample`
-    // intrinsic called from every deferred load site). Never cleared, so it is only safe
-    // to share unconditionally because this pass's only mutations are `deferBufferLoadInst`
-    // rewriting a load's shape (see `transferDecorationsTo` below) and the trailing
-    // `removeRedundancyInFunc` call itself -- neither adds/removes an `IRNoSideEffectDecoration`
-    // / `IRReadNoneDecoration`, nor creates or deletes the `IRAnnotation`s
-    // `doesCalleeHaveSideEffect` reads. A pass that changes to touch either would need to clear
-    // this cache (or stop sharing it) at that point.
+    // `removeRedundancyInFunc` call in `deferBufferLoadInFunc` below re-runs the load/store
+    // redundancy walk on every function this pass touches, and without a shared cache each
+    // function pays its own O(#call sites to that callee) cost to answer the same "does this
+    // callee have side effects" question for callees shared across the module (e.g. a resource
+    // `Sample` intrinsic called from every deferred load site). Never cleared, so it is only
+    // safe to share unconditionally because nothing this pass does -- `deferBufferLoadInst`
+    // rewriting a load's shape (its `transferDecorationsTo` calls move decorations on the load/
+    // `GetElement`/`FieldExtract` insts being rewritten, never on a callee function inst) or the
+    // `removeRedundancyInFunc` call itself -- adds/removes an `IRNoSideEffectDecoration`/
+    // `IRReadNoneDecoration`, or creates/deletes an `IRAnnotation` that `doesCalleeHaveSideEffect`
+    // reads. A future change to either would need to clear this cache (or stop sharing it).
     Dictionary<IRInst*, bool> calleeSideEffectCache;
 
-    // If this function (or anything else added to this pass) starts adding/removing an
-    // `IRNoSideEffectDecoration`/`IRReadNoneDecoration` or creating/deleting an `IRAnnotation`,
-    // it must also clear or stop sharing `calleeSideEffectCache` above -- that field's
-    // never-cleared soundness depends on this function never doing so.
     void deferBufferLoadInst(IRBuilder& builder, List<IRInst*>& workList, IRInst* loadInst)
     {
         bool failDueToAttributeFound = false;

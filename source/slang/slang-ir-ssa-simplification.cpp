@@ -136,8 +136,11 @@ void simplifyNonSSAIR(
     // Shared with removeRedundancy below, not just eliminateDeadCode -- see
     // slang-ir-redundancy-removal.h for why a stale entry isn't automatically safe for that
     // consumer the way it is for DCE. No step in this loop currently mutates callee purity, so
-    // this per-iteration clear is a defensive safeguard, not a live correctness requirement --
-    // mirroring simplifyIR's clear so the loop doesn't come to depend on that staying true.
+    // the per-iteration `clear()` below is a defensive safeguard, not a live correctness
+    // requirement -- mirroring simplifyIR's clear so the loop doesn't come to depend on that
+    // staying true. It clears whichever cache is in effect, local or caller-supplied: if a
+    // future caller passes in `options.deadCodeElimOptions.calleeSideEffectCache` already
+    // populated, expecting entries to survive one call to this function, they won't.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
