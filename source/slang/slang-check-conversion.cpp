@@ -2397,6 +2397,9 @@ bool SemanticsVisitor::_coerce(
             derefExpr->base = fromExpr;
             derefExpr->type = QualType(fromElementType);
             derefExpr->checked = true;
+            // The recursive coercion below diagnoses against this synthesized
+            // dereference, so it must carry the operand's source location.
+            derefExpr->loc = fromExpr->loc;
         }
 
         ConversionCost subCost = kConversionCost_None;
