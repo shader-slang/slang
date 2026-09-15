@@ -7287,11 +7287,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             // (the element is materialized by `kIROp_ExtractFirstFromPack`/`ExtractLastFromPack`),
             // so the projection to a concrete `superType` is governed by the pattern witness that
             // relates that element type to `superType`. The wrapper's super-type is its pattern
-            // witness's super-type by construction (see `FirstSubtypeWitness`), so `superType`
-            // passes through the recursion unchanged. That is an internal lowering invariant, not
-            // out-of-contract input, so a debug `SLANG_ASSERT` is the right tier; the
-            // side-effecting `lowerType` is hoisted out of the assertion so it is never a hidden
-            // side effect in a release build.
+            // witness's super-type. `getInheritanceInfo` builds the wrapper with its pattern
+            // witness's super-type (the `FirstPackElementType` projection in
+            // slang-check-inheritance.cpp), so `superType` passes through the recursion unchanged
+            // and the downstream `extractField(superType, ...)` on the pattern witness relies on
+            // that equality.
             auto loweredSup = lowerType(context, firstSubtypeWitness->getSup());
             SLANG_ASSERT(loweredSup == superType);
             return emitCastToConcreteSuperTypeRec(
