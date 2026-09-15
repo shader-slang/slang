@@ -2219,8 +2219,6 @@ public:
         Expr* arg);
 
 
-    BuiltinConversionKind getImplicitConversionBuiltinKind(Decl* decl);
-
     bool isEffectivelyScalarForInitializerLists(Type* type);
 
     /// Should the provided expression (from an initializer list) be used directly to initialize

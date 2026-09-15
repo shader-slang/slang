@@ -1584,9 +1584,6 @@ class ImplicitConversionModifier : public Modifier
     FIDDLE(...)
     // The conversion cost, used to rank conversions
     FIDDLE() ConversionCost cost = kConversionCost_None;
-
-    // A builtin identifier for identifying conversions that need special treatment.
-    FIDDLE() BuiltinConversionKind builtinConversionKind = kBuiltinConversion_Unknown;
 };
 
 FIDDLE()
