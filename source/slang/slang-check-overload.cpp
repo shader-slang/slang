@@ -1025,6 +1025,13 @@ bool isEffectivelyMutating(CallableDecl* decl)
     if (as<SetterDecl>(decl))
         return true;
 
+    // A `ref` accessor hands out a mutable reference to the referenced storage, so it
+    // must receive `this` by reference exactly like `set`; otherwise an unannotated `ref`
+    // takes `this` by value and a write through the returned reference targets a
+    // callee-local copy and is lost. `[nonmutating] ref` opts out via the check above.
+    if (as<RefAccessorDecl>(decl))
+        return true;
+
     return false;
 }
 

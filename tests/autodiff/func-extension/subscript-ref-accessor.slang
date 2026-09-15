@@ -22,6 +22,10 @@ struct RefCell : IDifferentiable
 
     __subscript(int index) -> float
     {
+        // A `ref` accessor is implicitly mutating, so it can only be invoked on a
+        // mutable base. The `get` supplies the non-mutating read path used below to
+        // read the subscript on the by-value `DifferentialPair` projection `self.p`.
+        get { return value; }
         ref { return value; }
     }
 }

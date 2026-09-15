@@ -3892,6 +3892,15 @@ ParamPassingMode getDeclaredParamPassingModeForImplicitThisParam(
     {
         return ParamPassingMode::BorrowInOut;
     }
+    // A `ref` accessor yields a mutable reference into the referenced storage, so like
+    // `set` its implicit `this` must be `inout`; with a by-value `this` the address it
+    // returns would point into a callee-local copy and writes would be lost. Explicit
+    // `[nonmutating] ref` (handled above) keeps `this` by value, for a `ref` that returns
+    // storage not rooted in `this` (e.g. a global or storage reached through a pointer).
+    if (as<RefAccessorDecl>(declWithImplicitThisParam))
+    {
+        return ParamPassingMode::BorrowInOut;
+    }
 
     // Declarations that represent abstract storage (e.g., a `property`
     // or `subscript`) do not want to dictate anything about the mode
