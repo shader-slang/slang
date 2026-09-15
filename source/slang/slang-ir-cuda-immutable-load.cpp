@@ -57,33 +57,26 @@ struct LoadMethod
     }
 };
 
-// Return true if `addr` points into the CUDA global uniform parameter group, i.e. the
-// entry-point/global uniform parameters that `CUDASourceEmitter::emitParameterGroupImpl`
-// emits as the single `extern "C" __constant__ GlobalParams_0 SLANG_globalParams;` block.
-// Consider this example:
+// Return true if `addr` roots at the CUDA global uniform parameter group: the
+// `IRGlobalParam` that `CUDASourceEmitter::emitParameterGroupImpl` emits as
+// `extern "C" __constant__ GlobalParams_0 SLANG_globalParams;`. For example:
 // ```
 // uniform uint gValue;
-// RWStructuredBuffer<uint> outBuf;
-// void main() { outBuf[0] = gValue; }
+// void main() { ... = gValue; }
 // ```
-// The front end collects `gValue` into a synthesized `ConstantBuffer<GlobalParams>`
-// global, and `emitParameterGroupImpl` emits its contents inline as fields of
-// `SLANG_globalParams`, which CUDA places in `__constant__` memory. A load of
-// `gValue` therefore has an address chain of `FieldAddress(globalParam, gValue)`;
-// this helper peels the address chain and finds `globalParam` itself, an `IRGlobalParam`
-// whose type is an `IRUniformParameterGroupType`. That root is memory Slang classifies
-// as immutable (see `isPointerToImmutableLocation`), but it is not CUDA global memory:
-// `__ldg` lowers to PTX `ld.global.nc`, which the PTX ISA requires to address global
-// memory, not `__constant__` memory, so loading `gValue` through `__ldg` is illegal
-// codegen even though `gValue` never changes.
+// The front end folds module-scope `uniform` globals like `gValue` into a synthesized
+// `ConstantBuffer<GlobalParams>` global, so a load of `gValue` is
+// `Load(FieldAddress(globalParam, gValue))`. `globalParam` is memory
+// `isPointerToImmutableLocation` correctly calls immutable, but it is CUDA `__constant__`
+// memory, not global memory: `__ldg` lowers to PTX `ld.global.nc`, which the ISA requires
+// to address global memory, so `__ldg` on `gValue` is illegal codegen even though `gValue`
+// never changes.
 //
-// A pointer *stored inside* the group, e.g. a `StructuredBuffer<T>` field, is a
-// different case: reading through it loads the pointer value out of
-// `SLANG_globalParams` first, and that `Load` — not the group's `IRGlobalParam` — is
-// the root of any subsequent access through the pointer, so genuine buffer reads are
-// unaffected by this check and keep the `__ldg` optimization. Accordingly, this walk
-// deliberately stops at `Load` while peeling pointer-forwarding operations introduced
-// by storage legalization.
+// A pointer *stored inside* the group (e.g. a `StructuredBuffer<T>` field) is unaffected:
+// reading through it loads the pointer out of `SLANG_globalParams` first, and that `Load`
+// — not `globalParam` — roots the subsequent access, so genuine buffer reads keep `__ldg`.
+// This walk stops at `Load` while peeling the field/cast/offset ops storage legalization
+// can insert on the way to `globalParam`.
 static bool isAddressIntoCudaConstantParameterGroup(IRInst* addr)
 {
     for (;;)
