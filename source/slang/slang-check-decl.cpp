@@ -5762,20 +5762,13 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
     DeclRef<GenericDecl> requiredGenericDeclRef,
     RefPtr<WitnessTable> witnessTable)
 {
-    // Advance the satisfying generic's constraint decls to SignatureChecked before we count or
-    // compare its finalized member set below. That state populates each constraint's operands (a
-    // GenericTypeConstraintDecl's sub/super, a TypeCoercionConstraintDecl's from/to) and flattens
-    // a conjunction constraint (`T : A & B`) into individual constraint members. A module-scope
-    // type's constraints are advanced to this state before conformance checking runs, but a
-    // function-local type nested in a function body has no such guarantee (see
-    // shader-slang/slang#12987), so without this the constraints would be read null (crashing) or
-    // enumerated before flattening (miscounted, so an over-constrained local impl could be matched
-    // against a weaker requirement). We advance the constraint decls only, not the enclosing type,
-    // which would re-enter this type's own in-progress conformance check and cycle. Snapshot the
-    // member list first because flattening appends siblings to it; advancing that pre-flatten
-    // snapshot is sufficient because flattening advances each appended sibling to SignatureChecked
-    // in the same step, so the whole post-flatten constraint set (which the asserts below rely on)
-    // is covered.
+    // Ensure the satisfying generic's constraint decls are SignatureChecked before we count and
+    // compare its members below -- that state populates each constraint's operands and flattens
+    // `T : A & B` into separate members. This matcher is the single point that every generic
+    // requirement match funnels through (module-scope, on-demand, and function-local), so the
+    // invariant belongs here, not at any one producer (#12987). We advance the constraints
+    // only (advancing the enclosing type would re-enter its in-progress conformance check), and
+    // snapshot members first since flattening appends to the list.
     {
         List<Decl*> satisfyingDirectMembers;
         for (auto m : satisfyingGenericDeclRef.getDecl()->getDirectMemberDecls())
