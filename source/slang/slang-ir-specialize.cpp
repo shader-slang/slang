@@ -475,12 +475,14 @@ struct SpecializationContext
 
     // When a transformation makes a change to an instruction, we may need to re-consider
     // transformations for instructions that use its value. Callers invoke this at the point of
-    // mutation on the instruction being modified or replaced. It re-walks `inst`'s *transitive*
-    // forward use closure (a force-seeded `expandUseClosure`), so that a change reaches not only
-    // `inst`'s direct users but any downstream user reachable through no-op wrapper intermediates
-    // (e.g. a `PtrType`/`ArrayType` around a now-concrete type). It is deliberately *not* gated by
-    // the `expanded` seeding memo — a mutation is exactly the event after which an already-walked
-    // closure must be revisited.
+    // mutation on the instruction being modified or replaced. It re-walks `inst`'s forward use
+    // closure (a force-seeded `expandUseClosure`) so that a change reaches not only `inst`'s direct
+    // users but any downstream user reachable through no-op wrapper intermediates (e.g. a
+    // `PtrType`/`ArrayType` around a now-concrete type). The re-walk is bounded by the queue — it
+    // descends only through users this call newly queues, leaving an already-queued user for the
+    // drain to reconsider — so the closure is revisited across the drain rather than re-walked
+    // whole here. It is deliberately *not* gated by the `expanded` seeding memo: a mutation is
+    // exactly the event after which an already-walked closure must be revisited.
     void addUsersToWorkList(IRInst* inst) { expandUseClosure(inst, /*forceSeed*/ true); }
 
     // Of course, somewhere along the way we expect
