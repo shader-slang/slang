@@ -9643,55 +9643,42 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             });
     }
 
-    // Emit an `OpGroupNonUniform*` at Subgroup scope. These ops share the leading operands
-    // [result-type, result <id>, scope <id>]; the caller supplies only the op-specific
-    // `trailingOperands` that follow (a predicate <id> for ballot; a GroupOperation literal + mask
-    // <id> for the bit-count).
-    template<typename... Operands>
-    SpvInst* emitGroupNonUniformOp(
-        SpvInstParent* parent,
-        IRInst* inst,
-        SpvOp opcode,
-        SpvCapability capability,
-        const Operands&... trailingOperands)
+    // Emit `OpGroupNonUniformBallot` at Subgroup scope: a uint4 mask of the lanes for which the
+    // predicate is true. The execution scope is an <id> of a constant uint (Subgroup), not a
+    // literal enum word.
+    SpvInst* emitGroupNonUniformBallot(SpvInstParent* parent, IRInst* inst)
     {
-        requireSPIRVCapability(capability);
+        requireSPIRVCapability(SpvCapabilityGroupNonUniformBallot);
         IRBuilder builder(m_irModule);
-        // The execution scope is an <id> of a constant uint whose value is the Subgroup scope,
-        // not a literal enum word.
         SpvInst* scope = emitIntConstant(SpvScopeSubgroup, builder.getUIntType());
         return emitInst(
             parent,
             inst,
-            opcode,
+            SpvOpGroupNonUniformBallot,
             inst->getFullType(),
             kResultID,
             scope,
-            trailingOperands...);
-    }
-
-    SpvInst* emitGroupNonUniformBallot(SpvInstParent* parent, IRInst* inst)
-    {
-        return emitGroupNonUniformOp(
-            parent,
-            inst,
-            SpvOpGroupNonUniformBallot,
-            SpvCapabilityGroupNonUniformBallot,
             inst->getOperand(0));
     }
 
-    // The GroupOperation (Reduce/ExclusiveScan) is a compile-time literal word that precedes the
-    // mask <id>, so it is read from the int-literal operand and emitted as a literal, not an <id>.
     SpvInst* emitGroupNonUniformBallotBitCount(SpvInstParent* parent, IRInst* inst)
     {
+        // The GroupOperation (Reduce/ExclusiveScan) is a compile-time literal word that precedes
+        // the mask <id>, so it is read from the int-literal operand and emitted as a literal. The
+        // scope is an <id> of a constant uint (Subgroup), not a literal.
         const IRIntegerValue groupOp = getIntVal(inst->getOperand(0));
         SLANG_RELEASE_ASSERT(
             groupOp == SpvGroupOperationReduce || groupOp == SpvGroupOperationExclusiveScan);
-        return emitGroupNonUniformOp(
+        requireSPIRVCapability(SpvCapabilityGroupNonUniformBallot);
+        IRBuilder builder(m_irModule);
+        SpvInst* scope = emitIntConstant(SpvScopeSubgroup, builder.getUIntType());
+        return emitInst(
             parent,
             inst,
             SpvOpGroupNonUniformBallotBitCount,
-            SpvCapabilityGroupNonUniformBallot,
+            inst->getFullType(),
+            kResultID,
+            scope,
             SpvWord(groupOp),
             inst->getOperand(1));
     }

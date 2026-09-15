@@ -3372,9 +3372,6 @@ bool mayChangeSubgroupParticipation(IRInst* inst)
     return inst->mightHaveSideEffects();
 }
 
-// Two ballots are equal when they have the same result type and the same predicate operand; after
-// simplification the shared predicate is a single SSA value, so a pointer-identity comparison of
-// the predicate operand is the exact, fail-safe equivalence test.
 void mergeDuplicateBallotsInBlock(IRBlock* block)
 {
     List<IRInst*> candidates;
