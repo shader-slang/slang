@@ -586,6 +586,19 @@ IRInst* tryGetTranslation(IRModule* module, IRInst* inst);
 
 IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
 
+// Peel `addr` through instructions that forward the address of the same underlying
+// storage without changing which storage it refers to (field/element access, casts,
+// offset computation), stopping at the first instruction that is not one of these.
+// Returns that terminal instruction. This is the shape-independent counterpart to
+// `getRootAddr`: `getRootAddr` only peels `FieldAddress`/`GetElementPtr`/
+// `NodeOutputRecordGetElementPtr`, so a `BitCast`/`Reinterpret`/`PtrCast`/`GetOffsetPtr`
+// inserted by a later legalization pass (e.g. `lowerBufferElementTypeToStorageType`) can
+// make `getRootAddr` stop short of the address's true root. Callers that need to
+// recognize a specific root shape regardless of such legalization (e.g. "is this address
+// into the OptiX SBT" or "is this address into CUDA's `__constant__` global parameter
+// group") should peel with this function first, then test the terminal instruction.
+IRInst* peelAddressForwardingOps(IRInst* addr);
+
 // Returns true if the memory location pointed to by `ptrInst` is immutable.
 // An immutable location is the memory region that can't be modified by the user code.
 // Examples are ConstantBuffer and shader resource contents(e.g. StructuredBuffer).

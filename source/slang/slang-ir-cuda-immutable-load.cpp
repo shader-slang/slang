@@ -75,28 +75,19 @@ struct LoadMethod
 // A pointer *stored inside* the group (e.g. a `StructuredBuffer<T>` field) is unaffected:
 // reading through it loads the pointer out of `SLANG_globalParams` first, and that `Load`
 // — not `globalParam` — roots the subsequent access, so genuine buffer reads keep `__ldg`.
-// This walk stops at `Load` while peeling the field/cast/offset ops storage legalization
-// can insert on the way to `globalParam`.
+//
+// This uses `peelAddressForwardingOps` (the same walk `isAddressIntoOptiXShaderBindingTable`
+// uses) rather than `getRootAddr`, so a `BitCast`/`Reinterpret`/`PtrCast`/`GetOffsetPtr`
+// cannot make the check stop short of `globalParam` the way it did for the superseded #11152
+// SBT guard. For CUDA specifically, `shouldLegalizeExistentialAndResourceTypes` is off and
+// `lowerBufferElementTypeToStorageType`'s buffer-element legalization does not appear to
+// reach `SLANG_globalParams` (unlike the OptiX SBT record, which is buffer-backed storage),
+// so those extra cases are not known to be reachable here today; they are kept for
+// defense in depth against a future legalization pass touching this group.
 static bool isAddressIntoCudaConstantParameterGroup(IRInst* addr)
 {
-    for (;;)
-    {
-        switch (addr->getOp())
-        {
-        case kIROp_FieldAddress:
-        case kIROp_GetElementPtr:
-        case kIROp_GetOffsetPtr:
-        case kIROp_NodeOutputRecordGetElementPtr:
-        case kIROp_BitCast:
-        case kIROp_Reinterpret:
-        case kIROp_PtrCast:
-            addr = addr->getOperand(0);
-            continue;
-        default:
-            auto globalParam = as<IRGlobalParam>(addr);
-            return globalParam && as<IRUniformParameterGroupType>(globalParam->getDataType());
-        }
-    }
+    auto globalParam = as<IRGlobalParam>(peelAddressForwardingOps(addr));
+    return globalParam && as<IRUniformParameterGroupType>(globalParam->getDataType());
 }
 
 struct ImmutableBufferLoadLoweringContext : InstPassBase
@@ -344,6 +335,10 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                 auto load = as<IRLoad>(inst);
                 auto ptr = load->getPtr();
                 auto rootAddr = getRootAddr(ptr);
+                // isAddressIntoCudaConstantParameterGroup must see the unpeeled `ptr`, not
+                // `rootAddr`: `getRootAddr` doesn't peel BitCast/Reinterpret/PtrCast/
+                // GetOffsetPtr, so passing `rootAddr` here could stop short of `globalParam`
+                // and miss the exclusion.
                 if (!isAddressIntoCudaConstantParameterGroup(ptr) &&
                     isPointerToImmutableLocation(rootAddr))
                 {

@@ -3083,16 +3083,12 @@ bool isIROpaqueType(IRType* type)
     }
 }
 
-// True if `addr`'s chain bottoms out at `GetOptiXSbtDataPtr` (the OptiX SBT), peeling every
-// forwarding op, including the `BitCast`/`GetOffsetPtr` that `getRootAddr` does not peel.
-static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
+IRInst* peelAddressForwardingOps(IRInst* addr)
 {
     for (;;)
     {
         switch (addr->getOp())
         {
-        case kIROp_GetOptiXSbtDataPtr:
-            return true;
         case kIROp_FieldAddress:
         case kIROp_GetElementPtr:
         case kIROp_GetOffsetPtr:
@@ -3102,9 +3098,16 @@ static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
             addr = addr->getOperand(0);
             continue;
         default:
-            return false;
+            return addr;
         }
     }
+}
+
+// True if `addr`'s chain bottoms out at `GetOptiXSbtDataPtr` (the OptiX SBT), peeling every
+// forwarding op, including the `BitCast`/`GetOffsetPtr` that `getRootAddr` does not peel.
+static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
+{
+    return peelAddressForwardingOps(addr)->getOp() == kIROp_GetOptiXSbtDataPtr;
 }
 
 bool isPointerToImmutableLocation(IRInst* loc)

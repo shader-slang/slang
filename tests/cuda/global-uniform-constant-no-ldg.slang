@@ -15,14 +15,17 @@
 // companion `constant-buffer-ldg.slang`.
 //
 // `CHECK-NOT` on both sides of the anchor: a regressed `__ldg` can land before the
-// anchor (in a `slang_ldg` helper emitted earlier) or after it (inline).
+// anchor (in a `slang_ldg` helper emitted earlier) or after it (inline). The anchor is
+// `SLANG_globalParams`, the fixed symbol name the emitter always uses for this group
+// (see `CUDASourceEmitter::emitParameterGroupImpl`), rather than a user-name-derived,
+// mangling-counter-suffixed identifier like `gValue_0`.
 
 RWStructuredBuffer<uint> outBuf;
 
 uniform uint gValue;
 
 //SCALAR-NOT: __ldg
-//SCALAR: globalParams_0->gValue_0
+//SCALAR: SLANG_globalParams
 //SCALAR-NOT: __ldg
 
 [shader("raygeneration")]
@@ -47,7 +50,7 @@ struct Nested
 uniform Nested gStruct;
 
 //STRUCT-NOT: __ldg
-//STRUCT: globalParams_0->gStruct_0
+//STRUCT: SLANG_globalParams
 //STRUCT-NOT: __ldg
 
 [shader("compute")]
@@ -60,7 +63,7 @@ void structMain(uint3 tid: SV_DispatchThreadID)
 uniform uint gArray[4];
 
 //ARRAY-NOT: __ldg
-//ARRAY: globalParams_0->gArray_0
+//ARRAY: SLANG_globalParams
 //ARRAY-NOT: __ldg
 
 [shader("compute")]
