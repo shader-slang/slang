@@ -300,8 +300,8 @@ struct SpecializationContext
     // closure was already walked. `expanded` is that separate memo, used *only* by the ordinary
     // seeding walk (`forceSeed == false`): an inst is added the first time its forward use closure
     // is walked and, unlike `workListSet`, is not removed on pop, so re-reaching an already-walked
-    // inst while nothing has changed does not redundantly re-walk its closure — the redundant
-    // re-walk that issue #12604 is about. It is reset per drain in
+    // inst while nothing has changed does not redundantly re-walk its closure. It is reset per
+    // drain in
     // `processSpecializationWorkListFromRoot`. The mutation walk (`forceSeed == true`) deliberately
     // does *not* consult `expanded`; see `expandUseClosure`.
     HashSet<IRInst*>& expanded;
@@ -326,9 +326,8 @@ struct SpecializationContext
     // Enqueue every instruction reachable by following use edges forward from `seed` (its users,
     // their users, and so on) — because specializing an inst may unblock specialization of the
     // things that use it. `seed` itself is never enqueued here. The walk uses an explicit stack so
-    // its depth is independent of the use-chain length; a long use chain must not overflow the call
-    // stack (the reason this replaced the former mutual recursion between `addToWorkList` and
-    // `addUsersToWorkList`).
+    // its depth is independent of use-chain length, so a long chain cannot overflow the call
+    // stack.
     //
     // The descent condition depends on `forceSeed`, and the two modes are intentionally different:
     //
@@ -338,8 +337,8 @@ struct SpecializationContext
     //    memo skips that redundant work.
     //
     //  - Mutation walk (`forceSeed == true`, from `addUsersToWorkList`): descend into every user
-    //    that was not already queued, exactly as the former mutual recursion did (it recursed into
-    //    a user iff `workListSet.add(user)` succeeded). This re-walks the changed inst's
+    //    that was not already queued (iff `enqueue(user)` succeeded). This re-walks the changed
+    //    inst's
     //    *transitive* forward closure, so a downstream `specialize` reached only through a no-op
     //    wrapper intermediate — e.g. `%A = specialize(H, …)`, `%arg = PtrType(%A)`, `%C =
     //    specialize(G, %arg)`, where reprocessing the `PtrType` is not itself a change and so never
@@ -374,7 +373,7 @@ struct SpecializationContext
                 {
                     // Transitive re-walk bounded by the queue: descend into a user only if this
                     // call queued it, which also terminates the walk on use cycles (a second visit
-                    // finds it already queued). This mirrors the old mutual recursion exactly.
+                    // finds it already queued).
                     if (newlyQueued)
                     {
                         expanded.add(user);
@@ -479,10 +478,9 @@ struct SpecializationContext
     // mutation on the instruction being modified or replaced. It re-walks `inst`'s *transitive*
     // forward use closure (a force-seeded `expandUseClosure`), so that a change reaches not only
     // `inst`'s direct users but any downstream user reachable through no-op wrapper intermediates
-    // (e.g. a `PtrType`/`ArrayType` around a now-concrete type). This is the same reconsideration
-    // the former mutual recursion performed; only its call-stack depth changed (see
-    // `expandUseClosure`). It is deliberately *not* gated by the `expanded` seeding memo — a
-    // mutation is exactly the event after which an already-walked closure must be revisited.
+    // (e.g. a `PtrType`/`ArrayType` around a now-concrete type). It is deliberately *not* gated by
+    // the `expanded` seeding memo — a mutation is exactly the event after which an already-walked
+    // closure must be revisited.
     void addUsersToWorkList(IRInst* inst) { expandUseClosure(inst, /*forceSeed*/ true); }
 
     // Of course, somewhere along the way we expect
@@ -1966,13 +1964,12 @@ struct SpecializationContext
 
     bool specializeChildInsts(IRInst* rootInst)
     {
-        // Drive the subtree to a fixpoint. A single drain is not order-complete: the iterative
-        // `expandUseClosure` enqueues the forward-use closure in a different order than the former
-        // recursion, and the forced walk descends only into a not-yet-queued user, so a no-op
-        // wrapper still queued when its grand-operand specializes can shadow an already-popped
-        // `specialize` user. Re-draining with a fresh `expanded` (cleared per drain in
-        // `processSpecializationWorkListFromRoot`) recovers such a user independent of enqueue
-        // order. Terminates once a drain reports no change.
+        // Drive the subtree to a fixpoint. A single drain is not order-complete: the forced walk
+        // descends only into a not-yet-queued user, so a no-op wrapper still queued when its
+        // grand-operand specializes can shadow an already-popped `specialize` user. Re-draining
+        // with a fresh `expanded` (cleared per drain in `processSpecializationWorkListFromRoot`)
+        // recovers such a user independent of enqueue order. Terminates once a drain reports no
+        // change.
         bool anyChange = false;
         while (processSpecializationWorkListFromRoot(rootInst))
             anyChange = true;
@@ -2138,8 +2135,8 @@ struct SpecializationContext
     {
         // Handle a special case of `StructuredBuffer.operator[]/Load/Consume`
         // calls first. These calls on builtin generic types should be handled
-        // the same way as a `load` inst. A successful rewrite here deleted and
-        // replaced the call, so report it as a specialization.
+        // the same way as a `load` inst. A successful rewrite here deletes and
+        // replaces the call, so report the mutation.
         if (maybeSpecializeBufferLoadCall(inst))
             return true;
 
@@ -2149,15 +2146,15 @@ struct SpecializationContext
         // on `hasSpecialization`, so an under-reported mutation here could stop a drain before the
         // follow-up work it enables is reconsidered.
         bool isCalleeFullyExpanded = false;
-        bool changed =
+        bool mutated =
             tryExpandParameterPack(as<IRFunc>(inst->getCallee()), &isCalleeFullyExpanded);
         if (isCalleeFullyExpanded)
         {
             auto newInst = tryExpandArgPack(inst);
-            changed |= newInst != inst;
+            mutated |= newInst != inst;
         }
 
-        return changed;
+        return mutated;
     }
 
     // The above `maybeSpecializeExistentialsForCall` routine needed
