@@ -2145,8 +2145,8 @@ struct SpecializationContext
         // If any arguments are value packs, we need to flatten them. Report whether the callee's
         // parameter pack or the call's argument pack was actually rewritten: flattening a pack
         // mutates the IR even though no generic was specialized, and the work-list fixpoint drains
-        // on `hasSpecialization`, so an under-reported mutation here could stop a drain before the
-        // follow-up work it enables is reconsidered.
+        // on `hasSpecialization`, so an under-reported mutation here could terminate the fixpoint
+        // before a follow-up drain reconsiders the work it enables.
         bool isCalleeFullyExpanded = false;
         bool mutated =
             tryExpandParameterPack(as<IRFunc>(inst->getCallee()), &isCalleeFullyExpanded);
