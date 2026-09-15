@@ -34,7 +34,7 @@ inheritance, and modifier checking.
      or an interpreter test (`//TEST:INTERPRET(filecheck=CHECK):`)
      that observes Y.
    - "X produces IR I" — write an IR-dump test
-     (`//TEST:SIMPLE(filecheck=CHECK): -target spirv -dump-ir -o /dev/null`).
+     (`//TEST:SIMPLE(filecheck=CHECK): -target spirv -dump-ir -o -`).
 
 3. Coverage per claim:
    - At least one positive test.

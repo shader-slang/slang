@@ -14,7 +14,7 @@
 // layout/interpretation parameters. The result is stored so it cannot
 // be eliminated, and the CHECK looks for the opcode in the user body.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 ByteAddressBuffer input;
 ByteAddressBuffer matrix;

@@ -14,7 +14,7 @@
 // `bit_cast<TargetType>(value)`. A reinterpret of an int's bits as a
 // float surfaces the opcode.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<float> fbuf;

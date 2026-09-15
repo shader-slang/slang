@@ -12,7 +12,7 @@
 // Expansion: composition axis — struct-of-arrays. The struct's
 // `field(...)` rows each carry the lowered array IR type.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Soa {
     int xs[4];

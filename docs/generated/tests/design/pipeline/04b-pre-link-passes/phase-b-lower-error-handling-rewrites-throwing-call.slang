@@ -17,7 +17,7 @@
 // on with `ifElse`; the closing CHECK-NOT asserts no `tryCall` opcode is
 // left anywhere for a downstream pass to have to understand.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 enum MyError { Fail }
 

@@ -18,7 +18,7 @@
 // the field, the three-operand `makeArray` typed `Array(Int, 3 : Int)`,
 // and the `store` that consumes it in that order.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Holder
 {

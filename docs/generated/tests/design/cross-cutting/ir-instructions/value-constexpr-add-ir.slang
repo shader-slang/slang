@@ -18,7 +18,7 @@
 // distinct opcode with the generic parameter as an operand — which is what
 // distinguishes the type-level arithmetic from the value-level one.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> outbuf;
 

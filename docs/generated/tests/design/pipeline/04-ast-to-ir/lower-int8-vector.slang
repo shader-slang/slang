@@ -12,7 +12,7 @@
 // Boundary: storage axis — vector with narrow element type.
 // Combines the VarDecl-global row with a Vec(...) element IR type.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform vector<int8_t, 4> v;
 uniform RWStructuredBuffer<int> buf;

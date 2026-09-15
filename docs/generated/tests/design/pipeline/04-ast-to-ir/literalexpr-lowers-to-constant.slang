@@ -15,7 +15,7 @@
 // or the `3.5` in `mul(%a, 3.5 : Float)`. The `: Int` / `: Float`
 // suffix is the constant inst's type annotation.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform float b;

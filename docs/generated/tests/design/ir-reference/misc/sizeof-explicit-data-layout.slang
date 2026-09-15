@@ -15,7 +15,7 @@
 // naming `Std140Layout` and `Std430Layout`; if the operand were ignored, both
 // queries would print the same layout token and one CHECK would fail.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<uint> outputBuffer;
 

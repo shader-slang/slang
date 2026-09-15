@@ -13,7 +13,7 @@
 // float). The doc places this under the same `castIntToFloat`
 // opcode as the 32-bit cases.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int64_t i64a;
 uniform RWStructuredBuffer<double> buf;

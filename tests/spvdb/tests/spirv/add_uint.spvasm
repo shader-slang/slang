@@ -1,0 +1,48 @@
+; Add shader: output[0] = input[0] + input[1].
+; Exercises OpIAdd and multiple loads from a storage buffer.
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+
+               OpDecorate %InputBlock Block
+               OpMemberDecorate %InputBlock 0 Offset 0
+               OpDecorate %in_buf DescriptorSet 0
+               OpDecorate %in_buf Binding 0
+               OpDecorate %ra_uint_in ArrayStride 4
+
+               OpDecorate %OutputBlock Block
+               OpMemberDecorate %OutputBlock 0 Offset 0
+               OpDecorate %out_buf DescriptorSet 0
+               OpDecorate %out_buf Binding 1
+               OpDecorate %ra_uint_out ArrayStride 4
+
+       %void = OpTypeVoid
+      %vfunc = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+     %uint_0 = OpConstant %uint 0
+     %uint_1 = OpConstant %uint 1
+
+  %ra_uint_in = OpTypeRuntimeArray %uint
+  %InputBlock = OpTypeStruct %ra_uint_in
+  %ptr_in_blk = OpTypePointer StorageBuffer %InputBlock
+     %in_buf = OpVariable %ptr_in_blk StorageBuffer
+ %ptr_in_uint = OpTypePointer StorageBuffer %uint
+
+ %ra_uint_out = OpTypeRuntimeArray %uint
+ %OutputBlock = OpTypeStruct %ra_uint_out
+ %ptr_out_blk = OpTypePointer StorageBuffer %OutputBlock
+     %out_buf = OpVariable %ptr_out_blk StorageBuffer
+%ptr_out_uint = OpTypePointer StorageBuffer %uint
+
+       %main = OpFunction %void None %vfunc
+      %entry = OpLabel
+    %ptr_a = OpAccessChain %ptr_in_uint %in_buf %uint_0 %uint_0
+        %a = OpLoad %uint %ptr_a
+    %ptr_b = OpAccessChain %ptr_in_uint %in_buf %uint_0 %uint_1
+        %b = OpLoad %uint %ptr_b
+      %sum = OpIAdd %uint %a %b
+  %out_ptr = OpAccessChain %ptr_out_uint %out_buf %uint_0 %uint_0
+               OpStore %out_ptr %sum
+               OpReturn
+               OpFunctionEnd

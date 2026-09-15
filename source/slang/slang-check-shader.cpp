@@ -1785,8 +1785,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         // Use the existing getTypeTags functionality to check for resource types
         // Create a temporary SemanticsVisitor to access getTypeTags
-        SharedSemanticsContext shared(linkage, module, sink);
-        SemanticsVisitor visitor(&shared);
+        auto shared = SharedSemanticsContext::createForOptionalModule(
+            linkage,
+            module,
+            linkage->m_optionSet.getLanguageVersion(),
+            sink);
+        SemanticsVisitor visitor(shared);
 
         auto typeTags = visitor.getTypeTags(returnType);
         bool hasResourceOrUnsizedTypes = (((int)typeTags & (int)TypeTag::Opaque) != 0) ||
@@ -1974,8 +1978,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // accessor it resolves to, so a need like `fragmentshaderbarycentric` on `SV_Barycentrics`
     // must be gathered here.
     {
-        SharedSemanticsContext shared(linkage, module, sink);
-        SemanticsVisitor visitor(&shared);
+        auto shared = SharedSemanticsContext::createForOptionalModule(
+            linkage,
+            module,
+            linkage->m_optionSet.getLanguageVersion(),
+            sink);
+        SemanticsVisitor visitor(shared);
 
         // Use the session's coreLanguageScope which contains the SemanticDecl definitions
         // The module's own scope may not include the core module (e.g., when loading from
@@ -3474,7 +3482,10 @@ static void _extractSpecializationArgs(
 {
     auto linkage = componentType->getLinkage();
 
-    SharedSemanticsContext semanticsContext(linkage, nullptr, sink);
+    SharedSemanticsContext semanticsContext(
+        linkage,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
     SemanticsVisitor semanticsVisitor(&semanticsContext);
 
     auto argCount = argExprs.getCount();
@@ -3519,20 +3530,28 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     // primary module's own extensions come along -- this is the same
     // point-of-view an in-body generic call has.
     //
-    // When the entry point has no owning module (`getModule()` is null) we pass
-    // `nullptr` and fall back to the prior module-less behavior.
+    // When the entry point has no owning module (`getModule()` is null), retain the prior
+    // module-less behavior and use the linkage's effective language version.
     auto entryPointModule = getModule();
-    SharedSemanticsContext sharedSemanticsContext(getLinkage(), entryPointModule, sink);
+    RefPtr<SharedSemanticsContext> sharedSemanticsContext;
     if (entryPointModule)
     {
+        sharedSemanticsContext = new SharedSemanticsContext(getLinkage(), entryPointModule, sink);
         for (auto module : getModuleDependencies())
         {
             auto moduleDecl = module->getModuleDecl();
-            if (sharedSemanticsContext.importedModulesSet.add(moduleDecl))
-                sharedSemanticsContext.importedModulesList.add(moduleDecl);
+            if (sharedSemanticsContext->importedModulesSet.add(moduleDecl))
+                sharedSemanticsContext->importedModulesList.add(moduleDecl);
         }
     }
-    SemanticsVisitor visitor(&sharedSemanticsContext);
+    else
+    {
+        sharedSemanticsContext = new SharedSemanticsContext(
+            getLinkage(),
+            getLinkage()->m_optionSet.getLanguageVersion(),
+            sink);
+    }
+    SemanticsVisitor visitor(sharedSemanticsContext);
 
     // The last N arguments will be for the implicit existential arguments
     // of the entry point (if it has any).
@@ -3793,7 +3812,10 @@ void parseSpecializationArgStrings(
     auto linkage = endToEndReq->getLinkage();
     auto sink = endToEndReq->getSink();
 
-    SharedSemanticsContext sharedSemanticsContext(linkage, nullptr, sink);
+    SharedSemanticsContext sharedSemanticsContext(
+        linkage,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
     SemanticsVisitor semantics(&sharedSemanticsContext);
 
     // We will be looping over the generic argument strings
@@ -3829,7 +3851,7 @@ Type* Linkage::specializeType(
     // TODO: We should cache and re-use specialized types
     // when the exact same arguments are provided again later.
 
-    SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
+    SharedSemanticsContext sharedSemanticsContext(this, m_optionSet.getLanguageVersion(), sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
     SpecializationParams specializationParams;
@@ -3872,7 +3894,6 @@ Type* Linkage::specializeType(
 
 /// Shared implementation logic for the `_createSpecializedProgram*` entry points.
 static RefPtr<ComponentType> _createSpecializedProgramImpl(
-    Linkage* linkage,
     ComponentType* unspecializedProgram,
     List<Expr*> const& specializationArgExprs,
     DiagnosticSink* sink)
@@ -3899,8 +3920,6 @@ static RefPtr<ComponentType> _createSpecializedProgramImpl(
     // We have an appropriate number of arguments for the global specialization parameters,
     // and now we need to check that the arguments conform to the declared constraints.
     //
-    SharedSemanticsContext visitor(linkage, nullptr, sink);
-
     List<SpecializationArg> specializationArgs;
     _extractSpecializationArgs(
         unspecializedProgram,
@@ -3971,7 +3990,6 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
     // global or entry-point generic parameters.
     //
     auto unspecializedProgram = endToEndReq->getUnspecializedGlobalComponentType();
-    auto linkage = endToEndReq->getLinkage();
     auto sink = endToEndReq->getSink();
 
     // First, let's parse the specialization argument strings that were
@@ -3992,11 +4010,8 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
     // applying the global generic arguments (if any) to the
     // unspecialized program.
     //
-    auto specializedProgram = _createSpecializedProgramImpl(
-        linkage,
-        unspecializedProgram,
-        globalSpecializationArgs,
-        sink);
+    auto specializedProgram =
+        _createSpecializedProgramImpl(unspecializedProgram, globalSpecializationArgs, sink);
 
     // If anything went wrong with the global generic
     // arguments, then bail out now.

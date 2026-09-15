@@ -1521,15 +1521,26 @@ static void addLinkageDecoration(
     }
 }
 
+/// Return true when the linkage decoration for `decl` will carry a hashed name rather than
+/// `decl`'s mangled name verbatim.
+///
+/// Care is needed around the core module as it is only compiled once and *without* obfuscation,
+/// so any linkage name to the core module *shouldn't* have obfuscation applied to it.
+///
+/// This is the single source of truth for that policy. `addLinkageDecoration` applies it, and
+/// `tryBorrowInterfaceFromOwningModule` consults it to decide whether the name it looks a symbol
+/// up by can match the name the linkage decoration will end up carrying.
+static bool isLinkageNameObfuscated(IRGenContext* context, Decl* decl)
+{
+    return context->shared->m_obfuscateCode && !isFromCoreModule(decl);
+}
+
 static void addLinkageDecoration(IRGenContext* context, IRInst* inst, Decl* decl)
 {
     const String mangledName = getMangledName(context->astBuilder, decl);
 
     // Obfuscate the mangled names if necessary.
-    //
-    // Care is needed around the core module as it is only compiled once and *without* obfuscation,
-    // so any linkage name to the core module *shouldn't* have obfuscation applied to it.
-    if (context->shared->m_obfuscateCode && !isFromCoreModule(decl))
+    if (isLinkageNameObfuscated(context, decl))
     {
         const auto obfuscatedName = getHashedName(mangledName.getUnownedSlice());
 
@@ -6642,6 +6653,22 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return innerType;
     }
 
+    // True when this aggregate's concrete fields already exist at this point in lowering. Fields
+    // that only materialize during linking — a bodyless `extern struct X;` (`!hasBody`) or a
+    // link-time alias `export struct Foo : IFoo = Bar;` (`aliasedType`) — must not build a
+    // field-wise IRMakeStruct here, or it is emitted over an empty field list and reads out of
+    // bounds once specialization resolves the real fields (shader-slang/slang#12708).
+    // `SynthesizedStructDecl` is excluded for the same reason: it lowers to an autodiff-context
+    // type, not `VarDecl` fields.
+    static bool isConcreteFieldOwningAggregate(DeclRef<AggTypeDecl> aggTypeDeclRef)
+    {
+        auto decl = aggTypeDeclRef.getDecl();
+        if (!decl->hasBody || decl->aliasedType)
+            return false;
+        return aggTypeDeclRef.as<StructDecl>() || aggTypeDeclRef.as<ClassDecl>() ||
+               aggTypeDeclRef.as<GLSLInterfaceBlockDecl>();
+    }
+
     LoweredValInfo getDefaultVal(Type* type)
     {
         type = getOriginalTypeFromModifiedType(type);
@@ -6706,7 +6733,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
             }
-            else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
+            else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>();
+                     aggTypeDeclRef && isConcreteFieldOwningAggregate(aggTypeDeclRef))
             {
                 List<IRInst*> args;
 
@@ -7022,7 +7050,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             auto val = lowerRValueExpr(context, expr->value);
             auto optType = lowerType(context, expr->type);
-            auto irVal = context->irBuilder->emitMakeOptionalValue(optType, val.val);
+            // The payload of a MakeOptionalValue must be a value, but
+            // lowerRValueExpr may return any flavor, so materialize it here. In
+            // particular a base-subobject upcast such as `b as A` (for
+            // `struct B : A`) lowers to a Ptr-flavored l-value (a field address);
+            // packing that raw pointer would make `.value` a field access on a
+            // pointer.
+            auto irVal =
+                context->irBuilder->emitMakeOptionalValue(optType, getSimpleVal(context, val));
             return LoweredValInfo::simple(irVal);
         }
         else
@@ -7799,12 +7834,14 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
         auto loweredBase = lowerLValueExpr(context, expr->base);
         UInt elementCount = (UInt)expr->elementIndices.getCount();
 
-        // Assign to 'bs' the elements from 'as' according to the first 'n' indices in 'is'
-        auto backpermute = [](UInt n, const auto as, const auto is, auto bs)
+        // Assign to `resultElements` the elements from `sourceElements` according to the first `n`
+        // indices in `indices`
+        auto backpermute =
+            [](UInt n, const auto& sourceElements, const auto& indices, auto& resultElements)
         {
             for (UInt i = 0; i < n; ++i)
             {
-                bs[i] = as[is[i]];
+                resultElements[i] = sourceElements[indices[i]];
             }
         };
 
@@ -7829,7 +7866,10 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
             RefPtr<SwizzledLValueInfo> swizzledLValue = new SwizzledLValueInfo;
             swizzledLValue->type = irType;
             swizzledLValue->base = baseSwizzleInfo->base;
-            swizzledLValue->elementIndices.add((uint32_t)elementCount);
+
+            // Set the count of indices and leave them uninitialized.
+            // This is safe because `backpermute` fills all `elementCount` slots below.
+            swizzledLValue->elementIndices.setCount((uint32_t)elementCount);
 
             // Take the swizzle element of the "outer" swizzle, as it was
             // written by the user. In our running example of `foo[i].zw.y`
@@ -12102,8 +12142,199 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return irBuilder->emitSpecializeInst(irBuilder->getGenericKind(), value, args);
     }
 
+    /// Reproduce, on a borrowed interface declaration, every decoration that some
+    /// pass reads off an `IRInterfaceType` *before* `prelinkIR` supplies the real
+    /// definition. Today that is exactly one: `IRComInterfaceDecoration`.
+    ///
+    /// This exists to give the invariant a name and a single home. `prelinkIR`
+    /// does not merge into the declaration -- it clones the owning module's
+    /// definition, calls `replaceUsesWith`, and then `removeAndDeallocate`s the
+    /// declaration -- so the interface that survives carries everything the owning
+    /// module gave it, and only a reader running before prelink can tell that the
+    /// declaration was ever bare. `visitInheritanceDecl` is that reader: it reads
+    /// `IRComInterfaceDecoration` off the interface while lowering a conformance,
+    /// and uses it to decide whether the conformance is lowered as a COM object at
+    /// all. A declaration without it silently produces a plain reference type
+    /// instead, losing the COM interface, its GUID and its vtable in the emitted
+    /// code -- which is what `tests/language-feature/dynamic-dispatch/imported-com-interface.slang`
+    /// pins.
+    ///
+    /// The derivation path in `visitInterfaceDecl` additionally attaches a name
+    /// hint, `IRAnyValueSizeDecoration`, `IRSpecializeDecoration`,
+    /// `IRBuiltinDecoration` and the target-intrinsic decorations. Those are
+    /// deliberately not reproduced: nothing reads them off an interface before
+    /// prelink, and the clone supplies them afterwards.
+    ///
+    /// Note what this function cannot do. The invariant is about which passes
+    /// *read* a decoration, so no check here or at the derivation site can detect
+    /// a violation -- adding a new pre-prelink reader elsewhere requires adding
+    /// the corresponding decoration here, and only this comment says so.
+    ///
+    /// The GUID is read from the same `ComInterfaceAttribute` the derivation path
+    /// reads, so the two cannot disagree about it.
+    void reproduceInterfaceDecorationsReadBeforePrelink(
+        IRBuilder* builder,
+        IRInterfaceType* declInterface,
+        InterfaceDecl* decl)
+    {
+        if (auto comInterfaceAttr = decl->findModifier<ComInterfaceAttribute>())
+        {
+            builder->addComInterfaceDecoration(
+                declInterface,
+                comInterfaceAttr->guid.getUnownedSlice());
+        }
+    }
+
+    /// Lower an interface owned by another module as a declaration, and arrange
+    /// for `prelinkIR` to supply its definition.
+    ///
+    /// Returns true only when the interface belongs to another module *and* a
+    /// definition was found to borrow, and writes the lowered value to `outVal`.
+    /// Returns false in every other case, leaving `outVal` untouched -- the caller
+    /// relies on that -- and derives the interface from the AST as before. Those
+    /// cases, in the order the body tests them: the interface belongs to the
+    /// module being lowered, which is the common one since a module defines most
+    /// of the interfaces it mentions; the reference would be obfuscated, so the
+    /// declaration and the owning module's symbol could not be paired by name; the
+    /// decl has no owning module, or that module has no lowered IR yet; and no
+    /// interface is registered under the mangled name in a module that does have
+    /// IR.
+    ///
+    /// Deriving an interface is expensive -- every requirement's type is lowered,
+    /// and each carries an expanded capability set -- and it reconstructs
+    /// something the owning module already holds. A six-line kernel whose only
+    /// core-module call is `sin()` otherwise rebuilds fifteen core interfaces,
+    /// seventy-five requirement entries and sixty keys into its own IR, and does
+    /// it again for every module in the session.
+    ///
+    /// The entries are deferred, not dropped. `prelinkIR` replaces the
+    /// declaration with the cloned definition at the end of lowering and before
+    /// any mandatory optimization, so every consumer that reads an interface's
+    /// requirement list still sees a complete interface: autodiff asserts on
+    /// `getRequirementCount()`, and specialization and witness-table lowering
+    /// scan the entries.
+    ///
+    /// The prelink registration is the same handoff `lowerFuncDeclInContext` uses
+    /// to make an imported `[__unsafeForceInlineEarly]` function's body available
+    /// locally. The policy around it differs, and deliberately: that path lowers
+    /// the function *and* registers it, gated on the force-inline attribute,
+    /// while this one registers *instead of* deriving, for every cross-module
+    /// interface. It also bails out when the linkage name would be obfuscated,
+    /// which the function path does not do -- an asymmetry that is a gap there
+    /// rather than caution here. Compiling a non-core imported
+    /// `[__unsafeForceInlineEarly]` function with `-obfuscate` makes that path
+    /// index an empty symbol list, which is a pre-existing defect on the function
+    /// side and not something this function inherits.
+    bool tryBorrowInterfaceFromOwningModule(InterfaceDecl* decl, LoweredValInfo& outVal)
+    {
+        if (!isDeclInDifferentModule(context, decl))
+            return false;
+
+        // In one combination -- obfuscating a reference to a non-core module --
+        // the declaration emitted below would carry a hashed linkage name while
+        // the name we search by is the original, so the two could not be paired.
+        // Derive from the AST instead; correctness first, and obfuscated builds
+        // are not the workload this optimises.
+        //
+        // This is an early-out rather than the only thing making obfuscation safe.
+        // When the owning module is lowered by the same obfuscating request its
+        // symbols are hashed too, so the search below finds nothing and falls
+        // through to the same place; removing this guard leaves the emitted code
+        // byte-identical for `tests/obfuscate/imported-interface-obfuscated.slang`.
+        // What the guard adds is not depending on that -- it states the condition
+        // directly instead of relying on a lookup happening to miss.
+        //
+        // The condition is read from `isLinkageNameObfuscated` rather than
+        // restated here, so it cannot drift from the copy inside
+        // `addLinkageDecoration`.
+        if (isLinkageNameObfuscated(context, decl))
+            return false;
+
+        auto owningModule = getModule(decl);
+        if (!owningModule)
+            return false;
+
+        // Absent while the builtin modules are themselves being built:
+        // `autodiff.meta.slang` imports `core.meta.slang` before core has lowered
+        // IR to borrow.
+        auto owningIRModule = owningModule->getIRModule();
+        if (!owningIRModule)
+            return false;
+
+        String mangledName = getMangledName(context->astBuilder, decl);
+        auto symbols = owningIRModule->findSymbolByMangledName(mangledName);
+
+        // Search the list rather than taking the first entry: a mangled name maps
+        // to a *list* of symbols, and only one of them is the interface. Finding
+        // it explicitly means the "no interface under this name" case is a plain
+        // "nothing to borrow" -- handled by falling through to AST derivation --
+        // rather than an assumption about ordering that would fail silently.
+        //
+        // `getGenericReturnVal` covers both shapes an interface can take here: it
+        // returns its argument unchanged for a non-generic symbol, and the inner
+        // value for an `IRGeneric`. The generic case is not hypothetical --
+        // `addLinkageDecoration` hoists linkage to the outermost generic, so a
+        // generic interface is registered under its mangled name as the
+        // `IRGeneric` wrapper, and that wrapper is what gets queued for prelink.
+        // The declaration built below is wrapped to match by `emitOuterGenerics`.
+        IRInst* borrowedSymbol = nullptr;
+        Index interfaceSymbolCount = 0;
+        for (auto symbol : symbols)
+        {
+            if (as<IRInterfaceType>(getGenericReturnVal(symbol)))
+            {
+                if (!borrowedSymbol)
+                    borrowedSymbol = symbol;
+                interfaceSymbolCount++;
+            }
+        }
+
+        // The whole list is scanned rather than stopping at the first match, so
+        // that "exactly one of these is an interface" is checked rather than
+        // assumed. Taking the first and stopping would silently pick one of
+        // several if a second interface ever landed under one mangled name.
+        SLANG_RELEASE_ASSERT(
+            interfaceSymbolCount <= 1 &&
+            "more than one interface is registered under a single mangled name");
+
+        if (!borrowedSymbol)
+            return false;
+
+        NestedContext declContext(this);
+        auto declBuilder = declContext.getBuilder();
+        auto declSubContext = declContext.getContext();
+
+        auto declGeneric = emitOuterGenerics(declSubContext, decl, decl);
+        IRInterfaceType* declInterface = declBuilder->createInterfaceType(0, nullptr);
+        auto declVal = finishOuterGenerics(declBuilder, declInterface, declGeneric);
+        addLinkageDecoration(declSubContext, declInterface, decl);
+
+        reproduceInterfaceDecorationsReadBeforePrelink(declBuilder, declInterface, decl);
+
+        context->setGlobalValue(decl, LoweredValInfo::simple(declVal));
+
+        // `prelinkIR` pairs the declaration with the queued symbol by mangled name
+        // and dereferences that lookup without a null check, so a name mismatch is
+        // a crash in a later pass rather than a missed optimisation here. Both
+        // halves are in hand at this point, which is the only place the failure can
+        // still be attributed to the code that caused it.
+        SLANG_RELEASE_ASSERT(
+            getMangledName(declVal) == getMangledName(borrowedSymbol) &&
+            "borrowed interface declaration and its prelink symbol disagree on the mangled name");
+
+        context->shared->externalSymbolsToPrelink.add(borrowedSymbol);
+        outVal = LoweredValInfo::simple(declVal);
+        return true;
+    }
+
     LoweredValInfo visitInterfaceDecl(InterfaceDecl* decl)
     {
+        // An interface owned by another module is borrowed from it rather than
+        // re-derived here; see `tryBorrowInterfaceFromOwningModule`.
+        LoweredValInfo borrowed;
+        if (tryBorrowInterfaceFromOwningModule(decl, borrowed))
+            return borrowed;
+
         // The members of an interface will turn into the keys that will
         // be used for lookup operations into witness
         // tables that promise conformance to the interface.
@@ -12198,7 +12429,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // a *conformance* requirement: its witness is a witness table for the bound.
                 // We must lower it with a `WitnessTableType` requirement value, because
                 // consumers of associated-type bounds read the witness-table entry for the bound.
-                // Equality constraints are handled by the generic path below.
+                // Equality constraints are handled separately below.
                 auto genericParent =
                     as<GenericDecl>(relocatedSubtypeConstraint.getDecl()->parentDecl);
                 if (genericParent && genericParent->inner != relocatedSubtypeConstraint.getDecl())
@@ -12247,6 +12478,32 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         getSup(subContext->astBuilder, relocatedSubtypeConstraint));
                     entry->setRequirementVal(subBuilder->getWitnessTableType(irBaseType));
                 }
+            }
+            else if (
+                relocatedSubtypeConstraint &&
+                relocatedSubtypeConstraint.getDecl()->isEqualityConstraint)
+            {
+                // Equality constraints deliberately keep the representation created above.
+                //
+                // Consider this example:
+                //
+                //     interface IScalar
+                //     {
+                //         associatedtype Mask;
+                //         __constraint Mask == bool;
+                //     }
+                //
+                // An equality constraint lowers to its interface requirement key, and its witness
+                // table entry carries the corresponding `TypeEqualityWitness`. Unlike a method,
+                // the interface requirement entry has no separate requirement value or type.
+                //
+                // The generic path below calls `removeLinkageDecorations` on a requirement value.
+                // For an equality constraint that value would be the requirement key itself. Its
+                // linkage is the stable identity used to defer and retrieve witness-table entries
+                // during linking, so removing it makes multiple equality keys collide under an
+                // empty mangled name. Leave the entry's value null and preserve the key's linkage.
+                SLANG_ASSERT(!entry->getRequirementVal());
+                SLANG_RELEASE_ASSERT(requirementKey->findDecoration<IRLinkageDecoration>());
             }
             else
             {
@@ -12335,6 +12592,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
+        // Adding a decoration here is also a decision about
+        // `reproduceInterfaceDecorationsReadBeforePrelink`, which is what a
+        // borrowed interface gets instead of this block. A decoration belongs
+        // there too exactly when something reads it off an `IRInterfaceType`
+        // before `prelinkIR` runs; otherwise the definition prelink clones in
+        // supplies it. That function documents the current answer for each of
+        // these, and is the only place that does -- the invariant is about which
+        // passes *read* a decoration, so neither site can check it locally.
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
         if (auto anyValueSizeAttr = decl->findModifier<AnyValueSizeAttribute>())

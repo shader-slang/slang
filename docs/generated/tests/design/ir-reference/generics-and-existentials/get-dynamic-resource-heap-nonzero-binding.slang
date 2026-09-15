@@ -11,7 +11,7 @@
 // Boundary on the binding-index operand, whose default is zero. Requesting
 // binding 2 must survive into the inst's operand list; the CHECK pins the
 // literal `2 : UInt`, so a dropped or defaulted index would fail.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int inVal;
 uniform RWStructuredBuffer<int> buf;

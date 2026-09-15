@@ -14,7 +14,7 @@
 // later learns to emit the matching `#extension` line. The CHECK pins the
 // instruction and its string operand inside the entry point's block.
 
-//TEST:SIMPLE(filecheck=CHECK):-target glsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target glsl -dump-ir -o - -entry main -stage compute
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;
