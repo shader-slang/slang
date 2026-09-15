@@ -125,6 +125,26 @@ public:
                         hasNonReadNoneOp = true;
                         break;
                     }
+
+                    // A resource-load accessor method (e.g. `ByteAddressBuffer.Load`) is declared
+                    // `[__readNone]` unconditionally, because the coherent/volatile qualifier lives
+                    // on the buffer variable and is invisible to the method declaration. When such
+                    // a call reads a `coherent`/`volatile` resource, the read may observe writes
+                    // from other invocations and must be re-performed at each occurrence, so the
+                    // enclosing function is not readNone. Without this, a `[noinline]` wrapper
+                    // around a coherent read would be inferred readNone (its only callee is the
+                    // readNone `.Load` method) and its calls commoned across a store. See
+                    // shader-slang/slang#13082.
+                    for (UInt a = 0; a < call->getArgCount(); a++)
+                    {
+                        if (resourceAccessTouchesCoherentOrVolatile(call->getArg(a)))
+                        {
+                            hasNonReadNoneOp = true;
+                            break;
+                        }
+                    }
+                    if (hasNonReadNoneOp)
+                        break;
                 }
 
                 // Do any operands defined have pointer type of global or

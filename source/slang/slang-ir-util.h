@@ -594,6 +594,18 @@ IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
 // so this function returns false in that case.
 bool isPointerToImmutableLocation(IRInst* ptrInst);
 
+// Returns true if `resource` reads a resource whose declaration carries a `coherent` or `volatile`
+// memory qualifier. A read of such a resource may observe writes from other invocations, so it is
+// not pure: it must be re-performed at each occurrence and cannot be treated as `readNone` (movable
+// / CSE-able). The qualifier (`IRMemoryQualifierSetDecoration`) is only ever declared on a global
+// resource (the front end rejects it on local and parameter declarations), but that global handle
+// can still be routed to a use through control-flow selection (an SSA phi), array indexing, or a
+// struct field. This therefore backward-slices the handle's definition — the address/access chain
+// (load / field-address / element-pointer) and phi incoming values — back to the originating
+// global. The slice terminates at globals; a function parameter cannot carry the qualifier, so
+// provenance ending at a parameter is non-coherent. See shader-slang/slang#13082.
+bool resourceAccessTouchesCoherentOrVolatile(IRInst* resource);
+
 // Check if `use` is the `baseAddr` operand of a GetElement/FieldExtract inst.
 // This is true if `use` is the first operand of the user inst.
 inline bool isUseBaseAddrOperand(IRUse* use, IRInst* user)
