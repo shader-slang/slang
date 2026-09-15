@@ -500,6 +500,68 @@ if(_dxc_build_from_source)
                 )
             endif()
         endforeach()
+
+        # A universal (multi-arch) macOS build forwards e.g. "x86_64;arm64" to
+        # the DXC source build. The vendored DXC ships an old LLVM tree that
+        # builds its build-time host tools (clang-tblgen/llvm-tblgen) under that
+        # same arch set, so a host tool can lack a slice for the build machine
+        # (e.g. an x86_64-only binary that cannot run on an arm64 host when
+        # Rosetta is unavailable) and fail to exec while generating .inc files.
+        # LLVM_USE_HOST_TOOLS routes those tools
+        # through a nested "NATIVE" build, kept separate from the universal DXC
+        # libraries so those stay fat. Scoped to the reported multi-arch case; a
+        # single non-host arch (e.g. x86_64 on an arm64 host) is the same class
+        # of problem but has no reported/validatable case and is intentionally
+        # out of scope here (see the PR's Known limitation note).
+        list(LENGTH CMAKE_OSX_ARCHITECTURES _dxc_osx_arch_count)
+        if(_dxc_osx_arch_count GREATER 1)
+            list(APPEND _dxc_forwarded_config_args -DLLVM_USE_HOST_TOOLS=ON)
+            # The NATIVE build inherits its invoking process environment, and
+            # CMAKE_OSX_ARCHITECTURES is a documented CMake env var that
+            # initializes the cache — so when it is set in the environment (as in
+            # the reported universal build), merely omitting it from the NATIVE
+            # command still leaves that build universal. Force the NATIVE build
+            # host-native explicitly: a -D on the command line overrides the
+            # env-var initialization. Only the host tools are built here, so a
+            # single host arch is exactly what we want; the universal libraries
+            # come from the main build above.
+            if(
+                DEFINED CMAKE_APPLE_SILICON_PROCESSOR
+                AND NOT CMAKE_APPLE_SILICON_PROCESSOR STREQUAL ""
+            )
+                set(_dxc_native_host_arch "${CMAKE_APPLE_SILICON_PROCESSOR}")
+            else()
+                set(_dxc_native_host_arch "${CMAKE_HOST_SYSTEM_PROCESSOR}")
+            endif()
+            set(_dxc_native_flags
+                "-DCMAKE_OSX_ARCHITECTURES=${_dxc_native_host_arch}"
+            )
+            # The NATIVE build also does not inherit the parent's
+            # -Wno-invalid-specialization flag (applied below for AppleClang 21+
+            # / Xcode 26+, where DXC's LLVM StringRef trait specializations are
+            # -Winvalid-specialization hard errors), so forward that into it too.
+            if(
+                CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang"
+                AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "21.0.0"
+            )
+                list(
+                    APPEND
+                    _dxc_native_flags
+                    "-DCMAKE_CXX_FLAGS=-Wno-invalid-specialization"
+                )
+            endif()
+            # CROSS_TOOLCHAIN_FLAGS_NATIVE is one cache value that LLVM's
+            # CrossCompile hook expands (unquoted) into the NATIVE configure
+            # command. Escape the ";" so these -D flags survive as a single argv
+            # element through this file's DXC-configure execute_process, then
+            # re-split into separate arguments in the NATIVE configure.
+            string(REPLACE ";" "\\;" _dxc_native_flags "${_dxc_native_flags}")
+            list(
+                APPEND
+                _dxc_forwarded_config_args
+                "-DCROSS_TOOLCHAIN_FLAGS_NATIVE=${_dxc_native_flags}"
+            )
+        endif()
     endif()
 
     # DXC's build (PredefinedParams.cmake) is designed for a single-config
