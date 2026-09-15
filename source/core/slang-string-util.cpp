@@ -864,19 +864,23 @@ String StringUtil::replaceAll(
         return SLANG_FAIL;
     }
 
-    Int value = 0;
+    UInt value = 0;
+    const UInt maxMagnitude = UInt(kMaxInt) + (negate ? 1 : 0);
     // Do the digits
     for (; cur < end; ++cur)
     {
         const auto d = getDigit(*cur);
         if (d == -1)
             return SLANG_FAIL;
-        value = value * radix + d;
+        if (value > (maxMagnitude - UInt(d)) / UInt(radix))
+            return SLANG_FAIL;
+        value = value * UInt(radix) + UInt(d);
     }
 
-    value = negate ? -value : value;
-
-    outValue = value;
+    if (negate)
+        outValue = value == maxMagnitude ? -kMaxInt - 1 : -Int(value);
+    else
+        outValue = Int(value);
     return SLANG_OK;
 }
 
