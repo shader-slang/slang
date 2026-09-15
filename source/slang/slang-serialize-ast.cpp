@@ -413,7 +413,7 @@ struct ContainerDeclDirectMemberDeclsInfo
 %   "BuiltinRequirementKind",
 %   "BuiltinOperationKind",
 %   "ImageFormat",
-%   "PreferRecomputeAttribute::SideEffectBehavior",
+%   "SideEffectBehavior",
 %   "TreatAsDifferentiableExpr::Flavor",
 %   "LogicOperatorShortCircuitExpr::Flavor",
 %   "RequirementWitness::Flavor",
