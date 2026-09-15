@@ -2535,6 +2535,11 @@ ImageFormat inferImageFormatFromTextureType(
 
 void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
 {
+    // Matrix layout modifiers are `TypeModifier`s, so for ordinary declarators the parser
+    // moves them onto the type expression and `visitModifiedTypeExpr` bakes in the layout.
+    // A traditional-style function parameter (leading-modifier syntax), however, parses its
+    // modifiers before its type and keeps them on the decl, so this decl-side branch remains
+    // the applier for that path.
     if (auto matrixType = as<MatrixExpressionType>(varDecl->type.type))
     {
         if (auto matrixLayoutModifier = varDecl->findModifier<MatrixLayoutModifier>())
