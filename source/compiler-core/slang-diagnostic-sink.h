@@ -257,6 +257,19 @@ public:
         return diagnoseRichImpl(d.toGenericDiagnostic(), D::getInfo());
     }
 
+    /// Emit rich diagnostic `d`, but with its severity replaced by `severity`. For diagnostics whose
+    /// severity is chosen dynamically (e.g. one that is a warning by default but is raised to an
+    /// error by a language version).
+    template<typename D>
+    bool diagnoseWithSeverity(Severity severity, D const& d)
+    {
+        // Copy the diagnostic's static metadata before overriding the severity, so a per-emission
+        // choice never mutates the shared `DiagnosticInfo` that every other call site reads.
+        DiagnosticInfo info = *D::getInfo();
+        info.severity = severity;
+        return diagnoseRichImpl(d.toGenericDiagnostic(), &info);
+    }
+
     // Useful for notes on existing diagnostics, where it would be redundant to display the same
     // line again. (Ideally we would print the error/warning and notes in one call...)
     template<typename P, typename... Args>

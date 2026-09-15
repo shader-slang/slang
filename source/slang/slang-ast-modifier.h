@@ -1466,6 +1466,18 @@ class NoDiscardAttribute : public Attribute
     FIDDLE(...)
 };
 
+// A `[DiscardableResult]` attribute, which indicates that the result of a
+// function call may be discarded without a diagnostic. It marks a function
+// whose result is often ignored on purpose (e.g. an atomic operation that both
+// updates memory and returns the previous value), so that discarding its result
+// in a statement-like context does not draw the discarded-result warning.
+//
+FIDDLE()
+class DiscardableResultAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 // A `[constref]` attribute, which indicates that the `this` parameter of
 // a member function should be passed by const reference.
 //

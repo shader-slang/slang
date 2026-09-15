@@ -16280,6 +16280,14 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
         {
             getSink()->diagnose(Diagnostics::NoDiscardOnVoidFunction{.decl = decl});
         }
+
+        // `[NoDiscard]` (result must not be discarded) and `[DiscardableResult]` (result may be
+        // discarded) are contradictory, so reject their combination rather than defining a silent
+        // precedence between them.
+        if (decl->findModifier<DiscardableResultAttribute>())
+        {
+            getSink()->diagnose(Diagnostics::NoDiscardAndDiscardableResult{.decl = decl});
+        }
     }
 
     checkInterfaceRequirement(decl);
