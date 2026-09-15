@@ -9,15 +9,11 @@
 uniform uint gScalar;
 uniform uint gArr[4];
 
-// A standalone `bool` uniform is the empirical pin for this fix's design. If the CUDA
-// `__constant__` path legalized `bool` storage (inserting a `BitCast`/`GetOffsetPtr`, as the
-// SPIR-V/SBT path does), this load would evade a `getRootAddr`-rooted guard and re-emit `__ldg`.
-// It does not — so reusing `getRootAddr` suffices and no shape-independent peel-walker is needed.
+// A standalone `bool` and 16-bit scalars are the small types most susceptible to storage
+// legalization. On the CUDA `__constant__` path they are not legalized: their loads root at the
+// group via `FieldAddress`/`GetElementPtr` (no `BitCast`/`GetOffsetPtr`), so `CHECK-NOT: __ldg`
+// holds for them too.
 uniform bool gFlag;
-
-// 16-bit scalars are the other shape where storage legalization *could* splice a
-// `BitCast`/`GetOffsetPtr` between the load and the group root (the #10188/#11152 failure mode). It
-// does not on the CUDA `__constant__` path, so these too root at the group via `getRootAddr`.
 uniform half gHalf;
 uniform uint16_t gU16;
 
