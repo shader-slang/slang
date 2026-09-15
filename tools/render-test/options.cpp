@@ -17,7 +17,6 @@ namespace renderer_test
 {
 using namespace Slang;
 
-// Helper function to check if a feature name is valid
 static bool isValidFeatureName(const UnownedStringSlice& featureName)
 {
 #define SLANG_RHI_FEATURES_X(id, name) name,
