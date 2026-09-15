@@ -1,5 +1,8 @@
 # Glossary
 
+[Breakable Statement](statements-break-and-continue.md)
+: A statement that can be exited using a [`break` statement](statements-break-and-continue.md).
+
 [Compute Dispatch](basics-program-execution.md)
 : See Dispatch.
 
