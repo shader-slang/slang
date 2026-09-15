@@ -34,7 +34,8 @@ RWStructuredBuffer<int> input;
 //TEST_INPUT: set output = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> output;
 
-// CUDA: addCopyElision{{.*}}Data{{.*}}*{{.*}}data
+// This projected one-word value need not acquire an address for the call.
+// CUDA: addCopyElision{{.*}}(Data_{{[0-9]+}} data
 int addCopyElision(Data data, int val)
 {
     // ensure we do not introduce a temporary

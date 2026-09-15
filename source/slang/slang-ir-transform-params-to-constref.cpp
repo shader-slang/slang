@@ -1,5 +1,7 @@
 #include "slang-ir-transform-params-to-constref.h"
 
+#include "slang-ir-clone.h"
+#include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -13,9 +15,14 @@ struct TransformParamsToConstRefContext
     DiagnosticSink* sink;
     IRBuilder builder;
     bool changed = false;
+    CodeGenContext* cudaContext = nullptr;
+    Dictionary<IRSimpleSpecializationKey, IRStructType*> compactTypes;
 
-    TransformParamsToConstRefContext(IRModule* module, DiagnosticSink* sink)
-        : module(module), sink(sink), builder(module)
+    TransformParamsToConstRefContext(
+        IRModule* module,
+        DiagnosticSink* sink,
+        CodeGenContext* cudaContext = nullptr)
+        : module(module), sink(sink), builder(module), cudaContext(cudaContext)
     {
     }
 
@@ -25,6 +32,18 @@ struct TransformParamsToConstRefContext
         auto type = param->getDataType();
         if (!type)
             return false;
+
+        // Small CUDA values need not acquire an address solely for a call. Share
+        // buffer-load specialization's estimate of when passing a composite value
+        // becomes expensive; its size threshold is a cost heuristic, not an ABI limit.
+        // Only change internal definitions with understood direct calls.
+        if (cudaContext && isScalarOrVectorRecord(type) && hasOnlyFieldReads(param))
+        {
+            bool preserveOriginal;
+            if (canRewriteValueParameters(getParentFunc(param), preserveOriginal) &&
+                !preserveOriginal && !isTypePreferrableToDeferLoad(cudaContext, type))
+                return false;
+        }
 
         switch (type->getOp())
         {
@@ -38,6 +57,41 @@ struct TransformParamsToConstRefContext
             return false;
         }
 
+        return true;
+    }
+
+    // Return whether type is a nonempty record containing only scalar/vector fields.
+    // Opaque and nested aggregate fields retain their separate ABI/lowering rules.
+    bool isScalarOrVectorRecord(IRType* type)
+    {
+        auto structType = as<IRStructType>(type);
+        if (!structType)
+            return false;
+        bool hasFields = false;
+        for (auto field : structType->getFields())
+        {
+            hasFields = true;
+            if (!isScalarOrVectorType(field->getFieldType()))
+                return false;
+        }
+        return hasFields;
+    }
+
+    // Return whether every use is an undecorated field read, excluding unused
+    // parameters and address-observing/whole-value uses. Optionally collect field
+    // keys; callers must ignore the possibly partial collection on failure.
+    bool hasOnlyFieldReads(IRParam* param, HashSet<IRInst*>* outFieldKeys = nullptr)
+    {
+        if (!param->firstUse)
+            return false;
+        for (auto use = param->firstUse; use; use = use->nextUse)
+        {
+            auto extract = as<IRFieldExtract>(use->getUser());
+            if (!extract || extract->getBase() != param || extract->getFirstDecoration())
+                return false;
+            if (outFieldKeys)
+                outFieldKeys->add(extract->getField());
+        }
         return true;
     }
 
@@ -299,6 +353,231 @@ struct TransformParamsToConstRefContext
         return true;
     }
 
+    // Return whether known direct calls may use a rewritten value-parameter signature.
+    // On success, preserveOriginal is false for in-place rewriting, or true when
+    // exports/opaque users require a private specialization and an unchanged original.
+    // On failure, neither rewrite is allowed and preserveOriginal must be ignored.
+    // Unfamiliar metadata may encode parameter positions without referencing IRParam,
+    // so inspecting value uses alone is insufficient.
+    bool canRewriteValueParameters(IRFunc* func, bool& preserveOriginal)
+    {
+        preserveOriginal = false;
+        if (func->getParent() != module->getModuleInst())
+            return false;
+        for (auto decoration : func->getDecorations())
+        {
+            switch (decoration->getOp())
+            {
+            // IR export is the linked Slang name. Source exports below retain their
+            // signature and body; only a private copy may use compact arguments.
+            case kIROp_ExportDecoration:
+            case kIROp_NameHintDecoration:
+            case kIROp_NoInlineDecoration:
+            case kIROp_ReadNoneDecoration:
+            case kIROp_NoSideEffectDecoration:
+                break;
+            case kIROp_HLSLExportDecoration:
+            case kIROp_KeepAliveDecoration:
+                preserveOriginal = true;
+                break;
+            default:
+                return false;
+            }
+        }
+        for (auto param : func->getParams())
+        {
+            for (auto decoration : param->getDecorations())
+            {
+                switch (decoration->getOp())
+                {
+                case kIROp_NameHintDecoration:
+                case kIROp_GlobalInputDecoration:
+                case kIROp_GlobalOutputDecoration:
+                    break;
+                default:
+                    return false;
+                }
+            }
+        }
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            auto call = as<IRCall>(use->getUser());
+            if (!call || call->getCalleeUse() != use)
+            {
+                // Keep metadata, callbacks, and other opaque users on the original
+                // signature. Only direct calls can select a private specialization.
+                preserveOriginal = true;
+                continue;
+            }
+            for (auto decoration : call->getDecorations())
+            {
+                switch (decoration->getOp())
+                {
+                case kIROp_NameHintDecoration:
+                case kIROp_ReadNoneDecoration:
+                case kIROp_NoSideEffectDecoration:
+                    break;
+                default:
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    // Collect fields for an eligible compact value payload, in declaration order.
+    // The caller supplies an empty list and must ignore it on failure.
+    // Consider f(State snapshot, inout State original) where State contains an unused
+    // array and f reads only snapshot.a and snapshot.b. Passing those scalar values
+    // avoids a second array-sized local copy while preserving f's call boundary.
+    // Extract from the original SSA argument, never from a borrowed address: another
+    // argument or the callee may mutate original after the snapshot was evaluated.
+    bool getPrunableValueFields(IRParam* param, List<IRStructField*>& fields)
+    {
+        auto structType = as<IRStructType>(param->getDataType());
+        if (!structType || param->getFullType() != structType || !param->firstUse)
+            return false;
+        for (auto decoration : param->getDecorations())
+            if (!as<IRNameHintDecoration>(decoration))
+                return false;
+
+        HashSet<IRInst*> usedKeys;
+        if (!hasOnlyFieldReads(param, &usedKeys))
+            return false;
+
+        bool dropsArray = false;
+        for (auto field : structType->getFields())
+        {
+            auto fieldType = field->getFieldType();
+            if (!usedKeys.contains(field->getKey()))
+            {
+                dropsArray |= as<IRArrayType>(fieldType) != nullptr;
+                continue;
+            }
+            // Aggregate, pointer and resource fields have separate lowering rules;
+            // only scalar/vector fields participate in the compact value payload.
+            auto elementType = fieldType;
+            if (auto vectorType = as<IRVectorType>(elementType))
+                elementType = vectorType->getElementType();
+            if (!as<IRBasicType>(elementType))
+                return false;
+            fields.add(field);
+        }
+        if (!dropsArray || fields.getCount() == 0)
+            return false;
+        return true;
+    }
+
+    // Return the cached private payload type, creating it for this ordered field
+    // selection if needed. Selected fields remain one argument; the source/resource
+    // type is never replaced.
+    IRStructType* getOrCreateCompactType(IRType* originalType, const List<IRStructField*>& fields)
+    {
+        IRSimpleSpecializationKey key;
+        key.vals.add(originalType);
+        for (auto field : fields)
+            key.vals.add(field->getKey());
+        if (auto type = compactTypes.tryGetValue(key))
+            return *type;
+
+        builder.setInsertBefore(originalType);
+        auto type = builder.createStructType();
+        builder.addNameHintDecoration(type, UnownedStringSlice("ValueFields"));
+        for (auto field : fields)
+        {
+            auto fieldKey = builder.createStructKey();
+            if (auto name = field->getKey()->findDecoration<IRNameHintDecoration>())
+                builder.addNameHintDecoration(fieldKey, name->getName());
+            builder.createStructField(type, fieldKey, field->getFieldType());
+        }
+        compactTypes.add(key, type);
+        return type;
+    }
+
+    // Preserve an exported or indirectly referenced function and specialize only its
+    // known calls. Cloning keeps block/value mappings in the existing IR infrastructure;
+    // only linkage on the new private definition is removed.
+    IRFunc* specializeValueCalls(IRFunc* func)
+    {
+        List<IRCall*> calls;
+        for (auto use = func->firstUse; use; use = use->nextUse)
+            if (auto call = as<IRCall>(use->getUser()))
+                if (call->getCalleeUse() == use)
+                    calls.add(call);
+        if (!calls.getCount())
+            return nullptr;
+
+        builder.setInsertBefore(func);
+        IRCloneEnv env;
+        auto specialized = as<IRFunc>(cloneInst(&env, &builder, func));
+        for (auto decoration = specialized->getFirstDecoration(); decoration;)
+        {
+            auto next = decoration->getNextDecoration();
+            if (as<IRLinkageDecoration>(decoration) || as<IRHLSLExportDecoration>(decoration) ||
+                as<IRKeepAliveDecoration>(decoration))
+                decoration->removeAndDeallocate();
+            decoration = next;
+        }
+        if (auto name = specialized->findDecoration<IRNameHintDecoration>())
+        {
+            StringBuilder specializedName;
+            specializedName << name->getName() << "_compact";
+            name->removeAndDeallocate();
+            builder.addNameHintDecoration(specialized, specializedName.getUnownedSlice());
+        }
+        for (auto call : calls)
+            call->getCalleeUse()->set(specialized);
+        return specialized;
+    }
+
+    // Rewrite an eligible parameter, its field reads and all direct call arguments.
+    // The caller must already have established that func can be rewritten in place,
+    // using a private specialization first if its original signature must survive.
+    // Return false without changing IR when the parameter is ineligible.
+    bool tryPruneValueParameter(IRFunc* func, IRParam* param)
+    {
+        List<IRStructField*> fields;
+        if (!getPrunableValueFields(param, fields))
+            return false;
+
+        List<IRFieldExtract*> extracts;
+        for (auto use = param->firstUse; use; use = use->nextUse)
+            extracts.add(as<IRFieldExtract>(use->getUser()));
+
+        UInt paramIndex = 0;
+        for (auto other : func->getParams())
+        {
+            if (other == param)
+                break;
+            ++paramIndex;
+        }
+        List<IRCall*> calls;
+        traverseUsers<IRCall>(func, [&](IRCall* call) { calls.add(call); });
+
+        auto compactType = getOrCreateCompactType(param->getDataType(), fields);
+        Dictionary<IRInst*, IRInst*> compactKeys;
+        Index fieldIndex = 0;
+        for (auto field : compactType->getFields())
+            compactKeys.add(fields[fieldIndex++]->getKey(), field->getKey());
+        param->setFullType(compactType);
+        for (auto extract : extracts)
+            extract->setOperand(1, compactKeys[extract->getField()]);
+        fixUpFuncType(func);
+        for (auto call : calls)
+        {
+            builder.setInsertBefore(call);
+            IRBuilderSourceLocRAII sourceLoc(&builder, call->sourceLoc);
+            List<IRInst*> values;
+            for (auto field : fields)
+                values.add(builder.emitFieldExtract(
+                    field->getFieldType(),
+                    call->getArg(paramIndex),
+                    field->getKey()));
+            call->getArgs()[paramIndex].set(builder.emitMakeStruct(compactType, values));
+        }
+        return true;
+    }
+
     // Process a single function
     void processFunc(IRFunc* func)
     {
@@ -412,6 +691,48 @@ struct TransformParamsToConstRefContext
             addFuncsToCallListInTopologicalOrder(func, functionsToProcess, visitedCandidates);
         }
 
+        if (cudaContext)
+        {
+            // Do this before any value parameter becomes a borrow-in pointer. Callee
+            // rewrites expose field reads at forwarding call sites in their callers.
+            for (auto originalFunc : functionsToProcess)
+            {
+                bool preserveOriginal;
+                if (!canRewriteValueParameters(originalFunc, preserveOriginal))
+                    continue;
+                auto func = originalFunc;
+                if (preserveOriginal)
+                {
+                    bool hasPrunableParam = false;
+                    for (auto param : func->getParams())
+                    {
+                        List<IRStructField*> fields;
+                        hasPrunableParam |= getPrunableValueFields(param, fields);
+                    }
+                    if (!hasPrunableParam)
+                        continue;
+                    func = specializeValueCalls(func);
+                    if (!func)
+                        continue;
+                }
+                List<IRParam*> params;
+                for (auto param : func->getParams())
+                    params.add(param);
+                for (auto param : params)
+                    changed |= tryPruneValueParameter(func, param);
+            }
+            // Specializations add call-graph edges. Recompute the order so borrowing
+            // still processes every callee before callers, including new definitions.
+            functionsToProcess.clear();
+            visitedCandidates.clear();
+            for (auto inst : module->getGlobalInsts())
+                if (auto func = as<IRFunc>(inst))
+                    addFuncsToCallListInTopologicalOrder(
+                        func,
+                        functionsToProcess,
+                        visitedCandidates);
+        }
+
         // Process each function
         for (auto func : functionsToProcess)
         {
@@ -422,9 +743,12 @@ struct TransformParamsToConstRefContext
     }
 };
 
-SlangResult transformParamsToConstRef(IRModule* module, DiagnosticSink* sink)
+SlangResult transformParamsToConstRef(
+    IRModule* module,
+    DiagnosticSink* sink,
+    CodeGenContext* cudaContext)
 {
-    TransformParamsToConstRefContext context(module, sink);
+    TransformParamsToConstRefContext context(module, sink, cudaContext);
     return context.processModule();
 }
 
