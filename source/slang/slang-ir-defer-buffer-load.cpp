@@ -227,6 +227,10 @@ struct DeferBufferLoadContext
     // this cache (or stop sharing it) at that point.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
 
+    // If this function (or anything else added to this pass) starts adding/removing an
+    // `IRNoSideEffectDecoration`/`IRReadNoneDecoration` or creating/deleting an `IRAnnotation`,
+    // it must also clear or stop sharing `calleeSideEffectCache` above -- that field's
+    // never-cleared soundness depends on this function never doing so.
     void deferBufferLoadInst(IRBuilder& builder, List<IRInst*>& workList, IRInst* loadInst)
     {
         bool failDueToAttributeFound = false;

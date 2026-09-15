@@ -134,9 +134,10 @@ void simplifyNonSSAIR(
     DiagnosticSink* sink)
 {
     // Shared with removeRedundancy below, not just eliminateDeadCode -- see
-    // slang-ir-redundancy-removal.h for why that consumer needs the cache cleared more eagerly
-    // than DCE's own staleness tolerance would require. Cleared every iteration, mirroring
-    // simplifyIR's own per-iteration clear.
+    // slang-ir-redundancy-removal.h for why a stale entry isn't automatically safe for that
+    // consumer the way it is for DCE. No step in this loop currently mutates callee purity, so
+    // this per-iteration clear is a defensive safeguard, not a live correctness requirement --
+    // mirroring simplifyIR's clear so the loop doesn't come to depend on that staying true.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
