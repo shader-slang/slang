@@ -28,8 +28,8 @@ int getWaveCount()
 // so blockDim is present and the default static_assert ("Only support compute stage") is not taken.
 // CHECK: __forceinline__ __device__ int getWaveCount
 // CHECK: blockDim
-// CHECK: __global__ void forward
 // CHECK-NOT: Only support compute stage
+// CHECK: __global__ void forward
 [CUDAKernel]
 void forward(TensorView<float> output)
 {

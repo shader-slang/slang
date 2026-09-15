@@ -2394,10 +2394,16 @@ struct LLVMEmitter
         // Attach attributes based on decorations!
         if (func->findDecoration<IRReadNoneDecoration>())
             funcAttributes |= SLANG_LLVM_FUNC_ATTR_READNONE;
-        if (func->findDecoration<IRForceInlineDecoration>() ||
-            func->findDecoration<IRUserForceInlineDecoration>())
+        // LLVM's verifier rejects a function that carries both `alwaysinline` and `noinline`. When
+        // a force-inline (compiler-mandated `ForceInline` or a user `[ForceInline]` hint) coexists
+        // with `[noinline]` on a function that survives inlining (e.g. an exported one), the inline
+        // request wins and `noinline` is suppressed — matching the precedence the CUDA emitter
+        // applies to `__forceinline__`/`__noinline__` (shader-slang/slang#12623).
+        bool hasForceInline = func->findDecoration<IRForceInlineDecoration>() ||
+                              func->findDecoration<IRUserForceInlineDecoration>();
+        if (hasForceInline)
             funcAttributes |= SLANG_LLVM_FUNC_ATTR_ALWAYSINLINE;
-        if (func->findDecoration<IRNoInlineDecoration>())
+        if (!hasForceInline && func->findDecoration<IRNoInlineDecoration>())
             funcAttributes |= SLANG_LLVM_FUNC_ATTR_NOINLINE;
 
         LLVMInst* llvmFunc = builder->declareFunction(llvmFuncType, linkageName, funcAttributes);
