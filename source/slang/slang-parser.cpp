@@ -3459,8 +3459,8 @@ static Expr* parseHLSLTraditionalIntegerTypeSpecifier(Parser* parser)
             typeNameBuilder << " long";
 
         // C and C++ also allow a trailing `int` in spellings such as `unsigned short int`.
-        // Slang does not support the type, but consuming the complete recognizable spelling avoids
-        // a misleading follow-on parse error at the trailing token.
+        // Consume it as part of the unsupported spelling so it does not produce an unrelated
+        // follow-on error.
         if (widthToken.getContent() != "char" && AdvanceIf(parser, "int"))
             typeNameBuilder << " int";
     }
