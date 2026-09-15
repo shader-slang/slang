@@ -1767,19 +1767,20 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     void processDefaultConstruct(IRInst* inst)
     {
         // Handle DefaultConstruct for DescriptorHandleType.
-        // In SPIRV, DescriptorHandle is lowered to uint64 (spvBindlessTextureNV) or uint2.
-        // A default-constructed handle should be a zero value.
+        // In SPIRV, DescriptorHandle is lowered to uint64 (spvBindlessTextureNV, texture/sampler
+        // kinds only) or uint2. A default-constructed handle should be a zero value.
         auto type = inst->getDataType();
         if (type && type->getOp() == kIROp_DescriptorHandleType)
         {
             IRBuilder builder(m_module);
             builder.setInsertBefore(inst);
             auto targetCaps = m_sharedContext->m_targetProgram->getTargetReq()->getTargetCaps();
+            bool hasBindlessTextureNV = targetCaps.implies(CapabilityAtom::spvBindlessTextureNV);
 
             IRInst* castInst = nullptr;
-            if (targetCaps.implies(CapabilityAtom::spvBindlessTextureNV))
+            if (isDescriptorHandleRepresentedAsUInt64(type, hasBindlessTextureNV))
             {
-                // spvBindlessTextureNV: DescriptorHandle is uint64_t
+                // uint64 form (texture/sampler kinds under spvBindlessTextureNV)
                 auto uint64Type = builder.getUInt64Type();
                 auto zero64 = builder.getIntValue(uint64Type, 0);
                 castInst =
@@ -1961,8 +1962,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         SLANG_ASSERT(paramTypes.getCount() >= 4);
 
+        // Consider `matrix.MapElement((..., value) => value * scale)`. The map instruction passes
+        // the lambda's capture struct as an optional operand. The callback must accept that same
+        // struct value so SPIR-V sees identical operand and parameter types.
         IRType* tempTypes[4];
-        tempTypes[3] = builder.getPtrType(paramTypes[0]);
+        tempTypes[3] = paramTypes[0];
         tempTypes[0] = paramTypes[1];
         tempTypes[1] = paramTypes[2];
         tempTypes[2] = paramTypes[3];
@@ -1987,7 +1991,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
 
         IRInst* tempParams[4];
-        tempParams[0] = builder.emitLoad(params[3]);
+        tempParams[0] = params[3];
         tempParams[1] = params[0];
         tempParams[2] = params[1];
         tempParams[3] = params[2];
@@ -2014,6 +2018,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // a struct instead of an int.
         if (inst->hasIFuncThis())
         {
+            SLANG_ASSERT(ifuncCall->getParamType(0) == inst->getIFuncThis()->getDataType());
             auto funcSynth = createWrapperFunctionForPerElement(builder, ifuncCall);
             inst->setIFuncCall(funcSynth);
         }

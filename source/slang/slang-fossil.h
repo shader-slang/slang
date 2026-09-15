@@ -21,6 +21,25 @@
 #include <optional>
 #include <type_traits>
 
+// Validation checks on deserialized data guard against mal-formed input, but
+// cost performance on a hot path (loading the trusted core module out of
+// `slang.dll`). This build option selects whether they are compiled in.
+//
+#ifndef SLANG_ENABLE_VALIDATION_FOSSIL
+#define SLANG_ENABLE_VALIDATION_FOSSIL 0
+#endif
+
+#if SLANG_ENABLE_VALIDATION_FOSSIL
+#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION)                             \
+    do                                                                         \
+    {                                                                          \
+        if (!(CONDITION))                                                      \
+            SLANG_UNEXPECTED("invalid format encountered in serialized data"); \
+    } while (0)
+#else
+#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION) SLANG_ASSERT(CONDITION)
+#endif
+
 namespace Slang
 {
 

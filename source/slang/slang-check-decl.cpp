@@ -351,14 +351,12 @@ static bool isAssociatedTypeDecl(Decl* decl)
 
 bool isSlang2026OrLater(SemanticsVisitor* visitor)
 {
-    return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
-           SLANG_LANGUAGE_VERSION_2026;
+    return visitor->getShared()->getLanguageVersion() >= SLANG_LANGUAGE_VERSION_2026;
 }
 
 bool isSlang202cOrLater(SemanticsVisitor* visitor)
 {
-    return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
-           SLANG_LANGUAGE_VERSION_202C;
+    return visitor->getShared()->getLanguageVersion() >= SLANG_LANGUAGE_VERSION_202C;
 }
 
 static bool allowExperimentalDynamicDispatch(
@@ -2548,7 +2546,7 @@ void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
                 matrixType->getElementType(),
                 matrixType->getRowCount(),
                 matrixType->getColumnCount(),
-                getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
+                getASTBuilder()->getIntVal(matrixType->getLayout()->getType(), matrixLayout));
             varDecl->type.type = newMatrixType;
         }
     }
@@ -6377,7 +6375,7 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
     if (!conformance)
     {
         for (auto requirementDecl : addedRequirementDecls)
-            witnessTable->m_requirementDictionary.remove(requirementDecl);
+            witnessTable->removeRequirement(InterfaceRequirementKey(requirementDecl));
     }
     return conformance;
 }
@@ -7122,11 +7120,15 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             .as<CallableDecl>();
 
     SLANG_ASSERT(requiredFuncDeclRef);
-    ConformanceCheckingContext subContext = *context;
-    subContext.parentDecl = synGenericDecl;
+    RefPtr<ConformanceCheckingContext> subContext = new ConformanceCheckingContext();
+    subContext->conformingType = context->conformingType;
+    subContext->conformingWitness = context->conformingWitness;
+    subContext->parentDecl = synGenericDecl;
+    subContext->rootInheritanceDecl = context->rootInheritanceDecl;
+    subContext->mapInterfaceToWitnessTable = context->mapInterfaceToWitnessTable;
 
     synGenericDecl->inner = synthesizeMethodSignatureForRequirementWitnessInner(
-        &subContext,
+        subContext,
         requiredFuncDeclRef,
         synArgs,
         synThis);
@@ -9930,6 +9932,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
 bool SemanticsVisitor::findDefaultInterfaceImpl(
     ConformanceCheckingContext* context,
     DeclRef<Decl> requiredMemberDeclRef,
+    SubtypeWitness* subTypeConformsToInterfaceWitness,
     RefPtr<WitnessTable> witnessTable)
 {
     // Interface default implementations are represented as callable stubs over
@@ -9980,7 +9983,7 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
     //    ```
     // Given this, we can simply form a GenericAppDeclRef to `IFoo::bar_defaultImpl`
     // with `This` being `context->conformingType` and `This:IFoo` being
-    // `context->conformingWitness`.
+    // `subTypeConformsToInterfaceWitness`.
     //
     // The following logic will create this declref, and register it to the witness table.
     //
@@ -9998,7 +10001,7 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
         m_astBuilder->getMemberDeclRef(interfaceDeclRef, genericDeclOfDefaultImplStub);
     List<Val*> specArgs;
     specArgs.add(context->conformingType);
-    specArgs.add(context->conformingWitness);
+    specArgs.add(subTypeConformsToInterfaceWitness);
 
     // Form a declref to `IFoo::bar_defaultImpl<conformingType>`.
     resultDeclRef = m_astBuilder->getGenericAppDeclRef(
@@ -10142,6 +10145,93 @@ static bool doesWitnessLookupPathContainDecl(SubtypeWitness* witness, Decl* targ
     return false;
 }
 
+/// Returns whether `declRef` still identifies a requirement rather than its satisfying declaration.
+///
+/// Most projected requirements have the interface as their decl-ref parent. A synthesized generic
+/// constraint requirement instead has its wrapping `GenericDecl` as the immediate parent while the
+/// inner declaration retains interface-requirement identity.
+static bool _doesDeclRefNameInterfaceRequirement(DeclRef<Decl> declRef)
+{
+    auto decl = declRef.getDecl();
+    if (as<InterfaceDecl>(declRef.getParent().getDecl()))
+        return true;
+    return as<GenericTypeConstraintDecl>(decl) && isInterfaceRequirement(decl);
+}
+
+bool SemanticsVisitor::ensureInheritedInterfaceRequirement(
+    ConformanceCheckingContext* context,
+    Type* subType,
+    DeclRef<InheritanceDecl> requiredInheritanceDeclRef,
+    RefPtr<WitnessTable> witnessTable,
+    InheritedInterfaceRequirementMode mode)
+{
+    auto requirementDecl = requiredInheritanceDeclRef.getDecl();
+    InterfaceRequirementKey requirementKey(requirementDecl);
+    auto reqType = getBaseType(m_astBuilder, requiredInheritanceDeclRef);
+    auto subIsReqWitness = tryGetSubtypeWitness(subType, reqType);
+    if (!subIsReqWitness)
+    {
+        // The current conformance can provide a path before the flattened inheritance cache has
+        // observed it. Preserve the actual specialized inheritance requirement in that path.
+        subIsReqWitness =
+            m_astBuilder->getDeclaredSubtypeWitness(subType, reqType, requiredInheritanceDeclRef);
+    }
+
+    bool isOnCanonicalPath =
+        doesWitnessLookupPathContainDecl(subIsReqWitness, requiredInheritanceDeclRef.getDecl());
+    if (!isOnCanonicalPath)
+    {
+        if (!witnessTable->containsRequirement(requirementKey))
+            witnessTable->add(requirementKey, RequirementWitness(subIsReqWitness));
+        return true;
+    }
+
+    RefPtr<WitnessTable> satisfyingWitnessTable;
+    RequirementWitness existingWitness;
+    if (witnessTable->tryGetRequirementWitness(requirementKey, existingWitness))
+    {
+        // A canonical inherited-interface entry is created only by this branch, including its
+        // `PrepareForLookup` mode, and is always a nested table. A non-canonical path stores a
+        // `SubtypeWitness` value in the branch above and is finalized without re-entering this
+        // canonical branch. Seeing that value here would mean the path classification or the
+        // per-requirement checking state has changed underneath an already-published entry.
+        SLANG_RELEASE_ASSERT(
+            existingWitness.getFlavor() == RequirementWitness::Flavor::witnessTable);
+        satisfyingWitnessTable = existingWitness.getWitnessTable();
+    }
+    else
+    {
+        satisfyingWitnessTable = new WitnessTable();
+        satisfyingWitnessTable->witnessedType = subType;
+        satisfyingWitnessTable->baseType = reqType;
+        witnessTable->add(requirementKey, RequirementWitness(satisfyingWitnessTable));
+    }
+
+    auto reqInterfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(reqType);
+    if (reqInterfaceDeclRef)
+    {
+        registerConformanceInterfaceCheckingState(
+            context,
+            subType,
+            reqType,
+            requirementDecl,
+            reqInterfaceDeclRef,
+            satisfyingWitnessTable,
+            subIsReqWitness);
+    }
+
+    if (mode == InheritedInterfaceRequirementMode::PrepareForLookup)
+        return true;
+
+    return checkConformanceToType(
+        context,
+        subType,
+        requirementDecl,
+        reqType,
+        subIsReqWitness,
+        satisfyingWitnessTable);
+}
+
 bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     ConformanceCheckingContext* context,
     Type* subType,
@@ -10153,7 +10243,6 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     SubtypeWitness* subTypeConformsToSuperInterfaceWitness)
 {
     SLANG_UNUSED(superInterfaceDeclRef)
-    SLANG_UNUSED(subTypeConformsToSuperInterfaceWitness);
     SLANG_UNUSED(superInterfaceType);
 
 
@@ -10183,11 +10272,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // IBackwardDifferentiable<This.f<T>>) }`. Do not treat that wrapped constraint shape as
     // already resolved just because the decl-ref parent is the generic wrapper; it still needs its
     // own witness-table entry.
-    auto requiredDecl = requiredMemberDeclRef.getDecl();
-    auto isGenericWrappedConstraintRequirement =
-        as<GenericTypeConstraintDecl>(requiredDecl) && isInterfaceRequirement(requiredDecl);
-    if (!as<InterfaceDecl>(requiredMemberDeclRef.getParent().getDecl()) &&
-        !isGenericWrappedConstraintRequirement)
+    if (!_doesDeclRefNameInterfaceRequirement(requiredMemberDeclRef))
     {
         return true;
     }
@@ -10207,7 +10292,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // actually conform to `__BuiltinIntegerType`. Respecting a synthesis-provided
     // witness here is therefore the contract, not a constraint-specific quirk.
     //
-    if (witnessTable->getRequirementDictionary().containsKey(requiredMemberDeclRef.getDecl()))
+    if (witnessTable->containsRequirement(InterfaceRequirementKey(requiredMemberDeclRef.getDecl())))
     {
         return true;
     }
@@ -10351,62 +10436,12 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     //
     if (auto requiredInheritanceDeclRef = requiredMemberDeclRef.as<InheritanceDecl>())
     {
-        // Recursively check that the type conforms
-        // to the inherited interface.
-        //
-        // TODO: we *really* need a linearization step here!!!!
-
-        auto reqType = getBaseType(m_astBuilder, requiredInheritanceDeclRef);
-        auto subIsReqWitness = tryGetSubtypeWitness(subType, reqType);
-        if (!subIsReqWitness)
-        {
-            // `requiredInheritanceDeclRef` is the inherited-interface requirement being checked,
-            // looked up through `subTypeConformsToSuperInterfaceWitness`. When no cached/global
-            // path exists yet, the current conformance itself provides the path: `subType`
-            // conforms to `superInterfaceType`, and that interface inherits `reqType`. This case
-            // matters for compiler-synthesized enum conformances, where the `__EnumType` witness
-            // table is being populated before `TonemapMode : ILogical` has appeared in the
-            // flattened inheritance cache. Build the declared witness from the actual inheritance
-            // decl-ref so the nested witness table below can synthesize `ILogical` requirements.
-            subIsReqWitness = m_astBuilder->getDeclaredSubtypeWitness(
-                subType,
-                reqType,
-                requiredInheritanceDeclRef);
-        }
-
-        bool isOnCanonicalPath =
-            doesWitnessLookupPathContainDecl(subIsReqWitness, requiredInheritanceDeclRef.getDecl());
-        if (isOnCanonicalPath)
-        {
-            // Only create a nested witness table if this is the canonical path.
-            RefPtr<WitnessTable> satisfyingWitnessTable = new WitnessTable();
-            satisfyingWitnessTable->witnessedType = subType;
-            satisfyingWitnessTable->baseType = reqType;
-
-            witnessTable->add(
-                requiredInheritanceDeclRef.getDecl(),
-                RequirementWitness(satisfyingWitnessTable));
-
-            if (!checkConformanceToType(
-                    context,
-                    subType,
-                    requiredInheritanceDeclRef.getDecl(),
-                    reqType,
-                    subIsReqWitness,
-                    satisfyingWitnessTable))
-            {
-                return false;
-            }
-        }
-        else
-        {
-            // Otherwise, store a reference to the canonical path instead.
-            witnessTable->add(
-                requiredInheritanceDeclRef.getDecl(),
-                RequirementWitness(subIsReqWitness));
-        }
-
-        return true;
+        return ensureInheritedInterfaceRequirement(
+            context,
+            subType,
+            requiredInheritanceDeclRef,
+            witnessTable,
+            InheritedInterfaceRequirementMode::CheckConformance);
     }
 
     // We will look up members with the same name,
@@ -10559,7 +10594,11 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // Finally, if there is a default implementation for the required member,
     // we can use that as a witness.
     //
-    if (findDefaultInterfaceImpl(context, requiredMemberDeclRef, witnessTable))
+    if (findDefaultInterfaceImpl(
+            context,
+            requiredMemberDeclRef,
+            subTypeConformsToSuperInterfaceWitness,
+            witnessTable))
         return true;
 
     // We failed to find a member of the type that can be used
@@ -10629,19 +10668,625 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     return false;
 }
 
+SemanticsVisitor::ConformanceRequirementCheckResult SemanticsVisitor::ensureConformanceRequirement(
+    ConformanceCheckingContext* context,
+    Type* subType,
+    Type* superInterfaceType,
+    InheritanceDecl* inheritanceDecl,
+    DeclRef<InterfaceDecl> superInterfaceDeclRef,
+    DeclRef<Decl> requiredMemberDeclRef,
+    RefPtr<WitnessTable> witnessTable,
+    SubtypeWitness* subTypeConformsToSuperInterfaceWitness)
+{
+    auto requirementDecl = requiredMemberDeclRef.getDecl();
+
+    // A resolved declaration reference already names the concrete satisfying declaration rather
+    // than a key in this interface table. `ThisType` is likewise synthesized structurally by
+    // requirement lookup. Neither case owns a table entry or per-entry checking state.
+    if (as<ThisTypeDecl>(requirementDecl) ||
+        !_doesDeclRefNameInterfaceRequirement(requiredMemberDeclRef))
+    {
+        return ConformanceRequirementCheckResult::Satisfied;
+    }
+
+    InterfaceRequirementKey requirementKey(requirementDecl);
+
+    auto previousState = witnessTable->getRequirementCheckState(requirementKey);
+    switch (previousState)
+    {
+    case RequirementCheckState::Succeeded:
+        SLANG_RELEASE_ASSERT(witnessTable->containsRequirement(requirementKey));
+        return ConformanceRequirementCheckResult::Satisfied;
+    case RequirementCheckState::Failed:
+        SLANG_RELEASE_ASSERT(!witnessTable->containsRequirement(requirementKey));
+        return ConformanceRequirementCheckResult::Failed;
+    case RequirementCheckState::Checking:
+        // Consider this example:
+        //
+        //     interface IA { associatedtype A : IB; }
+        //     interface IB { associatedtype B : IA; }
+        //
+        // Resolving one entry may legitimately request another entry that eventually reaches the
+        // first. The outer request still owns the attempt and may make progress after this nested
+        // request unwinds, so report the dependency instead of diagnosing a declaration cycle.
+        return ConformanceRequirementCheckResult::InProgress;
+    case RequirementCheckState::WitnessReady:
+        {
+            RequirementWitness preparedWitness;
+            SLANG_RELEASE_ASSERT(
+                witnessTable->tryGetRequirementWitness(requirementKey, preparedWitness));
+            SLANG_RELEASE_ASSERT(
+                preparedWitness.getFlavor() == RequirementWitness::Flavor::witnessTable);
+            break;
+        }
+    case RequirementCheckState::Unchecked:
+        break;
+    }
+
+    // Conformance synthesis can populate a final witness before ordinary requirement checking
+    // reaches it. A witness deliberately marked `WitnessReady`, in contrast, is only a structural
+    // answer published to break a recursive lookup path and still needs validation below.
+    if (previousState == RequirementCheckState::Unchecked &&
+        witnessTable->containsRequirement(requirementKey))
+    {
+        witnessTable->setRequirementCheckState(requirementKey, RequirementCheckState::Succeeded);
+        return ConformanceRequirementCheckResult::Satisfied;
+    }
+
+    witnessTable->setRequirementCheckState(requirementKey, RequirementCheckState::Checking);
+    bool requirementSatisfied = false;
+    if (previousState == RequirementCheckState::WitnessReady)
+    {
+        // The forceful projection path currently publishes only inherited-interface tables. The
+        // table is already present, so validate that nested conformance without treating mere
+        // dictionary presence as success.
+        if (auto requiredInheritanceDeclRef = requiredMemberDeclRef.as<InheritanceDecl>())
+        {
+            requirementSatisfied = ensureInheritedInterfaceRequirement(
+                context,
+                subType,
+                requiredInheritanceDeclRef,
+                witnessTable,
+                InheritedInterfaceRequirementMode::CheckConformance);
+        }
+        else
+        {
+            SLANG_UNEXPECTED("only an inherited-interface requirement may be prepared");
+        }
+    }
+    else
+    {
+        requirementSatisfied = findWitnessForInterfaceRequirement(
+            context,
+            subType,
+            superInterfaceType,
+            inheritanceDecl,
+            superInterfaceDeclRef,
+            requiredMemberDeclRef,
+            witnessTable,
+            subTypeConformsToSuperInterfaceWitness);
+    }
+
+    if (requirementSatisfied)
+    {
+        SLANG_RELEASE_ASSERT(witnessTable->containsRequirement(requirementKey));
+        witnessTable->setRequirementCheckState(requirementKey, RequirementCheckState::Succeeded);
+        return ConformanceRequirementCheckResult::Satisfied;
+    }
+
+    // A failed attempt must not leave a provisional structural answer visible to passive lookup.
+    witnessTable->removeRequirement(requirementKey);
+    witnessTable->setRequirementCheckState(requirementKey, RequirementCheckState::Failed);
+    return ConformanceRequirementCheckResult::Failed;
+}
+
+static bool _doesTypeDeclHaveDefinition(ContainerDecl* decl);
+
+SemanticsVisitor::ConformanceCheckingContext* SemanticsVisitor::
+    getOrCreateConformanceCheckingContext(
+        Type* conformingType,
+        InheritanceDecl* inheritanceDecl,
+        ContainerDecl* parentDecl)
+{
+    auto shared = getShared();
+    if (auto existing =
+            shared->m_mapInheritanceDeclToConformanceCheckingContext.tryGetValue(inheritanceDecl))
+    {
+        SLANG_RELEASE_ASSERT((*existing)->conformingType->equals(conformingType));
+        SLANG_RELEASE_ASSERT((*existing)->parentDecl == parentDecl);
+        SLANG_RELEASE_ASSERT((*existing)->rootInheritanceDecl == inheritanceDecl);
+        return existing->Ptr();
+    }
+
+    RefPtr<ConformanceCheckingContext> context = new ConformanceCheckingContext();
+    context->conformingType = conformingType;
+    context->parentDecl = parentDecl;
+    context->rootInheritanceDecl = inheritanceDecl;
+
+    auto inheritanceDeclRef =
+        createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(inheritanceDecl))
+            .as<InheritanceDecl>();
+    auto interfaceType = inheritanceDecl->base.type;
+    context->conformingWitness =
+        m_astBuilder->getDeclaredSubtypeWitness(conformingType, interfaceType, inheritanceDeclRef);
+
+    RefPtr<WitnessTable> witnessTable = inheritanceDecl->witnessTable;
+    if (!witnessTable)
+    {
+        witnessTable = new WitnessTable();
+        witnessTable->baseType = interfaceType;
+        witnessTable->witnessedType = conformingType;
+        witnessTable->isExtern =
+            (!_doesTypeDeclHaveDefinition(parentDecl) && parentDecl->hasModifier<ExternModifier>());
+        inheritanceDecl->witnessTable = witnessTable;
+    }
+
+    shared->m_mapInheritanceDeclToConformanceCheckingContext.add(inheritanceDecl, context);
+
+    if (auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(interfaceType))
+    {
+        registerConformanceInterfaceCheckingState(
+            context,
+            conformingType,
+            interfaceType,
+            inheritanceDecl,
+            interfaceDeclRef,
+            witnessTable,
+            context->conformingWitness);
+    }
+    return context.Ptr();
+}
+
+SemanticsVisitor::ConformanceInterfaceCheckingState* SemanticsVisitor::
+    registerConformanceInterfaceCheckingState(
+        ConformanceCheckingContext* context,
+        Type* conformingType,
+        Type* interfaceType,
+        InheritanceDecl* inheritanceDecl,
+        DeclRef<InterfaceDecl> interfaceDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        SubtypeWitness* conformingWitness)
+{
+    auto shared = getShared();
+    if (auto existing =
+            shared->m_mapWitnessTableToConformanceInterfaceCheckingState.tryGetValue(witnessTable))
+    {
+        // Synthesizing a generic requirement can use an ephemeral child context with a different
+        // parent declaration while referring to the same conformance table. The table's original
+        // persistent owner remains authoritative. Every other input describes the table itself and
+        // must agree with that original registration.
+        auto state = existing->Ptr();
+        SLANG_RELEASE_ASSERT(state->conformingType->equals(conformingType));
+        SLANG_RELEASE_ASSERT(state->interfaceType->equals(interfaceType));
+        SLANG_RELEASE_ASSERT(state->inheritanceDecl == inheritanceDecl);
+        SLANG_RELEASE_ASSERT(state->interfaceDeclRef == interfaceDeclRef);
+        SLANG_RELEASE_ASSERT(state->witnessTable.Ptr() == witnessTable.Ptr());
+        SLANG_RELEASE_ASSERT(state->conformingWitness->equals(conformingWitness));
+        return state;
+    }
+
+    RefPtr<ConformanceInterfaceCheckingState> state = new ConformanceInterfaceCheckingState();
+    state->owner = context;
+    state->conformingType = conformingType;
+    state->interfaceType = interfaceType;
+    state->inheritanceDecl = inheritanceDecl;
+    state->interfaceDeclRef = interfaceDeclRef;
+    state->witnessTable = witnessTable;
+    state->conformingWitness = conformingWitness;
+
+    if (auto existingTable = context->mapInterfaceToWitnessTable.tryGetValue(interfaceDeclRef))
+        SLANG_RELEASE_ASSERT(existingTable->Ptr() == witnessTable.Ptr());
+    else
+        context->mapInterfaceToWitnessTable.add(interfaceDeclRef, witnessTable);
+
+    shared->m_mapWitnessTableToConformanceInterfaceCheckingState.add(witnessTable, state);
+    return state.Ptr();
+}
+
+SemanticsVisitor::ConformanceRequirementCheckResult SemanticsVisitor::ensureConformanceRequirement(
+    WitnessTable* witnessTable,
+    DeclRef<Decl> requiredMemberDeclRef)
+{
+    auto state =
+        getShared()->m_mapWitnessTableToConformanceInterfaceCheckingState.tryGetValue(witnessTable);
+    SLANG_RELEASE_ASSERT(state);
+
+    auto interfaceState = state->Ptr();
+    return ensureConformanceRequirement(
+        interfaceState->owner.Ptr(),
+        interfaceState->conformingType,
+        interfaceState->interfaceType,
+        interfaceState->inheritanceDecl,
+        interfaceState->interfaceDeclRef,
+        requiredMemberDeclRef,
+        interfaceState->witnessTable,
+        interfaceState->conformingWitness);
+}
+
+SemanticsVisitor::RequirementLookupResult SemanticsVisitor::ensureAndLookupRequirementWitness(
+    SubtypeWitness* conformanceWitness,
+    DeclRef<Decl> requirementDeclRef)
+{
+    RequirementLookupResult result;
+    if (!conformanceWitness || !requirementDeclRef)
+        return result;
+
+    // `locateNextRequirementWitnessLookupFrontier` returns the first missing structural step, not
+    // necessarily the originally requested leaf. Each successful mutation therefore restarts the
+    // passive lookup from the original witness and requirement. Every path that reaches the bottom
+    // of the loop must set `madeProgress` after publishing the table or entry named by its
+    // frontier; the release assertion makes that restart contract structural rather than merely
+    // documentary. Both publication and the next lookup normalize an entry through
+    // `InterfaceRequirementKey`, so the next traversal must observe the newly inserted key and
+    // advance beyond that frontier. `gh-12822-multistep-inheritance.slang` exercises multiple such
+    // restarts. Encountering an entry already owned by an outer request returns `Recursive` instead
+    // of spinning, and every finite witness path therefore either advances to a later missing step
+    // or returns a terminal result.
+    for (;;)
+    {
+        bool madeProgress = false;
+        auto frontier = locateNextRequirementWitnessLookupFrontier(
+            m_astBuilder,
+            conformanceWitness,
+            requirementDeclRef);
+        switch (frontier.getStatus())
+        {
+        case RequirementWitnessLookupFrontierStatus::Found:
+            result.status = RequirementLookupStatus::Found;
+            result.witness = frontier.getWitness();
+            return result;
+
+        case RequirementWitnessLookupFrontierStatus::Indeterminate:
+            return result;
+
+        case RequirementWitnessLookupFrontierStatus::NeedsConcreteConformance:
+            return ensureAndLookupRequirementWitnessThroughProjectedConformance(
+                frontier.getProjectedConformanceWitness(),
+                requirementDeclRef);
+
+        case RequirementWitnessLookupFrontierStatus::MissingConcreteTable:
+            {
+                auto inheritanceDeclRef = frontier.getConcreteConformanceDeclRef();
+                auto inheritanceDecl = inheritanceDeclRef.getDecl();
+                auto conformanceParent = as<ContainerDecl>(inheritanceDecl->parentDecl);
+                SLANG_RELEASE_ASSERT(
+                    conformanceParent && !as<InterfaceDecl>(conformanceParent) &&
+                    !as<AssocTypeDecl>(conformanceParent));
+
+                // Witness tables contain declaration-context answers. Reconstruct the default
+                // declaration context rather than writing a specialized answer into the shared
+                // table for a generic conformance.
+                auto declarationInheritanceDeclRef = createDefaultSubstitutionsIfNeeded(
+                                                         m_astBuilder,
+                                                         this,
+                                                         makeDeclRef(inheritanceDecl))
+                                                         .as<InheritanceDecl>();
+                auto conformanceSubType =
+                    calcThisType(DeclRef<Decl>(declarationInheritanceDeclRef).getParent());
+                auto superInterfaceType = getBaseType(m_astBuilder, declarationInheritanceDeclRef);
+                if (!conformanceSubType || !isDeclRefTypeOf<InterfaceDecl>(superInterfaceType))
+                    return result;
+
+                getOrCreateConformanceCheckingContext(
+                    conformanceSubType,
+                    inheritanceDecl,
+                    conformanceParent);
+                SLANG_RELEASE_ASSERT(inheritanceDecl->witnessTable);
+                // Publishing the root table can change how a nested `LookupDeclRef` resolves. Make
+                // that change visible before restarting the lookup from its original value.
+                m_astBuilder->incrementEpoch();
+                madeProgress = true;
+                break;
+            }
+
+        case RequirementWitnessLookupFrontierStatus::MissingEntry:
+            {
+                auto witnessTable = frontier.getWitnessTable();
+                // Extern conformances accept the interface relationship without providing local
+                // satisfying declarations, so no structural entry can be forced here.
+                if (!witnessTable || witnessTable->isExtern)
+                    return result;
+
+                auto registeredState =
+                    getShared()->m_mapWitnessTableToConformanceInterfaceCheckingState.tryGetValue(
+                        witnessTable);
+                // Abstract generic constraints own path-resolution tables rather than declared
+                // conformances, and serialized or synthesized tables may likewise have no live
+                // declaration-context checker. Passive lookup may traverse such a table, but there
+                // is no concrete conformance state from which this operation could synthesize a
+                // missing entry, so leave the projection symbolic.
+                if (!registeredState)
+                    return result;
+                auto interfaceState = registeredState->Ptr();
+
+                auto frontierRequirementDeclRef = frontier.getRequirementDeclRef();
+                ensureDecl(frontierRequirementDeclRef, DeclCheckState::ReadyForReference);
+                auto declarationRequirementDeclRef = m_astBuilder->getLookupDeclRef(
+                    interfaceState->conformingWitness,
+                    frontierRequirementDeclRef.getDecl());
+
+                // A canonical inherited-interface entry is itself the table needed to continue
+                // toward a deeper leaf; a non-canonical entry instead points at the canonical
+                // conformance path. Publish either form without conflating structural progress on
+                // the canonical table with validation of all of its requirements.
+                if (auto requiredInheritanceDeclRef =
+                        declarationRequirementDeclRef.as<InheritanceDecl>())
+                {
+                    auto requirementDecl = requiredInheritanceDeclRef.getDecl();
+                    InterfaceRequirementKey requirementKey(requirementDecl);
+                    switch (witnessTable->getRequirementCheckState(requirementKey))
+                    {
+                    case RequirementCheckState::Checking:
+                        result.status = RequirementLookupStatus::Recursive;
+                        return result;
+                    case RequirementCheckState::Failed:
+                        result.status = RequirementLookupStatus::Failed;
+                        return result;
+                    case RequirementCheckState::Succeeded:
+                    case RequirementCheckState::WitnessReady:
+                        // Both states require a dictionary entry. `removeRequirement` clears the
+                        // entry and its state together, while failure paths set `Failed` only after
+                        // removing the entry, so the frontier could not have reported it missing.
+                        SLANG_UNEXPECTED("checked requirement has no structural witness");
+                    case RequirementCheckState::Unchecked:
+                        break;
+                    }
+
+                    // Preparation only publishes the canonical nested table (or its existing
+                    // non-canonical conformance witness); validation is deliberately deferred.
+                    // It therefore cannot fail for a well-formed inherited-interface requirement.
+                    SLANG_RELEASE_ASSERT(ensureInheritedInterfaceRequirement(
+                        interfaceState->owner.Ptr(),
+                        interfaceState->conformingType,
+                        requiredInheritanceDeclRef,
+                        witnessTable,
+                        InheritedInterfaceRequirementMode::PrepareForLookup));
+                    RequirementWitness preparedWitness;
+                    SLANG_RELEASE_ASSERT(
+                        witnessTable->tryGetRequirementWitness(requirementKey, preparedWitness));
+                    switch (preparedWitness.getFlavor())
+                    {
+                    case RequirementWitness::Flavor::witnessTable:
+                        witnessTable->setRequirementCheckState(
+                            requirementKey,
+                            RequirementCheckState::WitnessReady);
+                        break;
+                    case RequirementWitness::Flavor::val:
+                        witnessTable->setRequirementCheckState(
+                            requirementKey,
+                            RequirementCheckState::Succeeded);
+                        break;
+                    default:
+                        SLANG_UNEXPECTED("inherited-interface requirement has invalid witness");
+                    }
+                    // The next lookup step may need to resolve the newly published conformance
+                    // witness before it can identify another concrete table.
+                    m_astBuilder->incrementEpoch();
+                    madeProgress = true;
+                    break;
+                }
+
+                auto checkResult =
+                    ensureConformanceRequirement(witnessTable, declarationRequirementDeclRef);
+                switch (checkResult)
+                {
+                case ConformanceRequirementCheckResult::InProgress:
+                    result.status = RequirementLookupStatus::Recursive;
+                    return result;
+                case ConformanceRequirementCheckResult::Failed:
+                    result.status = RequirementLookupStatus::Failed;
+                    return result;
+                case ConformanceRequirementCheckResult::Satisfied:
+                    SLANG_RELEASE_ASSERT(witnessTable->containsRequirement(
+                        InterfaceRequirementKey(declarationRequirementDeclRef.getDecl())));
+                    m_astBuilder->incrementEpoch();
+                    madeProgress = true;
+                    break;
+                }
+                break;
+            }
+        }
+        SLANG_RELEASE_ASSERT(madeProgress);
+    }
+}
+
+SemanticsVisitor::RequirementLookupResult SemanticsVisitor::
+    ensureAndLookupRequirementWitnessThroughProjectedConformance(
+        SubtypeWitness* projectedConformanceWitness,
+        DeclRef<Decl> requirementDeclRef)
+{
+    RequirementLookupResult result;
+
+    // Consider `T.Element.Value` where `T : IOuter`, `IOuter.Element : IInner`, and `Value` is an
+    // `IInner` requirement. The outer table stores a symbolic witness for
+    // `T.Element : IInner`. Resolve `T.Element` first, recover the ordinary concrete conformance
+    // witness for that type, and continue the original `Value` lookup through it.
+    Type* concreteSubType = nullptr;
+    Type* concreteSuperType = nullptr;
+    result.status =
+        ensureConcreteConformanceEndpoint(projectedConformanceWitness->getSub(), concreteSubType);
+    if (result.status != RequirementLookupStatus::Found)
+        return result;
+    result.status =
+        ensureConcreteConformanceEndpoint(projectedConformanceWitness->getSup(), concreteSuperType);
+    if (result.status != RequirementLookupStatus::Found)
+        return result;
+
+    auto concreteConformanceWitness = tryGetSubtypeWitness(concreteSubType, concreteSuperType);
+    if (!concreteConformanceWitness)
+    {
+        result.status = RequirementLookupStatus::Failed;
+        return result;
+    }
+    if (concreteConformanceWitness->equals(projectedConformanceWitness))
+    {
+        // Resolving the endpoints reproduced the same symbolic relation, so recursing through it
+        // cannot make progress. Leave the projection unavailable to the forceful caller instead of
+        // claiming to have found an empty requirement witness.
+        result.status = RequirementLookupStatus::Unavailable;
+        return result;
+    }
+
+    return ensureAndLookupRequirementWitness(concreteConformanceWitness, requirementDeclRef);
+}
+
+SemanticsVisitor::RequirementLookupStatus SemanticsVisitor::ensureConcreteConformanceEndpoint(
+    Type* type,
+    Type*& outType)
+{
+    auto resolution = ensureAndResolveRequirementProjection(type);
+    switch (resolution.status)
+    {
+    case RequirementProjectionResolutionStatus::Resolved:
+        outType = as<Type>(resolution.value);
+        SLANG_RELEASE_ASSERT(outType);
+        return RequirementLookupStatus::Found;
+    case RequirementProjectionResolutionStatus::Unchanged:
+        return RequirementLookupStatus::Unavailable;
+    case RequirementProjectionResolutionStatus::Failed:
+        return RequirementLookupStatus::Failed;
+    }
+    SLANG_UNREACHABLE("unhandled requirement projection resolution result");
+}
+
+SemanticsVisitor::RequirementProjectionResolutionResult SemanticsVisitor::
+    ensureAndResolveRequirementProjection(Val* value)
+{
+    RequirementProjectionResolutionResult result;
+    result.value = value;
+    if (!value)
+        return result;
+
+    auto resolvedValue = value->resolve();
+    result.value = resolvedValue;
+
+    SubtypeWitness* conformanceWitness = nullptr;
+    DeclRef<Decl> requirementDeclRef;
+    bool resultMustBeType = false;
+
+    if (auto declRefType = as<DeclRefType>(resolvedValue))
+    {
+        resultMustBeType = true;
+        if (auto lookupDeclRef = SubstitutionSet(declRefType->getDeclRef()).findLookupDeclRef())
+        {
+            conformanceWitness = lookupDeclRef->getWitness();
+            requirementDeclRef = DeclRef<Decl>(lookupDeclRef);
+        }
+    }
+    else if (auto declRef = as<DeclRefBase>(resolvedValue))
+    {
+        if (auto lookupDeclRef = SubstitutionSet(declRef).findLookupDeclRef())
+        {
+            conformanceWitness = lookupDeclRef->getWitness();
+            requirementDeclRef = DeclRef<Decl>(lookupDeclRef);
+        }
+    }
+    else if (auto witnessLookupValue = as<WitnessLookupIntVal>(resolvedValue))
+    {
+        conformanceWitness = witnessLookupValue->getWitness();
+        requirementDeclRef = makeDeclRef(witnessLookupValue->getKey());
+    }
+
+    // The value is already as structurally resolved as ordinary canonicalization requires. This
+    // includes aliases and every value that is not a conformance-requirement projection.
+    if (!conformanceWitness || !requirementDeclRef)
+    {
+        result.status = RequirementProjectionResolutionStatus::Resolved;
+        return result;
+    }
+
+    auto lookupResult = ensureAndLookupRequirementWitness(conformanceWitness, requirementDeclRef);
+    switch (lookupResult.status)
+    {
+    case RequirementLookupStatus::Unavailable:
+    case RequirementLookupStatus::Recursive:
+        // Neither result provides a concrete value: the former path is not forceable here, while
+        // the latter is owned by an enclosing request. Both must remain symbolic for the caller.
+        return result;
+    case RequirementLookupStatus::Failed:
+        result.status = RequirementProjectionResolutionStatus::Failed;
+        return result;
+    case RequirementLookupStatus::Found:
+        break;
+    }
+
+    // A successful force invalidates the ordinary resolution cache, so first let the existing
+    // `Val` machinery rebuild any enclosing `MemberDeclRef` or `GenericAppDeclRef`. Direct
+    // projections fall back to extracting the value from `RequirementWitness` below.
+    auto resolvedAfterLookup = resolvedValue->resolve();
+    if (resolvedAfterLookup != resolvedValue)
+    {
+        // Each recursive step removes at least one alias, member, or generic wrapper that ordinary
+        // resolution could not simplify before the witness was published. `Val::resolve()` caches
+        // one canonical result per epoch, so a wrapper cannot reappear or alternate with an earlier
+        // representation.
+        return ensureAndResolveRequirementProjection(resolvedAfterLookup);
+    }
+
+    Val* satisfyingValue = nullptr;
+    switch (lookupResult.witness.getFlavor())
+    {
+    case RequirementWitness::Flavor::none:
+    case RequirementWitness::Flavor::witnessTable:
+        // Optional and inherited-interface requirements can be found structurally without naming
+        // a satisfying value. They are not value projections, so leave the input symbolic.
+        return result;
+    case RequirementWitness::Flavor::declRef:
+        satisfyingValue = lookupResult.witness.getDeclRef().declRefBase;
+        break;
+    case RequirementWitness::Flavor::val:
+        satisfyingValue = lookupResult.witness.getVal();
+        break;
+    default:
+        SLANG_UNEXPECTED("unknown requirement witness flavor");
+    }
+
+    if (resultMustBeType)
+    {
+        if (auto satisfyingType = as<Type>(satisfyingValue))
+            result.value = satisfyingType;
+        else if (auto satisfyingDeclRef = as<DeclRefBase>(satisfyingValue))
+            result.value = DeclRefType::create(m_astBuilder, DeclRef<Decl>(satisfyingDeclRef));
+        else
+            SLANG_UNEXPECTED("associated-type requirement did not produce a type");
+    }
+    else
+    {
+        result.value = satisfyingValue;
+    }
+    result.status = RequirementProjectionResolutionStatus::Resolved;
+    return result;
+}
+
 RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     ConformanceCheckingContext* context,
     Type* subType,
     Type* superInterfaceType,
     InheritanceDecl* inheritanceDecl,
     DeclRef<InterfaceDecl> superInterfaceDeclRef,
-    SubtypeWitness* subTypeConformsToSuperInterfaceWitnes)
+    SubtypeWitness* subTypeConformsToSuperInterfaceWitness)
 {
-    // Has somebody already checked this conformance,
-    // and/or is in the middle of checking it?
+    // A table is registered before its members are checked so recursive interface paths can reuse
+    // it. Registration alone is not completion: on-demand projection lookup may have prepared a
+    // nested table whose requirements still need to be checked here.
     RefPtr<WitnessTable> witnessTable;
     if (context->mapInterfaceToWitnessTable.tryGetValue(superInterfaceDeclRef, witnessTable))
-        return witnessTable;
+    {
+        auto registeredState =
+            getShared()->m_mapWitnessTableToConformanceInterfaceCheckingState.tryGetValue(
+                witnessTable);
+        SLANG_RELEASE_ASSERT(registeredState);
+        switch ((*registeredState)->status)
+        {
+        case ConformanceInterfaceCheckStatus::Checking:
+        case ConformanceInterfaceCheckStatus::Succeeded:
+            return witnessTable;
+        case ConformanceInterfaceCheckStatus::Failed:
+            return nullptr;
+        case ConformanceInterfaceCheckStatus::Unchecked:
+            break;
+        }
+    }
 
     // We need to check the declaration of the interface
     // before we can check that we conform to it.
@@ -10652,18 +11297,32 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     // *before* we go about checking fine-grained requirements,
     // in order to short-circuit any potential for infinite recursion.
 
-    // Note: we will re-use the witnes table attached to the inheritance decl,
-    // if there is one. This catches cases where semantic checking might
-    // have synthesized some of the conformance witnesses for us.
+    // Reuse a table already registered for this interface first. Otherwise, use a table attached
+    // to the inheritance declaration when earlier semantic work has synthesized entries there,
+    // and allocate a new table only when neither source exists.
     //
-    witnessTable = inheritanceDecl->witnessTable;
     if (!witnessTable)
     {
-        witnessTable = new WitnessTable();
-        witnessTable->baseType = DeclRefType::create(m_astBuilder, superInterfaceDeclRef);
-        witnessTable->witnessedType = subType;
+        witnessTable = inheritanceDecl->witnessTable;
+        if (!witnessTable)
+        {
+            witnessTable = new WitnessTable();
+            witnessTable->baseType = DeclRefType::create(m_astBuilder, superInterfaceDeclRef);
+            witnessTable->witnessedType = subType;
+        }
+        context->mapInterfaceToWitnessTable.add(superInterfaceDeclRef, witnessTable);
     }
-    context->mapInterfaceToWitnessTable.add(superInterfaceDeclRef, witnessTable);
+
+    auto interfaceState = registerConformanceInterfaceCheckingState(
+        context,
+        subType,
+        superInterfaceType,
+        inheritanceDecl,
+        superInterfaceDeclRef,
+        witnessTable,
+        subTypeConformsToSuperInterfaceWitness);
+    SLANG_RELEASE_ASSERT(interfaceState->status == ConformanceInterfaceCheckStatus::Unchecked);
+    interfaceState->status = ConformanceInterfaceCheckStatus::Checking;
 
     if (!checkInterfaceConformance(
             context,
@@ -10671,10 +11330,14 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
             superInterfaceType,
             inheritanceDecl,
             superInterfaceDeclRef,
-            subTypeConformsToSuperInterfaceWitnes,
+            subTypeConformsToSuperInterfaceWitness,
             witnessTable))
+    {
+        interfaceState->status = ConformanceInterfaceCheckStatus::Failed;
         return nullptr;
+    }
 
+    interfaceState->status = ConformanceInterfaceCheckStatus::Succeeded;
     return witnessTable;
 }
 
@@ -10687,6 +11350,15 @@ bool SemanticsVisitor::checkInterfaceConformance(
     SubtypeWitness* subTypeConformsToSuperInterfaceWitness,
     WitnessTable* witnessTable)
 {
+    registerConformanceInterfaceCheckingState(
+        context,
+        subType,
+        superInterfaceType,
+        inheritanceDecl,
+        superInterfaceDeclRef,
+        witnessTable,
+        subTypeConformsToSuperInterfaceWitness);
+
     // We need to check the declaration of the interface
     // before we can check that we conform to it.
     //
@@ -10732,6 +11404,25 @@ bool SemanticsVisitor::checkInterfaceConformance(
 
     bool result = true;
 
+    auto ensureRequirement = [&](DeclRef<Decl> requiredMemberDeclRef) -> bool
+    {
+        auto checkResult = ensureConformanceRequirement(
+            context,
+            subType,
+            superInterfaceType,
+            inheritanceDecl,
+            superInterfaceDeclRef,
+            requiredMemberDeclRef,
+            witnessTable,
+            subTypeConformsToSuperInterfaceWitness);
+
+        // An in-progress result means that an outer request still owns this entry. Existing
+        // conformance checking already handles recursive interface paths coinductively by reusing
+        // an in-progress witness table, so preserve that policy here. The owning request will
+        // eventually record success or failure on the entry.
+        return checkResult != ConformanceRequirementCheckResult::Failed;
+    };
+
     auto checkGenericTypeConstraintRequirement = [&](Decl* requiredMemberDecl) -> bool
     {
         ensureDecl(requiredMemberDecl, DeclCheckState::ReadyForReference);
@@ -10771,15 +11462,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
                 requiredMemberDecl);
         }
 
-        return findWitnessForInterfaceRequirement(
-            context,
-            subType,
-            superInterfaceType,
-            inheritanceDecl,
-            superInterfaceDeclRef,
-            requiredMemberDeclRef,
-            witnessTable,
-            subTypeConformsToSuperInterfaceWitness);
+        return ensureRequirement(requiredMemberDeclRef);
     };
 
     // TODO: If we ever allow for implementation inheritance,
@@ -10789,13 +11472,17 @@ bool SemanticsVisitor::checkInterfaceConformance(
     // that interface, so that all of the requirements are
     // already satisfied with inherited implementations...
 
-    // Note: we break this logic into two loops, where we first
-    // check conformance for all associated-type requirements
-    // and *then* check conformance for all other requirements.
+    // On-demand checking makes correctness less dependent on this sequence: a later requirement
+    // may force an earlier or later entry whenever it needs to inspect that entry structurally.
+    // Keeping a regular order still acts as a heuristic topological sort. It minimizes the depth of
+    // re-entrant checking and therefore the risk of reaching a valid fixpoint only after deeply
+    // nesting the native call stack.
     //
-    // Checking associated-type requirements first ensures that
-    // we can make use of the identity of the associated types
-    // when checking other members.
+    // Associated types currently come before inherited-interface tables because their identities
+    // are used broadly by member-signature and conformance checks. If an inherited-interface table
+    // needs one of those identities to become resolvable, it can force the individual associated-
+    // type entry. Reversing these first two stages is now possible, but should be motivated by
+    // examples or measurements that show it yields a shallower dependency traversal.
     //
     // TODO: There could in theory be subtle cases involving
     // circular or recursive dependency chains that make such
@@ -10818,15 +11505,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
         auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(
             subTypeConformsToSuperInterfaceWitness,
             requiredMemberDecl.getDecl());
-        auto requirementSatisfied = findWitnessForInterfaceRequirement(
-            context,
-            subType,
-            superInterfaceType,
-            inheritanceDecl,
-            superInterfaceDeclRef,
-            requiredMemberDeclRef,
-            witnessTable,
-            subTypeConformsToSuperInterfaceWitness);
+        auto requirementSatisfied = ensureRequirement(requiredMemberDeclRef);
 
         result = result && requirementSatisfied;
     }
@@ -10855,15 +11534,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
         auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(
             subTypeConformsToSuperInterfaceWitness,
             requiredInheritanceDecl);
-        auto requirementSatisfied = findWitnessForInterfaceRequirement(
-            context,
-            subType,
-            superInterfaceType,
-            inheritanceDecl,
-            superInterfaceDeclRef,
-            requiredMemberDeclRef,
-            witnessTable,
-            subTypeConformsToSuperInterfaceWitness);
+        auto requirementSatisfied = ensureRequirement(requiredMemberDeclRef);
 
         result = result && requirementSatisfied;
     }
@@ -10908,15 +11579,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
         auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(
             subTypeConformsToSuperInterfaceWitness,
             requiredMemberDecl.getDecl());
-        auto requirementSatisfied = findWitnessForInterfaceRequirement(
-            context,
-            subType,
-            superInterfaceType,
-            inheritanceDecl,
-            superInterfaceDeclRef,
-            requiredMemberDeclRef,
-            witnessTable,
-            subTypeConformsToSuperInterfaceWitness);
+        auto requirementSatisfied = ensureRequirement(requiredMemberDeclRef);
 
         result = result && requirementSatisfied;
     }
@@ -10976,15 +11639,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
             auto requiredInheritanceDeclRef = m_astBuilder->getLookupDeclRef(
                 subTypeConformsToSuperInterfaceWitness,
                 requiredInheritanceDecl.getDecl());
-            auto requirementSatisfied = findWitnessForInterfaceRequirement(
-                context,
-                subType,
-                superInterfaceType,
-                inheritanceDecl,
-                superInterfaceDeclRef,
-                requiredInheritanceDeclRef,
-                witnessTable,
-                subTypeConformsToSuperInterfaceWitness);
+            auto requirementSatisfied = ensureRequirement(requiredInheritanceDeclRef);
 
             result = result && requirementSatisfied;
         }
@@ -11145,29 +11800,34 @@ bool SemanticsVisitor::checkConformanceToType(
             // The type is stating that it conforms to an interface.
             // We need to check that it provides all of the members
             // required by that interface.
-            auto conformanceResult = checkInterfaceConformance(
+            auto conformanceWitnessTable = checkInterfaceConformance(
                 context,
                 subType,
                 superType,
                 inheritanceDecl,
                 superInterfaceDeclRef,
-                subIsSuperWitness,
-                witnessTable);
+                subIsSuperWitness);
+
+            // The caller supplies the declaration-context table associated with this conformance.
+            // The status-owning overload above must either validate that same table or report
+            // failure; silently replacing it would split one conformance across two tables.
+            SLANG_RELEASE_ASSERT(
+                !conformanceWitnessTable || conformanceWitnessTable.Ptr() == witnessTable);
 
             // If the interface is IDifferentiable, perform additional
             // derivative member checking now that the associated types
             // (including .Differential) have been resolved.
-            if (conformanceResult)
+            if (conformanceWitnessTable)
             {
                 _checkDifferentialConformance(
                     context,
                     subType,
                     inheritanceDecl,
                     superInterfaceDeclRef,
-                    witnessTable);
+                    conformanceWitnessTable);
             }
 
-            return conformanceResult;
+            return conformanceWitnessTable != nullptr;
         }
         else if (auto superStructDeclRef = superTypeDeclRef.as<StructDecl>())
         {
@@ -11198,7 +11858,6 @@ bool SemanticsVisitor::checkConformance(
     ContainerDecl* parentDecl)
 {
     auto superType = inheritanceDecl->base.type;
-    DeclRef<Decl> declRefForSubTypeWitness;
 
     if (auto declRefType = as<DeclRefType>(subType))
     {
@@ -11279,41 +11938,15 @@ bool SemanticsVisitor::checkConformance(
         }
     }
 
-    // Look at the type being inherited from, and validate
-    // appropriately.
-    //
-    if (!declRefForSubTypeWitness)
-    {
-        declRefForSubTypeWitness = makeDeclRef(inheritanceDecl);
-        declRefForSubTypeWitness =
-            createDefaultSubstitutionsIfNeeded(m_astBuilder, this, declRefForSubTypeWitness)
-                .as<InheritanceDecl>();
-    }
-    DeclaredSubtypeWitness* subIsSuperWitness =
-        m_astBuilder->getDeclaredSubtypeWitness(subType, superType, declRefForSubTypeWitness);
-
-    ConformanceCheckingContext context;
-    context.conformingType = subType;
-    context.parentDecl = parentDecl;
-    context.conformingWitness = subIsSuperWitness;
-
+    auto context = getOrCreateConformanceCheckingContext(subType, inheritanceDecl, parentDecl);
     RefPtr<WitnessTable> witnessTable = inheritanceDecl->witnessTable;
-    if (!witnessTable)
-    {
-        witnessTable = new WitnessTable();
-        witnessTable->baseType = superType;
-        witnessTable->witnessedType = subType;
-        witnessTable->isExtern =
-            (!_doesTypeDeclHaveDefinition(parentDecl) && parentDecl->hasModifier<ExternModifier>());
-        inheritanceDecl->witnessTable = witnessTable;
-    }
 
     if (!checkConformanceToType(
-            &context,
+            context,
             subType,
             inheritanceDecl,
             superType,
-            subIsSuperWitness,
+            context->conformingWitness,
             witnessTable))
     {
         return false;
@@ -18386,17 +19019,125 @@ struct ArgsWithDirectionInfo
     ParamPassingMode thisArgDirection;
 };
 
+// Describes whether the primal and derivative's outer generic signatures have already been
+// resolved against each other. A `[ForwardDerivativeOf]` attribute starts validation with
+// `AlreadyResolved` because higher-order overload resolution selected a compatible primal
+// specialization before calling `checkDerivativeAttributeImpl`.
+enum class PrimalAndDerivativeGenericSignatureResolutionStatus
+{
+    NotYetResolved,
+    AlreadyResolved,
+};
+
+// Returns the derivative expression applied to the primal's outer generic parameters when that
+// application is still needed for signature resolution. Consider `[ForwardDerivative(derivative)]`
+// on `primal<T, let N>()`: validation must resolve `derivative<T, N>()`, while an explicit generic
+// application or a `[ForwardDerivativeOf]` expression resolved by the higher-order call already
+// carries the required arguments. `getDefaultSubstitutionArgs` orders the ordinary type and value
+// parameters before constraint witnesses, so this function consumes exactly that ordinary prefix
+// in declaration order. `expressionVisitor` constructs value-parameter references in the temporary
+// scope that will resolve the derivative call.
+static Expr* getDerivativeExprWithPrimalGenericArgumentsIfNeeded(
+    SemanticsVisitor* declarationVisitor,
+    SemanticsVisitor& expressionVisitor,
+    DeclRef<FunctionDeclBase> primalDeclRef,
+    Expr* derivativeExpr,
+    PrimalAndDerivativeGenericSignatureResolutionStatus genericSignatureResolutionStatus)
+{
+    if (genericSignatureResolutionStatus ==
+        PrimalAndDerivativeGenericSignatureResolutionStatus::AlreadyResolved)
+    {
+        return derivativeExpr;
+    }
+
+    auto primalOuterGeneric = as<GenericDecl>(primalDeclRef.getDecl()->parentDecl);
+    if (!primalOuterGeneric)
+        return derivativeExpr;
+
+    if (as<GenericAppExpr>(derivativeExpr))
+        return derivativeExpr;
+
+    auto astBuilder = declarationVisitor->getASTBuilder();
+    auto substitutionArgs =
+        getDefaultSubstitutionArgs(astBuilder, declarationVisitor, primalOuterGeneric);
+    auto genericAppExpr = astBuilder->create<GenericAppExpr>();
+
+    Index remainingGenericParameterCount = 0;
+    for (auto member : primalOuterGeneric->getDirectMemberDecls())
+    {
+        if (isGenericParam(member))
+            remainingGenericParameterCount++;
+    }
+
+    genericAppExpr->functionExpr = derivativeExpr;
+
+    for (auto substitutionArg : substitutionArgs)
+    {
+        if (remainingGenericParameterCount == 0)
+            break;
+
+        if (auto declRefType = as<DeclRefType>(substitutionArg))
+        {
+            auto typeExpr = astBuilder->create<SharedTypeExpr>();
+            typeExpr->base.type = declRefType;
+            typeExpr->type.type = astBuilder->getOrCreate<TypeType>(declRefType);
+            genericAppExpr->arguments.add(typeExpr);
+        }
+        else if (auto genericValueParam = as<DeclRefIntVal>(substitutionArg))
+        {
+            genericAppExpr->arguments.add(expressionVisitor.ConstructDeclRefExpr(
+                genericValueParam->getDeclRef(),
+                nullptr,
+                nullptr,
+                SourceLoc(),
+                nullptr));
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Unhandled substitution arg type");
+        }
+
+        remainingGenericParameterCount--;
+    }
+
+    return genericAppExpr;
+}
+
+// Applies a resolved primal specialization to freshly synthesized imaginary argument types in
+// place. `getImaginaryArgsToForwardDerivative` creates these expressions from the primal's
+// unsubstituted parameter and receiver types, so no checked AST shares the nodes and the
+// specialization must be applied exactly once. Consider a derivative over `vector<T, N>` that
+// selects a primal declared over `U`: the substitution rewrites the primal's imaginary `U`
+// arguments into the derivative's `T` context before validation.
+static void specializeImaginaryArgumentTypes(
+    ASTBuilder* astBuilder,
+    ArgsWithDirectionInfo& args,
+    DeclRef<FunctionDeclBase> primalDeclRef)
+{
+    SubstitutionSet substitutions(primalDeclRef);
+    for (auto arg : args.args)
+        arg->type.type = substituteType(substitutions, astBuilder, arg->type.type);
+    if (args.thisArg)
+        args.thisArg->type.type =
+            substituteType(substitutions, astBuilder, args.thisArg->type.type);
+}
+
+// Checks a derivative against a primal declaration reference. `genericSignatureResolutionStatus`
+// states whether this function must still infer a mapping between their outer generic signatures
+// or preserve the specialized primal reference that higher-order overload resolution already chose.
 template<typename TDerivativeAttr>
 void checkDerivativeAttributeImpl(
     SemanticsVisitor* visitor,
-    Decl* funcDecl,
+    DeclRef<FunctionDeclBase> primalDeclRef,
     TDerivativeAttr* attr,
     const List<Expr*>& imaginaryArguments,
     const List<ParamPassingMode>& expectedParamDirections,
     Expr* expectedThisArg,
-    ParamPassingMode expectedThisArgDirection)
+    ParamPassingMode expectedThisArgDirection,
+    PrimalAndDerivativeGenericSignatureResolutionStatus genericSignatureResolutionStatus)
 {
-    if (isInterfaceRequirement(funcDecl))
+    auto primalFuncDecl = primalDeclRef.getDecl();
+    if (isInterfaceRequirement(primalFuncDecl))
     {
         visitor->getSink()->diagnose(
             Diagnostics::CannotAssociateInterfaceRequirementWithDerivative{.attr = attr->loc});
@@ -18407,63 +19148,18 @@ void checkDerivativeAttributeImpl(
     auto ctx = visitor->withExprLocalScope(&scope);
     auto subVisitor = SemanticsVisitor(ctx.allowStaticReferenceToNonStaticMember());
 
-    auto exprToCheck = attr->funcExpr;
+    auto derivativeExprToCheck = getDerivativeExprWithPrimalGenericArgumentsIfNeeded(
+        visitor,
+        subVisitor,
+        primalDeclRef,
+        attr->funcExpr,
+        genericSignatureResolutionStatus);
 
-    // If this is a generic, we want to wrap the call to the derivative method
-    // with the generic parameters of the source.
-    //
-    if (as<GenericDecl>(funcDecl->parentDecl) && !as<GenericAppExpr>(attr->funcExpr))
-    {
-        auto genericDecl = as<GenericDecl>(funcDecl->parentDecl);
-        auto substArgs = getDefaultSubstitutionArgs(ctx.getASTBuilder(), visitor, genericDecl);
-        auto appExpr = ctx.getASTBuilder()->create<GenericAppExpr>();
-
-        Index count = 0;
-        for (auto member : genericDecl->getDirectMemberDecls())
-        {
-            if (isGenericParam(member))
-                count++;
-        }
-
-        appExpr->functionExpr = attr->funcExpr;
-
-        for (auto arg : substArgs)
-        {
-            if (count == 0)
-                break;
-
-            if (auto declRefType = as<DeclRefType>(arg))
-            {
-                auto baseTypeExpr = ctx.getASTBuilder()->create<SharedTypeExpr>();
-                baseTypeExpr->base.type = declRefType;
-                auto baseTypeType = ctx.getASTBuilder()->getOrCreate<TypeType>(declRefType);
-                baseTypeExpr->type.type = baseTypeType;
-
-                appExpr->arguments.add(baseTypeExpr);
-            }
-            else if (auto genericValParam = as<DeclRefIntVal>(arg))
-            {
-                auto declRef = genericValParam->getDeclRef();
-                appExpr->arguments.add(
-                    subVisitor
-                        .ConstructDeclRefExpr(declRef, nullptr, nullptr, SourceLoc(), nullptr));
-            }
-            else
-            {
-                SLANG_UNEXPECTED("Unhandled substitution arg type");
-            }
-
-            count--;
-        }
-
-        exprToCheck = appExpr;
-    }
-
-    auto checkedFuncExpr = visitor->dispatchExpr(exprToCheck, ctx);
-    attr->funcExpr = checkedFuncExpr;
+    auto checkedDerivativeExpr = visitor->dispatchExpr(derivativeExprToCheck, ctx);
+    attr->funcExpr = checkedDerivativeExpr;
     if (attr->args.getCount())
         attr->args[0] = attr->funcExpr;
-    if (auto declRefExpr = as<DeclRefExpr>(checkedFuncExpr))
+    if (auto declRefExpr = as<DeclRefExpr>(checkedDerivativeExpr))
     {
         if (declRefExpr->declRef)
         {
@@ -18482,7 +19178,7 @@ void checkDerivativeAttributeImpl(
             return;
         }
     }
-    else if (auto overloadedExpr = as<OverloadedExpr>(checkedFuncExpr))
+    else if (auto overloadedExpr = as<OverloadedExpr>(checkedDerivativeExpr))
     {
         for (auto candidate : overloadedExpr->lookupResult2.items)
         {
@@ -18495,7 +19191,7 @@ void checkDerivativeAttributeImpl(
             }
         }
     }
-    else if (auto overloadedExpr2 = as<OverloadedExpr2>(checkedFuncExpr))
+    else if (auto overloadedExpr2 = as<OverloadedExpr2>(checkedDerivativeExpr))
     {
         for (auto candidate : overloadedExpr2->candidateExprs)
         {
@@ -18514,13 +19210,13 @@ void checkDerivativeAttributeImpl(
         return;
     }
 
-    /*if (!as<DeclRefExpr>(checkedFuncExpr))
+    /*if (!as<DeclRefExpr>(checkedDerivativeExpr))
     {
         visitor->getSink()->diagnose(attr, Diagnostics::cannotResolveDerivativeFunction);
         return;
     }
 
-    if (!as<DeclRefExpr>(checkedFuncExpr)->declRef)
+    if (!as<DeclRefExpr>(checkedDerivativeExpr)->declRef)
     {
         visitor->getSink()->diagnose(attr, Diagnostics::cannotResolveDerivativeFunction);
         return;
@@ -18550,12 +19246,12 @@ void checkDerivativeAttributeImpl(
         expectStaticFunc = true;
     }
 
-    auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedFuncExpr, argList);
+    auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedDerivativeExpr, argList);
     auto resolved = subVisitor.ResolveInvoke(invokeExpr);
 
     if (auto resolvedInvoke = as<InvokeExpr>(resolved))
     {
-        if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
+        if (auto resolvedDerivativeDeclRefExpr = as<DeclRefExpr>(resolvedInvoke->functionExpr))
         {
             // There are two ways to make it to this point.. a proper resolution, and a
             // resolution that has failed due to type mismatch.
@@ -18563,7 +19259,7 @@ void checkDerivativeAttributeImpl(
             // directionality.
             // We'll detect both these incorrect cases here and issue an appropriate diagnostic.
             //
-            auto funcType = as<FuncType>(calleeDeclRef->type);
+            auto funcType = as<FuncType>(resolvedDerivativeDeclRefExpr->type);
             if (!funcType)
             {
                 // The best candidate does not have a function type.
@@ -18576,7 +19272,7 @@ void checkDerivativeAttributeImpl(
                         .attr = attr->loc});
                 return;
             }
-            if (isInterfaceRequirement(calleeDeclRef->declRef.getDecl()))
+            if (isInterfaceRequirement(resolvedDerivativeDeclRefExpr->declRef.getDecl()))
             {
                 visitor->getSink()->diagnose(
                     Diagnostics::CannotUseInterfaceRequirementAsDerivative{.attr = attr->loc});
@@ -18605,11 +19301,12 @@ void checkDerivativeAttributeImpl(
             }
             // The `imaginaryArguments` list does not include the `this` parameter.
             // So we need to check that `this` type matches.
-            bool funcIsStatic = isEffectivelyStatic(funcDecl);
-            if (funcIsStatic)
+            bool primalIsStatic = isEffectivelyStatic(primalFuncDecl);
+            if (primalIsStatic)
                 expectStaticFunc = true;
 
-            bool derivativeFuncIsStatic = isEffectivelyStatic(calleeDeclRef->declRef.getDecl());
+            bool derivativeFuncIsStatic =
+                isEffectivelyStatic(resolvedDerivativeDeclRefExpr->declRef.getDecl());
 
             if (expectStaticFunc && !derivativeFuncIsStatic)
             {
@@ -18620,25 +19317,19 @@ void checkDerivativeAttributeImpl(
 
             if (!derivativeFuncIsStatic)
             {
-                auto defaultFuncDeclRef = createDefaultSubstitutionsIfNeeded(
-                    visitor->getASTBuilder(),
-                    visitor,
-                    makeDeclRef(funcDecl));
-
-                DeclRef<FunctionDeclBase> funcDeclRef = defaultFuncDeclRef.as<FunctionDeclBase>();
-                auto funcThisType = getTypeForThisExpr(visitor, funcDeclRef);
-                DeclRef<FunctionDeclBase> calleeFuncDeclRef =
-                    calleeDeclRef->declRef.template as<FunctionDeclBase>();
-                auto derivativeFuncThisType = getTypeForThisExpr(visitor, calleeFuncDeclRef);
+                auto primalThisType = getTypeForThisExpr(visitor, primalDeclRef);
+                DeclRef<FunctionDeclBase> derivativeDeclRef =
+                    resolvedDerivativeDeclRefExpr->declRef.template as<FunctionDeclBase>();
+                auto derivativeThisType = getTypeForThisExpr(visitor, derivativeDeclRef);
 
                 // If the function is a member function, we need to check that the
                 // `this` type matches the expected type. This will ensure that after lowering
                 // to IR, the two functions are compatible.
                 //
-                if (funcThisType && !canSolveGenericThisTypeCompatibility(
-                                        visitor,
-                                        funcThisType,
-                                        derivativeFuncThisType))
+                if (primalThisType && !canSolveGenericThisTypeCompatibility(
+                                          visitor,
+                                          primalThisType,
+                                          derivativeThisType))
                 {
                     visitor->getSink()->diagnose(
                         Diagnostics::CustomDerivativeSignatureThisParamMismatch{.attr = attr->loc});
@@ -18646,53 +19337,55 @@ void checkDerivativeAttributeImpl(
                 }
             }
 
-            // If the two decls are under different generic contexts, we'll need to check that
-            // they agree and specialize the attribute's decl-ref accordingly.
-            //
-
-            auto originalNextGeneric =
-                visitor->findNextOuterGeneric(visitor->getOuterGenericOrSelf(funcDecl));
-            auto derivativeNextGeneric = visitor->findNextOuterGeneric(
-                visitor->getOuterGenericOrSelf(calleeDeclRef->declRef.getDecl()));
-
-            if ((!originalNextGeneric) != (!derivativeNextGeneric))
+            // A `[ForwardDerivative]`, `[BackwardDerivative]`, or `[PrimalSubstitute]` attribute on
+            // the primal reaches this point before the primal and derivative's outer generic
+            // signatures have been matched. Diagnose a generic/non-generic mismatch, or infer the
+            // substitution that expresses the derivative in the primal's generic context.
+            // `[ForwardDerivativeOf]` already performed this work while selecting its primal
+            // specialization, so repeating it would compare the wrong generic contexts.
+            if (genericSignatureResolutionStatus ==
+                PrimalAndDerivativeGenericSignatureResolutionStatus::NotYetResolved)
             {
-                // Diagnostic for when one is generic and the other is not.
-                visitor->getSink()->diagnose(
-                    Diagnostics::CannotResolveGenericArgumentForDerivativeFunction{
-                        .attr = attr->loc});
-                return;
-            }
+                auto primalNextGeneric =
+                    visitor->findNextOuterGeneric(visitor->getOuterGenericOrSelf(primalFuncDecl));
+                auto derivativeNextGeneric =
+                    visitor->findNextOuterGeneric(visitor->getOuterGenericOrSelf(
+                        resolvedDerivativeDeclRefExpr->declRef.getDecl()));
 
-            if (originalNextGeneric != derivativeNextGeneric)
-            {
-                // If the two generic containers are not the same, but are compatible, we can
-                // unify them.
-                //
-
-                DeclRef<Decl> specializedDecl;
-                if (!visitor->doGenericSignaturesMatch(
-                        originalNextGeneric,
-                        derivativeNextGeneric,
-                        &specializedDecl))
+                if ((!primalNextGeneric) != (!derivativeNextGeneric))
                 {
-                    visitor->getSink()->diagnose(Diagnostics::CustomDerivativeSignatureMismatch{
-                        .expectedSignature = String{},
-                        .attr = attr->loc});
+                    visitor->getSink()->diagnose(
+                        Diagnostics::CannotResolveGenericArgumentForDerivativeFunction{
+                            .attr = attr->loc});
                     return;
                 }
 
-                calleeDeclRef->declRef = substituteDeclRef(
-                    SubstitutionSet(specializedDecl),
-                    visitor->getASTBuilder(),
-                    calleeDeclRef->declRef);
-                calleeDeclRef->type = substituteType(
-                    SubstitutionSet(specializedDecl),
-                    visitor->getASTBuilder(),
-                    calleeDeclRef->type);
+                if (primalNextGeneric != derivativeNextGeneric)
+                {
+                    DeclRef<Decl> specializedDecl;
+                    if (!visitor->doGenericSignaturesMatch(
+                            primalNextGeneric,
+                            derivativeNextGeneric,
+                            &specializedDecl))
+                    {
+                        visitor->getSink()->diagnose(Diagnostics::CustomDerivativeSignatureMismatch{
+                            .expectedSignature = String{},
+                            .attr = attr->loc});
+                        return;
+                    }
+
+                    resolvedDerivativeDeclRefExpr->declRef = substituteDeclRef(
+                        SubstitutionSet(specializedDecl),
+                        visitor->getASTBuilder(),
+                        resolvedDerivativeDeclRefExpr->declRef);
+                    resolvedDerivativeDeclRefExpr->type = substituteType(
+                        SubstitutionSet(specializedDecl),
+                        visitor->getASTBuilder(),
+                        resolvedDerivativeDeclRefExpr->type);
+                }
             }
 
-            attr->funcExpr = calleeDeclRef;
+            attr->funcExpr = resolvedDerivativeDeclRefExpr;
             if (attr->args.getCount())
                 attr->args[0] = attr->funcExpr;
             return;
@@ -18718,6 +19411,34 @@ error:;
     visitor->getSink()->diagnose(Diagnostics::CustomDerivativeSignatureMismatch{
         .expectedSignature = builder.produceString(),
         .attr = attr->loc});
+}
+
+// Checks a derivative named by `[ForwardDerivative]`, `[BackwardDerivative]`, or
+// `[PrimalSubstitute]` on the primal, using the primal's ordinary generic context.
+template<typename TDerivativeAttr>
+void checkDerivativeAttributeImpl(
+    SemanticsVisitor* visitor,
+    FunctionDeclBase* primalFuncDecl,
+    TDerivativeAttr* attr,
+    const List<Expr*>& imaginaryArguments,
+    const List<ParamPassingMode>& expectedParamDirections,
+    Expr* expectedThisArg,
+    ParamPassingMode expectedThisArgDirection)
+{
+    auto primalDeclRef = createDefaultSubstitutionsIfNeeded(
+                             visitor->getASTBuilder(),
+                             visitor,
+                             primalFuncDecl->getDefaultDeclRef())
+                             .as<FunctionDeclBase>();
+    checkDerivativeAttributeImpl(
+        visitor,
+        primalDeclRef,
+        attr,
+        imaginaryArguments,
+        expectedParamDirections,
+        expectedThisArg,
+        expectedThisArgDirection,
+        PrimalAndDerivativeGenericSignatureResolutionStatus::NotYetResolved);
 }
 
 template<typename TDerivativeAttr>
@@ -18979,6 +19700,16 @@ static void checkDerivativeAttribute(
     FunctionDeclBase* funcDecl,
     ForwardDerivativeAttribute* attr);
 
+// Checks a derivative whose `[ForwardDerivativeOf]` attribute names the primal. Higher-order
+// resolution selects the matching primal specialization before this function emits a conditional
+// extension for it. `attr` is freshly synthesized with an unresolved reference to
+// `derivativeFuncDecl`.
+static void checkDerivativeAttribute(
+    SemanticsVisitor* visitor,
+    DeclRef<FunctionDeclBase> primalDeclRef,
+    FunctionDeclBase* derivativeFuncDecl,
+    ForwardDerivativeAttribute* attr);
+
 static void checkDerivativeAttribute(
     SemanticsVisitor* visitor,
     FunctionDeclBase* funcDecl,
@@ -18992,13 +19723,13 @@ static void checkDerivativeAttribute(
 template<typename TDerivativeAttr, typename TDifferentiateExpr, typename TDerivativeOfAttr>
 void checkDerivativeOfAttributeImpl(
     SemanticsVisitor* visitor,
-    FunctionDeclBase* funcDecl,
+    FunctionDeclBase* derivativeFuncDecl,
     TDerivativeOfAttr* derivativeOfAttr,
     DeclAssociationKind assocKind)
 {
     auto astBuilder = visitor->getASTBuilder();
-    DeclRef<Decl> calleeDeclRef;
-    DeclRefExpr* calleeDeclRefExpr = nullptr;
+    DeclRef<Decl> selectedPrimalDeclRef;
+    DeclRefExpr* selectedPrimalDeclRefExpr = nullptr;
     HigherOrderInvokeExpr* higherOrderFuncExpr = astBuilder->create<TDifferentiateExpr>();
     higherOrderFuncExpr->baseFunction = derivativeOfAttr->funcExpr;
     if (derivativeOfAttr->args.getCount() > 0)
@@ -19015,7 +19746,7 @@ void checkDerivativeOfAttributeImpl(
         return;
     }
     List<Expr*> imaginaryArgs =
-        getImaginaryArgsToFunc(astBuilder, funcDecl, derivativeOfAttr->loc).args;
+        getImaginaryArgsToFunc(astBuilder, derivativeFuncDecl, derivativeOfAttr->loc).args;
     auto invokeExpr =
         visitor->constructUncheckedInvokeExpr(checkedHigherOrderFuncExpr, imaginaryArgs);
     SemanticsContext::ExprLocalScope scope;
@@ -19027,8 +19758,8 @@ void checkDerivativeOfAttributeImpl(
         auto resolvedFuncExpr = as<HigherOrderInvokeExpr>(resolvedInvoke->functionExpr);
         if (resolvedFuncExpr)
         {
-            calleeDeclRefExpr = as<DeclRefExpr>(resolvedFuncExpr->baseFunction);
-            if (!calleeDeclRef && as<OverloadedExpr>(resolvedFuncExpr->baseFunction))
+            selectedPrimalDeclRefExpr = as<DeclRefExpr>(resolvedFuncExpr->baseFunction);
+            if (!selectedPrimalDeclRefExpr && as<OverloadedExpr>(resolvedFuncExpr->baseFunction))
             {
                 visitor->getSink()->diagnose(
                     Diagnostics::OverloadedFuncUsedWithDerivativeOfAttributes{
@@ -19037,88 +19768,111 @@ void checkDerivativeOfAttributeImpl(
         }
     }
 
-    if (!calleeDeclRefExpr)
+    if (!selectedPrimalDeclRefExpr)
     {
         visitor->getSink()->diagnose(
             Diagnostics::CannotResolveOriginalFunctionForDerivative{.attr = derivativeOfAttr->loc});
         return;
     }
 
-    calleeDeclRefExpr->loc = higherOrderFuncExpr->loc;
+    selectedPrimalDeclRefExpr->loc = higherOrderFuncExpr->loc;
     if (derivativeOfAttr->args.getCount() > 0)
-        derivativeOfAttr->args[0] = calleeDeclRefExpr;
+        derivativeOfAttr->args[0] = selectedPrimalDeclRefExpr;
 
-    calleeDeclRef = calleeDeclRefExpr->declRef;
+    selectedPrimalDeclRef = selectedPrimalDeclRefExpr->declRef;
 
-    auto calleeFunc = as<FunctionDeclBase>(calleeDeclRef.getDecl());
+    auto primalFuncDecl = as<FunctionDeclBase>(selectedPrimalDeclRef.getDecl());
 
-    if (!calleeFunc)
+    if (!primalFuncDecl)
     {
         // If we couldn't find a direct function, it might be a generic.
-        if (auto genericDecl = as<GenericDecl>(calleeDeclRef.getDecl()))
+        if (auto genericDecl = as<GenericDecl>(selectedPrimalDeclRef.getDecl()))
         {
-            calleeFunc = as<FunctionDeclBase>(genericDecl->inner);
+            primalFuncDecl = as<FunctionDeclBase>(genericDecl->inner);
 
             if (as<ErrorType>(resolved->type.type))
             {
                 // If we can't resolve a type, something went wrong. If we're working with a
                 // generic decl, the most likely cause is a failure of generic argument
-                // inference.
+                // inference. The error-recovery candidate still refers to the enclosing
+                // `GenericDecl`, while `primalFuncDecl` refers to its inner function, so the
+                // later null check would not stop function-only processing. This diagnostic is
+                // the terminal boundary for that non-canonical reference.
                 //
                 visitor->getSink()->diagnose(
                     Diagnostics::CannotResolveGenericArgumentForDerivativeFunction{
                         .attr = derivativeOfAttr->loc});
+                return;
             }
         }
     }
 
-    if (!calleeFunc)
+    if (!primalFuncDecl)
     {
         visitor->getSink()->diagnose(
             Diagnostics::CannotResolveOriginalFunctionForDerivative{.attr = derivativeOfAttr->loc});
         return;
     }
 
-    // For now, if calleeFunc or funcDecl is nested inside some generic aggregate,
+    // For now, if `primalFuncDecl` or `derivativeFuncDecl` is nested inside a generic aggregate,
     // they must be the same generic decl. For example, using B<T>.f() as the original function
     // for C<T>.derivative() is not allowed.
     // We may relax this restriction in the future by solving the "inverse" generic arguments
-    // from the `calleeDeclRef`, and use them to create a declRef to funcDecl from the original
-    // func.
+    // from `selectedPrimalDeclRef`, and use them to create a declaration reference to the
+    // derivative from the primal.
 
-    if (isInterfaceRequirement(calleeFunc))
+    if (isInterfaceRequirement(primalFuncDecl))
     {
         visitor->getSink()->diagnose(Diagnostics::CannotAssociateInterfaceRequirementWithDerivative{
             .attr = derivativeOfAttr->loc});
         return;
     }
-    if (isInterfaceRequirement(funcDecl))
+    if (isInterfaceRequirement(derivativeFuncDecl))
     {
         visitor->getSink()->diagnose(
             Diagnostics::CannotUseInterfaceRequirementAsDerivative{.attr = derivativeOfAttr->loc});
         return;
     }
 
-    if (auto existingModifier = _findModifier<TDerivativeAttr>(calleeFunc))
+    if (auto existingModifier = _findModifier<TDerivativeAttr>(primalFuncDecl))
     {
         // The primal function already has a `[*Derivative]` attribute, this is invalid.
         visitor->getSink()->diagnose(Diagnostics::DeclAlreadyHasAttribute{
-            .decl = calleeDeclRef.getDecl(),
+            .decl = selectedPrimalDeclRef.getDecl(),
             .attrName = getDerivativeAttrName<TDerivativeAttr>(),
             .attr = derivativeOfAttr->loc});
         visitor->getSink()->diagnose(
-            Diagnostics::SeeDeclarationOf{.decl = calleeDeclRef.getDecl()});
+            Diagnostics::SeeDeclarationOf{.decl = selectedPrimalDeclRef.getDecl()});
     }
 
-    derivativeOfAttr->funcExpr = calleeDeclRefExpr;
+    derivativeOfAttr->funcExpr = selectedPrimalDeclRefExpr;
     auto derivativeAttr = astBuilder->create<TDerivativeAttr>();
     derivativeAttr->loc = derivativeOfAttr->loc;
-    auto outterGeneric = visitor->GetOuterGeneric(funcDecl);
-    auto declRef = makeDeclRef<Decl>((outterGeneric ? (Decl*)outterGeneric : funcDecl));
+    DeclRef<Decl> declRef;
+    if constexpr (std::is_same_v<TDerivativeAttr, ForwardDerivativeAttribute>)
+    {
+        // Higher-order overload resolution expressed the selected primal specialization in the
+        // derivative's generic context. Form the corresponding specialized reference to the
+        // derivative itself instead of rebuilding an application from the primal's raw generic
+        // declaration.
+        declRef = createDefaultSubstitutionsIfNeeded(
+            astBuilder,
+            visitor,
+            derivativeFuncDecl->getDefaultDeclRef());
+    }
+    else
+    {
+        // The backward-derivative and primal-substitute consumers still validate and synthesize
+        // from an unspecialized primal declaration. Keep their existing path explicit: unlike the
+        // forward-derivative path above, an overloaded generic primal is not yet supported for
+        // these two attribute kinds.
+        auto outerGeneric = visitor->GetOuterGeneric(derivativeFuncDecl);
+        declRef = makeDeclRef<Decl>((outerGeneric ? (Decl*)outerGeneric : derivativeFuncDecl));
 
-    // If both the derivative and the original function are defined in the same outer generic
-    // aggregate type, we want to form a full declref with default arguments.
-    declRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, declRef);
+        // If both the derivative and the original function are defined in the same outer generic
+        // aggregate type, we want to form a full declref with default arguments.
+        declRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, declRef);
+    }
 
     auto declRefExpr = visitor->ConstructDeclRefExpr(
         declRef,
@@ -19129,16 +19883,43 @@ void checkDerivativeOfAttributeImpl(
     declRefExpr->type.type = nullptr;
     derivativeAttr->args.add(declRefExpr);
     derivativeAttr->funcExpr = declRefExpr;
-    checkDerivativeAttribute(visitor, calleeFunc, derivativeAttr);
+    if constexpr (std::is_same_v<TDerivativeAttr, ForwardDerivativeAttribute>)
+    {
+        // `AddHigherOrderOverloadCandidates` replaces a successfully inferred generic candidate's
+        // base function with its specialized inner function reference. Error recovery can instead
+        // retain the enclosing `GenericDecl`, but the `ErrorType` path above returns after
+        // diagnosing failed generic argument inference. Enforce this producer-consumer boundary
+        // in release builds before the unchecked typed rewrap below.
+        SLANG_RELEASE_ASSERT(selectedPrimalDeclRef.is<FunctionDeclBase>());
+        auto specializedPrimalDeclRef = selectedPrimalDeclRef.as<FunctionDeclBase>();
+        checkDerivativeAttribute(
+            visitor,
+            specializedPrimalDeclRef,
+            derivativeFuncDecl,
+            derivativeAttr);
+    }
+    else
+    {
+        checkDerivativeAttribute(visitor, primalFuncDecl, derivativeAttr);
+    }
     derivativeOfAttr->backDeclRef = derivativeAttr->funcExpr;
     derivativeAttr->funcExpr = nullptr;
-    visitor->getShared()->registerAssociatedDecl(calleeDeclRef.getDecl(), assocKind, funcDecl);
+    visitor->getShared()->registerAssociatedDecl(
+        selectedPrimalDeclRef.getDecl(),
+        assocKind,
+        derivativeFuncDecl);
 }
 
 
+// Synthesizes an AD 2.0 forward-derivative extension. `primalDeclRef` supplies the specialized
+// function type being extended, while `extensionContextFuncDecl` supplies the generic and module
+// context in which the derivative reference is valid. They differ when `[ForwardDerivativeOf]` is
+// written on the derivative because the selected primal specialization is expressed in the
+// derivative declaration's generic context.
 static void translateFwdDerivativeAttributeToAD2(
     SemanticsVisitor* visitor,
-    FunctionDeclBase* funcDecl,
+    FunctionDeclBase* extensionContextFuncDecl,
+    DeclRef<FunctionDeclBase> primalDeclRef,
     ForwardDerivativeAttribute* attr)
 {
     //
@@ -19151,16 +19932,14 @@ static void translateFwdDerivativeAttributeToAD2(
     //
     auto astBuilder = visitor->getASTBuilder();
     auto fwdDiffExtension = astBuilder->create<ExtensionDecl>();
-    auto funcDeclRef = funcDecl->getDefaultDeclRef();
-    funcDeclRef = createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), visitor, funcDeclRef);
-    auto funcAsType = DeclRefType::create(astBuilder, funcDeclRef);
+    auto funcAsType = DeclRefType::create(astBuilder, primalDeclRef);
     auto userDefinedFwdDiffFunc = as<DeclRefExpr>(attr->funcExpr)->declRef.as<CallableDecl>();
     auto visibility = getMoreRestrictiveVisibility(
-        getDeclVisibility(funcDecl),
+        getDeclVisibility(primalDeclRef.getDecl()),
         getDeclVisibility(userDefinedFwdDiffFunc.getDecl()));
     auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
 
-    fwdDiffExtension->parentDecl = funcDecl;
+    fwdDiffExtension->parentDecl = extensionContextFuncDecl;
     fwdDiffExtension->loc = attr->loc;
     fwdDiffExtension->nameAndLoc.loc = attr->loc;
     visitor->addVisibilityModifier(fwdDiffExtension, synthesizedVisibility.extensionVisibility);
@@ -19203,8 +19982,21 @@ static void translateFwdDerivativeAttributeToAD2(
         outermostFwdDiffDecl = outermostFwdDiffDecl->parentDecl;
     }
 
-    getModuleDecl(funcDecl)->addMember(outermostFwdDiffDecl);
+    getModuleDecl(extensionContextFuncDecl)->addMember(outermostFwdDiffDecl);
     // End AD 2.0 translation
+}
+
+static void translateFwdDerivativeAttributeToAD2(
+    SemanticsVisitor* visitor,
+    FunctionDeclBase* funcDecl,
+    ForwardDerivativeAttribute* attr)
+{
+    auto funcDeclRef = createDefaultSubstitutionsIfNeeded(
+                           getCurrentASTBuilder(),
+                           visitor,
+                           funcDecl->getDefaultDeclRef())
+                           .as<FunctionDeclBase>();
+    translateFwdDerivativeAttributeToAD2(visitor, funcDecl, funcDeclRef, attr);
 }
 
 static void translateBwdDerivativeAttributeToAD2(
@@ -19308,6 +20100,37 @@ static void translateBwdDerivativeAttributeToAD2(
         true,
         synthesizedVisibility.memberVisibility,
         attr->loc);
+}
+
+static void checkDerivativeAttribute(
+    SemanticsVisitor* visitor,
+    DeclRef<FunctionDeclBase> primalDeclRef,
+    FunctionDeclBase* derivativeFuncDecl,
+    ForwardDerivativeAttribute* attr)
+{
+    SLANG_RELEASE_ASSERT(attr->funcExpr && !attr->funcExpr->type.type);
+
+    ArgsWithDirectionInfo imaginaryArguments =
+        getImaginaryArgsToForwardDerivative(visitor, primalDeclRef.getDecl(), attr->loc);
+    specializeImaginaryArgumentTypes(visitor->getASTBuilder(), imaginaryArguments, primalDeclRef);
+    checkDerivativeAttributeImpl(
+        visitor,
+        primalDeclRef,
+        attr,
+        imaginaryArguments.args,
+        imaginaryArguments.directions,
+        imaginaryArguments.thisArg,
+        imaginaryArguments.thisArgDirection,
+        PrimalAndDerivativeGenericSignatureResolutionStatus::AlreadyResolved);
+
+    if (!as<DeclRefExpr>(attr->funcExpr))
+    {
+        // `checkDerivativeAttributeImpl` diagnosed the failed derivative resolution. AD 2.0
+        // translation requires its declaration reference, so no association can be synthesized.
+        return;
+    }
+
+    translateFwdDerivativeAttributeToAD2(visitor, derivativeFuncDecl, primalDeclRef, attr);
 }
 
 static void checkDerivativeAttribute(

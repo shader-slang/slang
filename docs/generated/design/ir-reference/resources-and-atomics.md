@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T15:19:14Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 470f82b26786f2a688f0f99c7822edc17ef465471990f01be775afeea0760dea
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -163,19 +163,19 @@ flowchart TD
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `imageSubscript` | **`IRImageSubscript`** | `image, coord, sampleCoord?` | | `__intrinsic_op` on the `_Texture` subscript `__ref` accessors, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 5367, 5528, 19413 | Pointer-like value for one texel, so `image[coord]` can appear as an lvalue. Legalized away before emit. |
+| `imageSubscript` | **`IRImageSubscript`** | `image, coord, sampleCoord?` | | `__intrinsic_op` on the `_Texture` subscript `__ref` accessors, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 5553, 5528, 19413 | Pointer-like value for one texel, so `image[coord]` can appear as an lvalue. Legalized away before emit. |
 | `imageLoad` | **`IRImageLoad`** | `image, coord, auxCoord1?, auxCoord2?` | | `IRBuilder::emitImageLoad`, called only from [slang-ir-legalize-image-subscript.cpp](../../../../source/slang/slang-ir-legalize-image-subscript.cpp) lines 123, 157 | Loads a texel. `auxCoord1` is the sample coord on GLSL/SPIR-V and the array-or-sample coord on Metal; `auxCoord2` is the Metal sample coord. |
-| `imageStore` | **`IRImageStore`** | `image, coord, value` (+ up to two undeclared aux coords) | | `__intrinsic_op` on the Metal `__metalImageStore` / `__metalImageStoreArray` intrinsics, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 5230, 5234; also `IRBuilder::emitImageStore` from the image-subscript legalization pass | Stores a texel. See [`imageStore` carries undeclared operands](#imagestore-carries-undeclared-operands). |
-| `imageGatherOffset` | `IRImageGatherOffset` | `sampledImage, location, component, offset` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 2301 | Gathers four texels at `location` shifted by a texel `offset`. See [`imageGatherOffset`](#imagegatheroffset). |
-| `ImageTexelPointer` | `IRImageTexelPointer` | `image, coord, sample` | | `__intrinsic_op`, [glsl.meta.slang](../../../../source/slang/glsl.meta.slang) line 4505 | Forms a pointer to a texel so an atomic can target it; emits as `OpImageTexelPointer`. |
-| `SubpassLoad` | `IRSubpassLoad` | `subpassInput, sample?` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 22687, 22699 | Reads a fragment-shader input attachment; the optional operand selects an MSAA sample. |
+| `imageStore` | **`IRImageStore`** | `image, coord, value` (+ up to two undeclared aux coords) | | `__intrinsic_op` on the Metal `__metalImageStore` / `__metalImageStoreArray` intrinsics, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 5416, 5234; also `IRBuilder::emitImageStore` from the image-subscript legalization pass | Stores a texel. See [`imageStore` carries undeclared operands](#imagestore-carries-undeclared-operands). |
+| `imageGatherOffset` | `IRImageGatherOffset` | `sampledImage, location, component, offset` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 2391 | Gathers four texels at `location` shifted by a texel `offset`. See [`imageGatherOffset`](#imagegatheroffset). |
+| `ImageTexelPointer` | `IRImageTexelPointer` | `image, coord, sample` | | `__intrinsic_op`, [glsl.meta.slang](../../../../source/slang/glsl.meta.slang) line 4441 | Forms a pointer to a texel so an atomic can target it; emits as `OpImageTexelPointer`. |
+| `SubpassLoad` | `IRSubpassLoad` | `subpassInput, sample?` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 22876, 22699 | Reads a fragment-shader input attachment; the optional operand selects an MSAA sample. |
 | `MetalCastToDepthTexture` | `IRMetalCastToDepthTexture` | `texture` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 1121 | Reinterprets a texture as a Metal depth texture. |
 | `IsTextureAccess` | `IRIsTextureAccess` | `[value]` | | (no producer at HEAD) | Declared but unreferenced; see [unused texture-access helpers](#unused-texture-access-helpers). |
 | `IsTextureScalarAccess` | `IRIsTextureScalarAccess` | `[value]` | | (no producer at HEAD) | Same. |
 | `IsTextureArrayAccess` | `IRIsTextureArrayAccess` | `[value]` | | (no producer at HEAD) | Same. |
-| `ExtractTextureFromTextureAccess` | `IRExtractTextureFromTextureAccess` | `[textureAccess]` | | core-module declaration only, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11890 | Declared, never called; see [unused texture-access helpers](#unused-texture-access-helpers). |
-| `ExtractCoordFromTextureAccess` | `IRExtractCoordFromTextureAccess` | `[textureAccess]` | | core-module declaration only, line 11896 | Same. |
-| `ExtractArrayCoordFromTextureAccess` | `IRExtractArrayCoordFromTextureAccess` | `[textureAccess]` | | core-module declaration only, line 11902 | Same. |
+| `ExtractTextureFromTextureAccess` | `IRExtractTextureFromTextureAccess` | `[textureAccess]` | | core-module declaration only, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 12078 | Declared, never called; see [unused texture-access helpers](#unused-texture-access-helpers). |
+| `ExtractCoordFromTextureAccess` | `IRExtractCoordFromTextureAccess` | `[textureAccess]` | | core-module declaration only, line 12084 | Same. |
+| `ExtractArrayCoordFromTextureAccess` | `IRExtractArrayCoordFromTextureAccess` | `[textureAccess]` | | core-module declaration only, line 12090 | Same. |
 
 ### Sampling and combined samplers
 
@@ -183,8 +183,8 @@ flowchart TD
 | --- | --- | --- | --- | --- | --- |
 | `sample` | `IRSample` | `texture, sampler, coord` | | (no producer or consumer at HEAD) | See [`sample` and `sampleGrad`](#sample-and-samplegrad). |
 | `sampleGrad` | `IRSampleGrad` | `texture, sampler, coord, gradX` | | (no producer or consumer at HEAD) | Same. |
-| `makeCombinedTextureSampler` | `IRMakeCombinedTextureSampler` | `texture, sampler` | | `IRBuilder::emitMakeCombinedTextureSampler` from [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 1861 and [slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/slang-ir-float-non-uniform-resource-index.cpp) line 358 | Pairs a separate texture and sampler into one combined value. |
-| `MakeCombinedTextureSamplerFromHandle` | `IRMakeCombinedTextureSamplerFromHandle` | `handle` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 27687 | Builds a combined texture/sampler from a descriptor handle. |
+| `makeCombinedTextureSampler` | `IRMakeCombinedTextureSampler` | `texture, sampler` | | `IRBuilder::emitMakeCombinedTextureSampler` from [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 1862 and [slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/slang-ir-float-non-uniform-resource-index.cpp) line 358 | Pairs a separate texture and sampler into one combined value. |
+| `MakeCombinedTextureSamplerFromHandle` | `IRMakeCombinedTextureSamplerFromHandle` | `handle` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 27927 | Builds a combined texture/sampler from a descriptor handle. |
 | `CombinedTextureSamplerGetTexture` | `IRCombinedTextureSamplerGetTexture` | `sampler` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 1185, 2294 | Projects the texture half. Note the Lua operand is named `sampler` even though it holds the *combined* value. |
 | `CombinedTextureSamplerGetSampler` | `IRCombinedTextureSamplerGetSampler` | `sampler` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 1188, 1191 | Projects the sampler half; both are consumed and removed by [slang-ir-lower-combined-texture-sampler.cpp](../../../../source/slang/slang-ir-lower-combined-texture-sampler.cpp). |
 
@@ -192,14 +192,14 @@ flowchart TD
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `byteAddressBufferLoad` | `IRByteAddressBufferLoad` | `buffer, offset, alignment` | | `InvokeExpr` on the buffer's `Load` method — `visitInvokeExpr`, [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 7172, via the `__intrinsic_op` at [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 5906-5914 | Loads ordinary data of the result type at `offset` bytes. |
-| `byteAddressBufferStore` | `IRByteAddressBufferStore` | `buffer, offset, alignment, value` | | `IRBuilder::emitByteAddressBufferStore`, [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) lines 3303, 3312 | Stores ordinary data at `offset` bytes. **The generated accessors are swapped** — see [`byteAddressBufferStore` operand naming](#byteaddressbufferstore-operand-naming). |
-| `structuredBufferLoad` | `IRStructuredBufferLoad` | `[buffer], [index]` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 5989, 6019 | Loads the element at `index`. |
-| `structuredBufferLoadStatus` | `IRStructuredBufferLoadStatus` | `buffer, index, status` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 6007 | Load that also writes a residency-status output. |
-| `rwstructuredBufferLoad` | `IRRWStructuredBufferLoad` | `[buffer], [index]` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 7249 | Loads from a writable structured buffer. |
-| `rwstructuredBufferLoadStatus` | `IRRWStructuredBufferLoadStatus` | `[buffer], [index], [status]` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 7267 | Load with status from a writable structured buffer. |
-| `rwstructuredBufferStore` | **`IRRWStructuredBufferStore`** | `structuredBuffer, index, val` | | `emitIntrinsicInst` in [slang-ir-byte-address-legalize.cpp](../../../../source/slang/slang-ir-byte-address-legalize.cpp) line 1708 | Stores `val` at `index`. Has no core-module origin — it is synthesized when a store through a buffer pointer is legalized back into a buffer operation, then rewritten again by the SPIR-V, CPU, and buffer-element-type lowering passes. |
-| `rwstructuredBufferGetElementPtr` | **`IRRWStructuredBufferGetElementPtr`** | `base, index` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 5942, 5946, and the subscript `__ref` accessor at line 7283 | Pointer to the `index`-th element; see [`rwstructuredBufferGetElementPtr`](#rwstructuredbuffergetelementptr). |
+| `byteAddressBufferLoad` | `IRByteAddressBufferLoad` | `buffer, offset, alignment` | | `InvokeExpr` on the buffer's `Load` method — `visitInvokeExpr`, [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 7209, via the `__intrinsic_op` at [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 6092-6100 | Loads ordinary data of the result type at `offset` bytes. |
+| `byteAddressBufferStore` | `IRByteAddressBufferStore` | `buffer, offset, alignment, value` | | `IRBuilder::emitByteAddressBufferStore`, [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) lines 3304, 3312 | Stores ordinary data at `offset` bytes. **The generated accessors are swapped** — see [`byteAddressBufferStore` operand naming](#byteaddressbufferstore-operand-naming). |
+| `structuredBufferLoad` | `IRStructuredBufferLoad` | `[buffer], [index]` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 6175, 6019 | Loads the element at `index`. |
+| `structuredBufferLoadStatus` | `IRStructuredBufferLoadStatus` | `buffer, index, status` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 6193 | Load that also writes a residency-status output. |
+| `rwstructuredBufferLoad` | `IRRWStructuredBufferLoad` | `[buffer], [index]` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 7435 | Loads from a writable structured buffer. |
+| `rwstructuredBufferLoadStatus` | `IRRWStructuredBufferLoadStatus` | `[buffer], [index], [status]` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 7453 | Load with status from a writable structured buffer. |
+| `rwstructuredBufferStore` | **`IRRWStructuredBufferStore`** | `structuredBuffer, index, val` | | `emitIntrinsicInst` in [slang-ir-byte-address-legalize.cpp](../../../../source/slang/slang-ir-byte-address-legalize.cpp) line 1718 | Stores `val` at `index`. Has no core-module origin — it is synthesized when a store through a buffer pointer is legalized back into a buffer operation, then rewritten again by the SPIR-V, CPU, and buffer-element-type lowering passes. |
+| `rwstructuredBufferGetElementPtr` | **`IRRWStructuredBufferGetElementPtr`** | `base, index` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 6128, 5946, and the subscript `__ref` accessor at line 7469 | Pointer to the `index`-th element; see [`rwstructuredBufferGetElementPtr`](#rwstructuredbuffergetelementptr). |
 | `StructuredBufferGetDimensions` | **`IRStructuredBufferGetDimensions`** | `buffer` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 80, 85, 89 | Returns element count and stride. |
 
 ### Append and consume buffers
@@ -207,31 +207,43 @@ flowchart TD
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `StructuredBufferAppend` | **`IRStructuredBufferAppend`** | `buffer, element?` | | `__intrinsic_op` on `AppendStructuredBuffer.Append`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 127 | Appends one element. The `element` operand is declared optional but every producer supplies it and the emitters read `getOperand(1)` unconditionally. |
-| `StructuredBufferConsume` | **`IRStructuredBufferConsume`** | `buffer` | | `__intrinsic_op` on `ConsumeStructuredBuffer.Consume`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 6053 | Pops one element. |
+| `StructuredBufferConsume` | **`IRStructuredBufferConsume`** | `buffer` | | `__intrinsic_op` on `ConsumeStructuredBuffer.Consume`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 6239 | Pops one element. |
 
 ### Resource queries and modifiers
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `nonUniformResourceIndex` | `IRNonUniformResourceIndex` | `index` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 13941, 27811 and [glsl.meta.slang](../../../../source/slang/glsl.meta.slang) line 10693 | Marks a resource index as divergent; see [`nonUniformResourceIndex`](#nonuniformresourceindex). |
-| `getNaturalStride` | `IRGetNaturalStride` | `type` | | `__intrinsic_op` on `__naturalStrideOf_impl`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 3989 | Byte stride of the operand's natural layout; folded to a literal by peephole. |
-| `getNaturalAlignment` | `IRGetNaturalAlignment` | `type` | | `__intrinsic_op` on `__naturalAlignmentOf_impl`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 4000 | Power-of-two alignment guaranteed by the natural layout; see [`getNaturalStride` and `getNaturalAlignment`](#getnaturalstride-and-getnaturalalignment). |
-| `castDynamicResource` | `IRCastDynamicResource` | `resource` | | `__intrinsic_op` on `__DynamicResource.as` / `.asOpaqueDescriptor`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 27341, 27344, 27360 | Narrows a `__DynamicResource` to a concrete resource type. |
-| `getEquivalentStructuredBuffer` | `IRGetEquivalentStructuredBuffer` | `[buffer]` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 10206-10212 | Views a byte-address buffer as a structured buffer; consumed and removed by [slang-ir-byte-address-legalize.cpp](../../../../source/slang/slang-ir-byte-address-legalize.cpp). |
-| `getStructuredBufferPtr` | `IRGetStructuredBufferPtr` | `[buffer]` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 5934, 5938 | `T*` pointer to a structured buffer's data. |
-| `getUntypedBufferPtr` | `IRGetUntypedBufferPtr` | `[buffer]` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 5926, 5930 | `uint*` pointer to a byte-address buffer's data. |
-| `getRegisterIndex` | **`IRGetRegisterIndex`** | `[resource]` | | `__intrinsic_op` on `__getRegisterIndex`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 26386-26387 | Register index the resource is bound to. Child of the `BindingQuery` group. |
-| `getRegisterSpace` | **`IRGetRegisterSpace`** | `[resource]` | | `__intrinsic_op` on `__getRegisterSpace`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 26383-26384 | Register space the resource is bound to. Child of the `BindingQuery` group. |
+| `nonUniformResourceIndex` | `IRNonUniformResourceIndex` | `index` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 14129, 27811 and [glsl.meta.slang](../../../../source/slang/glsl.meta.slang) line 10640 | Marks a resource index as divergent; see [`nonUniformResourceIndex`](#nonuniformresourceindex). |
+| `getNaturalStride` | `IRGetNaturalStride` | `type` | | `__intrinsic_op` on `__naturalStrideOf_impl`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 3999 | Byte stride of the operand's natural layout; folded to a literal by peephole. |
+| `getNaturalAlignment` | `IRGetNaturalAlignment` | `type` | | `__intrinsic_op` on `__naturalAlignmentOf_impl`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 4010 | Power-of-two alignment guaranteed by the natural layout; see [`getNaturalStride` and `getNaturalAlignment`](#getnaturalstride-and-getnaturalalignment). |
+| `castDynamicResource` | `IRCastDynamicResource` | `resource` | | `__intrinsic_op` on `__DynamicResource.as` / `.asOpaqueDescriptor`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 27530, 27344, 27360 | Narrows a `__DynamicResource` to a concrete resource type. |
+| `getEquivalentStructuredBuffer` | `IRGetEquivalentStructuredBuffer` | `[buffer]` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 10394-10400 | Views a byte-address buffer as a structured buffer; consumed and removed by [slang-ir-byte-address-legalize.cpp](../../../../source/slang/slang-ir-byte-address-legalize.cpp). |
+| `getStructuredBufferPtr` | `IRGetStructuredBufferPtr` | `[buffer]` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 6120, 5938 | `T*` pointer to a structured buffer's data. |
+| `getUntypedBufferPtr` | `IRGetUntypedBufferPtr` | `[buffer]` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 6112, 5930 | `uint*` pointer to a byte-address buffer's data. |
+| `getRegisterIndex` | **`IRGetRegisterIndex`** | `[resource]` | | `__intrinsic_op` on `__getRegisterIndex`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 26575-26576 | Register index the resource is bound to. Declared only for `_Texture` and `SamplerState`, so passing anything else — a `StructuredBuffer`, say — is a type error (`E30019`) rather than an unsupported query. Child of the `BindingQuery` group. |
+| `getRegisterSpace` | **`IRGetRegisterSpace`** | `[resource]` | | `__intrinsic_op` on `__getRegisterSpace`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 26572-26573 | Register space the resource is bound to. Same two accepted resource kinds as `getRegisterIndex`. Child of the `BindingQuery` group. |
 
 Five of these rows have **no public wrapper**: the underscore-prefixed
 declarations `__getEquivalentStructuredBuffer`
 ([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
-10213-10219), `__getStructuredBufferPtr`, `__getUntypedBufferPtr`, and
-`__getRegisterIndex` / `__getRegisterSpace` (lines 26389-26393) are the
-whole surface. Unlike `InterlockedAdd` or `WaveGetActiveMask`, no
+10213-10219), `__getStructuredBufferPtr`,
+`__getByteAddressBufferPtr` (lines 6114 and 6118, one overload for
+`ByteAddressBuffer` and one for `RWByteAddressBuffer` — this is the
+intrinsic behind the `getUntypedBufferPtr` opcode; there is no
+`__getUntypedBufferPtr` declaration to call),
+`__metal_asDepthTexture` (line 1123, behind `MetalCastToDepthTexture`),
+and `__getRegisterIndex` / `__getRegisterSpace` (lines 26572-26576) are
+the whole surface. Unlike `InterlockedAdd` or `WaveGetActiveMask`, no
 ordinary Slang function calls them on the user's behalf, so reaching
 these opcodes from source means calling the underscore intrinsic
-directly and accepting that it is not a stable public API. That also
+directly and accepting that it is not a stable public API.
+
+The two binding queries additionally need a target whose binding model
+assigns a register and space at all. They are reached from the NVAPI
+path, and on a target that cannot resolve one — `-target cuda`, for
+instance — the compile fails with `E81111`
+(`opaque-reference-must-resolve-to-global`, *"cannot determine
+register/space for NVAPI resource"*), not with a fallback value. That also
 means they *do* appear at the lowering snapshot, with no inlining step
 in between — the opposite of the wrapper cases collected under
 [`Interlocked*` is a wrapper, not an opcode](#interlocked-is-a-wrapper-not-an-opcode).
@@ -240,15 +252,15 @@ in between — the opposite of the wrapper cases collected under
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `global_param` | **`IRGlobalParam`** | — | G | `VarDecl` at module scope — `visitVarDecl` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 11927) routes it to `lowerGlobalVarDecl` and then `lowerGlobalShaderParam`, which calls `createGlobalParam` at line 11588 | Module-scope shader parameter. Its enumerator is `kIROp_GlobalParam`; see [`global_param` and `EntryPointParamDecoration` (cross-link)](#global_param-and-entrypointparamdecoration-cross-link). |
-| `GetWorkGroupSize` | `IRGetWorkGroupSize` | — | H | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 7830 | Workgroup size of the calling entry point. Hoistable and nullary, so `materializeGetWorkGroupSize` in [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/slang-ir-translate-global-varying-var.cpp) (line 34) replaces it once the referencing entry point is known. |
-| `GetCurrentStage` | `IRGetCurrentStage` | — | | `IRBuilder::emitGetCurrentStage`, called from [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 9340 when lowering `__target_switch`-style stage dispatch | Pipeline stage of the calling entry point; folded away by `slang-ir-specialize-stage-switch.cpp`. |
-| `GetPerVertexInputArray` | `IRGetPerVertexInputArray` | `[attribute]` | H | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11700 | Array view of a `nointerpolation` input across the primitive's vertices. |
-| `ResolveVaryingInputRef` | `IRResolveVaryingInputRef` | `[attribute]` | H | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11697 | Placeholder reference to a varying input, rewritten to the real parameter by varying-param legalization. |
+| `global_param` | **`IRGlobalParam`** | — | G | `VarDecl` at module scope — `visitVarDecl` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 12011) routes it to `lowerGlobalVarDecl` and then `lowerGlobalShaderParam`, which calls `createGlobalParam` at line 4060 | Module-scope shader parameter. Its enumerator is `kIROp_GlobalParam`; see [`global_param` and `EntryPointParamDecoration` (cross-link)](#global_param-and-entrypointparamdecoration-cross-link). |
+| `GetWorkGroupSize` | `IRGetWorkGroupSize` | — | H | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 8016 | Workgroup size of the calling entry point. Hoistable and nullary, so `materializeGetWorkGroupSize` in [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/slang-ir-translate-global-varying-var.cpp) (line 34) replaces it once the referencing entry point is known. |
+| `GetCurrentStage` | `IRGetCurrentStage` | — | | `IRBuilder::emitGetCurrentStage`, called from [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 9412 when lowering `__target_switch`-style stage dispatch | Pipeline stage of the calling entry point; folded away by `slang-ir-specialize-stage-switch.cpp`. |
+| `GetPerVertexInputArray` | `IRGetPerVertexInputArray` | `[attribute]` | H | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11888 | Array view of a `nointerpolation` input across the primitive's vertices. |
+| `ResolveVaryingInputRef` | `IRResolveVaryingInputRef` | `[attribute]` | H | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11885 | Placeholder reference to a varying input, rewritten to the real parameter by varying-param legalization. |
 
 The last two rows share one user surface:
 `GetAttributeAtVertex(attribute, vertexIndex)`
-([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11733),
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11921),
 called from a `fragment` entry point on an input declared
 `nointerpolation`. Which of the two opcodes you get is a target
 decision, not a source one: the function's `__target_switch` produces
@@ -262,11 +274,11 @@ same call in a `vertex` entry point is rejected with `E36107`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `meshOutputRef` | **`IRMeshOutputRef`** | `base, index` | | `__intrinsic_op` on the mesh output-array subscript `__ref` accessors, [core.meta.slang](../../../../source/slang/core.meta.slang) lines 2677, 2715 | Reference to one slot of a mesh output array. The hand-written wrapper adds `getOutputType()`, which unwraps the result pointer type. |
-| `meshOutputSet` | **`IRMeshOutputSet`** | `base, index, elementValue` | | `__intrinsic_op`, [core.meta.slang](../../../../source/slang/core.meta.slang) lines 2652, 2695, 2730 | Writes one element of a mesh output array. |
-| `metalSetVertex` | **`IRMetalSetVertex`** | `index, elementValue` | | `__intrinsic_op`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 2649 | Metal `_slang_mesh.set_vertex` write. |
-| `metalSetPrimitive` | **`IRMetalSetPrimitive`** | `index, elementValue` | | (no producer at HEAD) | Metal primitive-output write; consumed by [slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp) but never emitted — see [the `metalSet*` builder helpers](#the-metalset-builder-helpers). |
-| `metalSetIndices` | **`IRMetalSetIndices`** | `index, elementValue` | | (no producer at HEAD) | Metal index-output write; same situation. |
+| `meshOutputRef` | **`IRMeshOutputRef`** | `base, index` | | `__intrinsic_op` on the mesh output-array subscript `__ref` accessors, [core.meta.slang](../../../../source/slang/core.meta.slang) lines 2684, 2715 | Reference to one slot of a mesh output array. The hand-written wrapper adds `getOutputType()`, which unwraps the result pointer type. |
+| `meshOutputSet` | **`IRMeshOutputSet`** | `base, index, elementValue` | | `__intrinsic_op`, [core.meta.slang](../../../../source/slang/core.meta.slang) lines 2659, 2695, 2730 | Writes one element of a mesh output array. |
+| `metalSetVertex` | **`IRMetalSetVertex`** | `index, elementValue` | | `__intrinsic_op`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 2656 | Metal `_slang_mesh.set_vertex` write. |
+| `metalSetPrimitive` | **`IRMetalSetPrimitive`** | `index, elementValue` | | `__intrinsic_op($(kIROp_MetalSetPrimitive))`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 2734 | Metal primitive-output write; consumed by [slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp) but never emitted — see [the `metalSet*` builder helpers](#the-metalset-builder-helpers). |
+| `metalSetIndices` | **`IRMetalSetIndices`** | `index, elementValue` | | `__intrinsic_op($(kIROp_MetalSetIndices))`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 2696 | Metal index-output write; same origin. |
 
 ### Atomic operations
 
@@ -305,7 +317,7 @@ constant above.
 There is no memory-*scope* operand. The SPIR-V backend hard-codes
 `SpvScopeDevice` in every atomic case
 ([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp),
-`emitMemorySemanticMask` at line 4462 and its call sites).
+`emitMemorySemanticMask` at line 4498 and its call sites).
 
 Each atomic has two producer surfaces, both in the core module and both
 declared with the same `__intrinsic_op`:
@@ -325,23 +337,23 @@ declared with the same `__intrinsic_op`:
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `atomicLoad` | **`IRAtomicLoad`** | `[ptr]`, `[order]` | | `Atomic<T>.load`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 4103 | Atomically reads `*ptr`. |
-| `atomicStore` | **`IRAtomicStore`** | `[ptr]`, `[val]`, `[order]` | | `Atomic<T>.store`, line 4107 | Atomically writes `*ptr`. |
-| `atomicExchange` | **`IRAtomicExchange`** | `[ptr]`, `[val]`, `[order]` | | `Atomic<T>.exchange` (line 4112) and `__atomic_exchange` | Writes and returns the previous value. |
-| `atomicCompareExchange` | `IRAtomicCompareExchange` | `ptr, expected, desired`, `[successOrder]`, `[failOrder]` | | `Atomic<T>.compareExchange` (line 4125) and `__atomic_compare_exchange` | CAS; see [`atomicCompareExchange`](#atomiccompareexchange). |
-| `atomicAdd` | `IRAtomicAdd` | `ptr, val`, `[order]` | | `Atomic<T>.add` (line 4138) and `__atomic_add` | Atomic add, returning the old value. |
-| `atomicSub` | `IRAtomicSub` | `ptr, val`, `[order]` | | `Atomic<T>.sub` (line 4143) and `__atomic_sub` | Atomic subtract. |
-| `atomicAnd` | `IRAtomicAnd` | `ptr, val`, `[order]` | | `Atomic<T>.and` (line 4220) and `__atomic_and` | Atomic bitwise AND. |
-| `atomicOr` | `IRAtomicOr` | `ptr, val`, `[order]` | | `Atomic<T>.or` (line 4226) and `__atomic_or` | Atomic bitwise OR. |
-| `atomicXor` | `IRAtomicXor` | `ptr, val`, `[order]` | | `Atomic<T>.xor` (line 4232) and `__atomic_xor` | Atomic bitwise XOR. |
-| `atomicMin` | `IRAtomicMin` | `ptr, val`, `[order]` | | `Atomic<T>.min` (line 4153) and `__atomic_min` | Atomic minimum. |
-| `atomicMax` | `IRAtomicMax` | `ptr, val`, `[order]` | | `Atomic<T>.max` (line 4148) and `__atomic_max` | Atomic maximum. |
-| `atomicInc` | `IRAtomicInc` | `ptr`, `[order]` | | `Atomic<T>.increment` (line 4237) and `__atomic_increment` | Atomic increment; emits `OpAtomicIIncrement` on SPIR-V. |
-| `atomicDec` | `IRAtomicDec` | `ptr`, `[order]` | | `Atomic<T>.decrement` (line 4242) and `__atomic_decrement` | Atomic decrement. |
-| `MetalAtomicCast` | `IRMetalAtomicCast` | `[value]` | | (no producer at HEAD) | Reinterprets a value as Metal's `atomic<T>`; consumed by [slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp) line 451 and [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) line 3261 but never emitted. |
+| `atomicLoad` | **`IRAtomicLoad`** | `[ptr]`, `[order]` | | `Atomic<T>.load`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 4109 | Atomically reads `*ptr`. |
+| `atomicStore` | **`IRAtomicStore`** | `[ptr]`, `[val]`, `[order]` | | `Atomic<T>.store`, line 4113 | Atomically writes `*ptr`. |
+| `atomicExchange` | **`IRAtomicExchange`** | `[ptr]`, `[val]`, `[order]` | | `Atomic<T>.exchange` (line 4118) and `__atomic_exchange` | Writes and returns the previous value. |
+| `atomicCompareExchange` | `IRAtomicCompareExchange` | `ptr, expected, desired`, `[successOrder]`, `[failOrder]` | | `Atomic<T>.compareExchange` (line 4131) and `__atomic_compare_exchange` | CAS; see [`atomicCompareExchange`](#atomiccompareexchange). |
+| `atomicAdd` | `IRAtomicAdd` | `ptr, val`, `[order]` | | `Atomic<T>.add` (line 4144) and `__atomic_add` | Atomic add, returning the old value. |
+| `atomicSub` | `IRAtomicSub` | `ptr, val`, `[order]` | | `Atomic<T>.sub` (line 4149) and `__atomic_sub` | Atomic subtract. |
+| `atomicAnd` | `IRAtomicAnd` | `ptr, val`, `[order]` | | `Atomic<T>.and` (line 4226) and `__atomic_and` | Atomic bitwise AND. |
+| `atomicOr` | `IRAtomicOr` | `ptr, val`, `[order]` | | `Atomic<T>.or` (line 4232) and `__atomic_or` | Atomic bitwise OR. |
+| `atomicXor` | `IRAtomicXor` | `ptr, val`, `[order]` | | `Atomic<T>.xor` (line 4238) and `__atomic_xor` | Atomic bitwise XOR. |
+| `atomicMin` | `IRAtomicMin` | `ptr, val`, `[order]` | | `Atomic<T>.min` (line 4159) and `__atomic_min` | Atomic minimum. |
+| `atomicMax` | `IRAtomicMax` | `ptr, val`, `[order]` | | `Atomic<T>.max` (line 4154) and `__atomic_max` | Atomic maximum. |
+| `atomicInc` | `IRAtomicInc` | `ptr`, `[order]` | | `Atomic<T>.increment` (line 4243) and `__atomic_increment` | Atomic increment; emits `OpAtomicIIncrement` on SPIR-V. |
+| `atomicDec` | `IRAtomicDec` | `ptr`, `[order]` | | `Atomic<T>.decrement` (line 4248) and `__atomic_decrement` | Atomic decrement. |
+| `MetalAtomicCast` | `IRMetalAtomicCast` | `[value]` | | (no producer at HEAD) | Reinterprets a value as Metal's `atomic<T>`; consumed by [slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp) line 450 and [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) line 3312 but never emitted. |
 
 The `atomic_reduce` family in the core module
-([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 5719
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 5905
 onward, and the `Atomic<T>.reduce*` methods) adds **no** opcodes. Each is a
 `[ForceInline]` function whose `__target_switch` emits inline CUDA `red.*`
 assembly for CUDA and otherwise falls through to the matching
@@ -353,7 +365,7 @@ instrumentation pass runs:
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `IncrementCoverageCounter` | `IRIncrementCoverageCounter` | — | | `IRBuilder::emitIncrementCoverageCounter` from [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 9987 | Line-coverage marker. Carries no operands — its position is the standard per-instruction `sourceLoc`, which `stripDebugInfo` never removes. `slang-ir-coverage-instrument.cpp` rewrites it into an atomic add on the synthesized `__slang_coverage` buffer. |
+| `IncrementCoverageCounter` | `IRIncrementCoverageCounter` | — | | `IRBuilder::emitIncrementCoverageCounter` from [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 10071 | Line-coverage marker. Carries no operands — its position is the standard per-instruction `sourceLoc`, which `stripDebugInfo` never removes. `slang-ir-coverage-instrument.cpp` rewrites it into an atomic add on the synthesized `__slang_coverage` buffer. |
 | `IncrementFunctionCoverageCounter` | `IRIncrementFunctionCoverageCounter` | `functionName, functionMangledName` (both `IRStringLit`) | | Function-entry lowering when function coverage is on | Function-entry marker; names are operands so later passes need no AST access. |
 | `IncrementBranchCoverageCounter` | `IRIncrementBranchCoverageCounter` | `branchSiteID, branchArmID, branchArmKind` (all `IRIntLit`) | | Branch lowering when branch coverage is on | Branch-arm marker; the arm kind lets LCOV export distinguish true/false/case arms. |
 
@@ -363,8 +375,8 @@ instrumentation pass runs:
 | --- | --- | --- | --- | --- | --- |
 | `ControlBarrier` | `IRControlBarrier` | — | | `IRBuilder::emitIntrinsicInst` in [slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp) line 1260 | Execution-plus-memory barrier synthesized when GLSL legalization needs a sync point; emitted as `barrier()` / `OpControlBarrier`. |
 | `GroupMemoryBarrierWithGroupSync` | `IRGroupMemoryBarrierWithGroupSync` | — | | (no producer at HEAD) | See [`ControlBarrier` vs `GroupMemoryBarrierWithGroupSync`](#controlbarrier-vs-groupmemorybarrierwithgroupsync). |
-| `BeginFragmentShaderInterlock` | `IRBeginFragmentShaderInterlock` | — | | `__intrinsic_op`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 3537 | Opens a rasterizer-ordered critical section. |
-| `EndFragmentShaderInterlock` | `IREndFragmentShaderInterlock` | — | | `__intrinsic_op`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 3542 | Closes the section opened above. |
+| `BeginFragmentShaderInterlock` | `IRBeginFragmentShaderInterlock` | — | | `__intrinsic_op`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 3529 | Opens a rasterizer-ordered critical section. |
+| `EndFragmentShaderInterlock` | `IREndFragmentShaderInterlock` | — | | `__intrinsic_op`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 3534 | Closes the section opened above. |
 
 The Slang a user writes to reach these: the two interlock opcodes are
 `beginInvocationInterlock()` and `endInvocationInterlock()`
@@ -389,9 +401,9 @@ documented in
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `CoopMatMapElementIFunc` | **`IRCoopMatMapElementIFunc`** | `[coopMat]`, `[iFuncCall]`, `[iFuncThis]?` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 28714, 30174, 30177 | Applies an `IFunc` element-wise over a cooperative matrix. The hand-written wrapper exposes `getCoopMat()`, `getIFuncCall()`, `getIFuncThis()`, and `hasIFuncThis()`; `getTuple()` is an alias for operand 0 for the multi-matrix overload. |
-| `CoopMatMulAdd` | `IRCoopMatMulAdd` | `matA, matB, matC, saturatingAccumulation` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 30114 | Fused multiply-add on cooperative matrices. |
-| `CoopVecMatMulAdd` | `IRCoopVecMatMulAdd` | `input, inputInterpretation, inputInterpretationPackingFactor, matrixPtr, matrixOffset, matrixInterpretation, k, memoryLayout, transpose, matrixStride, biasPtr?, biasOffset?, biasInterpretation?` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 32676, 32690, 32704 | Cooperative-vector matrix-multiply-add with optional bias. |
+| `CoopMatMapElementIFunc` | **`IRCoopMatMapElementIFunc`** | `[coopMat]`, `[iFuncCall]`, `[iFuncThis]?` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 28977, 30174, 30177 | Applies an `IFunc` element-wise over a cooperative matrix. The hand-written wrapper exposes `getCoopMat()`, `getIFuncCall()`, `getIFuncThis()`, and `hasIFuncThis()`; `getTuple()` is an alias for operand 0 for the multi-matrix overload. |
+| `CoopMatMulAdd` | `IRCoopMatMulAdd` | `matA, matB, matC, saturatingAccumulation` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 30377 | Fused multiply-add on cooperative matrices. |
+| `CoopVecMatMulAdd` | `IRCoopVecMatMulAdd` | `input, inputInterpretation, inputInterpretationPackingFactor, matrixPtr, matrixOffset, matrixInterpretation, k, memoryLayout, transpose, matrixStride, biasPtr?, biasOffset?, biasInterpretation?` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 32951, 32690, 32704 | Cooperative-vector matrix-multiply-add with optional bias. |
 | `CoopVecOuterProductAccumulate` | `IRCoopVecOuterProductAccumulate` | `matrixPtr, matrixOffset, a, b, memoryLayout, matrixInterpretation, matrixStride` | | `__intrinsic_op` on the cooperative-vector outer-product intrinsic | Accumulates the outer product of `a` and `b` into a matrix in memory. |
 | `CoopVecReduceSumAccumulate` | `IRCoopVecReduceSumAccumulate` | `bufferPtr, offset, value` | | `__intrinsic_op` on the cooperative-vector reduce-sum intrinsic | Accumulates a reduce-sum into a memory location. |
 
@@ -402,7 +414,7 @@ stay as core-module calls until backend emit.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `waveGetActiveMask` | `IRWaveGetActiveMask` | — | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 15526 | Mask of currently active lanes. |
+| `waveGetActiveMask` | `IRWaveGetActiveMask` | — | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 15714 | Mask of currently active lanes. |
 | `waveMaskBallot` | `IRWaveMaskBallot` | `mask, condition` | | `IRBuilder::emitWaveMaskBallot` from [slang-ir-synthesize-active-mask.cpp](../../../../source/slang/slang-ir-synthesize-active-mask.cpp) lines 750, 1217, 1796, 1833 | Mask of lanes in `mask` for which `condition` holds; the active-mask synthesis pass threads these through control flow for CUDA. |
 | `waveMaskMatch` | `IRWaveMaskMatch` | `mask, value` | | `IRBuilder::emitWaveMaskMatch` from the same pass, line 1450 | Mask of lanes in `mask` sharing the same `value`. |
 
@@ -410,12 +422,12 @@ stay as core-module calls until backend emit.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `getOptiXRayPayloadPtr` | `IRGetOptiXRayPayloadPtr` | — | H | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) lines 2330, 2345 | Pointer to the OptiX payload struct reassembled from payload registers. |
-| `getOptiXHitAttribute` | `IRGetOptiXHitAttribute` | `[type], [index]` | | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) line 2151 | Reads one hit attribute. Operand 0 is the *type* inst to fetch and operand 1 the attribute index — an unusual shape, since the type is normally the result type rather than an operand. |
+| `getOptiXRayPayloadPtr` | `IRGetOptiXRayPayloadPtr` | — | H | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) lines 2379, 2345 | Pointer to the OptiX payload struct reassembled from payload registers. |
+| `getOptiXHitAttribute` | `IRGetOptiXHitAttribute` | `[type], [index]` | | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) line 2174 | Reads one hit attribute. Operand 0 is the *type* inst to fetch and operand 1 the attribute index — an unusual shape, since the type is normally the result type rather than an operand. |
 | `getOptiXSbtDataPointer` | `IRGetOptiXSbtDataPtr` | — | | [slang-ir-optix-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-optix-entry-point-uniforms.cpp) line 230 | Pointer to the shader-binding-table record holding entry-point uniforms. Enumerator is `kIROp_GetOptiXSbtDataPtr`. |
-| `getOptiXPayloadRegister` | `IRGetOptiXPayloadRegister` | `[registerIndex]` | | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) lines 1297-1368 | Reads one 32-bit OptiX payload register. |
-| `setOptiXPayloadRegister` | `IRSetOptiXPayloadRegister` | `[registerIndex]`, `[value]` | | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) lines 1547-1624 | Writes one 32-bit OptiX payload register. |
-| `GetVulkanRayTracingPayloadLocation` | `IRGetVulkanRayTracingPayloadLocation` | `[payload]` | | `__intrinsic_op` on `__callablePayloadLocation`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 19599 | Location index assigned to a Vulkan raytracing / callable payload. |
+| `getOptiXPayloadRegister` | `IRGetOptiXPayloadRegister` | `[registerIndex]` | | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) lines 1315-1368 | Reads one 32-bit OptiX payload register. |
+| `setOptiXPayloadRegister` | `IRSetOptiXPayloadRegister` | `[registerIndex]`, `[value]` | | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) lines 1570-1624 | Writes one 32-bit OptiX payload register. |
+| `GetVulkanRayTracingPayloadLocation` | `IRGetVulkanRayTracingPayloadLocation` | `[payload]` | | `__intrinsic_op` on `__callablePayloadLocation`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 19786 | Location index assigned to a Vulkan raytracing / callable payload. |
 
 What produces `getOptiXSbtDataPointer` is *where* a uniform is
 declared, not how large it is. Only an entry-point `uniform`
@@ -447,12 +459,12 @@ its `uniform` parameter becomes a kernel launch argument.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `LoadResourceDescriptorFromHeap` | `IRLoadResourceDescriptorFromHeap` | `index` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 27672 | Loads a resource descriptor by heap index; see [`LoadResourceDescriptorFromHeap`](#loadresourcedescriptorfromheap). |
-| `LoadSamplerDescriptorFromHeap` | `IRLoadSamplerDescriptorFromHeap` | `index` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 27668 | Loads a sampler descriptor by heap index. |
-| `SPIRVLoadDescriptorFromHeap` | `IRSPIRVLoadDescriptorFromHeap` | `heap, index` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 27676, plus `IRBuilder::emitLoadDescriptorFromHeap` | Loads a descriptor out of an explicit SPIR-V heap array. |
+| `LoadResourceDescriptorFromHeap` | `IRLoadResourceDescriptorFromHeap` | `index` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 27912 | Loads a resource descriptor by heap index; see [`LoadResourceDescriptorFromHeap`](#loadresourcedescriptorfromheap). |
+| `LoadSamplerDescriptorFromHeap` | `IRLoadSamplerDescriptorFromHeap` | `index` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 27908 | Loads a sampler descriptor by heap index. |
+| `SPIRVLoadDescriptorFromHeap` | `IRSPIRVLoadDescriptorFromHeap` | `heap, index` | | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 27916, plus `IRBuilder::emitLoadDescriptorFromHeap` | Loads a descriptor out of an explicit SPIR-V heap array. |
 | `SPIRVLoadTexelPointerFromHeap` | `IRSPIRVLoadTexelPointerFromHeap` | `heap, index, textureType, coord, sampleIndex` | | `IRBuilder::emitSPIRVLoadTexelPointerFromHeap` from [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 1482 | Forms a texel pointer directly from a heap descriptor so an atomic can target a bindless image. |
-| `SPIRVResourceHeap` | `IRSPIRVResourceHeap` | — | H | `IRBuilder::emitSPIRVResourceDescriptorHeap` from [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 1854 | The implicit SPIR-V resource-descriptor array. Note the builder helper is named `emitSPIRVResourceDescriptorHeap`, not `emitSPIRVResourceHeap`. |
-| `SPIRVSamplerHeap` | `IRSPIRVSamplerHeap` | — | H | `IRBuilder::emitSPIRVSamplerDescriptorHeap` from the same site, line 1858 | The implicit SPIR-V sampler-descriptor array. |
+| `SPIRVResourceHeap` | `IRSPIRVResourceHeap` | — | H | `IRBuilder::emitSPIRVResourceDescriptorHeap` from [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 1855 | The implicit SPIR-V resource-descriptor array. Note the builder helper is named `emitSPIRVResourceDescriptorHeap`, not `emitSPIRVResourceHeap`. |
+| `SPIRVSamplerHeap` | `IRSPIRVSamplerHeap` | — | H | `IRBuilder::emitSPIRVSamplerDescriptorHeap` from the same site, line 1859 | The implicit SPIR-V sampler-descriptor array. |
 
 The surface behind every row here is `DescriptorHandle<T>`: each
 dereference of one goes through `defaultGetDescriptorFromHandle`
@@ -460,10 +472,10 @@ dereference of one goes through `defaultGetDescriptorFromHandle`
 27708-27807), whose `__target_switch` chooses the heap form. On SPIR-V
 the choice is made by a capability, not by the shader text. Compiled
 with `-capability spvDescriptorHeapEXT`, the `spvDescriptorHeapEXT`
-case (line 27797) returns
+case (line 28060) returns
 `__spirvLoadDescriptorFromHeap(__spirvResourceHeap(), i)`, or
 `__spirvSamplerHeap()` for `DescriptorKind.Sampler` — so the two heap
-opcodes are *core-module* intrinsics (lines 27685 and 27688) that are
+opcodes are *core-module* intrinsics (lines 27925 and 27688) that are
 in the IR from linking onward, not things SPIR-V legalization invents.
 Without that capability the same shader falls to the plain `spirv`
 case and uses `GetDynamicResourceHeap` instead; the emitted binary
@@ -478,7 +490,7 @@ combined-texture-sampler arm of that same branch:
 two heaps. `SPIRVLoadTexelPointerFromHeap` has no other producer at
 all. Neither is visible under `-dump-ir`: `legalizeIRForSPIRV` runs
 from [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)
-line 12131, inside emit, after the last dump point.
+line 12200, inside emit, after the last dump point.
 
 The conversions between descriptor handles and integers
 (`CastUInt2ToDescriptorHandle`, `CastDescriptorHandleToUInt64`,
@@ -495,8 +507,8 @@ The conversions between descriptor handles and integers
 for `image[coord]`. It is not the load itself — it models a *pointer to a
 texel*, which is what makes `image[coord] = v` and `image[coord] += v` type
 as lvalues. It comes from the `__ref` subscript accessor on `_Texture` in
-[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) (line 5367 for
-the single-coordinate form, line 5528 for the `[coord, sampleIndex]`
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) (line 5553 for
+the single-coordinate form, line 5714 for the `[coord, sampleIndex]`
 multi-sample form), not from a dedicated `visitIndexExpr` case.
 
 Most targets have no such pointer, so
@@ -522,7 +534,7 @@ Lua never mentions.
 The producer that actually supplies it is the core module's Metal array
 store, `__metalImageStoreArray(This val, vector<uint,N> location, T value,
 uint arrayIndex)` at
-[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 5230,
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 5416,
 whose fourth argument lands in operand 3. The Metal backend then emits
 `tex.write(value, coord, auxCoord1)`. Reading operand counts off the Lua
 declaration alone will therefore understate this opcode.
@@ -536,13 +548,13 @@ a compile-time constant or a runtime value, and the backends distinguish the
 two cases (see [../pipeline/06-emit.md](../pipeline/06-emit.md)). It is the
 newest opcode in this family and its only producer is the `__intrinsic_op`
 declaration at
-[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 2301.
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 2391.
 
 ### `sample` and `sampleGrad`
 
 `sample(texture, sampler, coord)` and
 `sampleGrad(texture, sampler, coord, gradX)` are declared in the Lua at
-lines 1637-1638 and have full generated wrappers, but at this commit **no
+lines 1679-1680 and have full generated wrappers, but at this commit **no
 code creates or consumes them**: `rg kIROp_Sample` finds only the Lua
 entry, the stable-name table, and the generated files. Texture sampling
 reaches the backends as ordinary core-module calls with a
@@ -553,7 +565,7 @@ wired up.
 
 ### Unused texture-access helpers
 
-The same holds for the six texture-access helpers at Lua lines 1680-1685.
+The same holds for the six texture-access helpers at Lua lines 1722-1727.
 `IsTextureAccess`, `IsTextureScalarAccess`, and `IsTextureArrayAccess` have
 no reference anywhere outside the Lua and generated files.
 `ExtractTextureFromTextureAccess`, `ExtractCoordFromTextureAccess`, and
@@ -566,10 +578,10 @@ directly. No backend consumes any of the six.
 
 ### `byteAddressBufferStore` operand naming
 
-The Lua entry (line 1332) reads
+The Lua entry (line 1374) reads
 `operands = { { "buffer" }, { "offset" }, { "value" }, { "alignment" } }`,
 but the comment two lines above it, `IRBuilder::emitByteAddressBufferStore`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) lines 3303 and
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) lines 3304 and
 3312), and every consumer all agree on the opposite order —
 `buffer, offset, alignment, value`. The builder's three-argument overload
 inserts a literal `0` alignment at index 2 and puts the value at index 3;
@@ -591,8 +603,8 @@ chained onto it. Without it, mutating one field of a struct held in a
 `RWStructuredBuffer<S>` would require reading the whole struct, editing it,
 and writing it all back. It has two origins: the explicit
 buffer-pointer intrinsics at
-[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 5942 and
-5946, and the `__ref` subscript accessor at line 7283 that makes
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 6128 and
+5946, and the `__ref` subscript accessor at line 7469 that makes
 `buf[i].field = v` work.
 
 ### The atomic memory-order operand
@@ -613,7 +625,7 @@ Backends therefore index it positionally. The layout is: `atomicLoad`,
 2; `atomicCompareExchange` puts the success order at operand 3 and the
 failure order at operand 4. Those positions are exactly what
 [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)
-passes to `emitMemorySemanticMask` at lines 5555, 5575, 5598, 5627, 5651,
+passes to `emitMemorySemanticMask` at lines 5630, 5575, 5598, 5627, 5651,
 5677, 5679, and 5708.
 
 ### `atomicCompareExchange`
@@ -623,7 +635,7 @@ names the first three operands `ptr`, `expected`, and `desired`; operands 3
 and 4 are the success and failure orders, matching the core-module
 signature `compareExchange(T compareValue, T newValue, MemoryOrder
 successOrder, MemoryOrder failOrder)` at
-[core.meta.slang](../../../../source/slang/core.meta.slang) line 4125. The
+[core.meta.slang](../../../../source/slang/core.meta.slang) line 4131. The
 core module documents two constraints the IR does not enforce:
 `successOrder` must be at least as strong as `failOrder`, and `failOrder`
 may not be `Release` or `AcquireRelease`. The result is the value that was
@@ -667,7 +679,7 @@ will not find them:
 
 | Opcode | Public surface | Where the `__intrinsic_op` actually sits |
 | --- | --- | --- |
-| `waveGetActiveMask` | `WaveGetActiveMask()` | `__WaveGetActiveMask()`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 15532-15533, called from the wrapper at 15538-15556 |
+| `waveGetActiveMask` | `WaveGetActiveMask()` | `__WaveGetActiveMask()`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 15720-15721, called from the wrapper at 15538-15556 |
 | `imageSubscript` | `rwtex[coord]` | the core-module `__ref` subscript accessor, so the subscript is still a call until that accessor is inlined |
 | `StructuredBufferGetDimensions` | `sBuf.GetDimensions(count, stride)` | inside the core-module `GetDimensions` body, never at the call site |
 | `atomicAdd` and friends, from `atomic_reduce` | the `[ForceInline]` `__target_switch` body | the switch body is still a call immediately after lowering; the unused-result `atomicAdd` the section describes appears once inlining has run |
@@ -682,7 +694,7 @@ These two form a family and are documented together here because their
 shared operand name is misleading. The Lua names the single operand `type`,
 but it is a **value**, not a type inst: the core-module declarations are
 `int __naturalStrideOf_impl(T v)` and `int __naturalAlignmentOf_impl(T v)`
-([core.meta.slang](../../../../source/slang/core.meta.slang) lines 3989 and
+([core.meta.slang](../../../../source/slang/core.meta.slang) lines 3999 and
 4000), and the `[__unsafeForceInlineEarly]` wrappers `__naturalStrideOf<T>()`
 and `__naturalAlignmentOf<T>()` pass `__declVal<T>()` — a placeholder value
 of the type. The opcode inspects the operand's type, not the operand.
@@ -693,12 +705,12 @@ guarantees, so `float4` gives 16, `float2` and `half4` give 8, and `float3`
 gives 4 because its 12-byte stride is not a power of two. Both are folded
 to literals by
 [slang-ir-peephole.cpp](../../../../source/slang/slang-ir-peephole.cpp)
-(lines 1804 and 1830) and neither survives to emit.
+(lines 1811 and 1830) and neither survives to emit.
 
 `getNaturalAlignment` is documented here rather than on
 [misc.md](misc.md#size-alignment-count) because it is the same family as
 `getNaturalStride`, which this page already owns. Its Lua neighbour
-`nodeOutputRecordGetElementPtr` (line 1376) belongs to the work-graph
+`nodeOutputRecordGetElementPtr` (line 1383) belongs to the work-graph
 record machinery and stays on
 [misc.md](misc.md#work-graph-records-and-barrier-flags).
 
@@ -711,9 +723,9 @@ the index diverges across lanes, so backends can scalarize the access
 correctly (SPIR-V attaches a `NonUniform` decoration; HLSL re-emits the
 intrinsic). It has three declaration sites because HLSL permits it on
 non-integer types too:
-[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 13941 for
-`__BuiltinArithmeticType`, line 27811 for the permissive overload, and
-[glsl.meta.slang](../../../../source/slang/glsl.meta.slang) line 10693 for
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 14129 for
+`__BuiltinArithmeticType`, line 28074 for the permissive overload, and
+[glsl.meta.slang](../../../../source/slang/glsl.meta.slang) line 10640 for
 the GLSL spelling.
 
 ### `LoadResourceDescriptorFromHeap`
@@ -748,25 +760,32 @@ GLSL and SPIR-V backends emit it.
 
 `GroupMemoryBarrierWithGroupSync` has **no producer** at this commit. The
 core-module function of the same name
-([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11867)
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 12055)
 is implemented with `__intrinsic_asm` per target, not `__intrinsic_op`, so
 calling it never creates the opcode. The only reference is a consumer arm
 in [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
-(line 2743) that cannot currently be reached.
+(line 2792) that cannot currently be reached.
 
 ### The `metalSet*` builder helpers
 
-Of the three Metal mesh-output opcodes, only `metalSetVertex` has a
-producer — the `__intrinsic_op` at
-[core.meta.slang](../../../../source/slang/core.meta.slang) line 2649.
-`metalSetPrimitive` and `metalSetIndices` are consumed by
-[slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp) but
-nothing creates them. The `IRBuilder::emitMetalSetPrimitive` and
+All three Metal mesh-output opcodes have a core-module producer: the
+`__intrinsic_op` declarations at
+[core.meta.slang](../../../../source/slang/core.meta.slang) lines 2656
+(`MetalSetVertex`), 2696 (`MetalSetIndices`) and 2734
+(`MetalSetPrimitive`). A `-target metal -stage mesh` compile puts all
+three in the IR dump, and
+[slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp)
+consumes them.
+
+What *is* unused is the pair of `IRBuilder` helpers, and they are worth
+a warning on their own. The `IRBuilder::emitMetalSetPrimitive` and
 `emitMetalSetIndices` helpers that would create them are declared and
 defined but never called, and both pass `kIROp_MetalSetVertex` to
 `createInst` rather than their own opcode, so they would produce the wrong
-instruction if they were called. This is a latent source bug, noted here
-so a reader is not misled by the helper names.
+instruction if they were called. Since the opcodes themselves are produced
+from the core module rather than through these helpers, the defect is
+latent; it is noted here so a reader is not misled by the helper names into
+using them.
 
 ### `fixedArgCount` in the generated op-info table
 
