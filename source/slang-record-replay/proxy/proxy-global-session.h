@@ -130,7 +130,7 @@ public:
 
         // Call create session with our wrapped file system
         PREPARE_POINTER_OUTPUT(outSession);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::IGlobalSession>()->createSession(desc2, outSession);
 
         // The created session holds its own reference to the file system for its
@@ -151,7 +151,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(name);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_PROFILE_UNKNOWN);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_PROFILE_UNKNOWN);
         auto result = getActual<slang::IGlobalSession>()->findProfile(name);
         RECORD_RETURN(result);
     }
@@ -162,7 +162,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(passThrough);
         RECORD_INPUT(path);
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         getActual<slang::IGlobalSession>()->setDownstreamCompilerPath(passThrough, path);
     }
 
@@ -185,7 +185,7 @@ public:
     virtual SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() override
     {
         RECORD_CALL();
-        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
+        RECORD_REPLAY_RETURN_IF_FAILED(nullptr);
         auto result = getActual<slang::IGlobalSession>()->getBuildTagString();
         RECORD_RETURN(result);
     }
@@ -197,7 +197,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(sourceLanguage);
         RECORD_INPUT(defaultCompiler);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<IGlobalSession>()->setDefaultDownstreamCompiler(
             sourceLanguage,
             defaultCompiler);
@@ -209,7 +209,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(sourceLanguage);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_PASS_THROUGH_NONE);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_PASS_THROUGH_NONE);
         auto result = getActual<IGlobalSession>()->getDefaultDownstreamCompiler(sourceLanguage);
         RECORD_RETURN(result);
     }
@@ -220,7 +220,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(sourceLanguage);
         RECORD_INPUT(preludeText);
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         getActual<IGlobalSession>()->setLanguagePrelude(sourceLanguage, preludeText);
     }
 
@@ -230,7 +230,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(sourceLanguage);
         PREPARE_POINTER_OUTPUT(outPrelude);
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         getActual<IGlobalSession>()->getLanguagePrelude(sourceLanguage, outPrelude);
         RECORD_COM_OUTPUT(outPrelude);
     }
@@ -241,7 +241,7 @@ public:
     {
         RECORD_CALL();
         PREPARE_POINTER_OUTPUT(outCompileRequest);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::IGlobalSession>()->createCompileRequest(outCompileRequest);
         RECORD_COM_OUTPUT(outCompileRequest);
         RECORD_RETURN(result);
@@ -273,7 +273,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(target);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::IGlobalSession>()->checkCompileTargetSupport(target);
         RECORD_RETURN(result);
     }
@@ -283,7 +283,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(passThrough);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::IGlobalSession>()->checkPassThroughSupport(passThrough);
         RECORD_RETURN(result);
     }
@@ -297,7 +297,7 @@ public:
         RECORD_INPUT(passThrough);
         PREPARE_POINTER_OUTPUT(outMajor);
         PREPARE_POINTER_OUTPUT(outMinor);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::IGlobalSession>()->getDownstreamCompilerVersion(
             passThrough,
             outMajor,
@@ -344,7 +344,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(name);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_CAPABILITY_UNKNOWN);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_CAPABILITY_UNKNOWN);
         auto result = getActual<slang::IGlobalSession>()->findCapability(name);
         RECORD_RETURN(result);
     }
@@ -358,7 +358,7 @@ public:
         RECORD_INPUT(source);
         RECORD_INPUT(target);
         RECORD_INPUT(compiler);
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         getActual<IGlobalSession>()->setDownstreamCompilerForTransition(source, target, compiler);
         RECORD_RETURN_VOID();
     }
@@ -370,7 +370,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(source);
         RECORD_INPUT(target);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_PASS_THROUGH_NONE);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_PASS_THROUGH_NONE);
         auto result =
             getActual<slang::IGlobalSession>()->getDownstreamCompilerForTransition(source, target);
         RECORD_RETURN(result);
@@ -383,7 +383,7 @@ public:
         RECORD_CALL();
         PREPARE_POINTER_OUTPUT(outTotalTime);
         PREPARE_POINTER_OUTPUT(outDownstreamTime);
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         getActual<slang::IGlobalSession>()->getCompilerElapsedTime(outTotalTime, outDownstreamTime);
     }
 
@@ -408,7 +408,7 @@ public:
         RECORD_INPUT(argc);
         RECORD_INPUT_ARRAY(argv, argc);
         PREPARE_POINTER_OUTPUT(outSessionDesc);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         SlangResult result = SLANG_OK;
         if (ReplayContext::get().isWriting())
         {
@@ -426,7 +426,7 @@ public:
         PREPARE_POINTER_INPUT(sessionDesc);
         RECORD_INPUT(*sessionDesc);
         PREPARE_POINTER_OUTPUT(outBlob);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result =
             getActual<slang::IGlobalSession>()->getSessionDescDigest(sessionDesc, outBlob);
         RECORD_COM_OUTPUT(outBlob);

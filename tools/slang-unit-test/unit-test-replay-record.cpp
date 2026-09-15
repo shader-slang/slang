@@ -134,12 +134,8 @@ static SlangResult executeReplay(const char* testName, const String& recordPath)
     SlangResult replayResult = ctx.executeAll();
     if (SLANG_FAILED(replayResult))
     {
-        const SlangRecord::ReplayError& error = ctx.getLastError();
-        const String& detail = error.kind != SlangRecord::ReplayErrorKind::None
-                                   ? error.message
-                                   : ctx.getStream().getErrorMessage();
         msgBuilder.clear();
-        msgBuilder << "Replay failed for '" << testName << "': " << detail << "\n";
+        msgBuilder << "Replay failed for '" << testName << "': " << ctx.getFailureMessage() << "\n";
         getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
         ctx.reset();
         return SLANG_FAIL;

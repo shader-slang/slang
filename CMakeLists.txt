@@ -150,7 +150,7 @@ option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
 option(
     SLANG_DISABLE_EXCEPTIONS
-    "Compile the exception-free libraries (core, compiler-core, slang-common-objects, slang-glsl-module) with C++ exceptions disabled"
+    "Build the compiler's exception-free libraries with C++ exceptions disabled: core, compiler-core, slang-glsl-module, the main slang compiler sources (the slang or slang-common-objects target, depending on SLANG_EMBED_CORE_MODULE), and the generated object libraries linked into them (slang-capability-lookup, slang-lookup-tables)"
     OFF
 )
 if(SLANG_DISABLE_EXCEPTIONS)

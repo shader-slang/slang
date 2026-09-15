@@ -77,15 +77,14 @@ SpvWord readWordOrWordLiteral(Misc::TokenReader& reader)
                 else
                 {
                     reader.Back(1);
-                    Misc::raiseTextFormatException(
-                        "Text parsing error: Unrecognized SPIR-V enum: " + i);
+                    reader.reportError("Text parsing error: Unrecognized SPIR-V enum: " + i);
                 }
             }
             break;
         default:
-            Misc::raiseTextFormatException("Text parsing error: Expected int or SPIR-V enum");
+            reader.reportError("Text parsing error: Expected int or SPIR-V enum");
         }
-    } while (reader.AdvanceIf(Misc::TokenType::OpBitOr));
+    } while (!reader.isError() && reader.AdvanceIf(Misc::TokenType::OpBitOr));
     return ret;
 }
 
@@ -107,7 +106,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
             auto storageToken = tokenReader.ReadWord();
             snippet->resultStorageClass = translateStorageClass(storageToken);
         }
-        while (!tokenReader.IsEnd())
+        while (!tokenReader.IsEnd() && !tokenReader.isError())
         {
             SpvSnippet::ASMInst inst;
             if (tokenReader.AdvanceIf("%"))
@@ -128,15 +127,21 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                     const auto opCodeMaybe = spirvGrammar.opcodes.lookup(opName.getUnownedSlice());
                     if (!opCodeMaybe)
                     {
-                        Misc::raiseTextFormatException(
+                        // Bail: with exceptions off reportError latches instead of throwing, so we
+                        // must not fall through to dereference the empty Optional.
+                        tokenReader.reportError(
                             "Text parsing error: Unrecognized SPIR-V opcode: " + opName);
+                        return nullptr;
                     }
                     opCode = *opCodeMaybe;
                     break;
                 }
             default:
-                Misc::raiseTextFormatException("Text parsing error: SPIR-V intrinsics must "
-                                               "begin with an integer or opcode name");
+                // Bail: with exceptions off reportError latches instead of throwing, so we must not
+                // fall through to use the uninitialized opCode below.
+                tokenReader.reportError("Text parsing error: SPIR-V intrinsics must "
+                                        "begin with an integer or opcode name");
+                return nullptr;
             }
             inst.opCode = opCode;
             bool insideOperandList = true;
@@ -154,23 +159,25 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         if (isGLSLstd450OpcodeAllowed)
                         {
                             auto opName = tokenReader.ReadWord();
-                            GLSLstd450 glslOpcode;
+                            GLSLstd450 glslOpcode = (GLSLstd450)0;
                             if (!lookupGLSLstd450(opName.getUnownedSlice(), glslOpcode))
                             {
-                                Misc::raiseTextFormatException(
+                                tokenReader.reportError(
                                     "Text parsing error: Unrecognized SPIR-V GLSLstd450 opcode: " +
                                     opName);
+                                return (SpvWord)0;
                             }
                             return (SpvWord)glslOpcode;
                         }
                     }
                 // fallthrough
                 default:
-                    Misc::raiseTextFormatException(
+                    tokenReader.reportError(
                         "Text parsing error: Failed to read SPIR-V ExtInst Opcode");
+                    return (SpvWord)0;
                 }
             };
-            while (insideOperandList)
+            while (insideOperandList && !tokenReader.isError())
             {
                 ASMOperand operand = {ASMOperandType::SpvWord, 0, 0, 0};
                 switch (tokenReader.NextToken().Type)
@@ -296,8 +303,16 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         }
                         else if (isGLSLstd450OpcodeAllowed)
                         {
-                            GLSLstd450 glslstd450Opcode;
-                            lookupGLSLstd450(identifier.getUnownedSlice(), glslstd450Opcode);
+                            GLSLstd450 glslstd450Opcode = (GLSLstd450)0;
+                            if (!lookupGLSLstd450(identifier.getUnownedSlice(), glslstd450Opcode))
+                            {
+                                // Malformed user input: bail rather than use the indeterminate
+                                // opcode (with exceptions off reportError latches, not throws).
+                                tokenReader.reportError(
+                                    "Text parsing error: Unrecognized SPIR-V GLSLstd450 opcode: " +
+                                    identifier);
+                                return nullptr;
+                            }
                             operand.type = SpvSnippet::ASMOperandType::SpvWord;
                             operand.content = (SpvWord)glslstd450Opcode;
                             inst.operands.add(operand);
@@ -316,6 +331,11 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
             }
             snippet->instructions.add(inst);
         }
+        // With exceptions disabled a malformed snippet latches an error on the reader instead of
+        // throwing; surface it the same way the catch below does (nullptr -> snippet-parsing-failed
+        // diagnostic) so behavior matches the exceptions-enabled build.
+        if (tokenReader.isError())
+            return nullptr;
     }
 #if SLANG_HAS_EXCEPTIONS
     catch (const Slang::Misc::TextFormatException&)

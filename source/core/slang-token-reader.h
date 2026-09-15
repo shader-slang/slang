@@ -148,28 +148,46 @@ public:
     }
 };
 
-// Single choke point for text-parse errors. When exceptions are enabled the error is a
-// recoverable TextFormatException (callers such as slang-ir-spirv-snippet.cpp catch it); when
-// they are disabled (SLANG_DISABLE_EXCEPTIONS) core cannot throw, so it is instead a fatal abort
-// through the signal path.
-[[noreturn]] inline void raiseTextFormatException(String message)
-{
-#if SLANG_HAS_EXCEPTIONS
-    throw TextFormatException(message);
-#else
-    SLANG_UNEXPECTED(message.getBuffer());
-#endif
-}
-
 class TokenReader
 {
 private:
     bool legal;
     List<Token> tokens;
     int tokenPtr;
+    bool m_hasError = false;
+    String m_errorMessage;
 
 public:
     TokenReader(String text);
+
+    // Report a text-parse error at the single choke point. When exceptions are enabled this throws
+    // a recoverable TextFormatException, exactly as before, so callers that catch it (render-test
+    // and the token-reader unit tests) are unaffected. When exceptions are disabled
+    // (SLANG_DISABLE_EXCEPTIONS) core cannot throw, so it instead latches a sticky error (first
+    // error wins) that the caller observes via isError(); each read method then yields a
+    // default/empty result for the rest of the parse rather than aborting the process. It is public
+    // so a higher-level parser (e.g. SpvSnippet::parse) can report a semantic error the tokenizer
+    // cannot detect, and so a malformed user __target_intrinsic(spirv, ...) still becomes the
+    // snippet-parsing-failed diagnostic under -fno-exceptions instead of aborting.
+    void reportError(String message)
+    {
+        if (!m_hasError)
+        {
+            m_hasError = true;
+            m_errorMessage = message;
+        }
+#if SLANG_HAS_EXCEPTIONS
+        throw TextFormatException(message);
+#endif
+    }
+
+    /// True if a read hit malformed input and latched an error. Only reachable when exceptions are
+    /// disabled; with exceptions enabled the error is thrown instead. Callers that need to recover
+    /// (e.g. SpvSnippet::parse) check this and stop rather than trusting subsequent reads.
+    bool isError() const { return m_hasError; }
+    /// The message from the first latched error (empty if none).
+    const String& getErrorMessage() const { return m_errorMessage; }
+
     int ReadInt()
     {
         auto token = ReadToken();
@@ -186,7 +204,8 @@ public:
             else
                 return stringToInt(token.Content);
         }
-        raiseTextFormatException("Text parsing error: int expected.");
+        reportError("Text parsing error: int expected.");
+        return 0;
     }
     unsigned int ReadUInt()
     {
@@ -195,7 +214,8 @@ public:
         {
             return stringToUInt(token.Content);
         }
-        raiseTextFormatException("Text parsing error: int expected.");
+        reportError("Text parsing error: int expected.");
+        return 0;
     }
     double ReadDouble()
     {
@@ -213,7 +233,8 @@ public:
             else
                 return stringToDouble(token.Content);
         }
-        raiseTextFormatException("Text parsing error: floating point value expected.");
+        reportError("Text parsing error: floating point value expected.");
+        return 0.0;
     }
     float ReadFloat() { return (float)ReadDouble(); }
     String ReadWord()
@@ -223,7 +244,8 @@ public:
         {
             return token.Content;
         }
-        raiseTextFormatException("Text parsing error: identifier expected.");
+        reportError("Text parsing error: identifier expected.");
+        return String();
     }
     String Read(const char* expectedStr)
     {
@@ -232,7 +254,8 @@ public:
         {
             return token.Content;
         }
-        raiseTextFormatException("Text parsing error: \'" + String(expectedStr) + "\' expected.");
+        reportError("Text parsing error: \'" + String(expectedStr) + "\' expected.");
+        return String();
     }
     String Read(String expectedStr)
     {
@@ -241,7 +264,8 @@ public:
         {
             return token.Content;
         }
-        raiseTextFormatException("Text parsing error: \'" + expectedStr + "\' expected.");
+        reportError("Text parsing error: \'" + expectedStr + "\' expected.");
+        return String();
     }
     bool Read(TokenType tokenType)
     {
@@ -250,7 +274,8 @@ public:
             ReadToken();
             return true;
         }
-        raiseTextFormatException("Text parsing error: unexpected '" + NextToken().Content + "'.");
+        reportError("Text parsing error: unexpected '" + NextToken().Content + "'.");
+        return false;
     }
 
     String ReadStringLiteral()
@@ -260,7 +285,8 @@ public:
         {
             return token.Content;
         }
-        raiseTextFormatException("Text parsing error: string literal expected.");
+        reportError("Text parsing error: string literal expected.");
+        return String();
     }
     void Back(int count) { tokenPtr -= count; }
     Token ReadMatchingToken(TokenType type)
@@ -268,7 +294,8 @@ public:
         auto token = ReadToken();
         if (token.Type != type)
         {
-            raiseTextFormatException("Text parsing error: unexpected token.");
+            reportError("Text parsing error: unexpected token.");
+            return Token();
         }
         return token;
     }
@@ -280,7 +307,8 @@ public:
             tokenPtr++;
             return rs;
         }
-        raiseTextFormatException("Unexpected ending.");
+        reportError("Unexpected ending.");
+        return Token();
     }
     Token NextToken(int offset = 0)
     {

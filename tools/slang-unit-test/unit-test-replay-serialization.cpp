@@ -487,6 +487,8 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedArrayPayload)
 
     SLANG_CHECK(ctx().hasError());
     SLANG_CHECK(ctx().getLastError().kind == ReplayErrorKind::Bounds);
+    // The partial read must reset the out-count so the caller cannot iterate an uninitialized tail.
+    SLANG_CHECK(count == 0);
 }
 
 SLANG_UNIT_TEST(replayContextCountsNestedStringArrayAllocations)

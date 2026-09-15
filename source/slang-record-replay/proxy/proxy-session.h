@@ -58,7 +58,7 @@ public:
     virtual SLANG_NO_THROW slang::IGlobalSession* SLANG_MCALL getGlobalSession() override
     {
         RECORD_CALL();
-        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
+        RECORD_REPLAY_RETURN_IF_FAILED(nullptr);
         slang::IGlobalSession* result = getActual<slang::ISession>()->getGlobalSession();
         RECORD_RETURN_EXISTING_PROXY(result);
     }
@@ -69,7 +69,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(moduleName);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
+        RECORD_REPLAY_RETURN_IF_FAILED(nullptr);
         slang::IModule* result =
             getActual<slang::ISession>()->loadModule(moduleName, outDiagnostics);
         RECORD_COM_OUTPUT(outDiagnostics);
@@ -87,7 +87,7 @@ public:
         RECORD_INPUT(path);
         RECORD_INPUT(source);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
+        RECORD_REPLAY_RETURN_IF_FAILED(nullptr);
         slang::IModule* result = getActual<slang::ISession>()->loadModuleFromSource(
             moduleName,
             path,
@@ -109,7 +109,7 @@ public:
         RECORD_INPUT_ARRAY(componentTypes, componentTypeCount);
         PREPARE_POINTER_OUTPUT(outCompositeComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::ISession>()->createCompositeComponentType(
             componentTypes,
             componentTypeCount,
@@ -144,7 +144,7 @@ public:
         RECORD_INPUT(targetIndex);
         RECORD_INPUT(rules);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
+        RECORD_REPLAY_RETURN_IF_FAILED(nullptr);
         slang::TypeLayoutReflection* result =
             getActual<slang::ISession>()->getTypeLayout(type, targetIndex, rules, outDiagnostics);
         RECORD_COM_OUTPUT(outDiagnostics);
@@ -195,7 +195,7 @@ public:
         RECORD_INPUT(type);
         RECORD_INPUT(interfaceType);
         PREPARE_POINTER_OUTPUT(outId);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::ISession>()->getTypeConformanceWitnessSequentialID(
             type,
             interfaceType,
@@ -230,7 +230,7 @@ public:
         RECORD_INPUT(conformanceIdOverride);
         PREPARE_POINTER_OUTPUT(outConformance);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::ISession>()->createTypeConformanceComponentType(
             type,
             interfaceType,
@@ -253,7 +253,7 @@ public:
         RECORD_INPUT(path);
         RECORD_INPUT(source);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
+        RECORD_REPLAY_RETURN_IF_FAILED(nullptr);
         slang::IModule* result = getActual<slang::ISession>()->loadModuleFromIRBlob(
             moduleName,
             path,
@@ -266,7 +266,7 @@ public:
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getLoadedModuleCount() override
     {
         RECORD_CALL();
-        RECORD_REPLAY_ABORT_IF_FAILED(0);
+        RECORD_REPLAY_RETURN_IF_FAILED(0);
         SlangInt result = getActual<slang::ISession>()->getLoadedModuleCount();
         RECORD_RETURN(result);
     }
@@ -275,7 +275,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(index);
-        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
+        RECORD_REPLAY_RETURN_IF_FAILED(nullptr);
         slang::IModule* result = getActual<slang::ISession>()->getLoadedModule(index);
         RECORD_RETURN_SESSION(result);
     }
@@ -286,7 +286,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(modulePath);
         RECORD_INPUT(binaryModuleBlob);
-        RECORD_REPLAY_ABORT_IF_FAILED(false);
+        RECORD_REPLAY_RETURN_IF_FAILED(false);
 
         bool result =
             getActual<slang::ISession>()->isBinaryModuleUpToDate(modulePath, binaryModuleBlob);
@@ -308,7 +308,7 @@ public:
         RECORD_INPUT(path);
         RECORD_INPUT(string);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
+        RECORD_REPLAY_RETURN_IF_FAILED(nullptr);
         slang::IModule* result = getActual<slang::ISession>()->loadModuleFromSourceString(
             moduleName,
             path,
@@ -339,7 +339,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(source);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::ISession>()->loadModuleInfoFromIRBlob(
             source,
             outModuleVersion,

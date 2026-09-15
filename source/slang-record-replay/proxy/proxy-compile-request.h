@@ -71,7 +71,7 @@ public:
     virtual SLANG_NO_THROW SlangCompileFlags SLANG_MCALL getCompileFlags() override
     {
         RECORD_CALL();
-        RECORD_REPLAY_ABORT_IF_FAILED(0);
+        RECORD_REPLAY_RETURN_IF_FAILED(0);
         return getActual<slang::ICompileRequest>()->getCompileFlags();
     }
 
@@ -104,7 +104,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(target);
-        RECORD_REPLAY_ABORT_IF_FAILED(0);
+        RECORD_REPLAY_RETURN_IF_FAILED(0);
         auto result = getActual<slang::ICompileRequest>()->addCodeGenTarget(target);
         RECORD_RETURN(result);
     }
@@ -123,7 +123,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(targetIndex);
         RECORD_INPUT(flags);
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         getActual<slang::ICompileRequest>()->setTargetFlags(targetIndex, flags);
     }
 
@@ -153,7 +153,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(level);
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         getActual<slang::ICompileRequest>()->setDebugInfoLevel(level);
     }
 
@@ -162,7 +162,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(level);
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         getActual<slang::ICompileRequest>()->setOptimizationLevel(level);
     }
 
@@ -193,7 +193,7 @@ public:
         RECORD_CALL();
         int32_t channelInt = static_cast<int32_t>(channel);
         RECORD_INPUT(channelInt);
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         // Note: writer is a callback interface provided by client, not wrapped
         getActual<slang::ICompileRequest>()->setWriter(channel, writer);
     }
@@ -208,7 +208,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(searchDir);
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         getActual<slang::ICompileRequest>()->addSearchPath(searchDir);
     }
 
@@ -226,7 +226,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(argCount);
         RECORD_INPUT_ARRAY(args, argCount);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result =
             getActual<slang::ICompileRequest>()->processCommandLineArguments(args, argCount);
         RECORD_RETURN(result);
@@ -238,7 +238,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(language);
         RECORD_INPUT(name);
-        RECORD_REPLAY_ABORT_IF_FAILED(0);
+        RECORD_REPLAY_RETURN_IF_FAILED(0);
         auto result = getActual<slang::ICompileRequest>()->addTranslationUnit(language, name);
         RECORD_RETURN(result);
     }
@@ -267,7 +267,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(translationUnitIndex);
         RECORD_INPUT(path);
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         getActual<slang::ICompileRequest>()->addTranslationUnitSourceFile(
             translationUnitIndex,
             path);
@@ -282,7 +282,7 @@ public:
         RECORD_INPUT(translationUnitIndex);
         RECORD_INPUT(path);
         RECORD_INPUT(source);
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         getActual<slang::ICompileRequest>()->addTranslationUnitSourceString(
             translationUnitIndex,
             path,
@@ -329,7 +329,7 @@ public:
         RECORD_INPUT(translationUnitIndex);
         RECORD_INPUT(name);
         RECORD_INPUT(stage);
-        RECORD_REPLAY_ABORT_IF_FAILED(0);
+        RECORD_REPLAY_RETURN_IF_FAILED(0);
         auto result =
             getActual<slang::ICompileRequest>()->addEntryPoint(translationUnitIndex, name, stage);
         RECORD_RETURN(result);
@@ -386,7 +386,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile() override
     {
         RECORD_CALL();
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::ICompileRequest>()->compile();
         RECORD_RETURN(result);
     }
@@ -394,7 +394,7 @@ public:
     virtual SLANG_NO_THROW char const* SLANG_MCALL getDiagnosticOutput() override
     {
         RECORD_CALL();
-        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
+        RECORD_REPLAY_RETURN_IF_FAILED(nullptr);
         auto result = getActual<slang::ICompileRequest>()->getDiagnosticOutput();
         RECORD_INFO(result);
         return result;
@@ -410,7 +410,7 @@ public:
     virtual SLANG_NO_THROW int SLANG_MCALL getDependencyFileCount() override
     {
         RECORD_CALL();
-        RECORD_REPLAY_ABORT_IF_FAILED(0);
+        RECORD_REPLAY_RETURN_IF_FAILED(0);
         auto result = getActual<slang::ICompileRequest>()->getDependencyFileCount();
         RECORD_INFO(result);
         return result;
@@ -420,7 +420,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(index);
-        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
+        RECORD_REPLAY_RETURN_IF_FAILED(nullptr);
         auto result = getActual<slang::ICompileRequest>()->getDependencyFilePath(index);
         RECORD_RETURN(result);
     }
@@ -451,7 +451,7 @@ public:
         RECORD_INPUT(entryPointIndex);
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outBlob);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::ICompileRequest>()->getEntryPointCodeBlob(
             entryPointIndex,
             targetIndex,
@@ -485,7 +485,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outSharedLibrary);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::ICompileRequest>()->getTargetHostCallable(
             targetIndex,
             outSharedLibrary);
@@ -563,14 +563,14 @@ public:
     virtual SLANG_NO_THROW SlangReflection* SLANG_MCALL getReflection() override
     {
         RECORD_CALL();
-        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
+        RECORD_REPLAY_RETURN_IF_FAILED(nullptr);
         return getActual<slang::ICompileRequest>()->getReflection();
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL setCommandLineCompilerMode() override
     {
         RECORD_CALL();
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         getActual<slang::ICompileRequest>()->setCommandLineCompilerMode();
     }
 
@@ -603,7 +603,7 @@ public:
         RECORD_INPUT(category);
         RECORD_INPUT(spaceIndex);
         RECORD_INPUT(registerIndex);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::ICompileRequest>()->isParameterLocationUsed(
             entryPointIndex,
             targetIndex,

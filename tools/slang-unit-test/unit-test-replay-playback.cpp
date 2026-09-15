@@ -66,6 +66,10 @@ public:
         RECORD_CALL();
         RECORD_INPUT(a);
         RECORD_INPUT(b);
+        // Playback safety gate (mirrors the real proxies): if a prior failure is latched, return
+        // the default instead of driving the real call with values read from a corrupt/failed
+        // stream.
+        RECORD_REPLAY_RETURN_IF_FAILED(0);
 
         // Track for test verification
         s_testCalcLastA = a;
@@ -358,6 +362,162 @@ SLANG_UNIT_TEST(replayContextFullRoundTrip)
 
     // No more calls
     SLANG_CHECK(!ctx().hasMoreCalls());
+}
+
+// =============================================================================
+// Exception-free failure semantics (status model, no throwing)
+// =============================================================================
+
+// setError latches the first failure and ignores later ones; clearError resets the context, and
+// getFailureMessage surfaces the latched message.
+SLANG_UNIT_TEST(replayContextFirstErrorWinsAndClears)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    SLANG_CHECK(!ctx().hasError());
+    SLANG_CHECK(!ctx().hasFailure());
+
+    ctx().setError(ReplayErrorKind::Bounds, "first");
+    ctx().setError(ReplayErrorKind::TypeMismatch, "second");
+
+    SLANG_CHECK(ctx().hasError());
+    SLANG_CHECK(ctx().hasFailure());
+    SLANG_CHECK(ctx().getLastError().kind == ReplayErrorKind::Bounds);
+    SLANG_CHECK(ctx().getLastError().message == "first");
+    SLANG_CHECK(ctx().getFailureMessage() == "first");
+
+    ctx().clearError();
+    SLANG_CHECK(!ctx().hasError());
+    SLANG_CHECK(!ctx().hasFailure());
+    SLANG_CHECK(ctx().getFailureMessage().getLength() == 0);
+}
+
+// A stream-level failure (truncated recording) sets hasFailure() but not hasError();
+// getFailureMessage falls back to the stream's message so a single call covers both sources.
+SLANG_UNIT_TEST(replayContextFailureMessageFallsBackToStreamError)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    uint32_t value = 0xABCDEF01;
+    ctx().getStream().write(&value, sizeof(value));
+
+    ctx().switchToPlayback();
+
+    // Consume the 4 recorded bytes, then read past the end to force a stream-level failure with no
+    // context error latched.
+    uint32_t first = 0;
+    uint32_t second = 0;
+    ctx().getStream().read(&first, sizeof(first));
+    ctx().getStream().read(&second, sizeof(second));
+
+    SLANG_CHECK(ctx().getStream().isFailed());
+    SLANG_CHECK(!ctx().hasError());
+    SLANG_CHECK(ctx().hasFailure());
+    SLANG_CHECK(ctx().getFailureMessage().getLength() > 0);
+}
+
+// executeNextCall latches NoHandler (and returns SLANG_FAIL without dispatching) when a recorded
+// call's signature has no registered handler.
+SLANG_UNIT_TEST(replayContextExecuteNextCallLatchesNoHandler)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    const char* signature = "SomeProxy::unregisteredMethod";
+    ctx().record(RecordFlag::Input, signature);
+
+    ctx().switchToPlayback();
+
+    bool executed = false;
+    SLANG_CHECK(SLANG_FAILED(ctx().executeNextCall(executed)));
+    SLANG_CHECK(!executed);
+    SLANG_CHECK(ctx().hasError());
+    SLANG_CHECK(ctx().getLastError().kind == ReplayErrorKind::NoHandler);
+}
+
+// executeAll rejects at the operation boundary when a failure is already latched: it returns
+// SLANG_FAIL, dispatches nothing, and preserves the original (first) error.
+SLANG_UNIT_TEST(replayContextExecuteAllShortCircuitsWhenAlreadyFailed)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    s_testCalcAddCalls = 0;
+
+    Slang::ComPtr<ITestCalculator> impl(Slang::INIT_ATTACH, new TestCalculatorImpl());
+    TestCalculatorProxy* proxy = new TestCalculatorProxy(impl.get());
+    Slang::ComPtr<ITestCalculator> proxyPtr(Slang::INIT_ATTACH, proxy);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    uint64_t proxyHandle = ctx().testsOnlyRegisterProxy(proxyPtr.get());
+    SLANG_CHECK(proxyHandle >= kFirstValidHandle);
+
+    const char* addSignature = "TestCalculatorProxy::add";
+    ctx().record(RecordFlag::Input, addSignature);
+    ctx().recordHandle(RecordFlag::Input, proxyHandle);
+    int32_t arg_a = 10;
+    int32_t arg_b = 20;
+    ctx().record(RecordFlag::Input, arg_a);
+    ctx().record(RecordFlag::Input, arg_b);
+    int32_t returnVal = 30;
+    ctx().record(RecordFlag::ReturnValue, returnVal);
+
+    ctx().switchToPlayback();
+    ctx().testsOnlyRegisterProxy(proxyPtr.get());
+    auto addHandler = [](ReplayContext& ctxRef)
+    {
+        SlangRecord::replayHandler<ITestCalculator, TestCalculatorProxy>(
+            ctxRef,
+            &TestCalculatorProxy::add);
+    };
+    ctx().registerHandler(addSignature, addHandler);
+
+    // Latch a failure before executing; the boundary must reject and never dispatch the call.
+    ctx().setError(ReplayErrorKind::Bounds, "pre-existing failure");
+
+    SLANG_CHECK(SLANG_FAILED(ctx().executeAll()));
+    SLANG_CHECK(s_testCalcAddCalls == 0);
+    SLANG_CHECK(ctx().getLastError().kind == ReplayErrorKind::Bounds);
+}
+
+// The per-method playback gate (RECORD_REPLAY_RETURN_IF_FAILED) returns the default and skips the
+// real call once a failure is latched, so a corrupt/failed stream never drives the wrapped API.
+SLANG_UNIT_TEST(replayContextPlaybackGateSkipsRealCallOnFailure)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    s_testCalcAddCalls = 0;
+
+    Slang::ComPtr<ITestCalculator> impl(Slang::INIT_ATTACH, new TestCalculatorImpl());
+    TestCalculatorProxy* proxy = new TestCalculatorProxy(impl.get());
+    Slang::ComPtr<ITestCalculator> proxyPtr(Slang::INIT_ATTACH, proxy);
+
+    // Record one valid call so the stream is well-formed, then play back with a failure latched.
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    uint64_t proxyHandle = ctx().testsOnlyRegisterProxy(proxyPtr.get());
+    SLANG_CHECK(proxyHandle >= kFirstValidHandle);
+    (void)proxy->add(1, 2);
+
+    ctx().switchToPlayback();
+    ctx().testsOnlyRegisterProxy(proxyPtr.get());
+    s_testCalcAddCalls = 0;
+
+    ctx().setError(ReplayErrorKind::Bounds, "corrupt stream");
+
+    int32_t result = proxy->add(10, 20);
+    SLANG_CHECK(result == 0);
+    SLANG_CHECK(s_testCalcAddCalls == 0);
 }
 
 // Test parseSignature with various signature formats

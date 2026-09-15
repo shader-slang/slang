@@ -110,7 +110,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(path);
         PREPARE_POINTER_OUTPUT(outBlob);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         SlangResult result = SLANG_OK;
         if (ReplayContext::get().isWriting())
         {
@@ -131,7 +131,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(path);
         PREPARE_POINTER_OUTPUT(outUniqueIdentity);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
@@ -156,7 +156,7 @@ public:
         RECORD_INPUT(fromPath);
         RECORD_INPUT(path);
         PREPARE_POINTER_OUTPUT(pathOut);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
@@ -176,7 +176,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(path);
         PREPARE_POINTER_OUTPUT(pathTypeOut);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
@@ -199,7 +199,7 @@ public:
         kind = static_cast<PathKind>(kindVal);
         RECORD_INPUT(path);
         PREPARE_POINTER_OUTPUT(outPath);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
@@ -216,7 +216,7 @@ public:
             return;
 
         RECORD_CALL();
-        RECORD_REPLAY_ABORT_IF_FAILED();
+        RECORD_REPLAY_RETURN_IF_FAILED();
         if (ReplayContext::get().isWriting())
         {
             m_fileSystemExt->clearCache();
@@ -233,7 +233,7 @@ public:
 
         RECORD_CALL();
         RECORD_INPUT(path);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
 
         SlangResult result = SLANG_OK;
         if (ReplayContext::get().isWriting())
@@ -290,7 +290,7 @@ public:
             return OSPathKind::None;
 
         RECORD_CALL();
-        RECORD_REPLAY_ABORT_IF_FAILED(OSPathKind::None);
+        RECORD_REPLAY_RETURN_IF_FAILED(OSPathKind::None);
         OSPathKind result;
         if (ReplayContext::get().isWriting())
         {
@@ -309,7 +309,7 @@ public:
 
         RECORD_CALL();
         RECORD_INPUT(path);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
@@ -327,7 +327,7 @@ public:
 
         RECORD_CALL();
         RECORD_INPUT(path);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
@@ -344,7 +344,7 @@ public:
 
         RECORD_CALL();
         RECORD_INPUT(path);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
@@ -361,7 +361,7 @@ public:
 
         RECORD_CALL();
         RECORD_INPUT(path);
-        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
+        RECORD_REPLAY_RETURN_IF_FAILED(SLANG_FAIL);
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {

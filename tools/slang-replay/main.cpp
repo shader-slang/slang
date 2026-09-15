@@ -129,7 +129,8 @@ int main(int argc, char* argv[])
                 inputPath = possibleStreamPath;
             }
 
-            decoded = SlangRecord::ReplayStreamDecoder::decodeFile(inputPath.getBuffer(), &hadError);
+            decoded =
+                SlangRecord::ReplayStreamDecoder::decodeFile(inputPath.getBuffer(), &hadError);
         }
         else
         {
@@ -205,12 +206,7 @@ int main(int argc, char* argv[])
         printf("Executing replay...\n");
         if (SLANG_FAILED(ctx.executeAll()))
         {
-            const SlangRecord::ReplayError& err = ctx.getLastError();
-            fprintf(
-                stderr,
-                "Error during replay: %s\n",
-                err.message.getLength() ? err.message.getBuffer()
-                                        : ctx.getStream().getErrorMessage().getBuffer());
+            fprintf(stderr, "Error during replay: %s\n", ctx.getFailureMessage().getBuffer());
             return 1;
         }
         printf("Replay completed successfully.\n");

@@ -159,7 +159,6 @@ inline String makeTypeMismatchMessage(TypeId expected, TypeId actual)
 enum class ReplayErrorKind : uint8_t
 {
     None = 0,           ///< No failure.
-    IO,                 ///< File open/read/write failure.
     Bounds,             ///< Read/seek/allocation past the stream's/limits' bounds.
     DataMismatch,       ///< Recorded data did not match expected (sync verify / replayed output).
     TypeMismatch,       ///< Recorded type tag did not match the expected tag.
@@ -168,8 +167,10 @@ enum class ReplayErrorKind : uint8_t
     UntrackedInterface, ///< An interface with no recorded handle was encountered.
     NoHandler,          ///< No handler registered for a recorded call / malformed call header.
     NullThis,           ///< The current 'this' handle did not resolve to a live proxy.
-    UnknownType,        ///< An unknown TypeId was encountered while decoding/skipping.
 };
+// Note: file-I/O failures are latched on the ReplayStream itself (isFailed()), not as a context
+// kind, and unknown type tags only arise in the standalone stream decoder (which has no context and
+// uses a stream-level message); hence no IO/UnknownType kinds here.
 
 /// A structured record/replay failure. Set once (first error wins) on the ReplayContext and queried
 /// at operation boundaries; carries exactly the data the former typed exceptions exposed so callers
@@ -304,6 +305,21 @@ public:
     SLANG_API bool hasFailure() const
     {
         return hasError() || m_stream.isFailed() || m_referenceStream.isFailed();
+    }
+
+    /// The human-readable message for the current failure: the latched context error's message when
+    /// hasError(), otherwise the first failed stream's message (a stream-level read/write failure
+    /// leaves the context error empty). Empty when !hasFailure(). This is the single source of
+    /// truth for the "context message, else stream message" fallback that reporting callers need.
+    SLANG_API String getFailureMessage() const
+    {
+        if (hasError())
+            return m_lastError.message;
+        if (m_stream.isFailed())
+            return m_stream.getErrorMessage();
+        if (m_referenceStream.isFailed())
+            return m_referenceStream.getErrorMessage();
+        return String();
     }
 
     /// Require the current playback stream position to contain a `size`-byte range. On failure
@@ -880,6 +896,10 @@ private:
     template<typename T>
     void recordInterfaceImpl(RecordFlag flags, T*& obj);
 
+    /// Decode a length-prefixed array during playback: validate the count, allocate from the replay
+    /// arena, and deserialize each element. On any failure it latches the context/stream error and
+    /// leaves `count == 0` (the returned pointer may be null, or non-null with no valid elements
+    /// after a partial read), so callers observe an empty array. Never partially reports a count.
     template<typename T, typename CountT>
     T* readArrayInPlayback(RecordFlag flags, CountT& count);
 
@@ -1004,7 +1024,9 @@ void ReplayContext::recordArray(RecordFlag flags, T*& arr, CountT& count)
     }
     else
     {
-        // readArrayInPlayback value-inits count and returns nullptr on failure.
+        // readArrayInPlayback leaves count == 0 on any failure (the returned pointer may be null,
+        // or non-null with zero valid elements after a partial read), so the decoded array is
+        // empty.
         arr = readArrayInPlayback<T>(flags, count);
     }
 }

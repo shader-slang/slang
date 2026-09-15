@@ -560,6 +560,9 @@ void ReplayStreamDecoder::decodeValueFromStream(
                 Slang::List<char> buffer;
                 buffer.setCount(len + 1);
                 stream.read(buffer.getBuffer(), len);
+                // A failed read leaves buffer untouched (uninitialized heap); do not print it.
+                if (stream.isFailed())
+                    return;
                 buffer[len] = '\0';
                 output << "ERROR: \"" << buffer.getBuffer() << "\"";
             }
