@@ -2,7 +2,7 @@
 """Slang compile-time perf-suite runner.
 
 Drives a given slangc over the workloads in manifest.py, parses the per-phase
-timers emitted by -report-perf-benchmark, and writes per-run JSON: a summary
+timers emitted by -report-detailed-perf-benchmark, and writes per-run JSON: a summary
 (median/min/max/mean/stdev/n) AND the raw samples per timer; merge-on-write.
 
 Stdlib only (no prettytable / numpy) so it runs unchanged against any release's
@@ -137,10 +137,54 @@ def stats(values):
     }
 
 
-# Base flag (not -report-detailed-perf-benchmark): the base flag already emits
-# every phase timer the suite uses and is supported across the whole release
-# window; the detailed flag was added mid-window and only adds finer sub-timers.
+# The timer flag, resolved per binary by `resolve_perf_flag`.
+#
+# `-report-detailed-perf-benchmark` is preferred and is what the suite asks for:
+# it emits every timer the base flag does, with IDENTICAL meaning, plus one
+# sub-timer per `SLANG_PASS` inside `linkAndOptimizeIR`. Without it the whole
+# target-specific back end — `deferBufferLoad`, `simplifyNonSSAIR`,
+# `legalizeIRForMetal`, `lowerCombinedTextureSamplers`, ~60 more — collapses
+# into the single `linkAndOptimizeIR (self)` residual and a regression there
+# cannot be attributed to a pass. Measured overhead is <= 1% of compileInner
+# (12-sample A/B, codegen/spirv and a resource-heavy CUDA compile), i.e. inside
+# run-to-run noise, so it does not break the series.
+#
+# The base flag stays as the fallback because `sweep.py` re-measures release
+# binaries going back to the window start, and the detailed flag was added
+# mid-window. `resolve_perf_flag` probes each binary ONCE and remembers the
+# answer, so a release that predates the flag still measures (with the coarse
+# timer set) instead of failing.
 PERF_FLAG = "-report-perf-benchmark"
+DETAILED_PERF_FLAG = "-report-detailed-perf-benchmark"
+
+# slangc path -> flag it accepts. Populated by resolve_perf_flag.
+_PERF_FLAG_CACHE = {}
+
+
+def resolve_perf_flag(slangc):
+    """Return the most detailed timer flag `slangc` accepts.
+
+    Probed by compiling nothing at all: `-help` prints the option table, so a
+    binary that predates the detailed flag is detected without running a
+    compile - and without the probe's own timings ever being mistaken for a
+    sample.
+    """
+    cached = _PERF_FLAG_CACHE.get(slangc)
+    if cached:
+        return cached
+    flag = PERF_FLAG
+    try:
+        res = subprocess.run([slangc, "-help"], capture_output=True, text=True, timeout=60)
+        if DETAILED_PERF_FLAG in (res.stdout + res.stderr):
+            flag = DETAILED_PERF_FLAG
+    except (OSError, subprocess.SubprocessError):
+        # Leave the base flag in place: a binary we cannot even probe is a
+        # binary whose compile will fail loudly a moment later, and guessing
+        # the detailed flag here would turn that into a confusing option error.
+        pass
+    _PERF_FLAG_CACHE[slangc] = flag
+    return flag
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -274,7 +318,8 @@ def api_driver_supports_out_dir(driver):
     return b"--out-dir" in r.stdout
 
 
-def build_commands(slangc, spec, src_dir, files, out_dir, size=None, api=None):
+def build_commands(slangc, spec, src_dir, files, out_dir, size=None, api=None,
+                   perf_flag=PERF_FLAG):
     """Return (commands, primary_outfile_for_parsing_index).
 
     `src_dir` holds the workload's .slang sources and is treated as READ-ONLY;
@@ -309,7 +354,7 @@ def build_commands(slangc, spec, src_dir, files, out_dir, size=None, api=None):
         out = os.path.join(out_dir, "out.slang-module")
         return {
             "setup": [],
-            "timed": [slangc, PERF_FLAG, os.path.join(src_dir, f),
+            "timed": [slangc, perf_flag, os.path.join(src_dir, f),
                       *spec.extra_flags, "-o", out],
         }
     if spec.mode == "link":
@@ -331,7 +376,7 @@ def build_commands(slangc, spec, src_dir, files, out_dir, size=None, api=None):
         for d in (out_dir, src_dir):
             if d not in includes:
                 includes += ["-I", d]
-        timed = [slangc, PERF_FLAG, *includes,
+        timed = [slangc, perf_flag, *includes,
                  os.path.join(src_dir, main), *spec.extra_flags, "-o", out]
         return {"setup": setup, "timed": timed}
     # "target" mode: single or multi-file compile to a GPU target. For single-file
@@ -349,7 +394,7 @@ def build_commands(slangc, spec, src_dir, files, out_dir, size=None, api=None):
     # -I src_dir lets multi-file corpora resolve imports; harmless for single files
     return {
         "setup": [],
-        "timed": [slangc, PERF_FLAG, "-I", src_dir, os.path.join(src_dir, f),
+        "timed": [slangc, perf_flag, "-I", src_dir, os.path.join(src_dir, f),
                   *extra, "-o", out],
     }
 
@@ -591,7 +636,8 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
             "crash_codes": None,
         }
 
-    cmds = build_commands(slangc, spec, src_dir, files, out_dir, size=size, api=api)
+    cmds = build_commands(slangc, spec, src_dir, files, out_dir, size=size, api=api,
+                          perf_flag=resolve_perf_flag(slangc))
     # A failed setup step (e.g. a module that didn't precompile in link mode) must
     # fail the workload — otherwise the timed compile runs against missing inputs.
     setup_ok = True

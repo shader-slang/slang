@@ -714,6 +714,114 @@ def gen_codegen(n):
     return {"codegen.slang": "".join(s)}
 
 
+# --------------------------------------------------------------------------- #
+# Back-end legalization stressors
+#
+# `gen_codegen` above is shared by every emit_*/codegen_* workload, and it is
+# deliberately construct-free: one compute entry, one RWStructuredBuffer, N
+# lines of scalar float math. That makes it a clean measurement of the
+# EMITTER, and a useless one of everything else the back end does -- almost
+# every target-specific pass in linkAndOptimizeIR is gated on a construct it
+# does not contain, so each one runs and finds nothing. Measured, the six
+# targets land within 1.18x of each other with ~42% of every number being the
+# identical front end.
+#
+# The generators below supply the constructs those passes are gated on. Each
+# scales ONE axis, and each is meant to be compiled to several targets so the
+# ratios BETWEEN targets are the signal. One axis per workload is not a
+# stylistic choice: a mixed "kitchen sink" cross-target shader was tried first
+# and failed, because a shared super-linear front-end cost dominated it and
+# flattened a 21x cuda/spirv divergence to 1.1x. See COVERAGE-ANALYSIS.md.
+# --------------------------------------------------------------------------- #
+
+def gen_resource_load_chain(n):
+    """n textures, each sampled once, in a single entry point.
+
+    The axis is the number of LOADS in one function, not the number of
+    resources -- 64 textures sampled 8 times reproduces the same cost. This is
+    the shape any material system produces after inlining, and it is what
+    drives the load/store redundancy machinery: `removeRedundancyInFunc` ->
+    `eliminateRedundantLoadStore` -> `tryRemoveRedundantLoad`, whose alias and
+    side-effect queries are per-load.
+
+    Which targets pay depends on where shader parameters live. On targets that
+    move globals into an explicit global context (CUDA, CPU) every parameter
+    access becomes a `Load` and `deferBufferLoad` runs the redundancy pass over
+    all of them; on SPIR-V they stay globals and there is nearly nothing to do.
+    `simplifyNonSSAIR` runs the same machinery once more after phi elimination
+    on every target. Measured at N=512 on ToT: cuda 17x spirv.
+
+    Scaling null: n scales loads, each O(1); ideal cost is O(n).
+    """
+    s = [_HEADER]
+    for i in range(n):
+        s.append(f"Texture2D<float4> tex_{i};\n")
+    s.append("SamplerState samp;\nRWStructuredBuffer<float4> outBuf;\n\n")
+    s.append('[shader("compute")]\n[numthreads(8,8,1)]\n')
+    s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
+    s.append("    float2 uv = float2(tid.xy) * 0.01;\n    float4 acc = 0.0;\n")
+    for i in range(n):
+        s.append(f"    acc += tex_{i}.SampleLevel(samp, uv + {i}.0 * 0.001, 0);\n")
+    s.append("    outBuf[tid.x] = acc;\n}\n")
+    return {"resource_load_chain.slang": "".join(s)}
+
+
+def gen_combined_samplers(n):
+    """n `Sampler2D` (combined texture-sampler) reads in one entry point.
+
+    HLSL, Metal and WGSL cannot express a combined texture-sampler, so
+    `lowerCombinedTextureSamplers` splits each one into a texture and a sampler
+    and rewrites every use; Khronos targets keep them and the pass is skipped
+    entirely (`calcRequiredLoweringPassSet` gates on a non-Khronos target
+    seeing an `IRTextureType` with `isCombined`). No other workload declares a
+    combined sampler at all. Measured at N=256: 2.70x spread across six
+    targets, Metal scaling at exponent 1.18 against SPIR-V's 0.59.
+
+    Paired with `resource_load_chain`, which is the same shape with the
+    combination removed, so the two A/B the splitting cost directly.
+
+    Scaling null: n scales combined samplers, each split independently; ideal
+    cost is O(n).
+    """
+    s = [_HEADER]
+    for i in range(n):
+        s.append(f"Sampler2D tex_{i};\n")
+    s.append("RWStructuredBuffer<float4> outBuf;\n\n")
+    s.append('[shader("compute")]\n[numthreads(8,8,1)]\n')
+    s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
+    s.append("    float2 uv = float2(tid.xy) * 0.01;\n    float4 acc = 0.0;\n")
+    for i in range(n):
+        s.append(f"    acc += tex_{i}.SampleLevel(uv + {i}.0 * 0.001, 0);\n")
+    s.append("    outBuf[tid.x] = acc;\n}\n")
+    return {"combined_samplers.slang": "".join(s)}
+
+
+def gen_matrix_chain(n):
+    """A chain of n `mul` operations on float4x4 values read from a
+    StructuredBuffer.
+
+    Matrices are the construct with the most per-target divergence in the
+    suite's blind spot: `legalizeMatrixTypes` and `specializeMatrixLayout` are
+    target-parameterized, HLSL additionally runs `wrapStructuredBuffersOfMatrices`,
+    and the C-family emitters lower matrix ops to their own helper types. Only
+    `reflection_layout` and `api_reflection` mention a matrix type today, and
+    both only DECLARE matrices -- neither computes with them. Measured at
+    N=256: 2.78x spread, CUDA scaling at exponent 1.32 against HLSL's 0.76.
+
+    Scaling null: n scales matrix ops, each O(1); ideal cost is O(n).
+    """
+    s = [_HEADER]
+    s.append("StructuredBuffer<float4x4> matBuf;\nRWStructuredBuffer<float4> outBuf;\n\n")
+    s.append('[shader("compute")]\n[numthreads(64,1,1)]\n')
+    s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
+    s.append("    float4x4 m = matBuf[tid.x];\n    float4 acc = float4(1, 2, 3, 4);\n")
+    for i in range(n):
+        s.append(f"    m = mul(m, matBuf[(tid.x + {i}) % 16]);\n")
+        s.append(f"    acc += mul(m, acc) * {i % 7 + 1}.0;\n")
+    s.append("    outBuf[tid.x] = acc;\n}\n")
+    return {"matrix_chain.slang": "".join(s)}
+
+
 def gen_module_link(n):
     """n importable modules plus a main that imports and uses all of them. The
     harness precompiles each module to .slang-module, then compiles main against

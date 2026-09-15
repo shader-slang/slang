@@ -13,26 +13,86 @@ could live.
 
 # (timer, [children]) — the nested timer tree. Each parent gets a synthetic
 # "<parent> (self)" residual = parent − Σ children, so buckets tile compileInner.
+
+# linkAndOptimizeIR's children. The first eight are emitted by the base
+# -report-perf-benchmark flag; the last four only appear when bench.py measured
+# with -report-detailed-perf-benchmark (see bench.resolve_perf_flag), and are
+# simply 0 ms — and so absent, per rule 5 below — for every point measured
+# before that. They are here because they are where the TARGET-SPECIFIC back end
+# spends its time, and without them it is all one opaque
+# `linkAndOptimizeIR (self)` band:
+#   deferBufferLoad / simplifyNonSSAIR      the load/store redundancy machinery
+#                                           (backend_loads_*); deferBufferLoad
+#                                           dominates on targets that move
+#                                           globals into a global context
+#   lowerCombinedTextureSamplers            backend_samplers_*, non-Khronos only
+#   legalizeMatrixTypes                     backend_matrix_*
+# The ~55 other SLANG_PASS timers stay in the residual on purpose: every one of
+# them measured under 1.5 ms on every workload in the suite, and a band that
+# thin is legend clutter, not signal.
+_LINK_CHILDREN = [
+    ("specializeModule", []),
+    ("simplifyIR", []),
+    ("linkIR", []),
+    ("unrollLoopsInModule", []),
+    ("legalizeResourceTypes", []),
+    ("legalizeExistentialTypeLayout", []),
+    ("performMandatoryEarlyInlining", []),
+    ("performForceInlining", []),
+    ("deferBufferLoad", []),
+    ("simplifyNonSSAIR", []),
+    ("lowerCombinedTextureSamplers", []),
+    ("legalizeMatrixTypes", []),
+]
+
+_FRONT_END = ("frontEndExecute", [
+    ("parseTranslationUnit", []),
+    ("SemanticChecking", []),
+    ("generateIR", []),
+])
+
+# Shape A — a target compiled straight to a binary (`-target spirv
+# -emit-spirv-directly`, and the downstream targets). linkAndOptimizeIR is
+# called from `emitSPIRVForEntryPointsDirectly`, which has no timer of its own,
+# so everything it does lands in `generateOutput (self)` — including the
+# bundled spirv-opt, which is most of it on a large shader.
 TREE = ("compileInner", [
-    ("frontEndExecute", [
-        ("parseTranslationUnit", []),
-        ("SemanticChecking", []),
-        ("generateIR", []),
-    ]),
+    _FRONT_END,
     ("generateOutput", [
-        ("linkAndOptimizeIR", [
-            ("specializeModule", []),
-            ("simplifyIR", []),
-            ("linkIR", []),
-            ("unrollLoopsInModule", []),
-            ("legalizeResourceTypes", []),
-            ("legalizeExistentialTypeLayout", []),
-            ("performMandatoryEarlyInlining", []),
-            ("performForceInlining", []),
-        ]),
-        ("emitEntryPointsSourceFromIR", []),
+        ("linkAndOptimizeIR", _LINK_CHILDREN),
     ]),
 ])
+
+# Shape B — a SOURCE target (metal/wgsl/hlsl/glsl/cuda).
+# `emitEntryPointsSourceFromIR` is the PARENT of linkAndOptimizeIR here, not its
+# sibling: `CodeGenContext::emitEntryPointsSourceFromIR` calls
+# `linkAndOptimizeIR` and then emits text from the result.
+#
+# Modelling the two as siblings (which this tree did until the back-end
+# workloads landed) double-counts: the allocator sees children summing to more
+# than `generateOutput`, scales them proportionally to fit, and splits
+# linkAndOptimizeIR's real work across both bands. It tiles correctly and
+# attributes wrongly — on `backend_loads_cuda` it named
+# `emitEntryPointsSourceFromIR` the dominant bucket at 41% when the actual text
+# emitter is under 5 ms and all the cost is `deferBufferLoad` beneath it.
+SOURCE_TREE = ("compileInner", [
+    _FRONT_END,
+    ("generateOutput", [
+        ("emitEntryPointsSourceFromIR", [
+            ("linkAndOptimizeIR", _LINK_CHILDREN),
+        ]),
+    ]),
+])
+
+
+def tree_for(timers):
+    """Which compiler-phase tree this run's timers describe.
+
+    Decided from the data rather than from the manifest so that stored results
+    decode without one: `emitEntryPointsSourceFromIR` is reported only by the
+    source-emission path, so a non-zero value IS the shape.
+    """
+    return SOURCE_TREE if timer_ms(timers, "emitEntryPointsSourceFromIR") > 0 else TREE
 
 
 # Canonical bucket order + colors for the stacked view, grouped by stage:
@@ -52,7 +112,12 @@ BUCKET_ORDER = [
     ("legalizeExistentialTypeLayout", "#6a51a3"),
     ("performMandatoryEarlyInlining", "#bcbddc"),
     ("performForceInlining", "#dadaeb"),
+    ("deferBufferLoad", "#3f007d"),
+    ("simplifyNonSSAIR", "#54278f"),
+    ("lowerCombinedTextureSamplers", "#9970ab"),
+    ("legalizeMatrixTypes", "#c2a5cf"),
     ("linkAndOptimizeIR (self)", "#4a1486"),
+    ("emitEntryPointsSourceFromIR (self)", "#fdd0a2"),
     ("emitEntryPointsSourceFromIR", "#fd8d3c"),
     ("generateOutput (self)", "#e6550d"),
     ("compileInner (self)", "#969696"),
@@ -112,7 +177,7 @@ def timer_ms(timers, name):
     return st if isinstance(st, (int, float)) else 0.0
 
 
-def buckets(timers, tree=TREE):
+def buckets(timers, tree=None):
     """Mutually-exclusive {bucket: ms} that sum to the given tree's root total
     (compileInner for the default compiler-phase TREE, apiTotal for API_TREE),
     allocated TOP-DOWN from that budget. Each parent places its measured
@@ -158,6 +223,8 @@ def buckets(timers, tree=TREE):
             if self_ms > 0:
                 out[f"{name} (self)"] = out.get(f"{name} (self)", 0.0) + self_ms
 
+    if tree is None:
+        tree = tree_for(timers)
     alloc(tree, timer_ms(timers, tree[0]))
     return out
 
