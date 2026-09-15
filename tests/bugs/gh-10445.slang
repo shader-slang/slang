@@ -1,4 +1,4 @@
-//TEST:SIMPLE: -o tests/bugs/gh-10445.slang-module
+//TEST:SIMPLE: -o tests/bugs/gh-10445.slang-module -warnings-disable module-format-not-frozen
 //TEST:SIMPLE(filecheck=MODULE-CHECK): -target hlsl -stage compute -entry computeMain tests/bugs/gh-10445.slang-module
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 
