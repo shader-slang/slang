@@ -3791,7 +3791,8 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion, Region* breakRegionToOmit)
                     emitLoopControlDecorationImpl(loopControlDecoration);
                 }
 
-                m_writer->emit("for(;;)\n{\n");
+                m_writer->emit(getUnconditionalLoopHeader());
+                m_writer->emit("\n{\n");
                 m_writer->indent();
                 emitRegion(loopRegion->body);
                 m_writer->dedent();
