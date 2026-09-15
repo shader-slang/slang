@@ -208,7 +208,8 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
     // We need to test differently - verify the template infrastructure compiles and works
 
     // For this test, just verify the handler dispatch works
-    bool executed = ctx().executeNextCall();
+    bool executed = false;
+    SLANG_CHECK(SLANG_SUCCEEDED(ctx().executeNextCall(executed)));
     SLANG_CHECK(executed);
 
     // In this test, the proxy's add() was called with default args (0, 0)
@@ -343,7 +344,7 @@ SLANG_UNIT_TEST(replayContextFullRoundTrip)
     ctx().registerHandler("TestCalculatorProxy::setOffset", setOffsetHandler);
 
     // Execute all recorded calls
-    ctx().executeAll();
+    SLANG_CHECK(SLANG_SUCCEEDED(ctx().executeAll()));
 
     // Verify the calls were replayed
     // Note: the values should match what was recorded
@@ -483,7 +484,7 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
 
     // Execute all recorded calls
     // This should recreate the global session and session
-    ctx().executeAll();
+    SLANG_CHECK(SLANG_SUCCEEDED(ctx().executeAll()));
     ctx().disable(); // Stop playback
 
     // Look up the session by its handle - it should exist after playback

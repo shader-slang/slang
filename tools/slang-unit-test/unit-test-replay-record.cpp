@@ -129,31 +129,25 @@ static SlangResult executeReplay(const char* testName, const String& recordPath)
         return res;
     }
 
-    // Execute all recorded calls
-    try
+    // Execute all recorded calls. executeAll latches a structured error and returns SLANG_FAIL on
+    // the first failure instead of throwing.
+    SlangResult replayResult = ctx.executeAll();
+    if (SLANG_FAILED(replayResult))
     {
-        ctx.executeAll();
+        const SlangRecord::ReplayError& error = ctx.getLastError();
+        const String& detail = error.kind != SlangRecord::ReplayErrorKind::None
+                                   ? error.message
+                                   : ctx.getStream().getErrorMessage();
+        msgBuilder.clear();
+        msgBuilder << "Replay failed for '" << testName << "': " << detail << "\n";
+        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+        ctx.reset();
+        return SLANG_FAIL;
+    }
 
-        msgBuilder.clear();
-        msgBuilder << "Replay completed successfully for '" << testName << "'\n";
-        getTestReporter()->message(TestMessageType::Info, msgBuilder.toString().getBuffer());
-    }
-    catch (const Slang::Exception& e)
-    {
-        msgBuilder.clear();
-        msgBuilder << "Replay failed for '" << testName << "': " << e.Message << "\n";
-        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
-        ctx.reset();
-        return SLANG_FAIL;
-    }
-    catch (const std::exception& e)
-    {
-        msgBuilder.clear();
-        msgBuilder << "Replay failed for '" << testName << "': " << e.what() << "\n";
-        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
-        ctx.reset();
-        return SLANG_FAIL;
-    }
+    msgBuilder.clear();
+    msgBuilder << "Replay completed successfully for '" << testName << "'\n";
+    getTestReporter()->message(TestMessageType::Info, msgBuilder.toString().getBuffer());
 
     // Reset context after replay
     ctx.reset();
@@ -222,47 +216,45 @@ static SlangResult runTest(
         return SLANG_FAIL;
     }
 
-    // Decode the stream.bin and compute a hash
-    try
-    {
-        String decoded = SlangRecord::ReplayStreamDecoder::decodeFile(streamPath.getBuffer());
-
-        // Compute hash of the decoded content
-        StableHashCode64 hash = getStableHashCode64(decoded.getBuffer(), decoded.getLength());
-
-        // Log the decoded content and hash
-        StringBuilder msgBuilder;
-        msgBuilder << "Decoded stream.bin for '" << testName << "' (" << decoded.getLength()
-                   << " bytes):\n";
-        msgBuilder << "Recording path: " << recordPath << "\n";
-        StringUtil::appendFormat(msgBuilder, "Hash: 0x%016llx\n", (unsigned long long)hash.hash);
-        msgBuilder << "--- Begin decoded content ---\n";
-        msgBuilder << decoded;
-        msgBuilder << "--- End decoded content ---\n";
-        getTestReporter()->message(TestMessageType::Info, msgBuilder.toString().getBuffer());
-
-        // Verify the hash matches the expected value (if provided)
-        if (expectedHash != 0 && hash.hash != expectedHash)
-        {
-            StringBuilder errBuilder;
-            StringUtil::appendFormat(
-                errBuilder,
-                "Hash mismatch for '%s': expected 0x%016llx, got 0x%016llx\n",
-                testName,
-                (unsigned long long)expectedHash,
-                (unsigned long long)hash.hash);
-            getTestReporter()->message(
-                TestMessageType::TestFailure,
-                errBuilder.toString().getBuffer());
-            cleanupRecordFiles(recordPath);
-            return SLANG_FAIL;
-        }
-    }
-    catch (const Exception& e)
+    // Decode the stream.bin and compute a hash. decodeFile reports a decode failure through its
+    // outHadError out-param (print-error-and-continue) rather than throwing.
+    bool decodeHadError = false;
+    String decoded =
+        SlangRecord::ReplayStreamDecoder::decodeFile(streamPath.getBuffer(), &decodeHadError);
+    if (decodeHadError)
     {
         StringBuilder msgBuilder;
-        msgBuilder << "Failed to decode stream.bin for '" << testName << "': " << e.Message << "\n";
+        msgBuilder << "Failed to decode stream.bin for '" << testName << "'\n";
         getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+        cleanupRecordFiles(recordPath);
+        return SLANG_FAIL;
+    }
+
+    // Compute hash of the decoded content
+    StableHashCode64 hash = getStableHashCode64(decoded.getBuffer(), decoded.getLength());
+
+    // Log the decoded content and hash
+    StringBuilder msgBuilder;
+    msgBuilder << "Decoded stream.bin for '" << testName << "' (" << decoded.getLength()
+               << " bytes):\n";
+    msgBuilder << "Recording path: " << recordPath << "\n";
+    StringUtil::appendFormat(msgBuilder, "Hash: 0x%016llx\n", (unsigned long long)hash.hash);
+    msgBuilder << "--- Begin decoded content ---\n";
+    msgBuilder << decoded;
+    msgBuilder << "--- End decoded content ---\n";
+    getTestReporter()->message(TestMessageType::Info, msgBuilder.toString().getBuffer());
+
+    // Verify the hash matches the expected value (if provided)
+    if (expectedHash != 0 && hash.hash != expectedHash)
+    {
+        StringBuilder errBuilder;
+        StringUtil::appendFormat(
+            errBuilder,
+            "Hash mismatch for '%s': expected 0x%016llx, got 0x%016llx\n",
+            testName,
+            (unsigned long long)expectedHash,
+            (unsigned long long)hash.hash);
+        getTestReporter()->message(TestMessageType::TestFailure, errBuilder.toString().getBuffer());
         cleanupRecordFiles(recordPath);
         return SLANG_FAIL;
     }

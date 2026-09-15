@@ -182,6 +182,7 @@ public:
     virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override
     {
         RECORD_CALL();
+        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
         slang::ISession* result = m_componentType->getSession();
         return RECORD_COM_RESULT(result);
     }
@@ -192,6 +193,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
+        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
         slang::ProgramLayout* result = m_componentType->getLayout(targetIndex, outDiagnostics);
         RECORD_COM_OUTPUT(outDiagnostics);
         return result;
@@ -200,6 +202,7 @@ public:
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getSpecializationParamCount() override
     {
         RECORD_CALL();
+        RECORD_REPLAY_ABORT_IF_FAILED(0);
         SlangInt result = m_componentType->getSpecializationParamCount();
         RECORD_RETURN(result);
     }
@@ -215,6 +218,7 @@ public:
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outCode);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
+        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
         auto result = m_componentType->getEntryPointCode(
             entryPointIndex,
             targetIndex,
@@ -243,6 +247,7 @@ public:
         RECORD_INPUT(entryPointIndex);
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outHash);
+        RECORD_REPLAY_ABORT_IF_FAILED();
         m_componentType->getEntryPointHash(entryPointIndex, targetIndex, outHash);
         RECORD_COM_OUTPUT(outHash);
     }
@@ -257,6 +262,7 @@ public:
         RECORD_INPUT_ARRAY(specializationArgs, specializationArgCount);
         PREPARE_POINTER_OUTPUT(outSpecializedComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
+        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
         auto result = m_componentType->specialize(
             specializationArgs,
             specializationArgCount,
@@ -273,6 +279,7 @@ public:
         RECORD_CALL();
         PREPARE_POINTER_OUTPUT(outLinkedComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
+        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
         auto result = m_componentType->link(outLinkedComponentType, outDiagnostics);
         RECORD_COM_OUTPUT(outLinkedComponentType);
         RECORD_COM_OUTPUT(outDiagnostics);
@@ -290,6 +297,7 @@ public:
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outSharedLibrary);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
+        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
         auto result = m_componentType->getEntryPointHostCallable(
             entryPointIndex,
             targetIndex,
@@ -318,6 +326,7 @@ public:
         RECORD_INPUT_ARRAY(compilerOptionEntries, compilerOptionEntryCount);
         PREPARE_POINTER_OUTPUT(outLinkedComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
+        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
         auto result = m_componentType->linkWithOptions(
             outLinkedComponentType,
             compilerOptionEntryCount,
@@ -335,6 +344,7 @@ public:
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outCode);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
+        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
         auto result = m_componentType->getTargetCode(targetIndex, outCode, outDiagnostics);
         RECORD_COM_OUTPUT(outCode);
         RECORD_COM_OUTPUT(outDiagnostics);
@@ -350,6 +360,7 @@ public:
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outMetadata);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
+        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
         auto result = m_componentType->getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
@@ -380,6 +391,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(name);
         PREPARE_POINTER_OUTPUT(outEntryPoint);
+        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
         SlangResult result = m_module->findEntryPointByName(name, outEntryPoint);
         RECORD_ENTRYPOINT_OUTPUT(outEntryPoint);
         RECORD_RETURN(result);
@@ -390,6 +402,7 @@ public:
         if (!m_module)
             return 0;
         RECORD_CALL();
+        RECORD_REPLAY_ABORT_IF_FAILED(0);
         auto result = m_module->getDefinedEntryPointCount();
         RECORD_INFO(result);
         return result;
@@ -403,6 +416,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(index);
         PREPARE_POINTER_OUTPUT(outEntryPoint);
+        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
         SlangResult result = m_module->getDefinedEntryPoint(index, outEntryPoint);
         RECORD_ENTRYPOINT_OUTPUT(outEntryPoint);
         RECORD_RETURN(result);
@@ -415,6 +429,7 @@ public:
             return SLANG_E_NOT_IMPLEMENTED;
         RECORD_CALL();
         PREPARE_POINTER_OUTPUT(outSerializedBlob);
+        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
         auto result = m_module->serialize(outSerializedBlob);
         RECORD_COM_OUTPUT(outSerializedBlob);
         RECORD_RETURN(result);
@@ -426,6 +441,7 @@ public:
             return SLANG_E_NOT_IMPLEMENTED;
         RECORD_CALL();
         RECORD_INPUT(fileName);
+        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
         auto result = m_module->writeToFile(fileName);
         RECORD_RETURN(result);
     }
@@ -435,6 +451,7 @@ public:
         if (!m_module)
             return nullptr;
         RECORD_CALL();
+        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
         return m_module->getName();
     }
 
@@ -443,6 +460,7 @@ public:
         if (!m_module)
             return nullptr;
         RECORD_CALL();
+        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
         return m_module->getFilePath();
     }
 
@@ -464,6 +482,7 @@ public:
         RECORD_INPUT(stage);
         PREPARE_POINTER_OUTPUT(outEntryPoint);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
+        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
         SlangResult result =
             m_module->findAndCheckEntryPoint(name, stage, outEntryPoint, outDiagnostics);
         RECORD_ENTRYPOINT_OUTPUT(outEntryPoint);
@@ -476,6 +495,7 @@ public:
         if (!m_module)
             return 0;
         RECORD_CALL();
+        RECORD_REPLAY_ABORT_IF_FAILED(0);
         auto result = m_module->getDependencyFileCount();
         RECORD_INFO(result);
         return result;
@@ -487,6 +507,7 @@ public:
             return nullptr;
         RECORD_CALL();
         RECORD_INPUT(index);
+        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
         auto result = m_module->getDependencyFilePath(index);
         RECORD_RETURN(result);
     }
@@ -496,6 +517,7 @@ public:
         if (!m_module)
             return nullptr;
         RECORD_CALL();
+        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
         return m_module->getModuleReflection();
     }
 
@@ -515,6 +537,7 @@ public:
         if (!m_entryPoint)
             return nullptr;
         RECORD_CALL();
+        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
         return m_entryPoint->getFunctionReflection();
     }
 
@@ -546,6 +569,7 @@ public:
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outCompileResult);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
+        RECORD_REPLAY_ABORT_IF_FAILED(SLANG_FAIL);
         auto result = getActual<slang::IComponentType2>()->getEntryPointCompileResult(
             entryPointIndex,
             targetIndex,

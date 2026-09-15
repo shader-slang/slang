@@ -111,112 +111,111 @@ int main(int argc, char* argv[])
 
     if (options.decode)
     {
-        // Decode the binary stream to human-readable text
-        try
+        // Decode the binary stream to human-readable text. The decoder reports malformed input via
+        // an ERROR line in the returned text and by setting `hadError`, rather than by throwing.
+        Slang::String decoded;
+        bool hadError = false;
+
+        if (options.rawDecode)
         {
-            Slang::String decoded;
+            // Raw mode: simple value-by-value dump
+            Slang::String inputPath = options.recordFileName;
 
-            if (options.rawDecode)
+            // If given a folder (check by seeing if stream.bin exists inside), append
+            // stream.bin
+            Slang::String possibleStreamPath = Slang::Path::combine(inputPath, "stream.bin");
+            if (Slang::File::exists(possibleStreamPath))
             {
-                // Raw mode: simple value-by-value dump
-                Slang::String inputPath = options.recordFileName;
-
-                // If given a folder (check by seeing if stream.bin exists inside), append
-                // stream.bin
-                Slang::String possibleStreamPath = Slang::Path::combine(inputPath, "stream.bin");
-                if (Slang::File::exists(possibleStreamPath))
-                {
-                    inputPath = possibleStreamPath;
-                }
-
-                decoded = SlangRecord::ReplayStreamDecoder::decodeFile(inputPath.getBuffer());
-            }
-            else
-            {
-                // Default: use index-based structured output if available
-                decoded = SlangRecord::ReplayStreamDecoder::decodeWithIndex(
-                    options.recordFileName.getBuffer());
+                inputPath = possibleStreamPath;
             }
 
-            if (options.outputFileName.getLength() > 0)
-            {
-                // Write to file
-                SlangResult res = Slang::File::writeAllText(
-                    options.outputFileName.getBuffer(),
-                    decoded.getUnownedSlice());
-                if (SLANG_FAILED(res))
-                {
-                    fprintf(
-                        stderr,
-                        "Error writing to file: %s\n",
-                        options.outputFileName.getBuffer());
-                    return 1;
-                }
-            }
-            else
-            {
-                // Write to stdout
-                printf("%s", decoded.getBuffer());
-            }
-            return 0;
+            decoded = SlangRecord::ReplayStreamDecoder::decodeFile(inputPath.getBuffer(), &hadError);
         }
-        catch (const Slang::Exception& e)
+        else
         {
-            fprintf(stderr, "Error decoding file: %s\n", e.Message.getBuffer());
+            // Default: use index-based structured output if available
+            decoded = SlangRecord::ReplayStreamDecoder::decodeWithIndex(
+                options.recordFileName.getBuffer(),
+                &hadError);
+        }
+
+        if (options.outputFileName.getLength() > 0)
+        {
+            // Write to file
+            SlangResult res = Slang::File::writeAllText(
+                options.outputFileName.getBuffer(),
+                decoded.getUnownedSlice());
+            if (SLANG_FAILED(res))
+            {
+                fprintf(stderr, "Error writing to file: %s\n", options.outputFileName.getBuffer());
+                return 1;
+            }
+        }
+        else
+        {
+            // Write to stdout
+            printf("%s", decoded.getBuffer());
+        }
+
+        if (hadError)
+        {
+            fprintf(stderr, "Error decoding file: malformed replay stream\n");
             return 1;
         }
+        return 0;
     }
 
     if (options.replay)
     {
         // Replay the recorded API calls
-        try
+        auto& ctx = SlangRecord::ReplayContext::get();
+
+        // Enable verbose logging if requested
+        if (options.verbose)
         {
-            auto& ctx = SlangRecord::ReplayContext::get();
-
-            // Enable verbose logging if requested
-            if (options.verbose)
-            {
-                ctx.setTtyLogging(true);
-            }
-
-            // Load the replay file
-            // The input can be either a folder containing stream.bin or the stream.bin file
-            // directly
-            Slang::String streamPath = options.recordFileName;
-            if (!streamPath.endsWith(".bin"))
-            {
-                streamPath = Slang::Path::combine(streamPath, "stream.bin");
-            }
-
-            if (!Slang::File::exists(streamPath))
-            {
-                fprintf(stderr, "Error: stream.bin not found at: %s\n", streamPath.getBuffer());
-                return 1;
-            }
-
-            printf("Loading replay from: %s\n", streamPath.getBuffer());
-
-            // Load and execute the replay
-            SlangResult loadResult =
-                ctx.loadReplay(Slang::Path::getParentDirectory(streamPath).getBuffer());
-            if (SLANG_FAILED(loadResult))
-            {
-                fprintf(stderr, "Error loading replay file\n");
-                return 1;
-            }
-
-            printf("Executing replay...\n");
-            ctx.executeAll();
-            printf("Replay completed successfully.\n");
-
-            return 0;
+            ctx.setTtyLogging(true);
         }
-        catch (const Slang::Exception& e)
+
+        // Load the replay file
+        // The input can be either a folder containing stream.bin or the stream.bin file
+        // directly
+        Slang::String streamPath = options.recordFileName;
+        if (!streamPath.endsWith(".bin"))
         {
-            fprintf(stderr, "Error during replay: %s\n", e.Message.getBuffer());
+            streamPath = Slang::Path::combine(streamPath, "stream.bin");
+        }
+
+        if (!Slang::File::exists(streamPath))
+        {
+            fprintf(stderr, "Error: stream.bin not found at: %s\n", streamPath.getBuffer());
             return 1;
         }
+
+        printf("Loading replay from: %s\n", streamPath.getBuffer());
+
+        // Load and execute the replay
+        SlangResult loadResult =
+            ctx.loadReplay(Slang::Path::getParentDirectory(streamPath).getBuffer());
+        if (SLANG_FAILED(loadResult))
+        {
+            fprintf(stderr, "Error loading replay file\n");
+            return 1;
+        }
+
+        printf("Executing replay...\n");
+        if (SLANG_FAILED(ctx.executeAll()))
+        {
+            const SlangRecord::ReplayError& err = ctx.getLastError();
+            fprintf(
+                stderr,
+                "Error during replay: %s\n",
+                err.message.getLength() ? err.message.getBuffer()
+                                        : ctx.getStream().getErrorMessage().getBuffer());
+            return 1;
+        }
+        printf("Replay completed successfully.\n");
+
+        return 0;
     }
 
     // Default: print usage if no operation specified

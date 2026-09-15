@@ -342,13 +342,30 @@ ReplayContext::get().registerHandler("slang_createGlobalSession2",
 
 ### Execution
 
+Replay reports failures through a sticky, structured error rather than exceptions, so the
+record-replay subsystem compiles and runs with C++ exceptions disabled. `executeAll()` and
+`executeNextCall()` return a `SlangResult`; on failure the specific `ReplayError` (kind, message,
+and structured fields) is available via `ctx.getLastError()`.
+
 ```cpp
 ctx.loadReplay("/path/to/recording");
-ctx.executeAll();
 
-// Or step-by-step:
+// executeAll() replays every recorded call. It returns SLANG_FAIL and latches a structured
+// error (see ctx.getLastError()) on the first failed call instead of throwing.
+if (SLANG_FAILED(ctx.executeAll()))
+{
+    const ReplayError& error = ctx.getLastError();
+    // Inspect error.kind / error.message to diagnose the failure.
+}
+
+// Or step-by-step. executeNextCall() reports whether a call was executed through its
+// out-parameter, and returns SLANG_FAIL on a replay failure:
+bool hadCall = false;
 while (ctx.hasMoreCalls())
-    ctx.executeNextCall();
+{
+    if (SLANG_FAILED(ctx.executeNextCall(hadCall)))
+        break; // ctx.getLastError() describes the failure
+}
 ```
 
 ### Playback Dispatch Flow

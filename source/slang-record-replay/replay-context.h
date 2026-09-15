@@ -80,55 +80,10 @@ static_assert(
     sizeof(CallIndexEntry) == CallIndexEntry::kSize,
     "CallIndexEntry must have expected fixed size");
 
-// Replay exceptions can be thrown across the slang shared-library boundary
-// and caught by type in the test executable when slang-test runs in-process
-// (server-count=1). They therefore carry SLANG_EXCEPTION_TYPE_VISIBLE
-// (core/slang-exception.h), which exports the RTTI on Itanium-ABI
-// (non-Windows) targets so the typed catch matches across dynamic libraries;
-// see that header for the full explanation.
-
-/// Exception thrown when trying to record an untracked interface.
-class SLANG_EXCEPTION_TYPE_VISIBLE UntrackedInterfaceException : public Slang::Exception
-{
-public:
-    UntrackedInterfaceException(ISlangUnknown* obj)
-        : Slang::Exception("Attempted to record untracked interface"), m_object(obj)
-    {
-    }
-    ISlangUnknown* getObject() const { return m_object; }
-
-private:
-    ISlangUnknown* m_object;
-};
-
-/// Exception thrown when a handle is not found during playback.
-class SLANG_EXCEPTION_TYPE_VISIBLE HandleNotFoundException : public Slang::Exception
-{
-public:
-    HandleNotFoundException(uint64_t handle)
-        : Slang::Exception(String("Handle not found: ") + String(handle)), m_handle(handle)
-    {
-    }
-    uint64_t getHandle() const { return m_handle; }
-
-private:
-    uint64_t m_handle;
-};
-
-/// Exception thrown when a TypeReflection cannot be resolved during playback.
-class SLANG_EXCEPTION_TYPE_VISIBLE UnresolvedTypeException : public Slang::Exception
-{
-public:
-    UnresolvedTypeException(slang::TypeReflection* type)
-        : Slang::Exception(String("Unresolved type: ") + String(type ? type->getName() : "<null>"))
-        , m_type(type)
-    {
-    }
-    slang::TypeReflection* getType() const { return m_type; }
-
-private:
-    slang::TypeReflection* m_type;
-};
+// Record/replay reports failures through a sticky, structured ReplayError (defined after TypeId,
+// below) rather than by throwing, so the subsystem compiles and runs with C++ exceptions disabled
+// (SLANG_DISABLE_EXCEPTIONS). The former exception classes (UntrackedInterface / HandleNotFound /
+// UnresolvedType / TypeMismatch / DataMismatch) are folded into ReplayError's kind + fields.
 
 /// Operating mode for the replay system.
 enum class Mode : uint8_t
@@ -191,68 +146,45 @@ enum class TypeId : uint8_t
 
 SLANG_API const char* getTypeIdName(TypeId id);
 
-/// Exception thrown when type mismatch occurs during deserialization.
-class SLANG_EXCEPTION_TYPE_VISIBLE TypeMismatchException : public Slang::Exception
+/// Build the diagnostic message a type-tag mismatch produces (expected vs actual). Shared by the
+/// setError call sites that replaced the former TypeMismatchException.
+inline String makeTypeMismatchMessage(TypeId expected, TypeId actual)
 {
-public:
-    SLANG_API TypeMismatchException(TypeId expected, TypeId actual);
-    TypeId getExpected() const { return m_expected; }
-    TypeId getActual() const { return m_actual; }
-
-private:
-    TypeId m_expected, m_actual;
-};
-
-/// Exception thrown when data mismatch occurs during sync mode verification.
-class SLANG_EXCEPTION_TYPE_VISIBLE DataMismatchException : public Slang::Exception
-{
-public:
-    SLANG_API DataMismatchException(size_t offset, size_t size);
-    size_t getOffset() const { return m_offset; }
-    size_t getSize() const { return m_size; }
-
-private:
-    size_t m_offset, m_size;
-};
-
-/// Require the current playback stream position to contain a byte range.
-inline void requireReplayStreamBytes(const ReplayStream& stream, size_t offset, size_t size)
-{
-    const size_t streamPosition = stream.getPosition();
-    const size_t streamSize = stream.getSize();
-    if (streamPosition > streamSize || size > streamSize - streamPosition)
-        throw DataMismatchException(offset, size);
+    return String("Type mismatch: expected ") + getTypeIdName(expected) + ", got " +
+           getTypeIdName(actual);
 }
 
-/// Validate a replayed array count before allocation and element deserialization.
-inline void validateReplayArrayCount(
-    const ReplayStream& stream,
-    uint64_t arrayCount,
-    uint64_t maxCountForCountType,
-    size_t elementSize,
-    size_t minStreamBytesPerElement,
-    size_t countOffset)
+/// The kind of a record/replay failure. Replaces the former exception hierarchy; the relevant
+/// structured fields on ReplayError are populated per kind.
+enum class ReplayErrorKind : uint8_t
 {
-    if (arrayCount > maxCountForCountType || arrayCount > kMaxReplayArrayCount)
-        throw DataMismatchException(countOffset, sizeof(arrayCount));
+    None = 0,           ///< No failure.
+    IO,                 ///< File open/read/write failure.
+    Bounds,             ///< Read/seek/allocation past the stream's/limits' bounds.
+    DataMismatch,       ///< Recorded data did not match expected (sync verify / replayed output).
+    TypeMismatch,       ///< Recorded type tag did not match the expected tag.
+    HandleNotFound,     ///< A handle had no live object during playback.
+    UnresolvedType,     ///< A TypeReflection could not be resolved.
+    UntrackedInterface, ///< An interface with no recorded handle was encountered.
+    NoHandler,          ///< No handler registered for a recorded call / malformed call header.
+    NullThis,           ///< The current 'this' handle did not resolve to a live proxy.
+    UnknownType,        ///< An unknown TypeId was encountered while decoding/skipping.
+};
 
-    if (arrayCount > uint64_t((std::numeric_limits<size_t>::max)()))
-        throw DataMismatchException(countOffset, sizeof(arrayCount));
-
-    const size_t sizeCount = static_cast<size_t>(arrayCount);
-    if (elementSize == 0 || minStreamBytesPerElement == 0 ||
-        sizeCount > kMaxReplayArrayAllocationSize / elementSize)
-        throw DataMismatchException(countOffset, sizeof(arrayCount));
-
-    const size_t streamPosition = stream.getPosition();
-    const size_t streamSize = stream.getSize();
-    if (streamPosition > streamSize)
-        throw DataMismatchException(streamPosition, sizeof(arrayCount));
-
-    const size_t bytesAvailable = streamSize - streamPosition;
-    if (arrayCount > uint64_t(bytesAvailable / minStreamBytesPerElement))
-        throw DataMismatchException(streamPosition, sizeof(arrayCount));
-}
+/// A structured record/replay failure. Set once (first error wins) on the ReplayContext and queried
+/// at operation boundaries; carries exactly the data the former typed exceptions exposed so callers
+/// (and unit tests) can inspect the specific failure. The `object`/`type` pointers are non-owning
+/// diagnostic identities — they must never be dereferenced, only compared or used to build a message.
+struct ReplayError
+{
+    ReplayErrorKind kind = ReplayErrorKind::None;
+    String message;
+    size_t offset = 0, size = 0;                  ///< DataMismatch / Bounds.
+    TypeId expected = TypeId::Null, actual = TypeId::Null; ///< TypeMismatch.
+    uint64_t handle = 0;                          ///< HandleNotFound.
+    ISlangUnknown* object = nullptr;              ///< UntrackedInterface (non-owning).
+    slang::TypeReflection* type = nullptr;        ///< UnresolvedType (non-owning).
+};
 
 template<typename T>
 inline constexpr size_t getReplayArrayMinStreamBytesPerElement()
@@ -321,6 +253,133 @@ public:
     SLANG_API bool isPlayback() const { return m_mode == Mode::Playback; }
     SLANG_API bool isReading() const { return m_mode == Mode::Playback; }
     SLANG_API bool isWriting() const { return m_mode == Mode::Record || m_mode == Mode::Sync; }
+
+    // =========================================================================
+    // Failure state (exception-free error reporting)
+    // =========================================================================
+    //
+    // Record/replay latches the first failure here (and on the streams) instead of throwing, so the
+    // subsystem builds and runs with C++ exceptions disabled. Fallible operations become no-ops once
+    // a failure is latched, and operation boundaries (executeNextCall/executeAll) convert it to a
+    // SlangResult. First error wins so the root-cause message/fields are preserved.
+
+    /// True if a structured failure has been latched on this context (not counting stream failures;
+    /// use hasFailure() for the aggregate).
+    SLANG_API bool hasError() const { return m_lastError.kind != ReplayErrorKind::None; }
+
+    /// The first latched failure (kind == None if none). Valid until clearError()/reset().
+    SLANG_API const ReplayError& getLastError() const { return m_lastError; }
+
+    /// Latch `error` as the failure (first error wins) and return SLANG_FAIL, so callers can write
+    /// `return setError(...)`. const because const read accessors (getProxy/getProxyHandleImpl) latch.
+    SLANG_API SlangResult setError(const ReplayError& error) const
+    {
+        if (m_lastError.kind == ReplayErrorKind::None)
+            m_lastError = error;
+        return SLANG_FAIL;
+    }
+
+    /// Convenience overload: latch a failure carrying only kind/message plus optional offset/size
+    /// (for Bounds/DataMismatch). First error wins; returns SLANG_FAIL.
+    SLANG_API SlangResult
+    setError(ReplayErrorKind kind, String message, size_t offset = 0, size_t size = 0) const
+    {
+        ReplayError error;
+        error.kind = kind;
+        error.message = message;
+        error.offset = offset;
+        error.size = size;
+        return setError(error);
+    }
+
+    /// Clear the latched context failure so a new replay session can start. Does not touch the
+    /// streams' failed flags (those clear via their own reset()/clearError()).
+    SLANG_API void clearError() { m_lastError = ReplayError(); }
+
+    /// Aggregate failure predicate: this context, or either owned stream, has latched a failure.
+    /// Boundaries and recorders must check this (never hasError() alone) so a stream-level read
+    /// failure also stops work.
+    SLANG_API bool hasFailure() const
+    {
+        return hasError() || m_stream.isFailed() || m_referenceStream.isFailed();
+    }
+
+    /// Require the current playback stream position to contain a `size`-byte range. On failure
+    /// latches a Bounds error carrying `offset`/`size` and returns false; callers must stop before
+    /// the dependent read.
+    SLANG_API bool requireReplayStreamBytes(size_t offset, size_t size) const
+    {
+        const size_t streamPosition = m_stream.getPosition();
+        const size_t streamSize = m_stream.getSize();
+        if (streamPosition > streamSize || size > streamSize - streamPosition)
+        {
+            setError(ReplayErrorKind::Bounds, "Read past end of replay stream", offset, size);
+            return false;
+        }
+        return true;
+    }
+
+    /// Validate a replayed array count before allocation and element deserialization. On failure
+    /// latches a Bounds error carrying the count offset (and count-field size) and returns false.
+    SLANG_API bool validateReplayArrayCount(
+        uint64_t arrayCount,
+        uint64_t maxCountForCountType,
+        size_t elementSize,
+        size_t minStreamBytesPerElement,
+        size_t countOffset) const
+    {
+        if (arrayCount > maxCountForCountType || arrayCount > kMaxReplayArrayCount)
+        {
+            setError(
+                ReplayErrorKind::Bounds,
+                "Replay array count exceeds limit",
+                countOffset,
+                sizeof(arrayCount));
+            return false;
+        }
+        if (arrayCount > uint64_t((std::numeric_limits<size_t>::max)()))
+        {
+            setError(
+                ReplayErrorKind::Bounds,
+                "Replay array count exceeds size_t range",
+                countOffset,
+                sizeof(arrayCount));
+            return false;
+        }
+        const size_t sizeCount = static_cast<size_t>(arrayCount);
+        if (elementSize == 0 || minStreamBytesPerElement == 0 ||
+            sizeCount > kMaxReplayArrayAllocationSize / elementSize)
+        {
+            setError(
+                ReplayErrorKind::Bounds,
+                "Replay array allocation exceeds limit",
+                countOffset,
+                sizeof(arrayCount));
+            return false;
+        }
+        const size_t streamPosition = m_stream.getPosition();
+        const size_t streamSize = m_stream.getSize();
+        if (streamPosition > streamSize)
+        {
+            setError(
+                ReplayErrorKind::Bounds,
+                "Replay stream position past end",
+                streamPosition,
+                sizeof(arrayCount));
+            return false;
+        }
+        const size_t bytesAvailable = streamSize - streamPosition;
+        if (arrayCount > uint64_t(bytesAvailable / minStreamBytesPerElement))
+        {
+            setError(
+                ReplayErrorKind::Bounds,
+                "Replay array count exceeds remaining stream bytes",
+                streamPosition,
+                sizeof(arrayCount));
+            return false;
+        }
+        return true;
+    }
 
     /// Enable recording (sets mode to Record if currently Idle).
     SLANG_API void enable();
@@ -450,7 +509,7 @@ public:
     inline void beginCall(const char* signature, T* thisPtr)
     {
         ensureInitialized();
-        if (!isActive())
+        if (!isActive() || hasFailure())
             return;
         // Parse and record the normalized signature
         char normalizedSig[256];
@@ -480,7 +539,7 @@ public:
     void beginStaticCall(const char* signature)
     {
         ensureInitialized();
-        if (!isActive())
+        if (!isActive() || hasFailure())
             return;
         char normalizedSig[256];
         const char* parsed = parseSignature(signature, normalizedSig, sizeof(normalizedSig));
@@ -504,7 +563,7 @@ public:
     void marker(const char* label)
     {
         ensureInitialized();
-        if (!isActive())
+        if (!isActive() || hasFailure())
             return;
         const char* sig = "__marker__";
         record(RecordFlag::Input, sig);
@@ -673,7 +732,8 @@ public:
         return isInterfaceRegisteredImpl(objUnknown);
     }
 
-    /// Get handle for an object (throws if not registered).
+    /// Get handle for an object. Latches an UntrackedInterface failure and returns kNullHandle if
+    /// the object is not registered (see getProxyHandleImpl).
     template<typename ProxyT>
     inline uint64_t getProxyHandle(ProxyT* obj) const
     {
@@ -732,11 +792,14 @@ public:
 
     /// Execute the next recorded call from the stream.
     /// Reads the function signature, looks up the handler, and calls it.
-    /// Returns true if a call was executed, false if at end of stream.
-    SLANG_API bool executeNextCall();
+    /// Sets `outHadCall` to true if a call was executed, false at genuine end of stream.
+    /// Returns SLANG_OK on success (including clean end of stream), SLANG_FAIL if a failure was
+    /// latched (the structured error is available via getLastError()/the streams).
+    SLANG_API SlangResult executeNextCall(bool& outHadCall);
 
-    /// Execute all recorded calls until end of stream.
-    SLANG_API void executeAll();
+    /// Execute all recorded calls until end of stream. Returns SLANG_OK if the whole stream replayed
+    /// cleanly, SLANG_FAIL on the first latched failure.
+    SLANG_API SlangResult executeAll();
 
     /// Check if there are more calls to execute.
     SLANG_API bool hasMoreCalls() const { return !m_stream.atEnd(); }
@@ -807,7 +870,9 @@ private:
     SLANG_API void setupRecordingMirror();
     SLANG_API void closeRecordingMirror();
     SLANG_API static String generateTimestampFolderName();
-    SLANG_API void requireReplayArenaAllocation(size_t offset, size_t size);
+    /// Charge `size` bytes against the playback allocation budget. On overflow latches a Bounds
+    /// error carrying `offset`/`size` and returns false without charging; returns true otherwise.
+    SLANG_API bool requireReplayArenaAllocation(size_t offset, size_t size);
 
     /// Record a COM interface pointer (internal implementation).
     template<typename T>
@@ -823,6 +888,7 @@ private:
     ReplayStream m_referenceStream; ///< Reference stream for sync mode comparison
     MemoryArena m_arena;
     size_t m_replayArenaAllocationSize = 0;
+    mutable ReplayError m_lastError; ///< First latched structured failure (first error wins).
     Mode m_mode;
     List<uint8_t> m_compareBuffer; ///< Reusable buffer for sync comparisons
 
@@ -866,29 +932,44 @@ private:
 template<typename T, typename CountT>
 T* ReplayContext::readArrayInPlayback(RecordFlag flags, CountT& count)
 {
+    // Value-init the out-count first so a bail-out before validation leaves a defined 0 rather than
+    // an indeterminate count reaching an allocation.
+    count = CountT{};
+
     expectTypeId(TypeId::Array);
-    uint64_t arrayCount;
+    if (hasFailure())
+        return nullptr;
+
+    uint64_t arrayCount = 0;
     record(flags, arrayCount);
+    if (hasFailure())
+        return nullptr;
+
     size_t countOffset = m_stream.getPosition() - sizeof(arrayCount);
-    validateReplayArrayCount(
-        m_stream,
-        arrayCount,
-        uint64_t((std::numeric_limits<CountT>::max)()),
-        sizeof(T),
-        getReplayArrayMinStreamBytesPerElement<T>(),
-        countOffset);
+    if (!validateReplayArrayCount(
+            arrayCount,
+            uint64_t((std::numeric_limits<CountT>::max)()),
+            sizeof(T),
+            getReplayArrayMinStreamBytesPerElement<T>(),
+            countOffset))
+        return nullptr;
+
     count = static_cast<CountT>(arrayCount);
     if (arrayCount == 0)
         return nullptr;
 
     size_t sizeCount = static_cast<size_t>(arrayCount);
     size_t allocationSize = sizeCount * sizeof(T);
-    requireReplayArenaAllocation(countOffset, allocationSize);
+    if (!requireReplayArenaAllocation(countOffset, allocationSize))
+        return nullptr;
+
     T* buf = reinterpret_cast<T*>(allocateReplayArena(allocationSize, alignof(T)));
     for (size_t i = 0; i < sizeCount; ++i)
     {
         new (&buf[i]) T{};
         record(flags, buf[i]);
+        if (hasFailure())
+            break; // stop on the first element failure; boundary sees hasFailure()
     }
     return buf;
 }
@@ -900,14 +981,21 @@ void ReplayContext::recordArray(RecordFlag flags, T*& arr, CountT& count)
         return;
     if (isWriting())
     {
+        if (hasFailure())
+            return;
         recordTypeId(TypeId::Array);
         uint64_t arrayCount = static_cast<uint64_t>(count);
         record(flags, arrayCount);
         for (uint64_t i = 0; i < arrayCount; ++i)
+        {
             record(flags, arr[i]);
+            if (hasFailure())
+                return;
+        }
     }
     else
     {
+        // readArrayInPlayback value-inits count and returns nullptr on failure.
         arr = readArrayInPlayback<T>(flags, count);
     }
 }
@@ -919,11 +1007,17 @@ void ReplayContext::recordArray(RecordFlag flags, const T*& arr, CountT& count)
         return;
     if (isWriting())
     {
+        if (hasFailure())
+            return;
         recordTypeId(TypeId::Array);
         uint64_t arrayCount = static_cast<uint64_t>(count);
         record(flags, arrayCount);
         for (uint64_t i = 0; i < arrayCount; ++i)
+        {
             record(flags, const_cast<T&>(arr[i]));
+            if (hasFailure())
+                return;
+        }
     }
     else
     {
@@ -934,18 +1028,18 @@ void ReplayContext::recordArray(RecordFlag flags, const T*& arr, CountT& count)
 template<typename EnumT>
 void ReplayContext::recordEnum(RecordFlag flags, EnumT& value)
 {
-    if (m_mode == Mode::Idle)
+    if (m_mode == Mode::Idle || hasFailure())
         return;
     int32_t v = static_cast<int32_t>(value);
     record(flags, v);
-    if (isReading())
+    if (isReading() && !hasFailure())
         value = static_cast<EnumT>(v);
 }
 
 template<typename T>
 void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
 {
-    if (m_mode == Mode::Idle)
+    if (m_mode == Mode::Idle || hasFailure())
         return;
 
     bool isInput = hasFlag(flags, RecordFlag::Input) || hasFlag(flags, RecordFlag::ThisPtr);
@@ -970,6 +1064,8 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
 
             // Normal case: look up handle for tracked object
             uint64_t handle = getProxyHandle(obj);
+            if (hasFailure())
+                return;
             recordHandle(flags, handle);
 
             // Unwrap the proxy to get the underlying implementation
@@ -986,6 +1082,8 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
 
             // Output: register object and record handle
             uint64_t handle = getProxyHandle(obj);
+            if (hasFailure())
+                return;
             recordHandle(flags, handle);
         }
     }
@@ -1001,6 +1099,8 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
             // Read handle
             uint64_t handle = kNullHandle;
             recordHandle(flags, handle);
+            if (hasFailure())
+                return;
 
             if (handle == kNullHandle)
             {
@@ -1009,6 +1109,8 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
             else
             {
                 ISlangUnknown* proxy = getProxy(handle);
+                if (hasFailure())
+                    return;
                 obj = proxy ? toSlangInterface<T>(proxy) : nullptr;
             }
 
@@ -1026,6 +1128,8 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
 
             // Output: register object and record handle
             uint64_t handle = getProxyHandle(obj);
+            if (hasFailure())
+                return;
             recordHandle(flags, handle);
 
             // The wrapped proxy's owning reference flows back into a discarded

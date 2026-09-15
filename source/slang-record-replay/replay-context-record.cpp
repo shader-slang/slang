@@ -46,9 +46,15 @@ void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
                 m_compareBuffer.setCount(Slang::Index(size));
             m_referenceStream.read(m_compareBuffer.getBuffer(), size);
 
+            // A failed main write or a short reference read latches on the respective stream; check
+            // both before comparing so a truncated reference does not silently compare-equal.
+            if (m_stream.isFailed() || m_referenceStream.isFailed())
+                return;
+
             if (memcmp(data, m_compareBuffer.getBuffer(), size) != 0)
             {
-                throw DataMismatchException(offset, size);
+                setError(ReplayErrorKind::DataMismatch, "Sync data mismatch", offset, size);
+                return;
             }
         }
         break;
@@ -66,20 +72,27 @@ void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
 
             // Read the recorded value from stream
             size_t offset = m_stream.getPosition();
-            requireReplayStreamBytes(m_stream, offset, size);
+            if (!requireReplayStreamBytes(offset, size))
+                return;
             m_stream.read(data, size);
+            // A failed read leaves `data` untouched (still holding the expected value), which would
+            // compare-equal; bail before the comparison so a truncated read is not a false match.
+            if (m_stream.isFailed())
+                return;
 
             // Compare: recorded value (now in data) vs expected value (in buffer)
             if (memcmp(data, m_compareBuffer.getBuffer(), size) != 0)
             {
-                throw DataMismatchException(offset, size);
+                setError(ReplayErrorKind::DataMismatch, "Replayed output mismatch", offset, size);
+                return;
             }
         }
         else
         {
             // For inputs, just read from stream
             size_t offset = m_stream.getPosition();
-            requireReplayStreamBytes(m_stream, offset, size);
+            if (!requireReplayStreamBytes(offset, size))
+                return;
             m_stream.read(data, size);
         }
         break;
@@ -101,8 +114,18 @@ void ReplayContext::recordTypeId(TypeId id)
             writeTypeId(id);
             // Verify against reference stream
             TypeId refId = readTypeIdFromReference();
+            if (m_stream.isFailed() || m_referenceStream.isFailed())
+                return;
             if (refId != id)
-                throw TypeMismatchException(refId, id);
+            {
+                ReplayError error;
+                error.kind = ReplayErrorKind::TypeMismatch;
+                error.message = makeTypeMismatchMessage(refId, id);
+                error.expected = refId;
+                error.actual = id;
+                setError(error);
+                return;
+            }
         }
         break;
     case Mode::Playback:
@@ -134,8 +157,17 @@ TypeId ReplayContext::readTypeIdFromReference()
 void ReplayContext::expectTypeId(TypeId expected)
 {
     TypeId actual = readTypeId();
+    if (m_stream.isFailed())
+        return;
     if (actual != expected)
-        throw TypeMismatchException(expected, actual);
+    {
+        ReplayError error;
+        error.kind = ReplayErrorKind::TypeMismatch;
+        error.message = makeTypeMismatchMessage(expected, actual);
+        error.expected = expected;
+        error.actual = actual;
+        setError(error);
+    }
 }
 
 // =============================================================================
@@ -238,44 +270,73 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
     {
         const char* expectedStr = str;
         TypeId typeId = readTypeId();
+        if (hasFailure())
+            return;
         if (typeId == TypeId::Null)
         {
             if (hasFlag(flags, RecordFlag::Output) && expectedStr != nullptr)
             {
-                throw DataMismatchException(m_stream.getPosition() - sizeof(uint8_t), 0);
+                setError(
+                    ReplayErrorKind::DataMismatch,
+                    "Replayed output string was null but a value was expected",
+                    m_stream.getPosition() - sizeof(uint8_t),
+                    0);
+                return;
             }
             str = nullptr;
         }
         else if (typeId == TypeId::String)
         {
-            uint32_t length;
+            uint32_t length = 0;
             recordRaw(RecordFlag::None, &length, sizeof(length));
+            if (hasFailure())
+                return;
             if (length > kMaxReplayStringLength)
             {
-                throw DataMismatchException(m_stream.getPosition() - sizeof(length), length);
+                setError(
+                    ReplayErrorKind::Bounds,
+                    "Replay string length exceeds limit",
+                    m_stream.getPosition() - sizeof(length),
+                    length);
+                return;
             }
 
             size_t stringSize = size_t(length);
             size_t streamPosition = m_stream.getPosition();
-            requireReplayStreamBytes(m_stream, streamPosition, stringSize);
-            requireReplayArenaAllocation(streamPosition, stringSize + 1);
+            if (!requireReplayStreamBytes(streamPosition, stringSize))
+                return;
+            if (!requireReplayArenaAllocation(streamPosition, stringSize + 1))
+                return;
 
             char* buf = m_arena.allocateArray<char>(stringSize + 1);
             if (length > 0)
                 recordRaw(RecordFlag::None, buf, stringSize);
+            if (hasFailure())
+                return;
             buf[stringSize] = '\0';
             if (hasFlag(flags, RecordFlag::Output))
             {
                 if (expectedStr == nullptr || strcmp(expectedStr, buf) != 0)
                 {
-                    throw DataMismatchException(m_stream.getPosition() - length, length);
+                    setError(
+                        ReplayErrorKind::DataMismatch,
+                        "Replayed output string mismatch",
+                        m_stream.getPosition() - length,
+                        length);
+                    return;
                 }
             }
             str = buf;
         }
         else
         {
-            throw TypeMismatchException(TypeId::String, typeId);
+            ReplayError error;
+            error.kind = ReplayErrorKind::TypeMismatch;
+            error.message = makeTypeMismatchMessage(TypeId::String, typeId);
+            error.expected = TypeId::String;
+            error.actual = typeId;
+            setError(error);
+            return;
         }
     }
 }
@@ -763,7 +824,12 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         if (!moduleHandle)
         {
             // If we still don't have a module handle, we can't record this type reference
-            throw UnresolvedTypeException(type);
+            ReplayError error;
+            error.kind = ReplayErrorKind::UnresolvedType;
+            error.message = "Could not resolve owning module for TypeReflection";
+            error.type = type;
+            setError(error);
+            return;
         }
 
         // Record the module handle and type name
@@ -816,13 +882,23 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
             else
             {
                 type = nullptr;
-                throw UnresolvedTypeException(type);
+                ReplayError error;
+                error.kind = ReplayErrorKind::UnresolvedType;
+                error.message = "Could not resolve TypeReflection: module has no layout";
+                error.type = type;
+                setError(error);
+                return;
             }
         }
         else
         {
             type = nullptr;
-            throw UnresolvedTypeException(type);
+            ReplayError error;
+            error.kind = ReplayErrorKind::UnresolvedType;
+            error.message = "Could not resolve TypeReflection: module/type name missing";
+            error.type = type;
+            setError(error);
+            return;
         }
     }
 }

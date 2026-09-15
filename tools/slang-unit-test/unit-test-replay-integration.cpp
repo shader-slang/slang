@@ -606,7 +606,7 @@ SLANG_UNIT_TEST(replayContextGetSessionDescDigestPlayback)
     // This calls through the proxy with default (null) arguments;
     // PREPARE_POINTER_INPUT ensures the null SessionDesc* is patched
     // to valid storage before RECORD_INPUT dereferences it.
-    ctx().executeAll();
+    SLANG_CHECK(SLANG_SUCCEEDED(ctx().executeAll()));
 
     // Confirm the whole recorded stream was consumed. A partial replay
     // (e.g. getSessionDescDigest silently skipped) would otherwise go unnoticed.

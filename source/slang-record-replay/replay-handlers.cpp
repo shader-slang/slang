@@ -45,6 +45,11 @@ static void handle_slang_createGlobalSession2(ReplayContext& ctx)
     SlangGlobalSessionDesc desc = {};
     ctx.record(RecordFlag::Input, desc);
 
+    // Playback-only manual handler: if deserializing the header/descriptor above latched a failure,
+    // do not drive the real API with indeterminate input. executeNextCall reports it afterwards.
+    if (ctx.hasFailure())
+        return;
+
     // Call the implementation directly (not slang_createGlobalSession2) to avoid re-recording
     Slang::GlobalSessionInternalDesc internalDesc = {};
     slang::IGlobalSession* globalSession = nullptr;

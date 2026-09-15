@@ -18,15 +18,20 @@ ReplayStream::ReplayStream(const void* data, size_t size)
 
 ReplayStream ReplayStream::loadFromFile(const char* path)
 {
+    ReplayStream stream;
+    stream.m_isReading = true;
+
     List<unsigned char> contents;
     SlangResult result = File::readAllBytes(String(path), contents);
     if (SLANG_FAILED(result))
-        throw Slang::Exception(String("Failed to open file for reading: ") + path);
+    {
+        // Communicate the IO failure through the returned stream's failed state; the caller checks
+        // isFailed() rather than catching.
+        stream.setError(String("Failed to open file for reading: ") + path);
+        return stream;
+    }
 
-    ReplayStream stream;
-    stream.m_isReading = true;
     stream.m_buffer = Slang::_Move(contents);
-
     return stream;
 }
 
@@ -47,9 +52,15 @@ ReplayStream& ReplayStream::operator=(ReplayStream&& other)
     m_position = other.m_position;
     m_isReading = other.m_isReading;
     m_mirrorFile = Slang::_Move(other.m_mirrorFile);
+    // Move the failed state too: loadFromFile reports IO failure through the returned stream, so a
+    // move must not silently drop it.
+    m_failed = other.m_failed;
+    m_errorMessage = Slang::_Move(other.m_errorMessage);
 
     other.m_position = 0;
     other.m_isReading = false;
+    other.m_failed = false;
+    other.m_errorMessage = String();
 
     return *this;
 }
@@ -61,8 +72,14 @@ ReplayStream::~ReplayStream()
 
 void ReplayStream::write(const void* data, size_t size)
 {
+    if (m_failed)
+        return;
+
     if (m_isReading)
-        throw Slang::Exception("Cannot write to a reading stream");
+    {
+        setError("Cannot write to a reading stream");
+        return;
+    }
 
     if (size == 0)
         return;
@@ -70,12 +87,18 @@ void ReplayStream::write(const void* data, size_t size)
     SLANG_RELEASE_ASSERT(data);
 
     if (size > (std::numeric_limits<size_t>::max)() - m_position)
-        throw Slang::Exception("Write past maximum stream size");
+    {
+        setError("Write past maximum stream size");
+        return;
+    }
 
     size_t newSize = m_position + size;
     const size_t maxListCount = size_t((std::numeric_limits<Slang::Index>::max)());
     if (newSize > maxListCount)
-        throw Slang::Exception("Write past maximum stream size");
+    {
+        setError("Write past maximum stream size");
+        return;
+    }
 
     if (newSize > size_t(m_buffer.getCapacity()))
     {
@@ -105,8 +128,15 @@ void ReplayStream::write(const void* data, size_t size)
 
 void ReplayStream::read(void* data, size_t size)
 {
+    // A read on an already-failed stream is a no-op; `data` is left as the caller initialized it.
+    if (m_failed)
+        return;
+
     if (!m_isReading)
-        throw Slang::Exception("Cannot read from a writing stream");
+    {
+        setError("Cannot read from a writing stream");
+        return;
+    }
 
     if (size == 0)
         return;
@@ -115,7 +145,12 @@ void ReplayStream::read(void* data, size_t size)
 
     const size_t bufferSize = size_t(m_buffer.getCount());
     if (m_position > bufferSize || size > bufferSize - m_position)
-        throw Slang::Exception("Read past end of stream");
+    {
+        // Leave `data` untouched — `size` may be enormous (a truncated stream can request a huge
+        // count), so writing to `data` here would overrun the caller's buffer.
+        setError("Read past end of stream");
+        return;
+    }
 
     std::memcpy(data, m_buffer.getBuffer() + m_position, size);
     m_position += size;
@@ -126,9 +161,10 @@ void ReplayStream::reset()
     m_buffer.clear();
     m_position = 0;
     m_isReading = false;
+    clearError();
 }
 
-void ReplayStream::setMirrorFile(const char* path)
+SlangResult ReplayStream::setMirrorFile(const char* path)
 {
     closeMirrorFile();
 
@@ -138,7 +174,7 @@ void ReplayStream::setMirrorFile(const char* path)
     if (SLANG_FAILED(result))
     {
         m_mirrorFile = nullptr;
-        throw Slang::Exception(String("Failed to open mirror file: ") + path);
+        return result;
     }
 
     if (m_buffer.getCount() > 0)
@@ -146,14 +182,12 @@ void ReplayStream::setMirrorFile(const char* path)
         m_mirrorFile->write(m_buffer.getBuffer(), m_buffer.getCount());
         m_mirrorFile->flush();
     }
+    return SLANG_OK;
 }
 
-void ReplayStream::saveToFile(const char* path) const
+SlangResult ReplayStream::saveToFile(const char* path) const
 {
-    SlangResult result =
-        File::writeAllBytes(String(path), m_buffer.getBuffer(), m_buffer.getCount());
-    if (SLANG_FAILED(result))
-        throw Slang::Exception(String("Failed to write to file: ") + path);
+    return File::writeAllBytes(String(path), m_buffer.getBuffer(), m_buffer.getCount());
 }
 
 void ReplayStream::closeMirrorFile()
@@ -175,6 +209,7 @@ void ReplayStream::clear()
     m_buffer.clear();
     m_position = 0;
     m_isReading = false;
+    clearError();
 }
 
 } // namespace SlangRecord

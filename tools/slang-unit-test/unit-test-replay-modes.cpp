@@ -199,17 +199,9 @@ SLANG_UNIT_TEST(replayContextSyncModeMatching)
     // Record the same values - should succeed
     int32_t syncVal1 = 100;
     int32_t syncVal2 = 200;
-    bool noException = true;
-    try
-    {
-        ctx().record(RecordFlag::None, syncVal1);
-        ctx().record(RecordFlag::None, syncVal2);
-    }
-    catch (const DataMismatchException&)
-    {
-        noException = false;
-    }
-    SLANG_CHECK(noException);
+    ctx().record(RecordFlag::None, syncVal1);
+    ctx().record(RecordFlag::None, syncVal2);
+    SLANG_CHECK(!ctx().hasFailure());
 }
 
 SLANG_UNIT_TEST(replayContextSyncModeMismatch)
@@ -227,19 +219,14 @@ SLANG_UNIT_TEST(replayContextSyncModeMismatch)
     // Switch to sync mode
     ctx().switchToSync();
 
-    // Record a different value - should throw
+    // Record a different value - should latch a DataMismatch error
     int32_t differentVal = 999;
-    bool caughtException = false;
-    try
-    {
-        ctx().record(RecordFlag::None, differentVal);
-    }
-    catch (const DataMismatchException& e)
-    {
-        caughtException = true;
-        SLANG_CHECK(e.getSize() == sizeof(int32_t));
-    }
-    SLANG_CHECK(caughtException);
+    ctx().record(RecordFlag::None, differentVal);
+
+    SLANG_CHECK(ctx().hasError());
+    const ReplayError& error = ctx().getLastError();
+    SLANG_CHECK(error.kind == ReplayErrorKind::DataMismatch);
+    SLANG_CHECK(error.size == sizeof(int32_t));
 }
 
 SLANG_UNIT_TEST(replayContextPlaybackOutputVerification)
@@ -265,18 +252,10 @@ SLANG_UNIT_TEST(replayContextPlaybackOutputVerification)
     SLANG_CHECK(readInput == 42);
 
     // For outputs, user provides the expected value. Playback verifies it matches
-    // the recorded value. If they match, no exception is thrown.
+    // the recorded value. If they match, no error is latched.
     int32_t expectedOutput = 100; // User says "I expect output to be 100"
-    bool noException = true;
-    try
-    {
-        ctx().record(RecordFlag::Output, expectedOutput);
-    }
-    catch (const DataMismatchException&)
-    {
-        noException = false;
-    }
-    SLANG_CHECK(noException);
+    ctx().record(RecordFlag::Output, expectedOutput);
+    SLANG_CHECK(!ctx().hasFailure());
     SLANG_CHECK(expectedOutput == 100); // Value unchanged since it matched
 }
 
@@ -295,19 +274,14 @@ SLANG_UNIT_TEST(replayContextPlaybackOutputMismatch)
     // Switch to playback
     ctx().switchToPlayback();
 
-    // User provides wrong expected value - should throw
+    // User provides wrong expected value - should latch a DataMismatch error
     int32_t wrongExpected = 999; // User says "I expect 999" but recorded was 100
-    bool caughtException = false;
-    try
-    {
-        ctx().record(RecordFlag::Output, wrongExpected);
-    }
-    catch (const DataMismatchException& e)
-    {
-        caughtException = true;
-        SLANG_CHECK(e.getSize() == sizeof(int32_t));
-    }
-    SLANG_CHECK(caughtException);
+    ctx().record(RecordFlag::Output, wrongExpected);
+
+    SLANG_CHECK(ctx().hasError());
+    const ReplayError& error = ctx().getLastError();
+    SLANG_CHECK(error.kind == ReplayErrorKind::DataMismatch);
+    SLANG_CHECK(error.size == sizeof(int32_t));
 }
 
 SLANG_UNIT_TEST(replayContextModeTransitions)
@@ -452,7 +426,7 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
     // Force a known-clean entry state. This test runs amid other replay tests
     // in the same process, and any prior test that left the stream in reading
     // mode (e.g. Mode::Playback) would make our setMode(Record) + record()
-    // setup throw before REPLAY_TEST executes.
+    // setup latch a sticky stream error before REPLAY_TEST executes.
     ctx().reset();
 
     // Hold the proxy alive across REPLAY_TEST's ctor so the handle dictionaries
@@ -480,7 +454,7 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
 // Mode::Playback is the most failure-prone prior state: a prior test that
 // aborted mid-read leaves the stream in reading mode at a non-zero position,
 // and a subsequent test that calls setMode(Record) + record() before
-// REPLAY_TEST throws on the still-reading stream.
+// REPLAY_TEST latches a sticky error on the still-reading stream.
 SLANG_UNIT_TEST(replayContextRecoversFromDirtyPlaybackState)
 {
     ctx().reset();

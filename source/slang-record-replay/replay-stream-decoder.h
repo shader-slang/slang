@@ -21,26 +21,36 @@ public:
     /// Decode a replay stream to a string (raw value-by-value dump).
     /// @param stream The stream to decode (will be read from current position).
     /// @param maxBytes Maximum bytes to decode (0 = entire stream).
+    /// @param outHadError If non-null, set to true when any decode step failed.
     /// @return Human-readable text representation.
-    SLANG_API static Slang::String decode(ReplayStream& stream, size_t maxBytes = 0);
+    SLANG_API static Slang::String
+    decode(ReplayStream& stream, size_t maxBytes = 0, bool* outHadError = nullptr);
 
     /// Decode a file to string (raw value-by-value dump).
     /// @param filePath Path to the stream.bin file.
+    /// @param outHadError If non-null, set to true when the file could not be loaded or any decode
+    /// step failed (for a nonzero CLI exit code).
     /// @return Human-readable text representation.
-    SLANG_API static Slang::String decodeFile(const char* filePath);
+    SLANG_API static Slang::String decodeFile(const char* filePath, bool* outHadError = nullptr);
 
     /// Decode a replay folder using index.bin for structured call-by-call output.
     /// @param folderPath Path to the folder containing stream.bin and index.bin.
+    /// @param outHadError If non-null, set to true when any decode step failed (aggregated across
+    /// the per-call recovery boundaries).
     /// @return Human-readable text representation with call structure.
-    SLANG_API static Slang::String decodeWithIndex(const char* folderPath);
+    SLANG_API static Slang::String decodeWithIndex(
+        const char* folderPath,
+        bool* outHadError = nullptr);
 
     /// Decode a replay using index stream for structured call-by-call output.
     /// @param dataStream The main data stream (stream.bin contents).
     /// @param indexStream The index stream (index.bin contents).
+    /// @param outHadError If non-null, set to true when any per-call decode failed.
     /// @return Human-readable text representation with call structure.
     SLANG_API static Slang::String decodeWithIndex(
         ReplayStream& dataStream,
-        ReplayStream& indexStream);
+        ReplayStream& indexStream,
+        bool* outHadError = nullptr);
 
     /// Decode raw bytes to string.
     /// @param data Pointer to the data.
@@ -96,7 +106,7 @@ public:
 private:
     ReplayStreamDecoder(ReplayStream& stream, Slang::StringBuilder& output);
 
-    void decodeAll(size_t maxBytes);
+    void decodeAll(size_t maxBytes, bool* outHadError);
     void decodeCall();
 
     /// Try to recover from a decoding error by finding the next valid call.

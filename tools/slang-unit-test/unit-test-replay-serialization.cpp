@@ -87,18 +87,14 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedOutputUInt32)
 
     ctx().switchToPlayback();
 
-    bool caughtException = false;
-    try
-    {
-        uint32_t expectedValue = 42;
-        ctx().record(RecordFlag::Output, expectedValue);
-    }
-    catch (const DataMismatchException& e)
-    {
-        caughtException = e.getOffset() == sizeof(typeId) && e.getSize() == sizeof(uint32_t);
-    }
+    uint32_t expectedValue = 42;
+    ctx().record(RecordFlag::Output, expectedValue);
 
-    SLANG_CHECK(caughtException);
+    SLANG_CHECK(ctx().hasError());
+    const ReplayError& error = ctx().getLastError();
+    SLANG_CHECK(error.kind == ReplayErrorKind::Bounds);
+    SLANG_CHECK(error.offset == sizeof(typeId));
+    SLANG_CHECK(error.size == sizeof(uint32_t));
 }
 
 SLANG_UNIT_TEST(replayContextUInt64)
@@ -208,18 +204,11 @@ SLANG_UNIT_TEST(replayContextRejectsOutputStringNullnessMismatch)
 
         ctx().switchToPlayback();
 
-        bool caughtException = false;
-        try
-        {
-            const char* expectedStr = "expected";
-            ctx().record(RecordFlag::Output, expectedStr);
-        }
-        catch (const DataMismatchException&)
-        {
-            caughtException = true;
-        }
+        const char* expectedStr = "expected";
+        ctx().record(RecordFlag::Output, expectedStr);
 
-        SLANG_CHECK(caughtException);
+        SLANG_CHECK(ctx().hasError());
+        SLANG_CHECK(ctx().getLastError().kind == ReplayErrorKind::DataMismatch);
     }
 
     {
@@ -230,18 +219,11 @@ SLANG_UNIT_TEST(replayContextRejectsOutputStringNullnessMismatch)
 
         ctx().switchToPlayback();
 
-        bool caughtException = false;
-        try
-        {
-            const char* expectedStr = nullptr;
-            ctx().record(RecordFlag::Output, expectedStr);
-        }
-        catch (const DataMismatchException&)
-        {
-            caughtException = true;
-        }
+        const char* expectedStr = nullptr;
+        ctx().record(RecordFlag::Output, expectedStr);
 
-        SLANG_CHECK(caughtException);
+        SLANG_CHECK(ctx().hasError());
+        SLANG_CHECK(ctx().getLastError().kind == ReplayErrorKind::DataMismatch);
     }
 }
 
@@ -286,18 +268,14 @@ SLANG_UNIT_TEST(replayContextRejectsStringLengthPastLimit)
 
     ctx().switchToPlayback();
 
-    bool caughtException = false;
-    try
-    {
-        const char* readStr = nullptr;
-        ctx().record(RecordFlag::None, readStr);
-    }
-    catch (const DataMismatchException& e)
-    {
-        caughtException = e.getOffset() == sizeof(typeId) && e.getSize() == length;
-    }
+    const char* readStr = nullptr;
+    ctx().record(RecordFlag::None, readStr);
 
-    SLANG_CHECK(caughtException);
+    SLANG_CHECK(ctx().hasError());
+    const ReplayError& error = ctx().getLastError();
+    SLANG_CHECK(error.kind == ReplayErrorKind::Bounds);
+    SLANG_CHECK(error.offset == sizeof(typeId));
+    SLANG_CHECK(error.size == length);
 }
 
 SLANG_UNIT_TEST(replayContextRejectsOversizedStringLength)
@@ -315,18 +293,14 @@ SLANG_UNIT_TEST(replayContextRejectsOversizedStringLength)
 
     ctx().switchToPlayback();
 
-    bool caughtException = false;
-    try
-    {
-        const char* readStr = nullptr;
-        ctx().record(RecordFlag::None, readStr);
-    }
-    catch (const DataMismatchException& e)
-    {
-        caughtException = e.getOffset() == sizeof(typeId) && e.getSize() == length;
-    }
+    const char* readStr = nullptr;
+    ctx().record(RecordFlag::None, readStr);
 
-    SLANG_CHECK(caughtException);
+    SLANG_CHECK(ctx().hasError());
+    const ReplayError& error = ctx().getLastError();
+    SLANG_CHECK(error.kind == ReplayErrorKind::Bounds);
+    SLANG_CHECK(error.offset == sizeof(typeId));
+    SLANG_CHECK(error.size == length);
 }
 
 SLANG_UNIT_TEST(replayContextRejectsTruncatedStringPayload)
@@ -346,18 +320,14 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedStringPayload)
 
     ctx().switchToPlayback();
 
-    bool caughtException = false;
-    try
-    {
-        const char* readStr = nullptr;
-        ctx().record(RecordFlag::None, readStr);
-    }
-    catch (const DataMismatchException& e)
-    {
-        caughtException = e.getOffset() == sizeof(typeId) + sizeof(length) && e.getSize() == length;
-    }
+    const char* readStr = nullptr;
+    ctx().record(RecordFlag::None, readStr);
 
-    SLANG_CHECK(caughtException);
+    SLANG_CHECK(ctx().hasError());
+    const ReplayError& error = ctx().getLastError();
+    SLANG_CHECK(error.kind == ReplayErrorKind::Bounds);
+    SLANG_CHECK(error.offset == sizeof(typeId) + sizeof(length));
+    SLANG_CHECK(error.size == length);
 }
 
 SLANG_UNIT_TEST(replayContextRejectsTruncatedStringLength)
@@ -375,18 +345,14 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedStringLength)
 
     ctx().switchToPlayback();
 
-    bool caughtException = false;
-    try
-    {
-        const char* readStr = nullptr;
-        ctx().record(RecordFlag::None, readStr);
-    }
-    catch (const DataMismatchException& e)
-    {
-        caughtException = e.getOffset() == sizeof(typeId) && e.getSize() == sizeof(uint32_t);
-    }
+    const char* readStr = nullptr;
+    ctx().record(RecordFlag::None, readStr);
 
-    SLANG_CHECK(caughtException);
+    SLANG_CHECK(ctx().hasError());
+    const ReplayError& error = ctx().getLastError();
+    SLANG_CHECK(error.kind == ReplayErrorKind::Bounds);
+    SLANG_CHECK(error.offset == sizeof(typeId));
+    SLANG_CHECK(error.size == sizeof(uint32_t));
 }
 
 SLANG_UNIT_TEST(replayContextRejectsCumulativeReplayArenaAllocationPastBudget)
@@ -402,17 +368,13 @@ SLANG_UNIT_TEST(replayContextRejectsCumulativeReplayArenaAllocationPastBudget)
     ctx().testsOnlyRequireReplayArenaAllocation(0, budget);
     SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() == budget);
 
-    bool caughtException = false;
-    try
-    {
-        ctx().testsOnlyRequireReplayArenaAllocation(0, 1);
-    }
-    catch (const DataMismatchException& e)
-    {
-        caughtException = e.getOffset() == 0 && e.getSize() == 1;
-    }
+    ctx().testsOnlyRequireReplayArenaAllocation(0, 1);
 
-    SLANG_CHECK(caughtException);
+    SLANG_CHECK(ctx().hasError());
+    const ReplayError& error = ctx().getLastError();
+    SLANG_CHECK(error.kind == ReplayErrorKind::Bounds);
+    SLANG_CHECK(error.offset == 0);
+    SLANG_CHECK(error.size == 1);
     SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() == budget);
 }
 
@@ -440,23 +402,15 @@ SLANG_UNIT_TEST(replayContextAcceptsMaxArrayCountAtAllocationLimit)
 
     ctx().switchToPlayback();
 
-    bool caughtException = false;
-    try
-    {
-        validateReplayArrayCount(
-            ctx().getStream(),
-            kMaxReplayArrayCount,
-            uint64_t((std::numeric_limits<uint64_t>::max)()),
-            sizeof(uint32_t),
-            sizeof(uint32_t),
-            0);
-    }
-    catch (const DataMismatchException&)
-    {
-        caughtException = true;
-    }
+    bool ok = ctx().validateReplayArrayCount(
+        kMaxReplayArrayCount,
+        uint64_t((std::numeric_limits<uint64_t>::max)()),
+        sizeof(uint32_t),
+        sizeof(uint32_t),
+        0);
 
-    SLANG_CHECK(!caughtException);
+    SLANG_CHECK(ok);
+    SLANG_CHECK(!ctx().hasError());
 }
 
 SLANG_UNIT_TEST(replayContextRejectsOversizedArrayCount)
@@ -470,19 +424,12 @@ SLANG_UNIT_TEST(replayContextRejectsOversizedArrayCount)
 
     ctx().switchToPlayback();
 
-    bool caughtException = false;
-    try
-    {
-        int32_t* arr = nullptr;
-        uint64_t count = 0;
-        ctx().recordArray(RecordFlag::None, arr, count);
-    }
-    catch (const DataMismatchException&)
-    {
-        caughtException = true;
-    }
+    int32_t* arr = nullptr;
+    uint64_t count = 0;
+    ctx().recordArray(RecordFlag::None, arr, count);
 
-    SLANG_CHECK(caughtException);
+    SLANG_CHECK(ctx().hasError());
+    SLANG_CHECK(ctx().getLastError().kind == ReplayErrorKind::Bounds);
 }
 
 SLANG_UNIT_TEST(replayContextRejectsArrayAllocationPastLimit)
@@ -496,19 +443,12 @@ SLANG_UNIT_TEST(replayContextRejectsArrayAllocationPastLimit)
 
     ctx().switchToPlayback();
 
-    bool caughtException = false;
-    try
-    {
-        uint64_t* arr = nullptr;
-        uint64_t count = 0;
-        ctx().recordArray(RecordFlag::None, arr, count);
-    }
-    catch (const DataMismatchException&)
-    {
-        caughtException = true;
-    }
+    uint64_t* arr = nullptr;
+    uint64_t count = 0;
+    ctx().recordArray(RecordFlag::None, arr, count);
 
-    SLANG_CHECK(caughtException);
+    SLANG_CHECK(ctx().hasError());
+    SLANG_CHECK(ctx().getLastError().kind == ReplayErrorKind::Bounds);
 }
 
 SLANG_UNIT_TEST(replayContextRejectsArrayCountThatDoesNotFitCountType)
@@ -522,19 +462,12 @@ SLANG_UNIT_TEST(replayContextRejectsArrayCountThatDoesNotFitCountType)
 
     ctx().switchToPlayback();
 
-    bool caughtException = false;
-    try
-    {
-        uint8_t* arr = nullptr;
-        uint16_t count = 0;
-        ctx().recordArray(RecordFlag::None, arr, count);
-    }
-    catch (const DataMismatchException&)
-    {
-        caughtException = true;
-    }
+    uint8_t* arr = nullptr;
+    uint16_t count = 0;
+    ctx().recordArray(RecordFlag::None, arr, count);
 
-    SLANG_CHECK(caughtException);
+    SLANG_CHECK(ctx().hasError());
+    SLANG_CHECK(ctx().getLastError().kind == ReplayErrorKind::Bounds);
 }
 
 SLANG_UNIT_TEST(replayContextRejectsTruncatedArrayPayload)
@@ -548,19 +481,12 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedArrayPayload)
 
     ctx().switchToPlayback();
 
-    bool caughtException = false;
-    try
-    {
-        const int32_t* arr = nullptr;
-        uint64_t count = 0;
-        ctx().recordArray(RecordFlag::None, arr, count);
-    }
-    catch (const DataMismatchException&)
-    {
-        caughtException = true;
-    }
+    const int32_t* arr = nullptr;
+    uint64_t count = 0;
+    ctx().recordArray(RecordFlag::None, arr, count);
 
-    SLANG_CHECK(caughtException);
+    SLANG_CHECK(ctx().hasError());
+    SLANG_CHECK(ctx().getLastError().kind == ReplayErrorKind::Bounds);
 }
 
 SLANG_UNIT_TEST(replayContextCountsNestedStringArrayAllocations)
@@ -814,7 +740,7 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
 }
 
 // =============================================================================
-// TypeMismatchException
+// Type mismatch
 // =============================================================================
 
 SLANG_UNIT_TEST(replayContextTypeMismatch)
@@ -822,7 +748,7 @@ SLANG_UNIT_TEST(replayContextTypeMismatch)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    // Write an int32, try to read a string - should throw
+    // Write an int32, try to read a string - should latch a TypeMismatch error
     ctx().reset();
     ctx().setMode(Mode::Record);
     int32_t writeInt = 42;
@@ -830,17 +756,12 @@ SLANG_UNIT_TEST(replayContextTypeMismatch)
 
     ctx().switchToPlayback();
 
-    bool caughtException = false;
-    try
-    {
-        const char* readStr = nullptr;
-        ctx().record(RecordFlag::None, readStr);
-    }
-    catch (const TypeMismatchException& e)
-    {
-        caughtException = true;
-        SLANG_CHECK(e.getExpected() == TypeId::String || e.getExpected() == TypeId::Null);
-        SLANG_CHECK(e.getActual() == TypeId::Int32);
-    }
-    SLANG_CHECK(caughtException);
+    const char* readStr = nullptr;
+    ctx().record(RecordFlag::None, readStr);
+
+    SLANG_CHECK(ctx().hasError());
+    const ReplayError& error = ctx().getLastError();
+    SLANG_CHECK(error.kind == ReplayErrorKind::TypeMismatch);
+    SLANG_CHECK(error.expected == TypeId::String || error.expected == TypeId::Null);
+    SLANG_CHECK(error.actual == TypeId::Int32);
 }

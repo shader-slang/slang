@@ -13,6 +13,7 @@
 #include <cinttypes>
 #include <cstdio>
 #include <mutex>
+#include <utility>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -100,24 +101,6 @@ const char* getTypeIdName(TypeId id)
     default:
         return "Unknown";
     }
-}
-
-TypeMismatchException::TypeMismatchException(TypeId expected, TypeId actual)
-    : Slang::Exception(
-          Slang::String("Type mismatch: expected ") + getTypeIdName(expected) + ", got " +
-          getTypeIdName(actual))
-    , m_expected(expected)
-    , m_actual(actual)
-{
-}
-
-DataMismatchException::DataMismatchException(size_t offset, size_t size)
-    : Slang::Exception(
-          Slang::String("Data mismatch at offset ") + Slang::String((uint64_t)offset) + " (size " +
-          Slang::String((uint64_t)size) + " bytes)")
-    , m_offset(offset)
-    , m_size(size)
-{
 }
 
 // =============================================================================
@@ -280,6 +263,7 @@ void ReplayContext::reset()
     m_proxyToImpl.clear();
     m_implToProxy.clear();
     m_currentThisHandle = kNullHandle;
+    clearError();
     // Note: m_handlers is intentionally NOT cleared - they're typically registered once
 }
 
@@ -447,11 +431,7 @@ void ReplayContext::setupRecordingMirror()
 
     // Set up mirror file for main stream
     String streamPath = Path::combine(m_currentReplayPath, "stream.bin");
-    try
-    {
-        m_stream.setMirrorFile(streamPath.getBuffer());
-    }
-    catch (const Slang::Exception&)
+    if (SLANG_FAILED(m_stream.setMirrorFile(streamPath.getBuffer())))
     {
         // If we can't create the mirror file, just record without mirroring
         m_currentReplayPath = String();
@@ -460,11 +440,7 @@ void ReplayContext::setupRecordingMirror()
 
     // Set up mirror file for index stream
     String indexPath = Path::combine(m_currentReplayPath, "index.bin");
-    try
-    {
-        m_indexStream.setMirrorFile(indexPath.getBuffer());
-    }
-    catch (const Slang::Exception&)
+    if (SLANG_FAILED(m_indexStream.setMirrorFile(indexPath.getBuffer())))
     {
         // Index is optional - continue without it but close main mirror to be consistent
         m_stream.closeMirrorFile();
@@ -497,16 +473,20 @@ static size_t getReplayArenaAllocationBudget(size_t streamSize)
     return budget;
 }
 
-void ReplayContext::requireReplayArenaAllocation(size_t offset, size_t size)
+bool ReplayContext::requireReplayArenaAllocation(size_t offset, size_t size)
 {
     if (m_mode != Mode::Playback || size == 0)
-        return;
+        return true;
 
     const size_t budget = getReplayArenaAllocationBudget(m_stream.getSize());
     if (size > budget || m_replayArenaAllocationSize > budget - size)
-        throw DataMismatchException(offset, size);
+    {
+        setError(ReplayErrorKind::Bounds, "Replay arena allocation exceeds budget", offset, size);
+        return false;
+    }
 
     m_replayArenaAllocationSize += size;
+    return true;
 }
 
 void* ReplayContext::allocateReplayArena(size_t sizeInBytes, size_t alignment)
@@ -589,40 +569,41 @@ SlangResult ReplayContext::loadReplay(const char* folderPath)
     if (!File::exists(streamPath))
         return SLANG_E_NOT_FOUND;
 
-    try
-    {
-        m_stream = ReplayStream::loadFromFile(streamPath.getBuffer());
+    // Load into a temporary first: loadFromFile signals IO failure via the returned stream's failed
+    // flag (not an exception), and a failed load must not clobber a usable m_stream.
+    ReplayStream loadedStream = ReplayStream::loadFromFile(streamPath.getBuffer());
+    if (loadedStream.isFailed())
+        return SLANG_FAIL;
+    m_stream = std::move(loadedStream);
 
-        // Also try to load the index stream (optional - may not exist for older recordings)
-        String indexPath = Path::combine(String(folderPath), "index.bin");
-        if (File::exists(indexPath))
+    // Also try to load the index stream (optional - may not exist for older recordings)
+    String indexPath = Path::combine(String(folderPath), "index.bin");
+    if (File::exists(indexPath))
+    {
+        ReplayStream loadedIndex = ReplayStream::loadFromFile(indexPath.getBuffer());
+        if (loadedIndex.isFailed())
         {
-            try
-            {
-                m_indexStream = ReplayStream::loadFromFile(indexPath.getBuffer());
-            }
-            catch (const Slang::Exception&)
-            {
-                // Index is optional, continue without it
-                m_indexStream = ReplayStream();
-            }
+            // Index is optional, continue without it.
+            m_indexStream = ReplayStream();
         }
         else
         {
-            // No index file, clear any existing index
-            m_indexStream = ReplayStream();
+            m_indexStream = std::move(loadedIndex);
         }
-        m_currentReplayPath = folderPath;
-
-        m_arena.reset();
-        m_replayArenaAllocationSize = 0;
-        m_mode = Mode::Playback;
-        return SLANG_OK;
     }
-    catch (const Slang::Exception&)
+    else
     {
-        return SLANG_FAIL;
+        // No index file, clear any existing index
+        m_indexStream = ReplayStream();
     }
+    m_currentReplayPath = folderPath;
+
+    m_arena.reset();
+    m_replayArenaAllocationSize = 0;
+    // Start a fresh replay session: clear any error latched by a previous session.
+    clearError();
+    m_mode = Mode::Playback;
+    return SLANG_OK;
 }
 
 SlangResult ReplayContext::loadLatestReplay()
@@ -962,7 +943,14 @@ uint64_t ReplayContext::getProxyHandleImpl(ISlangUnknown* obj) const
 
     const uint64_t* handle = m_objectToHandle.tryGetValue(obj);
     if (!handle)
-        throw UntrackedInterfaceException(obj);
+    {
+        ReplayError error;
+        error.kind = ReplayErrorKind::UntrackedInterface;
+        error.message = "Interface has no recorded handle";
+        error.object = obj;
+        setError(error);
+        return kNullHandle;
+    }
 
     return *handle;
 }
@@ -974,7 +962,14 @@ ISlangUnknown* ReplayContext::getProxy(uint64_t handle) const
 
     ISlangUnknown* const* obj = m_handleToObject.tryGetValue(handle);
     if (!obj)
-        throw HandleNotFoundException(handle);
+    {
+        ReplayError error;
+        error.kind = ReplayErrorKind::HandleNotFound;
+        error.message = "No live object for handle";
+        error.handle = handle;
+        setError(error);
+        return nullptr;
+    }
 
     return *obj;
 }
@@ -999,46 +994,72 @@ void ReplayContext::resetHandlers()
     m_handlers.swapWith(empty);
 }
 
-bool ReplayContext::executeNextCall()
+SlangResult ReplayContext::executeNextCall(bool& outHadCall)
 {
+    outHadCall = false;
+
+    // Do not clear the error at entry: first-error-wins, and after a prior failure a second call
+    // must not resume from a partially-consumed stream.
+    if (hasFailure())
+        return SLANG_FAIL;
+
     if (m_mode != Mode::Playback)
-        return false;
+        return SLANG_OK;
 
     if (m_stream.atEnd())
-        return false;
+        return SLANG_OK; // genuine end of stream
 
-    // Read the stream position so we can peak at the signature + type id
+    // Read the stream position so we can peek at the signature + type id
     // before handing it off to the handler.
     uint64_t streamPos = m_stream.getPosition();
 
     // Read the function signature
     const char* signature = nullptr;
     record(RecordFlag::Input, signature);
+    if (hasFailure())
+        return SLANG_FAIL;
 
     if (signature == nullptr)
-        return false;
+    {
+        // The stream was not at end, so a null signature is a malformed call header, not EOS.
+        return setError(ReplayErrorKind::NoHandler, "Malformed call header: missing signature");
+    }
 
     // Look up the handler
     PlaybackHandler* handler = m_handlers.tryGetValue(String(signature));
     if (!handler)
     {
-        throw Slang::Exception(String("No handler registered for function: ") + signature);
+        return setError(
+            ReplayErrorKind::NoHandler,
+            String("No handler registered for function: ") + signature);
     }
 
     // Read the 'this' pointer handle (recorded by beginCall)
     uint64_t thisHandle = kNullHandle;
     TypeId typeId = readTypeId();
+    if (hasFailure())
+        return SLANG_FAIL;
     if (typeId == TypeId::ObjectHandle)
     {
         m_stream.read(&thisHandle, sizeof(thisHandle));
     }
     else
     {
-        throw TypeMismatchException(TypeId::ObjectHandle, typeId);
+        ReplayError error;
+        error.kind = ReplayErrorKind::TypeMismatch;
+        error.message = makeTypeMismatchMessage(TypeId::ObjectHandle, typeId);
+        error.expected = TypeId::ObjectHandle;
+        error.actual = typeId;
+        return setError(error);
     }
+    if (hasFailure())
+        return SLANG_FAIL;
 
     // Store the current 'this' handle for the handler to use
     m_currentThisHandle = thisHandle;
+
+    // A valid call has been recognized.
+    outHadCall = true;
 
     // Seek back to the start of the command before calling the handler.
     m_stream.seek(streamPos);
@@ -1046,15 +1067,25 @@ bool ReplayContext::executeNextCall()
     // Call the handler - it will read the remaining arguments from the stream
     (*handler)(*this);
 
-    return true;
+    // Propagate any failure the handler (or the proxy method it drove) latched.
+    if (hasFailure())
+        return SLANG_FAIL;
+
+    return SLANG_OK;
 }
 
-void ReplayContext::executeAll()
+SlangResult ReplayContext::executeAll()
 {
-    while (executeNextCall())
+    for (;;)
     {
-        // Continue until end of stream or error
+        bool hadCall = false;
+        SlangResult result = executeNextCall(hadCall);
+        if (SLANG_FAILED(result))
+            return result;
+        if (!hadCall)
+            break;
     }
+    return SLANG_OK;
 }
 
 } // namespace SlangRecord

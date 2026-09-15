@@ -146,9 +146,9 @@ SLANG_UNIT_TEST(replayContextHandleNull)
     SLANG_CHECK(readBlob == nullptr);
 }
 
-// These exception tests catch concrete replay exception types through ReplayContext entry points.
-// That covers the in-process slang-test path where exceptions cross the slang shared-library
-// boundary before reaching the unit-test module.
+// These tests exercise the structured ReplayError latched by ReplayContext entry points, in the
+// in-process slang-test path where the record-replay library reports failures through sticky
+// status rather than exceptions.
 SLANG_UNIT_TEST(replayContextUntrackedInterfaceException)
 {
     REPLAY_TEST;
@@ -159,17 +159,12 @@ SLANG_UNIT_TEST(replayContextUntrackedInterfaceException)
 
     ctx().setMode(Mode::Record);
 
-    bool caught = false;
-    try
-    {
-        ctx().record(RecordFlag::Input, untrackedFileSystem);
-    }
-    catch (const UntrackedInterfaceException& e)
-    {
-        caught = true;
-        SLANG_CHECK(e.getObject() == toSlangUnknown(osFileSystem));
-    }
-    SLANG_CHECK(caught);
+    ctx().record(RecordFlag::Input, untrackedFileSystem);
+
+    SLANG_CHECK(ctx().hasError());
+    const ReplayError& error = ctx().getLastError();
+    SLANG_CHECK(error.kind == ReplayErrorKind::UntrackedInterface);
+    SLANG_CHECK(error.object == toSlangUnknown(osFileSystem));
 }
 
 SLANG_UNIT_TEST(replayContextHandleNotFoundException)
@@ -179,17 +174,12 @@ SLANG_UNIT_TEST(replayContextHandleNotFoundException)
 
     const uint64_t missingHandle = kFirstValidHandle;
 
-    bool caught = false;
-    try
-    {
-        ctx().getProxy(missingHandle);
-    }
-    catch (const HandleNotFoundException& e)
-    {
-        caught = true;
-        SLANG_CHECK(e.getHandle() == missingHandle);
-    }
-    SLANG_CHECK(caught);
+    ctx().getProxy(missingHandle);
+
+    SLANG_CHECK(ctx().hasError());
+    const ReplayError& error = ctx().getLastError();
+    SLANG_CHECK(error.kind == ReplayErrorKind::HandleNotFound);
+    SLANG_CHECK(error.handle == missingHandle);
 }
 
 SLANG_UNIT_TEST(replayContextInlineBlob)
@@ -357,17 +347,12 @@ SLANG_UNIT_TEST(replayContextUnresolvedTypeException)
     ctx().setMode(Mode::Record);
 
     slang::TypeReflection* unresolvedType = originalType;
-    bool caught = false;
-    try
-    {
-        ctx().record(RecordFlag::Input, unresolvedType);
-    }
-    catch (const UnresolvedTypeException& e)
-    {
-        caught = true;
-        SLANG_CHECK(e.getType() == originalType);
-    }
-    SLANG_CHECK(caught);
+    ctx().record(RecordFlag::Input, unresolvedType);
+
+    SLANG_CHECK(ctx().hasError());
+    const ReplayError& error = ctx().getLastError();
+    SLANG_CHECK(error.kind == ReplayErrorKind::UnresolvedType);
+    SLANG_CHECK(error.type == originalType);
 }
 
 SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
@@ -415,11 +400,12 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
     // Switch to playback and execute the calls that get us to the point
     // at which the type was recorded.
     ctx().switchToPlayback();
-    ctx().executeNextCall(); // slang_createGlobalSession
-    ctx().executeNextCall(); // globalSession->findProfile
-    ctx().executeNextCall(); // globalSession->createSession
-    ctx().executeNextCall(); // session->loadModuleFromSourceString
-    ctx().executeNextCall(); // module->getLayout
+    bool hadCall = false;
+    ctx().executeNextCall(hadCall); // slang_createGlobalSession
+    ctx().executeNextCall(hadCall); // globalSession->findProfile
+    ctx().executeNextCall(hadCall); // globalSession->createSession
+    ctx().executeNextCall(hadCall); // session->loadModuleFromSourceString
+    ctx().executeNextCall(hadCall); // module->getLayout
 
     //<layout->findTypeByName not captured>
 
@@ -497,11 +483,12 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType)
     // Switch to playback and execute the calls that get us to the point
     // at which the type was recorded.
     ctx().switchToPlayback();
-    ctx().executeNextCall(); // slang_createGlobalSession
-    ctx().executeNextCall(); // globalSession->findProfile
-    ctx().executeNextCall(); // globalSession->createSession
-    ctx().executeNextCall(); // session->loadModuleFromSourceString
-    ctx().executeNextCall(); // module->getLayout
+    bool hadCall = false;
+    ctx().executeNextCall(hadCall); // slang_createGlobalSession
+    ctx().executeNextCall(hadCall); // globalSession->findProfile
+    ctx().executeNextCall(hadCall); // globalSession->createSession
+    ctx().executeNextCall(hadCall); // session->loadModuleFromSourceString
+    ctx().executeNextCall(hadCall); // module->getLayout
 
     //<layout->findTypeByName not captured>
 

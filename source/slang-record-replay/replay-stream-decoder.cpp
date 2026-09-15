@@ -26,24 +26,33 @@ static const uint64_t kMaxReplayDecodeArrayElementCount = 1000000;
 // through the same guarded traversal used by ordinary skipping.
 static const uint64_t kMaxDisplayedArrayElementCount = 100;
 
-void reportReplayDecodeError(const char* message)
+void reportReplayDecodeError(ReplayStream& stream, const char* message)
 {
-    // These checks reject malformed external replay data. Use the decoder's existing
-    // exception path so public dump APIs can catch and print an ERROR line; a
-    // SLANG_RELEASE_ASSERT would turn a bad replay file into a process abort.
-    throw Slang::Exception(message);
+    // These checks reject malformed external replay data. Latch the message on the stream's failed
+    // state (exception-free); the public dump APIs check isFailed() at each recovery boundary and
+    // print an ERROR line. A SLANG_RELEASE_ASSERT would turn a bad replay file into a process abort.
+    stream.setError(message);
 }
 
-void checkReplayDecodeNestingDepth(int recursionDepth)
+// Returns false (and latches a stream error) if the recursion depth is exceeded.
+bool checkReplayDecodeNestingDepth(ReplayStream& stream, int recursionDepth)
 {
     if (recursionDepth > kMaxReplayDecodeNestingDepth)
-        reportReplayDecodeError("Maximum replay decode nesting depth exceeded");
+    {
+        reportReplayDecodeError(stream, "Maximum replay decode nesting depth exceeded");
+        return false;
+    }
+    return true;
 }
 
-void validateReplayDecodeArrayElementCount(ReplayStream& stream, uint64_t count)
+// Returns false (and latches a stream error) if the array element count is out of range.
+bool validateReplayDecodeArrayElementCount(ReplayStream& stream, uint64_t count)
 {
     if (count > kMaxReplayDecodeArrayElementCount)
-        reportReplayDecodeError("Array element count exceeds decoder limit");
+    {
+        reportReplayDecodeError(stream, "Array element count exceeds decoder limit");
+        return false;
+    }
 
     size_t position = stream.getPosition();
     size_t size = stream.getSize();
@@ -52,20 +61,33 @@ void validateReplayDecodeArrayElementCount(ReplayStream& stream, uint64_t count)
     // Each serialized array element has at least a one-byte TypeId. Reject impossible counts
     // before recursively walking the array.
     if (count > remainingBytes)
-        reportReplayDecodeError("Array element count exceeds remaining stream bytes");
+    {
+        reportReplayDecodeError(stream, "Array element count exceeds remaining stream bytes");
+        return false;
+    }
+    return true;
 }
 
+// Reads and validates an array element count, latching a stream error and returning 0 on failure.
 uint64_t readReplayDecodeArrayElementCount(ReplayStream& stream)
 {
-    uint8_t countTypeValue;
+    uint8_t countTypeValue = 0;
     stream.read(&countTypeValue, sizeof(countTypeValue));
+    if (stream.isFailed())
+        return 0;
     TypeId countType = static_cast<TypeId>(countTypeValue);
     if (countType != TypeId::UInt64)
-        reportReplayDecodeError("Array element count has invalid type");
+    {
+        reportReplayDecodeError(stream, "Array element count has invalid type");
+        return 0;
+    }
 
-    uint64_t count;
+    uint64_t count = 0;
     stream.read(&count, sizeof(count));
-    validateReplayDecodeArrayElementCount(stream, count);
+    if (stream.isFailed())
+        return 0;
+    if (!validateReplayDecodeArrayElementCount(stream, count))
+        return 0;
     return count;
 }
 
@@ -75,21 +97,31 @@ uint64_t readReplayDecodeArrayElementCount(ReplayStream& stream)
 // Public Static API - Full Stream Decoding
 // =============================================================================
 
-String ReplayStreamDecoder::decode(ReplayStream& stream, size_t maxBytes)
+String ReplayStreamDecoder::decode(ReplayStream& stream, size_t maxBytes, bool* outHadError)
 {
     StringBuilder output;
     ReplayStreamDecoder decoder(stream, output);
-    decoder.decodeAll(maxBytes);
+    decoder.decodeAll(maxBytes, outHadError);
     return output.produceString();
 }
 
-String ReplayStreamDecoder::decodeFile(const char* filePath)
+String ReplayStreamDecoder::decodeFile(const char* filePath, bool* outHadError)
 {
     ReplayStream stream = ReplayStream::loadFromFile(filePath);
-    return decode(stream, 0);
+    // loadFromFile signals IO failure via the returned stream's failed flag; surface it as a decode
+    // error (with a nonzero CLI exit) rather than silently decoding an empty stream.
+    if (stream.isFailed())
+    {
+        if (outHadError)
+            *outHadError = true;
+        StringBuilder output;
+        output << "ERROR: " << stream.getErrorMessage() << "\n";
+        return output.produceString();
+    }
+    return decode(stream, 0, outHadError);
 }
 
-String ReplayStreamDecoder::decodeWithIndex(const char* folderPath)
+String ReplayStreamDecoder::decodeWithIndex(const char* folderPath, bool* outHadError)
 {
     // Construct paths to stream.bin and index.bin
     String folder(folderPath);
@@ -101,21 +133,37 @@ String ReplayStreamDecoder::decodeWithIndex(const char* folderPath)
     {
         // Try to decode just the stream.bin
         if (Slang::File::exists(streamPath))
-            return decodeFile(streamPath.getBuffer());
+            return decodeFile(streamPath.getBuffer(), outHadError);
 
         // Maybe the path itself is the stream.bin file
-        return decodeFile(folderPath);
+        return decodeFile(folderPath, outHadError);
     }
 
     ReplayStream dataStream = ReplayStream::loadFromFile(streamPath.getBuffer());
     ReplayStream indexStream = ReplayStream::loadFromFile(indexPath.getBuffer());
+    if (dataStream.isFailed() || indexStream.isFailed())
+    {
+        if (outHadError)
+            *outHadError = true;
+        StringBuilder output;
+        output << "ERROR: "
+               << (dataStream.isFailed() ? dataStream.getErrorMessage()
+                                         : indexStream.getErrorMessage())
+               << "\n";
+        return output.produceString();
+    }
 
-    return decodeWithIndex(dataStream, indexStream);
+    return decodeWithIndex(dataStream, indexStream, outHadError);
 }
 
-String ReplayStreamDecoder::decodeWithIndex(ReplayStream& dataStream, ReplayStream& indexStream)
+String ReplayStreamDecoder::decodeWithIndex(
+    ReplayStream& dataStream,
+    ReplayStream& indexStream,
+    bool* outHadError)
 {
     StringBuilder output;
+    // Aggregate errors across per-call recovery boundaries (each clears the stream to continue).
+    bool hadError = false;
 
     // Calculate number of calls from index stream size
     size_t indexSize = indexStream.getSize();
@@ -159,33 +207,41 @@ String ReplayStreamDecoder::decodeWithIndex(ReplayStream& dataStream, ReplayStre
         if (!decodeCallHeader(dataStream, headerBuf))
         {
             output << "[" << (uint64_t)callIdx << "] <failed to read call header>\n\n";
+            if (dataStream.isFailed())
+            {
+                hadError = true;
+                dataStream.clearError(); // recover and continue to the next call
+            }
             continue;
         }
 
         output << "[" << (uint64_t)callIdx << "] " << headerBuf << "\n";
 
-        // Decode the remaining arguments (stream is already positioned past the header)
+        // Decode the remaining arguments (stream is already positioned past the header).
+        // The !isFailed() guard both stops on a decode failure and prevents an infinite loop: a
+        // read past end is a no-op that does not advance the position.
         int argNum = 0;
-        try
+        while (dataStream.getPosition() < endOffset &&
+               dataStream.getPosition() < dataStream.getSize() && !dataStream.isFailed())
         {
-            while (dataStream.getPosition() < endOffset &&
-                   dataStream.getPosition() < dataStream.getSize())
-            {
-                indent(output, 1);
-                output << "[" << argNum++ << "] ";
-                decodeValueFromStream(dataStream, output, 1);
-                output << "\n";
-            }
+            indent(output, 1);
+            output << "[" << argNum++ << "] ";
+            decodeValueFromStream(dataStream, output, 1);
+            output << "\n";
         }
-        catch (const Slang::Exception& e)
+        if (dataStream.isFailed())
         {
-            output << "    ERROR decoding call: " << e.Message.getBuffer() << "\n";
+            hadError = true;
+            output << "    ERROR decoding call: " << dataStream.getErrorMessage() << "\n";
+            dataStream.clearError(); // recover and continue to the next call
         }
 
         output << "\n";
     }
 
     output << "=== End of Stream (" << (uint64_t)callCount << " calls) ===\n";
+    if (outHadError && hadError)
+        *outHadError = true;
     return output.produceString();
 }
 
@@ -213,15 +269,21 @@ void ReplayStreamDecoder::decodeValueFromStream(
     int indentLevel,
     int recursionDepth)
 {
-    checkReplayDecodeNestingDepth(recursionDepth);
+    if (!checkReplayDecodeNestingDepth(stream, recursionDepth))
+        return;
 
     TypeId type = readTypeId(stream);
+    if (stream.isFailed())
+        return;
 
+    // Read-target locals are value-initialized: a read that runs past the end of a truncated stream
+    // is a no-op that leaves its destination untouched (and latches stream.isFailed()), so a
+    // defined 0 is printed rather than an indeterminate value before the boundary reports the error.
     switch (type)
     {
     case TypeId::Int8:
         {
-            int8_t v;
+            int8_t v = 0;
             stream.read(&v, sizeof(v));
             output << "Int8: " << (int)v;
         }
@@ -229,7 +291,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::Int16:
         {
-            int16_t v;
+            int16_t v = 0;
             stream.read(&v, sizeof(v));
             output << "Int16: " << v;
         }
@@ -237,7 +299,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::Int32:
         {
-            int32_t v;
+            int32_t v = 0;
             stream.read(&v, sizeof(v));
             output << "Int32: " << v;
         }
@@ -245,7 +307,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::Int64:
         {
-            int64_t v;
+            int64_t v = 0;
             stream.read(&v, sizeof(v));
             output << "Int64: " << v;
         }
@@ -253,7 +315,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::UInt8:
         {
-            uint8_t v;
+            uint8_t v = 0;
             stream.read(&v, sizeof(v));
             output << "UInt8: " << (unsigned)v;
         }
@@ -261,7 +323,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::UInt16:
         {
-            uint16_t v;
+            uint16_t v = 0;
             stream.read(&v, sizeof(v));
             output << "UInt16: " << v;
         }
@@ -269,7 +331,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::UInt32:
         {
-            uint32_t v;
+            uint32_t v = 0;
             stream.read(&v, sizeof(v));
             output << "UInt32: " << v;
         }
@@ -277,7 +339,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::UInt64:
         {
-            uint64_t v;
+            uint64_t v = 0;
             stream.read(&v, sizeof(v));
             output << "UInt64: " << v;
         }
@@ -285,7 +347,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::Float32:
         {
-            float v;
+            float v = 0;
             stream.read(&v, sizeof(v));
             output << "Float32: " << v;
         }
@@ -293,7 +355,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::Float64:
         {
-            double v;
+            double v = 0;
             stream.read(&v, sizeof(v));
             output << "Float64: " << v;
         }
@@ -301,7 +363,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::Bool:
         {
-            uint8_t v;
+            uint8_t v = 0;
             stream.read(&v, sizeof(v));
             output << "Bool: " << (v ? "true" : "false");
         }
@@ -309,8 +371,10 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::String:
         {
-            uint32_t len;
+            uint32_t len = 0;
             stream.read(&len, sizeof(len));
+            if (stream.isFailed())
+                return;
 
             if (len == 0)
             {
@@ -318,7 +382,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
             }
             else if (len < 256)
             {
-                char buffer[256];
+                char buffer[256] = {};
                 stream.read(buffer, len);
                 buffer[len] = '\0';
                 output << "String: \"" << buffer << "\"";
@@ -326,7 +390,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
             else
             {
                 // Long string - show truncated
-                char buffer[128];
+                char buffer[128] = {};
                 stream.read(buffer, 127);
                 buffer[127] = '\0';
                 stream.skip(len - 127);
@@ -341,28 +405,32 @@ void ReplayStreamDecoder::decodeValueFromStream(
             // Format: [TypeId::Blob][TypeId::String][uint32_t len][hash chars]
             // or:     [TypeId::Blob][TypeId::Null]  (for null blob)
             TypeId innerType = readTypeId(stream);
+            if (stream.isFailed())
+                return;
             if (innerType == TypeId::Null)
             {
                 output << "BlobHash: null";
             }
             else if (innerType == TypeId::String)
             {
-                uint32_t len;
+                uint32_t len = 0;
                 stream.read(&len, sizeof(len));
+                if (stream.isFailed())
+                    return;
                 if (len == 0)
                 {
                     output << "BlobHash: (empty)";
                 }
                 else if (len < 256)
                 {
-                    char buffer[256];
+                    char buffer[256] = {};
                     stream.read(buffer, len);
                     buffer[len] = '\0';
                     output << "BlobHash: \"" << buffer << "\"";
                 }
                 else
                 {
-                    char buffer[128];
+                    char buffer[128] = {};
                     stream.read(buffer, 127);
                     buffer[127] = '\0';
                     stream.skip(len - 127);
@@ -378,7 +446,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::ObjectHandle:
         {
-            uint64_t handle;
+            uint64_t handle = 0;
             stream.read(&handle, sizeof(handle));
             if (handle == kNullHandle)
                 output << "Handle: null";
@@ -394,18 +462,22 @@ void ReplayStreamDecoder::decodeValueFromStream(
     case TypeId::TypeReflectionRef:
         {
             // TypeReflectionRef: module handle + type name
-            uint64_t moduleHandle;
+            uint64_t moduleHandle = 0;
             stream.skip(1); // Skip ObjectHandle TypeId for module
             stream.read(&moduleHandle, sizeof(moduleHandle));
 
             // Read type name
-            uint8_t stringTypeId;
+            uint8_t stringTypeId = 0;
             stream.read(&stringTypeId, 1);
+            if (stream.isFailed())
+                return;
 
             if (stringTypeId == static_cast<uint8_t>(TypeId::String))
             {
-                uint32_t len;
+                uint32_t len = 0;
                 stream.read(&len, sizeof(len));
+                if (stream.isFailed())
+                    return;
 
                 if (moduleHandle == kNullHandle)
                 {
@@ -418,14 +490,14 @@ void ReplayStreamDecoder::decodeValueFromStream(
                 }
                 else if (len < 256)
                 {
-                    char buffer[256];
+                    char buffer[256] = {};
                     stream.read(buffer, len);
                     buffer[len] = '\0';
                     output << "TypeRef(module=#" << moduleHandle << "): \"" << buffer << "\"";
                 }
                 else
                 {
-                    char buffer[128];
+                    char buffer[128] = {};
                     stream.read(buffer, 127);
                     buffer[127] = '\0';
                     stream.skip(len - 127);
@@ -443,6 +515,8 @@ void ReplayStreamDecoder::decodeValueFromStream(
     case TypeId::Array:
         {
             uint64_t count = readReplayDecodeArrayElementCount(stream);
+            if (stream.isFailed())
+                return;
 
             output << "Array[" << count << "]:";
             uint64_t displayedCount =
@@ -453,6 +527,8 @@ void ReplayStreamDecoder::decodeValueFromStream(
                 indent(output, indentLevel + 1);
                 output << "[" << i << "] ";
                 decodeValueFromStream(stream, output, indentLevel + 1, recursionDepth + 1);
+                if (stream.isFailed())
+                    return;
             }
             if (count > kMaxDisplayedArrayElementCount)
             {
@@ -461,7 +537,11 @@ void ReplayStreamDecoder::decodeValueFromStream(
                 output << "... (" << (count - kMaxDisplayedArrayElementCount) << " more elements)";
                 // Skip remaining elements
                 for (uint64_t i = kMaxDisplayedArrayElementCount; i < count; ++i)
+                {
                     skipValueInStream(stream, recursionDepth + 1);
+                    if (stream.isFailed())
+                        return;
+                }
             }
         }
         break;
@@ -469,8 +549,10 @@ void ReplayStreamDecoder::decodeValueFromStream(
     case TypeId::Error:
         {
             // Error marker - read the error message
-            uint32_t len;
+            uint32_t len = 0;
             stream.read(&len, sizeof(len));
+            if (stream.isFailed())
+                return;
             if (len > 0 && len < 4096)
             {
                 Slang::List<char> buffer;
@@ -500,14 +582,9 @@ String ReplayStreamDecoder::decodeValueFromBytes(const void* data, size_t size)
 {
     ReplayStream stream(data, size);
     StringBuilder output;
-    try
-    {
-        decodeValueFromStream(stream, output, 0);
-    }
-    catch (const Slang::Exception& e)
-    {
-        output << "ERROR: " << e.Message.getBuffer();
-    }
+    decodeValueFromStream(stream, output, 0);
+    if (stream.isFailed())
+        output << "ERROR: " << stream.getErrorMessage();
     return output.produceString();
 }
 
@@ -535,20 +612,19 @@ void ReplayStreamDecoder::decodeByteRange(
         skipValueInStream(stream); // Skip this handle
     }
 
-    // Now decode remaining values (arguments, outputs, return value)
+    // Now decode remaining values (arguments, outputs, return value). The !isFailed() guard stops on
+    // a decode failure and prevents an infinite loop (a read past end does not advance position).
     int argNum = 0;
-    while (stream.getPosition() < endOffset && stream.getPosition() < stream.getSize())
+    while (stream.getPosition() < endOffset && stream.getPosition() < stream.getSize() &&
+           !stream.isFailed())
     {
         indent(output, indentLevel);
         output << "[" << argNum++ << "] ";
 
-        try
+        decodeValueFromStream(stream, output, indentLevel);
+        if (stream.isFailed())
         {
-            decodeValueFromStream(stream, output, indentLevel);
-        }
-        catch (const Slang::Exception& e)
-        {
-            output << "ERROR: " << e.Message.getBuffer();
+            output << "ERROR: " << stream.getErrorMessage();
             break;
         }
 
@@ -563,9 +639,12 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream)
 
 void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream, int recursionDepth)
 {
-    checkReplayDecodeNestingDepth(recursionDepth);
+    if (!checkReplayDecodeNestingDepth(stream, recursionDepth))
+        return;
 
     TypeId type = readTypeId(stream);
+    if (stream.isFailed())
+        return;
 
     switch (type)
     {
@@ -595,7 +674,7 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream, int recursionD
 
     case TypeId::String:
         {
-            uint32_t len;
+            uint32_t len = 0;
             stream.read(&len, sizeof(len));
             stream.skip(len);
         }
@@ -607,7 +686,7 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream, int recursionD
             TypeId innerType = readTypeId(stream);
             if (innerType == TypeId::String)
             {
-                uint32_t len;
+                uint32_t len = 0;
                 stream.read(&len, sizeof(len));
                 stream.skip(len);
             }
@@ -626,7 +705,7 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream, int recursionD
             stream.skip(1); // ObjectHandle TypeId
             stream.skip(8); // module handle
             stream.skip(1); // String TypeId
-            uint32_t len;
+            uint32_t len = 0;
             stream.read(&len, sizeof(len));
             stream.skip(len); // type name string
         }
@@ -635,14 +714,20 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream, int recursionD
     case TypeId::Array:
         {
             uint64_t count = readReplayDecodeArrayElementCount(stream);
+            if (stream.isFailed())
+                return;
             for (uint64_t i = 0; i < count; i++)
+            {
                 skipValueInStream(stream, recursionDepth + 1);
+                if (stream.isFailed())
+                    return;
+            }
         }
         break;
 
     case TypeId::Error:
         {
-            uint32_t len;
+            uint32_t len = 0;
             stream.read(&len, sizeof(len));
             stream.skip(len);
         }
@@ -650,7 +735,8 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream, int recursionD
 
     default:
         // Unknown type - can't skip safely
-        throw Slang::Exception("Cannot skip unknown type");
+        reportReplayDecodeError(stream, "Cannot skip unknown type");
+        return;
     }
 }
 
@@ -758,7 +844,7 @@ ReplayStreamDecoder::ReplayStreamDecoder(ReplayStream& stream, StringBuilder& ou
 // Private Instance Methods
 // =============================================================================
 
-void ReplayStreamDecoder::decodeAll(size_t maxBytes)
+void ReplayStreamDecoder::decodeAll(size_t maxBytes, bool* outHadError)
 {
     size_t endPosition = (maxBytes > 0) ? m_startPosition + maxBytes : m_stream.getSize();
 
@@ -767,22 +853,24 @@ void ReplayStreamDecoder::decodeAll(size_t maxBytes)
     m_output << "Start position: " << (uint64_t)m_startPosition << "\n\n";
 
     int valueNumber = 0;
-    while (m_stream.getPosition() < endPosition && m_stream.getPosition() < m_stream.getSize())
+    // The !isFailed() guard stops on a decode failure and prevents an infinite loop (a read past
+    // end is a no-op that does not advance position).
+    while (m_stream.getPosition() < endPosition && m_stream.getPosition() < m_stream.getSize() &&
+           !m_stream.isFailed())
     {
         size_t offset = m_stream.getPosition();
 
-        try
+        m_output << "[" << valueNumber++ << "] @" << (uint64_t)offset << ": ";
+        decodeValueFromStream(m_stream, m_output, 0);
+        if (m_stream.isFailed())
         {
-            m_output << "[" << valueNumber++ << "] @" << (uint64_t)offset << ": ";
-            decodeValueFromStream(m_stream, m_output, 0);
-            m_output << "\n";
-        }
-        catch (const Slang::Exception& e)
-        {
-            m_output << "ERROR: " << e.Message.getBuffer() << "\n";
+            if (outHadError)
+                *outHadError = true;
+            m_output << "ERROR: " << m_stream.getErrorMessage() << "\n";
             m_output << "(stopped at offset " << (uint64_t)m_stream.getPosition() << ")\n";
             break;
         }
+        m_output << "\n";
     }
 
     m_output << "\n=== End of Stream (decoded " << valueNumber << " values) ===\n";
@@ -802,7 +890,7 @@ void ReplayStreamDecoder::decodeCall()
     // Read remaining arguments until we hit another String (next call) or end
     m_output << "  Arguments:\n";
     int argNum = 0;
-    while (m_stream.getPosition() < m_stream.getSize())
+    while (m_stream.getPosition() < m_stream.getSize() && !m_stream.isFailed())
     {
         // Peek at next type - if it's a String, it might be the start of the next call
         TypeId nextType = peekTypeId(m_stream);

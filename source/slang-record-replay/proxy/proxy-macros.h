@@ -179,6 +179,16 @@ struct BlobOutputTempReleaser
 // For void returns
 #define RECORD_RETURN_VOID() ((void)0)
 
+// Abort a recorded proxy method during playback if the replay context has latched a failure.
+// Placed after the last input deserialization and before the real getActual()->method() call, so a
+// corrupt or truncated stream never drives the wrapped API with indeterminate arguments. Playback
+// only: during Record/Sync a capture failure is best-effort and must not skip the real call
+// (recording is non-fatal). `defaultReturn` is the value to return for the method's return type
+// (empty for void, SLANG_FAIL for SlangResult, nullptr for pointers, 0/false for scalars).
+#define RECORD_REPLAY_ABORT_IF_FAILED(defaultReturn) \
+    if (_ctx.isPlayback() && _ctx.hasFailure())      \
+        return defaultReturn;
+
 // =============================================================================
 // addRef/release recording macros for proxies
 // These record user ref-count changes so playback can match object lifetimes
@@ -414,10 +424,14 @@ void replayHandler(ReplayContext& ctx, MethodPtr method)
     auto* proxy = ctx.getCurrentThis<ProxyType>();
     if (!proxy)
     {
-        throw Slang::Exception("Replay: null 'this' pointer");
+        ctx.setError(ReplayErrorKind::NullThis, "Replay: null 'this' pointer");
+        return;
     }
 
-    // Call the method with default args - the proxy will read from stream
+    // Call the method with default args - the proxy will read from stream.
+    // If the method latches a failure (bad stream, unresolved handle), it returns early via
+    // RECORD_REPLAY_ABORT_IF_FAILED and the void recorders below become no-ops; executeNextCall
+    // observes ctx.hasFailure() after this handler returns and reports SLANG_FAIL.
     using Traits = MemberFunctionTraits<MethodPtr>;
     if constexpr (std::is_void_v<typename Traits::ReturnType>)
     {

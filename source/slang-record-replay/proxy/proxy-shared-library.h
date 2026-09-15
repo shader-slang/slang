@@ -63,6 +63,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(name);
+        RECORD_REPLAY_ABORT_IF_FAILED(nullptr);
         return getActual<ISlangSharedLibrary>()->findSymbolAddressByName(name);
     }
 };

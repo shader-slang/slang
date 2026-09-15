@@ -61,46 +61,26 @@ SLANG_UNIT_TEST(replayStreamRejectsNullDataWithNonzeroSize)
 
 SLANG_UNIT_TEST(replayStreamRejectsWritePositionOverflow)
 {
-#if SLANG_HAS_EXCEPTIONS
     ReplayStream stream;
     stream.seek((std::numeric_limits<size_t>::max)());
 
     uint8_t value = 0;
-    bool caughtException = false;
-    try
-    {
-        stream.write(&value, sizeof(value));
-    }
-    catch (const Exception& e)
-    {
-        caughtException = containsString(e.Message, "Write past maximum stream size");
-    }
-    SLANG_CHECK(caughtException);
-#else
-    SLANG_IGNORE_TEST;
-#endif
+    stream.write(&value, sizeof(value));
+
+    SLANG_CHECK(stream.isFailed());
+    SLANG_CHECK(containsString(stream.getErrorMessage(), "Write past maximum stream size"));
 }
 
 SLANG_UNIT_TEST(replayStreamRejectsWritePastListIndexLimit)
 {
-#if SLANG_HAS_EXCEPTIONS
     ReplayStream stream;
     stream.seek(size_t((std::numeric_limits<Slang::Index>::max)()));
 
     uint8_t value = 0;
-    bool caughtException = false;
-    try
-    {
-        stream.write(&value, sizeof(value));
-    }
-    catch (const Exception& e)
-    {
-        caughtException = containsString(e.Message, "Write past maximum stream size");
-    }
-    SLANG_CHECK(caughtException);
-#else
-    SLANG_IGNORE_TEST;
-#endif
+    stream.write(&value, sizeof(value));
+
+    SLANG_CHECK(stream.isFailed());
+    SLANG_CHECK(containsString(stream.getErrorMessage(), "Write past maximum stream size"));
 }
 
 SLANG_UNIT_TEST(replayStreamRejectsNullWriteWithNonzeroSize)
@@ -126,24 +106,14 @@ SLANG_UNIT_TEST(replayStreamRejectsNullWriteWithNonzeroSize)
 
 SLANG_UNIT_TEST(replayStreamRejectsReadSizeOverflow)
 {
-#if SLANG_HAS_EXCEPTIONS
     uint8_t value = 0;
     ReplayStream stream(&value, sizeof(value));
 
     uint8_t out = 0;
-    bool caughtException = false;
-    try
-    {
-        stream.read(&out, (std::numeric_limits<size_t>::max)());
-    }
-    catch (const Exception& e)
-    {
-        caughtException = containsString(e.Message, "Read past end of stream");
-    }
-    SLANG_CHECK(caughtException);
-#else
-    SLANG_IGNORE_TEST;
-#endif
+    stream.read(&out, (std::numeric_limits<size_t>::max)());
+
+    SLANG_CHECK(stream.isFailed());
+    SLANG_CHECK(containsString(stream.getErrorMessage(), "Read past end of stream"));
 }
 
 SLANG_UNIT_TEST(replayStreamRejectsNullReadWithNonzeroSize)

@@ -75,31 +75,31 @@ public:
 
     SLANG_API ~ReplayStream();
 
-    /// Write data to the stream.
-    /// @param data Pointer to the data to write.
-    /// @param size Number of bytes to write.
-    /// @throws Slang::Exception if this is a reading stream.
+    /// Write data to the stream. On a wrong-mode or out-of-bounds write the stream is put into the
+    /// failed state (see setError) and the write is dropped; check isFailed() at the operation
+    /// boundary rather than after every write.
     SLANG_API void write(const void* data, size_t size);
 
-    /// Read data from the stream.
-    /// @param data Buffer to read into.
-    /// @param size Number of bytes to read.
-    /// @throws Slang::Exception if this is a writing stream or read past end.
+    /// Read data from the stream into `data`. On a read past the end (or a wrong-mode read) the
+    /// stream is put into the failed state and `data` is left untouched, so callers must
+    /// value-initialize their destination before reading; a skipped read then leaves a defined
+    /// value. Reads on an already-failed stream are no-ops. Check isFailed() at the boundary.
     SLANG_API void read(void* data, size_t size);
 
-    /// Reset the stream to initial empty writing state.
+    /// Reset the stream to initial empty writing state (also clears any failed state).
     SLANG_API void reset();
 
     /// Set a mirror file for crash-safe capture.
     /// All subsequent writes will be immediately written to this file as well.
     /// @param path Path to the mirror file.
-    /// @throws Slang::Exception if file cannot be opened.
-    SLANG_API void setMirrorFile(const char* path);
+    /// @return SLANG_OK, or a failure code if the file cannot be opened. Does not affect the stream's
+    /// read/write failed state (mirroring is an optional write-side feature).
+    SLANG_API SlangResult setMirrorFile(const char* path);
 
     /// Save all data to a file.
     /// @param path Path to the file to write.
-    /// @throws Slang::Exception if file cannot be opened or written.
-    SLANG_API void saveToFile(const char* path) const;
+    /// @return SLANG_OK, or a failure code if the file cannot be opened or written.
+    SLANG_API SlangResult saveToFile(const char* path) const;
 
     /// Close the mirror file (data remains in memory).
     SLANG_API void closeMirrorFile();
@@ -180,15 +180,48 @@ public:
                    size) == 0;
     }
 
-    /// Get a byte at a specific offset (for sync comparison).
-    /// @param offset Offset into the buffer.
-    /// @return The byte at that offset.
-    /// @throws Slang::Exception if offset is past end.
+    /// Get a byte at a specific offset (for sync comparison). Returns 0 and puts the stream into the
+    /// failed state if the offset is past the end; callers detect this via isFailed().
     uint8_t getByte(size_t offset) const
     {
         if (offset >= size_t(m_buffer.getCount()))
-            throw Slang::Exception("Offset past end of stream");
+        {
+            setError("Offset past end of stream");
+            return 0;
+        }
         return m_buffer[Slang::Index(offset)];
+    }
+
+    // =========================================================================
+    // Failure state (exception-free error reporting)
+    // =========================================================================
+    //
+    // Low-level reads/writes latch a sticky failure here instead of throwing, so the many small
+    // deserialization reads stay branch-free at the call site and the operation boundary checks
+    // once. First error wins so the root-cause message is preserved.
+
+    /// Latch a failure with a diagnostic message. No-op if already failed (first error wins). const
+    /// so the const read accessors (getByte) can report a past-end access.
+    void setError(String message) const
+    {
+        if (!m_failed)
+        {
+            m_failed = true;
+            m_errorMessage = message;
+        }
+    }
+
+    /// True if a read/write has failed since the last clearError()/reset().
+    bool isFailed() const { return m_failed; }
+
+    /// The message from the first failure (empty if not failed).
+    const String& getErrorMessage() const { return m_errorMessage; }
+
+    /// Clear the failed state so decoding can resume (used at per-call recovery boundaries).
+    void clearError()
+    {
+        m_failed = false;
+        m_errorMessage = String();
     }
 
 private:
@@ -196,6 +229,8 @@ private:
     size_t m_position = 0;
     bool m_isReading = false;
     mutable RefPtr<FileStream> m_mirrorFile;
+    mutable bool m_failed = false;
+    mutable String m_errorMessage;
 };
 
 } // namespace SlangRecord
