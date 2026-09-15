@@ -9,15 +9,15 @@ struct IRGlobalValueWithCode;
 
 // `calleeSideEffectCache` memoizes `doesCalleeHaveSideEffect` queries the load/store redundancy
 // walk makes for every `Call` inst it scans past (see `canInstHaveSideEffectAtAddress` in
-// slang-ir-util.h/.cpp). It is optional; when shared with DCE (see the sharing/staleness
-// contract on `IRDeadCodeEliminationOptions::calleeSideEffectCache` in slang-ir-dce.h -- the
-// single place that contract is stated, not paraphrased here), callers must clear it whenever a
-// callee's purity could have changed since it was populated. That contract's "a stale entry is
-// conservative" reasoning is DCE-specific (a stale "no side effect" only keeps dead code alive);
-// for this consumer a stale "no side effect" instead lets `canInstHaveSideEffectAtAddress`
-// license forwarding a load/store across that call, which is not automatically safe -- callers
-// sharing a cache with this pass must clear it at least as often as DCE would need to, not rely
-// on DCE's weaker justification.
+// slang-ir-util.h/.cpp). It is optional, and may be the same cache a caller shares with DCE (see
+// `IRDeadCodeEliminationOptions::calleeSideEffectCache` in slang-ir-dce.h for the DCE-side
+// contract). This is the single place the contract for *this* consumer is stated; callers should
+// reference it rather than restate it. DCE's "a stale entry is conservative" reasoning does not
+// transfer here unchanged: DCE's stale "no side effect" only keeps dead code alive, but here it
+// lets `canInstHaveSideEffectAtAddress` license forwarding a load/store across a call that has
+// since become impure, which is not conservative. So a cache shared with this pass must be
+// cleared whenever a purity-changing pass (e.g. `propagateFuncProperties`) could have run since
+// it was last cleared, even if DCE's own staleness tolerance would have allowed reusing it.
 bool removeRedundancy(
     IRModule* module,
     bool hoistLoopInvariantInsts,

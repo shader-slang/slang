@@ -218,8 +218,13 @@ struct DeferBufferLoadContext
     // function this pass touches, and without a shared cache each function pays its own
     // O(#call sites to that callee) cost to answer the same "does this callee have side
     // effects" question for callees shared across the module (e.g. a resource `Sample`
-    // intrinsic called from every deferred load site). Safe to share unconditionally here:
-    // this pass never changes a callee's purity, only load/store shape.
+    // intrinsic called from every deferred load site). Never cleared, so it is only safe
+    // to share unconditionally because this pass's only mutations are `deferBufferLoadInst`
+    // rewriting a load's shape (see `transferDecorationsTo` below) and the trailing
+    // `removeRedundancyInFunc` call itself -- neither adds/removes an `IRNoSideEffectDecoration`
+    // / `IRReadNoneDecoration`, nor creates or deletes the `IRAnnotation`s
+    // `doesCalleeHaveSideEffect` reads. A pass that changes to touch either would need to clear
+    // this cache (or stop sharing it) at that point.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
 
     void deferBufferLoadInst(IRBuilder& builder, List<IRInst*>& workList, IRInst* loadInst)

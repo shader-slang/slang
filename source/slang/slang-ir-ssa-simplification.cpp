@@ -57,10 +57,14 @@ void simplifyIR(
 {
     SLANG_PROFILE;
 
-    // Callee-side-effect memo shared by every DCE invocation in this pass
-    // (see IRDeadCodeEliminationOptions::calleeSideEffectCache). Cleared each
-    // outer iteration so DCE sees the purity facts propagateFuncProperties
-    // proves that iteration.
+    // Callee-side-effect memo shared by every DCE invocation in this pass, and also by the
+    // removeRedundancyInFunc call below (see IRDeadCodeEliminationOptions::calleeSideEffectCache
+    // for the sharing contract, and slang-ir-redundancy-removal.h for why staleness is safe for
+    // that second consumer). Cleared each outer iteration so both consumers see the purity facts
+    // propagateFuncProperties proves that iteration. removeRedundancyInFunc itself runs inside
+    // the inner per-func loop, up to kMaxFuncIterations times per outer iteration, without an
+    // additional clear -- safe because propagateFuncProperties (the only thing in this pass that
+    // can change a callee's purity) runs once per outer iteration, before the inner loop starts.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
@@ -129,14 +133,10 @@ void simplifyNonSSAIR(
     IRSimplificationOptions options,
     DiagnosticSink* sink)
 {
-    // Shared with removeRedundancy below, not just eliminateDeadCode, unlike the cache's
-    // original DCE-only contract (IRDeadCodeEliminationOptions::calleeSideEffectCache): a stale
-    // "no side effect" entry there only keeps dead code alive, but here it would let
-    // canInstHaveSideEffectAtAddress's Call case license forwarding a load/store across that
-    // call, which is not conservative. Nothing in this loop mutates callee purity today, so
-    // that never happens in practice, but clearing every iteration -- mirroring simplifyIR's
-    // own per-iteration clear -- makes that a property of the code instead of a convention a
-    // future change to this loop would have to remember.
+    // Shared with removeRedundancy below, not just eliminateDeadCode -- see
+    // slang-ir-redundancy-removal.h for why that consumer needs the cache cleared more eagerly
+    // than DCE's own staleness tolerance would require. Cleared every iteration, mirroring
+    // simplifyIR's own per-iteration clear.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
