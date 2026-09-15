@@ -1379,7 +1379,11 @@ void copyOriginalDecorations(IRInst* origFunc, IRInst* diffFunc)
     {
         switch (decor->getOp())
         {
+        // Carry both the compiler force-inline and the user `[ForceInline]` hint onto the
+        // derivative function: the derivative of a user-force-inlined function should inline the
+        // same way — in Slang for non-CUDA, or deferred to NVRTC on CUDA (issue #12623).
         case kIROp_ForceInlineDecoration:
+        case kIROp_UserForceInlineDecoration:
             cloneDecoration(decor, diffFunc);
             break;
         }
