@@ -42,6 +42,7 @@
     { "option": "SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC" },
     { "option": "SLANG_ENABLE_RELEASE_LTO" },
     { "option": "SLANG_IGNORE_ABORT_MSG" },
+    { "option": "SLANG_DISABLE_EXCEPTIONS" },
     { "option": "SLANG_ENABLE_TIME_TRACE" },
     {
       "option": "SLANG_ENABLE_XLIB",

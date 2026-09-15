@@ -28,9 +28,8 @@ namespace Slang
 //
 // The macro stays defined on purpose: any Exception subclass that crosses a
 // library boundary needs the same annotation, wherever it is declared (see
-// TextFormatException in slang-token-reader.h and the replay exceptions in
-// replay-context.h). Subclasses thrown and caught inside one binary don't
-// need it.
+// TextFormatException in slang-token-reader.h). Subclasses thrown and caught
+// inside one binary don't need it.
 #if SLANG_WINDOWS_FAMILY
 #define SLANG_EXCEPTION_TYPE_VISIBLE
 #else

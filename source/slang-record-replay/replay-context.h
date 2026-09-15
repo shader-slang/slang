@@ -174,16 +174,17 @@ enum class ReplayErrorKind : uint8_t
 /// A structured record/replay failure. Set once (first error wins) on the ReplayContext and queried
 /// at operation boundaries; carries exactly the data the former typed exceptions exposed so callers
 /// (and unit tests) can inspect the specific failure. The `object`/`type` pointers are non-owning
-/// diagnostic identities — they must never be dereferenced, only compared or used to build a message.
+/// diagnostic identities — they must never be dereferenced, only compared or used to build a
+/// message.
 struct ReplayError
 {
     ReplayErrorKind kind = ReplayErrorKind::None;
     String message;
-    size_t offset = 0, size = 0;                  ///< DataMismatch / Bounds.
+    size_t offset = 0, size = 0;                           ///< DataMismatch / Bounds.
     TypeId expected = TypeId::Null, actual = TypeId::Null; ///< TypeMismatch.
-    uint64_t handle = 0;                          ///< HandleNotFound.
-    ISlangUnknown* object = nullptr;              ///< UntrackedInterface (non-owning).
-    slang::TypeReflection* type = nullptr;        ///< UnresolvedType (non-owning).
+    uint64_t handle = 0;                                   ///< HandleNotFound.
+    ISlangUnknown* object = nullptr;                       ///< UntrackedInterface (non-owning).
+    slang::TypeReflection* type = nullptr;                 ///< UnresolvedType (non-owning).
 };
 
 template<typename T>
@@ -259,9 +260,9 @@ public:
     // =========================================================================
     //
     // Record/replay latches the first failure here (and on the streams) instead of throwing, so the
-    // subsystem builds and runs with C++ exceptions disabled. Fallible operations become no-ops once
-    // a failure is latched, and operation boundaries (executeNextCall/executeAll) convert it to a
-    // SlangResult. First error wins so the root-cause message/fields are preserved.
+    // subsystem builds and runs with C++ exceptions disabled. Fallible operations become no-ops
+    // once a failure is latched, and operation boundaries (executeNextCall/executeAll) convert it
+    // to a SlangResult. First error wins so the root-cause message/fields are preserved.
 
     /// True if a structured failure has been latched on this context (not counting stream failures;
     /// use hasFailure() for the aggregate).
@@ -271,7 +272,8 @@ public:
     SLANG_API const ReplayError& getLastError() const { return m_lastError; }
 
     /// Latch `error` as the failure (first error wins) and return SLANG_FAIL, so callers can write
-    /// `return setError(...)`. const because const read accessors (getProxy/getProxyHandleImpl) latch.
+    /// `return setError(...)`. const because const read accessors (getProxy/getProxyHandleImpl)
+    /// latch.
     SLANG_API SlangResult setError(const ReplayError& error) const
     {
         if (m_lastError.kind == ReplayErrorKind::None)
@@ -797,8 +799,8 @@ public:
     /// latched (the structured error is available via getLastError()/the streams).
     SLANG_API SlangResult executeNextCall(bool& outHadCall);
 
-    /// Execute all recorded calls until end of stream. Returns SLANG_OK if the whole stream replayed
-    /// cleanly, SLANG_FAIL on the first latched failure.
+    /// Execute all recorded calls until end of stream. Returns SLANG_OK if the whole stream
+    /// replayed cleanly, SLANG_FAIL on the first latched failure.
     SLANG_API SlangResult executeAll();
 
     /// Check if there are more calls to execute.
@@ -969,7 +971,14 @@ T* ReplayContext::readArrayInPlayback(RecordFlag flags, CountT& count)
         new (&buf[i]) T{};
         record(flags, buf[i]);
         if (hasFailure())
-            break; // stop on the first element failure; boundary sees hasFailure()
+        {
+            // Stop on the first element failure. The boundary gate sees hasFailure() and skips the
+            // real call, but also reset the out-count: elements past `i` were never constructed
+            // (raw arena memory), so a consumer that ignored the failure must not be able to
+            // iterate the buffer's uninitialized tail.
+            count = CountT{};
+            return buf;
+        }
     }
     return buf;
 }

@@ -30,7 +30,8 @@ void reportReplayDecodeError(ReplayStream& stream, const char* message)
 {
     // These checks reject malformed external replay data. Latch the message on the stream's failed
     // state (exception-free); the public dump APIs check isFailed() at each recovery boundary and
-    // print an ERROR line. A SLANG_RELEASE_ASSERT would turn a bad replay file into a process abort.
+    // print an ERROR line. A SLANG_RELEASE_ASSERT would turn a bad replay file into a process
+    // abort.
     stream.setError(message);
 }
 
@@ -278,7 +279,8 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     // Read-target locals are value-initialized: a read that runs past the end of a truncated stream
     // is a no-op that leaves its destination untouched (and latches stream.isFailed()), so a
-    // defined 0 is printed rather than an indeterminate value before the boundary reports the error.
+    // defined 0 is printed rather than an indeterminate value before the boundary reports the
+    // error.
     switch (type)
     {
     case TypeId::Int8:
@@ -612,8 +614,9 @@ void ReplayStreamDecoder::decodeByteRange(
         skipValueInStream(stream); // Skip this handle
     }
 
-    // Now decode remaining values (arguments, outputs, return value). The !isFailed() guard stops on
-    // a decode failure and prevents an infinite loop (a read past end does not advance position).
+    // Now decode remaining values (arguments, outputs, return value). The !isFailed() guard stops
+    // on a decode failure and prevents an infinite loop (a read past end does not advance
+    // position).
     int argNum = 0;
     while (stream.getPosition() < endOffset && stream.getPosition() < stream.getSize() &&
            !stream.isFailed())
@@ -753,13 +756,22 @@ bool ReplayStreamDecoder::decodeCallHeader(ReplayStream& stream, StringBuilder& 
         return false;
     }
 
-    uint32_t sigLen;
+    // Value-initialize every local that is populated by a read: read() is a no-op that leaves the
+    // destination untouched when the stream is already/becomes failed (a truncated recording), so
+    // an unchecked read of an uninitialized local would print indeterminate stack bytes. After each
+    // read bail out via the stream's failed flag so the caller emits its "<failed to read call
+    // header>" recovery line.
+    uint32_t sigLen = 0;
     stream.read(&sigLen, sizeof(sigLen));
+    if (stream.isFailed())
+        return false;
 
-    char sigBuffer[512];
+    char sigBuffer[512] = {};
     size_t readLen = (sigLen < sizeof(sigBuffer) - 1) ? sigLen : sizeof(sigBuffer) - 1;
     if (readLen > 0)
         stream.read(sigBuffer, readLen);
+    if (stream.isFailed())
+        return false;
     sigBuffer[readLen] = '\0';
 
     // Skip remaining signature bytes if truncated
@@ -770,14 +782,18 @@ bool ReplayStreamDecoder::decodeCallHeader(ReplayStream& stream, StringBuilder& 
 
     // Read 'this' pointer handle
     TypeId thisType = readTypeId(stream);
+    if (stream.isFailed())
+        return false;
     if (thisType != TypeId::ObjectHandle)
     {
         output << " (unexpected 'this' type: " << getTypeIdName(thisType) << ")";
         return true;
     }
 
-    uint64_t thisHandle;
+    uint64_t thisHandle = 0;
     stream.read(&thisHandle, sizeof(thisHandle));
+    if (stream.isFailed())
+        return false;
     if (thisHandle == kNullHandle)
         output << " [static]";
     else

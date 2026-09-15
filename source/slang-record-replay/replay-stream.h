@@ -63,8 +63,8 @@ public:
 
     /// Create a reading stream by loading entire file into memory.
     /// @param path Path to the file to load.
-    /// @return The stream with file contents.
-    /// @throws Slang::Exception if file cannot be opened or read.
+    /// @return The stream with the file contents; on an IO failure the returned stream is in the
+    /// failed state (isFailed() is true, getErrorMessage() describes it) rather than throwing.
     SLANG_API static ReplayStream loadFromFile(const char* path);
 
     /// Move-construct from another stream.
@@ -92,8 +92,8 @@ public:
     /// Set a mirror file for crash-safe capture.
     /// All subsequent writes will be immediately written to this file as well.
     /// @param path Path to the mirror file.
-    /// @return SLANG_OK, or a failure code if the file cannot be opened. Does not affect the stream's
-    /// read/write failed state (mirroring is an optional write-side feature).
+    /// @return SLANG_OK, or a failure code if the file cannot be opened. Does not affect the
+    /// stream's read/write failed state (mirroring is an optional write-side feature).
     SLANG_API SlangResult setMirrorFile(const char* path);
 
     /// Save all data to a file.
@@ -180,8 +180,8 @@ public:
                    size) == 0;
     }
 
-    /// Get a byte at a specific offset (for sync comparison). Returns 0 and puts the stream into the
-    /// failed state if the offset is past the end; callers detect this via isFailed().
+    /// Get a byte at a specific offset (for sync comparison). Returns 0 and puts the stream into
+    /// the failed state if the offset is past the end; callers detect this via isFailed().
     uint8_t getByte(size_t offset) const
     {
         if (offset >= size_t(m_buffer.getCount()))
