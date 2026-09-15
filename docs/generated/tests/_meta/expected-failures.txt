@@ -198,3 +198,22 @@ docs/generated/tests/design/pipeline/04c-layout-ir/raytracing-callable-payload-r
 # the diagnostic sorts the list, which would make the text order-stable by
 # construction rather than a reflection of the merge order.
 docs/generated/tests/design/pipeline/05-ir-passes/typeflow-report-dynamic-dispatch-sites.slang
+
+# Surfaced on nightly run 34561421312:
+# https://github.com/shader-slang/slang/actions/runs/34561421312
+# Generated expectations awaiting bundle regeneration. PR #12986 changed
+# the matrix-layout operand's dumped IR type from `Int` to `Enum(Int)`,
+# and PR #12884 added the `base_instance` parameter to Metal vertex
+# entry-point signatures. The compiler output is intentional; these
+# failures are stale generated test content.
+docs/generated/tests/coverage/legalize/metal-vertex-compute-sysvals.slang
+docs/generated/tests/design/ir-reference/types/mat1x1-minimum-shape.slang
+docs/generated/tests/design/ir-reference/types/mat-shape-operands.slang
+docs/generated/tests/design/ir-reference/types/mat-rectangular-2x3.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/cbuffer-mixed-types-lowers-to-struct-with-mixed-fields.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/lower-double-matrix.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/lower-half-matrix.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/lower-mat-double-rectangular.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/lower-mat-half-rectangular.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/lower-mat2x4-rectangular.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/lower-mat4x2-rectangular.slang
