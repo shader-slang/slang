@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:18:21Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: f1411119c2984cf871fda3e87109caf5abb8a34836f05a251561d7792998a19a
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 2694a491ee2f94e50d717023bd6df07444c657a539dba963a29092910bc0d9ae
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -327,6 +327,31 @@ in the first place, so a reloaded location resolves to the physical
 line or to the remapped line and path depending on which the consumer
 asks for, exactly as in the session that wrote it; the remapping is
 never baked into the line table.
+
+"Which the consumer asks for" is a real choice rather than a hedge: a
+source-manager query takes a `SourceLocType` that selects the physical
+view or the `#line`-adjusted one, and that parameter — not anything
+recorded in the serialized data — decides which of the two a given
+consumer sees. [../syntax-reference/tokens.md#source-location](../syntax-reference/tokens.md#source-location)
+covers that selection and the `__LINE__` surface that reads it.
+
+What a consumer then *does* with the location is outside this document.
+Two things are worth knowing while you are here, though, because both
+are easy to mistake for serialization behaviour. The first is that
+whether a `#line` directive appears in emitted text at all, and in
+which spelling, is a compile option rather than a property of the
+serialized locations:
+`-line-directive-mode` ([slang-options.cpp](../../../../source/slang/slang-options.cpp)
+line 857) takes `none`, `source-map`, `default`, `standard`, or `glsl`
+— `standard` being C-style `#line <n> "<path>"` and `glsl` the form
+that carries a file *number* instead of a name — and its own help text
+records the default as C-style directives for HLSL and C/C++ output and
+GLSL-style directives for GLSL output. The second is that the emitted
+rendering is per-target and is documented with the backends, in
+[../pipeline/06-emit.md](../pipeline/06-emit.md) and the
+[../target-pipelines/](../target-pipelines) pages; none of the emit
+sources are watched by this document, so this page deliberately does
+not tabulate them.
 
 Driver: [slang-serialize-source-loc.cpp](../../../../source/slang/slang-serialize-source-loc.cpp).
 
