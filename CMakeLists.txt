@@ -148,8 +148,12 @@ option(
 
 option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
-option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
+option(SLANG_ENABLE_VALIDATION_IR "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_VALIDATION_VM_BYTECODE "Enable VM bytecode validation" ON)
+option(
+    SLANG_ENABLE_VALIDATION_FOSSIL
+    "Enable fossil deserialization validation"
+)
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(
     SLANG_IGNORE_ABORT_MSG
@@ -384,9 +388,6 @@ if(
     AND SLANG_LIB_TYPE STREQUAL "SHARED"
     AND NOT SLANG_ENABLE_ASAN
 )
-    # This default-on branch is MSVC-only, and TSan is unsupported on Windows,
-    # so SLANG_ENABLE_TSAN cannot be relevant here (no NOT SLANG_ENABLE_TSAN
-    # guard needed). The mimalloc+TSan interaction is covered by the warning below.
     set(SLANG_ENABLE_MIMALLOC_DEFAULT ON)
 endif()
 advanced_option(
@@ -691,6 +692,114 @@ install(
     EXCLUDE_FROM_ALL
     PATTERN ".*" EXCLUDE
 )
+
+# The vendored deps below are statically linked into the shipped libraries, and
+# their licenses -- BSD-2-Clause (cmark, lz4) and glslang's mixed
+# BSD/MIT/Apache-2.0 license (see external/README.md) -- require reproducing the
+# copyright notice in binary redistributions. Ship each one's own notice file
+# (its real COPYING/LICENSE, which carries the copyright lines a generic SPDX
+# template omits). Each condition mirrors the source selection in
+# external/CMakeLists.txt, installing the notice only when the vendored
+# submodule -- not a system copy or an override path -- is the source we build
+# against; a missing notice file then fails the install loudly rather than
+# silently shipping a non-compliant package.
+if(NOT SLANG_OVERRIDE_CMARK_PATH)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/cmark/COPYING"
+        DESTINATION third-party-notices
+        RENAME cmark-COPYING
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+if(NOT SLANG_USE_SYSTEM_LZ4 AND NOT SLANG_OVERRIDE_LZ4_PATH)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/lz4/lib/LICENSE"
+        DESTINATION third-party-notices
+        RENAME lz4-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+if(
+    SLANG_ENABLE_SLANG_GLSLANG
+    AND NOT SLANG_USE_SYSTEM_GLSLANG
+    AND NOT SLANG_OVERRIDE_GLSLANG_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/glslang/LICENSE.txt"
+        DESTINATION third-party-notices
+        RENAME glslang-LICENSE.txt
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+
+# The vendored deps below are MIT-licensed (miniz, mimalloc, unordered_dense)
+# or Apache-2.0-licensed (spirv-tools), and are likewise statically linked
+# into the shipped libraries -- miniz and unordered_dense unconditionally
+# into `core`, mimalloc when Slang-owned allocations or SPIRV-Tools request
+# it, and spirv-tools when glslang support is built. MIT's license-and-
+# copyright-notice clause and Apache-2.0's attribution-retention requirement
+# (Apache-2.0 SS4; spirv-tools carries no upstream NOTICE file, so SS4(d)'s
+# NOTICE-carry clause does not apply here) both require reproducing the
+# dependency's own notice in binary redistributions, same as the BSD trio
+# above. Each condition again mirrors the source selection in
+# external/CMakeLists.txt.
+if(NOT SLANG_USE_SYSTEM_MINIZ AND NOT SLANG_OVERRIDE_MINIZ_PATH)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/miniz/LICENSE"
+        DESTINATION third-party-notices
+        RENAME miniz-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+if(
+    NOT SLANG_USE_SYSTEM_UNORDERED_DENSE
+    AND NOT SLANG_OVERRIDE_UNORDERED_DENSE_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/unordered_dense/LICENSE"
+        DESTINATION third-party-notices
+        RENAME unordered_dense-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+if(
+    (
+        SLANG_ENABLE_MIMALLOC
+        OR (
+            SLANG_ENABLE_SLANG_GLSLANG
+            AND NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
+            AND SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
+        )
+    )
+    AND NOT SLANG_OVERRIDE_MIMALLOC_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/mimalloc/LICENSE"
+        DESTINATION third-party-notices
+        RENAME mimalloc-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+if(
+    SLANG_ENABLE_SLANG_GLSLANG
+    AND NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
+    AND NOT SLANG_OVERRIDE_SPIRV_TOOLS_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/spirv-tools/LICENSE"
+        DESTINATION third-party-notices
+        RENAME spirv-tools-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+
 install(
     DIRECTORY "${slang_SOURCE_DIR}/docs/"
     DESTINATION share/doc/slang
