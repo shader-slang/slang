@@ -387,13 +387,54 @@ public:
     }
 };
 
-class DownstreamCompilerBase : public ComBaseObject, public IDownstreamCompiler
+/// Optional extension kept separate from IDownstreamCompiler to preserve that interface's ABI
+/// across prebuilt compiler modules (e.g. the prebuilt slang-llvm loaded via
+/// createLLVMDownstreamCompiler_V4). Reached through a compiler's existing `castAs`, so a module
+/// that predates this capability simply returns null for the UUID rather than exposing a shifted
+/// vtable.
+///
+/// Deliberately a standalone interface, NOT `ICastable`-derived: a compiler implements it
+/// alongside IDownstreamCompiler (which is already ICastable), and adding a second ICastable base
+/// would give the concrete class two ISlangUnknown subobjects. That is an ambiguous base whenever
+/// the concrete type is held by its own type in a `ComPtr` (as `createLLVMDownstreamCompiler_V4`
+/// does with `ComPtr<LLVMDownstreamCompiler>`), which fails to compile.
+/// `as<IDownstreamCompilerPathProvider>` only needs `getTypeGuid()` here, reached via the
+/// compiler's IDownstreamCompiler/ICastable, so no ICastable base is required on this interface.
+class IDownstreamCompilerPathProvider
+{
+public:
+    SLANG_COM_INTERFACE(
+        0x50b7be35,
+        0x1157,
+        0x4f8c,
+        {0xa6, 0x68, 0x10, 0x6f, 0xfd, 0xd5, 0x65, 0xc5})
+
+    /// Get the on-disk path of the loaded compiler library as a blob. `outPath` must be non-null
+    /// and, on SLANG_OK, receives the path; it is left untouched on any failure return. Returns
+    /// SLANG_E_NOT_AVAILABLE when this compiler has no recoverable shared-library path -- either
+    /// because it is not backed by a shared library at all (executable-based command-line
+    /// compilers, Metal) or because the platform has no shared-library introspection (e.g. WASM).
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(slang::IBlob** outPath) = 0;
+};
+
+class DownstreamCompilerBase : public ComBaseObject,
+                               public IDownstreamCompiler,
+                               public IDownstreamCompilerPathProvider
 {
 public:
     SLANG_COM_BASE_IUNKNOWN_ALL
 
     // ICastable
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
+    // IDownstreamCompilerPathProvider. Default: no recoverable path (executable-based command-line
+    // compilers, Metal). Shared-library compilers override this. Leaves *outPath untouched on this
+    // failure return, matching the contract getPathFromSymbol and the public API document.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(slang::IBlob** outPath) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(outPath);
+        return SLANG_E_NOT_AVAILABLE;
+    }
 
     // IDownstreamCompiler
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
@@ -446,6 +487,13 @@ public:
 
     void* getInterface(const Guid& guid);
     void* getObject(const Guid& guid);
+
+    /// Recover the on-disk path of the shared library that `symbolInLib` belongs to and return it
+    /// as a blob. `symbolInLib` must be a symbol resolved from the loaded compiler library (e.g. a
+    /// held function pointer). Returns SLANG_E_NOT_AVAILABLE when the path cannot be recovered
+    /// (e.g. WASM, where shared-library introspection is unavailable). Shared-library compilers
+    /// implement getPath by delegating here.
+    static SlangResult getPathFromSymbol(void* symbolInLib, slang::IBlob** outPath);
 
     Desc m_desc;
 };

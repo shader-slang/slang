@@ -27,6 +27,7 @@ in. Every prefix currently in use:
 | `claude-`        | Claude-driven review and CI-failure automation.                     |
 | `perf-`          | Performance measurement and its published results.                  |
 | `container-`     | The CI container images.                                            |
+| `scaler-`        | The GCP runner scaler binary and auto-deployment artifact.          |
 | `sccache-`       | The shared compiler cache.                                          |
 | `issue-`         | Issue-triggered automation.                                         |
 | `reuse-`         | REUSE/SPDX license compliance.                                      |
@@ -150,6 +151,57 @@ CI, which uploads its result as an artifact, and this workflow then posts the PR
 comment, because commenting needs a token the build job (possibly running a
 fork's code) must not hold.
 
+### Cherry-picking a SlangPy PR
+
+A Slang change that intentionally breaks SlangPy cannot be landed together with
+its SlangPy counterpart, which leaves a chicken-and-egg problem: both fixes for
+the SlangPy and Slang must land together.
+
+To disconnect the cyclic dependency, `ci-slangpy-trigger-test.yml` can specify
+a SlangPy PR and it will be cherry-picked for SlangPy workflow just in Slang repo.
+
+There are two workflow YML related to this process. Slang uses `ci-slangpy-trigger-test.yml`
+and it simply triggers the existing workflow on SlangPy repo, `ci-latest-slang.yml`.
+Note that their names are similar:
+- `ci-slangpy-trigger-test.yml` is in Slang repo
+- `ci-latest-slang.yml` is in SlangPy repo; not Slang repo.
+
+
+You can specify which PR to cherry-pick by setting the following in `ci-slangpy-trigger-test.yml`:
+
+```yaml
+env:
+  SLANGPY_CHERRY_PICK_PR: "1135" # "" means no cherry-pick
+```
+
+For the security reason, this setting, unfortunately, is not effective unless it is
+merged to `master` branch. It means the CI runs showing up as a part of the PR page
+will ignore this setting.
+
+In order to workaround the limitation, you need to manually trigger the workflow
+with `branch` name and the PR number from "Action" page:
+- https://github.com/shader-slang/slang/actions/workflows/ci-slangpy-trigger-test.yml
+
+Click "Run workflow" button on the right side of the page. It will ask two info:
+- "Use workflow from" that takes a branch name
+- "Slang PR number to test against SlangPy"
+
+The `branch` should be the branch name the PR currently uses. And the branch must be
+a branch in the https://github.com/shader-slang/slang/; not a forked repo.
+
+Once the SlangPy workflow is triggered, you need to track the result from the SlangPy
+side:
+- https://github.com/shader-slang/slangpy/actions/workflows/ci-latest-slang.yml
+
+The manual run reports its result back to the PR, onto the same `SlangPy Tests`
+check that the automatic run wrote. A passing manual run therefore replaces the
+failure, and the PR page will end up green.
+
+It is worth noting that if you needed this feature of cherry-pick with the backward
+compatibility breaking change, you probably need to announce the breaking change to
+the community before merging the change.
+
+
 ## 2. Reusable building blocks (`workflow_call`)
 
 No trigger of their own; see the first diagram for who calls them. The
@@ -169,6 +221,7 @@ No trigger of their own; see the first diagram for who calls them. The
 | `ci-materialx-regression-test.yml`                             | MaterialX integration test.              |
 | `cmake-options-build.yml`, `cmake-options-build-container.yml` | Build one CMake-option combination.      |
 | `pr-board-sync.yml`                                            | The PR-board reconciliation engine.      |
+| `issue-board-onboard.yml`                                      | Onboard a new issue onto Slang-All.      |
 
 ## 3. Scheduled
 
@@ -201,19 +254,21 @@ The `pr-*` files — the first four rows — are thin callers around
 `pr-board-sync.yml`; each exists because a different event is the only one
 carrying a particular signal, or the only one carrying secrets for a fork PR.
 See the second diagram, and read [`pr-board-sync.md`](pr-board-sync.md) before
-changing any of them. The remaining rows are standalone bots that call nothing
-and are grouped here only because they react to issue, comment, and review
-events rather than to a PR's code.
+changing any of them. `issue-onboard.yml` is the same thin-caller pattern around
+`issue-board-onboard.yml` for newly opened issues. The remaining rows are
+standalone bots that call nothing and are grouped here because they react to
+issue, comment, and review events rather than to a PR's code.
 
-| Workflow                                                | Purpose                                                      |
-| ------------------------------------------------------- | ------------------------------------------------------------ |
-| `pr-maintenance.yml`                                    | Board sync for PR and review events on origin PRs.           |
-| `pr-ci-complete.yml`                                    | Board sync when a gating workflow finishes.                  |
-| `pr-commit-status.yml`                                  | Board sync when an external commit status settles.           |
-| `pr-review-fork-bridge.yml`, `pr-review-fork-apply.yml` | Two-stage relay for fork-PR reviews.                         |
-| `issue-add-labels.yml`                                  | Labels new issues by the author's team membership.           |
-| `claude.yml`                                            | The `@claude` assistant on issues and PRs.                   |
-| `claude-ci-analysis.yml`                                | On demand: analyzes a CI failure and pushes a fix to the PR. |
+| Workflow                                                | Purpose                                                                                                            |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `pr-maintenance.yml`                                    | Board sync for PR and review events on origin PRs.                                                                 |
+| `pr-ci-complete.yml`                                    | Board sync when a gating workflow finishes.                                                                        |
+| `pr-commit-status.yml`                                  | Board sync when an external commit status settles.                                                                 |
+| `pr-review-fork-bridge.yml`, `pr-review-fork-apply.yml` | Two-stage relay for fork-PR reviews.                                                                               |
+| `issue-add-labels.yml`                                  | Labels new issues by the author's team membership.                                                                 |
+| `issue-onboard.yml` / `issue-board-onboard.yml`         | Adds a new issue to Slang-All; sets Source; Internal authors are assigned and moved to In Triage / current Sprint. |
+| `claude.yml`                                            | The `@claude` assistant on issues and PRs.                                                                         |
+| `claude-ci-analysis.yml`                                | On demand: analyzes a CI failure and pushes a fix to the PR.                                                       |
 
 ## 5. Slash-command regenerators
 
@@ -234,15 +289,17 @@ PR against your branch, so a failed check can be fixed without a local checkout.
 | `release.yml`                                                  | version tag            | Builds and publishes the release binaries.                                                                                                                             |
 | `release-linux-glibc-2-27.yml`, `release-linux-glibc-2-28.yml` | version tag, nightly   | Extra Linux builds against older glibc.                                                                                                                                |
 | `container-publish-images.yml`                                 | push/PR on `docker/**` | Publishes the Linux CI container images. A PR validates the version contract only; it never builds a Dockerfile, since that would run PR code on a self-hosted runner. |
+| `scaler-release.yml`                                           | push/PR on scaler code | Validates scaler PRs, then uploads the merged scaler binary as a GitHub artifact for host-side auto-deployment from `gpu-scaler-host`.                                 |
 | `perf-push-benchmark-results.yml`                              | push to master         | Publishes MDL benchmark numbers.                                                                                                                                       |
 
 ## 7. Manual only
 
-| Workflow                         | Purpose                                                     |
-| -------------------------------- | ----------------------------------------------------------- |
-| `ci-retry.yml`                   | Waits for a run to finish, then reruns its failed jobs.     |
-| `perf-compile-release-sweep.yml` | Backfills compile-performance history across past releases. |
-| `check-spirv-tools.yml`          | Placeholder for a SPIRV-Tools tip-of-tree check.            |
+| Workflow                           | Purpose                                                     |
+| ---------------------------------- | ----------------------------------------------------------- |
+| `ci-falcor2-perf-bridge-smoke.yml` | Manual smoke test for the Falcor 2 perf bridge prototype.   |
+| `ci-retry.yml`                     | Waits for a run to finish, then reruns its failed jobs.     |
+| `perf-compile-release-sweep.yml`   | Backfills compile-performance history across past releases. |
+| `check-spirv-tools.yml`            | Placeholder for a SPIRV-Tools tip-of-tree check.            |
 
 ## 8. Composite actions
 
