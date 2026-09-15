@@ -80,11 +80,17 @@ cd external/spirv-tools
 log_info "Running git-sync-deps to fetch dependencies..."
 python3 utils/git-sync-deps
 
+# Note: the CMake build directory must NOT be named "build". SPIRV-Tools' DEPS
+# file has a 'build' entry that checks out Chromium's //build tree into
+# external/spirv-tools/build/, so git-sync-deps above populates that directory
+# with unrelated Chromium headers (build_config.h, buildflag.h, precompile.h).
+# Configuring CMake into it would mix those headers in with the generated ones
+# and the copy step below would pick them up.
 log_info "Configuring SPIRV-Tools with CMake..."
-cmake . -B build
+cmake . -B build-generated
 
 log_info "Building SPIRV-Tools (Release configuration)..."
-cmake --build build --config Release
+cmake --build build-generated --config Release
 
 cd ../..
 
@@ -105,7 +111,7 @@ log_info "Updating SPIRV-Headers submodule..."
 git -C external/spirv-headers fetch
 git -C external/spirv-headers checkout "$SPIRV_HEADERS_REV"
 
-# Step 7: Copy the generated files from spirv-tools/build/ to spirv-tools-generated/
+# Step 7: Copy the generated files from spirv-tools/build-generated/ to spirv-tools-generated/
 log_info "Copying generated files to spirv-tools-generated/..."
 
 # Remove old generated files (but keep README.md)
@@ -113,8 +119,8 @@ find external/spirv-tools-generated -maxdepth 1 -name "*.h" -delete
 find external/spirv-tools-generated -maxdepth 1 -name "*.inc" -delete
 
 # Copy new generated files
-cp external/spirv-tools/build/*.h external/spirv-tools-generated/ 2>/dev/null || true
-cp external/spirv-tools/build/*.inc external/spirv-tools-generated/ 2>/dev/null || true
+cp external/spirv-tools/build-generated/*.h external/spirv-tools-generated/ 2>/dev/null || true
+cp external/spirv-tools/build-generated/*.inc external/spirv-tools-generated/ 2>/dev/null || true
 
 # Verify files were copied
 H_COUNT=$(find external/spirv-tools-generated -maxdepth 1 -name "*.h" | wc -l)

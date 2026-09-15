@@ -236,6 +236,36 @@ if(SLANG_ENABLE_GFX)
     )
 endif()
 if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
+    # ---- spvdb integration for SPVDB_DEBUGGER tests -------------------------
+    # spvdb (vendored at tests/spvdb) is a SPIR-V interpreter and source-level
+    # debugger. Build libspvdb here and link it into slang-test so that
+    # .slang test files under tests/debuginfo can drive the debugger
+    # in-process and validate its output with FileCheck.
+    #
+    # slang-test-main.cpp is the translation unit that compiles the stb_image
+    # implementation, so spvdb normally reuses those symbols instead of
+    # compiling a second copy. In a static-library build, though, Slang also
+    # defines STB_IMAGE_STATIC (see cmake/CompilerFlags.cmake), which makes
+    # every stbi_* function internal to slang-test-main.cpp and therefore
+    # unreachable from spvdb — there, spvdb has to compile its own copy.
+    if(SLANG_LIB_TYPE STREQUAL "STATIC")
+        set(SPVDB_PARENT_PROVIDES_STB_IMAGE FALSE)
+    else()
+        set(SPVDB_PARENT_PROVIDES_STB_IMAGE TRUE)
+    endif()
+    add_subdirectory(
+        "${slang_SOURCE_DIR}/tests/spvdb"
+        "${CMAKE_CURRENT_BINARY_DIR}/spvdb"
+        EXCLUDE_FROM_ALL
+    )
+
+    # spvdb is a vendored library that brings its own warning configuration, so
+    # it deliberately does not go through slang_add_target /
+    # set_default_compile_options. It is linked into slang-test, though, and
+    # sanitizer settings have to match across a whole binary, so apply just the
+    # sanitizer flags to it.
+    add_sanitizer_options(spvdb)
+
     # The test executables and runtime-loaded modules
     slang_add_target(
         test-server
@@ -264,9 +294,11 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             compiler-core
             slang
             stb
+            spvdb
             ${CMAKE_DL_LIBS}
             Threads::Threads
         INCLUDE_FROM_PRIVATE prelude slang-rhi
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_ENABLE_SPVDB=1
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         REQUIRES
             # Shared libraries dlopened by slang-test
@@ -433,6 +465,17 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             $<TARGET_PROPERTY:slang-capability-defs,INTERFACE_INCLUDE_DIRECTORIES>
             $<TARGET_PROPERTY:slang-fiddle-output,INTERFACE_INCLUDE_DIRECTORIES>
     )
+    if(SLANG_ENABLE_OPTIX)
+        target_compile_definitions(
+            slang-unit-test
+            PRIVATE SLANG_UNIT_TEST_ENABLE_OPTIX=1
+        )
+        target_include_directories(
+            slang-unit-test
+            SYSTEM
+            PRIVATE ${OptiX_INCLUDE_DIRS}
+        )
+    endif()
     slang_add_target(
         slang-reflection-test
         MODULE
