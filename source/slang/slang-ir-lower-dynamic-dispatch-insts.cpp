@@ -1679,12 +1679,9 @@ struct ExistentialLoweringContext : public InstPassBase
         return true;
     }
 
-    // Dynamic-dispatch handles are 64-bit values carried as `uint2` (PR #9386; avoids
-    // the SPIR-V Int64 capability). The carrier is host-visible ABI and must be the
-    // same on every target: a scalar 64-bit carrier aligns to 8 instead of 4 and shifts
-    // nested-existential payload layouts (see the nested-existential-in-buffer test).
-    // MSL can't cast a vector to a pointer; legalizeIRForMetal splits such casts
-    // through a scalar `uint64_t`. The helpers below own the representation.
+    // Dynamic-dispatch handles are 64-bit values stored as a uint2 on all targets.
+    // This avoids needing 64-bit integer support and keeps existential layouts
+    // the same across targets.
 
     // Return the lowered IR type that carries a dynamic-dispatch handle: a `uint2`.
     IRType* getLoweredHandleType(IRBuilder& builder)

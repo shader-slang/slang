@@ -18,6 +18,12 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-llvm -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
+//TEST:SIMPLE(filecheck=MTL):-target metal -stage compute -entry computeMain -conformance "Literal:IValue=1" -conformance "LeafNode:INode=1" -conformance "IndirectNode:INode=2"
+
+// On Metal, both halves of the stored pointer are combined into a 64-bit value before the cast.
+// MTL-NOT: device*)(uint2(
+// MTL: device*)(as_type<ulong>(uint2(
+// MTL-NOT: device*)(uint2(
 
 [anyValueSize(8)]
 interface IValue

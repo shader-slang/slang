@@ -6,10 +6,7 @@
 // Both impls of IA carry an interface-typed (IB) field — an existential nested inside
 // another existential. The IA values come straight from host-written buffer contents, so
 // dispatch is fully dynamic and each impl binds its own nested existential.
-// The hardcoded buffer data also guards the cross-target layout ABI: box headers are
-// packed `uint2` pairs (alignment 4) on every target. The single `uint pos` before
-// `inner` puts the nested box at payload offset 4, where an 8-aligned handle carrier
-// would insert padding — keep `pos` a single 4-byte field.
+// The buffer data below assumes each nested value starts at a 4-byte offset.
 
 [anyValueSize(32)]
 interface IB
