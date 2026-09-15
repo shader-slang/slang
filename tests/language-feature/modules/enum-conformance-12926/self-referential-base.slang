@@ -2,15 +2,14 @@
 
 // Companion to https://github.com/shader-slang/slang/issues/12926.
 //
-// Exercises the path where an enum's inheritance is queried while the enum is still being
-// checked: `E`'s base `IFoo<E>` carries the constraint `E : __EnumType`, whose check runs during
-// `E`'s own base checking. That is a genuine cycle. The fix in `_calcInheritanceInfo` forces an
-// enum to `ReadyForLookup` before linearizing, but must not force it here — doing so would emit a
-// spurious `CyclicReference` on `E` and return without advancing. It skips when the enum is
-// mid-check and lets the cycle be reported as usual.
+// `E`'s base `IFoo<E>` carries the constraint `E : __EnumType`, so checking the base evaluates
+// `E`'s conformance while `E` itself is still being checked. That is a genuine cycle, and it must
+// be reported against the offending base (`$inheritance` / `IFoo<E>`), not against `E`: linearizing
+// `E`'s inheritance while `E` is mid-check must not be turned into a cyclic-reference diagnostic on
+// `E` itself. This is the mid-check path guarded in `_calcInheritanceInfo`.
 interface IFoo<T> where T : __EnumType {}
 enum E : IFoo<E>
-//CHECK: cyclic reference
+//CHECK: cyclic reference '$inheritance'
 {
     a = 1,
     b = 2,

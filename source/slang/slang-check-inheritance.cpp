@@ -680,17 +680,15 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     //
     // Restricted to enums, and skipped while the enum is itself being checked:
     //   * Enum-only because driving a general aggregate here could re-enter this same
-    //     computation. `visitEnumDecl`'s one subtype query is `tryGetSubtypeWitness(tagType, ...)`
-    //     (`slang-check-decl.cpp:12371`) on the enum's *tag* type, never on the enum, so it does
-    //     not query the enum's own inheritance; a struct, by contrast, can (its
-    //     `IDefaultInitializable` synthesis under `-zero-initialize` queries `isSubtype(self, ...)`
-    //     at `slang-check-decl.cpp:11933`).
-    //   * The `isBeingChecked` guard avoids a spurious diagnostic: if the enum's inheritance is
-    //     queried while the enum is mid-check below `ReadyForLookup`, `ensureDecl` would emit
-    //     `CyclicReference` (`slang-check-decl.cpp:1986`) and return without advancing. That only
-    //     arises for a self-referential base -- `enum E : IFoo<E>` with `IFoo<T : __EnumType>`, a
-    //     genuine cycle -- so we skip and let the inheritance machinery report that cycle as it
-    //     already does without this fix, rather than introduce a second, worse diagnostic on `E`.
+    //     computation. `visitEnumDecl`'s one subtype query, `tryGetSubtypeWitness(tagType, ...)`,
+    //     is on the enum's *tag* type, never on the enum, so it does not query the enum's own
+    //     inheritance; a struct, by contrast, does (its `IDefaultInitializable` synthesis under
+    //     `-zero-initialize` queries `isSubtype(self, ...)`).
+    //   * The `isBeingChecked` guard avoids `ensureDecl` diagnosing a `CyclicReference` on the
+    //     enum and returning without advancing. That is reached only for a self-referential base
+    //     such as `enum E : IFoo<E>` where `IFoo<T : __EnumType>` -- a genuine cycle -- so we
+    //     defer to the inheritance machinery's own cyclic-reference reporting (which points at the
+    //     offending base) rather than emit a worse diagnostic on `E`.
     if (auto enumDeclRef = declRef.as<EnumDecl>())
     {
         auto* enumDecl = enumDeclRef.getDecl();
