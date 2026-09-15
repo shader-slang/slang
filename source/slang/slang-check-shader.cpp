@@ -2130,7 +2130,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     if (needsNumThreads && !isThreadLaunchNode && !hasUncheckedNodeLaunchAttr &&
         !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
     {
-        auto parentDecl = entryPointFuncDecl->parentDecl;
+        // For a specialized generic entry point, entryPointFuncDecl is the inner FuncDecl
+        // whose immediate parent is the GenericDecl wrapper; the standalone `layout(...) in;`
+        // lives as an EmptyDecl on the enclosing module/namespace scope. Skip past the
+        // GenericDecl so we scan the scope that actually holds the layout declaration.
+        auto parentDecl = getParentDecl(entryPointFuncDecl);
         if (parentDecl)
         {
             NumThreadsAttribute* numThreads = nullptr;
