@@ -142,14 +142,16 @@ void ReplayContext::writeTypeId(TypeId id)
 
 TypeId ReplayContext::readTypeId()
 {
-    uint8_t v;
+    // Value-initialize: a failed read leaves `v` untouched, so an uninitialized `v` would yield an
+    // indeterminate TypeId. 0 is not a valid TypeId and isFailed() is set, so callers reject/bail.
+    uint8_t v = 0;
     m_stream.read(&v, sizeof(v));
     return static_cast<TypeId>(v);
 }
 
 TypeId ReplayContext::readTypeIdFromReference()
 {
-    uint8_t v;
+    uint8_t v = 0;
     m_referenceStream.read(&v, sizeof(v));
     return static_cast<TypeId>(v);
 }
@@ -237,7 +239,9 @@ void ReplayContext::record(RecordFlag flags, bool& value)
     }
     else
     {
-        uint8_t v;
+        // Value-initialize: a failed playback read leaves `v` untouched, so `value` stays a defined
+        // false rather than reading indeterminate memory (hasFailure() is set for the boundary).
+        uint8_t v = 0;
         recordRaw(flags, &v, sizeof(v));
         value = (v != 0);
     }

@@ -936,7 +936,7 @@ bool ReplayStreamDecoder::tryRecoverToNextCall()
         m_stream.seek(startPos + i);
 
         // Check for TypeId::String
-        uint8_t typeVal;
+        uint8_t typeVal = 0;
         m_stream.read(&typeVal, sizeof(typeVal));
         if (static_cast<TypeId>(typeVal) != TypeId::String)
             continue;
@@ -945,7 +945,7 @@ bool ReplayStreamDecoder::tryRecoverToNextCall()
         if (startPos + i + 5 >= endPos)
             break;
 
-        uint32_t strLen;
+        uint32_t strLen = 0;
         m_stream.read(&strLen, sizeof(strLen));
         if (strLen == 0 || strLen > 512)
             continue;
@@ -957,7 +957,7 @@ bool ReplayStreamDecoder::tryRecoverToNextCall()
         // Skip the string and check for ObjectHandle
         m_stream.skip(strLen);
 
-        uint8_t handleType;
+        uint8_t handleType = 0;
         m_stream.read(&handleType, sizeof(handleType));
         if (static_cast<TypeId>(handleType) != TypeId::ObjectHandle)
             continue;
@@ -986,7 +986,10 @@ TypeId ReplayStreamDecoder::peekTypeId(ReplayStream& stream)
 
 TypeId ReplayStreamDecoder::readTypeId(ReplayStream& stream)
 {
-    uint8_t v;
+    // Value-initialize: a failed read is a no-op that leaves `v` untouched, so an uninitialized `v`
+    // would yield an indeterminate TypeId. 0 is not a valid TypeId, and the stream's failed flag is
+    // set, so callers reject it / bail via isFailed().
+    uint8_t v = 0;
     stream.read(&v, sizeof(v));
     return static_cast<TypeId>(v);
 }
