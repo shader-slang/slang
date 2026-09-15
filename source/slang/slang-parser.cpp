@@ -1501,10 +1501,14 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
     }
 }
 
-// Parse a static member name after `::`. When `__subscript` is itself followed by `::`, as in
-// `Type::__subscript::get`, translate the declaration keyword to the `SubscriptDecl`'s internal
-// `operator[]` name. The trailing scope token is required: without it, preserve the literal
-// identifier so expressions such as `Type::__subscript()` keep their ordinary meaning.
+// Parse a static member name after `::`, e.g. the `m` in `Base::m`. There are two cases. When
+// `__subscript` is immediately followed by `::` (as in `Type::__subscript::get`), translate the
+// keyword to the `SubscriptDecl`'s internal `operator[]` name. Every other name -- including a bare
+// `__subscript` not followed by `::`, which therefore stays a literal identifier -- is read through
+// the shared `ParseDeclName` production. Routing through `ParseDeclName` is what lets the
+// `operator` escape behave the same here as at the bare and `.`-member name-read sites:
+// `Namespace::operator+` yields the operator-symbol Name "+", the same Name that infix `a + b`
+// looks up.
 static NameLoc ParseStaticMemberName(Parser* parser)
 {
     if (parser->LookAheadToken("__subscript") && parser->LookAheadToken(TokenType::Scope, 1))
@@ -1512,7 +1516,7 @@ static NameLoc ParseStaticMemberName(Parser* parser)
         auto subscriptToken = parser->ReadToken("__subscript");
         return NameLoc(getSubscriptOperatorName(parser->astBuilder), subscriptToken.loc);
     }
-    return expectIdentifier(parser);
+    return ParseDeclName(parser);
 }
 
 // A "declarator" as used in C-style languages
