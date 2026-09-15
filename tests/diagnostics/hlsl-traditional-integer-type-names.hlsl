@@ -12,6 +12,12 @@ signed int signedIntValue;
 ^^^^^^ 'signed' is not supported in HLSL; use 'int' instead
 */
 
+signed short int signedShortValue;
+/*CHECK:
+^^^^^^ traditional integer type name is not supported in HLSL
+^^^^^^ traditional integer type name 'signed short int' is not supported in HLSL
+*/
+
 unsigned char unsignedCharValue;
 /*CHECK:
 ^^^^^^^^ traditional integer type name is not supported in HLSL
@@ -28,6 +34,18 @@ unsigned long unsignedLongValue;
 /*CHECK:
 ^^^^^^^^ traditional integer type name is not supported in HLSL
 ^^^^^^^^ traditional integer type name 'unsigned long' is not supported in HLSL
+*/
+
+unsigned long int unsignedLongIntValue;
+/*CHECK:
+^^^^^^^^ traditional integer type name is not supported in HLSL
+^^^^^^^^ traditional integer type name 'unsigned long int' is not supported in HLSL
+*/
+
+unsigned long long unsignedLongLongWithoutIntValue;
+/*CHECK:
+^^^^^^^^ traditional integer type name is not supported in HLSL
+^^^^^^^^ traditional integer type name 'unsigned long long' is not supported in HLSL
 */
 
 unsigned long long int unsignedLongLongValue;

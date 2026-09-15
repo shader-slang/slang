@@ -3430,6 +3430,8 @@ static bool isHLSLTraditionalIntegerTypeSpecifierStart(Parser* parser)
 /// knows it needs a type. The second reaches it through `parseAtomicExpr`, because a generic
 /// argument can be either a type or a value. Keeping the grammar here gives both paths the same
 /// recognition and diagnostic recovery rules.
+/// Returns `HLSLUnsignedTypeExpr` for an accepted spelling and a non-null `IncompleteExpr` after
+/// diagnosing a rejected spelling.
 static Expr* parseHLSLTraditionalIntegerTypeSpecifier(Parser* parser)
 {
     SLANG_ASSERT(isHLSLTraditionalIntegerTypeSpecifierStart(parser));
@@ -3463,15 +3465,17 @@ static Expr* parseHLSLTraditionalIntegerTypeSpecifier(Parser* parser)
             typeNameBuilder << " int";
     }
 
-    if (!isUnsigned)
-    {
-        parser->sink->diagnose(Diagnostics::SignedTypeNameInHlsl{.location = signToken.loc});
-    }
-    else if (hasUnsupportedTypeNameSuffix)
+    // Diagnose the complete spelling first, because suggesting `int` for a type such as
+    // `signed short` would discard the requested width.
+    if (hasUnsupportedTypeNameSuffix)
     {
         parser->sink->diagnose(Diagnostics::UnsupportedTraditionalIntegerTypeNameInHlsl{
             .typeName = typeNameBuilder.produceString(),
             .location = signToken.loc});
+    }
+    else if (!isUnsigned)
+    {
+        parser->sink->diagnose(Diagnostics::SignedTypeNameInHlsl{.location = signToken.loc});
     }
     else
     {
@@ -8357,7 +8361,8 @@ static IntegerLiteralValue _fixIntegerLiteral(
 
 static bool _isCast(Parser* parser, Expr* expr)
 {
-    if (as<PointerTypeExpr>(expr))
+    // These nodes always denote types, so a following `+` or `-` starts a unary cast operand.
+    if (as<PointerTypeExpr>(expr) || as<HLSLUnsignedTypeExpr>(expr))
     {
         return true;
     }
