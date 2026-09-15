@@ -320,7 +320,10 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                 auto load = as<IRLoad>(inst);
                 auto rootAddr = getRootAddr(load->getPtr());
                 // Data stored inline in the CUDA `__constant__` launch-parameter group lives in
-                // constant memory, which `__ldg` cannot address. See shader-slang/slang#13088.
+                // constant memory, which `__ldg` cannot address. The group's pointer has address
+                // space `Uniform`, so the `isPointerToImmutableLocation` check below would
+                // otherwise classify it immutable and lower it to `__ldg`; this skip must precede
+                // that check. See shader-slang/slang#13088.
                 if (isLoadRootedInCUDAConstantParamGroup(rootAddr))
                     break;
                 if (isPointerToImmutableLocation(rootAddr))

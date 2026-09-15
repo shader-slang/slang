@@ -54,14 +54,17 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
                 (uint)gHalf + (uint)gU16;
 }
 
-// A read-only `StructuredBuffer` lives in global memory, reached through a pointer loaded out of
-// the group, so its load roots at that `Load` (not the group param) and must still use `__ldg`.
-StructuredBuffer<uint> inBuf;
+// A top-level `ConstantBuffer<T>` folds into the group as a pointer field, so reading a member is a
+// `kIROp_Load` whose root is the *loaded* CB pointer (a `Load`, which `getRootAddr` does not peel),
+// not the group param. The guard does not fire and `__ldg` is kept (the data is genuinely global).
+// Unlike the negative cases above, this exercises the guard's keep-`__ldg` branch: a `kIROp_Load`
+// the guard must not over-suppress.
+ConstantBuffer<Foo> gCB;
 
 //CHECK_POS: __ldg
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void positiveMain(uint3 tid : SV_DispatchThreadID)
 {
-    outBuf[0] = inBuf[tid.x];
+    outBuf[0] = gCB.a + tid.x;
 }
