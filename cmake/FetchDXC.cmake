@@ -483,6 +483,25 @@ endif()
 
 if(_dxc_build_from_source)
     set(_dxc_forwarded_config_args "")
+
+    # Apple Clang 21+ (Xcode 26+) ships a libc++ that marks
+    # std::is_nothrow_constructible with [[_Clang::__no_specializations__]],
+    # turning DXC's LLVM StringRef trait specializations into
+    # -Winvalid-specialization hard errors (#11489). Both the main DXC build and
+    # the universal-macOS NATIVE host-tools sub-build compile that code and need
+    # the suppression, so compute it once here as the single source of truth; it
+    # stays empty for every other toolchain, which must not receive a flag it
+    # does not need.
+    set(_dxc_invalid_specialization_flag "")
+    if(
+        CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang"
+        AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "21.0.0"
+    )
+        set(_dxc_invalid_specialization_flag
+            "-DCMAKE_CXX_FLAGS=-Wno-invalid-specialization"
+        )
+    endif()
+
     if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         foreach(
             _dxc_osx_var
@@ -500,6 +519,90 @@ if(_dxc_build_from_source)
                 )
             endif()
         endforeach()
+
+        # A universal (multi-arch) macOS build forwards e.g. "x86_64;arm64" to
+        # the DXC source build. The vendored DXC ships an old LLVM tree that
+        # builds its build-time host tools (clang-tblgen/llvm-tblgen) under that
+        # same arch set, so a host tool can lack a slice for the build machine
+        # (e.g. an x86_64-only binary that cannot run on an arm64 host when
+        # Rosetta is unavailable) and fail to exec while generating .inc files.
+        # LLVM_USE_HOST_TOOLS routes those tools through a nested "NATIVE" build,
+        # kept separate from the universal DXC libraries so those stay fat. Only
+        # the multi-arch case is fixed here; a single explicitly non-host arch
+        # can hit the same failure and is diagnosed with a warning below.
+        #
+        # Prefer CMAKE_APPLE_SILICON_PROCESSOR for the host arch: on an
+        # Apple-silicon host it names the host silicon to build tools for even
+        # when CMake itself runs under Rosetta (where CMAKE_HOST_SYSTEM_PROCESSOR,
+        # from `uname -m`, would report x86_64 and re-pin the host tool to a
+        # non-runnable slice). Fall back to CMAKE_HOST_SYSTEM_PROCESSOR when it
+        # is unset.
+        if(
+            DEFINED CMAKE_APPLE_SILICON_PROCESSOR
+            AND NOT CMAKE_APPLE_SILICON_PROCESSOR STREQUAL ""
+        )
+            set(_dxc_native_host_arch "${CMAKE_APPLE_SILICON_PROCESSOR}")
+        else()
+            set(_dxc_native_host_arch "${CMAKE_HOST_SYSTEM_PROCESSOR}")
+        endif()
+
+        list(LENGTH CMAKE_OSX_ARCHITECTURES _dxc_osx_arch_count)
+        if(_dxc_osx_arch_count GREATER 1)
+            list(APPEND _dxc_forwarded_config_args -DLLVM_USE_HOST_TOOLS=ON)
+            # The NATIVE build inherits its invoking process environment, and
+            # CMAKE_OSX_ARCHITECTURES is a documented CMake env var that
+            # initializes the cache — so when it is set in the environment (as in
+            # the reported universal build), merely omitting it from the NATIVE
+            # command still leaves that build universal. Force the NATIVE build
+            # host-native explicitly: a -D on the command line overrides the
+            # env-var initialization. Only the host tools are built here, so a
+            # single host arch is exactly what we want; the universal libraries
+            # come from the main build above.
+            set(_dxc_native_flags
+                "-DCMAKE_OSX_ARCHITECTURES=${_dxc_native_host_arch}"
+            )
+            # The NATIVE sub-build does not inherit the main build's compiler
+            # flags, so also forward the shared -Wno-invalid-specialization
+            # suppression (computed above) when it applies.
+            if(NOT _dxc_invalid_specialization_flag STREQUAL "")
+                list(
+                    APPEND
+                    _dxc_native_flags
+                    "${_dxc_invalid_specialization_flag}"
+                )
+            endif()
+            # CROSS_TOOLCHAIN_FLAGS_NATIVE is one cache value that LLVM's
+            # CrossCompile hook expands (unquoted) into the NATIVE configure
+            # command. Escape the ";" so these -D flags survive as a single argv
+            # element through this file's DXC-configure execute_process, then
+            # re-split into separate arguments in the NATIVE configure.
+            string(REPLACE ";" "\\;" _dxc_native_flags "${_dxc_native_flags}")
+            list(
+                APPEND
+                _dxc_forwarded_config_args
+                "-DCROSS_TOOLCHAIN_FLAGS_NATIVE=${_dxc_native_flags}"
+            )
+        elseif(
+            _dxc_osx_arch_count EQUAL 1
+            AND NOT CMAKE_OSX_ARCHITECTURES STREQUAL "${_dxc_native_host_arch}"
+        )
+            # Single explicitly non-host arch (e.g. x86_64 on an arm64 host):
+            # DXC's host tools would again be built non-host-runnable. We do not
+            # force host tools here — a Rosetta-equipped host builds this fine
+            # and there is no reported case — but warn so a no-Rosetta failure
+            # points at the fix instead of dying deep in the DXC build. Mirrors
+            # the unsupported-config warnings elsewhere in this file.
+            message(
+                WARNING
+                "Building the vendored DXC for a single non-host architecture "
+                "(${CMAKE_OSX_ARCHITECTURES} on host ${_dxc_native_host_arch}). "
+                "Its build-time host tools (clang-tblgen) may not be runnable "
+                "here; if the build fails with 'Bad CPU type in executable', "
+                "build for the host architecture or a universal (multi-arch) "
+                "set (which this build handles automatically), or ensure "
+                "Rosetta is available."
+            )
+        endif()
     endif()
 
     # DXC's build (PredefinedParams.cmake) is designed for a single-config
@@ -626,21 +729,10 @@ if(_dxc_build_from_source)
         -Wno-dev
     )
 
-    # Apple Clang 21+ (Xcode 26+) ships a libc++ that marks
-    # std::is_nothrow_constructible with [[_Clang::__no_specializations__]],
-    # turning DXC's LLVM StringRef trait specializations into
-    # -Winvalid-specialization hard errors. Only this toolchain needs the
-    # suppression, so scope it to AppleClang >= 21; other compilers (and older
-    # AppleClang) must not receive a flag they do not need.
-    if(
-        CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang"
-        AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "21.0.0"
-    )
-        list(
-            APPEND
-            _dxc_configure_args
-            "-DCMAKE_CXX_FLAGS=-Wno-invalid-specialization"
-        )
+    # Apply the shared -Wno-invalid-specialization suppression (computed once
+    # above) to the main DXC build.
+    if(NOT _dxc_invalid_specialization_flag STREQUAL "")
+        list(APPEND _dxc_configure_args "${_dxc_invalid_specialization_flag}")
     endif()
 
     # A SHA256 hash keeps the stamp content short regardless of argument length.
