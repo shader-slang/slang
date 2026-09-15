@@ -103,6 +103,16 @@ bool DebugValueStoreContext::isDebuggableType(IRType* type)
     return debuggable;
 }
 
+// True if a function local or parameter of `type` should get a source-level DebugVar. Extends
+// isDebuggableType (scalars/vectors/matrices and aggregates of those) with the supported opaque
+// leaf handles: unlike plain data, a handle gets a DebugLocalVariable with no backing OpVariable
+// and is bound to its lowered SSA value by a DebugValue. This is a type decision only; whether the
+// concrete lowered value is a representable DebugValue operand is checked in SPIR-V legalization.
+bool DebugValueStoreContext::isDebugVarTypeSupported(IRType* type)
+{
+    return isDebuggableType(type) || isSupportedOpaqueDebugHandleType(type);
+}
+
 void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
 {
     IRBuilder builder(func);
@@ -134,7 +144,7 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             isRefParam = true;
             paramType = ptrType->getValueType();
         }
-        if (!isDebuggableType(paramType))
+        if (!isDebugVarTypeSupported(paramType))
             continue;
         auto debugVar = builder.emitDebugVar(
             paramType,
@@ -189,7 +199,7 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
                 {
                     auto varType = tryGetPointedToType(&builder, varInst->getDataType());
                     builder.setInsertBefore(varInst);
-                    if (!isDebuggableType(varType))
+                    if (!isDebugVarTypeSupported(varType))
                         continue;
                     auto debugVar = builder.emitDebugVar(
                         varType,
