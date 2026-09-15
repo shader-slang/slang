@@ -396,6 +396,18 @@ option(
 
 option(SLANG_ENABLE_RELEASE_LTO "Enable LTO for Release builds" OFF)
 
+enum_option(
+    SLANG_INSTALL_USER_SKILLS
+    AUTO
+    "Whether to install the pinned Slang user skills:"
+    AUTO
+    "Install them when the exact, clean submodule checkout is available"
+    ON
+    "Require and install the exact, clean submodule checkout"
+    OFF
+    "Do not install Slang user skills"
+)
+
 option(
     SLANG_ENABLE_SPLIT_DEBUG_INFO
     "Generate split debug info for debug builds"
@@ -796,6 +808,8 @@ install(
     DESTINATION .
     PATTERN ".*" EXCLUDE
 )
+include(SlangUserSkills)
+slang_install_user_skills()
 include(CPack)
 
 # Write basic package config version file using standard CMakePackageConfigHelpers utility

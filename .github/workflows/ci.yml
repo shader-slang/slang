@@ -551,6 +551,7 @@ jobs:
       runs-on: '["ubuntu-24.04"]'
       full-gpu-tests: false
       cpu-only: true
+      slang-user-skills: true
       server-count: 4
 
   # macOS tests
