@@ -1858,7 +1858,7 @@ err(
     "count-of-argument-is-invalid",
     30083,
     "invalid countof argument",
-    span { loc = "expr:Expr", message = "argument to countof can only be a type pack or tuple" }
+    span { loc = "expr:Expr", message = "argument to countof must be a type pack, tuple, value pack, or fixed-size array" }
 )
 
 err(
