@@ -685,10 +685,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     //     inheritance; a struct, by contrast, does (its `IDefaultInitializable` synthesis under
     //     `-zero-initialize` queries `isSubtype(self, ...)`).
     //   * The `isBeingChecked` guard avoids `ensureDecl` diagnosing a `CyclicReference` on the
-    //     enum and returning without advancing. That is reached only for a self-referential base
-    //     such as `enum E : IFoo<E>` where `IFoo<T : __EnumType>` -- a genuine cycle -- so we
-    //     defer to the inheritance machinery's own cyclic-reference reporting (which points at the
-    //     offending base) rather than emit a worse diagnostic on `E`.
+    //     enum and returning without advancing. That happens when the enum's inheritance is
+    //     linearized while the enum is itself mid-check -- e.g. a self-referential base
+    //     `enum E : IFoo<E>` with `IFoo<T : __EnumType>`, a genuine cycle -- so we defer to the
+    //     inheritance machinery's own cyclic-reference reporting (which points at the offending
+    //     base) rather than emit a worse diagnostic on `E`.
     if (auto enumDeclRef = declRef.as<EnumDecl>())
     {
         auto* enumDecl = enumDeclRef.getDecl();
