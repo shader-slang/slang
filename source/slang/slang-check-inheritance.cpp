@@ -674,14 +674,29 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     SemanticsVisitor visitor(this);
 
     // An enum's `__EnumType` conformance is not written in source; it is synthesized in
-    // `SemanticsDeclBasesVisitor::visitEnumDecl` when the enum reaches `ReadyForLookup`. Its
-    // base list is therefore incomplete until then, so force that state before linearizing to
-    // avoid caching a spurious non-conforming result. Restricted to enums: `visitEnumDecl` does
-    // not directly query the enum's own inheritance, so this cannot recurse here, whereas driving
-    // a general aggregate to `ReadyForLookup` from this path can re-enter -- e.g. a struct's
-    // `IDefaultInitializable` synthesis under `-zero-initialize` queries `isSubtype(self, ...)`.
+    // `SemanticsDeclBasesVisitor::visitEnumDecl` when the enum reaches `ReadyForLookup`. Its base
+    // list is therefore incomplete until then, so force that state before linearizing to avoid
+    // caching a spurious non-conforming result.
+    //
+    // Restricted to enums, and skipped while the enum is itself being checked:
+    //   * Enum-only because driving a general aggregate here could re-enter this same
+    //     computation. `visitEnumDecl`'s one subtype query is `tryGetSubtypeWitness(tagType, ...)`
+    //     (`slang-check-decl.cpp:12371`) on the enum's *tag* type, never on the enum, so it does
+    //     not query the enum's own inheritance; a struct, by contrast, can (its
+    //     `IDefaultInitializable` synthesis under `-zero-initialize` queries `isSubtype(self, ...)`
+    //     at `slang-check-decl.cpp:11933`).
+    //   * The `isBeingChecked` guard avoids a spurious diagnostic: if the enum's inheritance is
+    //     queried while the enum is mid-check below `ReadyForLookup`, `ensureDecl` would emit
+    //     `CyclicReference` (`slang-check-decl.cpp:1986`) and return without advancing. That only
+    //     arises for a self-referential base -- `enum E : IFoo<E>` with `IFoo<T : __EnumType>`, a
+    //     genuine cycle -- so we skip and let the inheritance machinery report that cycle as it
+    //     already does without this fix, rather than introduce a second, worse diagnostic on `E`.
     if (auto enumDeclRef = declRef.as<EnumDecl>())
-        visitor.ensureDecl(enumDeclRef.getDecl(), DeclCheckState::ReadyForLookup);
+    {
+        auto* enumDecl = enumDeclRef.getDecl();
+        if (!enumDecl->checkState.isBeingChecked())
+            visitor.ensureDecl(enumDecl, DeclCheckState::ReadyForLookup);
+    }
 
     if (auto extensionDeclRef = declRef.as<ExtensionDecl>())
     {
