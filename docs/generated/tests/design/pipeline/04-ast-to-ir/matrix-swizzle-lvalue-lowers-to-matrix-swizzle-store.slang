@@ -20,7 +20,7 @@
 // not folded away, and the matrix is read back into the output buffer so the
 // store survives dead-code elimination.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<float> outputBuffer;
 uniform float a;

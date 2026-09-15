@@ -13,7 +13,7 @@
 // Slang surface declared with that intrinsic op; `-conformance` supplies the
 // sequential id the target needs. The CHECK pins the resulting inst with the
 // literal id first and the packed value second.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -conformance A:IFoo=0
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -conformance A:IFoo=0
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int v; int run(int x) { return v + x; } };

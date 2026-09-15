@@ -11,7 +11,7 @@
 
 // Boundary: storage axis — `half` element inside a square matrix.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform matrix<half, 3, 3> m;
 uniform RWStructuredBuffer<half> buf;

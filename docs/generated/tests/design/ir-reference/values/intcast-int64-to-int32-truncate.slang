@@ -12,7 +12,7 @@
 // Top-of-rank truncation: 64-bit signed to 32-bit signed. The
 // doc places this under the same `intCast` opcode as widening.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int64_t i64a;
 uniform RWStructuredBuffer<int> buf;

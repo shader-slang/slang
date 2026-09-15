@@ -16,7 +16,7 @@
 // the CHECK-NOT is a real negative rather than a vacuous one. Debug level 1
 // also keeps the source record from embedding a copy of this file.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after performForceInlining -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after performForceInlining -o - -entry main -stage compute -g1
 
 uniform RWStructuredBuffer<int> buf;
 

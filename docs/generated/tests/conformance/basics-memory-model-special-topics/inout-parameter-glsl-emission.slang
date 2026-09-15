@@ -47,10 +47,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // MTL: void multiReadWrite_{{[0-9]+}}(int thread* val_{{[0-9]+}})
 // MTL: *val_{{[0-9]+}} =
 
-// CUDA: __device__ void multiReadWrite_{{[0-9]+}}(int {{.*}}val_{{[0-9]+}})
+// CUDA: void multiReadWrite_{{[0-9]+}}(int {{.*}}val_{{[0-9]+}})
 // CUDA: *val_{{[0-9]+}} =
 
-// CPP: static void multiReadWrite_{{[0-9]+}}(int32_t {{.*}}val_{{[0-9]+}}
+// CPP: void multiReadWrite_{{[0-9]+}}(int32_t {{.*}}val_{{[0-9]+}}
 // CPP: *val_{{[0-9]+}} =
 
 // WGSL: fn multiReadWrite_{{[0-9]+}}( val_{{[0-9]+}} : ptr<function, i32>)

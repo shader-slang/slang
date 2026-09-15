@@ -13,7 +13,7 @@
 // pass emits two `loop` terminators back-to-back in the same function;
 // the inner loop's break/continue labels are distinct from the outer's.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int n;
 uniform int m;

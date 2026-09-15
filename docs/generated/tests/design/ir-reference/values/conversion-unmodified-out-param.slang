@@ -17,7 +17,7 @@
 // which shows the marker is attached to the parameter's pointer and not
 // to a copy.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

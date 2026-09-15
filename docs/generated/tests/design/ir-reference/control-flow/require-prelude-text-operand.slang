@@ -15,7 +15,7 @@
 // recognize by name. The CHECK pins the instruction with the exact snippet
 // the shader asked for, inside the entry point's block.
 
-//TEST:SIMPLE(filecheck=CHECK):-target cuda -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target cuda -dump-ir -o - -entry main -stage compute
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;

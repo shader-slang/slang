@@ -19,7 +19,7 @@
 // `-dump-ir` output; the specialized form collapses it to plain
 // `makeCoopVector` after pack expansion, which is the sibling test.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int ia;
 uniform int ib;

@@ -11,7 +11,7 @@
 // Boundary on requirement count: one entry per requirement, none merged. The
 // order-independent CHECK-DAGs assert an entry exists for each of the three
 // declared methods, keyed by that method's own key.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IMulti
 {

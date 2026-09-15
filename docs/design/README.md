@@ -27,3 +27,5 @@ The [Capabilities](capabilities.md) document explains the proposed model for how
 The [Casting](casting.md) document explains how casting works in the slang C++ compiler code base.
 
 The [Experimental API Interfaces](experimental.md) document explains how experimental Slang API changes are to be deployed.
+
+The [Statically Linked Unit Testing](static-linked-unit-testing.md) document explains `slang-static-unit-test`: an executable that links the compiler statically so unit tests can call non-exported `source/slang` entry points directly.

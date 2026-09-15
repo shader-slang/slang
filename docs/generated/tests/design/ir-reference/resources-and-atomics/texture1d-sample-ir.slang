@@ -15,7 +15,7 @@
 // token in the specialization args is the observable witness that
 // the 1D variant was selected.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform Texture1D<float4> tex;
 uniform SamplerState samp;

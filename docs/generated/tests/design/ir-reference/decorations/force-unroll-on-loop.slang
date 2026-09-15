@@ -15,7 +15,7 @@
 // `[ForceUnroll(N : Int)]` with the count wildcarded; the mismatch with the
 // documented arity is recorded as a doc gap rather than hidden.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

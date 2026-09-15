@@ -15,7 +15,7 @@
 // layout opcodes -- which is what makes "follow the decoration to reach the
 // offset/size data" a valid rule for a reader walking the IR.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

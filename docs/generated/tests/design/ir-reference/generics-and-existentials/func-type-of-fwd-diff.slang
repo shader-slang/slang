@@ -13,7 +13,7 @@
 // depend on the original callable, and lowering names that callable through a
 // projection instead of embedding it. The CHECK asserts the projection's result
 // is a `Type`.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float inVal;
 uniform RWStructuredBuffer<float> buf;

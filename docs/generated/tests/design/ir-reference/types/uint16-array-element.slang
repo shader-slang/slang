@@ -13,7 +13,7 @@
 // dump. A `uint16_t[6]` global_param surfaces `Array(UInt16, 6 :
 // Int)`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint16_t v[6];
 uniform RWStructuredBuffer<uint> buf;

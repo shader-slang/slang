@@ -16,7 +16,7 @@
 // itself yielding a value — which is only the shape a region-shaped inst can
 // print.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 

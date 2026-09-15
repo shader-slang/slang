@@ -18,8 +18,8 @@
 // verbatim copy of this file, so a pattern spelled as plain text would match
 // its own CHECK line in the echoed source instead of a real record.
 
-//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1
-//TEST:SIMPLE(filecheck=STD):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g2
+//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=STD):-target spirv-asm -dump-ir -o - -entry main -stage compute -g2
 
 uniform RWStructuredBuffer<int> buf;
 

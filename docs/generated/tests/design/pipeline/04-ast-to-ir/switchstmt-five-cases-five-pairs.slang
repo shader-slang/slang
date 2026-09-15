@@ -14,7 +14,7 @@
 // operand list (after scrutinee, merge, default). The doc's row
 // describes this structure once; verifies it scales.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int sel;
 uniform RWStructuredBuffer<int> buf;

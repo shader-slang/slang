@@ -15,7 +15,7 @@
 // value in the owning interface's entry list is the witness-table type
 // of the bound interface.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IBase
 {
