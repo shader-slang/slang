@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#where-visibility-is-filtered
-//META: doc_section_digest=bd2e5c9c313f8eee04427c042995baa864cc9e2068805e81fdd68950019c18ec
+//META: doc_section_digest=a89f8b98a91c1e771a177ba6097fa77139369c98b2d45bac6f12e2be5bc2ee74
 //META: purpose=The extension target-type alignment is guarded on the candidate's own container being an ExtensionDecl, so a `private` member declared in a generic type's own body is reachable from neither `extension G<int>` nor `extension<T> G<T>` and is rejected with declaration-not-accessible (E30600).
 //META: intent=negative
 //META: pipeline_stage=check
