@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-a-ast-walk-and-ir-emission
-//META: doc_section_digest=66b9b0ad1e435e5d64e2372e5eedf6745238e43195f17a70dd348156a613b908
+//META: doc_section_digest=2fe8dd7a16950f4d25991c1ed50ffc7708abb01cec59410111613533f4e48c3a
 //META: purpose=Phase A emits the single kIROp_GlobalHashedStringLiterals aggregate (A8) holding every hashed string literal observed during the declaration walk.
 //META: intent=functional
 //META: pipeline_stage=lower
