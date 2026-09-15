@@ -136,6 +136,53 @@ static void addRayPayloadDecorationIfNeeded(IRBuilder& builder, IRType* type)
         builder.addRayPayloadDecoration(type);
 }
 
+// Give an empty struct a legal one-field physical layout by adding an `int _slang_dummy` field
+// and rewriting every `MakeStruct` of the type to supply a zero for it. DXC rejects a zero-field
+// struct where a ray-payload / callable-data parameter is required, so padding keeps the struct
+// non-empty and it survives type legalization. `addPayloadAccessQualifiers` is set only for ray
+// payloads, whose fields must carry HLSL payload access qualifiers at SM 6.7+; a callable-data
+// struct is a plain `inout` parameter and must not receive them.
+static void padEmptyStructWithDummyField(
+    IRBuilder& builder,
+    IRStructType* structType,
+    bool addPayloadAccessQualifiers)
+{
+    // The callers only ever pass an empty struct; padding a struct that already has fields would
+    // silently corrupt its layout, so assert rather than proceed.
+    SLANG_ASSERT(!structType->getFields().getFirst());
+
+    // Insert the key BEFORE the struct type so it is defined before being referenced.
+    builder.setInsertBefore(structType);
+    auto dummyKey = builder.createStructKey();
+    builder.addNameHintDecoration(dummyKey, UnownedStringSlice("_slang_dummy"));
+
+    if (addPayloadAccessQualifiers)
+        addDefaultPayloadAccessQualifiersToField(builder, dummyKey);
+
+    builder.createStructField(structType, dummyKey, builder.getIntType());
+
+    // The (now non-empty) struct's `MakeStruct`s must supply a value for the new field. Collect
+    // first, then mutate: `replaceUsesWith`/`removeAndDeallocate` would invalidate the use walk.
+    List<IRInst*> makeStructsToUpdate;
+    for (auto use = structType->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (user->getOp() == kIROp_MakeStruct && user->getDataType() == structType)
+        {
+            makeStructsToUpdate.add(user);
+        }
+    }
+
+    for (auto makeStructInst : makeStructsToUpdate)
+    {
+        builder.setInsertBefore(makeStructInst);
+        auto defaultValue = builder.getIntValue(builder.getIntType(), 0);
+        auto newMakeStruct = builder.emitMakeStruct(structType, 1, &defaultValue);
+        makeStructInst->replaceUsesWith(newMakeStruct);
+        makeStructInst->removeAndDeallocate();
+    }
+}
+
 void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* inst)
 {
     for (auto child : inst->getChildren())
@@ -302,39 +349,130 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
         emptyRayPayloadStructs.add(structType);
     }
 
-    // Now process the collected structs
+    // Now process the collected structs. Ray payload fields require stage access qualifiers.
     for (auto structType : emptyRayPayloadStructs)
     {
-        // Add a dummy field to the empty ray payload struct
-        // Insert the key BEFORE the struct type so it's defined before being referenced
-        builder.setInsertBefore(structType);
-        auto dummyKey = builder.createStructKey();
-        builder.addNameHintDecoration(dummyKey, UnownedStringSlice("_slang_dummy"));
+        padEmptyStructWithDummyField(builder, structType, /*addPayloadAccessQualifiers*/ true);
+    }
+}
 
-        // Add stage access decorations that ray payload fields require
-        addDefaultPayloadAccessQualifiersToField(builder, dummyKey);
+// Add `type` to `set` if it is an empty (zero-field) struct. Centralizes the emptiness check the
+// callable-data passes share; `padEmptyStructWithDummyField` asserts emptiness, and the check also
+// makes the passes idempotent (an already-padded struct is non-empty and is skipped on a re-run).
+static void addIfEmptyStruct(IRType* type, HashSet<IRStructType*>& set)
+{
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return;
+    if (structType->getFields().begin() != structType->getFields().end())
+        return;
+    set.add(structType);
+}
 
-        builder.createStructField(structType, dummyKey, builder.getIntType());
+// Return true if `call` invokes the `CallShader` target intrinsic. Uses the canonical recognizer
+// `findTargetIntrinsicDefinition`, which matches both the pre-link
+// `[targetIntrinsic("CallShader")]` decoration and the post-link `IRGenericAsm("CallShader")` body
+// the callee becomes, so it holds wherever this runs in the pipeline.
+static bool isCallShaderCall(IRCall* call, CapabilitySet const& targetCaps)
+{
+    auto callee = getResolvedInstForDecorations(call->getCallee());
+    UnownedStringSlice definition;
+    IRInst* intrinsicInst = nullptr;
+    if (!findTargetIntrinsicDefinition(callee, targetCaps, definition, intrinsicInst))
+        return false;
+    return definition == UnownedStringSlice("CallShader");
+}
 
-        // Now find and update all makeStruct instructions that create this struct type.
-        List<IRInst*> makeStructsToUpdate;
-        for (auto use = structType->firstUse; use; use = use->nextUse)
+void legalizeEmptyCallableDataPayloadsForHLSL(IRModule* module, CapabilitySet targetCaps)
+{
+    // DXC requires a callable entry point to declare exactly one argument parameter, and a
+    // `CallShader(index, payload)` to pass exactly two arguments. An empty callable-data struct
+    // legalizes to `LegalType::Flavor::none`, so `legalizeResourceTypes` removes both the callable
+    // parameter (leaving a zero-parameter callable) and the `CallShader` payload argument (leaving
+    // `CallShader(index)`) — DXC rejects both. Pad the empty struct so it survives, as
+    // `legalizeEmptyRayPayloadsForHLSL` does for ray payloads.
+    IRBuilder builder(module);
+
+    // On the D3D path the callable-data struct carries no decoration to key on, so identify it
+    // structurally at its two use sites. Collect first, because padding inserts new global
+    // instructions (struct keys) that would invalidate a live `getGlobalInsts()` walk.
+    HashSet<IRStructType*> emptyCallableDataStructs;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+
+        // Use site 1: the callable entry point's own data, an `out`/`inout` varying parameter.
+        auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
+        if (entryPointDecor && entryPointDecor->getProfile().getStage() == Stage::Callable)
         {
-            auto user = use->getUser();
-            if (user->getOp() == kIROp_MakeStruct && user->getDataType() == structType)
+            for (auto param : func->getParams())
             {
-                makeStructsToUpdate.add(user);
+                if (auto outType = as<IROutParamTypeBase>(param->getFullType()))
+                    addIfEmptyStruct(outType->getValueType(), emptyCallableDataStructs);
             }
         }
 
-        for (auto makeStructInst : makeStructsToUpdate)
+        // Use site 2: the payload argument of a `CallShader` call. It is passed by `inout`, so the
+        // argument is the address (a pointer) of the caller's payload local; the struct is its
+        // pointee type.
+        for (auto block : func->getBlocks())
         {
-            builder.setInsertBefore(makeStructInst);
-            auto defaultValue = builder.getIntValue(builder.getIntType(), 0);
-            auto newMakeStruct = builder.emitMakeStruct(structType, 1, &defaultValue);
-            makeStructInst->replaceUsesWith(newMakeStruct);
-            makeStructInst->removeAndDeallocate();
+            for (auto inst : block->getChildren())
+            {
+                auto call = as<IRCall>(inst);
+                if (!call || call->getArgCount() < 2)
+                    continue;
+                if (!isCallShaderCall(call, targetCaps))
+                    continue;
+                if (auto ptrType = as<IRPtrTypeBase>(call->getArg(1)->getDataType()))
+                    addIfEmptyStruct(ptrType->getValueType(), emptyCallableDataStructs);
+            }
         }
+    }
+
+    // Unlike a ray payload, a callable-data struct is a plain `inout` parameter with no
+    // `[raypayload]` attribute, so the dummy field must NOT carry payload access qualifiers; DXC
+    // rejects `read()/write()` qualifiers on callable data.
+    for (auto structType : emptyCallableDataStructs)
+    {
+        padEmptyStructWithDummyField(builder, structType, /*addPayloadAccessQualifiers*/ false);
+    }
+}
+
+void legalizeEmptyCallableDataPayloadsForSPIRV(IRModule* module)
+{
+    // On SPIR-V, a `CallShader` payload is a module-scope `[__vulkanCallablePayload]` global (the
+    // `static Payload p` in `CallShader`'s `spirv` arm), and `OpExecuteCallableKHR` takes its
+    // address. An empty payload struct legalizes to `LegalType::Flavor::none`, which erases the
+    // global's value type and leaves `OpExecuteCallableKHR ... &p` with a non-simple operand;
+    // `legalizeInst` then aborts type legalization with "non-simple operand(s)!". Pad the empty
+    // struct so a real Callable Data variable survives, which `OpExecuteCallableKHR` requires.
+    // This mirrors the global-var branch of `legalizeEmptyRayPayloadsForHLSL`; the callable-payload
+    // global is keyed on directly (rather than on the `CallShader` call) so the fix does not depend
+    // on the intrinsic call surviving un-inlined at this point. Callable data is a plain `inout`,
+    // not a `[raypayload]`, so the dummy field carries no payload access qualifiers.
+    IRBuilder builder(module);
+
+    HashSet<IRStructType*> emptyCallablePayloadStructs;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto globalVar = as<IRGlobalVar>(globalInst);
+        if (!globalVar)
+            continue;
+        if (!globalVar->findDecoration<IRVulkanCallablePayloadDecoration>() &&
+            !globalVar->findDecoration<IRVulkanCallablePayloadInDecoration>())
+            continue;
+        auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
+        if (!ptrType)
+            continue;
+        addIfEmptyStruct(ptrType->getValueType(), emptyCallablePayloadStructs);
+    }
+
+    for (auto structType : emptyCallablePayloadStructs)
+    {
+        padEmptyStructWithDummyField(builder, structType, /*addPayloadAccessQualifiers*/ false);
     }
 }
 
