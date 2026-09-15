@@ -3161,7 +3161,7 @@ bool isPointerToImmutableLocation(IRInst* loc)
     return false;
 }
 
-bool resourceAccessTouchesCoherentOrVolatile(IRInst* resource)
+bool resourceAccessTouchesCoherentOrVolatile(IRInst* value)
 {
     const auto qualifierMask =
         MemoryQualifierSetModifier::Flags::kCoherent | MemoryQualifierSetModifier::Flags::kVolatile;
@@ -3172,14 +3172,28 @@ bool resourceAccessTouchesCoherentOrVolatile(IRInst* resource)
         return false;
     };
 
-    // Backward slice over the resource handle's definition. This terminates because the front end
-    // only ever places the qualifier on a global resource declaration (it is rejected on locals,
-    // parameters, and `?:` results), so a coherent/volatile handle bottoms out at a global; any
-    // other root (notably a function parameter, which cannot be qualifier-carrying) is
-    // non-coherent. `seen` bounds loop-carried phis.
+    // Backward-slice the handle's definition, checking the qualifier decoration at each node.
+    //
+    // Termination is unconditional: `seen` visits each inst at most once over a finite IR graph, so
+    // even a loop-carried phi cannot diverge.
+    //
+    // Completeness (why the followed op set reaches the qualifier when present): the decoration is
+    // only ever attached to a global resource declaration (or its parameter-block struct field), so
+    // it suffices to follow the SSA value-forwarding through which a handle is routed *within* a
+    // function — an aggregate access (field-address / element-pointer and their value forms), a
+    // load of such an address, or a phi selecting among them — back to that global. A handle that
+    // does not slice to a qualified global this way is reported non-coherent.
+    //
+    // Two boundaries are intentionally out of scope, reachable only after the front end has already
+    // dropped the qualifier from the type: (1) a value stored into local memory and reloaded —
+    // there is no reaching-store analysis here — reachable only via the silent qualifier-drop on a
+    // local copy, tracked separately (#13084); (2) a value crossing a function-parameter boundary —
+    // a coherent argument bound to a plain-typed parameter is diagnosed at the call site
+    // (`compareMemoryQualifierOfParamToArgument`). A parameter that itself *is* qualifier-carrying
+    // is still handled, because `carriesQualifier` runs on every popped node before the switch.
     HashSet<IRInst*> seen;
     List<IRInst*> workList;
-    workList.add(resource);
+    workList.add(value);
     while (workList.getCount())
     {
         IRInst* inst = workList.getLast();
@@ -3199,20 +3213,24 @@ bool resourceAccessTouchesCoherentOrVolatile(IRInst* resource)
         case kIROp_FieldAddress:
         case kIROp_GetElement:
         case kIROp_FieldExtract:
-            // The qualifier lives on the accessed field/element key when the resource is a member
-            // of a parameter-block/global-params struct, so follow the key as well as the
-            // aggregate.
+            // Follow the aggregate (operand 0). For a field access, operand 1 is the field key,
+            // which can itself carry the qualifier (a coherent struct member of a parameter block),
+            // so follow it too; for an element access operand 1 is an index and simply carries no
+            // qualifier (following it is harmless).
             if (inst->getOperandCount() >= 2)
                 workList.add(inst->getOperand(1));
             workList.add(inst->getOperand(0));
             break;
         case kIROp_Param:
-            // A block parameter (phi) forwards its predecessors' branch arguments; a coherent
-            // resource chosen across control flow (e.g. `if (c) b = inA; else b = inB;`) reaches
-            // the load through such a phi. Entry-block (function) parameters have no predecessors,
-            // so this yields nothing for them — consistent with parameters never being coherent.
-            for (auto incoming : getPhiArgs(inst))
-                workList.add(incoming);
+            // A block parameter is a phi: follow its predecessors' branch arguments, so a coherent
+            // resource chosen across control flow (e.g. `if (c) b = inA; else b = inB;`) is
+            // reached. `getPhiArgs` requires a block parameter; guard against any other param kind
+            // (e.g. a generic parameter, whose parent is not a block).
+            if (as<IRBlock>(inst->getParent()))
+            {
+                for (auto incoming : getPhiArgs(inst))
+                    workList.add(incoming);
+            }
             break;
         default:
             break;

@@ -17,6 +17,7 @@
 //TEST:SIMPLE(filecheck=SELECT): -entry computeMainSelect -stage compute -target cuda
 //TEST:SIMPLE(filecheck=SELECTPLAIN): -entry computeMainSelectPlain -stage compute -target cuda
 //TEST:SIMPLE(filecheck=PLAIN): -entry computeMainPlain -stage compute -target cuda
+//TEST:SIMPLE(filecheck=MEMBER): -entry computeMainMember -stage compute -target cuda
 
 globallycoherent ByteAddressBuffer inCoherent;
 globallycoherent ByteAddressBuffer inCoherentB;
@@ -60,6 +61,16 @@ uint loadSelectPlain(bool pick, uint i)
         sel = inPlainB;
     return sel.Load(i);
 }
+
+// The qualifier sits on a struct member (field key), reached through a field-address access chain.
+struct Params
+{
+    globallycoherent ByteAddressBuffer buf;
+}
+ParameterBlock<Params> gParams;
+
+[noinline]
+uint loadField(uint i) { return gParams.buf.Load(i); }
 
 [numthreads(1, 1, 1)]
 void computeMainCoherent(uint3 tid: SV_DispatchThreadID)
@@ -146,5 +157,19 @@ void computeMainSelectPlain(uint3 tid: SV_DispatchThreadID)
     uint a = loadSelectPlain(pick, i);
     outData.Store(i * 4, 999);
     uint b = loadSelectPlain(pick, i);
+    outData.Store(i * 8, a + b);
+}
+
+[numthreads(1, 1, 1)]
+void computeMainMember(uint3 tid: SV_DispatchThreadID)
+{
+    uint i = tid.x;
+    // The coherent buffer is a struct member reached via a field-address chain; both reads survive.
+    // MEMBER: = loadField
+    // MEMBER: .Store(
+    // MEMBER: + loadField
+    uint a = loadField(i);
+    outData.Store(i * 4, 999);
+    uint b = loadField(i);
     outData.Store(i * 8, a + b);
 }
