@@ -675,25 +675,47 @@ struct FunctionParameterSpecializationContext
         }
     }
 
+    // Return a NonUniformResourceIndex inst that `inst` is derived from, or null.
+    // Non-uniformity is contagious, so a NonUniformResourceIndex reached through an
+    // integer cast or through integer/bitwise index arithmetic (e.g. the `* i` in
+    // buffers[NonUniformResourceIndex(i) * i]) still makes the resulting index
+    // non-uniform. Because `buffers[...].Load(...)` and resource subscripts lower to
+    // a call whose index argument is this arithmetic value, the specializer must see
+    // through the arithmetic here to re-mark the index parameter inside the
+    // specialized function (see maybeInsertNonUniformResourceIndex). We walk into the
+    // operands of the cast/arithmetic ops isNonUniformIndexArithmeticOp() recognises,
+    // using an explicit worklist with a visited set so a shared operand sub-DAG (e.g.
+    // `x = a + a`) is expanded at most once rather than exponentially.
+    //
+    // When the index derives from more than one wrapper (e.g.
+    // `NonUniformResourceIndex(a) * NonUniformResourceIndex(b)`), this returns whichever
+    // one the worklist reaches first -- any of them, not a unique or "closest" wrapper.
+    // That is fine because neither caller depends on *which* wrapper is returned, nor on
+    // there being exactly one: getCallInfoForArg uses only whether a wrapper exists (to
+    // key the specialization), and maybeInsertNonUniformResourceIndex uses the result as
+    // a clone template and then overwrites both its operand and its type.
     IRInst* findNonuniformIndexInst(IRInst* inst)
     {
-        for (;;)
+        HashSet<IRInst*> seen;
+        List<IRInst*> workList;
+        workList.add(inst);
+        while (workList.getCount())
         {
-            if (inst == nullptr)
-                return nullptr;
+            auto cur = workList.getLast();
+            workList.removeLast();
+            if (!cur || !seen.add(cur))
+                continue;
 
-            if (inst->getOp() == kIROp_NonUniformResourceIndex)
-                return inst;
+            if (cur->getOp() == kIROp_NonUniformResourceIndex)
+                return cur;
 
-            if (inst->getOp() == kIROp_IntCast)
-            {
-                inst = inst->getOperand(0);
-            }
-            else
-            {
-                return nullptr;
-            }
+            if (cur->getOp() == kIROp_IntCast)
+                workList.add(cur->getOperand(0));
+            else if (isNonUniformIndexArithmeticOp(cur->getOp()))
+                for (UInt i = 0; i < cur->getOperandCount(); i++)
+                    workList.add(cur->getOperand(i));
         }
+        return nullptr;
     }
 
     // The remaining information we've discussed is only
@@ -1218,6 +1240,14 @@ struct FunctionParameterSpecializationContext
                 // At last, set the operand of the NonUniformResourceIndex to the new parameter
                 // because we haven't done it yet during inst clone.
                 clonedInst->setOperand(0, newParam);
+
+                // NonUniformResourceIndex is an identity wrapper, so its result type must
+                // match the parameter it now wraps. The discovered inner wrapper can have a
+                // different (e.g. narrower) type than this parameter when the non-uniform
+                // index was reached through a width-changing cast or arithmetic (for
+                // example `uint64Value << NonUniformResourceIndex(uintValue)`), so reset
+                // the type here rather than keeping the cloned wrapper's original type.
+                clonedInst->setFullType(newParam->getFullType());
             }
             paramIndex++;
         }
