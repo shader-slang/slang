@@ -2631,6 +2631,10 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
 
     SemanticsVisitor subVisitor(contextToUse);
     initExpr = subVisitor.CheckExpr(initExpr);
+    // A type-inferred variable adopts its initializer's type without coercion, so diagnose a
+    // dropped memory qualifier here: this header-phase path bypasses the body-visitor's
+    // checkVarDeclCommon where explicitly-typed initializers are checked.
+    diagnoseMemoryQualifierDropOnLocalCopy(varDecl, initExpr);
     initExpr = maybeOpenRef(initExpr);
 
     // TODO: We might need some additional steps here to ensure
@@ -3429,6 +3433,11 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
         if (initExpr->type.isWriteOnly)
             getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = initExpr});
+
+        // See checkAssignWithCheckedOperands: a memory qualifier on the initializer's source decl
+        // is invisible to the type-only coercion below, so diagnose dropping it into a variable
+        // that lacks the qualifier before coercing.
+        diagnoseMemoryQualifierDropOnLocalCopy(varDecl, initExpr);
 
         initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
         varDecl->initExpr = initExpr;

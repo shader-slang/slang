@@ -3981,7 +3981,8 @@ public:
     Expr* CheckExpr(Expr* expr);
 
 
-    void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
+    void diagnoseMemoryQualifierDrop(Decl* dstDecl, Expr* srcIn);
+    void diagnoseMemoryQualifierDropOnLocalCopy(Decl* dstDecl, Expr* srcIn);
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,

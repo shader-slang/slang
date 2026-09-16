@@ -3794,6 +3794,14 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     if (expr->right->type.isWriteOnly)
         getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = expr->right});
 
+    // Memory qualifiers are decl-level, invisible to the type-only coercion below, so check the raw
+    // operands here, before `maybeOpenRef`.
+    auto leftExpr = expr->left;
+    while (auto paren = as<ParenExpr>(leftExpr))
+        leftExpr = paren->base;
+    if (auto leftVar = as<VarExpr>(leftExpr))
+        diagnoseMemoryQualifierDropOnLocalCopy(leftVar->declRef.getDecl(), expr->right);
+
     expr->left = maybeOpenRef(expr->left);
     auto type = expr->left->type;
     if (auto atomicType = as<AtomicType>(type))
@@ -3917,47 +3925,70 @@ static bool _canLValueCoerce(Type* a, Type* b)
 }
 
 
-void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn)
+// Diagnose binding a source whose decl carries a memory qualifier (`coherent`, `readonly`,
+// `writeonly`, or `volatile`) into a destination decl that lacks it. The qualifier is a decl-level
+// modifier, not part of the type, so type-only coercion cannot observe it. `restrict` is
+// intentionally droppable (matches GLSL).
+void SemanticsVisitor::diagnoseMemoryQualifierDrop(Decl* dstDecl, Expr* srcIn)
 {
-    auto arg = as<VarExpr>(argIn);
-    if (!paramIn || !arg)
+    auto srcExpr = as<VarExpr>(srcIn);
+    if (!dstDecl || !srcExpr)
         return;
 
-    auto argDeclRef = arg->declRef;
-    if (!argDeclRef)
+    auto srcDeclRef = srcExpr->declRef;
+    if (!srcDeclRef)
         return;
-    auto argDecl = argDeclRef.getDecl();
-    auto argMemMods = argDecl->findModifier<MemoryQualifierSetModifier>();
-    if (!argMemMods)
+    auto srcDecl = srcDeclRef.getDecl();
+    auto srcMemMods = srcDecl->findModifier<MemoryQualifierSetModifier>();
+    if (!srcMemMods)
         return;
-    uint32_t argQualifiers = argMemMods->getMemoryQualifierBit();
+    uint32_t srcQualifiers = srcMemMods->getMemoryQualifierBit();
 
-    uint32_t paramQualifiers = 0;
-    auto paramMemMods = paramIn->findModifier<MemoryQualifierSetModifier>();
-    if (paramMemMods)
-        paramQualifiers = paramMemMods->getMemoryQualifierBit();
+    uint32_t dstQualifiers = 0;
+    if (auto dstMemMods = dstDecl->findModifier<MemoryQualifierSetModifier>())
+        dstQualifiers = dstMemMods->getMemoryQualifierBit();
 
-    if (argQualifiers & MemoryQualifierSetModifier::Flags::kCoherent &&
-        !(paramQualifiers & MemoryQualifierSetModifier::Flags::kCoherent))
+    if (srcQualifiers & MemoryQualifierSetModifier::Flags::kCoherent &&
+        !(dstQualifiers & MemoryQualifierSetModifier::Flags::kCoherent))
         getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
             .qualifier = "coherent",
-            .arg = arg});
-    if (argQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly &&
-        !(paramQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly))
+            .arg = srcExpr});
+    if (srcQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly &&
+        !(dstQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly))
         getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
             .qualifier = "readonly",
-            .arg = arg});
-    if (argQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly &&
-        !(paramQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly))
+            .arg = srcExpr});
+    if (srcQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly &&
+        !(dstQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly))
         getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
             .qualifier = "writeonly",
-            .arg = arg});
-    if (argQualifiers & MemoryQualifierSetModifier::Flags::kVolatile &&
-        !(paramQualifiers & MemoryQualifierSetModifier::Flags::kVolatile))
+            .arg = srcExpr});
+    if (srcQualifiers & MemoryQualifierSetModifier::Flags::kVolatile &&
+        !(dstQualifiers & MemoryQualifierSetModifier::Flags::kVolatile))
         getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
             .qualifier = "volatile",
-            .arg = arg});
-    // dropping a `restrict` qualifier from arguments is allowed in GLSL with memory qualifiers
+            .arg = srcExpr});
+    // Dropping a `restrict` qualifier is allowed (consistent with GLSL memory qualifiers).
+}
+
+// The copy-to-a-local counterpart of `diagnoseMemoryQualifierDrop`, guarded two ways: the source
+// must be a resource *handle* (reading a qualified scalar into a plain value is a completed load,
+// not a coherent location, so it is not a drop), and the destination must be a local variable
+// (which, unlike a global or a struct field, cannot carry the qualifier, so the drop is forced).
+void SemanticsVisitor::diagnoseMemoryQualifierDropOnLocalCopy(Decl* dstDecl, Expr* srcIn)
+{
+    while (auto paren = as<ParenExpr>(srcIn))
+        srcIn = paren->base;
+    auto srcExpr = as<VarExpr>(srcIn);
+    if (!srcExpr)
+        return;
+    auto srcType = srcExpr->type.type;
+    if (!as<ResourceType>(srcType) && !as<UntypedBufferResourceType>(srcType) &&
+        !as<HLSLStructuredBufferTypeBase>(srcType) && !as<DynamicResourceType>(srcType))
+        return;
+    if (!isLocalVar(dstDecl))
+        return;
+    diagnoseMemoryQualifierDrop(dstDecl, srcExpr);
 }
 
 DeclRef<CallableDecl> getResolvedFunc(DeclRef<CallableDecl> declRef)
@@ -4308,7 +4339,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                     if (funcDeclBase && funcDeclBase->getParameters().getCount() > pp)
                         paramDecl = funcDeclBase->getParameters()[pp];
                 }
-                compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
+                diagnoseMemoryQualifierDrop(paramDecl, argExpr);
 
                 if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
                 {
