@@ -3,10 +3,13 @@
 #include "core/slang-io.h"
 #include "core/slang-platform.h"
 #include "core/slang-process-util.h"
+#include "scoped-env-var.h"
 #include "slang-com-ptr.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
+using SlangUnitTest::ScopedEnvVar;
+using SlangUnitTest::writeEnvironmentVariable;
 
 namespace
 {
@@ -30,8 +33,9 @@ SlangResult _runSlangc(
     RunResult& out)
 {
     const UnownedStringSlice varName("SLANG_ONDEMAND_IR");
-    const UnownedStringSlice value(onDemand ? "1" : "0");
-    SLANG_RETURN_ON_FAIL(PlatformUtil::setEnvironmentVariable(varName, &value));
+    const char* const value = onDemand ? "1" : "0";
+    if (writeEnvironmentVariable("SLANG_ONDEMAND_IR", value) != 0)
+        return SLANG_FAIL;
 
     // Read it back before spawning. A setter that reported success without taking
     // effect would leave both children in the same mode, and this test would compare a
@@ -39,7 +43,7 @@ SlangResult _runSlangc(
     // the environment at creation, so confirming it here is enough.
     StringBuilder readBack;
     SLANG_RETURN_ON_FAIL(PlatformUtil::getEnvironmentVariable(varName, readBack));
-    if (readBack.produceString().getUnownedSlice() != value)
+    if (readBack.produceString() != value)
         return SLANG_FAIL;
 
     CommandLine cmdLine;
@@ -138,11 +142,11 @@ SlangResult _buildLibraryModule(
 // is proposed separately in shader-slang/slang#12704.
 SLANG_UNIT_TEST(irLoadEquivalence)
 {
-    // Remember the caller's setting, so this test does not leak a mode into the rest of
-    // the process -- the environment is shared with every other test running here.
-    StringBuilder previous;
-    const bool hadPrevious = SLANG_SUCCEEDED(
-        PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_ONDEMAND_IR"), previous));
+    // Saves the caller's setting and puts it back when this scope ends, so the test does
+    // not leak a mode into the rest of the process -- the environment is shared with every
+    // other test running here. `_runSlangc` overwrites the value per child; this only has
+    // to own the restore.
+    ScopedEnvVar modeGuard("SLANG_ONDEMAND_IR", "1");
 
     String sourcePath;
     {
@@ -270,19 +274,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
             modEagerIR,
             workDir));
 
-    // Restore before asserting, so a failure does not also corrupt later tests.
-    if (hadPrevious)
-    {
-        const String previousText = previous.produceString();
-        const UnownedStringSlice previousSlice = previousText.getUnownedSlice();
-        PlatformUtil::setEnvironmentVariable(
-            UnownedStringSlice("SLANG_ONDEMAND_IR"),
-            &previousSlice);
-    }
-    else
-    {
-        PlatformUtil::setEnvironmentVariable(UnownedStringSlice("SLANG_ONDEMAND_IR"), nullptr);
-    }
+    // `modeGuard` restores the caller's setting when this scope ends, which is after the
+    // assertions below -- a failing assertion does not skip it.
     File::remove(sourcePath);
     File::remove(irSinkPath);
     File::remove(libSourcePath);
