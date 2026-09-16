@@ -1,6 +1,6 @@
 //META: generated=true
 //META: model=gpt-5.6-sol
-//META: generated_at=2026-09-16T07:46:01Z
+//META: generated_at=2026-09-16T08:36:25Z
 //META: source_commit=d3b56927b854c14fa1ac169b72da6e080ea80833
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#how-target-choice-affects-ir
 //META: doc_section_digest=1103b6c6793a74ba9a2a797712002157cc506284940af6ab698172cadfb6ec8a
@@ -47,7 +47,8 @@ void main(uint3 tid : SV_DispatchThreadID)
 // GLSL: = inBuf_{{[0-9]+}}._data[
 // GLSL-NOT: __ldg
 // SPIRV-NOT: __ldg
-// SPIRV: OpLoad
+// SPIRV: %[[IN_PTR:[0-9]+]] = OpAccessChain %_ptr_StorageBuffer_int %inBuf
+// SPIRV-NEXT: {{%[0-9]+}} = OpLoad %int %[[IN_PTR]]
 // SPIRV-NOT: __ldg
 // METAL-NOT: __ldg
 // METAL: = inBuf_{{[0-9]+}}[

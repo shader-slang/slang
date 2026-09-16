@@ -9,11 +9,11 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 ## Suite totals
 
 - **Bundles:** 79
-- **Total `.slang` tests:** 4111
+- **Total `.slang` tests:** 4112
 
 | Intent | Count |
 | --- | --- |
-| `functional` | 1937 |
+| `functional` | 1938 |
 | `negative` | 797 |
 | `boundary` | 776 |
 | `expansion` | 299 |
@@ -125,7 +125,7 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`design/target-pipelines/cuda`](design/target-pipelines/cuda/README.md) | 94 | [`docs/generated/design/target-pipelines/cuda.md`](../design/target-pipelines/cuda.md) |
+| [`design/target-pipelines/cuda`](design/target-pipelines/cuda/README.md) | 95 | [`docs/generated/design/target-pipelines/cuda.md`](../design/target-pipelines/cuda.md) |
 | [`design/target-pipelines/hlsl`](design/target-pipelines/hlsl/README.md) | 170 | [`docs/generated/design/target-pipelines/hlsl.md`](../design/target-pipelines/hlsl.md) |
 | [`design/target-pipelines/metal`](design/target-pipelines/metal/README.md) | 78 | [`docs/generated/design/target-pipelines/metal.md`](../design/target-pipelines/metal.md) |
 | [`design/target-pipelines/spirv`](design/target-pipelines/spirv/README.md) | 125 | [`docs/generated/design/target-pipelines/spirv.md`](../design/target-pipelines/spirv.md) |

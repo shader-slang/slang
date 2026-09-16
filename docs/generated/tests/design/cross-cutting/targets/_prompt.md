@@ -213,7 +213,10 @@ These add to the universal lessons in `_common.md`. Apply them ALL:
   FileCheck prefix containing only `-NOT: __ldg` can pass on empty
   output. For each non-CUDA arm of an immutable-buffer test, match a
   target-specific ordinary buffer load and bracket that anchor with
-  `-NOT: __ldg` before and after it.
+  `-NOT: __ldg` before and after it. For SPIR-V, capture the
+  `OpAccessChain` rooted at the input buffer and require the following
+  `OpLoad` to consume that captured pointer; a bare `OpLoad` is too
+  broad to establish that the buffer read was emitted.
 - **`__target_switch` must include a `default:` arm** (or be
   exhaustive over every active target keyhole) when feeding through
   `slangc` — a missing arm for an active target is itself a

@@ -347,7 +347,7 @@
       "watched_paths_digest": "3b23aa8745718c3c9b2740ec584b30f97dee58483ad3f8efe781def69aa1b5d4"
     },
     "design/target-pipelines/cuda": {
-      "generated_at": "2026-09-16T06:55:52+00:00",
+      "generated_at": "2026-09-16T08:39:05+00:00",
       "model": "gpt-5.6-sol",
       "source_commit": "d3b56927b854c14fa1ac169b72da6e080ea80833",
       "source_doc_digest": "8f5f2c489e64725ff848a909352ae18b3fea8c9e41f23048f45bc851cc3e3b48",
