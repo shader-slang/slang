@@ -1869,6 +1869,11 @@ Result linkAndOptimizeIR(
     // selector is not yet a phi the pass finds nothing to thread and is a no-op.
     SLANG_PASS(threadSwitchOnConstantPhi);
 
+    if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader)
+    {
+        SLANG_PASS(legalizeOptiXReportIntersectionsForCUDA, sink);
+    }
+
     // Report checkpointing information.
     if (codeGenContext->shouldReportCheckpointIntermediates())
     {

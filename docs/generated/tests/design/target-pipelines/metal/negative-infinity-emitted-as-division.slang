@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools
-//META: doc_section_digest=f18a62d46309fae1d33b5fed992f19c2eff74d722d039dfeeeccc0dfdbf5b824
+//META: doc_section_digest=1eced9055efc11b8172cc551a8f3310e41738933d999dd62447ac27360db35ca
 //META: purpose=Boundary: negative infinity is the third non-finite spelling and is emitted bare as the division `(-1.0 / 0.0)` with no `f` suffix.
 //META: intent=boundary
 //META: pipeline_stage=emit

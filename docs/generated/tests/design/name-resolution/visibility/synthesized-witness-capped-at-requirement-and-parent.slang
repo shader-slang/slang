@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#generic-parameters-accessors-and-synthesized-members
-//META: doc_section_digest=5af69869d1bb41b9ec6da86b628cac4884b654398df91d571e67dbe22a034ace
+//META: doc_section_digest=76e3cae801b62d7c30aad84ab21cae4c506029ec2b237f69a42af9e0787d1c90
 //META: purpose=A synthesized requirement witness takes Min(parent visibility, requirement visibility); an internal struct can satisfy an explicitly-public interface requirement without a higher-than-parent violation.
 //META: intent=functional
 //META: pipeline_stage=check
