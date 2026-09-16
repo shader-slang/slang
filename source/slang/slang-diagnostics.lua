@@ -5919,7 +5919,7 @@ err(
     "cannot return a pointer in this storage class when targeting SPIR-V",
     span {
         loc = "location",
-        message = "SPIR-V's Logical addressing model only permits a function to return a pointer in the PhysicalStorageBuffer, StorageBuffer, or Workgroup storage class; a pointer in any other class — such as a function-local ('Function') or a 'static' global ('Private') — cannot be returned. Return a pointer in one of the permitted storage classes, or mark the function '[ForceInline]' so no such pointer crosses a call boundary.",
+        message = "only PhysicalStorageBuffer, StorageBuffer, and Workgroup pointers can be returned",
     }
 )
 
@@ -5929,7 +5929,7 @@ err(
     "function returns pointers in more than one storage class",
     span {
         loc = "location",
-        message = "this function returns pointers in more than one storage class (address space); a function has a single result type, so every return must yield a pointer in the same storage class. Restructure the code so all returned pointers live in the same storage class.",
+        message = "all returns must yield pointers in the same storage class",
     }
 )
 

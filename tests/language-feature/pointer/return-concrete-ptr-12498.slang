@@ -74,11 +74,10 @@ void computeMainNested(uint3 tid: SV_DispatchThreadID)
     outputBuffer[0] = *got;
 }
 
-// The E58004 remedy the diagnostic advertises: `[ForceInline]` a helper that
-// returns a pointer to a caller's function-local. Force-inlining runs before the
-// address-space pass, so no pointer crosses a call boundary and no `Function`-
-// storage-class result survives to be diagnosed — the module must compile
-// cleanly with no error (in particular, no E58004).
+// `[ForceInline]` is the remedy for E58004: force-inlining runs before the
+// address-space pass, so no pointer crosses a call boundary and no
+// `Function`-storage-class result survives to be diagnosed. The module must
+// compile cleanly with no error (in particular, no E58004).
 [ForceInline]
 int* pickLocal(int* p, bool cond)
 {

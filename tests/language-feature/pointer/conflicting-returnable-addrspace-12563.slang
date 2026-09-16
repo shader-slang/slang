@@ -16,15 +16,14 @@
 // returnable, so E58004 does not apply; the error is specifically that the two
 // returns disagree (E58005) — a distinct condition.
 //
-// The address-space specialization pass derives the result address space from
-// the first return in iteration order and then skips later returns, so it
-// converges instead of flipping the result type between Workgroup and
-// StorageBuffer on every fixpoint drain and requeuing the function forever
-// (without that deterministic choice this compile hangs). The mismatch the
-// choice leaves behind — one result type, two return classes — is then
-// diagnosed in diagnoseUnreturnableStorageClassPointerReturns rather than
-// reaching emission as invalid SPIR-V. That this DIAGNOSTIC_TEST runs to
-// completion instead of timing out is the termination check.
+// specializeAddressSpace derives the result address space from the first return
+// and skips the rest, so it converges instead of flipping the result type
+// between Workgroup and StorageBuffer every drain and requeuing forever (without
+// that choice this compile hangs). It reports the leftover mismatch itself, so
+// the check covers every target that runs the pass, not just SPIR-V. (Metal and
+// WGSL cannot reach it: raw pointers via `&` are unavailable there, rejected at
+// the front-end before this pass.) That this DIAGNOSTIC_TEST runs to completion
+// instead of timing out is the termination check.
 
 RWStructuredBuffer<int> buf;
 
@@ -38,7 +37,7 @@ int* pick(bool c, uint i)
     return &buf[i];
 }
 //CHECK: 58005
-//CHECK: more than one storage class
+//CHECK: same storage class
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID)

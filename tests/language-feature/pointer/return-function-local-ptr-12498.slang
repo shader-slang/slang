@@ -19,7 +19,7 @@ RWStructuredBuffer<int> outputBuffer;
 int* pickLocal(int* p, bool cond)
 /*CHECK:
      ^^^^^^^^^ E58004
-     ^^^^^^^^^ a function-local ('Function')
+     ^^^^^^^^^ PhysicalStorageBuffer
 */
 {
     if (cond)
@@ -35,7 +35,7 @@ static int gStatic;
 int* pickStatic(int* p, bool cond)
 /*CHECK:
      ^^^^^^^^^^ E58004
-     ^^^^^^^^^^ a 'static' global ('Private')
+     ^^^^^^^^^^ PhysicalStorageBuffer
 */
 {
     if (cond)

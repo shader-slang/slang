@@ -8,6 +8,6 @@ class DiagnosticSink;
 class TargetProgram;
 
 void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
-void specializeAddressSpaceForMetal(IRModule* module);
+void specializeAddressSpaceForMetal(IRModule* module, DiagnosticSink* sink = nullptr);
 
 } // namespace Slang

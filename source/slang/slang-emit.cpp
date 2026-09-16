@@ -2627,15 +2627,15 @@ Result linkAndOptimizeIR(
     if (target == CodeGenTarget::GLSL)
     {
         NoOpInitialAddressSpaceAssigner addrSpaceAssigner;
-        SLANG_PASS(specializeAddressSpace, &addrSpaceAssigner);
+        SLANG_PASS(specializeAddressSpace, &addrSpaceAssigner, sink);
     }
     else if (isMetalTarget(targetRequest))
     {
-        SLANG_PASS(specializeAddressSpaceForMetal);
+        SLANG_PASS(specializeAddressSpaceForMetal, sink);
     }
     else if (isWGPUTarget(targetRequest))
     {
-        SLANG_PASS(specializeAddressSpaceForWGSL);
+        SLANG_PASS(specializeAddressSpaceForWGSL, sink);
     }
 
     bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();

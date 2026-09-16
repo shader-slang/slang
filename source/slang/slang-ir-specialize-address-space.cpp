@@ -4,19 +4,31 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
 struct AddressSpaceContext : public AddressSpaceSpecializationContext
 {
     IRModule* module;
+    DiagnosticSink* sink;
 
     Dictionary<IRInst*, AddressSpace> mapInstToAddrSpace;
     InitialAddressSpaceAssigner* addrSpaceAssigner;
     HashSet<IRFunc*> functionsToConsiderRemoving;
 
-    AddressSpaceContext(IRModule* inModule, InitialAddressSpaceAssigner* inAddrSpaceAssigner)
-        : module(inModule), addrSpaceAssigner(inAddrSpaceAssigner)
+    // Functions that return pointers in more than one storage class, mapped to
+    // the disagreeing return's location. Recorded as found (once each, across the
+    // fixpoint's repeated passes) but reported only after dead-clone removal, so a
+    // diagnostic never fires on an original that a specialized clone replaced and
+    // this pass then deletes.
+    OrderedDictionary<IRFunc*, SourceLoc> conflictingReturns;
+
+    AddressSpaceContext(
+        IRModule* inModule,
+        InitialAddressSpaceAssigner* inAddrSpaceAssigner,
+        DiagnosticSink* inSink)
+        : module(inModule), sink(inSink), addrSpaceAssigner(inAddrSpaceAssigner)
     {
     }
 
@@ -84,17 +96,14 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
     Dictionary<FuncSpecializationKey, IRFunc*> functionSpecializations;
 
-    // Maps each specialized clone back to the ultimate original function it was
-    // (transitively) specialized from. Used to detect cyclic specialization
-    // regardless of how many intermediate clones a recursive call passes
-    // through: the clone identities all differ, but their root does not.
+    // Maps each specialized clone to its ultimate original. Detects cyclic
+    // specialization: clone identities differ across recursion levels, the root
+    // does not.
     Dictionary<IRFunc*, IRFunc*> specializationRootOf;
 
-    // The specialization roots whose specialization is currently in progress on
-    // the processFunction call stack. Guards against unbounded recursion when a
-    // recursive function reaches this pass (only possible with
-    // -disable-non-essential-validations, which skips the E55201 recursion
-    // check).
+    // Specialization roots in progress on the processFunction stack. Guards
+    // unbounded recursion when a recursive function reaches this pass (only under
+    // -disable-non-essential-validations, which skips the E55201 check).
     HashSet<IRFunc*> rootsBeingSpecialized;
 
     IRFunc* specializeFunc(const FuncSpecializationKey& key)
@@ -133,14 +142,10 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         functionSpecializations[key] = specializedFunc;
 
-        // Record the specialization root so a later cyclic specialization
-        // (recursion) can be detected even though every clone has a distinct
-        // identity: the clone's root is the original func's root, or the
-        // original func itself when it is not a clone.
-        IRFunc* root = func;
-        if (IRFunc** existingRoot = specializationRootOf.tryGetValue(func))
-            root = *existingRoot;
-        specializationRootOf[specializedFunc] = root;
+        // Record this clone's root (the original's root, else the original
+        // itself) so a later cyclic specialization is detected despite each
+        // clone's distinct identity.
+        specializationRootOf[specializedFunc] = getSpecializationRoot(func);
 
         return specializedFunc;
     }
@@ -149,6 +154,16 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     {
         auto funcType = as<IRFuncType>(callee->getDataType());
         return getAddressSpaceFromVarType(funcType->getResultType());
+    }
+
+    // Return the ultimate original `func` was (transitively) specialized from, or
+    // `func` itself when it is not a clone. Every specialized copy of one source
+    // function shares this root, so it is a stable per-source-function key.
+    IRFunc* getSpecializationRoot(IRFunc* func)
+    {
+        if (IRFunc** root = specializationRootOf.tryGetValue(func))
+            return *root;
+        return func;
     }
 
     // Return true if the address space of the function return type is changed.
@@ -290,27 +305,18 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                 }
                                 else
                                 {
-                                    // Detect cyclic specialization: if specializing `callee` would
-                                    // re-enter a specialization root already in progress on this
-                                    // stack, the call graph is recursive. That is normally rejected
-                                    // by E55201 before this pass, but the check is skipped under
-                                    // -disable-non-essential-validations. Cloning would not
-                                    // terminate (each clone is a fresh identity, and the recursive
-                                    // self-call, direct or with permuted argument address spaces,
-                                    // keeps producing new keys), so reuse `callee` to break the
-                                    // cycle instead of overflowing the stack.
-                                    IRFunc* root = callee;
-                                    if (IRFunc** existingRoot =
-                                            specializationRootOf.tryGetValue(callee))
-                                        root = *existingRoot;
+                                    // Cyclic specialization: if specializing `callee` re-enters a
+                                    // root already on this stack, the call graph is recursive
+                                    // (normally rejected by E55201, skipped under
+                                    // -disable-non-essential-validations). Cloning would not
+                                    // terminate (each clone is a fresh identity), so reuse `callee`
+                                    // to break the cycle.
+                                    IRFunc* root = getSpecializationRoot(callee);
                                     if (rootsBeingSpecialized.contains(root))
                                     {
-                                        // Reuse callee, and cache this decision under the current
-                                        // key so the worklist's later revisit of the clone resolves
-                                        // the same recursive call from the cache. Without caching,
-                                        // the revisit would miss the key (the root is no longer on
-                                        // the stack) and clone again, forming an unbounded clone
-                                        // chain iteratively rather than through stack recursion.
+                                        // Cache the reuse under this key so the worklist's later
+                                        // revisit resolves the same call from the cache instead of
+                                        // re-cloning (the root has left the stack by then).
                                         specializedCallee = callee;
                                         functionSpecializations[key] = callee;
                                     }
@@ -319,17 +325,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                         specializedCallee = specializeFunc(key);
                                         workList.add(specializedCallee);
 
-                                        // Settle the callee's result address space before it is
-                                        // read below: specializeFunc concretizes only parameters,
-                                        // and the result is concretized lazily in Return handling,
-                                        // so an unsettled callee would record a stale result
-                                        // address space that the mapInstToAddrSpace cache then
-                                        // makes permanent. The workList.add above still stands: the
-                                        // later visit is idempotent because processFunction skips
-                                        // insts already in mapInstToAddrSpace. Bracketing the
-                                        // recursive descent with rootsBeingSpecialized lets the
-                                        // check above catch a cyclic callee instead of recursing
-                                        // forever.
+                                        // Settle the callee's result address space before reading
+                                        // it below: specializeFunc concretizes only parameters, the
+                                        // result lazily in Return handling. The workList.add stays
+                                        // idempotent (processFunction skips already-mapped insts).
+                                        // Bracketing with rootsBeingSpecialized lets the check
+                                        // above catch a cyclic callee.
                                         rootsBeingSpecialized.add(root);
                                         processFunction(specializedCallee);
                                         rootsBeingSpecialized.remove(root);
@@ -357,23 +358,28 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                         break;
                     case kIROp_Return:
                         {
-                            // Derive the function's result address space from the first return
-                            // (in iteration order) that has a concrete address space, ignoring
-                            // later returns this pass. A well-typed pointer-returning function has
-                            // one result type, so all of its returns agree and the choice is
-                            // unambiguous. Committing to a single deterministic return also stops
-                            // the result from oscillating when returns disagree on the address
-                            // space: without it, the last return processed would win, so two
-                            // conflicting returns would flip the result type on every drain and
-                            // requeue the function forever. Conflicting returns are target-invalid
-                            // (one result type per function); they arise from code that returns
-                            // pointers of different address spaces, and from a recursive function
-                            // under -disable-non-essential-validations where E55201 no longer
-                            // rejects the recursion that produced them.
-                            if (resultAddrSpaceSetThisPass)
-                                break;
+                            // Use the first concrete return (in iteration order) as the result
+                            // address space and skip the rest. A well-typed function's returns
+                            // agree, so the choice is unambiguous; committing to one also keeps
+                            // conflicting returns from flipping the result type every drain and
+                            // requeuing the function forever.
                             auto retVal = inst->getOperand(0);
                             auto addrSpace = getAddrSpace(retVal);
+                            if (resultAddrSpaceSetThisPass)
+                            {
+                                // A later return in a different concrete storage class means the
+                                // function returns pointers in more than one class, which is
+                                // invalid (a function has one result type). Record it (once per
+                                // function); it is reported from this shared pass after dead-clone
+                                // removal, so every target is covered and no diagnostic fires on an
+                                // original that a clone replaced and this pass deletes.
+                                if (sink && addrSpace != AddressSpace::Generic &&
+                                    addrSpace != getFuncResultAddrSpace(func))
+                                {
+                                    conflictingReturns.addIfNotExists(func, inst->sourceLoc);
+                                }
+                                break;
+                            }
                             if (addrSpace != AddressSpace::Generic)
                             {
                                 auto funcType = as<IRFuncType>(func->getDataType());
@@ -464,14 +470,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             // set forever and the fixpoint never terminates (#12498).
             HashSet<IRFunc*> newWorkList;
             // Process each function at most once per drain. processFunction is
-            // idempotent (it skips insts already in mapInstToAddrSpace), and a
-            // caller that must re-observe a callee's settled result is requeued
-            // through newWorkList across drains, so this changes nothing for an
-            // acyclic call graph. It is what bounds the drain when the graph is
-            // cyclic: a recursive call re-adds its callee to workList on every
-            // visit (see the Call case), which would otherwise grow the list
-            // without bound under -disable-non-essential-validations (E55201
-            // normally rejects recursion first).
+            // idempotent, and a caller needing a callee's settled result is
+            // requeued via newWorkList, so this is a no-op for an acyclic graph.
+            // It bounds the drain for a cyclic one: a recursive call re-adds its
+            // callee every visit (see the Call case), which would otherwise grow
+            // workList without bound under -disable-non-essential-validations.
             HashSet<IRFunc*> processedThisDrain;
             for (Index i = 0; i < workList.getCount(); i++)
             {
@@ -497,19 +500,16 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         applyAddressSpaceToInstType();
 
-        // Remove the original functions that were replaced by specialized
-        // clones. Removal must not depend on iteration order: an original
-        // callee can still be used by an original caller that is itself pending
-        // removal (e.g. `doSomething` calls `foo`, and both are specialized
-        // away). A single pass over the unordered set may visit the callee
-        // first, see it still used, skip it, then remove the caller — orphaning
-        // the callee as a dead, unspecialized function whose parameter keeps a
-        // Generic address space that a later emit pass (Metal, WGSL) cannot
-        // lower. Iterate to a fixpoint so that removing a caller lets its
-        // now-unused callees be reclaimed on a subsequent pass.
+        // Remove originals replaced by specialized clones. Removal must be
+        // order-independent: an original callee may still be used by an original
+        // caller that is itself pending removal, so a single pass could skip the
+        // callee, remove the caller, and orphan it (a dead unspecialized function
+        // whose Generic address space a later Metal/WGSL emit cannot lower).
+        // Iterate to a fixpoint.
         List<IRFunc*> deadCandidates;
         for (auto func : functionsToConsiderRemoving)
             deadCandidates.add(func);
+        HashSet<IRFunc*> removedFuncs;
         bool removedAny = true;
         while (removedAny)
         {
@@ -522,18 +522,40 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 SLANG_ASSERT(!func->findDecoration<IREntryPointDecoration>());
                 if (!func->hasUses())
                 {
+                    removedFuncs.add(func);
                     func->removeAndDeallocate();
                     deadCandidates[i] = nullptr;
                     removedAny = true;
                 }
             }
         }
+
+        // Report conflicting-return-storage-class functions now that dead clones
+        // are gone. Skip any removed function (removedFuncs holds freed pointers,
+        // compared by identity only, never read). One source function can survive
+        // as several specialized copies, so key on the specialization root to
+        // report each source function at most once.
+        if (sink)
+        {
+            HashSet<IRFunc*> reportedRoots;
+            for (auto& [func, loc] : conflictingReturns)
+            {
+                if (removedFuncs.contains(func))
+                    continue;
+                if (reportedRoots.add(getSpecializationRoot(func)))
+                    sink->diagnose(
+                        Diagnostics::ConflictingReturnPointerStorageClasses{.location = loc});
+            }
+        }
     }
 };
 
-void specializeAddressSpace(IRModule* module, InitialAddressSpaceAssigner* addrSpaceAssigner)
+void specializeAddressSpace(
+    IRModule* module,
+    InitialAddressSpaceAssigner* addrSpaceAssigner,
+    DiagnosticSink* sink)
 {
-    AddressSpaceContext context(module, addrSpaceAssigner);
+    AddressSpaceContext context(module, addrSpaceAssigner, sink);
     context.processModule();
 }
 

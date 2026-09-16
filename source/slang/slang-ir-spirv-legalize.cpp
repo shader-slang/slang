@@ -3029,7 +3029,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // Specalize address space for all pointers.
         SpirvAddressSpaceAssigner addressSpaceAssigner;
-        specializeAddressSpace(m_module, &addressSpaceAssigner);
+        specializeAddressSpace(m_module, &addressSpaceAssigner, m_sink);
 
         // Must run after specialization: it makes each function's result address
         // space concrete (so we test the final value, not the pre-specialization
@@ -3042,39 +3042,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // invalid SPIR-V.
         bool skipFuncParamValidation = false;
         validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
-    }
-
-    // Return the first return instruction in `func` whose pointer operand is in a
-    // storage class other than `resultAddrSpace`, or null if every return agrees.
-    // Used after address-space specialization to catch a function the pass left
-    // with a single result type but return operands in two different storage
-    // classes: specializeAddressSpace fixes a function's result address space from
-    // the first concrete return in iteration order and then skips the rest (so its
-    // fixpoint over conflicting returns terminates instead of oscillating), which
-    // means a later return in a different — though also individually returnable —
-    // class survives silently. For example, a function with one `return &gShared;`
-    // (Workgroup) and one `return &sbuf[i];` (StorageBuffer) ends up typed to
-    // return a Workgroup pointer while its second return still yields a
-    // StorageBuffer pointer.
-    static IRReturn* findReturnWithConflictingAddressSpace(
-        IRFunc* func,
-        AddressSpace resultAddrSpace)
-    {
-        for (auto block : func->getBlocks())
-        {
-            for (auto inst : block->getChildren())
-            {
-                auto ret = as<IRReturn>(inst);
-                if (!ret)
-                    continue;
-                auto retValPtrType = as<IRPtrTypeBase>(ret->getVal()->getDataType());
-                if (!retValPtrType || !retValPtrType->hasAddressSpace())
-                    continue;
-                if (retValPtrType->getAddressSpace() != resultAddrSpace)
-                    return ret;
-            }
-        }
-        return nullptr;
     }
 
     // SPIR-V's Logical addressing model permits a function to return a pointer only
@@ -3104,24 +3071,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto resultPtrType = as<IRPtrTypeBase>(funcType->getResultType());
             if (!resultPtrType || !resultPtrType->hasAddressSpace())
                 continue;
-            auto resultAddrSpace = resultPtrType->getAddressSpace();
-            switch (resultAddrSpace)
+            switch (resultPtrType->getAddressSpace())
             {
             case AddressSpace::UserPointer: // emitted as PhysicalStorageBuffer
             case AddressSpace::StorageBuffer:
             case AddressSpace::GroupShared: // emitted as Workgroup
-                // The result class is itself returnable, but the returns may still
-                // disagree on which returnable class (the specialization pass
-                // records only the first). Diagnose that conflict as a distinct
-                // condition from the not-a-returnable-class case below, rather than
-                // let a function with one result type but return operands in two
-                // storage classes reach emission as invalid IR.
-                if (auto conflictingReturn =
-                        findReturnWithConflictingAddressSpace(func, resultAddrSpace))
-                {
-                    m_sink->diagnose(Diagnostics::ConflictingReturnPointerStorageClasses{
-                        .location = conflictingReturn->sourceLoc});
-                }
                 continue;
             default:
                 break;
