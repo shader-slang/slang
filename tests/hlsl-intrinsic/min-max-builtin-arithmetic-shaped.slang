@@ -13,9 +13,12 @@
 // Also verify that concrete vector calls continue to select the higher-ranked family-specific
 // overloads, which emit one target-native shaped instruction rather than scalarizing.
 
-// CONCRETE-DAG: OpExtInst {{.*}} SMin
-// CONCRETE-DAG: OpExtInst {{.*}} UMax
-// CONCRETE-DAG: OpExtInst {{.*}} FMax
+// CONCRETE-DAG: %[[V3_INT:[A-Za-z0-9_]+]] = OpTypeVector %int 3
+// CONCRETE-DAG: %[[V2_UINT:[A-Za-z0-9_]+]] = OpTypeVector %uint 2
+// CONCRETE-DAG: %[[V4_FLOAT:[A-Za-z0-9_]+]] = OpTypeVector %float 4
+// CONCRETE: OpExtInst %[[V3_INT]] {{.*}} SMin
+// CONCRETE: OpExtInst %[[V2_UINT]] {{.*}} UMax
+// CONCRETE: OpExtInst %[[V4_FLOAT]] {{.*}} FMax
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
