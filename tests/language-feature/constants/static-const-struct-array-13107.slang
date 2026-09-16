@@ -11,9 +11,11 @@
 // MiB at launch.
 //
 // The legalization pass that force-inlines non-simple global constants runs for
-// every target whose `shouldLegalizeExistentialAndResourceTypes` is on — i.e.
-// HLSL, GLSL, SPIR-V, Metal, WGSL, CUDA and the CPU-kernel path — so the bug (and
-// this fix) is not CUDA-specific; each target below reconstructed the table
+// CUDA (via the `CUDASource` clause in slang-emit.cpp), the CPU-kernel path, and
+// every other target with `shouldLegalizeExistentialAndResourceTypes` on — HLSL,
+// GLSL, SPIR-V, Metal, WGSL. (CUDA's source language actually sets that flag
+// false, so the `CUDASource` clause is what enables the pass there.) So the bug
+// (and this fix) is not CUDA-specific; each target below reconstructed the table
 // per-invocation before the fix. The `-NOT` lines assert the synthesized ctor is
 // no longer used to rebuild the table.
 
