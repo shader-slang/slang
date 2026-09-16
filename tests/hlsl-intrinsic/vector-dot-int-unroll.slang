@@ -1,7 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
 
 // Verify the integer `dot` fallback (the `[ForceUnroll]`'d helper used by
 // `__vectorDotImpl` in `hlsl.meta.slang`) emits straight-line multiply-adds — no runtime `for`
@@ -14,7 +13,7 @@
 // so the `dot` calls are not constant-folded before reaching the fallback. Three widths (2, 3, 4)
 // are exercised so the loop appears three times when unrolling regresses, independent of inlining.
 //
-// GLSL renames the compute entry point to `main`; Metal, CUDA, and WGSL keep `computeMain`.
+// GLSL renames the compute entry point to `main`; Metal and CUDA keep `computeMain`.
 
 RWStructuredBuffer<int> outputBuffer;
 
@@ -27,11 +26,6 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK_CUDA-NOT: for{{[[:space:]]*}}(
 // CHECK_CUDA: computeMain
 // CHECK_CUDA-NOT: for{{[[:space:]]*}}(
-// CHECK_WGSL-NOT: return dot(
-// CHECK_WGSL-NOT: for{{[[:space:]]*}}(
-// CHECK_WGSL: fn computeMain
-// CHECK_WGSL-NOT: return dot(
-// CHECK_WGSL-NOT: for{{[[:space:]]*}}(
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)

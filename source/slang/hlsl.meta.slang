@@ -10309,6 +10309,10 @@ T __vectorDotImpl(vector<T, N> x, vector<T, N> y)
         return x[0] * y[0];
     }
 
+    // HLSL and WGSL provide native dot operations for both integer and floating-point vectors.
+    // GLSL and Metal provide them only for floating-point vectors, while SPIR-V uses OpDot for
+    // floating-point vectors and the integer-dot-product extension for integer vectors. Other
+    // targets use the scalar-arithmetic fallback above.
     __target_switch
     {
     case glsl:
@@ -10353,12 +10357,7 @@ T __vectorDotImpl(vector<T, N> x, vector<T, N> y)
                 };
             }
         }
-    case wgsl:
-        // WGSL defines `dot` only for floating-point vectors.
-        if (__isFloat<T>())
-            __intrinsic_asm "dot";
-        else
-            return __vectorDotFallback(x, y);
+    case wgsl: __intrinsic_asm "dot";
     default: return __vectorDotFallback(x, y);
     }
 }
