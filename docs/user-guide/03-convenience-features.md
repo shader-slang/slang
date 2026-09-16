@@ -691,7 +691,13 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 `ResourceDescriptorHeap` only converts to resource (CBV/SRV/UAV) types and `SamplerDescriptorHeap` only
 to sampler types; a heap-family mismatch (for example `SamplerState s = ResourceDescriptorHeap[i];`, or
-`Texture2D.Handle th = SamplerDescriptorHeap[j];`) is a compile error. The recovered value rides the
+`Texture2D.Handle th = SamplerDescriptorHeap[j];`) is a compile error. Separately, a combined
+texture-sampler (e.g. `Sampler2D`) cannot be recovered from a single-index `ResourceDescriptorHeap[i]`
+handle on the targets whose combined-sampler lowering uses a separate sampler descriptor (HLSL, and
+SPIR-V with the `spvDescriptorHeapEXT` extension), because it requires two distinct heap indices; use
+the explicit `Sampler2D.Handle(uint2(resourceIndex, samplerIndex))` form there. On the default
+SPIR-V and GLSL model a combined sampler is a single native descriptor read by one index, so the
+single-index form is accepted there. The recovered value rides the
 existing `DescriptorHandle<T>` lowering, so this syntax is available on the same targets as the
 `DescriptorHandle<T>` representation it builds — HLSL, SPIR-V, GLSL, and WGSL — and lowers through the
 bindless path described below. On targets where that representation is unavailable (Metal, CUDA, CPU),

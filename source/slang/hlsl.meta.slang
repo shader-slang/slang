@@ -27621,10 +27621,21 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     [ForceInline]
     __init(UntypedResourceHandle h)
     {
-        // A combined texture-sampler needs two heap indices (a resource and a sampler); a single
-        // `ResourceDescriptorHeap[i]` handle carries only one, so this conversion would silently
-        // default the sampler to slot 0. Reject it and steer the user to the explicit two-index form.
-        static_assert(isCombined == 0, "a combined texture-sampler requires separate resource and sampler heap indices, so it cannot be initialized from a single ResourceDescriptorHeap index; use an explicit '.Handle(uint2(resourceIndex, samplerIndex))' to specify both indices");
+        // A single `ResourceDescriptorHeap[i]` index carries no sampler index, so building a combined
+        // texture-sampler here hard-codes the sampler to heap slot 0. That is only wrong where the
+        // combined-sampler lowering consumes a separate sampler index -- HLSL and SPIR-V
+        // `spvDescriptorHeapEXT`, which route through `__makeCombinedTextureSamplerFromHandle` (see
+        // `defaultGetDescriptorFromHandle`). Default SPIR-V and GLSL load one native combined
+        // descriptor by `.x`, where the single index is correct -- so reject only on those targets.
+        __target_switch
+        {
+        case hlsl:
+        case spvDescriptorHeapEXT:
+            static_assert(isCombined == 0, "a combined texture-sampler needs separate resource and sampler descriptor-heap indices on this target, so it cannot be initialized directly from a single ResourceDescriptorHeap index; use the explicit .Handle(uint2(resourceIndex, samplerIndex)) form to specify both");
+            break;
+        default:
+            break;
+        }
         return getDescriptorFromHandle(DescriptorHandle<This>(uint2(__getUntypedResourceHandleIndex(h), 0)));
     }
 }
@@ -27910,9 +27921,18 @@ extension DescriptorHandle<T>
     [ForceInline]
     __init(UntypedResourceHandle h)
     {
-        // Same restriction as the direct `_Texture` conversion above: a combined texture-sampler
-        // `T` needs a separate sampler index, which a single resource-heap handle does not carry.
-        static_assert(T.kind != DescriptorKind.CombinedTextureSampler, "a combined texture-sampler requires separate resource and sampler heap indices, so it cannot be initialized from a single ResourceDescriptorHeap index; use an explicit '.Handle(uint2(resourceIndex, samplerIndex))' to specify both indices");
+        // Same rejection as the `_Texture` conversion above, on the same targets. `isCombined` is not
+        // in scope here, so gate on `T.kind` -- equivalent for every public type (only a
+        // non-constructible combined buffer would differ).
+        __target_switch
+        {
+        case hlsl:
+        case spvDescriptorHeapEXT:
+            static_assert(T.kind != DescriptorKind.CombinedTextureSampler, "a combined texture-sampler needs separate resource and sampler descriptor-heap indices on this target, so its .Handle cannot be built from a single ResourceDescriptorHeap index; use the explicit .Handle(uint2(resourceIndex, samplerIndex)) form to specify both");
+            break;
+        default:
+            break;
+        }
         return DescriptorHandle<T>(uint2(__getUntypedResourceHandleIndex(h), 0));
     }
 }
