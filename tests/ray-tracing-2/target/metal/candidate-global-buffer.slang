@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -target metal
+//TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
 
 import slang.raytracing;
 
@@ -22,13 +22,22 @@ struct HitContext : rt::IHitContext
 }
 
 RWStructuredBuffer<uint> values;
+RWStructuredBuffer<uint> rayGenerationOnly;
+
+uint readCandidateValue()
+{
+    return values[0];
+}
 
 struct RuntimeAnyHit : rt::IAnyHitShader
 {
     typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
-        input.payload.value += values[0];
+        // A Metal intersection function cannot read a module-scope resource directly. The
+        // compiler must preserve this buffer's reflected binding and add it to the generated
+        // candidate signature, including when the use is reached through an ordinary helper.
+        input.payload.value += readCandidateValue();
     }
 }
 
@@ -59,10 +68,21 @@ void main()
     desc.ray.tMax = 100.0;
     desc.instanceMask = 0xff;
 
-    RuntimePayload payload = {};
+    RuntimePayload payload = { rayGenerationOnly[0] };
     rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
 }
 
-//CHECK: global parameter is unavailable from a Metal intersection function
-//CHECK: structural intersection and any-hit logic cannot reference global shader parameters in the first-version Metal lowering
+// Only `values` is reachable from the triangle candidate. `rayGenerationOnly`, `scene`, and
+// `program` must not leak into its native signature. Closing the signature immediately after
+// `values` checks that the lowering is demand-driven.
+// METAL-LABEL: {{\[\[}}intersection(triangle, metal::raytracing::instancing){{\]\]}}
+// METAL-NOT: rayGenerationOnly
+// METAL-NOT: scene
+// METAL-NOT: program_resources
+// METAL-SAME: uint device* values_{{[0-9]+}} {{\[\[}}buffer(0){{\]\]}})
+// METAL: ->values_0 = values_{{[0-9]+}};
+
+// The schema has no bounding-box candidate logic, so its reject-all table entry needs no buffer.
+// METAL-LABEL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing){{\]\]}}
+// METAL-SAME: ray_data Schema_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload{{\]\]}})

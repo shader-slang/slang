@@ -6,9 +6,9 @@
 namespace Slang
 {
 
-void buildEntryPointReferenceGraph(
+static void _buildEntryPointReferenceGraph(
     Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints,
-    IRModule* module)
+    List<IRFunc*> const& entryPoints)
 {
     struct WorkItem
     {
@@ -99,17 +99,36 @@ void buildEntryPointReferenceGraph(
         }
     };
 
-    for (auto globalInst : module->getGlobalInsts())
-    {
-        if (globalInst->getOp() == kIROp_Func &&
-            (globalInst->findDecoration<IREntryPointDecoration>() ||
-             globalInst->findDecoration<IRCudaKernelDecoration>()))
-        {
-            visit(as<IRFunc>(globalInst), globalInst);
-        }
-    }
+    for (auto entryPoint : entryPoints)
+        visit(entryPoint, entryPoint);
     for (Index i = 0; i < workList.getCount(); i++)
         visit(workList[i].entryPoint, workList[i].inst);
+}
+
+void buildEntryPointReferenceGraph(
+    Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints,
+    IRModule* module)
+{
+    List<IRFunc*> entryPoints;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(globalInst))
+        {
+            if (func->findDecoration<IREntryPointDecoration>() ||
+                func->findDecoration<IRCudaKernelDecoration>())
+            {
+                entryPoints.add(func);
+            }
+        }
+    }
+    _buildEntryPointReferenceGraph(referencingEntryPoints, entryPoints);
+}
+
+void buildEntryPointReferenceGraph(
+    Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints,
+    List<IRFunc*> const& entryPoints)
+{
+    _buildEntryPointReferenceGraph(referencingEntryPoints, entryPoints);
 }
 
 HashSet<IRFunc*>* getReferencingEntryPoints(

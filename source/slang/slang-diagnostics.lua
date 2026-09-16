@@ -4443,10 +4443,17 @@ err(
 )
 
 err(
-    "structural-ray-tracing-metal-candidate-global-parameter",
+    "structural-ray-tracing-metal-candidate-global-variable",
     38071,
-    "global parameter is unavailable from a Metal intersection function",
-    span { loc = "location", message = "structural intersection and any-hit logic cannot reference global shader parameters in the first-version Metal lowering" }
+    "global variable is unavailable from a Metal intersection function",
+    span { loc = "location", message = "move mutable global state used by structural intersection or any-hit logic into a bindable buffer resource" }
+)
+
+err(
+    "structural-ray-tracing-metal-candidate-resource-kind",
+    38092,
+    "resource cannot be passed directly to a Metal intersection function",
+    span { loc = "location", message = "Metal intersection functions accept device or constant buffer parameters, not direct texture or sampler parameters" }
 )
 
 err(
