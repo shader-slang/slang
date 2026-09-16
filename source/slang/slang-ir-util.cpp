@@ -2191,6 +2191,12 @@ UnownedStringSlice getBuiltinFuncName(IRInst* callee)
         return UnownedStringSlice::fromLiteral("IBwdCallable");
     case KnownBuiltinDeclName::NullDifferential:
         return UnownedStringSlice::fromLiteral("NullDifferential");
+    case KnownBuiltinDeclName::OperatorAddressOf:
+        return UnownedStringSlice::fromLiteral("OperatorAddressOf");
+    case KnownBuiltinDeclName::WaveIsFirstLane:
+        return UnownedStringSlice::fromLiteral("WaveIsFirstLane");
+    case KnownBuiltinDeclName::WaveReadLaneFirst:
+        return UnownedStringSlice::fromLiteral("WaveReadLaneFirst");
     default:
         return UnownedStringSlice();
     }
