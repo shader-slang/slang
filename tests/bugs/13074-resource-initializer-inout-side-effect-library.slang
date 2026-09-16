@@ -3,8 +3,6 @@
 Texture2D<float4> texture;
 RWStructuredBuffer<float> output;
 static uint initializationCount = 0;
-//CHECK:    ^^^^^^^^^^^^^^^^^^^ resource-dependent static state is not supported in an independently invoked function
-//CHECK:    ^^^^^^^^^^^^^^^^^^^ static variable 'initializationCount' depends on per-invocation resource state and cannot be used by function 'getInitializationCount', which may be invoked without an entry-point caller; pass the required state explicitly instead
 
 [noinline]
 void increment(inout uint value)
@@ -22,6 +20,8 @@ Texture2D<float4> initializeTexture()
 static Texture2D<float4> cachedTexture = initializeTexture();
 
 export uint getInitializationCount()
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^^^ resource-dependent static state is not supported in an independently invoked function
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^^^ function 'getInitializationCount' may be invoked without an entry-point caller and transitively accesses per-invocation resource-dependent static state; pass the required state explicitly instead
 {
     return initializationCount;
 }

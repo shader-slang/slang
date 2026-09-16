@@ -168,7 +168,7 @@ bool isResourceType(IRType* type)
         type = arrayType->getElementType();
     }
 
-    if (isResourceHandleType(type))
+    if (const auto resourceTypeBase = as<IRResourceTypeBase>(type); resourceTypeBase)
     {
         return true;
     }
@@ -180,6 +180,20 @@ bool isResourceType(IRType* type)
     {
         return true;
     }
+    else if (const auto samplerType = as<IRSamplerStateTypeBase>(type); samplerType)
+    {
+        return true;
+    }
+    else if (const auto subpassInputType = as<IRSubpassInputType>(type); subpassInputType)
+    {
+        return true;
+    }
+    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type);
+             untypedBufferType)
+    {
+        return true;
+    }
+
     // TODO: need more comprehensive coverage here
 
     return false;

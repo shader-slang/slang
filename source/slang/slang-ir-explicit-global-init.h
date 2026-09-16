@@ -9,15 +9,24 @@ struct IRGlobalVar;
 struct IRModule;
 class TargetProgram;
 
-/// Move initialization logic selected by the target policy onto each entry point.
+/// Make target-selected global initialization explicit at the start of every entry point.
+///
+/// Selected globals retain their storage but no longer contain initializer bodies.
 void moveGlobalVarInitializationToEntryPoints(IRModule* module, TargetProgram* targetProgram);
 
-/// Move resource-global initialization and the global initializers that transitively use it into
-/// entry points. The output identifies every resource global, every resource-dependent initializer
-/// target, and any ordinary global the resource-dependent initializer call graph may mutate. The
-/// resource-global pass uses that set to recognize state that cannot cross an independent call
-/// root. The module must contain linked source globals, identified by their linkage decorations,
-/// and calls between defined functions must be direct.
+/// Move resource-dependent global initializers to the start of each entry point.
+///
+/// This operation moves only linked, per-invocation initializer targets whose values transitively
+/// depend on resource state. The ordinary target-policy operation still runs later for any other
+/// initializer that the target cannot represent at global scope.
+///
+/// `outResourceDependentState` receives the complete state whose initialization semantics depend
+/// on an entry point: resource-bearing per-invocation globals, every resource-dependent initializer
+/// target (including targets this operation cannot move), and globals that the moved initializer
+/// call graph may mutate. A subsequent pass can use this wider set to validate other call roots.
+///
+/// Invoke this operation after linking, when source globals have linkage decorations and calls
+/// between defined functions are direct.
 void moveResourceDependentGlobalVarInitializationToEntryPoints(
     IRModule* module,
     TargetProgram* targetProgram,

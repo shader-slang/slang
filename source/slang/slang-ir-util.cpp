@@ -9,8 +9,11 @@
 namespace Slang
 {
 
-bool isTypeOnlyInst(IRInst* inst)
+bool doesInstOnlyDependOnOperandTypes(IRInst* inst)
 {
+    // A value-use analysis must not mistake a static type query for a read of the operand's runtime
+    // value. Keep the distinction explicit by enumerating instructions whose result depends only
+    // on an operand's type; every unlisted instruction remains a value use by default.
     switch (inst->getOp())
     {
     case kIROp_IsBool:
@@ -30,33 +33,37 @@ bool isTypeOnlyInst(IRInst* inst)
     }
 }
 
-bool isResourceHandleType(IRType* type)
+static bool _isResourceValueType(IRType* type)
 {
-    type = unwrapArray(type);
+    // Resource-global legalization needs a deliberately narrower classification than the general
+    // opaque-type machinery. Recognize exactly the direct resource values accepted by the front
+    // end and supported by downstream resource specialization.
     return as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
            as<IRUniformParameterGroupType>(type) || as<IRHLSLStructuredBufferTypeBase>(type) ||
-           as<IRByteAddressBufferTypeBase>(type) || as<IRUntypedBufferResourceType>(type) ||
-           as<IRSubpassInputType>(type) || as<IRGLSLShaderStorageBufferType>(type);
+           as<IRByteAddressBufferTypeBase>(type);
 }
 
-static bool _doesTypeContainResourceHandles(IRType* type, HashSet<IRType*>& visitedTypes)
+static bool _doesTypeContainResourceValues(IRType* type, HashSet<IRType*>& visitedTypes)
 {
+    // Earlier target lowering may wrap an accepted resource category in a compiler-generated
+    // aggregate before resource-global legalization runs. Follow only value-bearing aggregate
+    // children and use `visitedTypes` to terminate recursive type graphs.
     if (!visitedTypes.add(type))
         return false;
-    if (isResourceHandleType(type))
+    if (_isResourceValueType(type))
         return true;
 
     if (auto structType = as<IRStructType>(type))
     {
         for (auto field : structType->getFields())
         {
-            if (_doesTypeContainResourceHandles(field->getFieldType(), visitedTypes))
+            if (_doesTypeContainResourceValues(field->getFieldType(), visitedTypes))
                 return true;
         }
     }
     else if (auto arrayType = as<IRArrayTypeBase>(type))
     {
-        return _doesTypeContainResourceHandles(arrayType->getElementType(), visitedTypes);
+        return _doesTypeContainResourceValues(arrayType->getElementType(), visitedTypes);
     }
     else if (auto tupleType = as<IRTupleTypeBase>(type))
     {
@@ -64,7 +71,7 @@ static bool _doesTypeContainResourceHandles(IRType* type, HashSet<IRType*>& visi
         {
             if (auto elementType = as<IRType>(tupleType->getOperand(i)))
             {
-                if (_doesTypeContainResourceHandles(elementType, visitedTypes))
+                if (_doesTypeContainResourceValues(elementType, visitedTypes))
                     return true;
             }
         }
@@ -72,24 +79,21 @@ static bool _doesTypeContainResourceHandles(IRType* type, HashSet<IRType*>& visi
     return false;
 }
 
-bool doesTypeContainResourceHandles(IRType* type)
-{
-    HashSet<IRType*> visitedTypes;
-    return _doesTypeContainResourceHandles(type, visitedTypes);
-}
-
-bool isPerInvocationGlobalVar(IRGlobalVar* globalVar)
-{
-    return !globalVar->getRate() && globalVar->findDecoration<IRLinkageDecoration>();
-}
-
 bool isPerInvocationResourceStateGlobalVar(IRGlobalVar* globalVar)
 {
-    if (!isPerInvocationGlobalVar(globalVar))
+    // Resource-global legalization applies only to linked file-scope state with ordinary
+    // per-invocation lifetime. The front-end gate admits a supported resource value or arrays
+    // thereof, but earlier target lowering can synthesize aggregate wrappers around that value.
+    // Inspect those wrappers recursively without broadening the accepted leaf taxonomy.
+    if (globalVar->getRate() || !globalVar->findDecoration<IRLinkageDecoration>())
         return false;
 
     auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
-    return ptrType && doesTypeContainResourceHandles(ptrType->getValueType());
+    if (!ptrType)
+        return false;
+
+    HashSet<IRType*> visitedTypes;
+    return _doesTypeContainResourceValues(ptrType->getValueType(), visitedTypes);
 }
 
 bool isPointerOfType(IRInst* type, IROp opCode)

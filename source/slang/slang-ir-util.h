@@ -202,19 +202,12 @@ IRType* getVectorOrCoopMatrixElementType(IRType* type);
 // If `type` is a matrix, returns its element type. Otherwise, return `type`.
 IRType* getMatrixElementType(IRType* type);
 
-/// Return true if `inst` observes only an operand's type, not its runtime value.
-bool isTypeOnlyInst(IRInst* inst);
+/// Returns true if `inst` may inspect operand types but cannot observe operand runtime values.
+///
+/// A value-use analysis may ignore these instructions without treating their operands as read.
+bool doesInstOnlyDependOnOperandTypes(IRInst* inst);
 
-/// Return true for a direct resource handle or an array of resource handles.
-bool isResourceHandleType(IRType* type);
-
-/// Return true if `type` is or recursively contains a resource handle.
-bool doesTypeContainResourceHandles(IRType* type);
-
-/// Return true for a linked file-scope variable with per-invocation storage.
-bool isPerInvocationGlobalVar(IRGlobalVar* globalVar);
-
-/// Return true for a linked file-scope variable whose per-invocation storage contains a resource.
+/// Returns true if `globalVar` represents file-scope resource state with per-invocation lifetime.
 bool isPerInvocationResourceStateGlobalVar(IRGlobalVar* globalVar);
 
 // True if type is a resource backing memory

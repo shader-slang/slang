@@ -2023,23 +2023,18 @@ Result linkAndOptimizeIR(
         if (!validateStructuredBufferResourceTypes(irModule, sink, targetRequest))
             return SLANG_FAIL;
 
-        // A resource-global initializer is represented as code nested under an IRGlobalVar, while
-        // resource-type legalization expects code to belong to an ordinary function. Extract the
-        // complete resource-dependent initializer closure first. At this point the original
-        // globals still provide stable identities for checking independent call roots.
-        List<IRGlobalVar*> resourceDependentState;
-        SLANG_PASS(
-            moveResourceDependentGlobalVarInitializationToEntryPoints,
-            targetProgram,
-            resourceDependentState);
-        // Rewrite the linked source globals while each still has one stable IR identity. Resource
-        // type legalization can split a resource-bearing aggregate into several leaf variables,
-        // at which point those leaves no longer distinguish a file-scope static from a
-        // function-local static. The locals and parameters introduced here then flow through the
-        // existing resource specialization passes. Targets that cannot represent a residual
-        // resource local will continue to diagnose conditional or dynamically indexed shapes
-        // that those passes cannot yet resolve.
-        SLANG_PASS(legalizeResourceGlobalVars, resourceDependentState, sink);
+        // Make per-invocation resource state explicit while linked identities, initializer bodies,
+        // function decorations/references, and direct calls still expose the relevant boundaries.
+        // This must currently run before resource-type legalization: non-simple resource globals
+        // such as ParameterBlock and append-buffer values can carry initializer bodies that the
+        // type legalizer cannot split while preserving their source-static identity.
+        //
+        // TODO: Investigate whether global-initializer extraction can move here as a general step,
+        // with resource-global localization deferred until after resource-type legalization. That
+        // could eliminate the resource-specific initializer selection mode, but requires the type
+        // legalizer to preserve linkage, initialization dependencies, and boundary-analysis state
+        // across split leaf globals. Correctness and generated-code impact also need validation.
+        SLANG_PASS(legalizeResourceGlobalVars, targetProgram, sink);
         if (sink->getErrorCount() != 0)
             return SLANG_FAIL;
 

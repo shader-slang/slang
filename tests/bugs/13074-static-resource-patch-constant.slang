@@ -2,8 +2,6 @@
 
 Texture2D<float4> texture;
 static Texture2D<float4> cachedTexture = texture;
-//CHECK:                 ^^^^^^^^^^^^^ resource-dependent static state is not supported in an independently invoked function
-//CHECK:                 ^^^^^^^^^^^^^ static variable 'cachedTexture' depends on per-invocation resource state and cannot be used by function 'constants', which may be invoked without an entry-point caller; pass the required state explicitly instead
 
 struct HullOutput
 {
@@ -30,6 +28,8 @@ HullOutput hullMain()
 }
 
 PatchOutput constants()
+//CHECK:    ^^^^^^^^^ resource-dependent static state is not supported in an independently invoked function
+//CHECK:    ^^^^^^^^^ function 'constants' may be invoked without an entry-point caller and transitively accesses per-invocation resource-dependent static state; pass the required state explicitly instead
 {
     PatchOutput result;
     result.edgeFactors[0] = 1;

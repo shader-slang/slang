@@ -4,10 +4,10 @@ Texture2D<float4> texture;
 RWStructuredBuffer<float> output;
 
 export void recordInitialization()
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^ resource-dependent static state is not supported in an independently invoked function
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^ function 'recordInitialization' may be invoked without an entry-point caller and transitively accesses per-invocation resource-dependent static state; pass the required state explicitly instead
 {
     static uint initializationCount = 0;
-//CHECK:        ^^^^^^^^^^^^^^^^^^^ resource-dependent static state is not supported in an independently invoked function
-//CHECK:        ^^^^^^^^^^^^^^^^^^^ static variable 'initializationCount' depends on per-invocation resource state and cannot be used by function 'recordInitialization', which may be invoked without an entry-point caller; pass the required state explicitly instead
     ++initializationCount;
 }
 

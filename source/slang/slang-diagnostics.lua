@@ -5776,7 +5776,7 @@ err(
     "resource-dependent-static-used-by-preserved-function",
     56006,
     "resource-dependent static state is not supported in an independently invoked function",
-    span { loc = "location", message = "static variable '~variable:IRInst' depends on per-invocation resource state and cannot be used by function '~function:IRInst', which may be invoked without an entry-point caller; pass the required state explicitly instead" }
+    span { loc = "location", message = "function '~function:IRInst' may be invoked without an entry-point caller and transitively accesses per-invocation resource-dependent static state; pass the required state explicitly instead" }
 )
 
 err(
@@ -5804,7 +5804,7 @@ err(
     "resource-dependent-static-used-by-callable-entry-point",
     56010,
     "resource-dependent static state is not supported in a callable entry point",
-    span { loc = "location", message = "entry point '~function:IRInst' is also called as an ordinary function and accesses static variable '~variable:IRInst'; move the shared implementation to an unannotated helper" }
+    span { loc = "location", message = "entry point '~function:IRInst' is also called as an ordinary function and transitively accesses per-invocation resource-dependent static state; move the shared implementation to an unannotated helper" }
 )
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics

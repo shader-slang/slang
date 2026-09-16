@@ -1,13 +1,19 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry main -stage compute -validate-ir
 
 Texture2D<float4> texture;
 RWStructuredBuffer<float> output;
 static uint initializationCount = 0;
 
 [noinline]
+void increment(Ptr<uint> value)
+{
+    ++*value;
+}
+
+[noinline]
 Texture2D<float4> initializeTexture()
 {
-    ++initializationCount;
+    increment(&initializationCount);
     return texture;
 }
 

@@ -208,8 +208,8 @@ static void getAliasableInstructionsRec(
     {
         IRInst* user = use->getUser();
 
-        // Meta instructions only use the argument type
-        if (isTypeOnlyInst(user))
+        // Type queries do not observe the runtime value carried by this operand.
+        if (doesInstOnlyDependOnOperandTypes(user))
             continue;
 
         if (isAliasable(user))
@@ -331,12 +331,16 @@ static void collectPhiMergeStores(
 
 enum InstructionUsageType
 {
-    None,        // Instruction neither stores nor loads from the source (e.g. meta operations)
+    None,        // Instruction neither stores nor loads from the source (e.g. type-only queries)
     Store,       // Instruction acts as a write to the source
     StoreParent, // Instruction's parent acts as a write to the source
     Load         // Instruction acts as a load from the source
 };
 
+// Classify how a call uses one argument when the callee's parameter direction is the only
+// information available. The existing analysis treats an `out`, `inout`, or `ref` parameter as a
+// write and every other parameter as a read. A caller with a more precise semantic summary can
+// override this baseline classification for the exact `IRUse` in `collectInstructionByUsage`.
 static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
 {
     IRInst* callee = call->getCallee();
@@ -382,10 +386,14 @@ static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
                : Load;
 }
 
+// Infer whether `user` reads or writes the tracked value `inst` from the user's opcode and type.
+// First exclude instructions that merely propagate aliases or inspect types, then handle opcodes
+// with known operand roles. Unknown instructions fall back to the historical pointer-producing
+// heuristic so this classifier remains conservative for existing mandatory checking.
 static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
 {
-    // Meta intrinsics (which evaluate on type) do nothing
-    if (isTypeOnlyInst(user))
+    // Type-only instructions do not observe the runtime value of their operands.
+    if (doesInstOnlyDependOnOperandTypes(user))
         return None;
 
     // Ignore instructions generating more aliases
@@ -477,6 +485,11 @@ static void collectSpecialCaseInstructions(List<IRInst*>& stores, IRBlock* block
     }
 }
 
+// Add one use of the tracked value to the read/write sets consumed by the two CFG analyses.
+// An exact effect supplied by a transformation takes precedence over the generic IR classifier:
+// generated parameter directions can otherwise invent an incoming read or overstate a partial or
+// conditional write. Possible writes feed the reachability analysis, while only definite writes
+// feed the definite-assignment analysis.
 static void collectInstructionByUsage(
     List<IRInst*>& stores,
     List<IRInst*>* definiteStores,
@@ -518,6 +531,10 @@ static void collectInstructionByUsage(
     }
 }
 
+// Retain only reads for which no possible write can reach the read. This computes the first,
+// coarse class of violations: values that may still have no initialization at all. A single
+// instruction recorded as both a read and a write cannot use its outgoing write to satisfy its own
+// incoming read.
 static void cancelLoads(
     ReachabilityContext& reachability,
     const List<IRInst*>& stores,
@@ -778,7 +795,7 @@ static bool isWaveReadLaneFirstUse(IRInst* readingInst)
     for (auto use = readingInst->firstUse; use; use = use->nextUse)
     {
         auto user = use->getUser();
-        if (isTypeOnlyInst(user))
+        if (doesInstOnlyDependOnOperandTypes(user))
             continue;
         numRealUses++;
         realUse = user;
@@ -1053,6 +1070,12 @@ static void cancelLoadsByDefiniteAssignment(
     }
 }
 
+// Collect every read and write of `inst`, including uses through derived addresses and SSA phis.
+// Each use is classified once, consulting exact effects before the generic IR rules. The `stores`
+// result contains possible as well as definite writes for the coarse reachability check;
+// `definiteStores`, when requested, contains only writes that initialize the complete tracked value
+// on every path through the instruction. Genuine initialized values entering an alias phi count as
+// writes in both sets.
 static void collectAliasableLoadStores(
     IRInst* inst,
     List<IRInst*>& stores,
@@ -1104,20 +1127,23 @@ static List<IRInst*> getUnresolvedParamLoads(
     return loads;
 }
 
-// The two disjoint classes of uninitialized-use violations for a single variable,
-// computed from one shared collection pass over its aliasable loads/stores.
+// The checker reports two disjoint classes of reads for a tracked variable. Separating them lets
+// callers select the established diagnostics without running two independent use-collection walks.
 struct UninitializedUseLoads
 {
-    // Loads with NO store reaching them at all (the may-init violations, 41016/41033).
+    // Reads to which no possible write can reach (the may-init violations, 41016/41033).
     List<IRInst*> mayInit;
 
-    // Loads that some store reaches (so not may-init) but for which a store-free path
-    // from the function entry can still reach the load — i.e. the variable is only
-    // conditionally initialized (the must-init / definite-assignment violations,
-    // 41035/41036).
+    // Reads reached by some write but also by a path without a definite whole-value write (the
+    // must-init / definite-assignment violations, 41035/41036).
     List<IRInst*> mustInit;
 };
 
+// Find all reads of `inst` that can observe an uninitialized value. We first collect the reads,
+// possible writes, and definite writes shared by both analyses. Reachability from possible writes
+// identifies reads that can have no initialization at all. A forward definite-assignment CFG walk
+// then identifies the remaining reads that can be reached along a path without a definite write.
+// Finally we remove overlap so each source location receives only the more fundamental diagnostic.
 static UninitializedUseLoads getUninitializedUseLoads(
     ReachabilityContext& reachability,
     IRGlobalValueWithCode* func,
@@ -1534,6 +1560,10 @@ static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sin
     }
 }
 
+// Check one local introduced after the mandatory module-wide check has already visited `code`.
+// Rebuild the same function-wide contexts, then run the shared intraprocedural solver for that
+// local. Exact effects preserve the operation's semantic reads and writes when a generated ABI
+// would otherwise imply different behavior.
 void checkForUsingUninitializedVariable(
     IRGlobalValueWithCode* code,
     IRInst* variable,

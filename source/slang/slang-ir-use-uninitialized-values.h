@@ -11,24 +11,39 @@ struct IRInst;
 struct IRModule;
 struct IRUse;
 
-/// Describes the source-level effect of one use when its IR type alone is insufficient.
+/// Overrides the inferred read/write effect of one use for uninitialized-value checking.
 ///
-/// The use must pass the variable, or an address derived from it, to an instruction. A client uses
-/// this structure when the instruction's IR type does not describe its source-level effect. For
-/// example, a generated `inout` parameter can imply an incoming read that the source program did
-/// not perform, while a store through a derived address initializes only part of the root value.
-/// The client can state separately whether the exact use observes, may initialize, or definitely
-/// initializes the value. `definitelyWritesValue` always counts as a write, independently of
-/// `mayWriteValue`.
+/// The use must pass the tracked variable, or an address derived from it, to an instruction.
+/// Normally the checker infers whether that instruction reads or writes the variable from its IR
+/// opcode and operand type. A client that has more precise information can override that inference
+/// for an exact `IRUse`. This is useful when a transformation synthesizes an ABI whose parameter
+/// direction does not exactly represent the operation being modeled.
+///
+/// A read observes the incoming value. A possible write is enough to establish that some
+/// initialization can reach later uses; a definite write additionally establishes initialization
+/// on every path through the instruction. `definitelyWritesValue` implies a possible write even
+/// when `mayWriteValue` is false.
 struct UninitializedVariableUseEffect
 {
+    /// The exact operand use whose inferred effect should be replaced.
     IRUse* use = nullptr;
+
+    /// The instruction observes the value that arrives through `use`.
     bool readsValue = false;
+
+    /// The instruction can write some or all of the value on at least one path.
     bool mayWriteValue = false;
+
+    /// The instruction writes the complete value on every path through the instruction.
     bool definitelyWritesValue = false;
 };
 
-/// Diagnose reads of `variable` that can execute before it is initialized in `code`.
+/// Diagnose reads of one variable that can execute before it is initialized in `code`.
+///
+/// This entry point is for transformations that introduce a variable after the module-wide
+/// uninitialized-value check has run. It applies the same intraprocedural control-flow analysis to
+/// that variable alone. Entries in `useEffects` override the inferred effect of their exact uses;
+/// all other uses are classified from the IR as usual.
 void checkForUsingUninitializedVariable(
     IRGlobalValueWithCode* code,
     IRInst* variable,

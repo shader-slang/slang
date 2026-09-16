@@ -2,29 +2,26 @@
 #ifndef SLANG_IR_LEGALIZE_RESOURCE_GLOBALS_H
 #define SLANG_IR_LEGALIZE_RESOURCE_GLOBALS_H
 
-#include "core/slang-list.h"
-
 namespace Slang
 {
 
 class DiagnosticSink;
-struct IRGlobalVar;
 struct IRModule;
+class TargetProgram;
 
-/// Replace per-invocation file-scope variables whose types contain resource handles with
-/// entry-point locals and threaded parameters.
+/// Legalize per-invocation source-static resource state held in global IR storage into explicit
+/// entry-point state.
 ///
-/// Resource-dependent initializers must already have been moved into entry points.
-/// `resourceDependentState` must be the complete list produced by that move, including resource
-/// globals, initializer targets, and ordinary globals the moved initializer call graph may mutate.
-/// The pass diagnoses preserved call/storage boundaries before rewriting any state. Resource types
-/// must not yet have been split into leaf variables. The module must contain linked source globals,
-/// identified by their linkage decorations, and calls between defined functions must be direct.
-/// Existing resource specialization must run afterward; target-specific restrictions can still
-/// reject resource value-flow shapes that it cannot resolve.
+/// This operation moves resource-dependent initialization into each entry point, replaces the
+/// affected resource globals with entry-point locals, and threads their values through helper
+/// parameters. It diagnoses externally preserved storage and invocation boundaries that cannot
+/// carry per-invocation state without changing their contract.
+///
+/// Invoke it after linking, while source-static identities are intact, and before resource-type
+/// legalization and resource-usage specialization.
 void legalizeResourceGlobalVars(
     IRModule* module,
-    List<IRGlobalVar*> const& resourceDependentState,
+    TargetProgram* targetProgram,
     DiagnosticSink* sink);
 
 } // namespace Slang
