@@ -807,6 +807,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto rr : varLayout->getOffsetAttrs())
         {
             auto addressSpace = getAddressSpaceFromGlobalParamResourceKind(rr->getResourceKind());
+            // A resource kind that maps to no storage class does not participate in storage-class
+            // reconciliation: it can neither seed nor conflict with the inferred address space.
+            // For example, a `SubpassInput` occupies both a texture slot and an
+            // `InputAttachmentIndex` slot; the latter lowers only to
+            // `OpDecorateInputAttachmentIndex` and has no address space, so it must not be treated
+            // as a conflicting use when the texture slot has been reclassified to `ShaderResource`
+            // by `-fvk-t-shift`.
+            if (addressSpace == AddressSpace::Generic)
+                continue;
             // If we haven't inferred a storage class yet, use the one we just found.
             if (result == AddressSpace::Generic)
                 result = addressSpace;
