@@ -300,16 +300,25 @@ public extension<let R : int, let C : int, let L : MatrixLayoutMode>
     }
 }
 
-interface __IIntegerVectorDotProduct : IDotProduct, IIntegerType {}
-
-public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
-    vector<T, N> : __IIntegerVectorDotProduct
+// This extension owns the common shape witnesses for every builtin arithmetic vector. The integer
+// and floating-point refinements below reuse these members instead of publishing duplicate
+// Scalar, Mask, and fromScalar declarations.
+public extension<T : __BuiltinArithmeticType & IScalarNumeric, let N : int>
+    vector<T, N> : IDotProduct
 {
     typealias Scalar = T;
     typealias Mask = vector<bool, N>;
-    typealias ShiftAmount = vector<int, N>;
 
     [__unsafeForceInlineEarly] static This fromScalar(Scalar value) { return This(value); }
+    [__unsafeForceInlineEarly]
+    Scalar dotProductWith(This other) { return __numericsBuiltinDot(this, other); }
+}
+
+public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
+    vector<T, N> : IIntegerType
+{
+    typealias ShiftAmount = vector<int, N>;
+
     [__unsafeForceInlineEarly]
     __init<TSource : __BuiltinIntegerType>(TSource value)
     {
@@ -332,8 +341,6 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     This minus(This other) { return this.sub(other); }
     [__unsafeForceInlineEarly]
     This multipliedBy(This other) { return this.mul(other); }
-    [__unsafeForceInlineEarly]
-    Scalar dotProductWith(This other) { return __numericsBuiltinDot(this, other); }
     [__unsafeForceInlineEarly]
     This quotientWhenDividedBy(This divisor)
     {
@@ -382,10 +389,6 @@ public extension<T : __BuiltinIntegerType & IScalarUnsignedIntegerType, let N : 
 public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int>
     vector<T, N> : IComponentwiseOrdered
 {
-    typealias Scalar = T;
-    typealias Mask = vector<bool, N>;
-
-    [__unsafeForceInlineEarly] static This fromScalar(Scalar value) { return This(value); }
     [__unsafeForceInlineEarly]
     Mask isEqualTo(This other) { return __numericsBuiltinEqual(this, other); }
     [__unsafeForceInlineEarly]
@@ -397,10 +400,8 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
     }
 }
 
-interface __IFractionalVectorDotProduct : IDotProduct, IFractional {}
-
 public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int>
-    vector<T, N> : __IFractionalVectorDotProduct
+    vector<T, N> : IFractional
 {
     [__unsafeForceInlineEarly]
     __init<TSource : __BuiltinIntegerType>(TSource value)
@@ -420,8 +421,6 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
     This minus(This other) { return this.sub(other); }
     [__unsafeForceInlineEarly]
     This multipliedBy(This other) { return this.mul(other); }
-    [__unsafeForceInlineEarly]
-    Scalar dotProductWith(This other) { return __numericsBuiltinDot(this, other); }
     [__unsafeForceInlineEarly]
     This dividedBy(This other) { return this.div(other); }
     [__unsafeForceInlineEarly]

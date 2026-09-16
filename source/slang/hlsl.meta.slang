@@ -10282,10 +10282,26 @@ T dot(T x, T y)
     }
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int>
+// Computes a vector dot product with scalar arithmetic for targets without a native operation.
+__generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
+[ForceInline]
+T __vectorDotFallback(vector<T, N> x, vector<T, N> y)
+{
+    T result = T(0);
+    [ForceUnroll]
+    for(int i = 0; i < N; ++i)
+        result += x[i] * y[i];
+    return result;
+}
+
+// Implements the target-specific vector dot product behavior shared by all builtin arithmetic
+// element types.
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-T dot(vector<T, N> x, vector<T, N> y)
+T __vectorDotImpl(vector<T, N> x, vector<T, N> y)
 {
     // Handle 1-vector case explicitly since many backends don't support it natively
     if (N == 1)
@@ -10295,22 +10311,81 @@ T dot(vector<T, N> x, vector<T, N> y)
 
     __target_switch
     {
-    case glsl: __intrinsic_asm "dot";
+    case glsl:
+        if (__isFloat<T>())
+            __intrinsic_asm "dot";
+        else
+            return __vectorDotFallback(x, y);
     case hlsl: __intrinsic_asm "dot";
-    case metal: __intrinsic_asm "dot";
-    case spirv: return spirv_asm {
-        OpDot $$T result $x $y
-    };
+    case metal:
+        if (__isFloat<T>())
+            __intrinsic_asm "dot";
+        else
+            return __vectorDotFallback(x, y);
+    case spirv:
+        if (__isFloat<T>())
+        {
+            return spirv_asm {
+                OpDot $$T result $x $y
+            };
+        }
+        else
+        {
+            spirv_asm
+            {
+                OpCapability DotProduct;
+                OpCapability DotProductInputAll;
+                OpExtension "SPV_KHR_integer_dot_product";
+            };
+
+            if (__isSignedInt<T>())
+            {
+                return spirv_asm
+                {
+                    result:$$T = OpSDot $x $y;
+                };
+            }
+            else
+            {
+                return spirv_asm
+                {
+                    result:$$T = OpUDot $x $y;
+                };
+            }
+        }
     case wgsl: __intrinsic_asm "dot";
-    default:
-        T result = T(0);
-        [ForceUnroll]
-        for(int i = 0; i < N; ++i)
-            result += x[i] * y[i];
-        return result;
+    default: return __vectorDotFallback(x, y);
     }
 }
 
+// Keep the established floating-point and integer overloads so that concrete calls retain their
+// overload ranking and floating-point calls retain their conditional autodiff registration. The
+// lower-ranked arithmetic overload handles generic code that cannot prove which family `T` belongs
+// to.
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T dot(vector<T, N> x, vector<T, N> y)
+{
+    return __vectorDotImpl(x, y);
+}
+
+__generic<T : __BuiltinIntegerType, let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T dot(vector<T, N> x, vector<T, N> y)
+{
+    return __vectorDotImpl(x, y);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[OverloadRank(-1)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T dot(vector<T, N> x, vector<T, N> y)
+{
+    return __vectorDotImpl(x, y);
+}
 
 BFloat16 dot<let N : int>(vector<BFloat16, N> x, vector<BFloat16, N> y)
 {
@@ -10333,54 +10408,6 @@ BFloat16 dot<let N : int>(vector<BFloat16, N> x, vector<BFloat16, N> y)
         };
     case cuda:
         __intrinsic_asm "_slang_vector_dot";
-    }
-}
-
-__generic<T : __BuiltinIntegerType, let N : int>
-[__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-T dot(vector<T, N> x, vector<T, N> y)
-{
-    // Handle 1-vector case explicitly since many backends don't support it natively
-    if (N == 1)
-    {
-        return x[0] * y[0];
-    }
-
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "dot";
-    case wgsl: __intrinsic_asm "dot";
-    case spirv:
-    {
-        spirv_asm
-        {
-            OpCapability DotProduct;
-            OpCapability DotProductInputAll;
-            OpExtension "SPV_KHR_integer_dot_product";
-        };
-
-        if (__isSignedInt<T>())
-        {
-            return spirv_asm
-            {
-                result:$$T = OpSDot $x $y;
-            };
-        }
-        else
-        {
-            return spirv_asm
-            {
-                result:$$T = OpUDot $x $y;
-            };
-        }
-    }
-    default:
-        T result = T(0);
-        [ForceUnroll]
-        for(int i = 0; i < N; ++i)
-            result += x[i] * y[i];
-        return result;
     }
 }
 
