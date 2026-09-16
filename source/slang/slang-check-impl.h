@@ -4436,8 +4436,13 @@ VarDeclBase* getTrailingUnsizedArrayElement(
     VarDeclBase* rootObject,
     ArrayExpressionType*& outArrayType);
 
-// Test if `type` can be an opaque handle on certain targets, this includes
-// texture, buffer, sampler, acceleration structure, etc.
+// Return true for a resource handle or array of resource handles supported by resource-global
+// legalization, including textures, buffers, samplers, and acceleration structures. Keep this
+// classification aligned with `isResourceHandleType(IRType*)`.
+bool isResourceHandleType(Type* type);
+
+// Return true for any opaque handle. This includes resource handles as well as patch,
+// stream-output, and mesh-output types that resource-global legalization does not support.
 bool isOpaqueHandleType(Type* type);
 
 // Returns true if `type` itself is an opaque handle type, or if it is a struct

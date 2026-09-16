@@ -6,6 +6,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -353,14 +354,14 @@ struct ResourceOutputSpecializationPass
             if (!outType)
                 continue;
             auto valueType = outType->getValueType();
-            if (isResourceType(valueType))
+            if (isResourceHandleType(valueType))
                 return true;
         }
 
         // If the result type of the function is a resource type,
         // then we should specialize the function.
         //
-        if (isResourceType(func->getResultType()))
+        if (isResourceHandleType(func->getResultType()))
         {
             return true;
         }
@@ -371,45 +372,15 @@ struct ResourceOutputSpecializationPass
         return false;
     }
 
-    // For the above function to work, we need to be able to identify
-    // the resource types (and arrays thereof) that require specialization.
-    //
-    // TODO: It seems like we should be able to share a central definition
-    // of resource-ness.
-    //
     // Note: we do not worry about parameters/results that are structures
-    // with resource-type fields, under the assumption that resource
-    // legalization has already been applied, exposing all resource-type
+    // with resource-handle fields, under the assumption that resource
+    // legalization has already been applied, exposing all resource-handle
     // parameters as their own top-level parameters.
     //
     // TODO: resource legalization may not apply correctly to function
     // results and `out`/`inout` parameters, in which case we need to
     // fix that pass.
     //
-    bool isResourceType(IRType* type)
-    {
-        type = unwrapArray(type);
-
-        if (as<IRResourceTypeBase>(type))
-            return true;
-
-        if (as<IRUniformParameterGroupType>(type))
-            return true;
-
-        if (as<IRHLSLStructuredBufferTypeBase>(type))
-            return true;
-
-        if (as<IRByteAddressBufferTypeBase>(type))
-            return true;
-
-        if (as<IRSamplerStateTypeBase>(type))
-            return true;
-
-        // TODO: more cases here?
-
-        return false;
-    }
-
     // Once we've decided that a function is worth specializing,
     // we will both transform the function and collect information
     // about its outputs.
@@ -584,7 +555,7 @@ struct ResourceOutputSpecializationPass
         // then we don't need to specialize the result, and we
         // can succeed without doing anything.
         //
-        if (!isResourceType(func->getResultType()))
+        if (!isResourceHandleType(func->getResultType()))
             return SpecializeFuncResult::Ok;
 
         // Otherwise, we know that we will need to produce specialization
@@ -805,7 +776,7 @@ struct ResourceOutputSpecializationPass
         if (!outType)
             return SpecializeFuncResult::Ok;
         auto valueType = outType->getValueType();
-        if (!isResourceType(valueType))
+        if (!isResourceHandleType(valueType))
             return SpecializeFuncResult::Ok;
 
         prepareOutputValue(outParamInfo, ioFuncInfo);

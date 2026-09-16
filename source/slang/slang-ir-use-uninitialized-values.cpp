@@ -9,30 +9,6 @@
 
 namespace Slang
 {
-static bool isMetaOp(IRInst* inst)
-{
-    switch (inst->getOp())
-    {
-    // These instructions only look at the parameter's type,
-    // so passing an undefined value to them is permissible
-    case kIROp_IsBool:
-    case kIROp_IsInt:
-    case kIROp_IsUnsignedInt:
-    case kIROp_IsSignedInt:
-    case kIROp_IsHalf:
-    case kIROp_IsFloat:
-    case kIROp_IsCoopFloat:
-    case kIROp_IsVector:
-    case kIROp_GetNaturalStride:
-    case kIROp_GetNaturalAlignment:
-    case kIROp_TypeEquals:
-        return true;
-    default:
-        break;
-    }
-
-    return false;
-}
 
 static bool isUninitializedValue(IRInst* inst)
 {
@@ -233,7 +209,7 @@ static void getAliasableInstructionsRec(
         IRInst* user = use->getUser();
 
         // Meta instructions only use the argument type
-        if (isMetaOp(user))
+        if (isTypeOnlyInst(user))
             continue;
 
         if (isAliasable(user))
@@ -355,10 +331,10 @@ static void collectPhiMergeStores(
 
 enum InstructionUsageType
 {
-    None,        // Instruction neither stores nor loads from the soruce (e.g. meta operations)
+    None,        // Instruction neither stores nor loads from the source (e.g. meta operations)
     Store,       // Instruction acts as a write to the source
     StoreParent, // Instruction's parent acts as a write to the source
-    Load         // Instruciton acts as a load from the source
+    Load         // Instruction acts as a load from the source
 };
 
 static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
@@ -397,8 +373,8 @@ static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
     if (!ftype)
         return None;
 
-    // Consider it as a store if its passed
-    // as an out/inout/ref parameter
+    // Consider it as a store if it is passed as an out/inout/ref parameter. Callers that have a
+    // more precise interprocedural summary can override this classification for an exact use.
     auto type = unwrapAttributedType(ftype->getParamType(index));
     return (as<IROutParamType>(type) || as<IRBorrowInOutParamType>(type) ||
             as<IRRefParamType>(type))
@@ -409,7 +385,7 @@ static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
 static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
 {
     // Meta intrinsics (which evaluate on type) do nothing
-    if (isMetaOp(user))
+    if (isTypeOnlyInst(user))
         return None;
 
     // Ignore instructions generating more aliases
@@ -478,7 +454,7 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
         // For specializing generic structs
         return Store;
 
-    // Miscellaenous cases
+    // Miscellaneous cases
     case kIROp_ManagedPtrAttach:
     case kIROp_Unmodified:
         return Store;
@@ -503,19 +479,42 @@ static void collectSpecialCaseInstructions(List<IRInst*>& stores, IRBlock* block
 
 static void collectInstructionByUsage(
     List<IRInst*>& stores,
+    List<IRInst*>* definiteStores,
     List<IRInst*>& loads,
-    IRInst* user,
-    IRInst* inst)
+    IRUse* use,
+    IRInst* inst,
+    ConstArrayView<UninitializedVariableUseEffect> useEffects = {})
 {
+    auto user = use->getUser();
+    for (auto const& effect : useEffects)
+    {
+        if (effect.use != use)
+            continue;
+
+        if (effect.readsValue)
+            loads.add(user);
+        if (effect.mayWriteValue || effect.definitelyWritesValue)
+            stores.add(user);
+        if (effect.definitelyWritesValue && definiteStores)
+            definiteStores->add(user);
+        return;
+    }
+
     InstructionUsageType usage = getInstructionUsageType(user, inst);
     switch (usage)
     {
     case Load:
         return loads.add(user);
     case Store:
-        return stores.add(user);
+        stores.add(user);
+        if (definiteStores)
+            definiteStores->add(user);
+        return;
     case StoreParent:
-        return stores.add(user->getParent());
+        stores.add(user->getParent());
+        if (definiteStores)
+            definiteStores->add(user->getParent());
+        return;
     }
 }
 
@@ -529,7 +528,9 @@ static void cancelLoads(
     {
         for (Index i = 0; i < loads.getCount();)
         {
-            if (reachability.isInstReachable(store, loads[i]))
+            // A call that both reads and writes an argument cannot use its own write to
+            // initialize the incoming value that it reads.
+            if (store != loads[i] && reachability.isInstReachable(store, loads[i]))
                 loads.fastRemoveAt(i);
             else
                 i++;
@@ -754,7 +755,7 @@ static bool isEveryPathFromBlockedByStore(
 //  - `readingInst` may itself be the call to `WaveReadLaneFirst`, with the tracked value
 //    passed straight in as its argument; or
 //  - `readingInst` may be a plain load (or other Load-classified instruction) whose result is
-//    consumed *only* (ignoring meta ops, per `isMetaOp`) as the argument to such a call.
+//    consumed *only* (ignoring type-only instructions) as the argument to such a call.
 //
 // Either way, the tracked value's only real consumer must be the `WaveReadLaneFirst` call --
 // this is what ties the must-init relaxation to the specific broadcast read that makes it
@@ -777,7 +778,7 @@ static bool isWaveReadLaneFirstUse(IRInst* readingInst)
     for (auto use = readingInst->firstUse; use; use = use->nextUse)
     {
         auto user = use->getUser();
-        if (isMetaOp(user))
+        if (isTypeOnlyInst(user))
             continue;
         numRealUses++;
         realUse = user;
@@ -1052,7 +1053,12 @@ static void cancelLoadsByDefiniteAssignment(
     }
 }
 
-static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List<IRInst*>& loads)
+static void collectAliasableLoadStores(
+    IRInst* inst,
+    List<IRInst*>& stores,
+    List<IRInst*>& loads,
+    ConstArrayView<UninitializedVariableUseEffect> useEffects = {},
+    List<IRInst*>* definiteStores = nullptr)
 {
     HashSet<IRInst*> aliasSet;
     auto addresses = getAliasableInstructions(inst, aliasSet);
@@ -1061,13 +1067,15 @@ static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List
     {
         // TODO: Mark specific parts assigned to for partial initialization checks
         for (auto use = alias->firstUse; use; use = use->nextUse)
-            collectInstructionByUsage(stores, loads, use->getUser(), alias);
+            collectInstructionByUsage(stores, definiteStores, loads, use, alias, useEffects);
     }
 
     // A defined value flowing into a phi alias is a store of an initialized value reaching
     // that merge point; record it so reads after it are not mistaken for never-initialized
     // (may-init) uses.
     collectPhiMergeStores(aliasSet, addresses, stores);
+    if (definiteStores)
+        collectPhiMergeStores(aliasSet, addresses, *definiteStores);
 }
 
 static List<IRInst*> getUnresolvedParamLoads(
@@ -1114,12 +1122,14 @@ static UninitializedUseLoads getUninitializedUseLoads(
     ReachabilityContext& reachability,
     IRGlobalValueWithCode* func,
     IRInst* inst,
-    const WaveElectionContext& waveElection)
+    const WaveElectionContext& waveElection,
+    ConstArrayView<UninitializedVariableUseEffect> useEffects = {})
 {
     // Collect the aliasable loads/stores once and derive both violation sets from it.
     List<IRInst*> stores;
+    List<IRInst*> definiteStores;
     List<IRInst*> allLoads;
-    collectAliasableLoadStores(inst, stores, allLoads);
+    collectAliasableLoadStores(inst, stores, allLoads, useEffects, &definiteStores);
 
     UninitializedUseLoads result;
 
@@ -1137,7 +1147,7 @@ static UninitializedUseLoads getUninitializedUseLoads(
         mayInitSet.add(load);
 
     result.mustInit = allLoads;
-    cancelLoadsByDefiniteAssignment(func, stores, result.mustInit, waveElection);
+    cancelLoadsByDefiniteAssignment(func, definiteStores, result.mustInit, waveElection);
 
     // Keep the two sets disjoint: drop loads already reported as may-init violations.
     for (Index i = 0; i < result.mustInit.getCount();)
@@ -1198,7 +1208,7 @@ static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* referenc
     for (auto alias : getAliasableInstructions(inst))
     {
         for (auto use = alias->firstUse; use; use = use->nextUse)
-            collectInstructionByUsage(stores, loads, use->getUser(), alias);
+            collectInstructionByUsage(stores, nullptr, loads, use, alias);
     }
 
     for (auto store : stores)
@@ -1522,6 +1532,26 @@ static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sin
             .location = load->sourceLoc,
         });
     }
+}
+
+void checkForUsingUninitializedVariable(
+    IRGlobalValueWithCode* code,
+    IRInst* variable,
+    ConstArrayView<UninitializedVariableUseEffect> useEffects,
+    DiagnosticSink* sink)
+{
+    ReachabilityContext reachability(code);
+    auto waveElection = collectWaveElectionContext(code);
+    auto useLoads =
+        getUninitializedUseLoads(reachability, code, variable, waveElection, useEffects);
+    auto type = variable->getFullType();
+
+    diagnoseUninitializedUses<
+        Diagnostics::UsingUninitializedVariable,
+        Diagnostics::UsingUninitializedValue>(sink, variable, type, useLoads.mayInit);
+    diagnoseUninitializedUses<
+        Diagnostics::PossiblyUsingUninitializedVariable,
+        Diagnostics::PossiblyUsingUninitializedValue>(sink, variable, type, useLoads.mustInit);
 }
 
 void checkForUsingUninitializedValues(IRModule* module, DiagnosticSink* sink)

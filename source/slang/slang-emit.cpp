@@ -70,6 +70,7 @@
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-legalize-mesh-outputs.h"
+#include "slang-ir-legalize-resource-globals.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-legalize-vector-types.h"
@@ -2020,6 +2021,26 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
 
         if (!validateStructuredBufferResourceTypes(irModule, sink, targetRequest))
+            return SLANG_FAIL;
+
+        // A resource-global initializer is represented as code nested under an IRGlobalVar, while
+        // resource-type legalization expects code to belong to an ordinary function. Extract the
+        // complete resource-dependent initializer closure first. At this point the original
+        // globals still provide stable identities for checking independent call roots.
+        List<IRGlobalVar*> resourceDependentState;
+        SLANG_PASS(
+            moveResourceDependentGlobalVarInitializationToEntryPoints,
+            targetProgram,
+            resourceDependentState);
+        // Rewrite the linked source globals while each still has one stable IR identity. Resource
+        // type legalization can split a resource-bearing aggregate into several leaf variables,
+        // at which point those leaves no longer distinguish a file-scope static from a
+        // function-local static. The locals and parameters introduced here then flow through the
+        // existing resource specialization passes. Targets that cannot represent a residual
+        // resource local will continue to diagnose conditional or dynamically indexed shapes
+        // that those passes cannot yet resolve.
+        SLANG_PASS(legalizeResourceGlobalVars, resourceDependentState, sink);
+        if (sink->getErrorCount() != 0)
             return SLANG_FAIL;
 
         // Many of our target languages and/or downstream compilers

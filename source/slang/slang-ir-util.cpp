@@ -9,6 +9,89 @@
 namespace Slang
 {
 
+bool isTypeOnlyInst(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_IsBool:
+    case kIROp_IsInt:
+    case kIROp_IsUnsignedInt:
+    case kIROp_IsSignedInt:
+    case kIROp_IsHalf:
+    case kIROp_IsFloat:
+    case kIROp_IsCoopFloat:
+    case kIROp_IsVector:
+    case kIROp_GetNaturalStride:
+    case kIROp_GetNaturalAlignment:
+    case kIROp_TypeEquals:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool isResourceHandleType(IRType* type)
+{
+    type = unwrapArray(type);
+    return as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
+           as<IRUniformParameterGroupType>(type) || as<IRHLSLStructuredBufferTypeBase>(type) ||
+           as<IRByteAddressBufferTypeBase>(type) || as<IRUntypedBufferResourceType>(type) ||
+           as<IRSubpassInputType>(type) || as<IRGLSLShaderStorageBufferType>(type);
+}
+
+static bool _doesTypeContainResourceHandles(IRType* type, HashSet<IRType*>& visitedTypes)
+{
+    if (!visitedTypes.add(type))
+        return false;
+    if (isResourceHandleType(type))
+        return true;
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (_doesTypeContainResourceHandles(field->getFieldType(), visitedTypes))
+                return true;
+        }
+    }
+    else if (auto arrayType = as<IRArrayTypeBase>(type))
+    {
+        return _doesTypeContainResourceHandles(arrayType->getElementType(), visitedTypes);
+    }
+    else if (auto tupleType = as<IRTupleTypeBase>(type))
+    {
+        for (UInt i = 0; i < tupleType->getOperandCount(); ++i)
+        {
+            if (auto elementType = as<IRType>(tupleType->getOperand(i)))
+            {
+                if (_doesTypeContainResourceHandles(elementType, visitedTypes))
+                    return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool doesTypeContainResourceHandles(IRType* type)
+{
+    HashSet<IRType*> visitedTypes;
+    return _doesTypeContainResourceHandles(type, visitedTypes);
+}
+
+bool isPerInvocationGlobalVar(IRGlobalVar* globalVar)
+{
+    return !globalVar->getRate() && globalVar->findDecoration<IRLinkageDecoration>();
+}
+
+bool isPerInvocationResourceStateGlobalVar(IRGlobalVar* globalVar)
+{
+    if (!isPerInvocationGlobalVar(globalVar))
+        return false;
+
+    auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
+    return ptrType && doesTypeContainResourceHandles(ptrType->getValueType());
+}
+
 bool isPointerOfType(IRInst* type, IROp opCode)
 {
     if (auto ptrType = as<IRPtrTypeBase>(type))

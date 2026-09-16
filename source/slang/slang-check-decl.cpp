@@ -3632,10 +3632,18 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         }
 
         bool isOpaque = (((int)varTypeTags & (int)TypeTag::Opaque) != 0);
-        if (isOpaque && isGlobalDecl(varDecl) && !varDecl->hasModifier<ConstModifier>() &&
-            varDecl->hasModifier<HLSLStaticModifier>())
+        bool isPerInvocationResourceOrResourceArray =
+            isResourceHandleType(varDecl->getType()) &&
+            !varDecl->hasModifier<HLSLGroupSharedModifier>() &&
+            !varDecl->hasModifier<ActualGlobalModifier>() &&
+            !varDecl->hasModifier<MemoryQualifierSetModifier>();
+        if (isOpaque && !isPerInvocationResourceOrResourceArray && isGlobalDecl(varDecl) &&
+            !varDecl->hasModifier<ConstModifier>() && varDecl->hasModifier<HLSLStaticModifier>())
         {
-            // Opaque type global variable must be const.
+            // Ordinary file-scope resource handles are values, so a later IR legalization pass can
+            // replace their per-invocation storage with entry-point locals and explicit parameters.
+            // Keep rejecting other opaque types and rate- or memory-qualified resource storage
+            // until those representations have their own support.
             getSink()->diagnose(Diagnostics::GlobalVarCannotHaveOpaqueType{.decl = varDecl});
             if (varDecl->initExpr)
                 getSink()->diagnose(Diagnostics::DoYouMeanStaticConst{.decl = varDecl});
@@ -22215,10 +22223,17 @@ bool isImmutableBufferType(Type* type)
     return false;
 }
 
-bool isOpaqueHandleType(Type* type)
+bool isResourceHandleType(Type* type)
 {
-    while (auto modifiedType = as<ModifiedType>(type))
-        type = modifiedType->getBase();
+    for (;;)
+    {
+        if (auto modifiedType = as<ModifiedType>(type))
+            type = modifiedType->getBase();
+        else if (auto arrayType = as<ArrayExpressionType>(type))
+            type = arrayType->getElementType();
+        else
+            break;
+    }
     if (as<ResourceType>(type))
         return true;
     if (as<SamplerStateType>(type))
@@ -22230,6 +22245,17 @@ bool isOpaqueHandleType(Type* type)
     if (as<UntypedBufferResourceType>(type))
         return true;
     if (as<GLSLShaderStorageBufferType>(type))
+        return true;
+    if (as<SubpassInputType>(type))
+        return true;
+    return false;
+}
+
+bool isOpaqueHandleType(Type* type)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+    if (isResourceHandleType(type))
         return true;
     if (as<FeedbackType>(type))
         return true;
