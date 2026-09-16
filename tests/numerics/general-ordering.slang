@@ -2,11 +2,19 @@
 // require numeric arithmetic or a Scalar and Mask. Application types can use these operations
 // without claiming unrelated numeric capabilities.
 
-//TEST:SIMPLE: -target hlsl -entry main -stage compute -o numeric-interfaces-general-ordering.hlsl -experimental-feature
-//TEST:SIMPLE: -target spirv -entry main -stage compute -o numeric-interfaces-general-ordering.spv -experimental-feature
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
+//TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o numeric-interfaces-general-ordering.hlsl -experimental-feature
+//TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o numeric-interfaces-general-ordering.spv -experimental-feature
+
+// CHECK: type: int32_t
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 2
+// CHECK-NEXT: 12
 
 import slang.numerics;
 
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 struct NotificationKind : IPartiallyOrdered
@@ -61,7 +69,7 @@ T boundedMedian<T : INumericalExtrema>(T x, T y, T z)
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void main()
+void computeMain()
 {
     NotificationKind ordinary = {1};
     NotificationKind urgent = {3};
