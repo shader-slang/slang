@@ -10,11 +10,14 @@
 // CHECK-NEXT: 1
 // CHECK-NEXT: 1
 // CHECK-NEXT: 2
-// CHECK-NEXT: 12
+// CHECK-NEXT: 5
+// CHECK-NEXT: 0
+// CHECK-NEXT: 4
+// CHECK-NEXT: 7
 
 import slang.numerics;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 struct NotificationKind : IPartiallyOrdered
@@ -67,6 +70,11 @@ T boundedMedian<T : INumericalExtrema>(T x, T y, T z)
     return clamp(median3(x, y, z), min(x, y), max(y, z));
 }
 
+T bound<T : INumericalExtrema>(T value, T lower, T upper)
+{
+    return clamp(value, lower, upper);
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -77,6 +85,9 @@ void computeMain()
     outputBuffer[1] = int(representsSameKind(ordinary, ordinary));
     ExtremaOnly bounded = boundedMedian(ExtremaOnly(1), ExtremaOnly(3), ExtremaOnly(2));
     outputBuffer[2] = bounded.value;
-    int3 boundedInteger = clamp(int3(-2, 4, 9), int3(0, 1, 2), int3(3, 5, 7));
-    outputBuffer[3] = min(8, 5) + max3(boundedInteger.x, boundedInteger.y, boundedInteger.z);
+    outputBuffer[3] = bound(8, 0, 5);
+    int3 boundedInteger = bound(int3(-2, 4, 9), int3(0, 1, 2), int3(3, 5, 7));
+    outputBuffer[4] = boundedInteger.x;
+    outputBuffer[5] = boundedInteger.y;
+    outputBuffer[6] = boundedInteger.z;
 }
