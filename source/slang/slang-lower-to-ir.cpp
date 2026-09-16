@@ -12090,10 +12090,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 initVal = LoweredValInfo::simple(getSimpleVal(context, initVal));
 
                 // An immutable `let` lowers to the initializer's SSA value with no backing IRVar,
-                // so this is the only site that can attach debug info to it. Opaque resource
-                // handles are eligible here, same as at the local var site, via
-                // isDebugVarTypeSupported. Requires Standard level or higher for variable debug
-                // info.
+                // so this is the only site that can attach debug info to it.
                 if (context->debugInfoLevel >= DebugInfoLevel::Standard && decl->loc.isValid() &&
                     context->shared->debugValueContext.isDebugVarTypeSupported(
                         initVal.val->getDataType()))
