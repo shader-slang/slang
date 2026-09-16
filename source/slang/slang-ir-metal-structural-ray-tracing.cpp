@@ -6385,6 +6385,47 @@ static void _appendErasedKernelContextParameter(IRModule* module, IRFunc* func)
     fixUpFuncType(func);
 }
 
+// Returns whether a layout-bearing parameter can be bound directly on an
+// `MTLIntersectionFunctionTable`.
+//
+// Consider source AnyHit logic that reads `RWStructuredBuffer<uint> values`. Explicit-global-
+// context lowering turns that global into a candidate-function parameter with the original
+// `MetalBuffer` layout, and the Metal emitter writes `device uint* values [[buffer(n)]]`. Constant
+// buffers and ParameterBlocks use the same legal buffer-argument path. A top-level texture or
+// sampler is different: Metal intersection functions cannot receive those resource kinds
+// directly, although they remain legal when nested inside a ParameterBlock argument buffer.
+static bool _isLegalMetalIntersectionFunctionResourceParameter(IRParam* param)
+{
+    auto layout = findVarLayout(param);
+    if (!layout)
+        return true;
+
+    bool hasMetalBufferBinding = false;
+    for (auto offset : layout->getOffsetAttrs())
+    {
+        switch (offset->getResourceKind())
+        {
+        case LayoutResourceKind::MetalTexture:
+        case LayoutResourceKind::SamplerState:
+            return false;
+        case LayoutResourceKind::MetalBuffer:
+            hasMetalBufferBinding = true;
+            break;
+        default:
+            break;
+        }
+    }
+    if (!hasMetalBufferBinding)
+        return true;
+
+    IRType* type = param->getDataType();
+    if (auto handleType = as<IRDescriptorHandleType>(type))
+        type = handleType->getResourceType();
+
+    return as<IRPtrTypeBase>(type) || as<IRHLSLStructuredBufferTypeBase>(type) ||
+           as<IRByteAddressBufferTypeBase>(type) || as<IRUniformParameterGroupType>(type);
+}
+
 void finalizeMetalStructuralRayTracingGlobalContext(IRModule* module, DiagnosticSink* sink)
 {
     List<IRFunc*> visibleFunctions;
@@ -6398,15 +6439,32 @@ void finalizeMetalStructuralRayTracingGlobalContext(IRModule* module, Diagnostic
         if (visibleDecoration)
             visibleFunctions.add(func);
         auto contextParam = _findKernelContextParameter(func);
-        if (!contextParam)
-            continue;
-
         if (func->findDecoration<IRMetalIntersectionFunctionDecoration>())
         {
-            sink->diagnose(Diagnostics::StructuralRayTracingMetalCandidateGlobalParameter{
-                .location = func->sourceLoc});
+            // A native intersection function is a physical entry point. Reachable global buffer
+            // parameters should already have been materialized individually by
+            // `introduceExplicitGlobalContext`; a remaining context pointer means the function
+            // instead reached mutable global state that cannot be initialized by Metal.
+            if (contextParam)
+            {
+                sink->diagnose(Diagnostics::StructuralRayTracingMetalCandidateGlobalVariable{
+                    .location = contextParam->sourceLoc.isValid() ? contextParam->sourceLoc
+                                                                  : func->sourceLoc});
+                continue;
+            }
+
+            for (auto param : func->getParams())
+            {
+                if (!_isLegalMetalIntersectionFunctionResourceParameter(param))
+                {
+                    sink->diagnose(Diagnostics::StructuralRayTracingMetalCandidateResourceKind{
+                        .location = param->sourceLoc});
+                }
+            }
             continue;
         }
+        if (!contextParam)
+            continue;
         if (visibleDecoration)
         {
             _eraseVisibleFunctionKernelContextType(module, func, contextParam);

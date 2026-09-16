@@ -733,8 +733,13 @@ bool dispatch(
     id<MTLBuffer> results,
     uint32_t threadCount,
     bool nestedFrame,
-    bool callableOnly)
+    bool callableOnly,
+    id<MTLBuffer> candidateBuffer = nil,
+    NSUInteger candidateBufferIndex = NSNotFound)
 {
+    if (candidateBuffer && candidateBufferIndex == NSNotFound)
+        return fail(@"a candidate buffer has no reflected Metal binding");
+
     id<MTLBuffer> frameBuffer = nil;
     if (nestedFrame)
     {
@@ -766,6 +771,8 @@ bool dispatch(
         [encoder setBuffer:programResources offset:0 atIndex:1];
         [encoder setBuffer:results offset:0 atIndex:2];
     }
+    if (candidateBuffer)
+        [encoder setBuffer:candidateBuffer offset:0 atIndex:candidateBufferIndex];
 
     if (scene)
         [encoder useResource:scene usage:MTLResourceUsageRead];
@@ -781,6 +788,12 @@ bool dispatch(
     [encoder useResource:program.callableTable usage:MTLResourceUsageRead];
     [encoder useResource:records usage:MTLResourceUsageRead];
     [encoder useResource:results usage:MTLResourceUsageWrite];
+    if (candidateBuffer)
+    {
+        // An IFT resource is accessed indirectly by the traversal hardware. Binding it to the
+        // table does not make it resident, so the compute encoder must declare the resource too.
+        [encoder useResource:candidateBuffer usage:MTLResourceUsageRead];
+    }
     [encoder dispatchThreads:MTLSizeMake(threadCount, 1, 1)
         threadsPerThreadgroup:MTLSizeMake(threadCount, 1, 1)];
     [encoder endEncoding];
@@ -1455,6 +1468,93 @@ bool runProceduralHitFilter(
         sizeof(kExpected) / sizeof(kExpected[0]));
 }
 
+// Finds the top-level global parameter's Metal buffer index. Explicit-global-context lowering
+// preserves this index on both the compute entry point and generated intersection functions, so
+// the host can use one reflected value for the compute encoder and IFT binding namespaces.
+SlangInt findMetalBufferBinding(const NativeProgram& program, const char* parameterName)
+{
+    auto layout = program.slangProgram->getLayout();
+    for (SlangUInt i = 0; i < layout->getParameterCount(); ++i)
+    {
+        auto parameter = layout->getParameterByIndex(i);
+        if (!parameter || !parameter->getName() ||
+            std::strcmp(parameter->getName(), parameterName) != 0)
+        {
+            continue;
+        }
+
+        auto offset = parameter->getOffset(SLANG_PARAMETER_CATEGORY_METAL_BUFFER);
+        return offset == SLANG_UNKNOWN_SIZE ? -1 : SlangInt(offset);
+    }
+    return -1;
+}
+
+bool runCandidateGlobalBuffer(
+    slang::IGlobalSession* globalSession,
+    id<MTLDevice> device,
+    id<MTLCommandQueue> queue,
+    NSString* repositoryRoot)
+{
+    ProgramDescription description = {
+        "tests/ray-tracing-2/runtime/metal/candidate-global-buffer.slang",
+        "Schema",
+        "main"};
+    NativeProgram program = {};
+    if (!createProgram(globalSession, device, repositoryRoot, description, program))
+        return false;
+    if (program.payloads.size() != 1)
+        return fail(@"candidate-global-buffer did not reflect one payload partition");
+
+    MetalRayTracingScene scene = {};
+    NSString* sceneError = nil;
+    if (!buildMetalBoundingBoxScene(device, queue, scene, &sceneError))
+        return fail(sceneError);
+
+    id<MTLBuffer> records = createDefaultTraceRecords(device, program);
+    if (!records)
+        return false;
+    id<MTLBuffer> programResources = createProgramResourceBuffer(device, program, records);
+
+    const uint32_t candidateValues[] = {5, 7};
+    id<MTLBuffer> values = [device newBufferWithBytes:candidateValues
+                                               length:sizeof(candidateValues)
+                                              options:MTLResourceStorageModeShared];
+    const SlangInt valuesBinding = findMetalBufferBinding(program, "values");
+    if (valuesBinding < 0)
+        return fail(@"candidate-global-buffer has no reflected Metal binding for 'values'");
+
+    // The reflected index is one source of truth for both native signatures. Slang emits the
+    // ray-generation parameter and the generated `[[intersection]]` parameter with this same
+    // `[[buffer(n)]]` index. The compute encoder supplies the former below; the IFT owns the
+    // independent resource-binding namespace that supplies the latter.
+    [program.payloads[0].intersectionTable setBuffer:values
+                                              offset:0
+                                             atIndex:NSUInteger(valuesBinding)];
+
+    id<MTLBuffer> results = [device newBufferWithLength:sizeof(uint32_t)
+                                                options:MTLResourceStorageModeShared];
+    if (!dispatch(
+            device,
+            queue,
+            program,
+            scene.instanceAccelerationStructure,
+            programResources,
+            records,
+            results,
+            1,
+            false,
+            false,
+            values,
+            NSUInteger(valuesBinding)))
+    {
+        return false;
+    }
+
+    // Intersection writes attribute 5, AnyHit adds 7, and ClosestHit adds 100.
+    static const uint32_t kExpected[] = {112};
+    return validateResults("candidate-global-buffer", results, kExpected, 1);
+}
+
 bool runOpaqueIntersectionFunctions(
     slang::IGlobalSession* globalSession,
     id<MTLDevice> device,
@@ -1686,6 +1786,7 @@ bool runMetalStructuralRayTracingTests(const char* repositoryRootPath)
         NSString* repositoryRoot = [NSString stringWithUTF8String:repositoryRootPath];
         return runTriangleHitMiss(globalSession, device, queue, repositoryRoot) &&
                runProceduralHitFilter(globalSession, device, queue, repositoryRoot) &&
+               runCandidateGlobalBuffer(globalSession, device, queue, repositoryRoot) &&
                runOpaqueIntersectionFunctions(globalSession, device, queue, repositoryRoot) &&
                runCallableRecord(globalSession, device, queue, repositoryRoot) &&
                runRecursiveTrace(globalSession, device, queue, repositoryRoot) &&

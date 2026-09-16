@@ -1,6 +1,7 @@
 // slang-ir-explicit-global-context.cpp
 #include "slang-ir-explicit-global-context.h"
 
+#include "slang-ir-call-graph.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
@@ -156,6 +157,9 @@ struct IntroduceExplicitGlobalContextPass
     List<GlobalParamInfo> m_globalParams;
     List<IRGlobalVar*> m_globalVars;
     List<IRFunc*> m_entryPoints;
+    List<IRFunc*> m_metalIntersectionFunctions;
+    Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingMetalIntersectionFunctions;
+    Dictionary<IRFunc*, SourceLoc> m_metalIntersectionFunctionGlobalVarLocs;
 
     ExplicitContextPolicy m_options;
 
@@ -275,13 +279,29 @@ struct IntroduceExplicitGlobalContextPass
                     // that represent entry points.
                     //
                     auto func = cast<IRFunc>(inst);
-                    if (!func->findDecoration<IREntryPointDecoration>())
-                        continue;
-
-                    m_entryPoints.add(func);
+                    if (func->findDecoration<IREntryPointDecoration>())
+                        m_entryPoints.add(func);
+                    if (m_target == CodeGenTarget::Metal &&
+                        func->findDecoration<IRMetalIntersectionFunctionDecoration>())
+                    {
+                        m_metalIntersectionFunctions.add(func);
+                    }
                 }
                 break;
             }
+        }
+
+        // A generated Metal intersection function is a physical entry point: Metal invokes it
+        // through an intersection-function table, even though it intentionally has no ordinary
+        // `IREntryPointDecoration`. Build reference information from those exact roots so each
+        // function receives only the global resources that its AnyHit/Intersection logic reaches.
+        // Copying all globals would also put unrelated acceleration structures and program
+        // descriptors in the native intersection signature, which Metal does not allow.
+        if (m_metalIntersectionFunctions.getCount() != 0)
+        {
+            buildEntryPointReferenceGraph(
+                m_referencingMetalIntersectionFunctions,
+                m_metalIntersectionFunctions);
         }
 
         // If there are no global-scope entities that require processing,
@@ -363,6 +383,41 @@ struct IntroduceExplicitGlobalContextPass
             createContextForEntryPoint(entryPoint);
         }
 
+        for (auto intersectionFunction : m_metalIntersectionFunctions)
+        {
+            bool referencesGlobalParam = false;
+            for (auto globalParam : m_globalParams)
+            {
+                if (isReferencedByMetalIntersectionFunction(
+                        globalParam.globalParam,
+                        intersectionFunction))
+                {
+                    referencesGlobalParam = true;
+                    break;
+                }
+            }
+
+            // Plain global variables need entry-point initialization semantics in addition to a
+            // native resource parameter. Leave such a function on the established diagnostic path
+            // instead of creating an uninitialized context. The supported path here is the shader
+            // parameters that Metal can bind to an intersection-function table.
+            bool referencesGlobalVar = false;
+            for (auto globalVar : m_globalVars)
+            {
+                if (isReferencedByMetalIntersectionFunction(globalVar, intersectionFunction))
+                {
+                    referencesGlobalVar = true;
+                    m_metalIntersectionFunctionGlobalVarLocs.add(
+                        intersectionFunction,
+                        globalVar->sourceLoc);
+                    break;
+                }
+            }
+
+            if (referencesGlobalParam && !referencesGlobalVar)
+                createContextForEntryPoint(intersectionFunction, true);
+        }
+
         // Now that we've prepared all the entry points, we can make another
         // pass over the global parameters/variables and start to replace
         // their use sites with references to the fields of the context.
@@ -380,6 +435,15 @@ struct IntroduceExplicitGlobalContextPass
         for (auto globalVar : m_globalVars)
         {
             replaceUsesOfGlobalVar(globalVar);
+        }
+
+        // Give only the rejected physical intersection roots the source location of the mutable
+        // global that made their context invalid. Ordinary entry points and helper parameters keep
+        // their established source mapping.
+        for (auto pair : m_metalIntersectionFunctionGlobalVarLocs)
+        {
+            if (auto contextPtr = m_mapFuncToContextPtr.tryGetValue(pair.first))
+                (*contextPtr)->sourceLoc = pair.second;
         }
 
         // SPIRV requires a correct IR func-type to emit properly
@@ -409,6 +473,12 @@ struct IntroduceExplicitGlobalContextPass
     };
     Dictionary<IRInst*, ContextFieldInfo> m_mapInstToContextFieldInfo;
     Dictionary<IRFunc*, IRInst*> m_mapFuncToContextPtr;
+
+    bool isReferencedByMetalIntersectionFunction(IRInst* inst, IRFunc* intersectionFunction)
+    {
+        auto referencingFunctions = m_referencingMetalIntersectionFunctions.tryGetValue(inst);
+        return referencingFunctions && referencingFunctions->contains(intersectionFunction);
+    }
 
     void createContextStructField(IRInst* originalInst, GlobalObjectKind kind, IRType* type)
     {
@@ -459,7 +529,9 @@ struct IntroduceExplicitGlobalContextPass
         m_mapInstToContextFieldInfo.add(originalInst, ContextFieldInfo{key, needDereference});
     }
 
-    void createContextForEntryPoint(IRFunc* entryPointFunc)
+    void createContextForEntryPoint(
+        IRFunc* entryPointFunc,
+        bool includeOnlyReferencedGlobalParams = false)
     {
         // We can only introduce the explicit context into
         // entry points that have definitions.
@@ -484,9 +556,21 @@ struct IntroduceExplicitGlobalContextPass
         List<GlobalParamInfo> entryPointParamsToAdd;
         for (auto globalParam : m_globalParams)
         {
-            // Do not add global param to current entry point if global param
-            // explicitly originates from a different entry point.
-            if (globalParam.originatingEntryPoint &&
+            if (includeOnlyReferencedGlobalParams)
+            {
+                if (!isReferencedByMetalIntersectionFunction(
+                        globalParam.globalParam,
+                        entryPointFunc))
+                {
+                    continue;
+                }
+            }
+            // Do not add a global parameter to an ordinary entry point if it explicitly
+            // originates from a different entry point. A physical Metal intersection root uses
+            // the reachability test above instead because it was synthesized after source entry
+            // points were classified.
+            else if (
+                globalParam.originatingEntryPoint &&
                 globalParam.originatingEntryPoint != entryPointFunc)
             {
                 continue;
@@ -500,6 +584,8 @@ struct IntroduceExplicitGlobalContextPass
                 m_module,
                 globalParam.globalParam,
                 globalParam.entryPointParam);
+            if (includeOnlyReferencedGlobalParams)
+                globalParam.entryPointParam->sourceLoc = globalParam.globalParam->sourceLoc;
             entryPointParamsToAdd.add(globalParam);
 
             // The new parameter will be the last one in the
