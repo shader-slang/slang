@@ -780,12 +780,11 @@ Default behavior calls `defaultGetDescriptorFromHandle` with its default
 > `BindlessDescriptorOptions` preset; Slang does not expose a command-line option to reassign them
 > individually. In particular, the DXC options `-fvk-bind-resource-heap` and `-fvk-bind-sampler-heap`
 > are **not supported**. Only the descriptor _set_ is configurable, through `-bindless-space-index`
-> (above); the binding numbers are not. If you need explicit per-heap binding numbers, provide a
-> custom `getDescriptorFromHandle` whose `__DynamicResource` arrays declare explicit
-> `[vk::binding(binding, set)]` attributes — see [Custom Descriptor Fetch](#custom-descriptor-fetch)
-> below. More generally, Slang aims for a high degree of HLSL source compatibility but does not
-> implement the full set of DXC command-line options; unsupported options are tracked in the Slang
-> issue tracker.
+> (above); the binding numbers are not. If you need explicit control over each heap's binding and set,
+> provide a custom `getDescriptorFromHandle` and declare the backing `__DynamicResource` arrays with
+> explicit `[vk::binding(binding, set)]` attributes — see [Custom Descriptor Fetch](#custom-descriptor-fetch).
+> More generally, Slang aims for a high degree of HLSL source compatibility but does not implement the
+> full set of DXC command-line options.
 
 ### SPIR-V with `spvDescriptorHeapEXT`
 
