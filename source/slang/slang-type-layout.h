@@ -1175,6 +1175,23 @@ public:
     // Layout for any results of the entry point
     RefPtr<VarLayout> resultLayout;
 
+    /// Application-data type exposed through `input.record` for a selected structural stage.
+    ///
+    /// These fields are null for ordinary entry points. They live on the entry-point layout in
+    /// addition to the schema-free declaration catalogue because a host may compile a standalone
+    /// ClosestHit, AnyHit, or Intersection type without declaring an `IHitGroup` that would place
+    /// the stage in that catalogue.
+    Type* structuralRayTracingRecordType = nullptr;
+    RefPtr<TypeLayout> structuralRayTracingRecordTypeLayout;
+
+    /// D3D local constant-buffer binding used to read this stage's application Record.
+    ///
+    /// Each selected structural stage receives a distinct register in one compiler-owned space.
+    /// The fields remain -1 for ordinary entry points and for a structural stage whose Record is
+    /// `void`.
+    Int structuralRayTracingRecordBindingIndex = -1;
+    Int structuralRayTracingRecordBindingSpace = -1;
+
     enum Flag : unsigned
     {
         usesAnySampleRateInput = 0x1,
@@ -1270,6 +1287,15 @@ public:
     /// -1 means no bindless space was reserved for this program and target.
     /// >= 0 means a stable space was allocated; it does not by itself prove post-lowering heap use.
     Int bindlessSpaceIndex = -1;
+
+    /// D3D register space reserved for structural stage Record constant buffers.
+    ///
+    /// The whole space is compiler-owned, so adapters synthesized after parameter layout can add
+    /// distinct cbuffer registers without colliding with user resources. Selected entry points
+    /// occupy the initial register range and expose their individual indices above; schema-only
+    /// adapters continue after that range during IR lowering.
+    Int structuralRayTracingRecordBindingSpace = -1;
+    UInt structuralRayTracingSelectedRecordBindingCount = 0;
 
     /// Lazily constructed structural ray-tracing objects requested through reflection.
     ///

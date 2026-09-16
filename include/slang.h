@@ -2210,6 +2210,34 @@ public:                                                              \
         SlangReflection* reflection,
         SlangUInt index);
 
+    /** Get the application Record type for a selected structural ray-tracing stage.
+
+    Returns null for an ordinary entry point. A structural stage whose context declares
+    `Record = void` returns the reflected void type.
+    */
+    SLANG_API SlangReflectionType* spReflectionEntryPoint_getStructuralRayTracingRecordType(
+        SlangReflectionEntryPoint* entryPoint);
+    /** Get the application-data layout paired with a selected structural stage's Record type.
+
+    Metal uses structured-buffer packing for its raw record buffer. D3D uses ordinary
+    `ConstantBuffer<Record>` packing. The layout excludes the native shader identifier and any
+    record-level padding. A structural stage with `Record = void` has no local application data.
+    */
+    SLANG_API SlangReflectionTypeLayout* spReflectionEntryPoint_getStructuralRayTracingRecordTypeLayout(
+        SlangReflectionEntryPoint* entryPoint);
+    /** Get this selected stage's D3D constant-buffer register for structural Record data.
+
+    The binding has an independent shader-record role: its value comes from the selected SBT entry
+    and belongs to a D3D local root signature rather than the global shader object. Each structural
+    stage receives a distinct register so different Record declarations can coexist in one HLSL or
+    DXIL library. Returns -1 for an ordinary entry point or a structural stage with `Record = void`.
+    */
+    SLANG_API SlangInt spReflectionEntryPoint_getStructuralRayTracingRecordBindingIndex(
+        SlangReflectionEntryPoint* entryPoint);
+    /** Get the D3D register space paired with this stage's Record binding, or -1 when absent. */
+    SLANG_API SlangInt spReflectionEntryPoint_getStructuralRayTracingRecordBindingSpace(
+        SlangReflectionEntryPoint* entryPoint);
+
     /** Find a structural ray-tracing program schema by its source type name.
 
     Returns null when the name is not a schema or the schema is invalid for this linked program.
@@ -2398,10 +2426,11 @@ public:                                                              \
         SlangReflectionRayTracingHitGroup* group);
     SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getRecordType(
         SlangReflectionRayTracingHitGroup* group);
-    /** Get the application-record layout used by structural record-buffer lowering.
+    /** Get the application-data layout declared by this group's structural Record type.
 
     Metal uses structured-buffer layout rules because the compiler reads records from a raw device
-    buffer. Other targets use their ordinary data-layout rules.
+    buffer. D3D uses ordinary `ConstantBuffer<Record>` packing. The result excludes native record
+    headers and record-level padding.
     */
     SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingHitGroup_getRecordTypeLayout(
         SlangReflectionRayTracingHitGroup* group);
@@ -2439,7 +2468,12 @@ public:                                                              \
         SlangReflectionRayTracingMissShader* shader);
     SLANG_API SlangReflectionType* spReflectionRayTracingMissShader_getRecordType(
         SlangReflectionRayTracingMissShader* shader);
-    /** Get the application-record layout used by structural record-buffer lowering. */
+    /** Get the application-data layout declared by this shader's structural Record type.
+
+    Metal uses structured-buffer packing for its raw record buffer. D3D uses ordinary
+    `ConstantBuffer<Record>` packing. The result excludes native record headers and record-level
+    padding.
+    */
     SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingMissShader_getRecordTypeLayout(
         SlangReflectionRayTracingMissShader* shader);
     /** Return whether this shader was discovered from a linked open-section conformance. */
@@ -2460,7 +2494,12 @@ public:                                                              \
         SlangReflectionRayTracingCallableShader* shader);
     SLANG_API SlangReflectionType* spReflectionRayTracingCallableShader_getRecordType(
         SlangReflectionRayTracingCallableShader* shader);
-    /** Get the application-record layout used by structural record-buffer lowering. */
+    /** Get the application-data layout declared by this shader's structural Record type.
+
+    Metal uses structured-buffer packing for its raw record buffer. D3D uses ordinary
+    `ConstantBuffer<Record>` packing. The result excludes native record headers and record-level
+    padding.
+    */
     SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingCallableShader_getRecordTypeLayout(
         SlangReflectionRayTracingCallableShader* shader);
     /** Return whether this shader was discovered from a linked open-section conformance. */
@@ -4015,6 +4054,35 @@ struct EntryPointReflection
     SlangStage getStage()
     {
         return spReflectionEntryPoint_getStage((SlangReflectionEntryPoint*)this);
+    }
+
+    /// Returns this selected structural stage's application Record type, or null otherwise.
+    TypeReflection* getStructuralRayTracingRecordType()
+    {
+        return (TypeReflection*)spReflectionEntryPoint_getStructuralRayTracingRecordType(
+            (SlangReflectionEntryPoint*)this);
+    }
+
+    /// Returns the application-data layout of this selected structural stage's Record type.
+    TypeLayoutReflection* getStructuralRayTracingRecordTypeLayout()
+    {
+        return (TypeLayoutReflection*)
+            spReflectionEntryPoint_getStructuralRayTracingRecordTypeLayout(
+                (SlangReflectionEntryPoint*)this);
+    }
+
+    /// Returns this selected stage's structural Record `b` register, or -1 when absent.
+    SlangInt getStructuralRayTracingRecordBindingIndex()
+    {
+        return spReflectionEntryPoint_getStructuralRayTracingRecordBindingIndex(
+            (SlangReflectionEntryPoint*)this);
+    }
+
+    /// Returns this selected stage's structural Record register space, or -1 when absent.
+    SlangInt getStructuralRayTracingRecordBindingSpace()
+    {
+        return spReflectionEntryPoint_getStructuralRayTracingRecordBindingSpace(
+            (SlangReflectionEntryPoint*)this);
     }
 
     void getComputeThreadGroupSize(SlangUInt axisCount, SlangUInt* outSizeAlongAxis)

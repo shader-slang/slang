@@ -7,9 +7,18 @@
 #include "slang-mangle.h"
 #include "slang-module.h"
 #include "slang-syntax.h"
+#include "slang-target.h"
+#include "slang-type-layout.h"
 
 namespace Slang
 {
+
+TypeLayout* getStructuralRayTracingRecordTypeLayout(TargetRequest* targetRequest, Type* recordType)
+{
+    auto recordRules = isMetalTarget(targetRequest) ? slang::LayoutRules::DefaultStructuredBuffer
+                                                    : slang::LayoutRules::Default;
+    return targetRequest->getTypeLayout(recordType, recordRules);
+}
 
 bool isCoreLegacyRayTracingPipelineMethod(FunctionDeclBase* functionDecl)
 {

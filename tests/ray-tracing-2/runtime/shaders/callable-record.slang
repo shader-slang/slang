@@ -23,9 +23,10 @@ struct RuntimeTraceContext : rt::ITraceContext
 
 struct RuntimeCallableData
 {
-    uint value;
-    uint dispatchIndex;
-    uint dispatchWidth;
+    // Keep the callable parameter as one vector field. Some D3D12 drivers reject a callable
+    // parameter made from three scalar fields while creating the state object, independently of
+    // Record bindings or local root signatures.
+    uint4 values;
 }
 
 struct RuntimeCallableRecord
@@ -45,9 +46,9 @@ struct RuntimeCallable : rt::ICallableShader
     typealias Context = RuntimeCallableContext;
     void invoke(rt::CallableInput<RuntimeCallableContext> input)
     {
-        input.data.value = input.data.value * input.record.factor + 1;
-        input.data.dispatchIndex = input.dispatchRaysIndex.x;
-        input.data.dispatchWidth = input.dispatchRaysDimensions.x;
+        input.data.values.x = input.data.values.x * input.record.factor + 1;
+        input.data.values.y = input.dispatchRaysIndex.x;
+        input.data.values.z = input.dispatchRaysDimensions.x;
     }
 }
 
@@ -71,10 +72,10 @@ RWStructuredBuffer<RuntimeResult> results;
 [shader("raygeneration")]
 void rayGenerationMain()
 {
-    RuntimeCallableData data = { 3, 0, 0 };
+    RuntimeCallableData data = { uint4(3, 0, 0, 0) };
     rt::RayTracer<Schema> tracer;
     tracer.callShader<RuntimeCallableContext>(0, program, data);
 
-    results[0].value = data.value;
-    results[0].dispatchWidth = data.dispatchWidth;
+    results[0].value = data.values.x;
+    results[0].dispatchWidth = data.values.z;
 }

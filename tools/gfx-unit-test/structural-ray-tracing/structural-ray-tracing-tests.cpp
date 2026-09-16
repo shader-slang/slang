@@ -190,4 +190,10 @@ SLANG_UNIT_TEST(structuralRayTracingStageInputStateOptiX)
     runStageInputState(unitTestContext, DeviceType::CUDA);
 }
 
+SLANG_UNIT_TEST(structuralRayTracingSeparateEntryRecordsD3D12)
+{
+    auto device = createStructuralRayTracingTestDevice(unitTestContext, DeviceType::D3D12);
+    runStructuralRayTracingSeparateEntryRecords(device);
+}
+
 } // namespace gfx_test

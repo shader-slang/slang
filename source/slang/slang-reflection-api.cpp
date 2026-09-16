@@ -5202,6 +5202,37 @@ SLANG_API SlangStage spReflectionEntryPoint_getStage(SlangReflectionEntryPoint* 
     return SlangStage(entryPointLayout->profile.getStage());
 }
 
+SLANG_API SlangReflectionType* spReflectionEntryPoint_getStructuralRayTracingRecordType(
+    SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+    return entryPointLayout ? convert(entryPointLayout->structuralRayTracingRecordType) : nullptr;
+}
+
+SLANG_API SlangReflectionTypeLayout* spReflectionEntryPoint_getStructuralRayTracingRecordTypeLayout(
+    SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+    return entryPointLayout ? convert(entryPointLayout->structuralRayTracingRecordTypeLayout.Ptr())
+                            : nullptr;
+}
+
+SLANG_API SlangInt spReflectionEntryPoint_getStructuralRayTracingRecordBindingIndex(
+    SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+    return entryPointLayout ? SlangInt(entryPointLayout->structuralRayTracingRecordBindingIndex)
+                            : -1;
+}
+
+SLANG_API SlangInt spReflectionEntryPoint_getStructuralRayTracingRecordBindingSpace(
+    SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+    return entryPointLayout ? SlangInt(entryPointLayout->structuralRayTracingRecordBindingSpace)
+                            : -1;
+}
+
 SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     SlangReflectionEntryPoint* inEntryPoint,
     SlangUInt axisCount,

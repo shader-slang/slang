@@ -101,5 +101,6 @@ void runStructuralRayTracingSelectorAddressing(rhi::IDevice* device);
 void runStructuralRayTracingMultiplePayloads(rhi::IDevice* device);
 void runStructuralRayTracingTriangleAttributesFlags(rhi::IDevice* device);
 void runStructuralRayTracingStageInputState(rhi::IDevice* device);
+void runStructuralRayTracingSeparateEntryRecords(rhi::IDevice* device);
 
 } // namespace gfx_test

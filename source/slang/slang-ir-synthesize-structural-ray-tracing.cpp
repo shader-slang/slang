@@ -1,5 +1,6 @@
 #include "slang-ir-synthesize-structural-ray-tracing.h"
 
+#include "compiler-core/slang-name.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-inline.h"
@@ -10,6 +11,8 @@
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-structural-ray-tracing.h"
+#include "slang-target-program.h"
+#include "slang-type-layout.h"
 
 namespace Slang
 {
@@ -1044,6 +1047,7 @@ void preparePortableStructuralRayTracingEntryPoints(IRModule* module, List<IRFun
 void synthesizePortableStructuralRayTracingEntryPoints(
     IRModule* module,
     List<IRFunc*>& ioEntryPoints,
+    HashSet<IRFunc*>& outSelectedStructuralEntryPointAdapters,
     DiagnosticSink* sink)
 {
     List<IRInst*> programOperations;
@@ -1081,6 +1085,10 @@ void synthesizePortableStructuralRayTracingEntryPoints(
             {
                 continue;
             }
+            // These adapters correspond one-to-one with component entry-point layouts. Preserve
+            // that identity before schema synthesis appends additional adapters, because both
+            // kinds carry the same structural-info decoration after this point.
+            outSelectedStructuralEntryPointAdapters.add(entryPoint);
             generated.add(
                 {stageKind,
                  info->getStageSourceTypeName(),
@@ -1777,8 +1785,51 @@ void lowerOptiXStructuralRayTracingStageInputOperations(IRModule* module, Diagno
     }
 }
 
-void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
+/// Find the front-end layout corresponding to a selected native structural adapter.
+///
+/// Consider a selected `ClosestHit` component renamed to `materialClosestHit`, while a raygen
+/// schema also synthesizes the same stage under its default name. Schema synthesis gives both
+/// adapters the same structural-info decoration, and preparation can reorder them relative to the
+/// original component list. The caller's selected-adapter set identifies the adapter that owns an
+/// EntryPointLayout; matching its stage and final export name then finds the exact reflected
+/// binding without treating the schema-only adapter as a selected component.
+static EntryPointLayout* _findSelectedStructuralRayTracingEntryPointLayout(
+    ProgramLayout* programLayout,
+    IRFunc* adapter)
 {
+    auto adapterDecoration = adapter->findDecoration<IREntryPointDecoration>();
+    SLANG_RELEASE_ASSERT(adapterDecoration);
+    auto adapterStage = adapterDecoration->getProfile().getStage();
+    auto adapterName = adapterDecoration->getName()->getStringSlice();
+
+    for (auto entryPointLayout : programLayout->entryPoints)
+    {
+        if (!entryPointLayout->structuralRayTracingRecordType ||
+            entryPointLayout->profile.getStage() != adapterStage)
+        {
+            continue;
+        }
+
+        auto layoutName = entryPointLayout->nameOverride.getLength()
+                              ? entryPointLayout->nameOverride.getUnownedSlice()
+                              : getUnownedStringSliceText(entryPointLayout->name);
+        if (layoutName == adapterName)
+            return entryPointLayout;
+    }
+    return nullptr;
+}
+
+void lowerPortableStructuralRayTracingStageInputOperations(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    const HashSet<IRFunc*>& selectedStructuralEntryPointAdapters)
+{
+    SLANG_RELEASE_ASSERT(targetProgram);
+    auto targetRequest = targetProgram->getTargetReq();
+    auto programLayout = targetProgram->getExistingLayout();
+    SLANG_RELEASE_ASSERT(programLayout);
+    const bool useD3DRecordBinding = isD3DTarget(targetRequest);
+
     List<IRInst*> operations;
     _collectStageInputOperations(module->getModuleInst(), operations);
     List<IRFunc*> structuralEntryPoints;
@@ -1864,51 +1915,114 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
     HashSet<IRType*> loweredRecordTypes;
     // A declared Record type describes the SBT schema, but it does not by itself require a native
     // shader parameter. Collect only actual property reads that remain after target-specific
-    // lowering. D3D and Vulkan leave those markers here and receive a ShaderRecord parameter;
-    // OptiX has already replaced them with GetOptiXSbtDataPtr above. This also prevents an unused
-    // record declaration from changing an entry-point signature.
+    // lowering. D3D maps those reads to a compiler-reserved constant buffer, while Vulkan uses a
+    // ShaderRecord parameter. OptiX has already replaced them with GetOptiXSbtDataPtr above. This
+    // also prevents an unused record declaration from changing an entry-point signature.
     for (auto operation : operations)
     {
         if (operation->getOp() == kIROp_StructuralRayTracingGetRecord)
             loweredRecordTypes.add(operation->getDataType());
     }
 
+    Dictionary<IRFunc*, UInt> recordBindingIndexByEntryPoint;
+    const auto recordResourceKind =
+        useD3DRecordBinding ? LayoutResourceKind::ConstantBuffer : LayoutResourceKind::ShaderRecord;
+    if (useD3DRecordBinding && loweredRecordTypes.getCount() != 0)
+    {
+        SLANG_RELEASE_ASSERT(programLayout->structuralRayTracingRecordBindingSpace >= 0);
+        UInt nextSchemaRecordBindingIndex =
+            programLayout->structuralRayTracingSelectedRecordBindingCount;
+
+        // `loweredRecordTypes` is a hash set and therefore cannot define an externally observable
+        // register order. Assign indices by the adapters' stable module-child order before the
+        // per-type lowering loop. Selected adapters retain their reflected indices; schema-only
+        // adapters consume the remaining range deterministically.
+        for (auto entryPoint : structuralEntryPoints)
+        {
+            auto info =
+                entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+            if (!loweredRecordTypes.contains(info->getRecordType()))
+                continue;
+
+            UInt recordBindingIndex = 0;
+            if (selectedStructuralEntryPointAdapters.contains(entryPoint))
+            {
+                auto entryPointLayout =
+                    _findSelectedStructuralRayTracingEntryPointLayout(programLayout, entryPoint);
+                SLANG_RELEASE_ASSERT(entryPointLayout);
+                SLANG_RELEASE_ASSERT(entryPointLayout->structuralRayTracingRecordBindingIndex >= 0);
+                SLANG_RELEASE_ASSERT(
+                    entryPointLayout->structuralRayTracingRecordBindingSpace ==
+                    programLayout->structuralRayTracingRecordBindingSpace);
+                recordBindingIndex = UInt(entryPointLayout->structuralRayTracingRecordBindingIndex);
+            }
+            else
+            {
+                recordBindingIndex = nextSchemaRecordBindingIndex++;
+            }
+            recordBindingIndexByEntryPoint.add(entryPoint, recordBindingIndex);
+        }
+    }
+
+    Dictionary<IRFunc*, IRInst*> recordValueByEntryPoint;
+    for (auto entryPoint : structuralEntryPoints)
+    {
+        auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+        auto recordType = info->getRecordType();
+        if (!loweredRecordTypes.contains(recordType))
+            continue;
+
+        UInt recordBindingIndex = 0;
+        if (useD3DRecordBinding)
+        {
+            auto bindingIndex = recordBindingIndexByEntryPoint.tryGetValue(entryPoint);
+            SLANG_RELEASE_ASSERT(bindingIndex);
+            recordBindingIndex = *bindingIndex;
+        }
+
+        // Create native Record parameters in stable entry-point order as well as assigning their
+        // bindings in that order. This keeps emitted resource names and their registers
+        // reproducible even though the shared-operation lowering below is grouped by IR type.
+        IRBuilder builder(module);
+        builder.setInsertBefore(entryPoint);
+        auto recordBufferType = builder.getConstantBufferType(
+            recordType,
+            builder.getType(kIROp_DefaultBufferLayoutType));
+        auto recordBuffer = builder.createGlobalParam(recordBufferType);
+        builder.addNameHintDecoration(recordBuffer, UnownedTerminatedStringSlice("record"));
+        builder.addEntryPointParamDecoration(recordBuffer, entryPoint);
+
+        IRTypeLayout::Builder typeLayoutBuilder(&builder);
+        typeLayoutBuilder.addResourceUsage(recordResourceKind, LayoutSize(1));
+        IRVarLayout::Builder varLayoutBuilder(&builder, typeLayoutBuilder.build());
+        auto resourceInfo = varLayoutBuilder.findOrAddResourceInfo(recordResourceKind);
+        if (useD3DRecordBinding)
+        {
+            resourceInfo->offset = recordBindingIndex;
+            varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->offset =
+                UInt(programLayout->structuralRayTracingRecordBindingSpace);
+        }
+        if (auto entryPointDecoration = entryPoint->findDecoration<IREntryPointDecoration>())
+            varLayoutBuilder.setStage(entryPointDecoration->getProfile().getStage());
+        builder.addLayoutDecoration(recordBuffer, varLayoutBuilder.build());
+
+        builder.setInsertBefore(entryPoint->getFirstBlock()->getFirstOrdinaryInst());
+        recordValueByEntryPoint.add(entryPoint, builder.emitLoad(recordBuffer));
+    }
+
     for (auto recordType : loweredRecordTypes)
     {
-        IRBuilder builder(module);
-        StructuralRayTracingStageParameterThreader threader(
-            module,
-            recordType,
-            LayoutResourceKind::ShaderRecord,
-            "record",
-            nullptr,
-            false,
-            false);
+        StructuralRayTracingStageParameterThreader
+            threader(module, recordType, recordResourceKind, "record", nullptr, false, false);
         for (auto entryPoint : structuralEntryPoints)
         {
             auto info =
                 entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
             if (info->getRecordType() == recordType)
             {
-                builder.setInsertBefore(entryPoint);
-                auto recordBufferType = builder.getConstantBufferType(
-                    recordType,
-                    builder.getType(kIROp_DefaultBufferLayoutType));
-                auto recordBuffer = builder.createGlobalParam(recordBufferType);
-                builder.addNameHintDecoration(recordBuffer, UnownedTerminatedStringSlice("record"));
-                builder.addEntryPointParamDecoration(recordBuffer, entryPoint);
-
-                IRTypeLayout::Builder typeLayoutBuilder(&builder);
-                typeLayoutBuilder.addResourceUsage(LayoutResourceKind::ShaderRecord, LayoutSize(1));
-                IRVarLayout::Builder varLayoutBuilder(&builder, typeLayoutBuilder.build());
-                varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::ShaderRecord);
-                if (auto entryPointDecoration =
-                        entryPoint->findDecoration<IREntryPointDecoration>())
-                    varLayoutBuilder.setStage(entryPointDecoration->getProfile().getStage());
-                builder.addLayoutDecoration(recordBuffer, varLayoutBuilder.build());
-
-                builder.setInsertBefore(entryPoint->getFirstBlock()->getFirstOrdinaryInst());
-                threader.registerParameter(entryPoint, builder.emitLoad(recordBuffer));
+                auto recordValue = recordValueByEntryPoint.tryGetValue(entryPoint);
+                SLANG_RELEASE_ASSERT(recordValue);
+                threader.registerParameter(entryPoint, *recordValue);
             }
         }
         for (auto candidate : operations)

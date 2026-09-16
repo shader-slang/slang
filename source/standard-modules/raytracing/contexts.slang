@@ -17,8 +17,9 @@ public interface ITraceContext
 
 /// Describes state common to every executable structural ray-tracing stage.
 ///
-/// `Record` is the application-defined data appended to the native SBT record that selected the
-/// stage. Different stage contexts may share the same `TraceContext` while using different records.
+/// `Record` is the application-defined data selected with the stage's SBT entry. A target may store
+/// those bytes in the native record or address backend-owned storage through a local binding.
+/// Different stage contexts may share the same `TraceContext` while using different records.
 public interface IStageContext
 {
     associatedtype TraceContext;
