@@ -13112,6 +13112,21 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     }
 }
 
+/// Element-wise `max` for a vector whose element type is only known to be
+/// `__BuiltinArithmeticType`, the common base of `__BuiltinIntegerType` and
+/// `__BuiltinFloatingPointType`. Ranked below the concrete integer/floating-point vector overloads
+/// so those still win (with their target intrinsics) for concrete element types; this fallback
+/// decomposes to the scalar `max` per element, so it never emits a whole-vector intrinsic.
+/// @category math
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[OverloadRank(-10)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+vector<T, N> max(vector<T, N> x, vector<T, N> y)
+{
+    VECTOR_MAP_BINARY(T, N, max, x, y);
+}
+
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -13367,6 +13382,21 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
     default:
         VECTOR_MAP_BINARY(T, N, min, x, y);
     }
+}
+
+/// Element-wise `min` for a vector whose element type is only known to be
+/// `__BuiltinArithmeticType`, the common base of `__BuiltinIntegerType` and
+/// `__BuiltinFloatingPointType`. Ranked below the concrete integer/floating-point vector overloads
+/// so those still win (with their target intrinsics) for concrete element types; this fallback
+/// decomposes to the scalar `min` per element, so it never emits a whole-vector intrinsic.
+/// @category math
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[OverloadRank(-10)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+vector<T,N> min(vector<T,N> x, vector<T,N> y)
+{
+    VECTOR_MAP_BINARY(T, N, min, x, y);
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
