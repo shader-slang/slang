@@ -158,11 +158,11 @@
       "watched_paths_digest": "4e6b00091ba47f8369959c5a2fe18c6bbce1fdbf51cea6001632e6cda82a688a"
     },
     "design/cross-cutting/targets": {
-      "generated_at": "2026-09-11T14:06:28+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "a680b2b50f2ff7c3d2db2a0388214effc7655d18",
+      "generated_at": "2026-09-16T06:46:36+00:00",
+      "model": "gpt-5.6-sol",
+      "source_commit": "d3b56927b854c14fa1ac169b72da6e080ea80833",
       "source_doc_digest": "17c44d8c152f02477de96d75c284561a0a68bbc60055e05c53e5a61396a4760e",
-      "watched_paths_digest": "6e32c5414682c2e26fbacedcbbf317fd64e5c4aea7ff8c00adb4c9bc88907730"
+      "watched_paths_digest": "ae4ecf3a8d0550a9b7a41fdf512139e37f0f5a520470aa731ef7c12647e3d2f0"
     },
     "design/ir-reference/control-flow": {
       "generated_at": "2026-09-11T14:31:16+00:00",
@@ -305,11 +305,11 @@
       "watched_paths_digest": "87e9e0a0e1e824b00a4fade43a72d2b503c876dc891f0447067c52e5c0282cbb"
     },
     "design/pipeline/05-ir-passes": {
-      "generated_at": "2026-09-11T14:31:19+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "generated_at": "2026-09-16T06:46:37+00:00",
+      "model": "gpt-5.6-sol",
+      "source_commit": "d3b56927b854c14fa1ac169b72da6e080ea80833",
       "source_doc_digest": "9e47cfe14a2e87583d053faa5efba3bea70e1d24dc8091589cb824d2a1419b80",
-      "watched_paths_digest": "1bdd902177e6f90ea114a490f41301bff96bd1ec0e6de2e13d9dd3ecefbd458d"
+      "watched_paths_digest": "6793d82d75d05d6dd52d9c36466dde9550190660d1bbfac0f3e0727805879abd"
     },
     "design/pipeline/06-emit": {
       "generated_at": "2026-09-11T14:06:29+00:00",
@@ -347,11 +347,11 @@
       "watched_paths_digest": "3b23aa8745718c3c9b2740ec584b30f97dee58483ad3f8efe781def69aa1b5d4"
     },
     "design/target-pipelines/cuda": {
-      "generated_at": "2026-09-11T14:31:20+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
-      "source_doc_digest": "e7462aee414f23d64b072e1a5f0b96c33bd4050d4ea91b0ced60a95b5268470f",
-      "watched_paths_digest": "5a281e0b8b303af0b5be468b3b079d67251b98c1e03a7fc1358fe7ffaf9c78cd"
+      "generated_at": "2026-09-16T06:55:52+00:00",
+      "model": "gpt-5.6-sol",
+      "source_commit": "d3b56927b854c14fa1ac169b72da6e080ea80833",
+      "source_doc_digest": "8f5f2c489e64725ff848a909352ae18b3fea8c9e41f23048f45bc851cc3e3b48",
+      "watched_paths_digest": "cc1bfb5c7f168a5d644931cad25ab14568abe04820e170e0fd240e3e3f62b61c"
     },
     "design/target-pipelines/hlsl": {
       "generated_at": "2026-09-11T14:31:20+00:00",

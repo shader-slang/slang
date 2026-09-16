@@ -9,13 +9,13 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 ## Suite totals
 
 - **Bundles:** 79
-- **Total `.slang` tests:** 4103
+- **Total `.slang` tests:** 4111
 
 | Intent | Count |
 | --- | --- |
-| `functional` | 1936 |
-| `negative` | 791 |
-| `boundary` | 775 |
+| `functional` | 1937 |
+| `negative` | 797 |
+| `boundary` | 776 |
 | `expansion` | 299 |
 | `characterization` | 215 |
 | `stress` | 84 |
@@ -56,9 +56,9 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`design/pipeline/01-lex-preprocess`](design/pipeline/01-lex-preprocess/README.md) | 75 | [`docs/generated/design/pipeline/01-lex-preprocess.md`](../design/pipeline/01-lex-preprocess.md) |
+| [`design/pipeline/01-lex-preprocess`](design/pipeline/01-lex-preprocess/README.md) | 77 | [`docs/generated/design/pipeline/01-lex-preprocess.md`](../design/pipeline/01-lex-preprocess.md) |
 | [`design/pipeline/02-parse-ast`](design/pipeline/02-parse-ast/README.md) | 76 | [`docs/generated/design/pipeline/02-parse-ast.md`](../design/pipeline/02-parse-ast.md) |
-| [`design/pipeline/03-semantic-check`](design/pipeline/03-semantic-check/README.md) | 91 | [`docs/generated/design/pipeline/03-semantic-check.md`](../design/pipeline/03-semantic-check.md) |
+| [`design/pipeline/03-semantic-check`](design/pipeline/03-semantic-check/README.md) | 92 | [`docs/generated/design/pipeline/03-semantic-check.md`](../design/pipeline/03-semantic-check.md) |
 | [`design/pipeline/04-ast-to-ir`](design/pipeline/04-ast-to-ir/README.md) | 160 | [`docs/generated/design/pipeline/04-ast-to-ir.md`](../design/pipeline/04-ast-to-ir.md) |
 | [`design/pipeline/04b-pre-link-passes`](design/pipeline/04b-pre-link-passes/README.md) | 37 | [`docs/generated/design/pipeline/04b-pre-link-passes.md`](../design/pipeline/04b-pre-link-passes.md) |
 | [`design/pipeline/04c-layout-ir`](design/pipeline/04c-layout-ir/README.md) | 34 | [`docs/generated/design/pipeline/04c-layout-ir.md`](../design/pipeline/04c-layout-ir.md) |
@@ -70,7 +70,7 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`design/syntax-reference/grammar`](design/syntax-reference/grammar/README.md) | 97 | [`docs/generated/design/syntax-reference/grammar.md`](../design/syntax-reference/grammar.md) |
+| [`design/syntax-reference/grammar`](design/syntax-reference/grammar/README.md) | 98 | [`docs/generated/design/syntax-reference/grammar.md`](../design/syntax-reference/grammar.md) |
 | [`design/syntax-reference/keywords-and-builtins`](design/syntax-reference/keywords-and-builtins/README.md) | 60 | [`docs/generated/design/syntax-reference/keywords-and-builtins.md`](../design/syntax-reference/keywords-and-builtins.md) |
 | [`design/syntax-reference/tokens`](design/syntax-reference/tokens/README.md) | 50 | [`docs/generated/design/syntax-reference/tokens.md`](../design/syntax-reference/tokens.md) |
 
@@ -92,7 +92,7 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | [`design/ast-reference/base`](design/ast-reference/base/README.md) | 24 | [`docs/generated/design/ast-reference/base.md`](../design/ast-reference/base.md) |
 | [`design/ast-reference/declarations`](design/ast-reference/declarations/README.md) | 84 | [`docs/generated/design/ast-reference/declarations.md`](../design/ast-reference/declarations.md) |
 | [`design/ast-reference/expressions`](design/ast-reference/expressions/README.md) | 144 | [`docs/generated/design/ast-reference/expressions.md`](../design/ast-reference/expressions.md) |
-| [`design/ast-reference/modifiers`](design/ast-reference/modifiers/README.md) | 62 | [`docs/generated/design/ast-reference/modifiers.md`](../design/ast-reference/modifiers.md) |
+| [`design/ast-reference/modifiers`](design/ast-reference/modifiers/README.md) | 63 | [`docs/generated/design/ast-reference/modifiers.md`](../design/ast-reference/modifiers.md) |
 | [`design/ast-reference/statements`](design/ast-reference/statements/README.md) | 70 | [`docs/generated/design/ast-reference/statements.md`](../design/ast-reference/statements.md) |
 | [`design/ast-reference/types`](design/ast-reference/types/README.md) | 49 | [`docs/generated/design/ast-reference/types.md`](../design/ast-reference/types.md) |
 | [`design/ast-reference/values`](design/ast-reference/values/README.md) | 31 | [`docs/generated/design/ast-reference/values.md`](../design/ast-reference/values.md) |
@@ -101,9 +101,9 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`design/name-resolution/lookup`](design/name-resolution/lookup/README.md) | 53 | [`docs/generated/design/name-resolution/lookup.md`](../design/name-resolution/lookup.md) |
+| [`design/name-resolution/lookup`](design/name-resolution/lookup/README.md) | 54 | [`docs/generated/design/name-resolution/lookup.md`](../design/name-resolution/lookup.md) |
 | [`design/name-resolution/overload-resolution`](design/name-resolution/overload-resolution/README.md) | 90 | [`docs/generated/design/name-resolution/overload-resolution.md`](../design/name-resolution/overload-resolution.md) |
-| [`design/name-resolution/scopes`](design/name-resolution/scopes/README.md) | 57 | [`docs/generated/design/name-resolution/scopes.md`](../design/name-resolution/scopes.md) |
+| [`design/name-resolution/scopes`](design/name-resolution/scopes/README.md) | 58 | [`docs/generated/design/name-resolution/scopes.md`](../design/name-resolution/scopes.md) |
 | [`design/name-resolution/visibility`](design/name-resolution/visibility/README.md) | 42 | [`docs/generated/design/name-resolution/visibility.md`](../design/name-resolution/visibility.md) |
 
 ### IR reference
@@ -125,7 +125,7 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`design/target-pipelines/cuda`](design/target-pipelines/cuda/README.md) | 93 | [`docs/generated/design/target-pipelines/cuda.md`](../design/target-pipelines/cuda.md) |
+| [`design/target-pipelines/cuda`](design/target-pipelines/cuda/README.md) | 94 | [`docs/generated/design/target-pipelines/cuda.md`](../design/target-pipelines/cuda.md) |
 | [`design/target-pipelines/hlsl`](design/target-pipelines/hlsl/README.md) | 170 | [`docs/generated/design/target-pipelines/hlsl.md`](../design/target-pipelines/hlsl.md) |
 | [`design/target-pipelines/metal`](design/target-pipelines/metal/README.md) | 78 | [`docs/generated/design/target-pipelines/metal.md`](../design/target-pipelines/metal.md) |
 | [`design/target-pipelines/spirv`](design/target-pipelines/spirv/README.md) | 125 | [`docs/generated/design/target-pipelines/spirv.md`](../design/target-pipelines/spirv.md) |
