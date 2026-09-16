@@ -10363,9 +10363,12 @@ T __vectorDotImpl(vector<T, N> x, vector<T, N> y)
 }
 
 // Keep the established floating-point and integer overloads so that concrete calls retain their
-// overload ranking and floating-point calls retain their conditional autodiff registration. The
-// lower-ranked arithmetic overload handles generic code that cannot prove which family `T` belongs
-// to.
+// overload ranking and floating-point calls retain the derivative registrations on `__d_dot` in
+// `diff.meta.slang`. Those registrations bind to the floating-point signature by overload
+// resolution, so that overload remains distinct from the broader arithmetic signature. The
+// arithmetic overload has rank -1 so that the default-rank family-specific overloads remain
+// preferred for concrete calls after removal of the generic-parameter-count tie-breaker, while
+// generic code that cannot prove which family `T` belongs to can still use the broad overload.
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]

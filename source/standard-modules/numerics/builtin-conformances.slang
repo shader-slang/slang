@@ -303,7 +303,7 @@ public extension<let R : int, let C : int, let L : MatrixLayoutMode>
 // This extension owns the common shape witnesses for every builtin arithmetic vector. The integer
 // and floating-point refinements below reuse these members instead of publishing duplicate
 // Scalar, Mask, and fromScalar declarations.
-public extension<T : __BuiltinArithmeticType & IScalarNumeric, let N : int>
+public extension<T : IBuiltinScalarNumeric, let N : int>
     vector<T, N> : IDotProduct
 {
     typealias Scalar = T;
