@@ -144,10 +144,6 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             isRefParam = true;
             paramType = ptrType->getValueType();
         }
-        // Parameters use the plain-data eligibility rule. An opaque-handle parameter's DebugVar
-        // arg-index is not preserved through the type-legalization passes that remove parameters,
-        // so opaque handles get debug vars only as function-local var/let aliases (below), where
-        // there is no arg-index to preserve.
         if (!isDebuggableType(paramType))
             continue;
         auto debugVar = builder.emitDebugVar(
