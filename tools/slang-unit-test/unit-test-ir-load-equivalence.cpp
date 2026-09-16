@@ -18,17 +18,15 @@ struct RunResult
     String err;
 };
 
-/// Compiles `source` with `slangc`, with on-demand IR loading forced to `onDemand`.
+/// Runs `slangc` with `args`, with on-demand IR loading forced to `onDemand`.
 ///
 /// Runs a child process rather than compiling in-process because the load mode is read
 /// once per process: a test that tried to switch it in-process would measure whichever
 /// mode happened to be read first.
-SlangResult _compileWith(
+SlangResult _runSlangc(
     UnitTestContext* unitTestContext,
-    const String& sourcePath,
-    const String& irSinkPath,
+    const List<String>& args,
     bool onDemand,
-    bool dumpIR,
     RunResult& out)
 {
     const UnownedStringSlice varName("SLANG_ONDEMAND_IR");
@@ -47,26 +45,8 @@ SlangResult _compileWith(
     CommandLine cmdLine;
     cmdLine.setExecutableLocation(
         ExecutableLocation(unitTestContext->executableDirectory, "slangc"));
-    cmdLine.addArg(sourcePath);
-    cmdLine.addArg("-target");
-    cmdLine.addArg("hlsl");
-    cmdLine.addArg("-entry");
-    cmdLine.addArg("computeMain");
-    cmdLine.addArg("-stage");
-    cmdLine.addArg("compute");
-    if (dumpIR)
-    {
-        // Dumps the linked IR, builtin modules included -- which is where deferral
-        // acts, and where a divergence shows up even when it never reaches codegen.
-        //
-        // `-o` must name a real file rather than a null device, because there is no
-        // spelling of one that works on every platform this runs on. A failing `-o` would
-        // fail both runs identically and leave the comparison below matching two error
-        // messages. The file itself is never read; only the IR dump on stderr is.
-        cmdLine.addArg("-dump-ir");
-        cmdLine.addArg("-o");
-        cmdLine.addArg(irSinkPath);
-    }
+    for (const auto& arg : args)
+        cmdLine.addArg(arg);
 
     ExecuteResult exeRes;
     SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmdLine, exeRes));
@@ -74,6 +54,72 @@ SlangResult _compileWith(
     out.out = exeRes.standardOutput;
     out.err = exeRes.standardError;
     return SLANG_OK;
+}
+
+/// Compiles `sourcePath` to HLSL, optionally dumping the linked IR.
+///
+/// `includeDir`, when non-empty, is where `import` looks for a precompiled module.
+///
+/// Note what is *not* passed when `dumpIR` is false: no `-o`. The generated code has to
+/// reach stdout for the comparison to mean anything -- directing it to a file leaves two
+/// empty strings, which compare equal.
+SlangResult _compileWith(
+    UnitTestContext* unitTestContext,
+    const String& sourcePath,
+    const String& irSinkPath,
+    bool onDemand,
+    bool dumpIR,
+    RunResult& out,
+    const String& includeDir = String())
+{
+    List<String> args;
+    args.add(sourcePath);
+    if (includeDir.getLength())
+    {
+        args.add("-I");
+        args.add(includeDir);
+    }
+    args.add("-target");
+    args.add("hlsl");
+    args.add("-entry");
+    args.add("computeMain");
+    args.add("-stage");
+    args.add("compute");
+    if (dumpIR)
+    {
+        // Dumps the linked IR -- where a divergence shows up even when it never reaches
+        // codegen.
+        //
+        // `-o` must name a real file rather than a null device, because there is no
+        // spelling of one that works on every platform this runs on. A failing `-o` would
+        // fail both runs identically and leave the comparison matching two error
+        // messages. The file itself is never read; only the IR dump on stderr is.
+        args.add("-dump-ir");
+        args.add("-o");
+        args.add(irSinkPath);
+    }
+    return _runSlangc(unitTestContext, args, onDemand, out);
+}
+
+/// Precompiles `sourcePath` into a `.slang-module` at `modulePath`.
+///
+/// Built once rather than per mode. The variable under test is the *load* path; a module
+/// whose serialized bytes depended on the writer's load mode would be a different bug,
+/// and building it twice would fold that question into this comparison.
+SlangResult _buildLibraryModule(
+    UnitTestContext* unitTestContext,
+    const String& sourcePath,
+    const String& modulePath,
+    RunResult& out)
+{
+    List<String> args;
+    args.add(sourcePath);
+    args.add("-target");
+    args.add("hlsl");
+    args.add("-o");
+    args.add(modulePath);
+    args.add("-emit-ir");
+    return _runSlangc(unitTestContext, args, true, out);
 }
 
 } // namespace
@@ -124,14 +170,62 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(sourcePath, source)));
     }
 
-    const String irSinkPath = Path::combine(
-        Path::getParentDirectory(unitTestContext->executableDirectory),
-        "ir-load-equivalence-dump-sink.hlsl");
+    const String workDir = Path::getParentDirectory(unitTestContext->executableDirectory);
+    const String irSinkPath = Path::combine(workDir, "ir-load-equivalence-dump-sink.hlsl");
+
+    // A precompiled *user* module, which takes the same deferred path as the builtin
+    // ones -- `Linkage::loadSerializedModuleContents` passes a retained blob too. The
+    // shapes here are the ones the deferral invariant is least obviously true for:
+    // interfaces with generic methods, two conformances, witness tables, and a generic
+    // value parameter, so the library carries globals nested inside generic bodies.
+    //
+    // The file name has to match the module name for `import` to find it.
+    const String libSourcePath = Path::combine(workDir, "irLoadEquivalenceLib.slang");
+    const String libModulePath = Path::combine(workDir, "irLoadEquivalenceLib.slang-module");
+    const String userSourcePath = Path::combine(workDir, "irLoadEquivalenceUser.slang");
+    {
+        const char* libSource = R"(
+module irLoadEquivalenceLib;
+public interface IShape { float area(); float scaledBy<let N : int>(float k); }
+public struct Circle : IShape
+{
+    public float r;
+    public float area() { return 3.14159f * r * r; }
+    public float scaledBy<let N : int>(float k) { return area() * k * float(N); }
+}
+public struct Box : IShape
+{
+    public float w; public float h;
+    public float area() { return w * h; }
+    public float scaledBy<let N : int>(float k) { return area() * k * float(N); }
+}
+public float totalArea<T : IShape>(T s, float k) { return s.scaledBy<3>(k); }
+)";
+        const char* userSource = R"(
+import irLoadEquivalenceLib;
+RWStructuredBuffer<float> gOut;
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMain(uint3 tid : SV_DispatchThreadID)
+{
+    Circle c; c.r = 2.0f;
+    Box b; b.w = 3.0f; b.h = 4.0f;
+    gOut[tid.x] = totalArea(c, 1.5f) + totalArea(b, 2.0f);
+}
+)";
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(libSourcePath, libSource)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(userSourcePath, userSource)));
+    }
 
     RunResult onDemand;
     RunResult eager;
     RunResult onDemandIR;
     RunResult eagerIR;
+    RunResult libBuild;
+    RunResult modOnDemand;
+    RunResult modEager;
+    RunResult modOnDemandIR;
+    RunResult modEagerIR;
     const bool ranBoth =
         SLANG_SUCCEEDED(
             _compileWith(unitTestContext, sourcePath, irSinkPath, true, false, onDemand)) &&
@@ -140,7 +234,41 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         SLANG_SUCCEEDED(
             _compileWith(unitTestContext, sourcePath, irSinkPath, true, true, onDemandIR)) &&
         SLANG_SUCCEEDED(
-            _compileWith(unitTestContext, sourcePath, irSinkPath, false, true, eagerIR));
+            _compileWith(unitTestContext, sourcePath, irSinkPath, false, true, eagerIR)) &&
+        SLANG_SUCCEEDED(
+            _buildLibraryModule(unitTestContext, libSourcePath, libModulePath, libBuild)) &&
+        SLANG_SUCCEEDED(_compileWith(
+            unitTestContext,
+            userSourcePath,
+            irSinkPath,
+            true,
+            false,
+            modOnDemand,
+            workDir)) &&
+        SLANG_SUCCEEDED(_compileWith(
+            unitTestContext,
+            userSourcePath,
+            irSinkPath,
+            false,
+            false,
+            modEager,
+            workDir)) &&
+        SLANG_SUCCEEDED(_compileWith(
+            unitTestContext,
+            userSourcePath,
+            irSinkPath,
+            true,
+            true,
+            modOnDemandIR,
+            workDir)) &&
+        SLANG_SUCCEEDED(_compileWith(
+            unitTestContext,
+            userSourcePath,
+            irSinkPath,
+            false,
+            true,
+            modEagerIR,
+            workDir));
 
     // Restore before asserting, so a failure does not also corrupt later tests.
     if (hadPrevious)
@@ -157,6 +285,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     }
     File::remove(sourcePath);
     File::remove(irSinkPath);
+    File::remove(libSourcePath);
+    File::remove(libModulePath);
+    File::remove(userSourcePath);
 
     SLANG_CHECK_ABORT(ranBoth);
 
@@ -183,4 +314,29 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     SLANG_CHECK(onDemandIR.exitCode == eagerIR.exitCode);
     SLANG_CHECK(onDemandIR.err.getLength() > 0);
     SLANG_CHECK(onDemandIR.err == eagerIR.err);
+
+    // The same comparison for a precompiled *user* module. Deferral is not builtin-only:
+    // `loadSerializedModuleContents` hands the reader a retained blob, so a
+    // `.slang-module` defers on the same terms. The invariant deferral rests on -- that
+    // nothing below module scope references another global's body -- was measured over
+    // the builtin modules, so a user module built by the real front end is the case that
+    // measurement did not cover. A violation aborts the compile on a release assert in
+    // `readInstRef`, which is why the exit codes are checked and not only the output.
+    //
+    // Limit worth knowing: this compares modes, it cannot confirm the user module was
+    // deferred. If deferral ever declined for `.slang-module` files, both runs would be
+    // eager and agree trivially. The loader is not observable from a child process;
+    // `irDeferralDeclinesWhenTheBlobDoesNotBackTheSpans` covers that decision directly,
+    // on a module round-tripped in-process.
+    SLANG_CHECK(libBuild.exitCode == 0);
+    SLANG_CHECK(modOnDemand.exitCode == 0);
+    SLANG_CHECK(modOnDemand.exitCode == modEager.exitCode);
+    SLANG_CHECK(modOnDemand.out.getLength() > 0);
+    SLANG_CHECK(modOnDemand.out == modEager.out);
+    SLANG_CHECK(modOnDemand.err == modEager.err);
+
+    SLANG_CHECK(modOnDemandIR.exitCode == 0);
+    SLANG_CHECK(modOnDemandIR.exitCode == modEagerIR.exitCode);
+    SLANG_CHECK(modOnDemandIR.err.getLength() > 0);
+    SLANG_CHECK(modOnDemandIR.err == modEagerIR.err);
 }
