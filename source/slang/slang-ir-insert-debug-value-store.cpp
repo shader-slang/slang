@@ -103,7 +103,7 @@ bool DebugValueStoreContext::isDebuggableType(IRType* type)
     return debuggable;
 }
 
-// True if a function local or parameter of `type` should get a source-level DebugVar. Extends
+// True if a function-local `var`/`let` of `type` should get a source-level DebugVar. Extends
 // isDebuggableType (scalars/vectors/matrices and aggregates of those) with the supported opaque
 // leaf handles: unlike plain data, a handle gets a DebugLocalVariable with no backing OpVariable
 // and is bound to its lowered SSA value by a DebugValue. This is a type decision only; whether the
@@ -144,9 +144,10 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             isRefParam = true;
             paramType = ptrType->getValueType();
         }
-        // Parameters keep the plain-data eligibility rule. Opaque-handle *parameter* debug info is
-        // deferred to a follow-up because it interacts with the DebugVar arg-index remap across the
-        // type-legalization passes; function-local var/let aliases (below) do use the widened gate.
+        // Parameters use the plain-data eligibility rule. An opaque-handle parameter's DebugVar
+        // arg-index is not preserved through the type-legalization passes that remove parameters,
+        // so opaque handles get debug vars only as function-local var/let aliases (below), where
+        // there is no arg-index to preserve.
         if (!isDebuggableType(paramType))
             continue;
         auto debugVar = builder.emitDebugVar(
