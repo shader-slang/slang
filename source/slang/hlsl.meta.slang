@@ -10353,7 +10353,12 @@ T __vectorDotImpl(vector<T, N> x, vector<T, N> y)
                 };
             }
         }
-    case wgsl: __intrinsic_asm "dot";
+    case wgsl:
+        // WGSL defines `dot` only for floating-point vectors.
+        if (__isFloat<T>())
+            __intrinsic_asm "dot";
+        else
+            return __vectorDotFallback(x, y);
     default: return __vectorDotFallback(x, y);
     }
 }
