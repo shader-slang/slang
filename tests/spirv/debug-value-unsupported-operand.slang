@@ -1,6 +1,6 @@
-// Companion to debug-resource-aliases.slang, guarding the value-side check in SPIR-V legalization
-// (canUseAsSPIRVDebugValueOperand). A DebugVar may be created for a supported source-level type,
-// but the concrete lowered value bound to it must also be a representable OpDebugValue operand.
+// Companion to debug-resource-aliases.slang, guarding the value-side representability check in
+// SPIR-V legalization (processDebugValue). A DebugVar may be created for a supported source-level
+// type, but the concrete lowered value bound to it must also be a representable OpDebugValue operand.
 //
 // A combined texture-sampler is an OpTypeSampledImage value, which SPIR-V does not permit as an
 // OpDebugValue operand. Here the value is an OpLoad of the combined-image-sampler global (its result
