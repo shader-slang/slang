@@ -1054,6 +1054,11 @@ Result linkAndOptimizeIR(
     outLinkedIR = linkIR(codeGenContext);
     auto irModule = outLinkedIR.module;
     auto irEntryPoints = outLinkedIR.entryPoints;
+    // Portable synthesis populates this after generic specialization. Generated adapters are
+    // KeepAlive entry-point functions, and the intervening cleanup/inlining passes mutate their
+    // bodies without replacing those global IRFunc objects, so their identity remains valid until
+    // stage-input lowering consumes the set below.
+    HashSet<IRFunc*> selectedStructuralRayTracingEntryPointAdapters;
 
     // If our linking step resulted in errors, abort. We can't assume that
     // our IR is complete.
@@ -1607,7 +1612,11 @@ Result linkAndOptimizeIR(
         (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
          isCUDATarget(targetRequest)))
     {
-        SLANG_PASS(synthesizePortableStructuralRayTracingEntryPoints, irEntryPoints, sink);
+        SLANG_PASS(
+            synthesizePortableStructuralRayTracingEntryPoints,
+            irEntryPoints,
+            selectedStructuralRayTracingEntryPointAdapters,
+            sink);
         outLinkedIR.entryPoints = irEntryPoints;
     }
     else if (
@@ -1950,7 +1959,10 @@ Result linkAndOptimizeIR(
             // their standard-module fallbacks.
             SLANG_PASS(lowerOptiXStructuralRayTracingStageInputOperations, sink);
         }
-        SLANG_PASS(lowerPortableStructuralRayTracingStageInputOperations);
+        SLANG_PASS(
+            lowerPortableStructuralRayTracingStageInputOperations,
+            targetProgram,
+            selectedStructuralRayTracingEntryPointAdapters);
 
         // Structural stage-input lowering synthesizes native varying parameters after the
         // canonical entry-point `in`-parameter translation above. Normalize those late

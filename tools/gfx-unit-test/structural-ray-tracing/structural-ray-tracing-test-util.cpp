@@ -103,6 +103,55 @@ Result loadProgram(
     return loadProgram(device, module, entries, entryCount, outProgram);
 }
 
+// Creates one independently linked component per selected entry point. This is deliberately not a
+// variation of `loadProgram`: pre-composing all entries there would turn the test back into
+// SingleProgram linking and hide reflection that is available only on `linkedEntryPoints`.
+Result loadSeparateProgram(
+    IDevice* device,
+    slang::IModule* module,
+    const EntryDesc* entries,
+    Index entryCount,
+    IShaderProgram** outProgram)
+{
+    ComPtr<slang::IBlob> diagnostics;
+    std::vector<ComPtr<slang::IComponentType>> entryPointComponents;
+    std::vector<slang::IComponentType*> entryPoints;
+    for (Index i = 0; i < entryCount; ++i)
+    {
+        const auto& entryDesc = entries[i];
+        ComPtr<slang::IEntryPoint> entryPoint;
+        auto result = module->findAndCheckEntryPoint(
+            entryDesc.sourceName,
+            entryDesc.stage,
+            entryPoint.writeRef(),
+            diagnostics.writeRef());
+        diagnoseIfNeeded(diagnostics);
+        SLANG_RETURN_ON_FAIL(result);
+
+        ComPtr<slang::IComponentType> entryPointComponent;
+        if (entryDesc.linkedName)
+        {
+            SLANG_RETURN_ON_FAIL(
+                entryPoint->renameEntryPoint(entryDesc.linkedName, entryPointComponent.writeRef()));
+        }
+        else
+        {
+            entryPointComponent = entryPoint;
+        }
+        entryPointComponents.push_back(entryPointComponent);
+        entryPoints.push_back(entryPointComponent);
+    }
+
+    ShaderProgramDesc programDesc = {};
+    programDesc.slangGlobalScope = module;
+    programDesc.linkingStyle = LinkingStyle::SeparateEntryPointCompilation;
+    programDesc.slangEntryPoints = entryPoints.data();
+    programDesc.slangEntryPointCount = uint32_t(entryPoints.size());
+    auto result = device->createShaderProgram(programDesc, outProgram, diagnostics.writeRef());
+    diagnoseIfNeeded(diagnostics);
+    return result;
+}
+
 // Finds the schema partition by its stable, qualified payload type name. Function indices are only
 // meaningful within this partition, so callers must resolve the partition before interpreting a
 // hit or miss index.
@@ -414,10 +463,8 @@ void runStructuralRayTracingCallableRecord(IDevice* device)
 
     static const char* kRayGenerationNames[] = {"rayGenerationMain"};
     static const char* kCallableNames[] = {"RuntimeCallable"};
-    ShaderRecordOverwrite callableRecord = {};
-    callableRecord.offset = 32;
-    callableRecord.size = sizeof(uint32_t);
-    callableRecord.data[0] = 7;
+    uint32_t callableRecordValue = 7;
+    ShaderRecordData callableRecord = {&callableRecordValue, sizeof(callableRecordValue)};
 
     ShaderTableDesc shaderTableDesc = {};
     shaderTableDesc.program = program;
@@ -425,7 +472,7 @@ void runStructuralRayTracingCallableRecord(IDevice* device)
     shaderTableDesc.rayGenShaderEntryPointNames = kRayGenerationNames;
     shaderTableDesc.callableShaderCount = SLANG_COUNT_OF(kCallableNames);
     shaderTableDesc.callableShaderEntryPointNames = kCallableNames;
-    shaderTableDesc.callableShaderRecordOverwrites = &callableRecord;
+    shaderTableDesc.callableShaderRecordData = &callableRecord;
 
     ComPtr<IShaderTable> shaderTable;
     GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
@@ -561,7 +608,13 @@ void runStructuralRayTracingRepeatedRecords(IDevice* device)
 
     auto queue = device->getQueue(QueueType::Graphics);
     SLANG_CHECK_ABORT(queue != nullptr);
-    StructuralRayTracingTriangleScene scene(device, queue);
+    // Force the otherwise opaque test triangle through AnyHit. The AnyHit and ClosestHit stages
+    // use distinct generated D3D cbuffer bindings in this combined program, so executing both
+    // verifies that the hit-group record supplies its Record address to the full union signature.
+    StructuralRayTracingTriangleScene scene(
+        device,
+        queue,
+        AccelerationStructureInstanceFlags::NoOpaque);
 
     auto slangSession = device->getSlangSession();
     ComPtr<slang::IBlob> diagnostics;
@@ -585,6 +638,7 @@ void runStructuralRayTracingRepeatedRecords(IDevice* device)
     // pipeline hit group.
     static const char* kReflectedHitGroupNames[] = {"hitFunction0", "hitFunction1"};
     const char* closestHitEntryPointNames[kFunctionCount] = {};
+    const char* anyHitEntryPointName = nullptr;
     const char* reflectedMissEntryPointNames[kFunctionCount] = {};
     HitGroupDesc hitGroups[kFunctionCount] = {};
     for (SlangUInt declarationIndex = 0; declarationIndex < kFunctionCount; ++declarationIndex)
@@ -604,22 +658,35 @@ void runStructuralRayTracingRepeatedRecords(IDevice* device)
         SLANG_CHECK_ABORT(reflectedMissEntryPointNames[missIndex] == nullptr);
 
         auto reflectedClosestHit = reflectedHitGroup->getClosestHit();
+        auto reflectedAnyHit = reflectedHitGroup->getAnyHit();
         auto reflectedMiss = reflectedMissShader->getMiss();
         SLANG_CHECK_ABORT(reflectedClosestHit != nullptr);
+        SLANG_CHECK_ABORT(reflectedAnyHit != nullptr);
         SLANG_CHECK_ABORT(reflectedMiss != nullptr);
         closestHitEntryPointNames[hitIndex] = reflectedClosestHit->getEntryPointName();
+        auto reflectedAnyHitName = reflectedAnyHit->getEntryPointName();
+        SLANG_CHECK_ABORT(reflectedAnyHitName != nullptr);
+        if (!anyHitEntryPointName)
+            anyHitEntryPointName = reflectedAnyHitName;
+        else
+            SLANG_CHECK_ABORT(std::strcmp(anyHitEntryPointName, reflectedAnyHitName) == 0);
         reflectedMissEntryPointNames[missIndex] = reflectedMiss->getEntryPointName();
         SLANG_CHECK_ABORT(closestHitEntryPointNames[hitIndex] != nullptr);
         SLANG_CHECK_ABORT(reflectedMissEntryPointNames[missIndex] != nullptr);
 
         hitGroups[hitIndex].hitGroupName = kReflectedHitGroupNames[hitIndex];
         hitGroups[hitIndex].closestHitEntryPoint = closestHitEntryPointNames[hitIndex];
+        hitGroups[hitIndex].anyHitEntryPoint = anyHitEntryPointName;
     }
 
     const EntryDesc kEntries[] = {
         {"rayGenerationMain", SLANG_STAGE_RAY_GENERATION},
         {closestHitEntryPointNames[0], SLANG_STAGE_CLOSEST_HIT},
         {closestHitEntryPointNames[1], SLANG_STAGE_CLOSEST_HIT},
+        // Keep one selected structural hit stage outside every HitGroupDesc. Its generated Record
+        // binding still needs a direct D3D local-root association even though no SBT entry uses it.
+        {"UnusedClosestHit", SLANG_STAGE_CLOSEST_HIT},
+        {anyHitEntryPointName, SLANG_STAGE_ANY_HIT},
         {reflectedMissEntryPointNames[0], SLANG_STAGE_MISS},
         {reflectedMissEntryPointNames[1], SLANG_STAGE_MISS},
     };
@@ -696,8 +763,8 @@ void runStructuralRayTracingRepeatedRecords(IDevice* device)
     auto actual = static_cast<const StructuralRayTracingRepeatedRecordResult*>(
         resultBlob->getBufferPointer());
     static const StructuralRayTracingRepeatedRecordResult kExpected[] = {
-        {10, 100, 4},
         {10, 200, 4},
+        {10, 400, 4},
         {20, 300, 4},
         {20, 400, 4},
     };
@@ -758,8 +825,8 @@ void runStructuralRayTracingRepeatedRecords(IDevice* device)
     actual = static_cast<const StructuralRayTracingRepeatedRecordResult*>(
         resultBlob->getBufferPointer());
     static const StructuralRayTracingRepeatedRecordResult kExpectedAfterReplacement[] = {
-        {10, 500, 4},
-        {11, 700, 4},
+        {10, 1000, 4},
+        {11, 1400, 4},
         {20, 600, 4},
         {21, 800, 4},
     };
@@ -1327,6 +1394,123 @@ void runStructuralRayTracingStageInputState(IDevice* device)
         const uint32_t* expectedWords = reinterpret_cast<const uint32_t*>(&kExpected[i]);
         for (Index word = 0; word < sizeof(kExpected[i]) / sizeof(uint32_t); ++word)
             SLANG_CHECK(actualWords[word] == expectedWords[word]);
+    }
+}
+
+void runStructuralRayTracingSeparateEntryRecords(IDevice* device)
+{
+    if (!device->hasFeature(Feature::RayTracing))
+    {
+        SLANG_IGNORE_TEST;
+    }
+
+    auto queue = device->getQueue(QueueType::Graphics);
+    SLANG_CHECK_ABORT(queue != nullptr);
+    StructuralRayTracingTriangleScene scene(device, queue);
+
+    auto slangSession = device->getSlangSession();
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(
+        slangSession->loadModule("separate-entry-record", diagnostics.writeRef()));
+    diagnoseIfNeeded(diagnostics);
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto schema = module->getLayout()->findTraceProgramSchema("Schema");
+    SLANG_CHECK_ABORT(schema != nullptr);
+
+    // Rename both structural stages before handing them to RHI. Separate entry-point compilation
+    // stores their reflection on per-entry components, while the native state object and SBT use
+    // these final names rather than the source struct names.
+    static const EntryDesc kEntries[] = {
+        {"rayGenerationMain", SLANG_STAGE_RAY_GENERATION},
+        {"SeparateClosestHit", SLANG_STAGE_CLOSEST_HIT, "linkedClosestHit"},
+        {"SeparateMiss", SLANG_STAGE_MISS, "linkedMiss"},
+    };
+    ComPtr<IShaderProgram> program;
+    GFX_CHECK_CALL_ABORT(loadSeparateProgram(
+        device,
+        module,
+        kEntries,
+        SLANG_COUNT_OF(kEntries),
+        program.writeRef()));
+
+    static const char* kHitGroupNames[] = {"separateHitGroup"};
+    HitGroupDesc hitGroup = {};
+    hitGroup.hitGroupName = kHitGroupNames[0];
+    hitGroup.closestHitEntryPoint = "linkedClosestHit";
+
+    RayTracingPipelineDesc pipelineDesc = {};
+    pipelineDesc.program = program;
+    pipelineDesc.hitGroups = &hitGroup;
+    pipelineDesc.hitGroupCount = 1;
+    pipelineDesc.maxRecursion = 1;
+    applyNativeRayTracingABISizes(schema, pipelineDesc);
+
+    ComPtr<IRayTracingPipeline> pipeline;
+    GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
+
+    static const char* kRayGenerationNames[] = {"rayGenerationMain"};
+    static const char* kMissNames[] = {"linkedMiss"};
+    // Match the reflected HLSL cbuffer layout of `uint4 values[257]`. At 4112 bytes, this Record
+    // cannot fit inline in a native D3D shader-table record or a local root signature. The shaders
+    // dynamically select the final two elements, proving that RHI instead supplies a local CBV.
+    uint32_t hitRecordValues[257 * 4] = {};
+    uint32_t missRecordValues[257 * 4] = {};
+    hitRecordValues[255 * 4] = 10;
+    hitRecordValues[256 * 4] = 30;
+    missRecordValues[255 * 4] = 40;
+    missRecordValues[256 * 4] = 20;
+    ShaderRecordData hitRecord = {hitRecordValues, sizeof(hitRecordValues)};
+    ShaderRecordData missRecord = {missRecordValues, sizeof(missRecordValues)};
+
+    ShaderTableDesc shaderTableDesc = {};
+    shaderTableDesc.program = program;
+    shaderTableDesc.rayGenShaderCount = SLANG_COUNT_OF(kRayGenerationNames);
+    shaderTableDesc.rayGenShaderEntryPointNames = kRayGenerationNames;
+    shaderTableDesc.missShaderCount = SLANG_COUNT_OF(kMissNames);
+    shaderTableDesc.missShaderEntryPointNames = kMissNames;
+    shaderTableDesc.missShaderRecordData = &missRecord;
+    shaderTableDesc.hitGroupCount = SLANG_COUNT_OF(kHitGroupNames);
+    shaderTableDesc.hitGroupNames = kHitGroupNames;
+    shaderTableDesc.hitGroupRecordData = &hitRecord;
+
+    ComPtr<IShaderTable> shaderTable;
+    GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
+
+    BufferDesc resultDesc = {};
+    resultDesc.size = sizeof(StructuralRayTracingRepeatedRecordResult) * 2;
+    resultDesc.elementSize = sizeof(StructuralRayTracingRepeatedRecordResult);
+    resultDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::CopySource;
+    resultDesc.defaultState = ResourceState::UnorderedAccess;
+    auto results = device->createBuffer(resultDesc);
+    SLANG_CHECK_ABORT(results != nullptr);
+
+    auto commandEncoder = queue->createCommandEncoder();
+    auto passEncoder = commandEncoder->beginRayTracingPass();
+    auto rootObject = passEncoder->bindPipeline(pipeline, shaderTable);
+    ShaderCursor root(rootObject);
+    uint32_t globalBias = 7;
+    GFX_CHECK_CALL_ABORT(root["existingConstants"]["bias"].setData(globalBias));
+    GFX_CHECK_CALL_ABORT(root["scene"].setBinding(Binding(scene.topLevel)));
+    GFX_CHECK_CALL_ABORT(root["results"].setBinding(Binding(results)));
+    passEncoder->dispatchRays(0, 2, 1, 1);
+    passEncoder->end();
+    GFX_CHECK_CALL_ABORT(queue->submit(commandEncoder->finish()));
+    GFX_CHECK_CALL_ABORT(queue->waitOnHost());
+
+    ComPtr<ISlangBlob> resultBlob;
+    GFX_CHECK_CALL_ABORT(device->readBuffer(results, 0, resultDesc.size, resultBlob.writeRef()));
+    auto actual = static_cast<const StructuralRayTracingRepeatedRecordResult*>(
+        resultBlob->getBufferPointer());
+    static const StructuralRayTracingRepeatedRecordResult kExpected[] = {
+        {10, 17, 2},
+        {20, 27, 2},
+    };
+    for (Index i = 0; i < SLANG_COUNT_OF(kExpected); ++i)
+    {
+        SLANG_CHECK(actual[i].stage == kExpected[i].stage);
+        SLANG_CHECK(actual[i].recordValue == kExpected[i].recordValue);
+        SLANG_CHECK(actual[i].dispatchWidth == kExpected[i].dispatchWidth);
     }
 }
 

@@ -27,6 +27,14 @@ class GenericDecl;
 class ExtensionDecl;
 class GenericTypeParamDecl;
 
+/// Returns the host-visible layout for the application data in a structural shader record.
+///
+/// Metal reads that data from its compiler-generated raw record buffer and therefore uses
+/// structured-buffer packing. D3D exposes it through an ordinary `ConstantBuffer<Record>` and
+/// therefore uses HLSL constant-buffer packing. Other targets retain their ordinary reflected
+/// application-data layout.
+TypeLayout* getStructuralRayTracingRecordTypeLayout(TargetRequest* targetRequest, Type* recordType);
+
 /// Returns whether `functionDecl` is one of the top-level legacy pipeline intrinsics in `core`.
 ///
 /// The check deliberately excludes methods such as `RayQuery.TraceRayInline` and

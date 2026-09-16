@@ -967,19 +967,6 @@ static bool _tryGetMetalRecordStride(
     return true;
 }
 
-// Returns the public layout used for one structural application's record data. Metal reads the
-// data from a raw record buffer using structured-buffer rules; other targets expose their ordinary
-// record layout. Both schema reflection and the schema-free catalogue call this single helper so a
-// declaration does not acquire a different record ABI merely because a schema selected it.
-static TypeLayout* _getStructuralRayTracingRecordTypeLayout(
-    TargetRequest* targetRequest,
-    Type* recordType)
-{
-    auto recordRules = isMetalTarget(targetRequest) ? slang::LayoutRules::DefaultStructuredBuffer
-                                                    : slang::LayoutRules::Default;
-    return targetRequest->getTypeLayout(recordType, recordRules);
-}
-
 // Resolves public layouts only after manifest identity has selected the AST types. Payloads use
 // the target's ordinary reflected layout. Records use the shared target rule above.
 static bool _populateStructuralRayTracingTypeLayouts(
@@ -995,14 +982,14 @@ static bool _populateStructuralRayTracingTypeLayouts(
         for (auto group : payload->hitGroups)
         {
             group->recordTypeLayout =
-                _getStructuralRayTracingRecordTypeLayout(targetRequest, group->recordType);
+                getStructuralRayTracingRecordTypeLayout(targetRequest, group->recordType);
             if (!group->recordTypeLayout)
                 return false;
         }
         for (auto shader : payload->missShaders)
         {
             shader->recordTypeLayout =
-                _getStructuralRayTracingRecordTypeLayout(targetRequest, shader->recordType);
+                getStructuralRayTracingRecordTypeLayout(targetRequest, shader->recordType);
             if (!shader->recordTypeLayout)
                 return false;
         }
@@ -1010,7 +997,7 @@ static bool _populateStructuralRayTracingTypeLayouts(
     for (auto shader : result->callableShaders)
     {
         shader->recordTypeLayout =
-            _getStructuralRayTracingRecordTypeLayout(targetRequest, shader->recordType);
+            getStructuralRayTracingRecordTypeLayout(targetRequest, shader->recordType);
         if (!shader->recordTypeLayout)
             return false;
     }
@@ -1440,7 +1427,7 @@ static bool _addStructuralRayTracingEntryCatalogueSection(
                 }
                 auto group = contract.reflection;
                 group->recordTypeLayout =
-                    _getStructuralRayTracingRecordTypeLayout(targetRequest, group->recordType);
+                    getStructuralRayTracingRecordTypeLayout(targetRequest, group->recordType);
                 if (!group->recordTypeLayout)
                     return false;
                 if (isMetalTarget(targetRequest))
@@ -1462,7 +1449,7 @@ static bool _addStructuralRayTracingEntryCatalogueSection(
                 }
                 auto shader = contract.reflection;
                 shader->recordTypeLayout =
-                    _getStructuralRayTracingRecordTypeLayout(targetRequest, shader->recordType);
+                    getStructuralRayTracingRecordTypeLayout(targetRequest, shader->recordType);
                 if (!shader->recordTypeLayout)
                     return false;
                 if (isMetalTarget(targetRequest))
@@ -1484,7 +1471,7 @@ static bool _addStructuralRayTracingEntryCatalogueSection(
                 }
                 auto shader = contract.reflection;
                 shader->recordTypeLayout =
-                    _getStructuralRayTracingRecordTypeLayout(targetRequest, shader->recordType);
+                    getStructuralRayTracingRecordTypeLayout(targetRequest, shader->recordType);
                 if (!shader->recordTypeLayout)
                     return false;
                 if (isMetalTarget(targetRequest))

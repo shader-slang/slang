@@ -3,6 +3,7 @@
 #include "unit-test/slang-unit-test.h"
 
 #include <atomic>
+#include <cstring>
 #include <stdio.h>
 #include <thread>
 
@@ -2784,4 +2785,491 @@ SLANG_UNIT_TEST(structuralRayTracingEntryCatalogueIsSchemaIndependent)
     SLANG_CHECK(catalogueHitA->getFunctionIndex() == -1);
     SLANG_CHECK(catalogueMissA->getFunctionIndex() == -1);
     SLANG_CHECK(catalogueCallableA->getFunctionIndex() == -1);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingD3DRecordBindingReflection)
+{
+    const char* source = R"(
+        import slang.raytracing;
+
+        struct Payload { uint value; }
+        struct Record
+        {
+            float3 direction;
+            float weight;
+            float2 samples[2];
+            uint tail;
+        }
+        struct SecondRecord { uint2 value; }
+
+        // Use the same type in a handwritten cbuffer so reflection can prove the synthesized
+        // structural Record follows the ordinary HLSL constant-buffer packing rules.
+        ConstantBuffer<Record> existingRecord : register(b0);
+        RWStructuredBuffer<uint> output;
+
+        struct TraceContext : rt::ITraceContext
+        {
+            typealias AccelerationStructure = rt::AccelerationStructure;
+            typealias Motion = rt::NoMotion;
+        }
+
+        struct RecordContext : rt::IPayloadContext
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias Payload = ::Payload;
+            typealias Record = ::Record;
+        }
+
+        struct RecordMiss : rt::IMissShader
+        {
+            typealias Context = RecordContext;
+            void invoke(rt::MissInput<Context> input)
+            {
+                output[0] = input.record.tail + existingRecord.tail;
+            }
+        }
+
+        struct SecondRecordContext : rt::IPayloadContext
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias Payload = ::Payload;
+            typealias Record = ::SecondRecord;
+        }
+
+        // Qualified structural stage names have a separate source lookup identity and target-safe
+        // physical export name. Keep this stage qualified so the combined-program test below
+        // verifies that parameter layout preserves the same physical identity as IR linking.
+        namespace Stages
+        {
+            struct SecondRecordMiss : rt::IMissShader
+            {
+                typealias Context = ::SecondRecordContext;
+                void invoke(rt::MissInput<::SecondRecordContext> input)
+                {
+                    output[1] = input.record.value.x;
+                }
+            }
+        }
+
+        struct VoidContext : rt::IPayloadContext
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias Payload = ::Payload;
+            typealias Record = void;
+        }
+
+        struct VoidMiss : rt::IMissShader
+        {
+            typealias Context = VoidContext;
+            void invoke(rt::MissInput<Context> input) {}
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry experimentalOption = {};
+    experimentalOption.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalOption.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalOption.value.intValue0 = 1;
+
+    slang::TargetDesc target = {};
+    target.format = SLANG_HLSL;
+    target.profile = globalSession->findProfile("sm_6_6");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &target;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &experimentalOption;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+        "structuralD3DRecordBinding",
+        "structural-d3d-record-binding.slang",
+        source,
+        diagnostics.writeRef()));
+    if (!module && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto checkLinkedStageLayout = [&](const char* name,
+                                      SlangInt expectedBindingIndex,
+                                      SlangInt expectedBindingSpace,
+                                      bool expectVoidRecord)
+    {
+        ComPtr<slang::IEntryPoint> entryPoint;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+            name,
+            SLANG_STAGE_MISS,
+            entryPoint.writeRef(),
+            diagnostics.writeRef())));
+        ComPtr<slang::IComponentType> linkedEntryPoint;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(entryPoint->link(linkedEntryPoint.writeRef(), diagnostics.writeRef())));
+        auto layout = linkedEntryPoint->getLayout(0, diagnostics.writeRef());
+        SLANG_CHECK_ABORT(layout != nullptr);
+
+        auto reflectedEntryPoint = layout->getEntryPointByIndex(0);
+        SLANG_CHECK_ABORT(reflectedEntryPoint != nullptr);
+        SLANG_CHECK(
+            reflectedEntryPoint->getStructuralRayTracingRecordBindingIndex() ==
+            expectedBindingIndex);
+        SLANG_CHECK(
+            reflectedEntryPoint->getStructuralRayTracingRecordBindingSpace() ==
+            expectedBindingSpace);
+        auto recordType = reflectedEntryPoint->getStructuralRayTracingRecordType();
+        auto recordTypeLayout = reflectedEntryPoint->getStructuralRayTracingRecordTypeLayout();
+        SLANG_CHECK_ABORT(recordType != nullptr);
+        SLANG_CHECK_ABORT(recordTypeLayout != nullptr);
+        SLANG_CHECK(
+            (recordType->getScalarType() == slang::TypeReflection::ScalarType::Void) ==
+            expectVoidRecord);
+        if (!expectVoidRecord)
+        {
+            slang::VariableLayoutReflection* existingRecord = nullptr;
+            for (SlangUInt i = 0; i < layout->getParameterCount(); ++i)
+            {
+                auto parameter = layout->getParameterByIndex(i);
+                if (parameter && parameter->getName() &&
+                    strcmp(parameter->getName(), "existingRecord") == 0)
+                {
+                    existingRecord = parameter;
+                    break;
+                }
+            }
+            SLANG_CHECK_ABORT(existingRecord != nullptr);
+            auto handwrittenRecordLayout = existingRecord->getTypeLayout()->getElementTypeLayout();
+            SLANG_CHECK_ABORT(handwrittenRecordLayout != nullptr);
+
+            // `samples` has a 16-byte element stride in an HLSL cbuffer but an 8-byte stride in a
+            // structured buffer, so comparing the aggregate and field layouts detects an
+            // accidental use of the wrong Record ABI rules.
+            SLANG_CHECK(recordTypeLayout->getSize() == handwrittenRecordLayout->getSize());
+            SLANG_CHECK(
+                recordTypeLayout->getAlignment() == handwrittenRecordLayout->getAlignment());
+            SLANG_CHECK(
+                recordTypeLayout->getFieldCount() == handwrittenRecordLayout->getFieldCount());
+            for (unsigned i = 0; i < recordTypeLayout->getFieldCount(); ++i)
+            {
+                auto reflectedField = recordTypeLayout->getFieldByIndex(i);
+                auto handwrittenField = handwrittenRecordLayout->getFieldByIndex(i);
+                SLANG_CHECK_ABORT(reflectedField != nullptr && handwrittenField != nullptr);
+                SLANG_CHECK(reflectedField->getOffset() == handwrittenField->getOffset());
+                SLANG_CHECK(
+                    reflectedField->getTypeLayout()->getSize() ==
+                    handwrittenField->getTypeLayout()->getSize());
+                SLANG_CHECK(
+                    reflectedField->getTypeLayout()->getStride() ==
+                    handwrittenField->getTypeLayout()->getStride());
+            }
+
+            auto samplesIndex = recordTypeLayout->findFieldIndexByName("samples");
+            SLANG_CHECK_ABORT(samplesIndex >= 0);
+            auto samplesLayout =
+                recordTypeLayout->getFieldByIndex(unsigned(samplesIndex))->getTypeLayout();
+            SLANG_CHECK(samplesLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM) == 16);
+        }
+    };
+
+    // b0 is explicitly occupied by `existingRecord`. The structural record binding receives b0
+    // in a fresh compiler-owned space rather than sharing the user's global resource namespace.
+    checkLinkedStageLayout("RecordMiss", 0, 1, false);
+
+    // A combined target library gives every selected structural entry point a distinct register.
+    // Rename one component before composition to verify that IR lowering matches the final export
+    // name rather than assuming the source declaration name survived component composition.
+    ComPtr<slang::IEntryPoint> firstSelectedEntryPoint;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+        "RecordMiss",
+        SLANG_STAGE_MISS,
+        firstSelectedEntryPoint.writeRef(),
+        diagnostics.writeRef())));
+    ComPtr<slang::IComponentType> renamedFirstEntryPoint;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(firstSelectedEntryPoint->renameEntryPoint(
+        "RenamedRecordMiss",
+        renamedFirstEntryPoint.writeRef())));
+
+    ComPtr<slang::IEntryPoint> secondSelectedEntryPoint;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+        "Stages.SecondRecordMiss",
+        SLANG_STAGE_MISS,
+        secondSelectedEntryPoint.writeRef(),
+        diagnostics.writeRef())));
+    slang::IComponentType* selectedComponents[] = {
+        renamedFirstEntryPoint,
+        secondSelectedEntryPoint,
+    };
+    ComPtr<slang::IComponentType> selectedProgram;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+        selectedComponents,
+        SLANG_COUNT_OF(selectedComponents),
+        selectedProgram.writeRef(),
+        diagnostics.writeRef())));
+    ComPtr<slang::IComponentType> linkedSelectedProgram;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        selectedProgram->link(linkedSelectedProgram.writeRef(), diagnostics.writeRef())));
+
+    auto selectedLayout = linkedSelectedProgram->getLayout(0, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(selectedLayout != nullptr);
+    SLANG_CHECK(selectedLayout->getEntryPointCount() == 2);
+    auto renamedEntryPointLayout = selectedLayout->getEntryPointByIndex(0);
+    auto qualifiedEntryPointLayout = selectedLayout->getEntryPointByIndex(1);
+    SLANG_CHECK_ABORT(renamedEntryPointLayout != nullptr && qualifiedEntryPointLayout != nullptr);
+    SLANG_CHECK(strcmp(renamedEntryPointLayout->getNameOverride(), "RenamedRecordMiss") == 0);
+    SLANG_CHECK(renamedEntryPointLayout->getStructuralRayTracingRecordBindingIndex() == 0);
+    SLANG_CHECK(renamedEntryPointLayout->getStructuralRayTracingRecordBindingSpace() == 1);
+    SLANG_CHECK(strcmp(qualifiedEntryPointLayout->getName(), "Stages.SecondRecordMiss") == 0);
+    SLANG_CHECK(
+        strcmp(
+            qualifiedEntryPointLayout->getNameOverride(),
+            qualifiedEntryPointLayout->getName()) != 0);
+    SLANG_CHECK(qualifiedEntryPointLayout->getStructuralRayTracingRecordBindingIndex() == 1);
+    SLANG_CHECK(qualifiedEntryPointLayout->getStructuralRayTracingRecordBindingSpace() == 1);
+
+    ComPtr<slang::IBlob> selectedCode;
+    auto selectedCodeResult =
+        linkedSelectedProgram->getTargetCode(0, selectedCode.writeRef(), diagnostics.writeRef());
+    if (SLANG_FAILED(selectedCodeResult) && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(selectedCodeResult));
+    SLANG_CHECK_ABORT(selectedCode != nullptr);
+    UnownedStringSlice selectedCodeText(
+        (const char*)selectedCode->getBufferPointer(),
+        (const char*)selectedCode->getBufferPointer() + selectedCode->getBufferSize());
+    auto firstBindingPosition = selectedCodeText.indexOf(toSlice("register(b0, space1)"));
+    auto secondBindingPosition = selectedCodeText.indexOf(toSlice("register(b1, space1)"));
+    auto firstRecordPosition = selectedCodeText.indexOf(toSlice("Record_0 record_"));
+    auto secondRecordPosition = selectedCodeText.indexOf(toSlice("SecondRecord_0 record_"));
+    SLANG_CHECK(firstBindingPosition >= 0);
+    SLANG_CHECK(secondBindingPosition > firstBindingPosition);
+    SLANG_CHECK(firstRecordPosition > firstBindingPosition);
+    SLANG_CHECK(firstRecordPosition < secondBindingPosition);
+    SLANG_CHECK(secondRecordPosition > secondBindingPosition);
+
+    // A separately linked stage with Record = void keeps its reflected structural contract but
+    // does not reserve a local cbuffer binding that it cannot use.
+    checkLinkedStageLayout("VoidMiss", -1, -1, true);
+
+    const char* recordOnlySource = R"(
+        import slang.raytracing;
+
+        struct Payload { uint value; }
+        struct Record { uint value; }
+
+        struct TraceContext : rt::ITraceContext
+        {
+            typealias AccelerationStructure = rt::AccelerationStructure;
+            typealias Motion = rt::NoMotion;
+        }
+
+        struct RecordOnlyContext : rt::IPayloadContext
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias Payload = ::Payload;
+            typealias Record = ::Record;
+        }
+
+        struct RecordOnlyMiss : rt::IMissShader
+        {
+            typealias Context = RecordOnlyContext;
+            void invoke(rt::MissInput<Context> input)
+            {
+                uint value = input.record.value;
+            }
+        }
+    )";
+    ComPtr<slang::IModule> recordOnlyModule(session->loadModuleFromSourceString(
+        "structuralD3DRecordOnly",
+        "structural-d3d-record-only.slang",
+        recordOnlySource,
+        diagnostics.writeRef()));
+    if (!recordOnlyModule && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(recordOnlyModule != nullptr);
+
+    ComPtr<slang::IEntryPoint> recordOnlyEntryPoint;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(recordOnlyModule->findAndCheckEntryPoint(
+        "RecordOnlyMiss",
+        SLANG_STAGE_MISS,
+        recordOnlyEntryPoint.writeRef(),
+        diagnostics.writeRef())));
+    ComPtr<slang::IComponentType> linkedRecordOnlyEntryPoint;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        recordOnlyEntryPoint->link(linkedRecordOnlyEntryPoint.writeRef(), diagnostics.writeRef())));
+    auto recordOnlyLayout = linkedRecordOnlyEntryPoint->getLayout(0, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(recordOnlyLayout != nullptr);
+    auto recordOnlyReflection = recordOnlyLayout->getEntryPointByIndex(0);
+    SLANG_CHECK_ABORT(recordOnlyReflection != nullptr);
+    SLANG_CHECK(recordOnlyReflection->getStructuralRayTracingRecordBindingIndex() == 0);
+    SLANG_CHECK(recordOnlyReflection->getStructuralRayTracingRecordBindingSpace() == 0);
+
+    // A record-only SM 6.6 component has no user resource that would otherwise claim space zero.
+    // Reserving the hidden cbuffer must still mark that space before the bindless heap is assigned.
+    SLANG_CHECK(recordOnlyLayout->getBindlessSpaceIndex() == 1);
+
+    const char* wholeSpaceSource = R"(
+        import slang.raytracing;
+
+        struct Payload { uint value; }
+        struct Record { uint value; }
+        struct Globals { uint value; }
+
+        // A ParameterBlock owns all of space0. The hidden local Record CBV must not be allocated
+        // inside that space merely because per-register occupancy is tracked separately.
+        ParameterBlock<Globals> globals : register(space0);
+        RWStructuredBuffer<uint> output : register(u0, space2);
+
+        struct TraceContext : rt::ITraceContext
+        {
+            typealias AccelerationStructure = rt::AccelerationStructure;
+            typealias Motion = rt::NoMotion;
+        }
+
+        struct WholeSpaceContext : rt::IPayloadContext
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias Payload = ::Payload;
+            typealias Record = ::Record;
+        }
+
+        struct WholeSpaceMiss : rt::IMissShader
+        {
+            typealias Context = WholeSpaceContext;
+            void invoke(rt::MissInput<Context> input)
+            {
+                output[0] = input.record.value + globals.value;
+            }
+        }
+    )";
+    ComPtr<slang::IModule> wholeSpaceModule(session->loadModuleFromSourceString(
+        "structuralD3DWholeSpace",
+        "structural-d3d-whole-space.slang",
+        wholeSpaceSource,
+        diagnostics.writeRef()));
+    if (!wholeSpaceModule && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(wholeSpaceModule != nullptr);
+
+    ComPtr<slang::IEntryPoint> wholeSpaceEntryPoint;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(wholeSpaceModule->findAndCheckEntryPoint(
+        "WholeSpaceMiss",
+        SLANG_STAGE_MISS,
+        wholeSpaceEntryPoint.writeRef(),
+        diagnostics.writeRef())));
+    ComPtr<slang::IComponentType> linkedWholeSpaceEntryPoint;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        wholeSpaceEntryPoint->link(linkedWholeSpaceEntryPoint.writeRef(), diagnostics.writeRef())));
+    auto wholeSpaceLayout = linkedWholeSpaceEntryPoint->getLayout(0, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(wholeSpaceLayout != nullptr);
+    auto wholeSpaceReflection = wholeSpaceLayout->getEntryPointByIndex(0);
+    SLANG_CHECK_ABORT(wholeSpaceReflection != nullptr);
+    SLANG_CHECK(wholeSpaceReflection->getStructuralRayTracingRecordBindingIndex() == 0);
+    SLANG_CHECK(wholeSpaceReflection->getStructuralRayTracingRecordBindingSpace() == 1);
+
+    const char* noRecordSource = R"(
+        import slang.raytracing;
+
+        struct Payload { uint value; }
+        struct Record { uint value; }
+        RWStructuredBuffer<uint> output;
+
+        struct TraceContext : rt::ITraceContext
+        {
+            typealias AccelerationStructure = rt::AccelerationStructure;
+            typealias Motion = rt::NoMotion;
+        }
+
+        struct VoidContext : rt::IPayloadContext
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias Payload = ::Payload;
+            typealias Record = void;
+        }
+
+        struct VoidOnlyMiss : rt::IMissShader
+        {
+            typealias Context = VoidContext;
+            void invoke(rt::MissInput<Context> input) {}
+        }
+
+        // This declaration deliberately reads a non-void Record but is not selected as an entry
+        // point and is unreachable from `ordinaryMain`. It must not reserve a hidden D3D binding
+        // for either selected entry point below.
+        struct UnusedRecordContext : rt::IPayloadContext
+        {
+            typealias TraceContext = ::TraceContext;
+            typealias Payload = ::Payload;
+            typealias Record = ::Record;
+        }
+
+        struct UnusedRecordMiss : rt::IMissShader
+        {
+            typealias Context = UnusedRecordContext;
+            void invoke(rt::MissInput<Context> input)
+            {
+                output[0] = input.record.value;
+            }
+        }
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void ordinaryMain() {}
+
+        // Merely selecting a ray-generation stage does not make unrelated structural declarations
+        // reachable. Only a RayTracer operation may request adapters and their Record binding.
+        [shader("raygeneration")]
+        void unrelatedRaygen() {}
+    )";
+    ComPtr<slang::IModule> noRecordModule(session->loadModuleFromSourceString(
+        "structuralD3DNoRecord",
+        "structural-d3d-no-record.slang",
+        noRecordSource,
+        diagnostics.writeRef()));
+    if (!noRecordModule && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(noRecordModule != nullptr);
+
+    auto checkNoRecordBinding = [&](const char* name, SlangStage stage, bool expectStructuralVoid)
+    {
+        ComPtr<slang::IEntryPoint> entryPoint;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(noRecordModule->findAndCheckEntryPoint(
+            name,
+            stage,
+            entryPoint.writeRef(),
+            diagnostics.writeRef())));
+        ComPtr<slang::IComponentType> linkedEntryPoint;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(entryPoint->link(linkedEntryPoint.writeRef(), diagnostics.writeRef())));
+        auto layout = linkedEntryPoint->getLayout(0, diagnostics.writeRef());
+        SLANG_CHECK_ABORT(layout != nullptr);
+
+        auto reflectedEntryPoint = layout->getEntryPointByIndex(0);
+        SLANG_CHECK_ABORT(reflectedEntryPoint != nullptr);
+        SLANG_CHECK(reflectedEntryPoint->getStructuralRayTracingRecordBindingIndex() == -1);
+        SLANG_CHECK(reflectedEntryPoint->getStructuralRayTracingRecordBindingSpace() == -1);
+        auto recordType = reflectedEntryPoint->getStructuralRayTracingRecordType();
+        auto recordTypeLayout = reflectedEntryPoint->getStructuralRayTracingRecordTypeLayout();
+        if (expectStructuralVoid)
+        {
+            SLANG_CHECK_ABORT(recordType != nullptr);
+            SLANG_CHECK_ABORT(recordTypeLayout != nullptr);
+            SLANG_CHECK(recordType->getScalarType() == slang::TypeReflection::ScalarType::Void);
+        }
+        else
+        {
+            SLANG_CHECK(recordType == nullptr);
+            SLANG_CHECK(recordTypeLayout == nullptr);
+        }
+    };
+
+    // A structural stage with Record = void keeps its stage contract but needs no hidden cbuffer.
+    checkNoRecordBinding("VoidOnlyMiss", SLANG_STAGE_MISS, true);
+
+    // Ordinary entry points expose neither a structural Record contract nor its D3D binding.
+    checkNoRecordBinding("ordinaryMain", SLANG_STAGE_COMPUTE, false);
+    checkNoRecordBinding("unrelatedRaygen", SLANG_STAGE_RAY_GENERATION, false);
 }

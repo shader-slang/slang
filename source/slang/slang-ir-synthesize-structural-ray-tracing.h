@@ -11,6 +11,7 @@ struct IRFunc;
 struct IRInst;
 class DiagnosticSink;
 class TargetRequest;
+class TargetProgram;
 
 /// Validate the payload and record ABI types of a selected standalone structural stage.
 bool validateStructuralRayTracingEntryPoint(IRFunc* entryPoint, DiagnosticSink* sink);
@@ -29,10 +30,14 @@ void preparePortableStructuralRayTracingEntryPoints(IRModule* module, List<IRFun
 void synthesizePortableStructuralRayTracingEntryPoints(
     IRModule* module,
     List<IRFunc*>& ioEntryPoints,
+    HashSet<IRFunc*>& outSelectedStructuralEntryPointAdapters,
     DiagnosticSink* sink);
 
 /// Lower structural stage-input operations through their portable standard-module bodies.
-void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module);
+void lowerPortableStructuralRayTracingStageInputOperations(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    const HashSet<IRFunc*>& selectedStructuralEntryPointAdapters);
 
 /// Lower structural stage-input operations that have native OptiX representations.
 void lowerOptiXStructuralRayTracingStageInputOperations(IRModule* module, DiagnosticSink* sink);

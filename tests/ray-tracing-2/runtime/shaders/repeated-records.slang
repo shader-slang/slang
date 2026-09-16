@@ -49,7 +49,7 @@ struct RuntimeClosestHit : rt::IClosestHitShader
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         input.payload.stage = 10;
-        input.payload.recordValue = input.record.value;
+        input.payload.recordValue += input.record.value;
     }
 }
 
@@ -59,7 +59,34 @@ struct AlternateClosestHit : rt::IClosestHitShader
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         input.payload.stage = 11;
+        input.payload.recordValue += input.record.value;
+    }
+}
+
+// The runtime test selects this structural stage as a native export without importing it into a
+// hit group. D3D must associate its generated Record CBV directly because no hit-group local root
+// signature covers an otherwise unused export.
+struct UnusedClosestHit : rt::IClosestHitShader
+{
+    typealias Context = HitContext;
+    void invoke(rt::ClosestHitInput<HitContext> input)
+    {
+        input.payload.stage = 12;
+        input.payload.recordValue += input.record.value;
+    }
+}
+
+// Both closest-hit stages and this any-hit stage read the same logical Record. A combined D3D
+// library assigns each selected stage its own hidden cbuffer binding, so the native hit-group
+// record must provide the same Record address to every binding in its local root signature.
+struct RuntimeAnyHit : rt::IAnyHitShader
+{
+    typealias Context = HitContext;
+    void invoke(rt::AnyHitInput<HitContext> input)
+    {
         input.payload.recordValue = input.record.value;
+        if (input.record.value == 0)
+            input.ignoreHit();
     }
 }
 
@@ -87,7 +114,7 @@ struct RuntimeHitGroup : rt::IHitGroup
 {
     typealias Context = HitContext;
     typealias ClosestHit = RuntimeClosestHit;
-    typealias AnyHit = rt::NoAnyHit<HitContext>;
+    typealias AnyHit = RuntimeAnyHit;
     typealias Intersection = rt::NoIntersection<HitContext>;
 }
 
@@ -95,7 +122,7 @@ struct AlternateHitGroup : rt::IHitGroup
 {
     typealias Context = HitContext;
     typealias ClosestHit = AlternateClosestHit;
-    typealias AnyHit = rt::NoAnyHit<HitContext>;
+    typealias AnyHit = RuntimeAnyHit;
     typealias Intersection = rt::NoIntersection<HitContext>;
 }
 
@@ -142,10 +169,12 @@ void rayGenerationMain()
 
 // HLSL-DAG: [shader("closesthit")]void RuntimeClosestHit(
 // HLSL-DAG: [shader("closesthit")]void AlternateClosestHit(
+// HLSL-DAG: [shader("anyhit")]void RuntimeAnyHit(
 // HLSL-DAG: [shader("miss")]void RuntimeMiss(
 // HLSL-DAG: [shader("miss")]void AlternateMiss(
 // SPIRV-DAG: OpEntryPoint ClosestHitKHR {{.*}} "RuntimeClosestHit"
 // SPIRV-DAG: OpEntryPoint ClosestHitKHR {{.*}} "AlternateClosestHit"
+// SPIRV-DAG: OpEntryPoint AnyHitKHR {{.*}} "RuntimeAnyHit"
 // SPIRV-DAG: OpEntryPoint MissKHR {{.*}} "RuntimeMiss"
 // SPIRV-DAG: OpEntryPoint MissKHR {{.*}} "AlternateMiss"
 // METAL-DAG: metal::visible_function_table<void(Schema_rayData_0 thread*, uchar device*)> missFunctions_0;
