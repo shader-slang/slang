@@ -793,7 +793,9 @@ IRWitnessTable* cloneWitnessTableImpl(
     {
         clonedBaseType = cloneType(context, (IRType*)(originalTable->getConformanceType()));
         auto clonedSubType = cloneType(context, (IRType*)(originalTable->getConcreteType()));
-        clonedTable = builder->createWitnessTable(clonedBaseType, clonedSubType);
+        auto originalIdentity = originalTable->getConformanceIdentity();
+        auto clonedIdentity = originalIdentity ? cloneValue(context, originalIdentity) : nullptr;
+        clonedTable = builder->createWitnessTable(clonedBaseType, clonedSubType, clonedIdentity);
         if (clonedTable->hasDecorationOrChild())
             return clonedTable;
     }
@@ -2544,9 +2546,11 @@ struct IRPrelinkContext : IRSpecContext
         case kIROp_WitnessTable:
             {
                 auto witnessTable = as<IRWitnessTable>(originalVal);
+                auto originalIdentity = witnessTable->getConformanceIdentity();
                 clonedInst = builderForClone->createWitnessTable(
                     cloneType(this, (IRType*)witnessTable->getConformanceType()),
-                    cloneType(this, witnessTable->getConcreteType()));
+                    cloneType(this, witnessTable->getConcreteType()),
+                    originalIdentity ? cloneValue(this, originalIdentity) : nullptr);
                 break;
             }
         case kIROp_Func:
