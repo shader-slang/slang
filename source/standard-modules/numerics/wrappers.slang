@@ -751,7 +751,7 @@ public T clamp<T : INumericExtrema>(T value, T minimumValue, T maximumValue)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T saturate<T : IFractional & IRealOrderingFunctions>(T value)
+public T saturate<T : IFractional & INumericExtrema>(T value)
 {
     return clamp<T>(
         value,
@@ -763,7 +763,7 @@ public T saturate<T : IFractional & IRealOrderingFunctions>(T value)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T fdim<T : IFractional & IRealOrderingFunctions>(T x, T y)
+public T fdim<T : IFractional & INumericExtrema>(T x, T y)
 {
     T zero = T.zero();
     return x.minus(y).maximum(zero);

@@ -311,6 +311,9 @@ public extension<let R : int, let C : int, let L : MatrixLayoutMode>
     }
 }
 
+// This nominal join lets one integer-vector extension supply the shared numeric witnesses while it
+// implements dot product, integer arithmetic/bitwise operations, and numerical extrema. Separate
+// overlapping extensions currently produce ambiguous witnesses; see #12874.
 interface __IIntegerVectorCapabilities : IDotProduct, IIntegerType, INumericExtrema {}
 
 public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
@@ -377,6 +380,18 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     {
         return __numericsBuiltinShiftRight(this, amount);
     }
+}
+
+public extension<
+    T : __BuiltinIntegerType & IScalarIntegerType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode> matrix<T, R, C, L> : INumericExtrema
+{
+    [__unsafeForceInlineEarly]
+    This minimum(This other) { return __numericsBuiltinMinimum(this, other); }
+    [__unsafeForceInlineEarly]
+    This maximum(This other) { return __numericsBuiltinMaximum(this, other); }
 }
 
 public extension<

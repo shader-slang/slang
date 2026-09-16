@@ -337,6 +337,31 @@ SLANG_NUMERICS_BINARY_ADAPTER(
 
 #undef SLANG_NUMERICS_BINARY_ADAPTER
 
+// Extrema are the binary operations above that the core module also defines for matrices over the
+// full builtin arithmetic domain. Keep these matrix adapters explicit so this file does not imply
+// that operations such as `atan2` and `fmod` have the same matrix domain.
+[__readNone]
+[__unsafeForceInlineEarly]
+public matrix<T, R, C, L> __numericsBuiltinMaximum<
+    T : __BuiltinArithmeticType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(matrix<T, R, C, L> left, matrix<T, R, C, L> right)
+{
+    return ::max(left, right);
+}
+
+[__readNone]
+[__unsafeForceInlineEarly]
+public matrix<T, R, C, L> __numericsBuiltinMinimum<
+    T : __BuiltinArithmeticType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(matrix<T, R, C, L> left, matrix<T, R, C, L> right)
+{
+    return ::min(left, right);
+}
+
 #define SLANG_NUMERICS_CLASSIFICATION_ADAPTER(NAME, BUILTIN)                          \
     [__readNone] [__unsafeForceInlineEarly]                                     \
     public bool NAME<T : __BuiltinFloatingPointType>(T value)                   \

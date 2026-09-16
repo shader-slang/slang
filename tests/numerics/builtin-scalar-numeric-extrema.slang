@@ -1,9 +1,9 @@
-// Verify that builtin scalar numeric constraints include extrema operations across signed-integer,
-// unsigned-integer, and floating-point domains.
-
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
 //TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o builtin-scalar-numeric-extrema.hlsl -experimental-feature
 //TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o builtin-scalar-numeric-extrema.spv -experimental-feature
+
+// Verify that builtin scalar numeric constraints include extrema operations across signed-integer,
+// unsigned-integer, and floating-point domains.
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 10

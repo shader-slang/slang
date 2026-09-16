@@ -1,6 +1,6 @@
-// Verify that builtin scalar numeric constraints exclude Boolean and user-defined values.
-
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive): -experimental-feature
+
+// Verify that builtin scalar numeric constraints exclude Boolean and user-defined values.
 
 // CHECK: type argument 'bool' does not conform to the required interface
 // CHECK: type argument 'CustomNumeric' does not conform to the required interface
