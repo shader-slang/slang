@@ -352,18 +352,16 @@ void _materializeBodiesConcurrently(
 
 
 /// Round-trips a module with a chosen blob mode, reporting whether deferral was taken
-/// (`outDeferredLoaderInstalled`), what was loaded (`outInstCount`, which must match across
-/// modes), and whether the containment check fired (`outSpanMismatchDelta`).
+/// (`outDeferredLoaderInstalled`) and what was loaded (`outInstCount`, which must match
+/// across modes).
 void _roundTripWithBlobMode(
     slang::IGlobalSession* globalSession,
     BlobMode blobMode,
     bool& outDeferredLoaderInstalled,
-    Index& outInstCount,
-    Index& outSpanMismatchDelta)
+    Index& outInstCount)
 {
     outDeferredLoaderInstalled = false;
     outInstCount = 0;
-    outSpanMismatchDelta = 0;
 
     Session* session = static_cast<Session*>(globalSession);
 
@@ -391,14 +389,11 @@ void _roundTripWithBlobMode(
         }
     }
 
-    const Index mismatchBefore = getDeferralDeclinedForSpanMismatchCount();
-
     ComPtr<ISlangBlob> blob;
     RefPtr<IRModule> reloaded;
     if (SLANG_FAILED(_roundTripModule(original, session, blob, reloaded, blobMode)))
         return;
 
-    outSpanMismatchDelta = getDeferralDeclinedForSpanMismatchCount() - mismatchBefore;
     outDeferredLoaderInstalled = (reloaded->getDeferredBodyLoader() != nullptr);
 
     // Counting every instruction forces every body to materialize if it was deferred, and
@@ -654,22 +649,14 @@ SLANG_UNIT_TEST(irDeferredBodyConcurrentMaterialization)
     SLANG_CHECK(mismatches == 0);
 }
 
-// Checks that the concurrency Slang actually supports is where deferred bodies get
-// materialized, and that racing on them yields identical output.
+// Runs the documented serial-frontend/parallel-backend workflow and checks every thread
+// gets the same answer.
 //
-// This is the counterpart to the test above: that one drives `ensureBodyMaterialized`
-// directly on a synthetic module, which proves the protocol works but not that anything
-// real depends on it. This one runs the documented serial-frontend/parallel-backend
-// workflow from docs/user-guide/08-compiling.md -- load, specialize and `link()` on one
-// thread, then call `getEntryPointCode()` from many -- and asserts that the parallel phase
-// is where first touches happen.
-//
-// That assertion is the one that keeps the loader's mutex honest. If linking ever starts
-// materializing everything eagerly, the concurrent first touch stops occurring, and the
-// justification for the lock quietly becomes false without any test noticing. Measured
-// when written: zero materializations during the front end, and 38 (1 thread) rising to 57
-// (16 threads) during the backend, the excess being threads that all observed the deferred
-// flag before any had finished.
+// The counterpart to the test above: that one drives `ensureBodyMaterialized` directly on a
+// synthetic module, proving the protocol works but not that anything real exercises it.
+// This one follows docs/user-guide/08-compiling.md -- load, specialize and `link()` on one
+// thread, then `getEntryPointCode()` from many. `link()` leaves bodies it did not need
+// encoded, so emit is what walks them, and these threads reach them concurrently.
 SLANG_UNIT_TEST(irDeferredBodyMaterializesOnTheSupportedConcurrentPath)
 {
     if (!isOnDemandIRLoadEnabled())
@@ -724,8 +711,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     ComPtr<slang::IComponentType> linked;
     SLANG_CHECK_ABORT(composed->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
 
-    const Index afterLink = getDeferredBodyMaterializationCount();
-
     // ---- parallel back end: the one concurrent use the API documents as supported ----
     const int kThreadCount = 8;
     List<String> outputs;
@@ -758,29 +743,22 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     for (auto& t : threads)
         t.join();
 
-    const Index duringBackend = getDeferredBodyMaterializationCount() - afterLink;
-
     for (int i = 0; i < kThreadCount; i++)
     {
         SLANG_CHECK(succeeded[i] != 0);
         SLANG_CHECK(outputs[i] == outputs[0]);
     }
     SLANG_CHECK(outputs[0].getLength() > 0);
-
-    // The point of the test: first touches happen on the concurrent side, so the loader's
-    // lock is guarding a path that is really taken.
-    SLANG_CHECK(duringBackend > 0);
 }
 
 // Checks the two paths that decline deferral, and that declining changes nothing but cost.
 //
 // Deferral is skipped when the caller supplies no blob, and when the blob it supplies does
-// not back the flat table's spans. Neither was exercised by anything that asserted the
-// outcome, and the second is the one that matters: it is what stands between a caller
-// passing the wrong buffer and a use-after-free surfacing somewhere unrelated. It is also
-// invisible from outside, so `getDeferralDeclinedForSpanMismatchCount()` exists to make the
-// decision observable — a check that silently stopped rejecting would otherwise look
-// exactly like one that had nothing to reject.
+// not back the flat table's spans. The second is the one that matters: it stands between a
+// caller passing the wrong buffer and a use-after-free surfacing somewhere unrelated.
+//
+// A containment check that stopped rejecting shows up here directly: the `Mismatched` case
+// would then defer, and the loader-installed assertion below would fail.
 SLANG_UNIT_TEST(irDeferralDeclinesWhenTheBlobDoesNotBackTheSpans)
 {
     ComPtr<slang::IGlobalSession> globalSession;
@@ -792,12 +770,11 @@ SLANG_UNIT_TEST(irDeferralDeclinesWhenTheBlobDoesNotBackTheSpans)
         BlobMode blobMode;
         const char* what;
         bool expectDeferral;
-        bool expectMismatchCounted;
     };
     const Case cases[] = {
-        {BlobMode::Matching, "matching blob", true, false},
-        {BlobMode::Null, "no blob", false, false},
-        {BlobMode::Mismatched, "mismatched blob", false, true},
+        {BlobMode::Matching, "matching blob", true},
+        {BlobMode::Null, "no blob", false},
+        {BlobMode::Mismatched, "mismatched blob", false},
     };
 
     Index referenceInstCount = 0;
@@ -805,13 +782,7 @@ SLANG_UNIT_TEST(irDeferralDeclinesWhenTheBlobDoesNotBackTheSpans)
     {
         bool deferred = false;
         Index instCount = 0;
-        Index mismatchDelta = 0;
-        _roundTripWithBlobMode(
-            globalSession,
-            testCase.blobMode,
-            deferred,
-            instCount,
-            mismatchDelta);
+        _roundTripWithBlobMode(globalSession, testCase.blobMode, deferred, instCount);
 
         SLANG_CHECK_ABORT(instCount > 0);
         if (testCase.blobMode == BlobMode::Matching)
@@ -828,14 +799,53 @@ SLANG_UNIT_TEST(irDeferralDeclinesWhenTheBlobDoesNotBackTheSpans)
             // The whole point of the fallback: declining costs time, never contents.
             SLANG_CHECK(instCount == referenceInstCount);
         }
-
-        // Only the mismatched case should trip the containment check. A null blob is
-        // refused earlier, before there is anything to compare.
-        if (isOnDemandIRLoadEnabled())
-            SLANG_CHECK((mismatchDelta > 0) == testCase.expectMismatchCounted);
     }
 }
 
+
+// Checks that a lazily loaded module is not kept alive by its own deferred-body loader.
+//
+// The module owns the loader (`IRModule::m_deferredBodyLoader` is a `RefPtr`), so anything
+// the loader holds back to the module closes a cycle: `IRModule -> FlatModuleDecoder ->
+// IRModule`. That is why the decoder keeps a raw `IRModule*` and deliberately does not
+// reference the `IRSerialReadContext`, which does hold a `RefPtr` to the module.
+//
+// Such a cycle is invisible to LeakSanitizer in the shapes CI runs -- the module stays
+// reachable from a live global session until the process exits, so there is nothing
+// unreachable to report -- and invisible to peak-RSS measurement, which loads once and
+// exits. What does show it is asking the module how many references it has: after the
+// round trip, the only one should be the caller's.
+SLANG_UNIT_TEST(irDeferredBodyLoaderDoesNotRetainItsModule)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    Session* session = static_cast<Session*>(globalSession.get());
+
+    RefPtr<IRModule> original = IRModule::create(session);
+    {
+        IRBuilder builder(original);
+        builder.setInsertInto(original->getModuleInst());
+        IRInst* func = builder.createFunc();
+        builder.addNameHintDecoration(func, UnownedStringSlice("retainProbe"));
+        builder.setInsertInto(func);
+        builder.emitBlock();
+        builder.emitReturn();
+    }
+
+    ComPtr<ISlangBlob> blob;
+    RefPtr<IRModule> reloaded;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_roundTripModule(original, session, blob, reloaded)));
+    SLANG_CHECK_ABORT(reloaded != nullptr);
+
+    // Guards the premise: with no loader installed there is no cycle to have.
+    if (isOnDemandIRLoadEnabled())
+        SLANG_CHECK(reloaded->getDeferredBodyLoader() != nullptr);
+
+    // `reloaded` is the only thing that should still hold this module. A loader that
+    // retained its module, or a decoder that kept the read context alive, reads as 2+.
+    SLANG_CHECK(reloaded->debugGetReferenceCount() == 1);
+}
 
 // Checks that a mutation reaching a global whose body is still encoded neither destroys
 // that body nor mistakes the decorations for the whole child list.

@@ -39,19 +39,14 @@ class TargetRequest;
 //
 // Publication of a deferred body, and the links it attaches to.
 //
-// A deferred body is built as a detached chain and attached with a single release
-// store, so a reader either sees no body or sees one whose instructions are fully
-// written. The decoration walk is the one reader that must *not* materialize before
-// following a link -- materializing during decoration lookup would defeat on-demand
-// loading entirely -- so it loads the link with acquire. Every other reader
-// materializes first and synchronizes on the deferred flag instead.
+// A deferred body is built as a detached chain and attached with a single release store,
+// so a reader sees either no body or a fully written one. The decoration walk is the one
+// reader that must not materialize first -- doing so during decoration lookup would
+// defeat on-demand loading -- so it loads links with acquire. Every other reader
+// materializes and synchronizes on the deferred flag instead.
 //
-// The acquire is paid on every link read rather than only on that walk, so the rule
-// can be "read a link through an accessor" with no second question about which
-// accessor is permitted where. On x86-64 an acquire load is a plain `mov`, so this
-// costs nothing there. If an ARM64 profile ever shows `ldar` mattering, the fix is to
-// have the decoration iterator carry the decision once, not to consult the parent's
-// flag on every link.
+// The acquire is paid on every link read rather than only on that walk, so the rule is
+// simply "read a link through an accessor". On x86-64 that is a plain `mov`.
 //
 
 /// Release-stores `value` into `slot`, publishing everything written before it.
@@ -64,54 +59,16 @@ SLANG_FORCE_INLINE void irPublishInstLink(IRInst*& slot, IRInst* value)
 
 /// Acquire-loads a `next`/`first` link of an instruction list.
 ///
-/// Used by every accessor that hands back a link: `getNextInst`/`getPrevInst` and the
-/// `peek` pair on `IRInst`, and `peekFirstDecorationOrChild`/`peekLastDecorationOrChild`
-/// on the child list.
-///
-/// The acquire only has work to do for a reader that runs *without* materializing first,
-/// since only such a reader can observe a publication in progress. Those readers are the
-/// decoration walk and nothing else -- `IRInst::getFirstDecoration`,
-/// `IRDecoration::getNextDecoration`, and `IRDecorationList::Iterator::operator++`.
-///
-/// A reader that materialized has already synchronized on the deferred flag, whose
-/// release/acquire pair orders everything the writer wrote. That is why the accessors
-/// which materialize -- `getFirstDecorationOrChild` and friends -- may then read
-/// `m_decorationsAndChildren` directly rather than through this.
+/// Only the non-materializing readers need it -- the decoration walk
+/// (`getFirstDecoration`, `IRDecoration::getNextDecoration`,
+/// `IRDecorationList::Iterator::operator++`), which alone can observe a publication in
+/// progress. A reader that materialized first has already synchronized on the deferred
+/// flag, which is why `getFirstDecorationOrChild` and friends may then read
+/// `m_decorationsAndChildren` directly.
 SLANG_FORCE_INLINE IRInst* irLoadInstLink(IRInst* const& slot)
 {
     return std::atomic_ref<IRInst*>(const_cast<IRInst*&>(slot)).load(std::memory_order_acquire);
 }
-
-//
-// Live-`IRModule` accounting, for tests that a module is actually released.
-//
-// A retain cycle through an `IRModule` is invisible to LeakSanitizer in the shapes CI
-// runs: the module stays reachable from a live global session until the process exits,
-// so there is nothing unreachable to report. It shows up only as growth in a process
-// that creates and destroys sessions, which is what a test can assert directly.
-//
-void _noteIRModuleCreated();
-void _noteIRModuleDestroyed();
-void _noteDeferredBodyLoaderInstalled();
-
-/// Number of `IRModule`s currently alive in this process. Read by `slang-static-unit-test`,
-/// which links the compiler statically and so needs no export; absent from `slang.h` on purpose.
-Index getLiveIRModuleCount();
-
-/// Number of modules that have had a deferred-body loader installed. Lets a test assert it
-/// exercised the deferred path at all, rather than passing on an eager load.
-Index getDeferredBodyLoaderInstallCount();
-
-/// Number of first touches of a deferred body, process-wide. Counts entries to the
-/// loader's slow path, so it answers whether a phase reaches still-deferred bodies.
-Index getDeferredBodyMaterializationCount();
-
-void _noteDeferralDeclinedForSpanMismatch();
-
-/// Number of module loads that declined deferral because the blob did not back the flat
-/// table's spans. Makes that decision observable: wrongly saying "safe" surfaces only as a
-/// use-after-free far away, and wrongly saying "unsafe" costs performance with no signal.
-Index getDeferralDeclinedForSpanMismatchCount();
 
 /// Supplies instruction bodies that were not materialized when a module was
 /// deserialized.
@@ -289,19 +246,14 @@ struct IRInstListBase
 /// The decorations of an instruction, as a list that ends where the decorations do.
 ///
 /// Terminates on the first non-decoration rather than on a saved `last->next` sentinel,
-/// which is what every other instruction list does. The distinction only matters under
-/// on-demand loading, and it is the difference between a stable end and a moving one:
-/// `last->next` for a global with a deferred body is the slot `materializeDeferredBody`
-/// publishes the body into. A walker that snapshots `end` while the body is still
-/// deferred captures null, and if another thread publishes before the walk reaches the
-/// last decoration, the walk sees `bodyFirst != end` and continues *into the body*,
-/// iterating body instructions as though they were decorations.
+/// unlike every other instruction list. That matters only under on-demand loading:
+/// `last->next` on a deferred global is the slot the body is published into, so a walker
+/// that snapshots `end` captures null and, if a body appears mid-walk, iterates body
+/// instructions as though they were decorations. An end value that cannot be raced
+/// removes the question.
 ///
-/// Every consumer today re-checks the opcode -- `findDecorationImpl` compares `getOp()`
-/// -- so that produced no wrong answers, but "all 111 call sites happen to op-filter" is
-/// not an invariant worth resting on, and the design comment on `irLoadInstLink` already
-/// claims decoration lookup stops at the first non-decoration. This makes that claim
-/// true rather than aspirational, and the end value immutable rather than raced.
+/// Compared with the alternative -- relying on all ~111 call sites to re-check the opcode,
+/// which they happen to do today.
 struct IRDecorationList
 {
     IRDecorationList() {}
@@ -708,33 +660,17 @@ struct IRInst
     uint32_t operandCount = 0;
 
     /// True while this instruction's children are still encoded rather than
-    /// materialized. Only ever set on global values of a lazily deserialized
-    /// module, and cleared once the body is decoded.
+    /// materialized. Only set on global values of a lazily deserialized module,
+    /// and cleared once the body is decoded.
     ///
-    /// Placed next to `operandCount` so it lands in padding rather than growing
-    /// `IRInst`, which matters because these are allocated in enormous numbers.
-    /// Measured on x86-64 clang-18: `sizeof(IRInst)` is 104 either way. With this
-    /// field, `m_op` and `operandCount` fill [0,8), the flag takes [8,9), and
-    /// `sourceLoc` (4 bytes) sits at [12,16); without it `sourceLoc` would sit at
-    /// [8,12) and the same 4 bytes would be padding, because the next member is
-    /// pointer-aligned and starts at 16 regardless.
+    /// Sits next to `operandCount` so it lands in existing padding rather than growing
+    /// `IRInst`, which is allocated in enormous numbers.
     ///
-    /// Deliberately not pinned by a `static_assert` on `sizeof(IRInst)`. The value
-    /// is toolchain- and pointer-size-dependent, so the assert would need a table
-    /// of per-platform literals, and it would fire on any unrelated field addition
-    /// -- turning a documentation question into a build break for someone who has
-    /// not grown the type at all. If the layout ever does need enforcing, the thing
-    /// to assert is this field's offset relative to `sourceLoc`, not the total.
-    ///
-    /// Atomic because of the concurrency Slang supports: the serial-frontend /
-    /// parallel-backend workflow in docs/user-guide/08-compiling.md, where several
-    /// `getEntryPointCode` calls run at once over IR that can still reference a builtin
-    /// module, and so reach the same deferred body. (Running whole compiles concurrently
-    /// on one shared global session is documented as unsupported, and is deliberately not
-    /// the justification here.) The flag is cleared with release ordering once the body
-    /// has been linked and is read here with acquire, so a thread that observes `false`
-    /// also observes the children; one that observes `true` falls into the loader, which
-    /// serialises it on its own lock.
+    /// Atomic because the parallel-backend workflow in docs/user-guide/08-compiling.md
+    /// can reach the same deferred body from several threads. Cleared with release
+    /// ordering once the body is linked and read with acquire, so a thread that observes
+    /// `false` also observes the children; one that observes `true` enters the loader,
+    /// which takes its own lock.
     std::atomic<bool> m_hasDeferredBody{false};
 
     UInt getOperandCount() { return operandCount; }
@@ -812,18 +748,14 @@ struct IRInst
 
     /// The next and previous instructions with the same parent.
     ///
-    /// Private on purpose, and reached only through the accessors below. A deferred
-    /// body is published by writing these links with release ordering, so a reader
-    /// that loads one with a plain read can observe a link to an instruction whose
-    /// contents are not yet visible to it. Making the members private moves that from
-    /// something each call site has to remember into something it cannot get wrong:
-    /// outside this class there is no way to read a link except through an acquire
-    /// load, and no way to write one except through a release store.
+    /// Private, and reached only through the accessors below. A deferred body is
+    /// published by writing these links with release ordering, so a plain read can
+    /// observe a link to instructions whose contents are not yet visible. Making them
+    /// private turns that from something every call site must remember into something it
+    /// cannot get wrong.
     ///
     /// The names are deliberately unchanged, for the same reason as
-    /// `m_decorationsAndChildren` below: `slang.natvis` and `slang_lldb.py` walk `next`
-    /// by name to display IR in a debugger, and neither is checked by the compiler, so
-    /// renaming it would break IR inspection silently.
+    /// `m_decorationsAndChildren` below: the debugger scripts walk them by name.
 private:
     IRInst* next;
     IRInst* prev;
@@ -900,36 +832,20 @@ public:
     ///
     /// The decorations and children of this instruction, as a list.
     ///
-    /// Private for the same reason as `next`/`prev`: the head of this list is the other
-    /// slot a deferred body is published into, so a plain read of it can observe a link
-    /// to instructions whose contents are not yet visible.
+    /// Private for the same reason as `next`/`prev`: this is the other slot a deferred
+    /// body is published into. Two readers are safe. One that has not materialized must
+    /// use `peekFirstDecorationOrChild()`/`peekLastDecorationOrChild()`, whose acquire
+    /// pairs with the publishing release store -- that is the decoration walk's path. One
+    /// that calls `ensureBodyMaterialized()` first may read the members directly, as
+    /// `getFirstDecorationOrChild()` and friends do, because observing
+    /// `m_hasDeferredBody == false` is itself an acquire that pairs with the release
+    /// clearing it after the chain is linked.
     ///
-    /// Two kinds of reader are safe, and both are provided below:
+    /// Beyond ordering, a direct read from outside would also see only the decorations of
+    /// a still-deferred global, and report success -- silently, far from the cause.
     ///
-    /// * A reader that has not materialized uses `peekFirstDecorationOrChild()` or
-    ///   `peekLastDecorationOrChild()`, whose acquire pairs with the release store that
-    ///   publishes a body. This is the decoration walk's path.
-    ///
-    /// * A reader that calls `ensureBodyMaterialized()` first may then read the members
-    ///   directly, as `getFirstDecorationOrChild()` and friends do. Observing
-    ///   `m_hasDeferredBody == false` is itself an acquire load, and it pairs with the
-    ///   release store that clears the flag *after* the chain is linked -- so by the
-    ///   time such a reader gets here, the publication is already visible to it.
-    ///
-    /// Writes always go through `setFirstDecorationOrChild()`/
-    /// `setLastDecorationOrChild()`, which release-store. What `private` buys is that no
-    /// code outside this class can reach the members without having taken one of those
-    /// paths.
-    ///
-    /// Ordering aside, a direct read from outside would be wrong for a plainer reason
-    /// too: on a module loaded with deferred bodies `.first`/`.last` describe only the
-    /// decorations until `ensureBodyMaterialized()` has run, so reading a global value's
-    /// children directly finds an empty body and reports success -- silently, and far
-    /// from the cause.
-    ///
-    /// The name is deliberately unchanged. `slang.natvis` and `slang_lldb.py` walk this
-    /// member by name to display IR in a debugger, and neither is checked by the
-    /// compiler -- renaming it would break IR inspection silently.
+    /// The name is deliberately unchanged: `slang.natvis` and `slang_lldb.py` walk it by
+    /// name, and neither is checked by the compiler.
 private:
     IRInstListBase m_decorationsAndChildren;
 
@@ -958,18 +874,13 @@ public:
     }
 
 
-    /// Returns the head of the combined decoration/child list, materializing a
-    /// deferred body first.
+    /// Returns the head of the combined decoration/child list, materializing first.
     ///
-    /// This materializes even though the returned pointer alone can only reach a
-    /// decoration, because callers overwhelmingly use it as the head of a loop
-    /// that walks on into the children. Such a loop against an unmaterialized
-    /// body would find the decorations, no children, and report that there are
-    /// none -- a silent wrong answer rather than a crash.
-    ///
-    /// Decoration lookup, which must not pay for materialization, does not come
-    /// through here: `getFirstDecoration` reads the list head directly, with the
-    /// acquire that pairs with a body being published.
+    /// Materializes even though the returned pointer alone can only reach a decoration,
+    /// because callers use it as the head of a loop that walks on into the children;
+    /// against an unmaterialized body such a loop reports no children rather than
+    /// crashing. Decoration lookup does not come through here -- `getFirstDecoration`
+    /// reads the head directly with acquire.
     IRInst* getFirstDecorationOrChild()
     {
         ensureBodyMaterialized();
@@ -2491,11 +2402,7 @@ public:
 
     /// Installs the loader that supplies deferred instruction bodies for this
     /// module. See `IRDeferredBodyLoader`.
-    void setDeferredBodyLoader(IRDeferredBodyLoader* loader)
-    {
-        m_deferredBodyLoader = loader;
-        _noteDeferredBodyLoaderInstalled();
-    }
+    void setDeferredBodyLoader(IRDeferredBodyLoader* loader) { m_deferredBodyLoader = loader; }
     IRDeferredBodyLoader* getDeferredBodyLoader() const { return m_deferredBodyLoader; }
 
     IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
@@ -2612,13 +2519,8 @@ private:
     IRModule(Session* session)
         : m_session(session), m_memoryArena(kMemoryArenaBlockSize), m_deduplicationContext(this)
     {
-        _noteIRModuleCreated();
     }
 
-public:
-    ~IRModule() { _noteIRModuleDestroyed(); }
-
-private:
     // The compilation session in use.
     Session* m_session = nullptr;
 

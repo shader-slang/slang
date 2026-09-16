@@ -1300,11 +1300,8 @@ struct ICompileRequest : public ISlangUnknown
     /** Add a slang library - such that its contents can be referenced during linking.
     This is equivalent to the -r command line option.
 
-    The implementation copies `libData`, so the caller may free or reuse that buffer as
-    soon as this call returns. Nothing the compiler retains afterwards points into it.
-
     @param basePath The base path used to lookup referenced modules.
-    @param libData The library data. Copied; need not outlive this call.
+    @param libData The library data
     @param libDataSize The size of the library data
     */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL

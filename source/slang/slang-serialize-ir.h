@@ -41,13 +41,16 @@ void writeSerializedModuleIR(
 
 /// True if instruction bodies are left encoded until something reads them.
 ///
-/// On by default; `SLANG_ONDEMAND_IR=0` forces the eager load. Declared here rather than
-/// left private to the .cpp so that tests can ask the same question the loader asks instead
-/// of reimplementing the rule — three copies of "on unless explicitly 0" had already
-/// appeared, and a test whose copy drifts from this one stops testing the mode it believes
-/// it is testing.
+/// On by default; `SLANG_ONDEMAND_IR=0` forces the eager load. Declared here, rather than
+/// kept private to the .cpp, so tests ask the loader's own question instead of
+/// reimplementing "on unless explicitly 0" and drifting from it.
 bool isOnDemandIRLoadEnabled();
 
+/// Reads a module's header info out of `chunk`.
+///
+/// `blobHoldingSerializedData` is forwarded to the shared `IRSerialReadContext` for
+/// symmetry with `readSerializedModuleIR`; this path decodes no instruction bodies, so it
+/// defers nothing and callers may always pass null.
 [[nodiscard]] Result readSerializedModuleInfo(
     RIFF::Chunk const* chunk,
     String& compilerVersion,

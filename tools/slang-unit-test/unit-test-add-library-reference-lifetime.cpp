@@ -10,29 +10,21 @@
 using namespace Slang;
 
 // Checks that `spAddLibraryReference` does not depend on the caller's buffer once it has
-// returned.
+// returned, which is the documented contract.
 //
-// The documented contract is that the caller may release `libData` as soon as the call
-// returns. The implementation built a blob with `RawBlob::create`, which *copies*, and then
-// asked the loader to parse the caller's pointer instead of the copy it retained, so every
-// RIFF chunk pointer and fossil cursor referred into memory nothing kept alive.
+// The bug this guards: the implementation copies into a blob with `RawBlob::create`, but
+// used to hand the loader the *caller's* pointer instead of the copy, leaving every RIFF
+// chunk pointer and fossil cursor referring into memory nothing kept alive.
 //
-// That is a use-after-free without any help from on-demand IR: AST declarations are already
-// read lazily, so the library's declarations are decoded during semantic checking of the
-// `import` below -- after this call returned. Leaving instruction bodies encoded adds a
-// second route into the same bytes, later still, during linking and emit.
+// Not vacuous in either load mode. AST declarations are already read lazily, so the
+// library's declarations are decoded during semantic checking of the `import` below --
+// after this call returned. Deferred instruction bodies add a second route into the same
+// bytes, later still. Verified by mutation: restoring the old pointer crashes this test
+// with `SLANG_ONDEMAND_IR` both unset and `0`.
 //
-// So this test is not vacuous under either load mode, and it uses only the public C API --
-// which is why it stays here, in the tool `slang-test` loads, and so runs against the shipped
-// shared library on every configuration CI builds. The extra route that deferral opens is
-// covered separately by `irDeferralDeclinesWhenTheBlobDoesNotBackTheSpans` in
-// `slang-static-unit-test`, whose `Mismatched` case is exactly the blob shape this call had.
-//
-// The test poisons the caller's buffer in place rather than freeing it. Freed memory
-// often still reads back intact, which would make this pass under the bug; overwriting is
-// deterministic, and it also keeps the test itself free of any read-after-free. Under the
-// bug the deferred decode reads the poison and the compile produces garbage, wrong
-// results, or a crash. Under the fix the buffer is irrelevant the moment the call returns.
+// The buffer is poisoned in place rather than freed: freed memory often still reads back
+// intact, which would let this pass under the bug, and overwriting keeps the test itself
+// free of any read-after-free.
 SLANG_UNIT_TEST(addLibraryReferenceDoesNotAliasCallerBuffer)
 {
     ComPtr<slang::IGlobalSession> globalSession;

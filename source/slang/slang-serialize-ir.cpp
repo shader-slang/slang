@@ -719,21 +719,14 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     };
     Dictionary<IRInst*, DeferredBody> deferredBodies;
 
-    /// True while the load walk should defer bodies. Cleared during a deferred
-    /// decode so that nested subtrees materialize fully.
+    /// True while the load walk should defer bodies; forced false during a deferred
+    /// decode so nested subtrees materialize fully, and restored on the way out.
     ///
-    /// The flag means two different things at two different times: during the initial
-    /// load walk it is the top-level on-demand/eager mode, and during a later
-    /// `materializeDeferredBody` it is forced false and restored on the way out.
-    ///
-    /// **Not reentrancy-safe on its own.** Because it is a member rather than a
-    /// parameter threaded through `decodeInst`, the save/restore is only correct while
-    /// no second decode can interleave with it -- which holds today because every
-    /// deferred decode runs under `mutex`, and the load walk runs before the decoder is
-    /// reachable by anyone else. A future caller that reaches `decodeInst` from some
-    /// other context must take that lock or thread the mode through as a parameter;
-    /// otherwise one decode's restore will overwrite another's mode mid-walk and
-    /// bodies will be deferred, or not, at the wrong depth.
+    /// **Not reentrancy-safe on its own.** The save/restore is correct only while no
+    /// second decode can interleave: every deferred decode runs under `mutex`, and the
+    /// load walk runs before the decoder is reachable by anyone else. A future caller
+    /// reaching `decodeInst` from elsewhere must hold that lock or thread the mode
+    /// through as a parameter.
     bool deferBodies = false;
 
     /// The eager-skeleton predicate, borrowed for the duration of the initial load walk.
@@ -756,37 +749,16 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
 
     /// Serialises deferred decoding.
     ///
-    /// The decode mutates state that is global to the module -- the cursors, the
-    /// instruction array and the module's arena -- so it is serialised wholesale
-    /// rather than per instruction. Contention is limited to the first touch of
-    /// each body.
+    /// A decode mutates state global to the module -- the cursors, the instruction array,
+    /// the arena -- so it is serialised wholesale rather than per instruction. Contention
+    /// is limited to the first touch of each body.
     ///
     /// The concurrency guarded against is the supported one: the
-    /// serial-frontend/parallel-backend workflow in docs/user-guide/08-compiling.md, where
-    /// `getEntryPointCode` and friends may run concurrently on a linked component type.
-    /// Those run target passes and emit over IR that can still reference a builtin module.
-    /// (Concurrent whole *compiles* on a shared global session are documented as
-    /// unsupported, so they are not the justification.)
-    ///
-    /// That is where materializing actually happens, measured rather than assumed --
-    /// first touches across the two phases, for one compute entry point:
-    ///
-    ///     threads   during serial front end   during parallel backend
-    ///        1                 0                        38
-    ///        4                 0                        40
-    ///        8                 0                        52
-    ///       16                 0                        57
-    ///
-    /// The front end materializes nothing: linking leaves every body it did not
-    /// need still encoded, and emit is what walks them. So every first touch happens
-    /// on the concurrent side.
-    ///
-    /// The rise from 38 to 57 is the contended case occurring, not extra work being
-    /// done. 38 is the number of distinct bodies; the excess is threads that all
-    /// observed the deferred flag before any of them had finished, each entering the
-    /// slow path for the same body. That is the shape `materializeDeferredBody`
-    /// documents and handles by rechecking under this lock, and it is why the lock
-    /// is load-bearing rather than insurance.
+    /// serial-frontend/parallel-backend workflow in docs/user-guide/08-compiling.md.
+    /// `link()` leaves bodies it did not need encoded and emit walks them, so first
+    /// touches happen on the concurrent side, and several threads can observe the
+    /// deferred flag for one body before any finishes. `materializeDeferredBody` rechecks
+    /// under this lock for exactly that case.
     std::mutex mutex;
 
     Int64 instIndex = 0;
@@ -846,14 +818,13 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     /// Decodes the instruction at the cursor and, recursively, its children.
     ///
     /// **Advances every cursor it touches** -- instruction, operand, literal, string
-    /// length and string data -- for the subtree it walks. That is the central side
-    /// effect and the reason the decode order is fixed: the payload for instruction *i*
-    /// is "the next unread entry", not something addressable by index, so the cursors
-    /// are the only thing that says where the next instruction's data begins.
+    /// length and string data. The payload for instruction *i* is "the next unread
+    /// entry" rather than something addressable by index, so the cursors are the only
+    /// thing saying where the next instruction's data begins; that is why
+    /// `materializeDeferredBody` restores all five before replaying a subtree.
     ///
     /// A null return means the instruction was deliberately not materialized. Its
-    /// operand and payload entries are consumed anyway, precisely so that the cursors
-    /// stay aligned for the instructions that are kept.
+    /// payload entries are consumed anyway, to keep the cursors aligned.
     IRInst* decodeInst(IRInst* parent, Int64 depth);
 
     /// The opcode to decode instruction `index` as, mapping an opcode this build does
@@ -975,8 +946,13 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
 }
 
 
-/// Returns the allocation size an instruction of `op` needs beyond the base `IRInst`,
-/// advancing `stringLengthCursor` past the length entry of a string or blob constant.
+/// Returns the minimum total allocation size for an instruction of `op`, and **advances
+/// `stringLengthCursor`** past the length entry of a string or blob constant.
+///
+/// The result is an absolute floor, not an increment: `_allocateInst` takes the larger of
+/// it and `sizeof(IRInst) + operandCount * sizeof(IRUse)`, and `0` means "no floor".
+/// The cursor advance is a stream side effect both callers depend on happening exactly
+/// once, which is why each threads its own cursor in by reference.
 ///
 /// Shared by the load-time walk and by deferred materialization, which must size the
 /// same instruction identically. Keeping one copy also keeps the two range checks below
@@ -1291,25 +1267,14 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             return sizeInBytes <= blobHigh - p;
         };
 
-        // The byte size is computed in 64 bits on every target, and a count that cannot
-        // produce an addressable span is refused rather than converted.
+        // The byte size is computed in 64 bits on every target. On wasm32 `Count` and
+        // `uintptr_t` are both 32 bits, so `count * elementSize` wraps above ~2^29: a
+        // corrupt count of 0x20000001 with an 8-byte stride would wrap to 8 and pass the
+        // containment check below. Nothing validates the count before this point --
+        // `_pushContainerState` takes it verbatim from the container header.
         //
-        // Casting to `uintptr_t` before multiplying is *not* a widening on a 32-bit
-        // target. On wasm32 `SLANG_PTR_IS_64` is 0, so `SlangInt` -- and therefore
-        // `Count` -- is `int32_t` and `uintptr_t` is 32 bits, and `count * elementSize`
-        // wraps for counts above about 2^29. A corrupt count of 0x20000001 with an
-        // 8-byte stride would wrap to a byte size of 8 and pass the containment check
-        // below while the table claimed half a billion elements -- defeating the guard
-        // in exactly the case it exists for, since nothing validates the count before
-        // this point (`_pushContainerState` takes it verbatim from the container header).
-        //
-        // Counts are non-negative by construction; a negative one means the table is
-        // corrupt and is refused rather than multiplied.
-        //
-        // The element size is taken from the array's own element type rather than passed
-        // in. A stride restated at each call site is one a later type change can silently
-        // invalidate -- and checking the wrong number of bytes is precisely the failure
-        // this guard exists to catch.
+        // The element size comes from the array's own element type rather than a
+        // parameter, so a later type change cannot silently invalidate the check.
         auto arrayIsInsideBlob = [&]<typename T>(SerializedArray<T> const& array)
         {
             constexpr uint64_t elementSize = sizeof(T);
@@ -1342,7 +1307,6 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 
         if (!everySpanIsInsideBlob)
         {
-            _noteDeferralDeclinedForSpanMismatch();
             // Fall back to an eager load rather than asserting. A caller that supplies an
             // unrelated blob then gets correct behaviour at the old cost, which is a better
             // failure mode than aborting a compile -- and eager loading is exactly what this
