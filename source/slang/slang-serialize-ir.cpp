@@ -697,9 +697,15 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     /// Recorded here rather than on the `IRSerialReadContext`, which this must not
     /// reference: that would close the cycle `IRModule -> decoder -> context -> IRModule`
     /// and leak every module for the life of the process, while a raw pointer would
-    /// dangle. The load propagates this into the context while it is alive; a deferred
-    /// decode has no reader, and writes here so the information is not lost into freed
-    /// memory.
+    /// dangle.
+    ///
+    /// **Only the load walk's observation reaches a caller.** `deserializeFromFlatModule`
+    /// propagates this into the context once, before returning, and the end-state checks
+    /// consult it there. An unknown opcode first seen inside a body decoded later sets
+    /// this flag and nothing reads it: by then the read has already returned `SLANG_OK`,
+    /// so there is no result left to turn into the recoverable read failure the eager
+    /// path produces. Reaching that state needs a module from a future version whose
+    /// unknown instruction sits below module scope.
     bool foundUnrecognizedInstructions = false;
 
     /// Where each deferred body's encoding begins.
@@ -1127,6 +1133,11 @@ IRInst* FlatModuleDecoder::decodeInst(IRInst* parent, Int64 depth)
         // starts, then let the remaining children be walked without being materialized --
         // the walk still has to run, to consume their operand and payload entries and
         // keep the cursors aligned.
+        // `!inst->m_hasDeferredBody` latches: it is set a few lines below, so the
+        // deferral branch fires once per global, on its first non-eager child. A plain
+        // read is right here even though this field carries acquire/release ordering
+        // elsewhere -- the load walk is single-threaded and runs before the decoder is
+        // reachable by anyone else.
         if (deferBodies && depth == kGlobalValueDepth && inst && !inst->m_hasDeferredBody)
         {
             // Looked at before the recursive call validates it, so bound it here; a

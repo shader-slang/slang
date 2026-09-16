@@ -1732,8 +1732,9 @@ SlangResult EndToEndCompileRequest::addLibraryReference(
     // memory, at two removes: AST declarations are decoded during semantic checking of
     // whatever `import`s them, and IR bodies later still, during linking and emit.
     //
-    // `addLibraryReference` in slang-module-library.cpp is the sibling of this, and does
-    // the same thing; the two should stay in step.
+    // The artifact overload of `loadModuleLibrary` in slang-module-library.cpp is the
+    // sibling of this: it passes the blob it retains together with that blob's own
+    // pointer. The two should stay in step.
     auto libBlob = RawBlob::create((const Byte*)libData, libDataSize);
     if (!libBlob)
         return SLANG_E_OUT_OF_MEMORY;

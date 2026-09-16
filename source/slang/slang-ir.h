@@ -252,8 +252,10 @@ struct IRInstListBase
 /// instructions as though they were decorations. An end value that cannot be raced
 /// removes the question.
 ///
-/// Compared with the alternative -- relying on all ~111 call sites to re-check the opcode,
-/// which they happen to do today.
+/// The alternative is to keep returning `IRInstList<IRDecoration>` and rely on all ~111
+/// call sites to re-check the opcode, which they happen to do today. Putting the
+/// type-terminated end in the list itself makes that a property of the type rather than a
+/// habit every current and future caller has to share.
 struct IRDecorationList
 {
     IRDecorationList() {}
