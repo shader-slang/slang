@@ -13112,6 +13112,16 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     }
 }
 
+/// Component-wise maximum for builtin vectors whose element family is abstract.
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[OverloadRank(-1)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+vector<T, N> max(vector<T, N> x, vector<T, N> y)
+{
+    VECTOR_MAP_BINARY(T, N, max, x, y);
+}
+
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -13367,6 +13377,16 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
     default:
         VECTOR_MAP_BINARY(T, N, min, x, y);
     }
+}
+
+/// Component-wise minimum for builtin vectors whose element family is abstract.
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[OverloadRank(-1)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+vector<T,N> min(vector<T,N> x, vector<T,N> y)
+{
+    VECTOR_MAP_BINARY(T, N, min, x, y);
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
