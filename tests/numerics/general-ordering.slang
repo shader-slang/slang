@@ -40,7 +40,7 @@ struct NotificationKind : IPartiallyOrdered
     }
 }
 
-struct ExtremaOnly : INumericalExtrema
+struct ExtremaOnly : INumericExtrema
 {
     int value;
 
@@ -65,12 +65,12 @@ bool representsSameKind<T : IEquatable>(T left, T right)
     return left == right;
 }
 
-T boundedMedian<T : INumericalExtrema>(T x, T y, T z)
+T boundedMedian<T : INumericExtrema>(T x, T y, T z)
 {
     return clamp(median3(x, y, z), min(x, y), max(y, z));
 }
 
-T bound<T : INumericalExtrema>(T value, T lower, T upper)
+T bound<T : INumericExtrema>(T value, T lower, T upper)
 {
     return clamp(value, lower, upper);
 }

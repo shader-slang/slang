@@ -93,7 +93,7 @@ SLANG_NUMERICS_SIGNED_INTEGER_CONFORMANCE(intptr_t)
 #undef SLANG_NUMERICS_SIGNED_INTEGER_CONFORMANCE
 
 #define SLANG_NUMERICS_INTEGER_CONFORMANCE(TYPE)                                      \
-    public extension TYPE : ITotallyOrdered, INumericalExtrema                  \
+    public extension TYPE : ITotallyOrdered, INumericExtrema                     \
     {                                                                            \
         [__unsafeForceInlineEarly]                                               \
         This minimum(This other)                                                 \
@@ -311,7 +311,7 @@ public extension<let R : int, let C : int, let L : MatrixLayoutMode>
     }
 }
 
-interface __IIntegerVectorCapabilities : IDotProduct, IIntegerType, INumericalExtrema {}
+interface __IIntegerVectorCapabilities : IDotProduct, IIntegerType, INumericExtrema {}
 
 public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     vector<T, N> : __IIntegerVectorCapabilities

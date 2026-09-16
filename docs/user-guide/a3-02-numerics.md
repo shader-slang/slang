@@ -242,6 +242,8 @@ The module provides corresponding built-in restrictions for its scalar capabilit
 
 Use the extensible `IScalar...` interfaces when an algorithm should admit user-defined scalar representations.
 Use the corresponding `IBuiltinScalar...` definition when the algorithm also depends on a compiler-supported built-in representation.
+`IBuiltinScalarNumeric` and the builtin scalar aliases that refine it also include `INumericExtrema`, because every builtin arithmetic scalar representation provides `min` and `max`.
+This additional guarantee belongs only to the closed builtin domain; `IScalarNumeric` remains independent of extrema so that user-defined numeric representations do not need to invent an ordering.
 
 ## Choosing the Right Numeric Interface
 
@@ -346,9 +348,9 @@ bool allLessThan<T : IComponentwiseOrdered>(T left, T right)
 }
 ```
 
-#### Numerical Extrema and Real Number Ordering
+#### Numeric Extrema and Real Number Ordering
 
-The `INumericalExtrema` interface provides element-wise minimum and maximum operations for numeric
+The `INumericExtrema` interface provides element-wise minimum and maximum operations for numeric
 types.
 Its built-in conformances include integer scalars, vectors, and cooperative vectors, as well as
 floating-point scalars, vectors, matrices, and cooperative vectors.

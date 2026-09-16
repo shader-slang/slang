@@ -134,7 +134,7 @@ public extension<T : __BuiltinIntegerType & IScalarUnsignedIntegerType, let N : 
 {}
 
 public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
-    CoopVec<T, N> : INumericalExtrema
+    CoopVec<T, N> : INumericExtrema
 {
     [ForceInline] [require(cooperative_vector)]
     This minimum(This other)

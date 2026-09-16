@@ -57,7 +57,7 @@ T constructFromBuiltinInteger<T : INumeric, TSource : IBuiltinScalarIntegerType>
     return T(value);
 }
 
-T clampInteger<T : INumericalExtrema>(T value, T lower, T upper)
+T clampInteger<T : INumericExtrema>(T value, T lower, T upper)
 {
     return clamp(value, lower, upper);
 }
