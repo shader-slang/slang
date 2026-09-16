@@ -1,6 +1,6 @@
 // Tests 'inputloc' for fragment shader interpolated inputs, and 'outputs' to
-// inspect the written fragment color.
-//TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage fragment
+// inspect the written fragment color. The expected debug values require standard -O1 optimization.
+//TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage fragment -O1
 
 struct PS_Out
 {
