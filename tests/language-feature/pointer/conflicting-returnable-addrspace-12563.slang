@@ -21,9 +21,12 @@
 // between Workgroup and StorageBuffer every drain and requeuing forever (without
 // that choice this compile hangs). It reports the leftover mismatch itself, so
 // the check covers every target that runs the pass, not just SPIR-V. (Metal and
-// WGSL cannot reach it: raw pointers via `&` are unavailable there, rejected at
-// the front-end before this pass.) That this DIAGNOSTIC_TEST runs to completion
-// instead of timing out is the termination check.
+// WGSL reject the same conflict earlier, in the type checker: a pointer's
+// address space is part of its type there, so two returns in different classes
+// are a type mismatch, E30019, before this pass — see
+// conflicting-returnable-addrspace-metal-12563.slang. The shared-pass check
+// still covers them by construction.) That this DIAGNOSTIC_TEST runs to
+// completion instead of timing out is the termination check.
 
 RWStructuredBuffer<int> buf;
 
