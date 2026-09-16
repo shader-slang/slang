@@ -11,6 +11,34 @@
 // these distinguished forwarding names should be removed in favor of direct qualified calls.
 module __builtin;
 
+// Keep the public conversion wrappers from redispatching through generic constructors. BuiltinCast
+// represents the same explicit scalar conversion semantics used by the concrete builtin types and
+// applies those semantics component-wise to vectors and matrices.
+[__readNone]
+[__unsafeForceInlineEarly]
+__intrinsic_op(BuiltinCast)
+public TDestination __numericsBuiltinConvertScalar<
+    TDestination : __BuiltinScalarType,
+    TSource : __BuiltinScalarType>(TSource value);
+
+[__readNone]
+[__unsafeForceInlineEarly]
+__intrinsic_op(BuiltinCast)
+public vector<TDestination, N> __numericsBuiltinConvertVector<
+    TDestination : __BuiltinScalarType,
+    TSource : __BuiltinScalarType,
+    let N : int>(vector<TSource, N> value);
+
+[__readNone]
+[__unsafeForceInlineEarly]
+__intrinsic_op(BuiltinCast)
+public matrix<TDestination, R, C, L> __numericsBuiltinConvertMatrix<
+    TDestination : __BuiltinScalarType,
+    TSource : __BuiltinScalarType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(matrix<TSource, R, C, L> value);
+
 // These conversion adapters keep constructor bodies in `slang.numerics` from redispatching to
 // the very generic constructor requirement they implement. Because this module does not import
 // `slang.numerics`, each construction below can only resolve to an established core constructor.

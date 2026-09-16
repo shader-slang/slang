@@ -14,6 +14,44 @@ implementing numerics;
 //   and min/max win at -9, while component-wise Mask-valued relations remain fallback behavior at
 //   -11 for types that also conform to IComparable.
 
+/// Explicitly converts between non-void builtin scalar representations.
+__generic<
+    TDestination : IBuiltinScalarTypeDispatchMarker,
+    TSource : IBuiltinScalarTypeDispatchMarker>
+[__readNone]
+[__unsafeForceInlineEarly]
+public TDestination convertBuiltinScalar(TSource value)
+{
+    return __numericsBuiltinConvertScalar<TDestination>(value);
+}
+
+/// Explicitly converts every component of a builtin vector to `TDestination`.
+__generic<
+    TDestination : IBuiltinScalarTypeDispatchMarker,
+    TSource : IBuiltinScalarTypeDispatchMarker,
+    let N : int>
+[__readNone]
+[__unsafeForceInlineEarly]
+public vector<TDestination, N> convertBuiltinVector(vector<TSource, N> value)
+{
+    return __numericsBuiltinConvertVector<TDestination>(value);
+}
+
+/// Explicitly converts every component of a builtin matrix to `TDestination` while preserving its
+/// dimensions and layout.
+__generic<
+    TDestination : IBuiltinScalarTypeDispatchMarker,
+    TSource : IBuiltinScalarTypeDispatchMarker,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>
+[__readNone]
+[__unsafeForceInlineEarly]
+public matrix<TDestination, R, C, L> convertBuiltinMatrix(matrix<TSource, R, C, L> value)
+{
+    return __numericsBuiltinConvertMatrix<TDestination>(value);
+}
+
 /// Returns true if every logical component is true.
 __generic<M : IBooleanMask>
 [__readNone]

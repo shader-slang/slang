@@ -370,12 +370,19 @@ interface __BuiltinType
 {
 }
 
+/// A non-void builtin scalar type with compiler-defined conversion semantics.
+[sealed]
+[builtin]
+interface __BuiltinScalarType : __BuiltinType
+{
+}
+
 /// A type that can be used for arithmetic operations. For defining generic functions that work with builtin scalar arithmetic types only.
 /// Builtin types implementing this interface: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `half`, `double`.
 /// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinType, IArithmetic, ICoopElement
+interface __BuiltinArithmeticType : __BuiltinScalarType, IArithmetic, ICoopElement
 {
 }
 
@@ -383,7 +390,7 @@ interface __BuiltinArithmeticType : __BuiltinType, IArithmetic, ICoopElement
 /// Builtin types implementing this interface: `bool`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int`, `uint`, `int64_t`, `uint64_t`.
 [sealed]
 [builtin]
-interface __BuiltinLogicalType : __BuiltinType, ILogical
+interface __BuiltinLogicalType : __BuiltinScalarType, ILogical
 {
 }
 

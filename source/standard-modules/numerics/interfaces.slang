@@ -5,6 +5,11 @@ implementing numerics;
 // public spelling deliberately describes the complete useful constraint; clients should not need
 // to name the implementation-level `__Builtin...` interfaces directly.
 
+/// Identifies the non-void builtin scalar representations supported by compiler-defined casts.
+/// This sealed interface is a dispatch marker, not a mathematical capability. Prefer a more
+/// specific `IScalar...` or `IBuiltinScalar...` interface when an algorithm requires arithmetic.
+public typealias IBuiltinScalarTypeDispatchMarker = __BuiltinScalarType;
+
 /// Restricts `IScalarShapedType` to builtin arithmetic scalar representations.
 public typealias IBuiltinScalarShapedType = __BuiltinArithmeticType & IScalarShapedType;
 

@@ -243,6 +243,33 @@ The module provides corresponding built-in restrictions for its scalar capabilit
 Use the extensible `IScalar...` interfaces when an algorithm should admit user-defined scalar representations.
 Use the corresponding `IBuiltinScalar...` definition when the algorithm also depends on a compiler-supported built-in representation.
 
+## Converting Built-In Scalar Representations
+
+Generic code cannot always express a conversion between two independently chosen built-in scalar types through constructor syntax.
+The numerics module provides explicit helpers for scalar, vector, and matrix conversions:
+
+```slang
+TDestination convertValue<
+    TDestination : IBuiltinScalarTypeDispatchMarker,
+    TSource : IBuiltinScalarTypeDispatchMarker>(TSource value)
+{
+    return convertBuiltinScalar<TDestination>(value);
+}
+
+int3 convertCoordinates(float3 value)
+{
+    return convertBuiltinVector<int>(value);
+}
+```
+
+`convertBuiltinScalar`, `convertBuiltinVector`, and `convertBuiltinMatrix` use the ordinary explicit conversion semantics of the destination built-in type.
+Vector and matrix conversions apply the scalar conversion component-wise and preserve the input shape; matrix conversion also preserves the input layout.
+The helpers do not perform bit reinterpretation, scalar splatting, or shape conversion.
+
+`IBuiltinScalarTypeDispatchMarker` admits `bool`, the built-in integer types, and `half`, `float`, and `double`.
+It excludes `void`, user-defined types, enums, and specialized storage types such as `BFloat16`, `FloatE4M3`, and `FloatE5M2`.
+It is a sealed representation marker rather than a mathematical capability, so generic algorithms should combine it with the appropriate numeric interface when they also perform arithmetic.
+
 ## Choosing the Right Numeric Interface
 
 Different numeric types support different operations, and sometimes the same symbol will denote semantically distinct operations between types (e.g., the infix `/` operator acts quite differently between the built-in integer and floating-point types).
