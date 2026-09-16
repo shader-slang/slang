@@ -62,6 +62,22 @@
 //    Bubbles the NonUniformResourceIndex wrapper outward through the
 //    use-def chain (GetElement, Load, MakeCombinedTextureSampler,
 //    CombinedTextureSamplerGetTexture, ImageTexelPointer, etc.).
+//    A ResourceDescriptorHeap / DescriptorHandle<T> subscript needs no
+//    round-trip-specific cases of its own here. Its lowering produces a DescriptorHandle
+//    representation round-trip -- makeVector(index, 0) ->
+//    CastUInt2ToDescriptorHandle -> CastDescriptorHandleToUInt2 ->
+//    swizzle(_, 0) -> getElement(heap, _) -- but two peephole rules fold
+//    that away: the cast-pair fold in slang-ir-peephole.cpp
+//    (CastDescriptorHandleToUIntN(CastUIntNToDescriptorHandle(x)) -> x)
+//    exposes the makeVector to the pre-existing swizzle(makeVector(a, b), 0)
+//    -> a fold in the same file. Both are needed; either alone leaves the
+//    wrapper buried. They run in the simplifyIR pass of the emit pipeline
+//    (slang-emit.cpp), which is upstream of SPIR-V legalization -- note the
+//    peephole invocation *inside* legalizeIRForSPIRV runs after this pass,
+//    so it is the earlier simplifyIR that guarantees the collapsed shape
+//    here. What reaches this pass is therefore the plain
+//    getElement(heap, index) shape the cases below already handle; see
+//    tests/language-feature/descriptor-handle/desc-heap-nonuniform-spirv.slang.
 //    When the wrapper reaches an instruction the pass cannot float
 //    through (e.g. the spirv_asm boundary), the decoration phase
 //    walks back through the chain via decorateNonUniformChain to
