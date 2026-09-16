@@ -277,13 +277,6 @@ bool isScalarOrVectorType(IRInst* type);
 
 bool isSimpleDataType(IRType* type);
 
-// True if `type` (after unwrapping attributed types) is a leaf opaque handle that is eligible for a
-// source-level debug variable: a texture or a sampler-state-family type. Unlike the broad
-// `isResourceType` legalization classifier, this does NOT unwrap arrays or match buffer /
-// pointer-like / subpass / builtin-generic shapes — only the leaf handles get a DebugLocalVariable
-// with no backing OpVariable.
-bool isSupportedOpaqueDebugHandleType(IRType* type);
-
 bool isSimpleHLSLDataType(IRInst* inst);
 
 bool isWrapperType(IRInst* inst);

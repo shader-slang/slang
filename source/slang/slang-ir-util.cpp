@@ -392,12 +392,6 @@ bool isSimpleDataType(IRType* type)
     }
 }
 
-bool isSupportedOpaqueDebugHandleType(IRType* type)
-{
-    type = (IRType*)unwrapAttributedType(type);
-    return as<IRTextureTypeBase>(type) || as<IRSamplerStateTypeBase>(type);
-}
-
 bool isSimpleHLSLDataType(IRInst* inst)
 {
     // TODO: Add criteria

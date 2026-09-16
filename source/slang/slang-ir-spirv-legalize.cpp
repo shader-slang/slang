@@ -2330,24 +2330,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         addToWorkList(debugValue);
     }
 
-    // Returns true if `value` is representable as the operand of an OpDebugValue on the SPIR-V
-    // target: a plain data value, or a leaf opaque handle (texture/sampler). This is the
-    // value-side companion to the type-side isDebugVarTypeSupported: a DebugVar may be created for
-    // a supported type, but the concrete lowered value bound to it must also be representable.
-    bool canUseAsSPIRVDebugValueOperand(IRInst* value)
-    {
-        auto valueType = as<IRType>(unwrapAttributedType(value->getDataType()));
-        if (!valueType)
-            return false;
-        // A combined texture-sampler is an OpTypeSampledImage value (whether produced by loading a
-        // combined-image-sampler or by an OpSampledImage), which SPIR-V does not permit as an
-        // OpDebugValue operand. Match by type so both forms are covered.
-        if (auto textureType = as<IRTextureTypeBase>(valueType);
-            textureType && textureType->isCombined())
-            return false;
-        return isSimpleDataType(valueType) || isSupportedOpaqueDebugHandleType(valueType);
-    }
-
     void processDebugValue(IRDebugValue* inst)
     {
         auto valueType = as<IRType>(unwrapAttributedType(inst->getValue()->getDataType()));
@@ -2362,10 +2344,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             return;
         }
 
-        // Drop the DebugValue when its value is not a representable SPIR-V debug value operand (a
-        // combined sampled-image value), so the variable simply has no current location there
-        // rather than binding a value SPIR-V does not permit as an OpDebugValue operand.
-        if (!canUseAsSPIRVDebugValueOperand(inst->getValue()))
+        // Keep the DebugValue only when its value is representable as an OpDebugValue operand: a
+        // plain data value, or a leaf opaque handle (texture/sampler). A combined texture-sampler
+        // is an OpTypeSampledImage value, which SPIR-V does not permit as an OpDebugValue operand,
+        // so drop it — the variable is left without a current location rather than binding a
+        // forbidden value.
+        bool representable = valueType && isSimpleDataType(valueType);
+        if (auto textureType = as<IRTextureTypeBase>(valueType))
+            representable = !textureType->isCombined();
+        else if (as<IRSamplerStateTypeBase>(valueType))
+            representable = true;
+        if (!representable)
             inst->removeAndDeallocate();
     }
 
