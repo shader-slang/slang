@@ -9086,11 +9086,11 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
         }
         else if (auto funcDeclBase = as<FunctionDeclBase>(containerDecl))
         {
-            if (funcDeclBase->hasModifier<MutatingAttribute>())
-            {
-                expr->type.isLeftValue = true;
-            }
-            else if (funcDeclBase->hasModifier<RefAttribute>())
+            // A mutable `this` (a borrowed `inout` or a `ref`) makes the `this` expression an
+            // l-value. Only ever set the flag here: an outer plain-method scope must not reset an
+            // inner mutable `this`.
+            auto mode = getDeclaredThisParamPassingMode(funcDeclBase);
+            if (mode == ParamPassingMode::BorrowInOut || mode == ParamPassingMode::Ref)
             {
                 expr->type.isLeftValue = true;
             }

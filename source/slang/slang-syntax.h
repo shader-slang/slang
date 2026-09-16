@@ -3,6 +3,8 @@
 
 #include "slang-ast-builder.h"
 
+#include <optional>
+
 namespace Slang
 {
 
@@ -567,6 +569,29 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
 /// adjusted to something else.
 ///
 ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
+
+/// Return the parameter-passing mode that `decl`'s `this`-mutability attributes and declaration
+/// kind explicitly ask for, or `none` when nothing about the declaration itself dictates a mode.
+///
+/// This is the single definition of the `this`-passing-mode ladder that all consumers share: a
+/// `[mutating]` method borrows `this` as `inout` (`BorrowInOut`), `[constref]` borrows it immutably
+/// (`BorrowIn`), `[ref]` passes it by mutable reference (`Ref`), `[nonmutating]` passes it by value
+/// (`In`), and a `set` accessor (`SetterDecl`) defaults to a mutable `this` (`BorrowInOut`). The
+/// checks are performed in that order, matching the precedence the compiler has always used. When
+/// none of these apply (e.g. a plain method, a getter, or a constructor) the declaration does not
+/// itself dictate a mode and `none` is returned, leaving the choice to context and defaults.
+std::optional<ParamPassingMode> tryGetDeclaredThisParamPassingMode(Decl* decl);
+
+/// Return the declared parameter-passing mode of `decl`'s implicit `this` parameter.
+///
+/// This is the query the consumers use to read the one stored source of truth. It first reads the
+/// `ThisParamPassingModeModifier` synthesized onto the declaration during semantic checking; if
+/// that modifier is absent (e.g. on a synthesized, aliased, or deserialized declaration that never
+/// went through the attaching visitor) it recomputes the declared mode via
+/// `tryGetDeclaredThisParamPassingMode`, and otherwise falls back to `ParamPassingMode::In` (the
+/// default for an implicit `this`). Reading the stored value and recomputing yield the same result,
+/// so the fallback keeps callers correct without requiring the modifier to be present.
+ParamPassingMode getDeclaredThisParamPassingMode(Decl* decl);
 
 /// Returns true if `type` or one of its modified-type bases carries `no_diff`.
 bool doesTypeHaveNoDiffModifier(Type* type);

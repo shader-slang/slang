@@ -1489,6 +1489,21 @@ class RefAttribute : public Attribute
     FIDDLE(...)
 };
 
+// A checker-synthesized modifier that records the declared parameter-passing
+// mode of a declaration's implicit `this` parameter, as computed from the
+// `this`-mutability attributes (`[mutating]`, `[constref]`, `[ref]`,
+// `[nonmutating]`) and the declaration kind (e.g. a `set` accessor). It exists
+// so that the several consumers that need this mode (semantic checking, name
+// lookup, interface-conformance matching, and IR lowering) read it from one
+// stored source of truth instead of each re-deriving it from the raw
+// attributes.
+FIDDLE()
+class ThisParamPassingModeModifier : public Modifier
+{
+    FIDDLE(...)
+    FIDDLE() ParamPassingMode mode = ParamPassingMode::In;
+};
+
 // A `[__readNone]` attribute, which indicates that a function
 // computes its results strictly based on argument values, without
 // reading or writing through any pointer arguments, or any other

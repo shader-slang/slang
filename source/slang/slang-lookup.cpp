@@ -1014,29 +1014,18 @@ static void _lookUpInScopes(
                     //
                     thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
                 }
-                else if (funcDeclRef.getDecl()->hasModifier<MutatingAttribute>())
-                {
-                    // In a non-`static` method marked `[mutating]` there is
-                    // an implicit `this` parameter that is mutable.
-                    //
-                    thisParameterMode =
-                        LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
-                }
-                else if (funcDeclRef.getDecl()->hasModifier<RefAttribute>())
-                {
-                    // In a non-`static` method marked `[ref]` there is
-                    // an implicit `this` parameter that is mutable.
-                    //
-                    thisParameterMode =
-                        LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
-                }
                 else
                 {
-                    // In all other cases, there is an implicit `this` parameter
-                    // that is immutable.
+                    // Otherwise, whether the implicit `this` is mutable follows from its declared
+                    // parameter-passing mode: a borrowed `inout` or a `ref` is a mutable value,
+                    // while everything else (e.g. a plain method, `[nonmutating]`, or `[constref]`)
+                    // is immutable.
                     //
+                    auto mode = getDeclaredThisParamPassingMode(funcDeclRef.getDecl());
                     thisParameterMode =
-                        LookupResultItem::Breadcrumb::ThisParameterMode::ImmutableValue;
+                        (mode == ParamPassingMode::BorrowInOut || mode == ParamPassingMode::Ref)
+                            ? LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue
+                            : LookupResultItem::Breadcrumb::ThisParameterMode::ImmutableValue;
                 }
             }
             else if (containerDeclRef.as<AggTypeDeclBase>())
