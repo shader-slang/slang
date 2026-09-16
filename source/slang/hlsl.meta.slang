@@ -13018,11 +13018,13 @@ T max(T x, T y)
     return x;
 }
 
-/// @category math
-__generic<T : __BuiltinIntegerType, let N : int>
+// Implements the target-specific vector maximum behavior shared by all builtin arithmetic
+// element types.
+__generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-vector<T, N> max(vector<T, N> x, vector<T, N> y)
+vector<T, N> __vectorMaxImpl(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
     {
@@ -13031,7 +13033,13 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     case metal: __intrinsic_asm "max";
     case spirv:
     {
-        if (__isSignedInt<T>())
+        if (__isFloat<T>())
+        {
+            return spirv_asm {
+                result:$$vector<T,N> = OpExtInst glsl450 FMax $x $y
+            };
+        }
+        else if (__isSignedInt<T>())
         {
             return spirv_asm {
                 result:$$vector<T,N> = OpExtInst glsl450 SMax $x $y
@@ -13047,7 +13055,23 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     case wgsl: __intrinsic_asm "max";
     case llvm:
     {
-        if (__isSignedInt<T>())
+        if (__isFloat<T>())
+        {
+            // Unfortunately, as of LLVM 21.1.1, maximumnum seems to generate invalid code on
+            // x86. Preserve the floating-point overload's NaN behavior in the scalar fallback.
+            vector<T, N> result;
+            for (int i = 0; i < N; ++i)
+            {
+                if (x[i] != x[i])
+                    result[i] = y[i];
+                else if (y[i] != y[i])
+                    result[i] = x[i];
+                else
+                    result[i] = x[i] > y[i] ? x[i] : y[i];
+            }
+            return result;
+        }
+        else if (__isSignedInt<T>())
             __intrinsic_asm "%result = call $T0 @llvm.smax($0, $1)";
         else
             __intrinsic_asm "%result = call $T0 @llvm.umax($0, $1)";
@@ -13057,18 +13081,38 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     }
 }
 
+// Implements the target-specific matrix maximum behavior shared by all builtin arithmetic
+// element types.
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+matrix<T, N, M> __matrixMaxImpl(matrix<T, N, M> x, matrix<T, N, M> y)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "max";
+    default:
+        MATRIX_MAP_BINARY(T, N, M, __vectorMaxImpl, x, y);
+    }
+}
+
+/// @category math
+__generic<T : __BuiltinIntegerType, let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+vector<T, N> max(vector<T, N> x, vector<T, N> y)
+{
+    return __vectorMaxImpl(x, y);
+}
+
 /// @category math
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "max";
-    default:
-        MATRIX_MAP_BINARY(T, N, M, max, x, y);
-    }
+    return __matrixMaxImpl(x, y);
 }
 
 __generic<T : __BuiltinFloatingPointType>
@@ -13097,28 +13141,13 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "max";
-    case metal: __intrinsic_asm "max";
-    case glsl: __intrinsic_asm "max";
-    case spirv: return spirv_asm {
-        result:$$vector<T, N> = OpExtInst glsl450 FMax $x $y
-    };
-    case wgsl: __intrinsic_asm "max";
-    //case llvm: __intrinsic_asm "%result = call $T0 @llvm.maximumnum($0, $1)";
-    default:
-        VECTOR_MAP_BINARY(T, N, max, x, y);
-    }
+    return __vectorMaxImpl(x, y);
 }
 
 /// Component-wise maximum for builtin arithmetic vectors.
-/// @remarks This fallback allows generic code constrained only by `__BuiltinArithmeticType` to
-/// call `max`. Its rank need only be below the default rank of the integer- and
-/// floating-point-specific shaped overloads; it is independent of the scalar fallback's rank
-/// because scalar and shaped overloads do not compete for the same call. The body deliberately
-/// maps through the scalar `IComparable` fallback, whose builtin-type branch calls `__max_impl`,
-/// without duplicating both aggregate target-dispatch tables here.
+/// @remarks This overload allows generic code constrained only by `__BuiltinArithmeticType` to
+/// call `max`. Its rank is below the integer- and floating-point-specific shaped overloads, while
+/// all three overloads share the same target-specific implementation.
 /// @category math
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
@@ -13126,7 +13155,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
-    VECTOR_MAP_BINARY(T, N, max, x, y);
+    return __vectorMaxImpl(x, y);
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
@@ -13134,21 +13163,13 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "max";
-    default:
-        MATRIX_MAP_BINARY(T, N, M, max, x, y);
-    }
+    return __matrixMaxImpl(x, y);
 }
 
 /// Component-wise maximum for builtin arithmetic matrices.
-/// @remarks This fallback allows generic code constrained only by `__BuiltinArithmeticType` to
-/// call `max`. Its rank need only be below the default rank of the integer- and
-/// floating-point-specific shaped overloads; it is independent of the scalar fallback's rank
-/// because scalar and shaped overloads do not compete for the same call. The body deliberately
-/// maps through the scalar `IComparable` fallback, whose builtin-type branch calls `__max_impl`,
-/// without duplicating both aggregate target-dispatch tables here.
+/// @remarks This overload allows generic code constrained only by `__BuiltinArithmeticType` to
+/// call `max`. Its rank is below the integer- and floating-point-specific shaped overloads, while
+/// all three overloads share the same target-specific implementation.
 /// @category math
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]
@@ -13156,7 +13177,7 @@ __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 {
-    MATRIX_MAP_BINARY(T, N, M, max, x, y);
+    return __matrixMaxImpl(x, y);
 }
 
 /// Maximum of 3 inputs.
@@ -13315,10 +13336,13 @@ T min(T x, T y)
     return __min_impl(x, y);
 }
 
-__generic<T : __BuiltinIntegerType, let N : int>
+// Implements the target-specific vector minimum behavior shared by all builtin arithmetic
+// element types.
+__generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-vector<T,N> min(vector<T,N> x, vector<T,N> y)
+vector<T, N> __vectorMinImpl(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
     {
@@ -13328,18 +13352,44 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
     case wgsl: __intrinsic_asm "min";
     case spirv:
     {
-        if (__isSignedInt<T>())
+        if (__isFloat<T>())
+        {
+            return spirv_asm {
+                result:$$vector<T,N> = OpExtInst glsl450 FMin $x $y
+            };
+        }
+        else if (__isSignedInt<T>())
+        {
             return spirv_asm {
                 result:$$vector<T,N> = OpExtInst glsl450 SMin $x $y
             };
+        }
         else
+        {
             return spirv_asm {
                 result:$$vector<T,N> = OpExtInst glsl450 UMin $x $y
             };
+        }
     }
     case llvm:
     {
-        if (__isSignedInt<T>())
+        if (__isFloat<T>())
+        {
+            // Unfortunately, as of LLVM 21.1.1, minimumnum seems to generate invalid code on
+            // x86. Preserve the floating-point overload's NaN behavior in the scalar fallback.
+            vector<T, N> result;
+            for (int i = 0; i < N; ++i)
+            {
+                if (x[i] != x[i])
+                    result[i] = y[i];
+                else if (y[i] != y[i])
+                    result[i] = x[i];
+                else
+                    result[i] = x[i] < y[i] ? x[i] : y[i];
+            }
+            return result;
+        }
+        else if (__isSignedInt<T>())
             __intrinsic_asm "%result = call $T0 @llvm.smin($0, $1)";
         else
             __intrinsic_asm "%result = call $T0 @llvm.umin($0, $1)";
@@ -13349,17 +13399,36 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+// Implements the target-specific matrix minimum behavior shared by all builtin arithmetic
+// element types.
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
+matrix<T, N, M> __matrixMinImpl(matrix<T, N, M> x, matrix<T, N, M> y)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "min";
     default:
-        MATRIX_MAP_BINARY(T, N, M, min, x, y);
+        MATRIX_MAP_BINARY(T, N, M, __vectorMinImpl, x, y);
     }
+}
+
+__generic<T : __BuiltinIntegerType, let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+vector<T,N> min(vector<T,N> x, vector<T,N> y)
+{
+    return __vectorMinImpl(x, y);
+}
+
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
+{
+    return __matrixMinImpl(x, y);
 }
 
 __generic<T : __BuiltinFloatingPointType>
@@ -13388,28 +13457,13 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "min";
-    case metal: __intrinsic_asm "min";
-    case glsl: __intrinsic_asm "min";
-    case wgsl: __intrinsic_asm "min";
-    case spirv: return spirv_asm {
-        result:$$vector<T,N> = OpExtInst glsl450 FMin $x $y
-    };
-    //case llvm: __intrinsic_asm "%result = call $T0 @llvm.minimumnum($0, $1)";
-    default:
-        VECTOR_MAP_BINARY(T, N, min, x, y);
-    }
+    return __vectorMinImpl(x, y);
 }
 
 /// Component-wise minimum for builtin arithmetic vectors.
-/// @remarks This fallback allows generic code constrained only by `__BuiltinArithmeticType` to
-/// call `min`. Its rank need only be below the default rank of the integer- and
-/// floating-point-specific shaped overloads; it is independent of the scalar fallback's rank
-/// because scalar and shaped overloads do not compete for the same call. The body deliberately
-/// maps through the scalar `IComparable` fallback, whose builtin-type branch calls `__min_impl`,
-/// without duplicating both aggregate target-dispatch tables here.
+/// @remarks This overload allows generic code constrained only by `__BuiltinArithmeticType` to
+/// call `min`. Its rank is below the integer- and floating-point-specific shaped overloads, while
+/// all three overloads share the same target-specific implementation.
 /// @category math
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
@@ -13417,7 +13471,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
-    VECTOR_MAP_BINARY(T, N, min, x, y);
+    return __vectorMinImpl(x, y);
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
@@ -13425,21 +13479,13 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "min";
-    default:
-        MATRIX_MAP_BINARY(T, N, M, min, x, y);
-    }
+    return __matrixMinImpl(x, y);
 }
 
 /// Component-wise minimum for builtin arithmetic matrices.
-/// @remarks This fallback allows generic code constrained only by `__BuiltinArithmeticType` to
-/// call `min`. Its rank need only be below the default rank of the integer- and
-/// floating-point-specific shaped overloads; it is independent of the scalar fallback's rank
-/// because scalar and shaped overloads do not compete for the same call. The body deliberately
-/// maps through the scalar `IComparable` fallback, whose builtin-type branch calls `__min_impl`,
-/// without duplicating both aggregate target-dispatch tables here.
+/// @remarks This overload allows generic code constrained only by `__BuiltinArithmeticType` to
+/// call `min`. Its rank is below the integer- and floating-point-specific shaped overloads, while
+/// all three overloads share the same target-specific implementation.
 /// @category math
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]
@@ -13447,7 +13493,7 @@ __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> min(matrix<T, N, M> x, matrix<T, N, M> y)
 {
-    MATRIX_MAP_BINARY(T, N, M, min, x, y);
+    return __matrixMinImpl(x, y);
 }
 
 /// Minimum.

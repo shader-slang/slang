@@ -6,12 +6,14 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-mtl -compute -shaderobj
 //TEST:SIMPLE(filecheck=CONCRETE): -target spirv-asm -entry concreteMain -stage compute
+//TEST:SIMPLE(filecheck=GENERIC): -target spirv-asm -entry genericCodegenMain -stage compute
 
 // Verify that min and max accept scalar, vector, and matrix operands when generic code knows only
 // that the element type belongs to the sealed builtin arithmetic domain.
 
 // Also verify that concrete vector calls continue to select the higher-ranked family-specific
-// overloads, which emit one target-native shaped instruction rather than scalarizing.
+// overloads, and that calls dispatched through the broader arithmetic overload emit the same
+// target-native shaped instructions rather than scalarizing.
 
 // CONCRETE-DAG: %[[V3_INT:[A-Za-z0-9_]+]] = OpTypeVector %int 3
 // CONCRETE-DAG: %[[V2_UINT:[A-Za-z0-9_]+]] = OpTypeVector %uint 2
@@ -19,6 +21,16 @@
 // CONCRETE: OpExtInst %[[V3_INT]] {{.*}} SMin
 // CONCRETE: OpExtInst %[[V2_UINT]] {{.*}} UMax
 // CONCRETE: OpExtInst %[[V4_FLOAT]] {{.*}} FMax
+
+// GENERIC-DAG: %[[V3_INT:[A-Za-z0-9_]+]] = OpTypeVector %int 3
+// GENERIC-DAG: %[[V2_UINT:[A-Za-z0-9_]+]] = OpTypeVector %uint 2
+// GENERIC-DAG: %[[V4_FLOAT:[A-Za-z0-9_]+]] = OpTypeVector %float 4
+// GENERIC-DAG: OpExtInst %[[V3_INT]] {{.*}} SMin
+// GENERIC-DAG: OpExtInst %[[V3_INT]] {{.*}} SMax
+// GENERIC-DAG: OpExtInst %[[V2_UINT]] {{.*}} UMin
+// GENERIC-DAG: OpExtInst %[[V2_UINT]] {{.*}} UMax
+// GENERIC-DAG: OpExtInst %[[V4_FLOAT]] {{.*}} FMin
+// GENERIC-DAG: OpExtInst %[[V4_FLOAT]] {{.*}} FMax
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -74,6 +86,21 @@ matrix<T, R, C> genericMaximum<T : __BuiltinArithmeticType, let R : int, let C :
     matrix<T, R, C> right)
 {
     return max(left, right);
+}
+
+[numthreads(1, 1, 1)]
+void genericCodegenMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    int3 signedValue = int3(dispatchThreadID);
+    uint2 unsignedValue = dispatchThreadID.xy;
+    float4 floatingValue = float4(float3(dispatchThreadID), 1.0);
+
+    concreteIntOutput[0] = genericMinimum(signedValue, int3(4, 5, 6));
+    concreteIntOutput[1] = genericMaximum(signedValue, int3(4, 5, 6));
+    concreteUIntOutput[0] = genericMinimum(unsignedValue, uint2(7, 8));
+    concreteUIntOutput[1] = genericMaximum(unsignedValue, uint2(7, 8));
+    concreteFloatOutput[0] = genericMinimum(floatingValue, float4(1.0, 2.0, 3.0, 4.0));
+    concreteFloatOutput[1] = genericMaximum(floatingValue, float4(1.0, 2.0, 3.0, 4.0));
 }
 
 [numthreads(1, 1, 1)]
