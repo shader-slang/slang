@@ -106,6 +106,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // -disable-non-essential-validations, which skips the E55201 check).
     HashSet<IRFunc*> rootsBeingSpecialized;
 
+    // Specialization roots ever observed recursing (a call re-entered a root still
+    // on the stack). A recursive call's result never settles to a concrete pointer,
+    // so held-pointer reconciliation ignores stores fed by such calls rather than
+    // treat a provisional default as a conflicting storage class; the recursion
+    // itself is invalid SPIR-V and diagnosed elsewhere.
+    HashSet<IRFunc*> recursiveRoots;
+
     IRFunc* specializeFunc(const FuncSpecializationKey& key)
     {
         auto func = key.getFunc();
@@ -154,6 +161,136 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     {
         auto funcType = as<IRFuncType>(callee->getDataType());
         return getAddressSpaceFromVarType(funcType->getResultType());
+    }
+
+    // Return true if a value loaded from `var` is directly returned by its
+    // function. Used to scope the held-pointer conflict diagnostic (E58005) to a
+    // merged pointer that actually reaches a return — the shape #12563 is about and
+    // what the E58005 message describes.
+    bool anyLoadReachesReturn(IRInst* var)
+    {
+        for (auto use = var->firstUse; use; use = use->nextUse)
+        {
+            auto load = as<IRLoad>(use->getUser());
+            if (!load || load->getPtr() != var)
+                continue;
+            for (auto loadUse = load->firstUse; loadUse; loadUse = loadUse->nextUse)
+                if (loadUse->getUser()->getOp() == kIROp_Return)
+                    return true;
+        }
+        return false;
+    }
+
+    // Reconcile the address space of the pointer *held by* a local variable that
+    // stores a pointer (a `Ptr(Ptr(T))` such as an `int*` local) from the pointers
+    // written into it. The pass otherwise tracks a single address space per inst,
+    // which is the variable's own storage class (Function); the *pointee* pointer's
+    // class comes only from what is stored. Consider:
+    //
+    //     int* result;
+    //     if (c) result = &gShared;   // Workgroup
+    //     else   result = &buf[i];    // StorageBuffer
+    //     return result;
+    //
+    // `result` is a `Ptr(Ptr(int, UserPointer), Function)` whose inner pointer keeps
+    // the pre-specialization default (UserPointer) while the stored pointers are
+    // Workgroup/StorageBuffer, so the OpStore/OpLoad types disagree. When every
+    // stored pointer shares one concrete class, rewrite the variable's inner pointer
+    // (and its loads) to that class so the stores and the loaded/returned pointer
+    // agree. When two stored pointers disagree, the held pointer would need two
+    // classes at once — the same conflict as a function returning two classes — so
+    // record it for the E58005 report. Returns whether anything changed.
+    bool reconcileHeldPointerAddressSpace(IRFunc* func, IRInst* storePtr)
+    {
+        auto var = as<IRVar>(storePtr);
+        if (!var)
+            return false;
+        auto outerPtr = as<IRPtrTypeBase>(var->getDataType());
+        if (!outerPtr)
+            return false;
+        auto innerPtr = as<IRPtrTypeBase>(outerPtr->getValueType());
+        if (!innerPtr)
+            return false;
+
+        AddressSpace held = AddressSpace::Generic;
+        bool conflict = false;
+        SourceLoc conflictLoc;
+        for (auto use = var->firstUse; use; use = use->nextUse)
+        {
+            auto store = as<IRStore>(use->getUser());
+            if (!store || store->getPtr() != var)
+                continue;
+            // Skip a value still settling on the recursion stack: an in-progress
+            // recursive call's result is provisional (a pre-settlement default) and
+            // would otherwise look like a second, conflicting storage class. Once the
+            // callee settles, a later drain rescans this store with its concrete
+            // result.
+            if (auto call = as<IRCall>(store->getVal()))
+                if (auto calleeFunc = as<IRFunc>(call->getCallee()))
+                {
+                    auto calleeRoot = getSpecializationRoot(calleeFunc);
+                    if (rootsBeingSpecialized.contains(calleeRoot) ||
+                        recursiveRoots.contains(calleeRoot))
+                        continue;
+                }
+            auto valAddrSpace = getAddrSpace(store->getVal());
+            if (valAddrSpace == AddressSpace::Generic)
+                continue;
+            if (held == AddressSpace::Generic)
+            {
+                held = valAddrSpace;
+            }
+            else if (held != valAddrSpace)
+            {
+                conflict = true;
+                conflictLoc = store->sourceLoc;
+                break;
+            }
+        }
+        if (conflict)
+        {
+            // The held pointer would need two storage classes at once. Diagnose it
+            // only when the merged pointer is actually returned — a conflicting local
+            // that is not returned (e.g. only dereferenced) is a separate,
+            // pre-existing gap that would need its own, non-return-worded diagnostic.
+            if (sink && anyLoadReachesReturn(var))
+                conflictingReturns.addIfNotExists(func, conflictLoc);
+            return false;
+        }
+        if (held == AddressSpace::Generic)
+            return false;
+
+        bool changed = false;
+        if (innerPtr->getAddressSpace() != held)
+        {
+            IRBuilder builder(var);
+            auto newInner = builder.getPtrType(
+                innerPtr->getOp(),
+                innerPtr->getValueType(),
+                innerPtr->getAccessQualifier(),
+                held,
+                innerPtr->getDataLayout());
+            auto newOuter = builder.getPtrType(
+                outerPtr->getOp(),
+                newInner,
+                outerPtr->getAccessQualifier(),
+                outerPtr->getAddressSpace(),
+                outerPtr->getDataLayout());
+            setDataType(var, newOuter);
+            changed = true;
+        }
+        for (auto use = var->firstUse; use; use = use->nextUse)
+        {
+            auto load = as<IRLoad>(use->getUser());
+            if (!load || load->getPtr() != var)
+                continue;
+            if (getAddrSpace(load) != held)
+            {
+                mapInstToAddrSpace[load] = held;
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     // Return the ultimate original `func` was (transitively) specialized from, or
@@ -242,6 +379,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                         }
                         break;
                     case kIROp_Store:
+                        changed |=
+                            reconcileHeldPointerAddressSpace(func, as<IRStore>(inst)->getPtr());
                         break;
                     case kIROp_Param:
                         if (!isFirstBlock)
@@ -274,34 +413,33 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                         {
                             auto callInst = as<IRCall>(inst);
                             auto callee = as<IRFunc>(inst->getOperand(0));
-                            if (callee)
+                            if (!callee)
+                                break;
+
+                            List<AddressSpace> argAddrSpaces;
+                            bool hasSpecializableArg = false;
+                            for (UInt i = 0; i < callInst->getArgCount(); i++)
                             {
-                                List<AddressSpace> argAddrSpaces;
-                                bool hasSpecializableArg = false;
-                                for (UInt i = 0; i < callInst->getArgCount(); i++)
-                                {
-                                    auto arg = callInst->getArg(i);
-                                    auto addrSpace = getAddrSpace(arg);
-                                    argAddrSpaces.add(addrSpace);
-                                    if (addrSpace != AddressSpace::Generic)
-                                    {
-                                        hasSpecializableArg = true;
-                                    }
-                                }
-                                if (!hasSpecializableArg)
-                                {
-                                    workList.add(callee);
-                                    break;
-                                }
-                                // If callee doesn't have a body, don't specialize.
-                                if (!callee->getFirstBlock())
-                                    break;
+                                auto arg = callInst->getArg(i);
+                                auto argAddrSpace = getAddrSpace(arg);
+                                argAddrSpaces.add(argAddrSpace);
+                                if (argAddrSpace != AddressSpace::Generic)
+                                    hasSpecializableArg = true;
+                            }
+
+                            // A callee with no pointer arguments (or no body) is not
+                            // cloned, but it can still RETURN a pointer, so its result
+                            // address space must be reconciled onto the call below either
+                            // way. Argument specialization and result reconciliation are
+                            // independent concerns; only the former is gated on
+                            // hasSpecializableArg.
+                            IRFunc* specializedCallee = callee;
+                            if (hasSpecializableArg && callee->getFirstBlock())
+                            {
                                 FuncSpecializationKey key(callee, argAddrSpaces);
-                                IRFunc* specializedCallee = nullptr;
-                                if (IRFunc** specializedFunc =
-                                        functionSpecializations.tryGetValue(key))
+                                if (IRFunc** cached = functionSpecializations.tryGetValue(key))
                                 {
-                                    specializedCallee = *specializedFunc;
+                                    specializedCallee = *cached;
                                 }
                                 else
                                 {
@@ -319,6 +457,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                         // re-cloning (the root has left the stack by then).
                                         specializedCallee = callee;
                                         functionSpecializations[key] = callee;
+                                        recursiveRoots.add(root);
                                     }
                                     else
                                     {
@@ -336,23 +475,52 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                         rootsBeingSpecialized.remove(root);
                                     }
                                 }
-                                IRBuilder builder(callInst);
-                                builder.setInsertBefore(callInst);
-                                if (specializedCallee != callInst->getCallee())
+                            }
+                            else if (callee->getFirstBlock())
+                            {
+                                // No argument to specialize on, but the callee may still
+                                // return a pointer. Add it to the worklist, and if it
+                                // returns a pointer settle its result now (guarded against
+                                // recursion via the specialization root) — exactly as the
+                                // specialized branch settles a fresh clone. The tail below
+                                // records this call's result once and it is then skipped on
+                                // later drains (a mapped inst is not revisited), so reading a
+                                // pre-settlement default here would never be corrected.
+                                workList.add(callee);
+                                IRFunc* root = getSpecializationRoot(callee);
+                                if (rootsBeingSpecialized.contains(root))
                                 {
-                                    callInst = as<IRCall>(builder.replaceOperand(
-                                        callInst->getOperands(),
-                                        specializedCallee));
-                                    // At this point, the original callee may be left without uses.
-                                    functionsToConsiderRemoving.add(callee);
+                                    recursiveRoots.add(root);
                                 }
-                                auto callResultAddrSpace =
-                                    getFuncResultAddrSpace(specializedCallee);
-                                if (callResultAddrSpace != AddressSpace::Generic)
+                                else if (getFuncResultAddrSpace(callee) != AddressSpace::Generic)
                                 {
-                                    mapInstToAddrSpace[callInst] = callResultAddrSpace;
-                                    changed = true;
+                                    rootsBeingSpecialized.add(root);
+                                    processFunction(callee);
+                                    rootsBeingSpecialized.remove(root);
                                 }
+                            }
+
+                            IRBuilder builder(callInst);
+                            builder.setInsertBefore(callInst);
+                            if (specializedCallee != callInst->getCallee())
+                            {
+                                callInst = as<IRCall>(builder.replaceOperand(
+                                    callInst->getOperands(),
+                                    specializedCallee));
+                                // At this point, the original callee may be left without uses.
+                                functionsToConsiderRemoving.add(callee);
+                            }
+                            // Reconcile the call's result address space to the callee's.
+                            // The callee has been settled above (eagerly for a fresh
+                            // specialization or a pointer-returning unspecialized callee;
+                            // a recursive back-edge reuses an already-cached callee whose
+                            // result the base case settles before the recursive return is
+                            // read), so this reads a concrete result rather than a default.
+                            auto callResultAddrSpace = getFuncResultAddrSpace(specializedCallee);
+                            if (callResultAddrSpace != AddressSpace::Generic)
+                            {
+                                mapInstToAddrSpace[callInst] = callResultAddrSpace;
+                                changed = true;
                             }
                         }
                         break;
