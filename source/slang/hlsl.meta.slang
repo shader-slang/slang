@@ -13112,6 +13112,25 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     }
 }
 
+/// Maximum.
+/// @param x The first value.
+/// @param y The second value.
+/// @return The component-wise maximum of `x` and `y`.
+/// @remarks This overload allows using `max` on vectors in generic code constrained by
+/// `__BuiltinArithmeticType` (the common base of `__BuiltinIntegerType` and
+/// `__BuiltinFloatingPointType`). For concrete integer and floating-point element types the more
+/// specific vector overloads above are preferred; this lower-ranked fallback decomposes
+/// element-wise to the scalar overload, so it is valid for any builtin arithmetic element type.
+/// @category math
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[OverloadRank(-10)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+vector<T, N> max(vector<T, N> x, vector<T, N> y)
+{
+    VECTOR_MAP_BINARY(T, N, max, x, y);
+}
+
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -13367,6 +13386,25 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
     default:
         VECTOR_MAP_BINARY(T, N, min, x, y);
     }
+}
+
+/// Minimum.
+/// @param x The first value.
+/// @param y The second value.
+/// @return The component-wise minimum of `x` and `y`.
+/// @remarks This overload allows using `min` on vectors in generic code constrained by
+/// `__BuiltinArithmeticType` (the common base of `__BuiltinIntegerType` and
+/// `__BuiltinFloatingPointType`). For concrete integer and floating-point element types the more
+/// specific vector overloads above are preferred; this lower-ranked fallback decomposes
+/// element-wise to the scalar overload, so it is valid for any builtin arithmetic element type.
+/// @category math
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[OverloadRank(-10)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+vector<T,N> min(vector<T,N> x, vector<T,N> y)
+{
+    VECTOR_MAP_BINARY(T, N, min, x, y);
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
