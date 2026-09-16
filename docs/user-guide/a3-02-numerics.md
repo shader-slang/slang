@@ -349,10 +349,12 @@ bool allLessThan<T : IComponentwiseOrdered>(T left, T right)
 #### Numerical Extrema and Real Number Ordering
 
 The `INumericalExtrema` interface provides element-wise minimum and maximum operations for numeric
-types, including built-in integer and floating-point scalars and vectors.
-The `IRealOrderingFunctions` interface refines it with the step-function operation.
-The operation's conventional definition depends on real-ordering behavior such as that of IEEE
-floating-point numbers.
+types.
+Its built-in conformances include integer scalars, vectors, and cooperative vectors, as well as
+floating-point scalars, vectors, matrices, and cooperative vectors.
+The `IRealOrderingFunctions` interface refines it with the step-function operation, whose
+conventional definition depends on real-ordering behavior such as that of IEEE floating-point
+numbers.
 
 ### The `IReal` Convenience Definition
 

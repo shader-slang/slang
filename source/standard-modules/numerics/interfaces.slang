@@ -469,7 +469,8 @@ public interface INumericalExtrema
     This maximum(This other);
 }
 
-/// Supports operations whose conventional definitions depend on a real ordering.
+/// Refines `INumericalExtrema` with the step operation, whose conventional definition depends on a
+/// real ordering.
 public interface IRealOrderingFunctions : INumericalExtrema
 {
     /// Returns the component-wise step result: zero where this value is less than `edge`, and one

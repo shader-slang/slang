@@ -311,10 +311,10 @@ public extension<let R : int, let C : int, let L : MatrixLayoutMode>
     }
 }
 
-interface __IIntegerVectorDotProduct : IDotProduct, IIntegerType, INumericalExtrema {}
+interface __IIntegerVectorCapabilities : IDotProduct, IIntegerType, INumericalExtrema {}
 
 public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
-    vector<T, N> : __IIntegerVectorDotProduct
+    vector<T, N> : __IIntegerVectorCapabilities
 {
     typealias Scalar = T;
     typealias Mask = vector<bool, N>;
