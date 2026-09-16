@@ -88,12 +88,12 @@ uint arrayRecord(WithArray snapshot, uint i)
     return snapshot.data[i & 1];
 }
 
-// The existing small-value policy admits 128 bytes; nested/array fields retain
-// their original lowering. Export and explicit-reference cases are tested separately.
-// Mutable whole-value uses keep the previous lowering; projected reads may use values.
+// Field compaction must not change borrow-in lowering for ordinary records,
+// irrespective of size. None of these arguments contains an unused array field
+// eligible for compaction. Mutation must continue to observe the captured value.
 // CUDA-DAG: mutateCopy_{{[0-9]+}}(Small_{{[0-9]+}} *
-// CUDA-DAG: readCopy_{{[0-9]+}}(Small_{{[0-9]+}} snapshot
-// CUDA-DAG: fitRecord_{{[0-9]+}}(Fits_{{[0-9]+}} snapshot
+// CUDA-DAG: readCopy_{{[0-9]+}}(Small_{{[0-9]+}} *
+// CUDA-DAG: fitRecord_{{[0-9]+}}(Fits_{{[0-9]+}} *
 // CUDA-DAG: largeRecord_{{[0-9]+}}(Larger_{{[0-9]+}} *
 // CUDA-DAG: nestedRecord_{{[0-9]+}}(Nested_{{[0-9]+}} *
 // CUDA-DAG: exportedSmall_{{[0-9]+}}(Small_{{[0-9]+}} *

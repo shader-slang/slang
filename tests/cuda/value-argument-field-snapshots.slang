@@ -51,12 +51,12 @@ uint mutateValue(State snapshot, inout State original, uint index)
     return snapshot.a + snapshot.b + snapshot.unused[index];
 }
 
-// A compact captured value precedes the remaining mutable pointer. The same
-// transformation reaches forwardFields after readFields is specialized.
-// CUDA-DAG: static __device__ __noinline__ uint readFields_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} {{[a-zA-Z0-9_]+}}, State_{{[0-9]+}} *
-// CUDA-DAG: static __device__ __noinline__ uint forwardFields_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} {{[a-zA-Z0-9_]+}}, State_{{[0-9]+}} *
-// CUDA-DAG: static __device__ __noinline__ uint readReorderedFields_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} snapshot
-// CUDA-DAG: static __device__ __noinline__ uint readTwoSnapshots_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} {{[a-zA-Z0-9_]+}}, uint {{[a-zA-Z0-9_]+}}, ValueFields{{[a-zA-Z0-9_]*}} {{[a-zA-Z0-9_]+}}, State_{{[0-9]+}} *
+// The compact snapshot keeps borrow-in lowering, separate from the original's
+// mutable pointer. Compaction also reaches callers after their callees specialize.
+// CUDA-DAG: static __device__ __noinline__ uint readFields_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} * {{[a-zA-Z0-9_]+}}, State_{{[0-9]+}} *
+// CUDA-DAG: static __device__ __noinline__ uint forwardFields_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} * {{[a-zA-Z0-9_]+}}, State_{{[0-9]+}} *
+// CUDA-DAG: static __device__ __noinline__ uint readReorderedFields_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} *
+// CUDA-DAG: static __device__ __noinline__ uint readTwoSnapshots_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} * {{[a-zA-Z0-9_]+}}, uint {{[a-zA-Z0-9_]+}}, ValueFields{{[a-zA-Z0-9_]*}} * {{[a-zA-Z0-9_]+}}, State_{{[0-9]+}} *
 // CUDA-DAG: static __device__ __noinline__ uint mutateValue_{{[0-9]+}}(State_{{[0-9]+}} *
 
 // CUDA-only optimization: the CPU target retains its existing aggregate ABI.

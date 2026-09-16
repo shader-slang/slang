@@ -63,8 +63,9 @@ uint deviceBoundary(State snapshot)
 }
 
 // CUDA-DAG: struct ValueFields
-// CUDA-DAG: __noinline__ uint nineFields_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} snapshot
-// CUDA-DAG: __noinline__ uint exportedFields_compact_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} snapshot
+// Compact payloads still use the existing borrow-in calling convention.
+// CUDA-DAG: __noinline__ uint nineFields_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} *
+// CUDA-DAG: __noinline__ uint exportedFields_compact_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} *
 // CUDA-DAG: __noinline__ uint exportedFields_{{[0-9]+}}(State_{{[0-9]+}} *
 // CUDA-DAG: __noinline__ uint liveArray_{{[0-9]+}}(State_{{[0-9]+}} *
 // CUDA-DAG: __device__ uint deviceBoundary(State_{{[0-9]+}}

@@ -1,7 +1,6 @@
 #include "slang-ir-transform-params-to-constref.h"
 
 #include "slang-ir-clone.h"
-#include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -33,18 +32,6 @@ struct TransformParamsToConstRefContext
         if (!type)
             return false;
 
-        // Small CUDA values need not acquire an address solely for a call. Share
-        // buffer-load specialization's estimate of when passing a composite value
-        // becomes expensive; its size threshold is a cost heuristic, not an ABI limit.
-        // Only change internal definitions with understood direct calls.
-        if (cudaContext && isScalarOrVectorRecord(type) && hasOnlyFieldReads(param))
-        {
-            bool preserveOriginal;
-            if (canRewriteValueParameters(getParentFunc(param), preserveOriginal) &&
-                !preserveOriginal && !isTypePreferrableToDeferLoad(cudaContext, type))
-                return false;
-        }
-
         switch (type->getOp())
         {
         case kIROp_StructType:
@@ -58,23 +45,6 @@ struct TransformParamsToConstRefContext
         }
 
         return true;
-    }
-
-    // Return whether type is a nonempty record containing only scalar/vector fields.
-    // Opaque and nested aggregate fields retain their separate ABI/lowering rules.
-    bool isScalarOrVectorRecord(IRType* type)
-    {
-        auto structType = as<IRStructType>(type);
-        if (!structType)
-            return false;
-        bool hasFields = false;
-        for (auto field : structType->getFields())
-        {
-            hasFields = true;
-            if (!isScalarOrVectorType(field->getFieldType()))
-                return false;
-        }
-        return hasFields;
     }
 
     // Return whether every use is an undecorated field read, excluding unused

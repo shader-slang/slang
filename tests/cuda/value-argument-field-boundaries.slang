@@ -101,13 +101,13 @@ uint forwardsWholeValue(State snapshot)
 // CUDA-DAG: __device__ uint ordinaryExport_{{[0-9]+}}(State_{{[0-9]+}} *
 // CUDA-DAG: __device__ uint deviceExport(State_{{[0-9]+}}
 // CUDA-DAG: namedState(State_{{[0-9]+}} *
-// CUDA-DAG: static __device__ __noinline__ uint vectorState_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} snapshot
-// CUDA-DAG: static __device__ __noinline__ uint manyFields_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} snapshot
-// CUDA-DAG: static __device__ __noinline__ uint fourFields_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} snapshot
+// CUDA-DAG: static __device__ __noinline__ uint vectorState_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} *
+// CUDA-DAG: static __device__ __noinline__ uint manyFields_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} *
+// CUDA-DAG: static __device__ __noinline__ uint fourFields_{{[0-9]+}}(ValueFields{{[a-zA-Z0-9_]*}} *
 // CUDA-DAG: static __device__ __noinline__ uint mutableState_{{[0-9]+}}(State_{{[0-9]+}} *
 // CUDA-DAG: static __device__ __noinline__ uint borrowedState_{{[0-9]+}}(State_{{[0-9]+}} *
 // CUDA-DAG: static __device__ __noinline__ uint usesArray_{{[0-9]+}}(State_{{[0-9]+}} *
-// CUDA-DAG: static __device__ __noinline__ uint smallState_{{[0-9]+}}(Plain_{{[0-9]+}} snapshot
+// CUDA-DAG: static __device__ __noinline__ uint smallState_{{[0-9]+}}(Plain_{{[0-9]+}} *
 // CUDA-DAG: static __device__ __noinline__ uint forwardsWholeValue_{{[0-9]+}}(State_{{[0-9]+}} *
 
 RWStructuredBuffer<uint> output;
