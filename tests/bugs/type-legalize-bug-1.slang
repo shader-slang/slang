@@ -20,8 +20,8 @@ void user()
 {
     IFoo a = createDynamicObject<IFoo>(0, 0);
     IFoo b = createDynamicObject<IFoo>(1, 0);
-    test(a.getT(), b);
-    test(a, gB.getT());
+    (void)test(a.getT(), b);
+    (void)test(a, gB.getT());
 }
 B test<T:IFoo>(T a, IFoo b)
 {

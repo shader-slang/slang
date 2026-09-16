@@ -17,6 +17,6 @@ int use(__ref groupshared int i){ return i; }
 void computeMain(uint i : SV_GroupIndex)
 {
     set(myInt);
-    use(myInt);
+    (void)use(myInt);
     outputBuffer[i] = i;
 }

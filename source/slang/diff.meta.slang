@@ -738,6 +738,7 @@ $}
 extension TensorView<float>
 {
     [require(cuda)]
+    [DiscardableResult]
     float InterlockedExchange(uint index, float val, out float oldVal)
     {
         __target_switch
@@ -748,6 +749,7 @@ extension TensorView<float>
 
     __generic<let N:int>
     [require(cuda)]
+    [DiscardableResult]
     float InterlockedExchange(vector<uint, N> index, float val, out float oldVal)
     {
         __target_switch

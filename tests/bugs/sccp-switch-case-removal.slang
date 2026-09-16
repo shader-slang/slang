@@ -16,10 +16,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 	    outputBuffer[tid] = 0;
         break;
     case 1:
-        ddx(x); // this should trigger glslang error if it doesn't get eliminated by sccp.
+        (void)ddx(x); // this should trigger glslang error if it doesn't get eliminated by sccp.
         break;
     default:
-        ddy(x); // this should trigger glslang error if it doesn't get eliminated by sccp.
+        (void)ddy(x); // this should trigger glslang error if it doesn't get eliminated by sccp.
         break;
     }
 }
