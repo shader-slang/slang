@@ -559,6 +559,110 @@ DeferredParentMutationResult _mutateGlobalWithDeferredBody(
     return result;
 }
 
+
+/// What a round trip left of a global whose children are [decoration, body, decoration].
+struct TrailingDecorationResult
+{
+    Index expectedChildCount = 0;
+    Index actualChildCount = 0;
+    Index expectedBodyInsts = 0;
+    Index actualBodyInsts = 0;
+    /// Decorations the decoration walk yields. The walk stops at the first non-decoration,
+    /// so this is 1 even though the global carries two.
+    Index walkedDecorations = 0;
+    /// Whether the last entry in the combined decoration/child list came back as the
+    /// trailing name-hint decoration.
+    bool trailingDecorationIsLastChild = false;
+    bool bodyWasDeferred = false;
+};
+
+/// Round-trips a global that carries a decoration *after* its body.
+///
+/// `IRBuilder::addDecoration` always inserts at the head, so the serializer never emits
+/// this shape on its own; it is built here by moving the second decoration to the end.
+TrailingDecorationResult _roundTripTrailingDecoration(slang::IGlobalSession* globalSession)
+{
+    TrailingDecorationResult result;
+    Session* session = static_cast<Session*>(globalSession);
+
+    RefPtr<IRModule> original = IRModule::create(session);
+    IRInst* originalFunc = nullptr;
+    {
+        IRBuilder builder(original);
+        builder.setInsertInto(original->getModuleInst());
+        originalFunc = builder.createFunc();
+
+        // Leading decoration, then a body.
+        builder.addNameHintDecoration(originalFunc, UnownedStringSlice("leading"));
+        builder.setInsertInto(originalFunc);
+        builder.emitBlock();
+        IRType* floatType = builder.getFloatType();
+        for (Index i = 0; i < 6; ++i)
+        {
+            builder.emitAdd(
+                floatType,
+                builder.getFloatValue(floatType, IRFloatingPointValue(i)),
+                builder.getFloatValue(floatType, IRFloatingPointValue(1)));
+        }
+        builder.emitReturn();
+
+        // Then a decoration placed after it, which is the shape under test.
+        IRDecoration* trailing = builder.addDecoration(
+            originalFunc,
+            kIROp_NameHintDecoration,
+            builder.getStringValue(UnownedStringSlice("trailing")));
+        trailing->insertAtEnd(originalFunc);
+    }
+
+    // `getDecorationsAndChildren()`, not `getChildren()`: the latter starts after the
+    // last *leading* decoration, so it would not see the leading one at all.
+    for (IRInst* child : originalFunc->getDecorationsAndChildren())
+    {
+        result.expectedChildCount++;
+        result.expectedBodyInsts += _countChildrenOf(child);
+    }
+
+    ComPtr<ISlangBlob> blob;
+    RefPtr<IRModule> reloaded;
+    if (SLANG_FAILED(_roundTripModule(original, session, blob, reloaded)))
+        return result;
+
+    IRInst* func = nullptr;
+    for (IRInst* global : reloaded->getModuleInst()->getChildren())
+    {
+        if (global->getOp() == kIROp_Func)
+        {
+            func = global;
+            break;
+        }
+    }
+    if (!func)
+        return result;
+
+    // Read before anything below decodes it.
+    result.bodyWasDeferred = func->m_hasDeferredBody;
+
+    // The decoration walk must stop at the block, so it sees only the leading decoration.
+    for (IRDecoration* decoration : func->getDecorations())
+    {
+        SLANG_UNUSED(decoration);
+        result.walkedDecorations++;
+    }
+
+    // Materializes, and checks the whole list came back once and in order.
+    IRInst* lastChild = nullptr;
+    for (IRInst* child : func->getDecorationsAndChildren())
+    {
+        result.actualChildCount++;
+        result.actualBodyInsts += _countChildrenOf(child);
+        lastChild = child;
+    }
+    result.trailingDecorationIsLastChild =
+        lastChild != nullptr && lastChild->getOp() == kIROp_NameHintDecoration;
+
+    return result;
+}
+
 } // namespace
 
 
@@ -845,6 +949,53 @@ SLANG_UNIT_TEST(irDeferredBodyLoaderDoesNotRetainItsModule)
     // `reloaded` is the only thing that should still hold this module. A loader that
     // retained its module, or a decoder that kept the read context alive, reads as 2+.
     SLANG_CHECK(reloaded->debugGetReferenceCount() == 1);
+}
+
+// Checks the suffix rule: a decoration that appears *after* a body instruction belongs to
+// the deferred body, not to the eager skeleton.
+//
+// Two pieces of logic decide the eager/deferred cut and must agree exactly.
+// `_computeEagerSkeleton` marks a depth-2 instruction eager only while no body child has
+// been seen (`inEagerDecoration = !inBody && isDecoration`), and `decodeInst` records the
+// deferred body as "the last n children" from the first non-eager child onward. Both are
+// suffix-shaped, so a trailing decoration is deferred by both.
+//
+// If they ever disagree -- the scan calling a trailing decoration eager while `decodeInst`
+// still counts it inside the body -- the instruction is allocated by the load walk, linked
+// into the child list, and then decoded and linked a *second* time by
+// `materializeDeferredBody`, corrupting its `prev`/`next` and the parent's `last`. Nothing
+// asserts, because `readInstRef` still resolves every operand.
+//
+// No shader produces this shape: `IRBuilder::addDecoration` inserts at the head, so a
+// global's decorations are always contiguous at the front. The module is therefore built
+// directly, for the same reason `irDeferredBodyKeepsDecorationChildren` is -- a
+// shader-driven test would pass whether the rule held or not.
+SLANG_UNIT_TEST(irDeferredBodyTreatsATrailingDecorationAsBody)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    const TrailingDecorationResult result = _roundTripTrailingDecoration(globalSession);
+
+    // Guards the premise: the built shape really is
+    // [leading decoration, block, trailing decoration].
+    SLANG_CHECK_ABORT(result.expectedChildCount == 3);
+    SLANG_CHECK_ABORT(result.expectedBodyInsts > 0);
+
+    // An eager load has nothing deferred, so it says nothing about the cut.
+    if (isOnDemandIRLoadEnabled())
+        SLANG_CHECK(result.bodyWasDeferred);
+
+    // Decoded once, in order: a double-decode shows up as a child count that disagrees
+    // with the module the round trip started from.
+    SLANG_CHECK(result.actualChildCount == result.expectedChildCount);
+    SLANG_CHECK(result.actualBodyInsts == result.expectedBodyInsts);
+    SLANG_CHECK(result.trailingDecorationIsLastChild);
+
+    // And the decoration walk still ends at the first non-decoration rather than running
+    // on into the body to collect the trailing one.
+    SLANG_CHECK(result.walkedDecorations == 1);
 }
 
 // Checks that a mutation reaching a global whose body is still encoded neither destroys
