@@ -3791,16 +3791,23 @@ void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
 
 Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
 {
+    auto errorCountBeforeAssign = getSink()->getErrorCount();
+
     if (expr->right->type.isWriteOnly)
         getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = expr->right});
 
-    // Memory qualifiers are decl-level, invisible to the type-only coercion below, so check the raw
-    // operands here, before `maybeOpenRef`.
-    auto leftExpr = expr->left;
-    while (auto paren = as<ParenExpr>(leftExpr))
-        leftExpr = paren->base;
-    if (auto leftVar = as<VarExpr>(leftExpr))
-        diagnoseMemoryQualifierDropOnLocalCopy(leftVar->declRef.getDecl(), expr->right);
+    // A memory qualifier on the source decl is a decl-level modifier, invisible to the type-only
+    // coercion below. Capture the checked (pre-coercion) source and the destination decl now; the
+    // drop is diagnosed after coercion, only if the assignment is otherwise valid.
+    Expr* checkedSrcExpr = expr->right;
+    Decl* dstDecl = nullptr;
+    {
+        auto leftExpr = expr->left;
+        while (auto paren = as<ParenExpr>(leftExpr))
+            leftExpr = paren->base;
+        if (auto leftVar = as<VarExpr>(leftExpr))
+            dstDecl = leftVar->declRef.getDecl();
+    }
 
     expr->left = maybeOpenRef(expr->left);
     auto type = expr->left->type;
@@ -3843,6 +3850,12 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
             getSink()->diagnose(Diagnostics::AssignNonLvalue{.expr = expr});
         }
     }
+    // Only diagnose the dropped qualifier when the assignment is otherwise valid (assignable
+    // l-value, coercion succeeded), so a type mismatch or a non-l-value target is not also charged
+    // a spurious qualifier-drop error.
+    if (dstDecl && getSink()->getErrorCount() == errorCountBeforeAssign)
+        diagnoseMemoryQualifierDropOnLocalCopy(dstDecl, checkedSrcExpr);
+
     expr->type = type;
     return expr;
 }
@@ -3971,10 +3984,29 @@ void SemanticsVisitor::diagnoseMemoryQualifierDrop(Decl* dstDecl, Expr* srcIn)
     // Dropping a `restrict` qualifier is allowed (consistent with GLSL memory qualifiers).
 }
 
-// The copy-to-a-local counterpart of `diagnoseMemoryQualifierDrop`, guarded two ways: the source
-// must be a resource *handle* (reading a qualified scalar into a plain value is a completed load,
-// not a coherent location, so it is not a drop), and the destination must be a local variable
-// (which, unlike a global or a struct field, cannot carry the qualifier, so the drop is forced).
+// True if `type` is a resource handle whose memory-coherence qualifier a plain copy would silently
+// drop: read/write buffers and textures/images, GLSL shader-storage buffers, and `DynamicResource`.
+// A raytracing acceleration structure derives from `UntypedBufferResourceType` but is a read-only
+// opaque handle, not coherent read/write memory, so it is excluded.
+static bool isMemoryQualifiableResourceHandle(Type* type)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+    if (as<RaytracingAccelerationStructureType>(type))
+        return false;
+    return as<ResourceType>(type) || as<UntypedBufferResourceType>(type) ||
+           as<HLSLStructuredBufferTypeBase>(type) || as<GLSLShaderStorageBufferType>(type) ||
+           as<DynamicResourceType>(type);
+}
+
+// The copy-to-a-local counterpart of `diagnoseMemoryQualifierDrop`. It fires only for a genuine
+// same-kind handle copy that forcibly drops the qualifier, guarded three ways: the source and the
+// destination are both memory-qualifiable resource handles (a qualified scalar read is a completed
+// load, not a coherent location; a non-handle or error-typed destination means the copy is already
+// ill-formed), and the destination is a local variable (`isLocalVar`), which -- unlike a global or
+// a struct field -- cannot carry the qualifier. Callers invoke this only once the copy is otherwise
+// valid (see checkVarDeclCommon / checkAssignWithCheckedOperands), so a type-mismatched or
+// non-l-value target is not charged a spurious diagnostic.
 void SemanticsVisitor::diagnoseMemoryQualifierDropOnLocalCopy(Decl* dstDecl, Expr* srcIn)
 {
     while (auto paren = as<ParenExpr>(srcIn))
@@ -3982,11 +4014,10 @@ void SemanticsVisitor::diagnoseMemoryQualifierDropOnLocalCopy(Decl* dstDecl, Exp
     auto srcExpr = as<VarExpr>(srcIn);
     if (!srcExpr)
         return;
-    auto srcType = srcExpr->type.type;
-    if (!as<ResourceType>(srcType) && !as<UntypedBufferResourceType>(srcType) &&
-        !as<HLSLStructuredBufferTypeBase>(srcType) && !as<DynamicResourceType>(srcType))
+    if (!isMemoryQualifiableResourceHandle(srcExpr->type.type))
         return;
-    if (!isLocalVar(dstDecl))
+    auto dstVar = as<VarDeclBase>(dstDecl);
+    if (!dstVar || !isLocalVar(dstDecl) || !isMemoryQualifiableResourceHandle(dstVar->getType()))
         return;
     diagnoseMemoryQualifierDrop(dstDecl, srcExpr);
 }
