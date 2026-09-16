@@ -17,11 +17,12 @@ void legalizeNonStructParameterToStructForHLSL(IRModule* module);
 void legalizeEmptyRayPayloadsForHLSL(IRModule* module);
 
 // Fill in any missing per-side payload access qualifiers (PAQs) on every
-// `[raypayload]` struct in the module, so that each field carries both a `read(...)`
-// and a `write(...)` qualifier. HLSL SM 6.7+ requires both sides on every member of a
-// `[raypayload]` struct; a user-authored struct with one-sided PAQ (or a struct that
-// only reaches a hit shader and is never `TraceRay`'d) would otherwise be emitted with
-// one-sided qualifiers and rejected by DXC.
+// `[raypayload]` struct in the module, so that each field carries both a `read(...)` and a
+// `write(...)` qualifier. HLSL SM 6.7+ requires both sides on every member of a `[raypayload]`
+// struct except one whose type is itself a `[raypayload]` struct (which inherits its type's
+// field PAQs and carries none of its own); a user-authored struct with one-sided PAQ (or a
+// struct that only reaches a hit shader and is never `TraceRay`'d) would otherwise be emitted
+// with one-sided qualifiers and rejected by DXC. Such nested-payload members are skipped here.
 void legalizeRayPayloadAccessQualifiersForHLSL(IRModule* module);
 
 void validateBarrierFlagsForHLSL(IRModule* module, DiagnosticSink* sink);
