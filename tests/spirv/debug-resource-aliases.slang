@@ -19,19 +19,6 @@ SamplerState inputSampler;
 [[vk::binding(2)]]
 RWStructuredBuffer<float4> results;
 
-// A helper taking opaque resources by value, kept as a real function so its parameters exercise
-// the parameter gate in insertDebugValueStore (which runs before general inlining). texParam and
-// sampParam are supported debug handle types, so each gets a DebugLocalVariable + DebugValue at its
-// source parameter position.
-[noinline]
-float4 sampleThroughParams(
-    Texture2D<float4> texParam,
-    SamplerState sampParam,
-    float2 uv)
-{
-    return texParam.SampleLevel(sampParam, uv, 0.0);
-}
-
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void debugResourceAliases(uint3 threadId : SV_DispatchThreadID)
@@ -46,8 +33,7 @@ void debugResourceAliases(uint3 threadId : SV_DispatchThreadID)
 
     float2 uv = (float2(threadId.xy) + 0.5) / 64.0;
     float4 sampledValue = textureAlias.SampleLevel(samplerAlias, uv, 0.0) +
-                          textureLet.SampleLevel(samplerLet, uv, 0.0) +
-                          sampleThroughParams(inputTexture, inputSampler, uv);
+                          textureLet.SampleLevel(samplerLet, uv, 0.0);
     results[threadId.x] =
         sampledValue + float4(float(scalarMarker) * 0.001, 0.0, 0.0, 0.0);
 }
@@ -57,8 +43,6 @@ void debugResourceAliases(uint3 threadId : SV_DispatchThreadID)
 // CHECK-DAG: %[[SMPNAME:[0-9]+]] = OpString "samplerAlias"
 // CHECK-DAG: %[[TEXLETNAME:[0-9]+]] = OpString "textureLet"
 // CHECK-DAG: %[[SMPLETNAME:[0-9]+]] = OpString "samplerLet"
-// CHECK-DAG: %[[TEXPNAME:[0-9]+]] = OpString "texParam"
-// CHECK-DAG: %[[SMPPNAME:[0-9]+]] = OpString "sampParam"
 
 // No opaque-handle alias may get a backing Function OpVariable — that would be illegal SPIR-V.
 // A backing var carries an `OpName %id "_dbgvar_<name>"` (scalars get one, e.g. _dbgvar_scalarMarker),
@@ -70,8 +54,6 @@ void debugResourceAliases(uint3 threadId : SV_DispatchThreadID)
 // CHECK-NOT: OpName {{%[A-Za-z0-9_]+}} "_dbgvar_samplerAlias"
 // CHECK-NOT: OpName {{%[A-Za-z0-9_]+}} "_dbgvar_textureLet"
 // CHECK-NOT: OpName {{%[A-Za-z0-9_]+}} "_dbgvar_samplerLet"
-// CHECK-NOT: OpName {{%[A-Za-z0-9_]+}} "_dbgvar_texParam"
-// CHECK-NOT: OpName {{%[A-Za-z0-9_]+}} "_dbgvar_sampParam"
 
 // Group 2 — each alias gets a DebugLocalVariable bound to its OpString name, plus a DebugValue.
 // CHECK-DAG: %[[TEXVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[TEXNAME]]
@@ -82,11 +64,3 @@ void debugResourceAliases(uint3 threadId : SV_DispatchThreadID)
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[TEXLETVAR]]
 // CHECK-DAG: %[[SMPLETVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[SMPLETNAME]]
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[SMPLETVAR]]
-
-// The by-value resource parameters get DebugLocalVariable + DebugValue. The trailing operand is the
-// DebugLocalVariable ArgNumber, encoding the source parameter position: texParam is the first
-// parameter (%uint_1) and sampParam the second (%uint_2).
-// CHECK-DAG: %[[TEXPVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[TEXPNAME]] {{.*}} %uint_0 %uint_1
-// CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[TEXPVAR]]
-// CHECK-DAG: %[[SMPPVAR:[A-Za-z0-9_]+]] = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %[[SMPPNAME]] {{.*}} %uint_0 %uint_2
-// CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugValue %[[SMPPVAR]]

@@ -144,7 +144,10 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             isRefParam = true;
             paramType = ptrType->getValueType();
         }
-        if (!isDebugVarTypeSupported(paramType))
+        // Parameters keep the plain-data eligibility rule. Opaque-handle *parameter* debug info is
+        // deferred to a follow-up because it interacts with the DebugVar arg-index remap across the
+        // type-legalization passes; function-local var/let aliases (below) do use the widened gate.
+        if (!isDebuggableType(paramType))
             continue;
         auto debugVar = builder.emitDebugVar(
             paramType,
