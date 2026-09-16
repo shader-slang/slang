@@ -613,6 +613,20 @@ SLANG_FORCE_INLINE Count tryGetRemainingElementCount(S const& serializer)
         return Count(-1);
 }
 
+/// True when `T`'s serialized encoding is byte-identical to its in-memory form, so a
+/// whole run of them can be copied or borrowed rather than decoded one at a time.
+///
+/// `bool` is excluded even though it is arithmetic. The fossil format deliberately does
+/// not store a `bool` as itself -- native `bool` layout is not guaranteed consistent
+/// across targets, so it is stored as a `uint8_t` and converted on read (see
+/// `slang-fossil.h`). Copying those bytes into a `bool[]`, or handing back a view of
+/// them typed as `bool`, would be reading a type that was never written.
+template<typename T>
+struct IsBulkCopyableScalar
+    : std::integral_constant<bool, std::is_arithmetic<T>::value && !std::is_same<T, bool>::value>
+{
+};
+
 //
 // Backends whose stored layout for a scalar element matches the in-memory one can
 // hand over a whole run of elements at once rather than decoding them singly.
@@ -1127,7 +1141,7 @@ void serialize(S const& serializer, SerializedArray<T>& value)
     else
     {
         const Count remaining = tryGetRemainingElementCount(serializer);
-        if constexpr (std::is_arithmetic<T>::value)
+        if constexpr (IsBulkCopyableScalar<T>::value)
         {
             if (remaining > 0)
             {
@@ -1176,11 +1190,11 @@ void serialize(S const& serializer, List<T>& value)
         // take the whole run in one copy; the per-element loop below costs a
         // layout check and a bounds-checked append per value, which for the IR's
         // multi-megabyte index arrays is most of deserialization time.
-        // Restricted to arithmetic elements: those are the ones the fossil format
-        // stores as a bare scalar of the same width, so the stored run and the
-        // destination array have identical layout. Aggregates like InstAllocInfo
-        // are stored as records and must go through the per-element path.
-        if constexpr (std::is_arithmetic<T>::value)
+        // Restricted to elements the fossil format stores as a bare scalar of the same
+        // width, so the stored run and the destination array have identical layout.
+        // Aggregates like InstAllocInfo are stored as records, and `bool` is stored as a
+        // converted `uint8_t`; both must go through the per-element path.
+        if constexpr (IsBulkCopyableScalar<T>::value)
         {
             if (remaining > 0)
             {

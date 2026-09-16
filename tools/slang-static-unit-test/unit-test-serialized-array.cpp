@@ -241,7 +241,10 @@ namespace
 /// loop; `single` takes the fast path with nothing left to copy after the validating first
 /// read; `many` takes it with a real bulk copy behind it; `borrowed` goes through
 /// `tryBorrowContiguousScalars` instead and comes back as a view; `narrow` is a second
-/// element width. The scalar fields on either side are sentinels.
+/// element width. `flags` is `bool`, which is arithmetic but must *not* take either fast
+/// path: fossil stores a bool as a converted `uint8_t`, so copying or borrowing the
+/// stored bytes as native `bool` would read a type that was never written. The scalar
+/// fields on either side are sentinels.
 struct BulkReadProbe
 {
     Int64 leading = 0;
@@ -250,6 +253,7 @@ struct BulkReadProbe
     List<Int64> many;
     SerializedArray<Int64> borrowed;
     List<uint8_t> narrow;
+    List<bool> flags;
     Int64 trailing = 0;
 };
 
@@ -263,6 +267,7 @@ void serialize(S const& serializer, BulkReadProbe& value)
     serialize(serializer, value.many);
     serialize(serializer, value.borrowed);
     serialize(serializer, value.narrow);
+    serialize(serializer, value.flags);
     serialize(serializer, value.trailing);
 }
 
@@ -323,6 +328,10 @@ SLANG_UNIT_TEST(serializedArrayBulkScalarPathsAreTakenAtEverySize)
         in.borrowed.add(Int64(i * 3 - 5));
     for (Index i = 0; i < 5; ++i)
         in.narrow.add(uint8_t(i * 13 + 2));
+    // Alternating, and an odd count, so a path that byte-copied the stored `uint8_t`
+    // run into native `bool` storage would show up as wrong values rather than by luck.
+    for (Index i = 0; i < 7; ++i)
+        in.flags.add((i % 2) == 0);
     in.trailing = 0x1112131415161718ll;
 
     BulkReadProbe out;
@@ -344,6 +353,13 @@ SLANG_UNIT_TEST(serializedArrayBulkScalarPathsAreTakenAtEverySize)
     SLANG_CHECK(out.narrow.getCount() == in.narrow.getCount());
     for (Index i = 0; i < out.narrow.getCount(); ++i)
         SLANG_CHECK(out.narrow[i] == in.narrow[i]);
+
+    // `bool` is arithmetic, so it would be swept into the scalar fast path by a gate
+    // keyed on `std::is_arithmetic` alone. It must round-trip through the per-element
+    // path instead, which is what converts fossil's `uint8_t` back to a native `bool`.
+    SLANG_CHECK(out.flags.getCount() == in.flags.getCount());
+    for (Index i = 0; i < out.flags.getCount(); ++i)
+        SLANG_CHECK(out.flags[i] == in.flags[i]);
 
     SLANG_CHECK(out.borrowed.getCount() == in.borrowed.getCount());
     for (Index i = 0; i < out.borrowed.getCount(); ++i)

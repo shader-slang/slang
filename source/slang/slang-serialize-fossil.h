@@ -938,7 +938,9 @@ public:
     template<typename T>
     bool tryBorrowContiguousScalars(T const*& outData, Count count)
     {
-        static_assert(std::is_arithmetic<T>::value, "spans are only for scalar elements");
+        static_assert(
+            IsBulkCopyableScalar<T>::value,
+            "spans are only for scalars whose fossil encoding matches memory");
 
         if (!canReadContiguousScalars<T>(count))
             return false;
@@ -981,7 +983,9 @@ public:
     template<typename T>
     bool tryReadContiguousScalars(T* dest, Count count)
     {
-        static_assert(std::is_arithmetic<T>::value, "bulk read is only for scalar elements");
+        static_assert(
+            IsBulkCopyableScalar<T>::value,
+            "bulk read is only for scalars whose fossil encoding matches memory");
 
         if (!canReadContiguousScalars<T>(count))
             return false;

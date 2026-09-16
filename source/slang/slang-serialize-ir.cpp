@@ -544,8 +544,12 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
 }
 
 //
-/// True if builtin-module instruction bodies should be left encoded until something
-/// reads them. **On by default**; `SLANG_ONDEMAND_IR=0` forces the eager load.
+/// True if instruction bodies should be left encoded until something reads them.
+/// **On by default**; `SLANG_ONDEMAND_IR=0` forces the eager load.
+///
+/// Applies to every module deserialized from a retained blob, not only the builtin
+/// ones: `Linkage::loadSerializedModuleContents` passes a blob too, so a precompiled
+/// user module defers on the same terms.
 ///
 /// The override exists because the two paths must produce identical results, and the
 /// cheapest way to investigate a suspected difference is to run the same binary both

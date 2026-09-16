@@ -116,11 +116,13 @@ Index getDeferralDeclinedForSpanMismatchCount();
 /// Supplies instruction bodies that were not materialized when a module was
 /// deserialized.
 ///
-/// A serialized builtin module is mostly bodies that a given compile never looks
-/// at, so deserialization can stop at each global value's decorations and leave
-/// the rest encoded. Whoever deserialized the module installs one of these on the
-/// `IRModule`, and the first access to a global value's children asks it to decode
-/// that one body.
+/// A serialized module is mostly bodies that a given compile never looks at, so
+/// deserialization can stop at each global value's decorations and leave the rest
+/// encoded. This applies to any module read from a blob the caller keeps alive --
+/// the builtin modules, and precompiled user modules loaded through
+/// `Linkage::loadSerializedModuleContents` alike. Whoever deserialized the module
+/// installs one of these on the `IRModule`, and the first access to a global value's
+/// children asks it to decode that one body.
 struct IRDeferredBodyLoader : RefObject
 {
     virtual ~IRDeferredBodyLoader() = default;
