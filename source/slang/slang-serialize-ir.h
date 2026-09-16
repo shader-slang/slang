@@ -39,13 +39,6 @@ void writeSerializedModuleIR(
     ISlangBlob* blobHoldingSerializedData,
     RefPtr<IRModule>& outIRModule);
 
-/// True if instruction bodies are left encoded until something reads them.
-///
-/// On by default; `SLANG_ONDEMAND_IR=0` forces the eager load. Declared here, rather than
-/// kept private to the .cpp, so tests ask the loader's own question instead of
-/// reimplementing "on unless explicitly 0" and drifting from it.
-bool isOnDemandIRLoadEnabled();
-
 /// Reads a module's header info out of `chunk`.
 ///
 /// `blobHoldingSerializedData` is forwarded to the shared `IRSerialReadContext` for

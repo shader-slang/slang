@@ -19,8 +19,7 @@ using namespace Slang;
 // Not vacuous in either load mode. AST declarations are already read lazily, so the
 // library's declarations are decoded during semantic checking of the `import` below --
 // after this call returned. Deferred instruction bodies add a second route into the same
-// bytes, later still. Verified by mutation: restoring the old pointer crashes this test
-// with `SLANG_ONDEMAND_IR` both unset and `0`.
+// bytes, later still. Verified by mutation: restoring the old pointer crashes this test.
 //
 // The buffer is poisoned in place rather than freed: freed memory often still reads back
 // intact, which would let this pass under the bug, and overwriting keeps the test itself

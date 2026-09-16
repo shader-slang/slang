@@ -256,6 +256,10 @@ struct IRInstListBase
 /// call sites to re-check the opcode, which they happen to do today. Putting the
 /// type-terminated end in the list itself makes that a property of the type rather than a
 /// habit every current and future caller has to share.
+///
+/// The narrower interface is deliberate. `IRInstList`'s `getFirst`/`getLast` and its
+/// `last`-based random access are dropped, because both rest on the saved sentinel this
+/// type exists to do without. Iteration is what every `getDecorations()` caller needed.
 struct IRDecorationList
 {
     IRDecorationList() {}

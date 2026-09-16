@@ -702,9 +702,8 @@ SLANG_UNIT_TEST(irDeferredBodyKeepsDecorationChildren)
     // comparison below would hold trivially and this test would check nothing.
     SLANG_CHECK_ABORT(expectedChildren == 2);
 
-    // Likewise: an eager load keeps everything, so it says nothing about the rule.
-    if (isOnDemandIRLoadEnabled())
-        SLANG_CHECK(bodyWasDeferred);
+    // Guards the premise: an eager load keeps everything, so it would say nothing here.
+    SLANG_CHECK(bodyWasDeferred);
 
     // The assertion the rule is about. Under the bug this replaces, the decoration comes
     // back with no children at all: they sit at the same depth as body instructions and
@@ -745,8 +744,7 @@ SLANG_UNIT_TEST(irDeferredBodyConcurrentMaterialization)
     _materializeBodiesConcurrently(globalSession, deferredCount, mismatches);
 
     // An eager load races nothing, so it would make the assertion below meaningless.
-    if (isOnDemandIRLoadEnabled())
-        SLANG_CHECK(deferredCount > 0);
+    SLANG_CHECK(deferredCount > 0);
 
     // Every thread must have seen a complete body every time. A body published before its
     // instructions were fully linked shows up here as a short child list.
@@ -763,9 +761,6 @@ SLANG_UNIT_TEST(irDeferredBodyConcurrentMaterialization)
 // encoded, so emit is what walks them, and these threads reach them concurrently.
 SLANG_UNIT_TEST(irDeferredBodyMaterializesOnTheSupportedConcurrentPath)
 {
-    if (!isOnDemandIRLoadEnabled())
-        return; // Nothing is deferred, so there is nothing to observe.
-
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
@@ -894,8 +889,7 @@ SLANG_UNIT_TEST(irDeferralDeclinesWhenTheBlobDoesNotBackTheSpans)
             referenceInstCount = instCount;
             // Guards the premise: if deferral stopped happening for the matching blob, the
             // other two cases would agree with it trivially and prove nothing.
-            if (isOnDemandIRLoadEnabled())
-                SLANG_CHECK(deferred == testCase.expectDeferral);
+            SLANG_CHECK(deferred == testCase.expectDeferral);
         }
         else
         {
@@ -943,8 +937,7 @@ SLANG_UNIT_TEST(irDeferredBodyLoaderDoesNotRetainItsModule)
     SLANG_CHECK_ABORT(reloaded != nullptr);
 
     // Guards the premise: with no loader installed there is no cycle to have.
-    if (isOnDemandIRLoadEnabled())
-        SLANG_CHECK(reloaded->getDeferredBodyLoader() != nullptr);
+    SLANG_CHECK(reloaded->getDeferredBodyLoader() != nullptr);
 
     // `reloaded` is the only thing that should still hold this module. A loader that
     // retained its module, or a decoder that kept the read context alive, reads as 2+.
@@ -983,9 +976,8 @@ SLANG_UNIT_TEST(irDeferredBodyTreatsATrailingDecorationAsBody)
     SLANG_CHECK_ABORT(result.expectedChildCount == 3);
     SLANG_CHECK_ABORT(result.expectedBodyInsts > 0);
 
-    // An eager load has nothing deferred, so it says nothing about the cut.
-    if (isOnDemandIRLoadEnabled())
-        SLANG_CHECK(result.bodyWasDeferred);
+    // Guards the premise: an eager load has nothing deferred, so it says nothing here.
+    SLANG_CHECK(result.bodyWasDeferred);
 
     // Decoded once, in order: a double-decode shows up as a child count that disagrees
     // with the module the round trip started from.
@@ -1047,10 +1039,9 @@ SLANG_UNIT_TEST(irDeferredBodySurvivesMutationOfItsParent)
 
         // Guards the premise: with no body to lose, every check below holds trivially.
         SLANG_CHECK_ABORT(result.expectedBodyInsts > 0);
-        // Likewise, an eager load has nothing still encoded when the mutation runs, so it
-        // says nothing about any of this.
-        if (isOnDemandIRLoadEnabled())
-            SLANG_CHECK(result.bodyWasDeferred);
+        // Guards the premise: an eager load has nothing still encoded when the mutation
+        // runs, so it would say nothing about any of this.
+        SLANG_CHECK(result.bodyWasDeferred);
 
         SLANG_CHECK(result.actualBodyInsts == result.expectedBodyInsts);
         SLANG_CHECK(result.childCount == testCase.expectedChildCount);
