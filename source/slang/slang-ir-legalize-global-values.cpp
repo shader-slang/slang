@@ -310,30 +310,41 @@ struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextG
     IRInst* getOutsideASM(IRInst* beforeInst) override { return beforeInst; }
 };
 
-// A struct's synthesized constructor is, by construction, member-wise: it
+// Build and return the `makeStruct` equivalent of a call to a *member-wise*
+// synthesized constructor, or return nullptr if `call` is not such a call (the
+// caller performs the replacement). A member-wise synthesized constructor
 // allocates a temporary, stores each argument into the corresponding field in
-// declaration order, then returns the loaded value. That is semantically
-// identical to a `makeStruct` of the arguments. Inside a function body the
-// normal inline + SSA-promotion pipeline already collapses such a call into a
-// `makeStruct`, but at module scope (a `static const` initializer, e.g.
-// `static const Record records[2] = { {1,2}, {3,4} }`) that pipeline never
-// runs, so the call survives as the initializer's value:
+// declaration order, then returns the loaded value — which is semantically
+// identical to a `makeStruct` of the arguments.
+//
+// Not every synthesized constructor is member-wise: a derived struct's
+// synthesized constructor, for example, initializes its base through a nested
+// base-constructor call. So the body is verified field-by-field rather than
+// trusting the `synthesizedConstructor` decoration alone; anything that is not a
+// plain member-wise store of the parameters — a base-struct initializer, a
+// default field value, a conversion, any control flow — causes a conservative
+// bail, leaving the call to be inlined as before.
+//
+// A synthesized member-wise constructor call is the general lowering of struct
+// construction, and in a function body it correctly stays a call: a local
+// struct really is constructed at runtime there (a direct local `Record r =
+// {1,2}` emits a `Record.$init(...)` call, not a `makeStruct`). The shape only
+// becomes a problem for a module-scope `static const` initializer, e.g.
+// `static const Record records[2] = { {1,2}, {3,4} }`, whose value must be a
+// compile-time-constant aggregate to live in device-global storage:
 //
 //     let %r = globalConstant(makeArray(call Record.$init(1,2),
 //                                        call Record.$init(3,4)))
 //
-// A bare call cannot be a legal global constant on any target, so leaving it
-// there forces the whole table to be reconstructed per-invocation in every
-// using function. This helper completes the same lowering the function-body
-// pipeline would have done: given a call to a synthesized member-wise
-// constructor with the exact var / field-store / load / return shape, it
-// returns the equivalent `makeStruct`; otherwise it returns nullptr. The body
-// is verified field-by-field (rather than trusting the constructor decoration
-// alone) so that anything that is not a plain member-wise store of the
-// parameters — a base-struct initializer, a default field value, a conversion,
-// any control flow — causes a conservative bail, leaving the call to be inlined
-// as before.
-static IRInst* tryReplaceSynthesizedConstructorCallWithMakeStruct(IRCall* call)
+// A `Call` is never a legal global constant on any target, so left as-is the
+// whole table is force-inlined and reconstructed per-invocation in every using
+// function. When the constructor is provably member-wise (verified below) the
+// call is equivalent to a `makeStruct` of its arguments — the canonical
+// constant-aggregate form the legality gate and the emitter's global brace-init
+// folder already recognize. Normalizing to it here, at the module-global
+// legality boundary and only after proving the body shape, is what lets the
+// table stay a global constant.
+static IRInst* tryBuildMakeStructFromSynthesizedConstructorCall(IRCall* call)
 {
     auto callee = as<IRFunc>(getResolvedInstForDecorations(call->getCallee()));
     if (!callee)
@@ -420,7 +431,7 @@ static IRInst* tryReplaceSynthesizedConstructorCallWithMakeStruct(IRCall* call)
             loadedResult = inst;
             break;
         case kIROp_Return:
-            if (inst->getOperand(0) != loadedResult)
+            if (as<IRReturn>(inst)->getVal() != loadedResult)
                 return nullptr;
             break;
         default:
@@ -461,10 +472,19 @@ static IRInst* tryReplaceSynthesizedConstructorCallWithMakeStruct(IRCall* call)
 // This runs just before `inlineGlobalConstantsForLegalization` so the resulting
 // `makeStruct` (whose type the extended `isSimpleConstantType` now recognizes)
 // stays a legal global constant instead of being reconstructed per-invocation.
-// See `tryReplaceSynthesizedConstructorCallWithMakeStruct` for why the call
-// shape appears only at module scope and why folding it is the principled fix.
+// The same call shape also occurs inside function bodies, where it is left
+// alone (a local struct is legitimately constructed at runtime); only a
+// module-scope occurrence needs this normalization, because only there must the
+// value be a compile-time-constant aggregate. See
+// `tryBuildMakeStructFromSynthesizedConstructorCall` for why folding it is the
+// principled fix.
 void legalizeConstantConstructorCallsForGlobalScope(IRModule* module)
 {
+    // The domain is exactly the module's own children: a `static const`
+    // initializer's constructor calls are hoisted to module scope, so they are
+    // direct global insts here (never nested inside a function body). Collect
+    // them first, then transform, because the transform mutates this same
+    // global-inst list (`replaceUsesWith` + `removeAndDeallocate`).
     List<IRCall*> globalCalls;
     for (auto inst : module->getGlobalInsts())
     {
@@ -473,7 +493,7 @@ void legalizeConstantConstructorCallsForGlobalScope(IRModule* module)
     }
     for (auto call : globalCalls)
     {
-        if (auto makeStruct = tryReplaceSynthesizedConstructorCallWithMakeStruct(call))
+        if (auto makeStruct = tryBuildMakeStructFromSynthesizedConstructorCall(call))
         {
             call->replaceUsesWith(makeStruct);
             call->removeAndDeallocate();
