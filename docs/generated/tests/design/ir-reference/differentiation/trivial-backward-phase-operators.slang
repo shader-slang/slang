@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#reverse-mode
-//META: doc_section_digest=b18c139464f823deeeb4d040a62520838e80b082fa7e2f42dee8680582a5dec9
+//META: doc_section_digest=50d50fc11cd5cf0d2c306ba5b1a1d9c8f2003b1c2a912a6b97e3c47bfd1c314a
 //META: purpose=A [TreatAsDifferentiable] callable gets the trivial reverse-mode phases TrivialBackwardDifferentiatePrimal, TrivialBackwardDifferentiatePropagate and TrivialBackwardRemat instead of the ordinary ones.
 //META: intent=functional
 //META: pipeline_stage=lower
