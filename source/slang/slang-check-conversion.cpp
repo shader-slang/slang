@@ -2219,7 +2219,7 @@ bool SemanticsVisitor::_coerce(
             return true;
         }
 
-        // HLSL compatibility (shader-slang/slang#13075): an unscoped enum in an
+        // HLSL compatibility: an unscoped enum in an
         // HLSL-dialect translation unit may also convert implicitly to any
         // builtin scalar its tag type can reach, performed as two implicit
         // rounds that mirror the reverse composite below: first enum -> tag,

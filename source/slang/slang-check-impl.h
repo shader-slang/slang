@@ -2350,8 +2350,8 @@ public:
         TypeCoercionWitness** outWitnessOfConversion);
 
     /// Determine whether an unscoped enum may implicitly convert to the builtin
-    /// scalar type `toType`. This is the HLSL-compatibility widening from
-    /// shader-slang/slang#13075: it holds only for an enum that `isUnscopedEnum`
+    /// scalar type `toType`. This is an HLSL-compatibility widening: it holds
+    /// only for an enum that `isUnscopedEnum`
     /// accepts (one carrying `UnscopedEnumAttribute`, from either `-unscoped-enum`
     /// or an explicit `[UnscopedEnum]` — see that predicate for the exact routes),
     /// in a translation unit using the HLSL-flavored dialect, and never for `bool`

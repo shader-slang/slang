@@ -1193,8 +1193,12 @@ EnumDecl* isUnscopedEnum(Decl* decl)
         }
         else if (auto uncheckedAttribute = as<UncheckedAttribute>(mod))
         {
-            // We have to perform an ugly string comparison here, because the attributes
-            // haven't been checked during parsing.
+            // TODO: This unchecked, string-based attribute match exists only so that this
+            // predicate can be used during parsing, before attributes are checked. It is
+            // both ugly and fragile, and we should aspire to remove the need for it -- e.g.
+            // by not requiring an enum's unscoped-ness to be known at parse time -- so that
+            // "is this enum unscoped" can rely solely on the checked `UnscopedEnumAttribute`
+            // handled above.
             if (getText(uncheckedAttribute->keywordName) == "UnscopedEnum")
             {
                 return enumDecl;

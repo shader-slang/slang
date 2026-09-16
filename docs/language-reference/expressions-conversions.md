@@ -262,7 +262,6 @@ The following implicit type conversions are allowed:
 - `nullptr` to any pointer type
 - sized array to unsized array of the same element type
 - `enum` type to its tag type
-- an unscoped `enum` type to any builtin scalar type (except `bool`) its tag type can convert to, in the HLSL-compatibility dialect only (a `.hlsl` translation unit) and for an enum made unscoped via `-unscoped-enum` or an explicit `[UnscopedEnum]` (after GitHub issue [#13075](https://github.com/shader-slang/slang/issues/13075))
 - an initializer list to a type with an initializer that accepts the arguments in the list
 
 The following implicit type conversions are allowed but not recommended. A cell marked "after GitHub issue
@@ -291,6 +290,16 @@ When the source is a binary, octal, or hexadecimal integer literal converted to 
 considered lost only when set bits are dropped. This allows expressions such as `int16_t v = 0x8000`, where
 the literal value is technically out of range but only unset bits are dropped in truncation. (After GitHub
 issue [#10516](https://github.com/shader-slang/slang/issues/10516).)
+
+Finally, one implicit conversion exists **only as a source-compatibility feature for the HLSL-flavored
+dialect** and is intentionally kept out of the lists above. It is more restricted than the not-recommended
+cases: it is unavailable in Slang-dialect code entirely, and is provided only so that existing HLSL shaders
+that rely on an enum decaying to an arithmetic value continue to compile.
+
+- An **unscoped** `enum` (one made unscoped by `-unscoped-enum` or an explicit `[UnscopedEnum]`), in a `.hlsl`
+  translation unit, implicitly converts to any builtin scalar type other than `bool` that its tag type can
+  convert to, performed as `enum` &rarr; tag type &rarr; destination. This does not apply to scoped enums, to
+  `enum class`, or to any enum in a Slang-dialect translation unit.
 
 > 📝 **Remark:** Some common contexts for implicit type conversions:
 >
