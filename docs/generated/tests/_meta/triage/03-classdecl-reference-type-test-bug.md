@@ -41,6 +41,7 @@ Give the object an observable use and the expected shape appears:
 C a = new C(7);
 gOut[0] = a.v;
 ```
+
 ```cpp
 class C_0 : public RefObject
 static RefPtr<C_0> C_x24init_0(int32_t x_0)
@@ -71,3 +72,14 @@ RWStructuredBuffer<int> gOut;
 This is the general hazard for any characterization test whose subject is a
 value rather than a diagnostic: DCE is entitled to delete anything unobserved,
 so the test has to make the thing it is pinning reachable from an output.
+
+---
+
+## Resolved 2026-09-12
+
+Fixed as described: the test now stores `a.v` into an `RWStructuredBuffer`, so
+the allocation survives DCE and reaches emit, and the `//CHECK: new C` has real
+output to match. The comment above the shader records why the store is load-
+bearing, so it is not removed as noise by a later edit.
+
+The test passes and its `expected-failures.txt` entry has been removed.

@@ -1955,7 +1955,7 @@ err(
     "count-of-argument-is-invalid",
     30083,
     "invalid countof argument",
-    span { loc = "expr:Expr", message = "argument to countof can only be a type pack or tuple" }
+    span { loc = "expr:Expr", message = "argument to countof must be a type pack, tuple, value pack, or fixed-size array" }
 )
 
 err(
@@ -3501,6 +3501,20 @@ err(
     span { loc = "location", message = "loops inside a differentiable function need to provide either '[MaxIters(n)]' or '[ForceUnroll]' attribute." }
 )
 
+warning(
+    "compile-time-for-is-deprecated",
+    30525,
+    "compile-time for is deprecated",
+    span { loc = "location", message = "compile-time for is deprecated and will be removed in Slang 202c. Use '[ForceUnroll] for' instead." }
+)
+
+err(
+    "compile-time-for-is-removed",
+    30526,
+    "compile-time for has been removed",
+    span { loc = "location", message = "compile-time for has been removed from the language. Use '[ForceUnroll] for' instead." }
+)
+
 -- Switch (306xx)
 
 err(
@@ -4401,6 +4415,13 @@ err(
     38012,
     "entry point cannot return array type",
     span { loc = "location", message = "entry point '~entryPoint:Name' cannot return array type '~returnType:Type'" }
+)
+
+err(
+    "entry-point-cannot-throw",
+    38053,
+    "entry point cannot have a 'throws' clause",
+    span { loc = "location", message = "entry point '~entryPoint:Name' cannot declare a 'throws' clause; a shader entry point has no error return channel, so handle the error inside the entry point with 'do'/'catch' instead" }
 )
 
 err(

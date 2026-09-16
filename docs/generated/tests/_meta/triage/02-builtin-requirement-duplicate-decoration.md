@@ -51,7 +51,7 @@ note: non-matching line after previous match is here
 
 Two observations rule out a dump artifact:
 
-1. For kind 26 an unrelated `StaticRequirementDecoration` sits *between* the
+1. For kind 26 an unrelated `StaticRequirementDecoration` sits _between_ the
    two copies. A repeated print of a single decoration could not interleave a
    third one.
 2. Both decoration lines precede one `let ... = builtinRequirementKey(...)`
@@ -73,10 +73,11 @@ The single call site is already guarded, and its comment says exactly why:
 if (!requirementKey->findDecoration<IRBuiltinRequirementDecoration>())
     builder->addBuiltinRequirementDecoration(requirementKey, (IRIntegerValue)builtinRole);
 ```
+
 — `source/slang/slang-lower-to-ir.cpp:1817-1820`
 
 `addBuiltinRequirementDecoration` has exactly one caller in the tree
-(confirmed by grep over `source/`), so a second *add* is not the obvious
+(confirmed by grep over `source/`), so a second _add_ is not the obvious
 mechanism. The more likely one is a path that copies decorations onto the
 shared key — cloning, or a specialization/linking helper that runs during
 lowering. That was not pinned down here and is left for whoever picks the

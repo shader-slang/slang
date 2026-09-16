@@ -44,6 +44,8 @@ Slang language version 2025 brings these changes on top of the legacy language:
 - Modifier `volatile` has been deprecated in Slang. See GitHub issue
   [#10614](https://github.com/shader-slang/slang/issues/10614) for details. The modifier is still accepted
   in GLSL source code for compatibility reasons.
+- Compile-time for (`$for`) has been deprecated. Use `[ForceUnroll] for` instead. See GitHub issue
+  [#13065](https://github.com/shader-slang/slang/issues/13065) for details.
 
 ## Slang 2026
 
@@ -89,3 +91,5 @@ Slang language version 202c brings these changes on top of Slang 2026:
   it is now a regular conversion. To maintain the previous semantics, a constructor call with no arguments can
   be used instead (e.g., `MyStruct()`). See GitHub issue
   [#12045](https://github.com/shader-slang/slang/issues/12045) for details.
+- Compile-time for (`$for`) has been removed from the language. Use `[ForceUnroll] for` instead. See GitHub issue
+  [#13065](https://github.com/shader-slang/slang/issues/13065) for details.
