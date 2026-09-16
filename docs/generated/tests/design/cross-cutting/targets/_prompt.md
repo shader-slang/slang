@@ -209,6 +209,11 @@ These add to the universal lessons in `_common.md`. Apply them ALL:
   in `__ldg`. Use `StructuredBuffer<T>` or `ConstantBuffer<T>` for a
   positive `__ldg` observation, and use a top-level `uniform` only
   for the corresponding `CHECK-NOT` boundary.
+- **Pair cross-target `-NOT` checks with positive emit anchors.** A
+  FileCheck prefix containing only `-NOT: __ldg` can pass on empty
+  output. For each non-CUDA arm of an immutable-buffer test, match a
+  target-specific ordinary buffer load and bracket that anchor with
+  `-NOT: __ldg` before and after it.
 - **`__target_switch` must include a `default:` arm** (or be
   exhaustive over every active target keyhole) when feeding through
   `slangc` — a missing arm for an active target is itself a
