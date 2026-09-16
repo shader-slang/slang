@@ -993,7 +993,10 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
 /// on both paths; they are what stop a corrupt or future-version table from truncating
 /// `numChars` or overflowing the allocation the subsequent `memcpy` writes into, and a
 /// duplicate of this switch is easy to write without them.
-static size_t _takeInstMinSizeInBytes(IROp op, const FlatInstTable& flat, Int64& ioStringLengthCursor)
+static size_t _takeInstMinSizeInBytes(
+    IROp op,
+    const FlatInstTable& flat,
+    Int64& ioStringLengthCursor)
 {
     switch (op)
     {
