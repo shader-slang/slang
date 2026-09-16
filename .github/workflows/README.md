@@ -297,7 +297,6 @@ PR against your branch, so a failed check can be fixed without a local checkout.
 | Workflow                           | Purpose                                                     |
 | ---------------------------------- | ----------------------------------------------------------- |
 | `ci-falcor2-perf-bridge-smoke.yml` | Manual smoke test for the Falcor 2 perf bridge prototype.   |
-| `ci-retry.yml`                     | Waits for a run to finish, then reruns its failed jobs.     |
 | `perf-compile-release-sweep.yml`   | Backfills compile-performance history across past releases. |
 | `check-spirv-tools.yml`            | Placeholder for a SPIRV-Tools tip-of-tree check.            |
 
