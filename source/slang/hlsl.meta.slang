@@ -19552,6 +19552,8 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 ${
         if (isReadOnly) {
 $}
+    // These exact-signature members witness `IArray<T>`. The native `uint` subscript remains a
+    // separate overload.
     int getCount()
     {
         uint count;
