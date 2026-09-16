@@ -6,6 +6,7 @@
 // positive case in desc-heap-combined-sampler-default-model-gh-13085.slang.
 
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -profile spirv_1_6 -capability spvDescriptorHeapEXT -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage fragment -entry main -profile sm_6_6
 
 [shader("fragment")]
 float4 main(float3 coordinate : TEXCOORD0) : SV_Target

@@ -692,12 +692,15 @@ void main(uint3 tid : SV_DispatchThreadID)
 `ResourceDescriptorHeap` only converts to resource (CBV/SRV/UAV) types and `SamplerDescriptorHeap` only
 to sampler types; a heap-family mismatch (for example `SamplerState s = ResourceDescriptorHeap[i];`, or
 `Texture2D.Handle th = SamplerDescriptorHeap[j];`) is a compile error. Separately, a combined
-texture-sampler (e.g. `Sampler2D`) cannot be recovered from a single-index `ResourceDescriptorHeap[i]`
-handle on the targets whose combined-sampler lowering uses a separate sampler descriptor (HLSL, and
-SPIR-V with the `spvDescriptorHeapEXT` extension), because it requires two distinct heap indices; use
-the explicit `Sampler2D.Handle(uint2(resourceIndex, samplerIndex))` form there. On the default
-SPIR-V and GLSL model a combined sampler is a single native descriptor read by one index, so the
-single-index form is accepted there. The recovered value rides the
+texture-sampler (e.g. `Sampler2D`) needs two distinct heap indices -- one for the texture and one for
+the sampler -- on HLSL and on SPIR-V with the `spvDescriptorHeapEXT` extension, whose lowering keeps
+the two as separate descriptors. A single-index `ResourceDescriptorHeap[i]` handle supplies only one,
+so building a combined sampler from it is a compile-time error on those targets; use the explicit
+`Sampler2D.Handle(uint2(resourceIndex, samplerIndex))` form, which supplies both, instead. The
+single-index form is accepted where a combined sampler is one native descriptor indexed by a single
+value -- the default SPIR-V and GLSL model, and the `spvBindlessTextureNV` path. (On WGSL, recovering a
+combined texture-sampler from the descriptor heap is not currently supported in either form -- an
+unrelated limitation of WGSL's combined-sampler lowering.) The recovered value rides the
 existing `DescriptorHandle<T>` lowering, so this syntax is available on the same targets as the
 `DescriptorHandle<T>` representation it builds — HLSL, SPIR-V, GLSL, and WGSL — and lowers through the
 bindless path described below. On targets where that representation is unavailable (Metal, CUDA, CPU),

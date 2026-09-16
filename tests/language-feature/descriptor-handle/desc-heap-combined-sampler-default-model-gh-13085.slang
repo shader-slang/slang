@@ -1,10 +1,11 @@
 // Positive companion to desc-heap-combined-sampler-gh-13085.slang for shader-slang/slang#13085.
 // On the default SPIR-V and GLSL bindless model a combined texture-sampler is a single native
 // descriptor loaded by one heap index (getDescriptorFromDynamicResourceHeap reads only `.x`), so
-// building one from a single-index `ResourceDescriptorHeap[i]` handle is correct and must keep
-// compiling -- the rejection is scoped to the targets that consume a separate sampler index. Both
-// single-index paths (the direct `_Texture` conversion and the `.Handle` conversion) are covered
-// here, WITHOUT spvDescriptorHeapEXT.
+// building one from a single-index `ResourceDescriptorHeap[i]` handle must keep compiling -- the
+// rejection is scoped to the targets that consume a separate sampler index. The `SPV`/`GLSL` checks
+// below confirm the guard does not fire on the default model: the shader still compiles. They do not
+// assert which heap slot is loaded. Both single-index paths (the direct `_Texture` conversion and the
+// `.Handle` conversion) are covered here, WITHOUT spvDescriptorHeapEXT.
 
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -stage fragment -entry main -profile spirv_1_6 -emit-spirv-directly
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage fragment -entry main
