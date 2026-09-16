@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#functype
-//META: doc_section_digest=5e92206b0f0b0b7cbc40b1055a81166a8628747c755d5cf61ab0cfb9b61096cf
+//META: doc_section_digest=1aae0462f279ac2b648e03663edfa7d1a259b7889cb50a6d6ae179281e018a5e
 //META: purpose=A parameter's passing-mode qualifier is part of the parameter's type rather than stored beside it, so the mode appears in the rendered function type of a candidate.
 //META: intent=negative
 //META: pipeline_stage=check

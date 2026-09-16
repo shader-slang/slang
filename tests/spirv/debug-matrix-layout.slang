@@ -1,8 +1,10 @@
-// Validate DebugTypeMatrix column major argument for buffer and local matrices.
-// Expect matrix layout to affect buffer matrices, but not local matrices which are always row-major (ColMajor in SPIR-V).
+// Validate buffer storage decorations and matrix debug types for buffer and local matrices.
+// Expect explicit or command-line layout to affect buffer member decorations, while every
+// DebugTypeMatrix uses SPIR-V's column-vector form (Column Major = true).
 //
 //TEST:SIMPLE(filecheck=CHECK,CHECK_COL):-target spirv-asm -g2 -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=CHECK,CHECK_ROW):-target spirv-asm -g2 -matrix-layout-row-major
+//TEST:SIMPLE(filecheck=CHECK_NO_ROW_VECTOR):-target spirv-asm -g2 -matrix-layout-column-major
 
 struct S
 {
@@ -38,40 +40,44 @@ void main()
 }
 
 
-// Check struct members have correct matrix layouts
+// Check struct members have correct matrix layouts.
 //CHECK_ROW-DAG: OpMemberDecorate {{.*}} 0 ColMajor
 //CHECK_COL-DAG: OpMemberDecorate {{.*}} 0 RowMajor
 //CHECK-DAG: OpMemberDecorate {{.*}} 1 RowMajor
 //CHECK-DAG: OpMemberDecorate {{.*}} 2 ColMajor
 
-// When checking we have the correct debug info, we verify by:
-// 1. Getting the ids of the column-major and row-major DebugTypeMatrix (DTM_COLMAJOR and DTM_ROWMAJOR)
-// 2. Getting the OpString id for the member/variable to check (STR_member/variable)
-// 3. Check the DebugTypeMember/DebugLocalVariable has the expected id of the member/variable and id of the column-major or row-major DebugTypeMatrix
-
-//CHECK-DAG: [[FALSE:%[a-zA-Z0-9_]+]] = OpConstantFalse %bool
+// A float3x2 SPIR-V matrix value is three vec2 columns. To verify the debug info:
+// 1. Capture that canonical DebugTypeMatrix ID.
+// 2. Capture each buffer member or local variable's OpString ID.
+// 3. Verify its DebugTypeMember or DebugLocalVariable refers to that canonical type.
+//CHECK-DAG: [[TWO:%[a-zA-Z0-9_]+]] = OpConstant %uint 2{{$}}
+//CHECK-DAG: [[THREE:%[a-zA-Z0-9_]+]] = OpConstant %uint 3{{$}}
 //CHECK-DAG: [[TRUE:%[a-zA-Z0-9_]+]] = OpConstantTrue %bool
-//CHECK-DAG: [[DTM_COLMAJOR:%[0-9]+]] = OpExtInst %void {{.*}} DebugTypeMatrix {{.*}} [[FALSE]]
-//CHECK-DAG: [[DTM_ROWMAJOR:%[0-9]+]] = OpExtInst %void {{.*}} DebugTypeMatrix {{.*}} [[TRUE]]
+//CHECK-DAG: [[VEC2:%[0-9]+]] = OpExtInst %void {{.*}} DebugTypeVector {{.*}} [[TWO]]
+//CHECK-DAG: [[DTM:%[0-9]+]] = OpExtInst %void {{.*}} DebugTypeMatrix [[VEC2]] [[THREE]] [[TRUE]]
 
-// Buffer fields (capture via member -> type -> ordering)
+// Buffer members all refer to the canonical matrix debug type.
 //CHECK-DAG: [[STR_M:%[0-9]+]] = OpString "m"
-//CHECK_COL-DAG: DebugTypeMember [[STR_M]] [[DTM_COLMAJOR]]
-//CHECK_ROW-DAG: DebugTypeMember [[STR_M]] [[DTM_ROWMAJOR]]
+//CHECK-DAG: DebugTypeMember [[STR_M]] [[DTM]]
 
 //CHECK-DAG: [[STR_MCOL:%[0-9]+]] = OpString "mcol"
-//CHECK-DAG: DebugTypeMember [[STR_MCOL]] [[DTM_COLMAJOR]]
+//CHECK-DAG: DebugTypeMember [[STR_MCOL]] [[DTM]]
 
 //CHECK-DAG: [[STR_MROW:%[0-9]+]] = OpString "mrow"
-//CHECK-DAG: DebugTypeMember [[STR_MROW]] [[DTM_ROWMAJOR]]
+//CHECK-DAG: DebugTypeMember [[STR_MROW]] [[DTM]]
 
-// Locals (capture via DebugLocalVariable -> type -> ordering)
+// Locals refer to the same canonical matrix debug type.
 //CHECK-DAG: [[STR_M_LOCAL:%[0-9]+]] = OpString "m_local"
-//CHECK-DAG: DebugLocalVariable [[STR_M_LOCAL]] [[DTM_ROWMAJOR]]
+//CHECK-DAG: DebugLocalVariable [[STR_M_LOCAL]] [[DTM]]
 
 //CHECK-DAG: [[STR_MCOL_LOCAL:%[0-9]+]] = OpString "mcol_local"
-//CHECK-DAG: DebugLocalVariable [[STR_MCOL_LOCAL]] [[DTM_ROWMAJOR]]
+//CHECK-DAG: DebugLocalVariable [[STR_MCOL_LOCAL]] [[DTM]]
 
 //CHECK-DAG: [[STR_MROW_LOCAL:%[0-9]+]] = OpString "mrow_local"
-//CHECK-DAG: DebugLocalVariable [[STR_MROW_LOCAL]] [[DTM_ROWMAJOR]]
+//CHECK-DAG: DebugLocalVariable [[STR_MROW_LOCAL]] [[DTM]]
+
+// Reject the unsupported row-vector DebugTypeMatrix form anywhere in the module.
+//CHECK_NO_ROW_VECTOR: OpCapability Shader
+//CHECK_NO_ROW_VECTOR-NOT: OpExtInst %void {{.*}} DebugTypeMatrix {{.*}} %false
+//CHECK_NO_ROW_VECTOR: OpFunctionEnd
 

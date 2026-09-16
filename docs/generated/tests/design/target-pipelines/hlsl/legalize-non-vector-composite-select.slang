@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#legalizenonvectorcompositeselect
-//META: doc_section_digest=df783fe9f7eb04b5ed0ac969a54f8362c05373a06817be1cb797d8588ef3e724
+//META: doc_section_digest=a3c7d5fd8d2bdc4d89a104ece416b2229b6933d286d320d9680ea40bec1ff78a
 //META: purpose=HLSL-only legalizeNonVectorCompositeSelect rewrites a struct-typed conditional into an explicit if/else with a temporary.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

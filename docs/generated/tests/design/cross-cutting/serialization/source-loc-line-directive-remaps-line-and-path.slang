@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#source-location-serialization
-//META: doc_section_digest=ae999a9ca10102d601efa25676c15bb84b077c450aa17af1e8655c2470159d1f
+//META: doc_section_digest=c3e541277e1a118f0563d54ebc7447a80c95e6db1fca53bafa9002c1df39445a
 //META: purpose=A location covered by a #line directive keeps both halves of its adjusted record, so emit renders the remapped line index and the overridden path while a location outside the directive's reach still renders the physical file.
 //META: intent=functional
 //META: pipeline_stage=emit

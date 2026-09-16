@@ -15,7 +15,7 @@ jobs:
   falcor2-perf-bridge-smoke:
     name: Falcor 2 perf bridge smoke
     timeout-minutes: 30
-    runs-on: [Linux, self-hosted, X64, falcor2-perf-bridge]
+    runs-on: [Linux, self-hosted, X64, falcor-bridge]
     # Keep this public workflow thin, matching ci-falcor-test.yml.
     defaults:
       run:

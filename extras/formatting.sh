@@ -294,7 +294,7 @@ read_lines() {
 cmake_formatting() {
   echo "Formatting CMake files..." >&2
 
-  read_lines < <(list_files '*.cmake' 'CMakeLists.txt' '**/CMakeLists.txt')
+  read_lines < <(list_files '*.cmake' 'CMakeLists.txt' '**/CMakeLists.txt' ':!tests/spvdb/**')
   [ ${#files[@]} -gt 0 ] || return 0
 
   common_args=(
@@ -332,7 +332,7 @@ track_progress() {
 cpp_formatting() {
   echo "Formatting cpp files..." >&2
 
-  read_lines < <(list_files '*.cpp' '*.hpp' '*.c' '*.h' ':!external/**')
+  read_lines < <(list_files '*.cpp' '*.hpp' '*.c' '*.h' ':!external/**' ':!tests/spvdb/**')
   [ ${#files[@]} -gt 0 ] || return 0
 
   # The progress reporting is a bit sneaky, we use `--verbose` with xargs which
@@ -383,7 +383,7 @@ prettier_formatting() {
 yaml_json_formatting() {
   echo "Formatting yaml and json files..." >&2
 
-  read_lines < <(list_files "*.yaml" "*.yml" "*.json" ':!external/**')
+  read_lines < <(list_files "*.yaml" "*.yml" "*.json" ':!external/**' ':!tests/spvdb/**')
   [ ${#files[@]} -gt 0 ] || return 0
 
   prettier_formatting
@@ -392,7 +392,7 @@ yaml_json_formatting() {
 markdown_formatting() {
   echo "Formatting markdown files..." >&2
 
-  read_lines < <(list_files "*.md" ':!external/**')
+  read_lines < <(list_files "*.md" ':!external/**' ':!tests/spvdb/**')
   [ ${#files[@]} -gt 0 ] || return 0
 
   prettier_formatting
