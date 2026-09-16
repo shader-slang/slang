@@ -11,8 +11,12 @@
 // CHECK-NEXT: 2
 // CHECK-NEXT: 7
 // CHECK-NEXT: 12
+// CHECK-NEXT: 10
+// CHECK-NEXT: 20
+// CHECK-NEXT: 7
+// CHECK-NEXT: 8
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 
 import slang.numerics;
 
@@ -119,4 +123,11 @@ void computeMain()
     int2 vectorResult = boundedVectorProductSum(int2(2, 5), int2(4, 3), int2(7, 12));
     outputBuffer[3] = vectorResult.x;
     outputBuffer[4] = vectorResult.y;
+
+    // These calls also verify that the C++ and CUDA preludes provide the helper names emitted for
+    // extrema over the small builtin integer types.
+    outputBuffer[5] = int(boundedProductSum(int8_t(3), int8_t(4), int8_t(10)));
+    outputBuffer[6] = int(boundedProductSum(int16_t(5), int16_t(6), int16_t(20)));
+    outputBuffer[7] = int(boundedProductSum(uint8_t(4), uint8_t(2), uint8_t(7)));
+    outputBuffer[8] = int(boundedProductSum(uint16_t(2), uint16_t(3), uint16_t(12)));
 }
