@@ -147,15 +147,9 @@ function(add_sanitizer_options target)
     endif()
 
     if(SLANG_ENABLE_TSAN)
-        if(WIN32)
-            # ThreadSanitizer has no Windows implementation in any of clang-cl,
-            # MinGW, or MSVC, so reject it here rather than emit flags that fail
-            # to compile or link.
-            message(
-                FATAL_ERROR
-                "SLANG_ENABLE_TSAN is not supported on Windows."
-            )
-        elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        # The Windows-unsupported case is rejected at option-validation time in
+        # the top-level CMakeLists, so it never reaches here.
+        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
             target_compile_options(${target} PRIVATE -fsanitize=thread)
             target_link_options(${target} BEFORE PRIVATE -fsanitize=thread)
             if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT APPLE)

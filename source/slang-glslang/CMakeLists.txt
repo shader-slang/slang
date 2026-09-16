@@ -6,6 +6,15 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         .
         MODULE
         USE_FEWER_WARNINGS
+        # Skip ASan and TSan instrumentation of this wrapper: it links the external
+        # glslang / SPIRV-Tools libraries, which are unsanitized and, on the
+        # platforms where TSan runs, are never instrumented regardless of this flag.
+        # ASan simply leaves that boundary unchecked. TSan stays sound because it
+        # intercepts pthread/mutex synchronization process-wide, so glslang's own
+        # locking is observed even though its memory accesses are not; the mutable
+        # data crossing the boundary is per-call and disjoint (glslang's pool
+        # allocator is thread-local), and shared inputs such as the resource-limit
+        # table are read-only.
         SKIP_SANITIZERS
         LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt SPIRV-Tools-link
         INCLUDE_DIRECTORIES_PRIVATE

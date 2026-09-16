@@ -181,6 +181,13 @@ if(SLANG_ENABLE_ASAN AND SLANG_ENABLE_TSAN)
         "SLANG_ENABLE_ASAN and SLANG_ENABLE_TSAN are mutually exclusive; enable at most one."
     )
 endif()
+# ThreadSanitizer has no Windows implementation in clang-cl, MinGW, or MSVC.
+# Reject it here alongside the mutual-exclusion check so both SLANG_ENABLE_TSAN
+# constraints fail fast at configure time in one place, rather than surfacing
+# later during per-target setup.
+if(SLANG_ENABLE_TSAN AND WIN32)
+    message(FATAL_ERROR "SLANG_ENABLE_TSAN is not supported on Windows.")
+endif()
 option(SLANG_ENABLE_COVERAGE "Enable code coverage instrumentation")
 option(
     SLANG_ENABLE_TIME_TRACE
@@ -395,10 +402,16 @@ advanced_option(
     "Use mimalloc for Slang-owned allocations"
     ${SLANG_ENABLE_MIMALLOC_DEFAULT}
 )
-if(SLANG_ENABLE_MIMALLOC AND (SLANG_ENABLE_ASAN OR SLANG_ENABLE_TSAN))
+if(SLANG_ENABLE_MIMALLOC AND SLANG_ENABLE_ASAN)
     message(
         WARNING
-        "SLANG_ENABLE_MIMALLOC is enabled with a sanitizer (SLANG_ENABLE_ASAN or SLANG_ENABLE_TSAN); replacing the allocator may reduce sanitizer coverage because Slang-owned allocations bypass the sanitizer's interceptors"
+        "SLANG_ENABLE_MIMALLOC is enabled with SLANG_ENABLE_ASAN, but this mimalloc configuration does not enable ASan tracking"
+    )
+endif()
+if(SLANG_ENABLE_MIMALLOC AND SLANG_ENABLE_TSAN)
+    message(
+        WARNING
+        "SLANG_ENABLE_MIMALLOC is enabled with SLANG_ENABLE_TSAN, but this mimalloc configuration is not built with TSan instrumentation (MI_DEBUG_TSAN), so data races inside mimalloc's own allocator are not detected"
     )
 endif()
 
