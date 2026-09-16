@@ -57,14 +57,13 @@ void simplifyIR(
 {
     SLANG_PROFILE;
 
-    // Callee-side-effect memo shared by every DCE invocation in this pass, and also by the
-    // removeRedundancyInFunc call below (see IRDeadCodeEliminationOptions::calleeSideEffectCache
-    // for the sharing contract, and slang-ir-redundancy-removal.h for why staleness is safe for
-    // that second consumer). Cleared each outer iteration so both consumers see the purity facts
-    // propagateFuncProperties proves that iteration. removeRedundancyInFunc itself runs inside
-    // the inner per-func loop, up to kMaxFuncIterations times per outer iteration, without an
-    // additional clear -- safe because propagateFuncProperties (the only thing in this pass that
-    // can change a callee's purity) runs once per outer iteration, before the inner loop starts.
+    // Callee-side-effect memo shared by DCE and the removeRedundancyInFunc call below (see
+    // IRDeadCodeEliminationOptions::calleeSideEffectCache and slang-ir-redundancy-removal.h).
+    // Cleared each outer iteration, before propagateFuncProperties updates purity facts for that
+    // iteration. Unlike the sibling simplifyNonSSAIR/simplifyFunc, this omits a clear inside the
+    // inner per-func loop that calls removeRedundancyInFunc -- safe because
+    // propagateFuncProperties is this pass's only purity mutator, and it runs once per outer
+    // iteration, before the inner loop starts.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
@@ -134,13 +133,9 @@ void simplifyNonSSAIR(
     DiagnosticSink* sink)
 {
     // Shared with removeRedundancy below, not just eliminateDeadCode -- see
-    // slang-ir-redundancy-removal.h for why a stale entry isn't automatically safe for that
-    // consumer the way it is for DCE. No step in this loop currently mutates callee purity, so
-    // the per-iteration `clear()` below is a defensive safeguard, not a live correctness
-    // requirement -- mirroring simplifyIR's clear so the loop doesn't come to depend on that
-    // staying true. It clears whichever cache is in effect, local or caller-supplied: if a
-    // future caller passes in `options.deadCodeElimOptions.calleeSideEffectCache` already
-    // populated, expecting entries to survive one call to this function, they won't.
+    // slang-ir-redundancy-removal.h for why staleness is unsafe there. No step in this loop
+    // mutates callee purity, so the per-iteration `clear()` is defensive, not required -- it
+    // mirrors simplifyIR's clear, and also empties a caller-supplied cache if one was passed in.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;

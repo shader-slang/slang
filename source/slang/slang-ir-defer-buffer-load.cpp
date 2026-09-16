@@ -212,19 +212,10 @@ struct DeferBufferLoadContext
 {
     CodeGenContext* codeGenContext;
 
-    // Shared across every function in the module (see
-    // `IRDeadCodeEliminationOptions::calleeSideEffectCache` for the sharing contract): the
-    // `removeRedundancyInFunc` call in `deferBufferLoadInFunc` below re-runs the load/store
-    // redundancy walk on every function this pass touches, and without a shared cache each
-    // function pays its own O(#call sites to that callee) cost to answer the same "does this
-    // callee have side effects" question for callees shared across the module (e.g. a resource
-    // `Sample` intrinsic called from every deferred load site). Never cleared, so it is only
-    // safe to share unconditionally because nothing this pass does -- `deferBufferLoadInst`
-    // rewriting a load's shape (its `transferDecorationsTo` calls move decorations on the load/
-    // `GetElement`/`FieldExtract` insts being rewritten, never on a callee function inst) or the
-    // `removeRedundancyInFunc` call itself -- adds/removes an `IRNoSideEffectDecoration`/
-    // `IRReadNoneDecoration`, or creates/deletes an `IRAnnotation` that `doesCalleeHaveSideEffect`
-    // reads. A future change to either would need to clear this cache (or stop sharing it).
+    // Shared across every function in the module and never cleared for this pass's lifetime (see
+    // `slang-ir-redundancy-removal.h` for the staleness contract this depends on). Safe because
+    // this pass never mutates callee purity -- it only rewrites load shape and moves per-load
+    // decorations.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
 
     void deferBufferLoadInst(IRBuilder& builder, List<IRInst*>& workList, IRInst* loadInst)
