@@ -2253,6 +2253,15 @@ bool SemanticsVisitor::_coerce(
                     &innerCost,
                     nullptr))
             {
+                // Cost is additive across the two rounds: the enum -> tag leg
+                // reuses kConversionCost_RankPromotion (matching the direct
+                // enum -> tag case above) plus the inner tag -> destination cost.
+                // This keeps enum -> tag (150) cheaper than enum -> float
+                // (150 + 400 = 550), so overload resolution still prefers the
+                // tag. No E30081 "unrecommended implicit conversion" warning
+                // fires on this path: we return here, before the
+                // initializer-overload branch that emits it, and the inner leg
+                // (int -> float, 400) stays below that branch's threshold (500).
                 if (outCost)
                     *outCost = kConversionCost_RankPromotion + innerCost;
                 if (outToExpr)

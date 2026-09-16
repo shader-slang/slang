@@ -277,7 +277,7 @@ enum Channel : uint16_t
 }
 ```
 
-By default, the underlying type of an enumeration type is `int`. Enumeration types are implicitly convertible to their underlying type. All enumeration types conform to the builtin `ILogical` interface, which provides operator overloads for bit operations. The following code is allowed:
+By default, the underlying type of an enumeration type is `int`. Enumeration types are implicitly convertible to their underlying type. (As an HLSL-compatibility feature, in a `.hlsl` translation unit an *unscoped* enumeration additionally converts implicitly to any builtin scalar its underlying type can reach — for example `float f = MyEnum.Case;` — but this widening does not apply to Slang-dialect code; see GitHub issue [#13075](https://github.com/shader-slang/slang/issues/13075).) All enumeration types conform to the builtin `ILogical` interface, which provides operator overloads for bit operations. The following code is allowed:
 
 ```csharp
 void test()

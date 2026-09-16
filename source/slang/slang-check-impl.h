@@ -2351,11 +2351,11 @@ public:
 
     /// Determine whether an unscoped enum may implicitly convert to the builtin
     /// scalar type `toType`. This is the HLSL-compatibility widening from
-    /// shader-slang/slang#13075: it holds only for an enum carrying
-    /// `UnscopedEnumAttribute` (which the parser attaches to every non-generic
-    /// enum parsed under `-unscoped-enum`) in a translation unit using the
-    /// HLSL-flavored dialect, and never for `bool` (which already has its own
-    /// implicit conversion from any `__EnumType`).
+    /// shader-slang/slang#13075: it holds only for an enum that `isUnscopedEnum`
+    /// accepts (one carrying `UnscopedEnumAttribute`, from either `-unscoped-enum`
+    /// or an explicit `[UnscopedEnum]` — see that predicate for the exact routes),
+    /// in a translation unit using the HLSL-flavored dialect, and never for `bool`
+    /// (which already has its own implicit conversion from any `__EnumType`).
     bool isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.

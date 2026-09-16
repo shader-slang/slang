@@ -262,6 +262,7 @@ The following implicit type conversions are allowed:
 - `nullptr` to any pointer type
 - sized array to unsized array of the same element type
 - `enum` type to its tag type
+- an unscoped `enum` type to any builtin scalar type (except `bool`) its tag type can convert to, in the HLSL-compatibility dialect only (a `.hlsl` translation unit) and for an enum made unscoped via `-unscoped-enum` or an explicit `[UnscopedEnum]` (after GitHub issue [#13075](https://github.com/shader-slang/slang/issues/13075))
 - an initializer list to a type with an initializer that accepts the arguments in the list
 
 The following implicit type conversions are allowed but not recommended. A cell marked "after GitHub issue
