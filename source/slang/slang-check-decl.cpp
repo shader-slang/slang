@@ -733,6 +733,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkInterfaceRequirement(Decl* decl);
 
     void checkCallableDeclCommon(CallableDecl* decl);
+    void attachThisParamPassingMode(CallableDecl* decl);
     void maybeInferPrefixModifierForOperator(CallableDecl* decl);
     void checkPublicCallableOperandVisibility(CallableDecl* decl);
 
@@ -5341,30 +5342,13 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
     DeclRef<CallableDecl> requiredMemberDeclRef,
     RefPtr<WitnessTable> witnessTable)
 {
-    if (satisfyingMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>() !=
-        requiredMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>())
+    if (getDeclaredThisParamPassingMode(satisfyingMemberDeclRef.getDecl()) !=
+        getDeclaredThisParamPassingMode(requiredMemberDeclRef.getDecl()))
     {
-        // A `[mutating]` method can't satisfy a non-`[mutating]` requirement.
-        // The opposite direction is okay, but we will need to synthesize a wrapper
-        // to ensure type matches, so we will return false here either way.
-        return false;
-    }
-
-    if (satisfyingMemberDeclRef.getDecl()->hasModifier<ConstRefAttribute>() !=
-        requiredMemberDeclRef.getDecl()->hasModifier<ConstRefAttribute>())
-    {
-        // A `[constref]` method can't satisfy a non-`[constref]` requirement.
-        // The opposite direction is okay, but we will need to synthesize a wrapper
-        // to ensure type matches, so we will return false here either way.
-        return false;
-    }
-
-    if (satisfyingMemberDeclRef.getDecl()->hasModifier<RefAttribute>() !=
-        requiredMemberDeclRef.getDecl()->hasModifier<RefAttribute>())
-    {
-        // A `[ref]` method can't satisfy a non-`[ref]` requirement.
-        // The opposite direction is okay, but we will need to synthesize a wrapper
-        // to ensure type matches, so we will return false here either way.
+        // A direct witness requires the satisfying member's `this` to be passed exactly as the
+        // requirement's. A merely compatible mismatch (one mode a wrapper could adapt to the other)
+        // is not treated as a direct match here; we return false so that requirement-witness
+        // synthesis handles it downstream.
         return false;
     }
 
@@ -16239,6 +16223,21 @@ void SemanticsDeclHeaderVisitor::maybeInferPrefixModifierForOperator(CallableDec
     addModifier(decl, prefixModifier);
 }
 
+void SemanticsDeclHeaderVisitor::attachThisParamPassingMode(CallableDecl* decl)
+{
+    // Cache the declared `this`-passing mode as a modifier on `decl`, so that the front-end query
+    // callers (semantic checking, lookup, conformance matching) and IR lowering's leaf read it
+    // through `getDeclaredThisParamPassingMode` rather than each re-deriving it from the raw
+    // attributes. This runs at the end of signature checking, where the modifiers and declaration
+    // kind are stable.
+    if (!decl->findModifier<ThisParamPassingModeModifier>())
+    {
+        auto modifier = m_astBuilder->create<ThisParamPassingModeModifier>();
+        modifier->mode = getDeclaredThisParamPassingMode(decl);
+        addModifier(decl, modifier);
+    }
+}
+
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 {
     for (auto paramDecl : decl->getParameters())
@@ -16311,6 +16310,8 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 
     checkInterfaceRequirement(decl);
     checkVisibility(decl);
+
+    attachThisParamPassingMode(decl);
 }
 
 void SemanticsDeclHeaderVisitor::checkPublicCallableOperandVisibility(CallableDecl* decl)
@@ -17476,6 +17477,8 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
     }
 
     checkDifferentiableCallableCommon(decl);
+
+    attachThisParamPassingMode(decl);
 }
 
 void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
@@ -17562,6 +17565,8 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
         }
     }
     checkDifferentiableCallableCommon(decl);
+
+    attachThisParamPassingMode(decl);
 }
 
 GenericDecl* SemanticsVisitor::GetOuterGeneric(Decl* decl)

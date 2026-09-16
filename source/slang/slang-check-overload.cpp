@@ -1015,16 +1015,14 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
 
 bool isEffectivelyMutating(CallableDecl* decl)
 {
-    if (decl->hasModifier<MutatingAttribute>())
+    auto mode = getDeclaredThisParamPassingMode(decl);
+    if (mode == ParamPassingMode::BorrowInOut || mode == ParamPassingMode::Ref)
         return true;
-    if (decl->hasModifier<RefAttribute>())
+    // A `set` accessor mutates through `this` unless it is explicitly `[nonmutating]`. This is
+    // independent of the passing-mode ladder: a `[constref]` setter has a read-only borrow as its
+    // declared mode yet still counts as mutating for the purpose of overload checking.
+    if (as<SetterDecl>(decl) && !decl->hasModifier<NonmutatingAttribute>())
         return true;
-    if (decl->hasModifier<NonmutatingAttribute>())
-        return false;
-
-    if (as<SetterDecl>(decl))
-        return true;
-
     return false;
 }
 

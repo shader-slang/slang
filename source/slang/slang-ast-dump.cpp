@@ -332,6 +332,7 @@ struct ASTDumpContext
     void dump(BuiltinOperationKind op) { m_writer->emit(getBuiltinOperationOpText(op)); }
     void dump(MarkupVisibility v) { m_writer->emit((int)v); }
     void dump(TypeTag tag) { m_writer->emit((int)tag); }
+    void dump(ParamPassingMode mode) { m_writer->emit((int)mode); }
     void dump(const String& string) { dump(string.getUnownedSlice()); }
 
     void dump(const DiagnosticInfo* info)

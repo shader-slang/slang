@@ -979,6 +979,30 @@ std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
     }
 }
 
+std::optional<ParamPassingMode> tryGetDeclaredThisParamPassingMode(Decl* decl)
+{
+    if (decl->hasModifier<MutatingAttribute>())
+        return ParamPassingMode::BorrowInOut;
+    if (decl->hasModifier<ConstRefAttribute>())
+        return ParamPassingMode::BorrowIn;
+    if (decl->hasModifier<RefAttribute>())
+        return ParamPassingMode::Ref;
+    if (decl->hasModifier<NonmutatingAttribute>())
+        return ParamPassingMode::In;
+    if (as<SetterDecl>(decl))
+        return ParamPassingMode::BorrowInOut;
+    return std::nullopt;
+}
+
+ParamPassingMode getDeclaredThisParamPassingMode(Decl* decl)
+{
+    if (auto modifier = decl->findModifier<ThisParamPassingModeModifier>())
+        return modifier->mode;
+    if (auto declaredMode = tryGetDeclaredThisParamPassingMode(decl))
+        return *declaredMode;
+    return ParamPassingMode::In;
+}
+
 bool doesTypeHaveNoDiffModifier(Type* type)
 {
     if (auto modifiedType = as<ModifiedType>(type))

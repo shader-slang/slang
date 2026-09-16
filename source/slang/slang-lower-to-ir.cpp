@@ -3840,57 +3840,21 @@ ParamPassingMode getDeclaredParamPassingModeForImplicitThisParam(
         }
     }
 
-    // Slang currently provides a set of attributes that a declaration
-    // can use to explicitly specify a parameter-passing mode for
-    // the implicit `this` parameter. We will check for those here,
-    // since the explicit request from the programmer should in general
-    // take precedence over other considerations.
+    // Slang currently provides a set of attributes (`[mutating]`, `[constref]`,
+    // `[__ref]`, `[nonmutating]`) and declaration kinds (e.g. a `set` accessor)
+    // that explicitly dictate a parameter-passing mode for the implicit `this`
+    // parameter. That mapping lives in one place, `tryGetDeclaredThisParamPassingMode`,
+    // which we consult here since the explicit request from the programmer should
+    // in general take precedence over the remaining context-based considerations.
     //
     // If there are ever cases where it would be semantically incorrect
     // to follow what these modifiers indicate, then we should be detecting
     // and diagnosing such situations during semantic checking, rather than
     // hacking in workarounds here.
     //
-    if (declWithImplicitThisParam->hasModifier<MutatingAttribute>())
+    if (auto explicitMode = tryGetDeclaredThisParamPassingMode(declWithImplicitThisParam))
     {
-        return ParamPassingMode::BorrowInOut;
-    }
-    if (declWithImplicitThisParam->hasModifier<ConstRefAttribute>())
-    {
-        return ParamPassingMode::BorrowIn;
-    }
-    if (declWithImplicitThisParam->hasModifier<RefAttribute>())
-    {
-        return ParamPassingMode::Ref;
-    }
-    //
-    // The `[nonmutating]` attribute is really just another case of
-    // these attributes that specify a mode, except that it should
-    // in principle only be allowed on declarations where the
-    // implicit `this` parameter would otherwise be `inout`.
-    //
-    // TODO: ensure that semantic checking is diagnosing errors when
-    // these attributes are applied inappropriately.
-    //
-    if (declWithImplicitThisParam->hasModifier<NonmutatingAttribute>())
-    {
-        return ParamPassingMode::In;
-    }
-
-    // Once we'e considered the attributes on the declaration,
-    // and given them an opportunity to dictate a parameter-passing
-    // mode, we turn our attention to the kind of declaration
-    // under consideration.
-    //
-    // For example, a `set` accessor (e.g., on a `property` or
-    // `subscript` declaration) defaults to having a mutable
-    // `this` parameter, unless the programmer explicitly
-    // opts out using `[nomutating]` (which was already checked
-    // for above).
-    //
-    if (as<SetterDecl>(declWithImplicitThisParam))
-    {
-        return ParamPassingMode::BorrowInOut;
+        return *explicitMode;
     }
 
     // Declarations that represent abstract storage (e.g., a `property`
@@ -3922,17 +3886,13 @@ ParamPassingMode getDeclaredParamPassingModeForImplicitThisParam(
         return defaultModeFromContext;
     }
 
-    // If we reach the end of this function, then that means
-    // that the declaration itself didn't dictate a mode
-    // (either via modifiers or its AST node class), and
-    // it wasn't identified as one of the cases that should
-    // just pass through the information from an inner
-    // declaration.
+    // The declaration did not dictate a mode via its attributes, its AST node
+    // class, or a passthrough case, so the earlier
+    // `tryGetDeclaredThisParamPassingMode` check has already returned. The
+    // shared query therefore resolves it to its stored declared mode, which is
+    // the default `ParamPassingMode::In` for such a declaration.
     //
-    // At this point we can finally fall back on the
-    // default parameter-passing mode for an implicit `this`.
-    //
-    return kDefaultModeForImplicitThisParam;
+    return getDeclaredThisParamPassingMode(declWithImplicitThisParam);
 }
 
 ParamPassingMode getActualParamPassingModeForImplicitThisParam(
