@@ -6,6 +6,8 @@ globallycoherent RWStructuredBuffer<int> inSB;
 globallycoherent RWTexture2D<float> inTex;
 readonly RWByteAddressBuffer inR;
 writeonly RWByteAddressBuffer inW;
+restrict RWByteAddressBuffer inRestrict;
+globallycoherent volatile RWByteAddressBuffer inCV;
 globallycoherent int gScalar;
 globallycoherent SamplerState gSampler;
 globallycoherent RaytracingAccelerationStructure gRas;
@@ -63,6 +65,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // CHECK: error[E30048]
     RWByteAddressBuffer r = inR;
 
+    // A source carrying multiple dropped qualifiers reports one diagnostic per dropped bit.
+    // CHECK-COUNT-2: error[E30048]
+    RWByteAddressBuffer cv = inCV;
+
     // A qualified scalar read into a plain value is a completed coherent load, not a handle copy,
     // so it must not be diagnosed.
     // CHECK-NOT: error[E30048]
@@ -77,6 +83,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // subclass), not coherent read/write memory, so a copy of it must not be diagnosed either.
     // CHECK-NOT: error[E30048]
     RaytracingAccelerationStructure rasCopy = gRas;
+
+    // `restrict` is intentionally droppable (matching GLSL and argument binding), so a restrict-only
+    // source copied to a local must not be diagnosed. This guards the deliberate absence of a
+    // kRestrict branch in the comparison against a future edit that mirrors the other four.
+    // CHECK-NOT: error[E30048]
+    RWByteAddressBuffer rc = inRestrict;
 
     // A type-mismatched copy draws only the type error, never a spurious qualifier-drop error: the
     // check runs after coercion and is skipped once the copy is known to be otherwise invalid.
