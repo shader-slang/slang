@@ -13115,7 +13115,9 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
 /// Component-wise maximum for builtin arithmetic vectors.
 /// @remarks This fallback allows generic code constrained only by `__BuiltinArithmeticType` to
 /// call `max`. Its negative overload rank keeps the integer- and floating-point-specific
-/// overloads preferred for concrete element types.
+/// overloads preferred for concrete element types. The body deliberately maps through scalar
+/// `max`; those calls specialize to the family-specific scalar intrinsics once the element type
+/// is known, without duplicating both aggregate target-dispatch tables here.
 /// @category math
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
@@ -13137,6 +13139,22 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
     default:
         MATRIX_MAP_BINARY(T, N, M, max, x, y);
     }
+}
+
+/// Component-wise maximum for builtin arithmetic matrices.
+/// @remarks This fallback allows generic code constrained only by `__BuiltinArithmeticType` to
+/// call `max`. Its negative overload rank keeps the integer- and floating-point-specific
+/// overloads preferred for concrete element types. The body deliberately maps through scalar
+/// `max`; those calls specialize to the family-specific scalar intrinsics once the element type
+/// is known, without duplicating both aggregate target-dispatch tables here.
+/// @category math
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[__readNone]
+[OverloadRank(-1)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
+{
+    MATRIX_MAP_BINARY(T, N, M, max, x, y);
 }
 
 /// Maximum of 3 inputs.
@@ -13278,20 +13296,6 @@ T __min_impl(T x, T y)
     }
 }
 
-/// Component-wise maximum for builtin arithmetic matrices.
-/// @remarks This fallback allows generic code constrained only by `__BuiltinArithmeticType` to
-/// call `max`. Its negative overload rank keeps the integer- and floating-point-specific
-/// overloads preferred for concrete element types.
-/// @category math
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[__readNone]
-[OverloadRank(-1)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
-{
-    MATRIX_MAP_BINARY(T, N, M, max, x, y);
-}
-
 //@public:
 /// Minimum.
 /// @param x The first value to compare.
@@ -13400,7 +13404,9 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
 /// Component-wise minimum for builtin arithmetic vectors.
 /// @remarks This fallback allows generic code constrained only by `__BuiltinArithmeticType` to
 /// call `min`. Its negative overload rank keeps the integer- and floating-point-specific
-/// overloads preferred for concrete element types.
+/// overloads preferred for concrete element types. The body deliberately maps through scalar
+/// `min`; those calls specialize to the family-specific scalar intrinsics once the element type
+/// is known, without duplicating both aggregate target-dispatch tables here.
 /// @category math
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
@@ -13427,7 +13433,9 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 /// Component-wise minimum for builtin arithmetic matrices.
 /// @remarks This fallback allows generic code constrained only by `__BuiltinArithmeticType` to
 /// call `min`. Its negative overload rank keeps the integer- and floating-point-specific
-/// overloads preferred for concrete element types.
+/// overloads preferred for concrete element types. The body deliberately maps through scalar
+/// `min`; those calls specialize to the family-specific scalar intrinsics once the element type
+/// is known, without duplicating both aggregate target-dispatch tables here.
 /// @category math
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]

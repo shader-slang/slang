@@ -5,12 +5,35 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-mtl -compute -shaderobj
+//TEST:SIMPLE(filecheck=CONCRETE): -target spirv-asm -entry concreteMain -stage compute
 
 // Verify that min and max accept scalar, vector, and matrix operands when generic code knows only
 // that the element type belongs to the sealed builtin arithmetic domain.
 
+// Also verify that concrete vector calls continue to select the higher-ranked family-specific
+// overloads, which emit one target-native shaped instruction rather than scalarizing.
+
+// CONCRETE-DAG: OpExtInst {{.*}} SMin
+// CONCRETE-DAG: OpExtInst {{.*}} UMax
+// CONCRETE-DAG: OpExtInst {{.*}} FMax
+
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
+RWStructuredBuffer<int3> concreteIntOutput;
+RWStructuredBuffer<uint2> concreteUIntOutput;
+RWStructuredBuffer<float4> concreteFloatOutput;
+
+[numthreads(1, 1, 1)]
+void concreteMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    int3 signedValue = int3(dispatchThreadID);
+    uint2 unsignedValue = dispatchThreadID.xy;
+    float4 floatingValue = float4(float3(dispatchThreadID), 1.0);
+
+    concreteIntOutput[0] = min(signedValue, int3(4, 5, 6));
+    concreteUIntOutput[0] = max(unsignedValue, uint2(7, 8));
+    concreteFloatOutput[0] = max(floatingValue, float4(1.0, 2.0, 3.0, 4.0));
+}
 
 T genericMinimum<T : __BuiltinArithmeticType>(T left, T right)
 {
