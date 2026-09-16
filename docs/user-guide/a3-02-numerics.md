@@ -231,6 +231,7 @@ The module provides corresponding built-in restrictions for its scalar capabilit
 - `IBuiltinScalarShapedType`
 - `IBuiltinScalarAdditive`
 - `IBuiltinScalarNumeric`
+- `IBuiltinScalarArithmetic`
 - `IBuiltinScalarSignedNumeric`
 - `IBuiltinScalarIntegerType`
 - `IBuiltinScalarUnsignedIntegerType`
@@ -242,6 +243,11 @@ The module provides corresponding built-in restrictions for its scalar capabilit
 
 Use the extensible `IScalar...` interfaces when an algorithm should admit user-defined scalar representations.
 Use the corresponding `IBuiltinScalar...` definition when the algorithm also depends on a compiler-supported built-in representation.
+
+`IBuiltinScalarArithmetic` is a broad convenience constraint that combines `IBuiltinScalarNumeric` with `INumericalExtrema`.
+Use it when an algorithm deliberately spans builtin integer and floating-point scalar domains and needs ordinary numeric arithmetic together with `min` or `max`.
+Prefer `IBuiltinScalarNumeric`, `INumericalExtrema`, or another narrower capability when the implementation does not need that complete combination.
+Combine `IBuiltinScalarShapedType` with `INumericalExtrema` when an implementation needs extrema and a builtin scalar representation, but not general arithmetic.
 
 ## Choosing the Right Numeric Interface
 

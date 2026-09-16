@@ -14,6 +14,12 @@ public typealias IBuiltinScalarAdditive = __BuiltinArithmeticType & IScalarAddit
 /// Restricts `IScalarNumeric` to builtin arithmetic scalar representations.
 public typealias IBuiltinScalarNumeric = __BuiltinArithmeticType & IScalarNumeric;
 
+/// Restricts broad numeric arithmetic and extrema to builtin scalar representations.
+///
+/// This is a convenience constraint for code that deliberately spans builtin integer and
+/// floating-point domains. Prefer a narrower capability when the implementation needs less.
+public typealias IBuiltinScalarArithmetic = IBuiltinScalarNumeric & INumericalExtrema;
+
 /// Restricts `IScalarSignedNumeric` to builtin signed arithmetic scalar representations.
 public typealias IBuiltinScalarSignedNumeric =
     __BuiltinSignedArithmeticType & IScalarSignedNumeric;
