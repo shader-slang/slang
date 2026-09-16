@@ -949,6 +949,20 @@ err(
 )
 
 err(
+    "signed-type-name-in-hlsl",
+    20021,
+    "'signed' is not supported in HLSL",
+    span { loc = "location", message = "'signed' is not supported in HLSL; use 'int' instead" }
+)
+
+err(
+    "unsupported-traditional-integer-type-name-in-hlsl",
+    20022,
+    "traditional integer type name is not supported in HLSL",
+    span { loc = "location", message = "traditional integer type name '~typeName' is not supported in HLSL" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
@@ -5735,6 +5749,20 @@ err(
     55214,
     "shader-terminating intrinsic in non-inlinable callee",
     span { loc = "location", message = "a shader-terminating intrinsic ('IgnoreHit' or 'AcceptHitAndEndSearch') is reachable from this ray entry point only through a call that could not be inlined (for example, recursion); mark the intervening function(s) '[ForceInline]' or call the intrinsic directly in the entry point so the ray payload is written back before the ray terminates." }
+)
+
+err(
+    "optix-hit-attribute-type-not-supported",
+    55217,
+    "unsupported hit attribute type for ReportHit on OptiX",
+    span { loc = "location", message = "the hit attribute type passed to 'ReportHit' cannot be lowered to OptiX attribute registers; each scalar field must fit in one 32-bit register ('float', 'bool', and 8/16/32-bit signed or unsigned integers, and vectors/arrays/matrices of those) — 'double', 'half', and 64-bit types are not supported." }
+)
+
+err(
+    "optix-hit-attribute-too-large",
+    55218,
+    "hit attribute exceeds the OptiX attribute register limit",
+    span { loc = "location", message = "the hit attribute passed to 'ReportHit' requires ~registerCount:int 32-bit attribute registers, but OptiX supports at most 8 (32 bytes)." }
 )
 
 err(

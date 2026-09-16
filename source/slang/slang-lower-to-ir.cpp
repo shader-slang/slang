@@ -7631,6 +7631,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("HLSL unsigned type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitAndTypeExpr(AndTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("'&' type expression during code generation");
@@ -9560,7 +9566,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             else
             {
                 auto argVal = lowerRValueExpr(context, argExpr);
-                args.add(argVal.val);
+                args.add(getSimpleVal(context, argVal));
             }
         }
         builder->emitIntrinsicInst(

@@ -1189,6 +1189,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitThisExpr(ThisExpr*) { return; }
 
     void visitThisTypeExpr(ThisTypeExpr*) { return; }
+    void visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr*) { return; }
     void visitThisInterfaceExpr(ThisInterfaceExpr*) { return; }
     void visitAndTypeExpr(AndTypeExpr* expr)
     {
@@ -5762,6 +5763,22 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
     DeclRef<GenericDecl> requiredGenericDeclRef,
     RefPtr<WitnessTable> witnessTable)
 {
+    // Ensure the satisfying generic's constraint decls are SignatureChecked before we count and
+    // compare its members below -- that state populates each constraint's operands and flattens
+    // `T : A & B` into separate members. This matcher is the single point that every generic
+    // requirement match funnels through (module-scope, on-demand, and function-local), so the
+    // invariant belongs here, not at any one producer (#12987). We advance the constraints
+    // only (advancing the enclosing type would re-enter its in-progress conformance check), and
+    // snapshot members first since flattening appends to the list.
+    {
+        List<Decl*> satisfyingDirectMembers;
+        for (auto m : satisfyingGenericDeclRef.getDecl()->getDirectMemberDecls())
+            satisfyingDirectMembers.add(m);
+        for (auto m : satisfyingDirectMembers)
+            if (isConstraintDecl(m))
+                ensureDecl(m, DeclCheckState::SignatureChecked);
+    }
+
     auto memberCount = requiredGenericDeclRef.getDecl()->getDirectMemberDeclCount();
     auto satisfyingMemberCount = satisfyingGenericDeclRef.getDecl()->getDirectMemberDeclCount();
 
@@ -6008,9 +6025,14 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>();
             SLANG_ASSERT(satisfyingConstraintDeclRef);
 
+            auto satisfyingSubType = getSub(m_astBuilder, satisfyingConstraintDeclRef);
+            auto satisfyingSuperType = getSup(m_astBuilder, satisfyingConstraintDeclRef);
+            // Fail loud rather than build a witness from a null type: a self-referential
+            // constraint can still trip ensureDecl's cyclic-reference guard and leave these null.
+            SLANG_RELEASE_ASSERT(satisfyingSubType && satisfyingSuperType);
             auto satisfyingWitness = m_astBuilder->getDeclaredSubtypeWitness(
-                getSub(m_astBuilder, satisfyingConstraintDeclRef),
-                getSup(m_astBuilder, satisfyingConstraintDeclRef),
+                satisfyingSubType,
+                satisfyingSuperType,
                 satisfyingConstraintDeclRef);
 
             requiredSubstArgs.add(satisfyingWitness);
@@ -6023,9 +6045,11 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 satisfyingMemberDeclRef.as<TypeCoercionConstraintDecl>();
             SLANG_ASSERT(satisfyingConstraintDeclRef);
 
-            auto satisfyingWitness = m_astBuilder->getBuiltinTypeCoercionWitness(
-                getFromType(m_astBuilder, satisfyingConstraintDeclRef),
-                getToType(m_astBuilder, satisfyingConstraintDeclRef));
+            auto satisfyingFromType = getFromType(m_astBuilder, satisfyingConstraintDeclRef);
+            auto satisfyingToType = getToType(m_astBuilder, satisfyingConstraintDeclRef);
+            SLANG_RELEASE_ASSERT(satisfyingFromType && satisfyingToType);
+            auto satisfyingWitness =
+                m_astBuilder->getBuiltinTypeCoercionWitness(satisfyingFromType, satisfyingToType);
 
             requiredSubstArgs.add(satisfyingWitness);
         }
@@ -6151,11 +6175,13 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                     .as<GenericTypeConstraintDecl>();
             auto requiredSubType = getSub(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingSubType = getSub(m_astBuilder, satisfyingConstraintDeclRef);
+            SLANG_RELEASE_ASSERT(satisfyingSubType);
             if (!satisfyingSubType->equals(requiredSubType))
                 return false;
 
             auto requiredSuperType = getSup(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingSuperType = getSup(m_astBuilder, satisfyingConstraintDeclRef);
+            SLANG_RELEASE_ASSERT(satisfyingSuperType);
             if (!satisfyingSuperType->equals(requiredSuperType))
                 return false;
         }
@@ -6176,11 +6202,13 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                     .as<TypeCoercionConstraintDecl>();
             auto requiredFromType = getFromType(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingFromType = getFromType(m_astBuilder, satisfyingConstraintDeclRef);
+            SLANG_RELEASE_ASSERT(satisfyingFromType);
             if (!satisfyingFromType->equals(requiredFromType))
                 return false;
 
             auto requiredToType = getToType(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingToType = getToType(m_astBuilder, satisfyingConstraintDeclRef);
+            SLANG_RELEASE_ASSERT(satisfyingToType);
             if (!satisfyingToType->equals(requiredToType))
                 return false;
 
