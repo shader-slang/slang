@@ -949,6 +949,20 @@ err(
 )
 
 err(
+    "signed-type-name-in-hlsl",
+    20021,
+    "'signed' is not supported in HLSL",
+    span { loc = "location", message = "'signed' is not supported in HLSL; use 'int' instead" }
+)
+
+err(
+    "unsupported-traditional-integer-type-name-in-hlsl",
+    20022,
+    "traditional integer type name is not supported in HLSL",
+    span { loc = "location", message = "traditional integer type name '~typeName' is not supported in HLSL" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",

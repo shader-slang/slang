@@ -2143,6 +2143,7 @@ public:
         if (expr->base.exp)
             dispatch(expr->base.exp);
     }
+    void visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr*) {}
     void visitModifiedTypeExpr(ModifiedTypeExpr* expr)
     {
         if (expr->base.exp)
@@ -3411,6 +3412,83 @@ static TypeSpec _applyModifiersToTypeSpec(Parser* parser, TypeSpec typeSpec, Mod
     return typeSpec;
 }
 
+/// Reports whether the next token starts a traditional integer type specifier in HLSL input.
+static bool isHLSLTraditionalIntegerTypeSpecifierStart(Parser* parser)
+{
+    return parser->getSourceLanguage() == SourceLanguage::HLSL &&
+           (parser->LookAheadToken("unsigned") || parser->LookAheadToken("signed"));
+}
+
+/// Parses an HLSL integer type specifier that starts with `unsigned` or `signed`.
+///
+/// Consider these examples:
+///
+///     unsigned int value;
+///     vector<unsigned int, 4> values;
+///
+/// The first example reaches this routine through `_parseSimpleTypeSpec`, where the parser already
+/// knows it needs a type. The second reaches it through `parseAtomicExpr`, because a generic
+/// argument can be either a type or a value. Keeping the grammar here gives both paths the same
+/// recognition and diagnostic recovery rules.
+/// Returns `HLSLUnsignedTypeExpr` for an accepted spelling and a non-null `IncompleteExpr` after
+/// diagnosing a rejected spelling.
+static Expr* parseHLSLTraditionalIntegerTypeSpecifier(Parser* parser)
+{
+    SLANG_ASSERT(isHLSLTraditionalIntegerTypeSpecifierStart(parser));
+
+    const Token signToken = parser->ReadToken(TokenType::Identifier);
+    const bool isUnsigned = signToken.getContent() == "unsigned";
+
+    StringBuilder typeNameBuilder;
+    typeNameBuilder << signToken.getContent();
+
+    bool hasUnsupportedTypeNameSuffix = false;
+    if (AdvanceIf(parser, "int"))
+    {
+        typeNameBuilder << " int";
+    }
+    else if (
+        parser->LookAheadToken("char") || parser->LookAheadToken("short") ||
+        parser->LookAheadToken("long"))
+    {
+        const Token widthToken = parser->ReadToken(TokenType::Identifier);
+        typeNameBuilder << " " << widthToken.getContent();
+        hasUnsupportedTypeNameSuffix = true;
+
+        if (widthToken.getContent() == "long" && AdvanceIf(parser, "long"))
+            typeNameBuilder << " long";
+
+        // C and C++ also allow a trailing `int` in spellings such as `unsigned short int`.
+        // Consume it as part of the unsupported spelling so it does not produce an unrelated
+        // follow-on error.
+        if (widthToken.getContent() != "char" && AdvanceIf(parser, "int"))
+            typeNameBuilder << " int";
+    }
+
+    // Diagnose the complete spelling first, because suggesting `int` for a type such as
+    // `signed short` would discard the requested width.
+    if (hasUnsupportedTypeNameSuffix)
+    {
+        parser->sink->diagnose(Diagnostics::UnsupportedTraditionalIntegerTypeNameInHlsl{
+            .typeName = typeNameBuilder.produceString(),
+            .location = signToken.loc});
+    }
+    else if (!isUnsigned)
+    {
+        parser->sink->diagnose(Diagnostics::SignedTypeNameInHlsl{.location = signToken.loc});
+    }
+    else
+    {
+        auto expr = parser->astBuilder->create<HLSLUnsignedTypeExpr>();
+        expr->loc = signToken.loc;
+        return expr;
+    }
+
+    auto errorExpr = parser->astBuilder->create<IncompleteExpr>();
+    errorExpr->loc = signToken.loc;
+    return errorExpr;
+}
+
 /// Parse a type specifier, without dealing with modifiers.
 static TypeSpec _parseSimpleTypeSpec(Parser* parser)
 {
@@ -3436,7 +3514,11 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     // closing `}` is at the end of its line, as a bit of a special case
     // to allow the common idiom.
     //
-    if (parser->LookAheadToken("struct"))
+    if (isHLSLTraditionalIntegerTypeSpecifierStart(parser))
+    {
+        typeExpr = parseHLSLTraditionalIntegerTypeSpecifier(parser);
+    }
+    else if (parser->LookAheadToken("struct"))
     {
         auto decl = parser->ParseStruct();
         typeSpec.decl = decl;
@@ -8279,7 +8361,8 @@ static IntegerLiteralValue _fixIntegerLiteral(
 
 static bool _isCast(Parser* parser, Expr* expr)
 {
-    if (as<PointerTypeExpr>(expr))
+    // These nodes always denote types, so a following `+` or `-` starts a unary cast operand.
+    if (as<PointerTypeExpr>(expr) || as<HLSLUnsignedTypeExpr>(expr))
     {
         return true;
     }
@@ -9084,6 +9167,11 @@ static Expr* parseAtomicExpr(Parser* parser)
         }
     case TokenType::Identifier:
         {
+            if (isHLSLTraditionalIntegerTypeSpecifierStart(parser))
+            {
+                return parseHLSLTraditionalIntegerTypeSpecifier(parser);
+            }
+
             // We will perform name lookup here so that we can find syntax
             // keywords registered for use as expressions.
             Token nameToken = peekToken(parser);
