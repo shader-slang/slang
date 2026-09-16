@@ -25,6 +25,7 @@ void main(uint3 tid : SV_DispatchThreadID)
     buf[0] = input[tid.x] + 1;
 }
 
-// HLSL: void main
+// HLSL-NOT: __ldg
+// HLSL: input_{{[0-9]+}}.Load(
 // HLSL-NOT: __ldg
 // CUDA: __ldg
