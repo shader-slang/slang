@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#adjacent-targets
-//META: doc_section_digest=670fb73013f0eb3dbefe3964c40824a553973f0ec76bbe12d828725e0730b00f
+//META: doc_section_digest=a0b226a1bd3f83df262292669b2807f32bbaddabb63ae2722080cf8e47f120dd
 //META: purpose=A hand-written __dispatch_kernel in an ordinary compute entry point survives removeTorchKernels and emits verbatim as fn<<<grid, block>>>, with the surface's dispatchSize argument landing in CUDA's block slot and threadGroupSize in the grid slot.
 //META: intent=expansion
 //META: pipeline_stage=emit

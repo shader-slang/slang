@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#the-work-graph-record-types
-//META: doc_section_digest=506cb2ed2c3804532948deb2c5dd2e42ee753eaa8de398038d1daace8dd14b9f
+//META: doc_section_digest=deb13f76ed16f0bab4e31daef38394df1a912cce4c68938abb87c637cc2aeae6
 //META: purpose=EmptyNodeInput, EmptyNodeOutput and EmptyNodeOutputArray are nullary type opcodes carrying no element-type operand.
 //META: intent=boundary
 //META: pipeline_stage=lower

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#failure-modes
-//META: doc_section_digest=045c5379570a64224b0f0d784c24bc57410eef152e105148ecb4e662cb3f9c88
+//META: doc_section_digest=917434add55b557b228b443846eefc5d6962c4a14daa202ebe626eecee22d1ca
 //META: purpose=The parser reports at most one diagnostic per floating-point literal, so `1e400q` — an unrecognized suffix on a significand that also overflows — draws only the suffix report and the range report is suppressed.
 //META: intent=negative
 //META: pipeline_stage=parse

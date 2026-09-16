@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-a-link-and-entry-point-prep
-//META: doc_section_digest=d0dd806e881cf8d0bf251730509f805647fcb23a653f4914d05a97f630cbc3c6
+//META: doc_section_digest=e05186529ba2daf053c37d2c46a6631e81729c49c01d391e844c72eac0982799
 //META: purpose=HLSL is non-Khronos, so the Phase A gate lets `lowerGLSLShaderStorageBufferObjectsToStructuredBuffers` fire: a GLSL `buffer` block emits as `RWStructuredBuffer<T>` on a `u` register for HLSL, while the Khronos sibling keeps it as a `layout(std430) buffer` block.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
