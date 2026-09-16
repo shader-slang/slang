@@ -919,12 +919,17 @@ struct FunctionParameterSpecializationContext
             //
             builder->setInsertInto(ioInfo.newBodyInsts);
 
-            // Rebuild the access from the specialized base and index, copying any operands past
-            // the base/index pair (e.g. a `ByteAddressBufferLoad`'s trailing `alignment`) so they
-            // survive into the specialized body. Such an operand is referenced from that body, so
-            // it must not be defined inside a function; the release-assert catches a function-local
-            // operand that would be an invalid cross-function reference (the alignment is a
-            // `constexpr`, hence a module-scope `IRIntLit`).
+            // Rebuild the access from the specialized base and index, copying any operands past the
+            // base/index pair (e.g. a `ByteAddressBufferLoad`'s trailing `alignment`) so they
+            // survive into the specialized body, which references them -- so each must be
+            // module-scope, not function-local, or the reference would cross function boundaries.
+            // Every alignment form reaching this pass is a module-scope integer literal: plain
+            // `Load` and explicit `LoadAligned<T>(loc, N)` pass a literal, and the
+            // natural-alignment `LoadAligned<T>(loc)` overload's `__naturalAlignmentOf<T>()` is
+            // folded to one before this pass runs (including at -O0; see
+            // byte-address-buffer-loadaligned-natural-13126). The release-assert enforces that
+            // loudly rather than silently forming a cross-function reference if a future producer
+            // ever violates it.
             List<IRInst*> newOperands;
             newOperands.add(newBase);
             newOperands.add(newIndex);

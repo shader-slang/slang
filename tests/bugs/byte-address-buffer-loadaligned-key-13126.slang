@@ -9,6 +9,13 @@
 // call keeps its own alignment operand: after this pass there are four `byteAddressBufferLoad`
 // insts -- the two original call-site loads plus one in each of the two specialized clones -- two
 // carrying alignment 16 and two carrying alignment 4. A collapse merges the clones, leaving three.
+//
+// Why the two original call-site loads are still present in this dump: `specializeFuncsForBufferLoadArgs`
+// replaces each specialized *call* but runs no argument DCE, so the now-dead original loads remain
+// until a later dead-code pass. The four checks below are order-independent CHECK-DAG lines (a lower
+// bound of two per alignment) rather than exact CHECK-COUNTs because the loads interleave in the dump
+// (16, 4, 4, 16); a clone collapse drops one alignment to a single load, so the second DAG line for
+// that alignment fails and the test catches the regression.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute -dump-ir-after specializeFuncsForBufferLoadArgs -o -
 
