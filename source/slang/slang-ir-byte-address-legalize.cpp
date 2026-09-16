@@ -130,6 +130,15 @@ struct ByteAddressBufferLegalizationContext
         //
         auto type = load->getDataType();
 
+        // Loads reaching this pass are pre-legalization loads and always carry their
+        // (buffer, offset, alignment) operands: the alignment is emitted for both `Load` (the
+        // literal 0 sentinel) and `LoadAligned` (a `constexpr` alignment). The 2-operand loads
+        // `emitLegalLoad` emits below are inserted before the current inst and excluded from this
+        // walk's snapshotted child list, so they are never re-processed here. Enforce the contract
+        // before reading the alignment operand so a dropped operand fails loudly rather than
+        // reading out of bounds and dereferencing a garbage pointer.
+        SLANG_RELEASE_ASSERT(load->getOperandCount() == 3);
+
         // Validate the load's `location`/`alignment` contract up front so the diagnostic
         // fires regardless of whether the loaded type happens to need legalization.
         validateExplicitAlignment(load->getOperand(1), load->getOperand(2), type);

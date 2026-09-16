@@ -621,6 +621,16 @@ struct FunctionParameterSpecializationContext
             auto irType = getBuilder()->getAttributedType(oldIndex->getDataType(), irAttrs);
             ioInfo.key.vals.add(irType);
 
+            // getSpecializedValueForArg bakes any operands beyond the base/index pair into the
+            // specialized callee, so they must also distinguish specializations here; otherwise two
+            // accesses that differ only in a trailing operand share one clone and inherit whichever
+            // operand was specialized first. A `ByteAddressBufferLoad`'s alignment is such an
+            // operand: `LoadAligned<T>(o, 16)` and `LoadAligned<T>(o, 4)` on the same buffer must
+            // stay distinct so each keeps its own wide-vs-scalarized decision. See
+            // shader-slang/slang#13126.
+            for (UInt i = 2; i < oldArg->getOperandCount(); i++)
+                ioInfo.key.vals.add(oldArg->getOperand(i));
+
             ioInfo.newArgs.add(oldIndex);
         }
         else if (isFieldAccessInst(oldArg))
@@ -908,9 +918,27 @@ struct FunctionParameterSpecializationContext
             // is set.
             //
             builder->setInsertInto(ioInfo.newBodyInsts);
-            IRInst* newOperands[] = {newBase, newIndex};
-            auto newVal =
-                builder->emitIntrinsicInst(oldArg->getFullType(), oldArg->getOp(), 2, newOperands);
+
+            // Rebuild the access from the specialized base and index, copying any operands past
+            // the base/index pair (e.g. a `ByteAddressBufferLoad`'s trailing `alignment`) so they
+            // survive into the specialized body. Such an operand is referenced from that body, so
+            // it must not be defined inside a function; the release-assert catches a function-local
+            // operand that would be an invalid cross-function reference (the alignment is a
+            // `constexpr`, hence a module-scope `IRIntLit`).
+            List<IRInst*> newOperands;
+            newOperands.add(newBase);
+            newOperands.add(newIndex);
+            for (UInt i = 2; i < oldArg->getOperandCount(); i++)
+            {
+                auto trailingOperand = oldArg->getOperand(i);
+                SLANG_RELEASE_ASSERT(!getParentFunc(trailingOperand));
+                newOperands.add(trailingOperand);
+            }
+            auto newVal = builder->emitIntrinsicInst(
+                oldArg->getFullType(),
+                oldArg->getOp(),
+                newOperands.getCount(),
+                newOperands.getBuffer());
 
             return newVal;
         }
