@@ -919,6 +919,16 @@ class ThisTypeExpr : public Expr
     Scope* scope = nullptr;
 };
 
+/// An HLSL type expression written as `unsigned` or `unsigned int`.
+///
+/// This syntax always denotes the built-in `uint` type, even if ordinary name lookup would find a
+/// declaration named `uint` in the surrounding scope.
+FIDDLE()
+class HLSLUnsignedTypeExpr : public Expr
+{
+    FIDDLE(...)
+};
+
 
 /// A type expression of the form `ThisInterface`
 ///

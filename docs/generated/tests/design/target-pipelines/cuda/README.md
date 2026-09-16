@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-13T00:00:00+00:00
-source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-watched_paths_digest: a25251b8d559ae543baf8b53f0f062d2b717ec05c0c4a85853eac7c8938b9929
+model: gpt-5.6-sol
+generated_at: 2026-09-16T06:40:19Z
+source_commit: d3b56927b854c14fa1ac169b72da6e080ea80833
+watched_paths_digest: cc1bfb5c7f168a5d644931cad25ab14568abe04820e170e0fd240e3e3f62b61c
 source_doc: docs/generated/design/target-pipelines/cuda.md
-source_doc_digest: 47c50163759420f2beec2ece252daa2540ab7f75d4d64a8b7e58917f5937433e
+source_doc_digest: 8f5f2c489e64725ff848a909352ae18b3fea8c9e41f23048f45bc851cc3e3b48
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -227,7 +227,7 @@ the document's own headings.
 
 **`#lowerimmutablebufferloadforcuda`**
 
-101. The pass rewrites a load whose root address `isPointerToImmutableLocation` accepts — both a plain `kIROp_Load` and a `kIROp_StructuredBufferLoad` — into CUDA's `__ldg` read-only-cache load.
+101. For a plain `kIROp_Load`, the pass requires an immutable root and excludes addresses rooted in CUDA's `__constant__` global parameter group; `kIROp_StructuredBufferLoad` values remain eligible and are first turned into element pointers.
 102. A scalar (`float`, `half`, `double`, the sized int/uint types, `bool`, `char`) maps straight to `kIROp_CUDALDG`.
 103. A vector maps directly only when it has a corresponding CUDA vector type; otherwise the pass emits one `kIROp_CUDALDG` per element and reassembles the vector.
 104. Anything larger gets a generated per-type load function, name-hinted `slang_ldg`, which the emitter renders as an ordinary function call.
@@ -291,6 +291,8 @@ the document's own headings.
 | kIROp_ArrayType is one of the type ops createLoadFuncForType recognizes, so an array field of an immutable-buffer element gets its own generated slang_ldg helper that issues one \_\_ldg per element and reassembles the FixedArray. | expansion | [#lowerimmutablebufferloadforcuda](../../../../design/target-pipelines/cuda.md#lowerimmutablebufferloadforcuda) | [`ldg-array-field-per-element.slang`](ldg-array-field-per-element.slang) |
 | lowerImmutableBufferLoadForCUDA expands a struct-typed immutable load into per-field \_\_ldg(&ptr-\>field) reads through a generated slang_ldg helper.                                                                                                                                                                    | functional | [#lowerimmutablebufferloadforcuda](../../../../design/target-pipelines/cuda.md#lowerimmutablebufferloadforcuda)                                                                                           | [`ldg-on-immutable-struct.slang`](ldg-on-immutable-struct.slang)                                             |
 | lowerImmutableBufferLoadForCUDA translates a StructuredBuffer\<T\> load into a \_\_ldg intrinsic call so the read-only cache path is used.                                                                                                                                                                                | functional | [#lowerimmutablebufferloadforcuda](../../../../design/target-pipelines/cuda.md#lowerimmutablebufferloadforcuda)                                                                                           | [`ldg-on-immutable-buffer.slang`](ldg-on-immutable-buffer.slang)                                             |
+| A top-level ConstantBuffer\<T\> stores its backing pointer in `SLANG_globalParams`; loading through that pointer remains eligible for a \_\_ldg global-memory read.                                                                                                                               | functional | [#lowerimmutablebufferloadforcuda](../../../../design/target-pipelines/cuda.md#lowerimmutablebufferloadforcuda)                                                                                           | [`ldg-on-constant-buffer.slang`](ldg-on-constant-buffer.slang)                                               |
+| Direct loads from top-level uniform fields are rooted in CUDA's `__constant__` `SLANG_globalParams` group and remain plain loads rather than `__ldg` global-memory reads.                                                                                                           | boundary   | [#lowerimmutablebufferloadforcuda](../../../../design/target-pipelines/cuda.md#lowerimmutablebufferloadforcuda)                                                                                           | [`global-uniform-constant-memory-no-ldg.slang`](global-uniform-constant-memory-no-ldg.slang)                 |
 | Boundary - slangc -trace-coverage-counter-width 32 stores the corresponding byte width, so the synthesized coverage buffer narrows from the default ulonglong counters to uint counters incremented by 1U. | boundary | [#option-set-toggles-and-emit-side-options](../../../../design/target-pipelines/cuda.md#option-set-toggles-and-emit-side-options) | [`coverage-counter-width-32-bits.slang`](coverage-counter-width-32-bits.slang) |
 | Negative - slangc -trace-coverage-counter-width accepts only 32 or 64 and rejects any other value as E45113 on the command line, before the E45114 byte-width check inside linkAndOptimizeIR can be reached. | negative | [#option-set-toggles-and-emit-side-options](../../../../design/target-pipelines/cuda.md#option-set-toggles-and-emit-side-options) | [`coverage-counter-width-invalid-rejected.slang`](coverage-counter-width-invalid-rejected.slang) |
 | slangc -trace-coverage-boolean forwards the boolean coverage flag to instrumentCoverage so each counter slot is written with a plain non-atomic store of 1 rather than atomically incremented per execution. | functional | [#option-set-toggles-and-emit-side-options](../../../../design/target-pipelines/cuda.md#option-set-toggles-and-emit-side-options) | [`coverage-boolean-non-atomic-store.slang`](coverage-boolean-non-atomic-store.slang) |
