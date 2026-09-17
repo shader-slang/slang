@@ -7,7 +7,7 @@ shipped in `a680b2b50f` — my own work in the companion PR.
 ## What the test asserts
 
 `design/pipeline/04c-layout-ir/raytracing-callable-payload-rejected-on-cuda.slang`
-expects CUDA to *reject* a `callable` entry point that takes an `inout`
+expects CUDA to _reject_ a `callable` entry point that takes an `inout`
 payload:
 
 ```slang
@@ -44,11 +44,11 @@ That commit changed the accessor from returning `nullptr` to returning real
 rules. Checking all four families at HEAD:
 
 | family | RayPayload | CallablePayload | HitAttributes |
-| --- | --- | --- | --- |
-| CUDA | rules | **rules** | rules |
-| Metal | null | null | null |
-| CPU | null | null | null |
-| LLVM | null | null | null |
+| ------ | ---------- | --------------- | ------------- |
+| CUDA   | rules      | **rules**       | rules         |
+| Metal  | null       | null            | null          |
+| CPU    | null       | null            | null          |
+| LLVM   | null       | null            | null          |
 
 CUDA now supplies **all three**. It is not a regression — the diagnostic is
 correctly absent.
@@ -78,7 +78,7 @@ The claim about Metal/CPU/LLVM is right. The CUDA clause has been wrong since
 
 So the correction was written down and waiting. My doc pass did not find it
 because it never read `expected-failures.txt` as an input: sections were
-classified by whether their *cited line numbers* moved and whether a recorded
+classified by whether their _cited line numbers_ moved and whether a recorded
 doc-gap touched them, and this section had neither. That is the real lesson —
 `expected-failures.txt` is a triage source, not just a suppression list, and a
 doc regeneration should read it. The same comment block also contains the

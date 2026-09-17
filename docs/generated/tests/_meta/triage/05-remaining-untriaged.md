@@ -19,7 +19,7 @@ two shapes to distinguish:
 
 The second is worth checking first: `slang-ir-typeflow-specialize.cpp` changed
 by 400 lines in the range this work covered, so a specialization improvement
-that removes the dispatch site is plausible, and would make the *doc* claim in
+that removes the dispatch site is plausible, and would make the _doc_ claim in
 `05-ir-passes.md#specialization-and-generics` stale too.
 
 ## `builtinoperationintval-enum-operands-fold` → `enum-cast-in-generic-array-bound-rejected`
