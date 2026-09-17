@@ -20,14 +20,16 @@
 // HLSL: dot(
 // HLSL: dot(
 // HLSL: dot(
+// HLSL-NOT: dot_
 
-// SPIRV: OpDot
-// SPIRV: OpSDot
-// SPIRV: OpUDot
+// SPIRV-DAG: OpDot
+// SPIRV-DAG: OpSDot
+// SPIRV-DAG: OpUDot
 
 // WGSL: dot(
 // WGSL: dot(
 // WGSL: dot(
+// WGSL-NOT: dot_
 
 import slang.numerics;
 

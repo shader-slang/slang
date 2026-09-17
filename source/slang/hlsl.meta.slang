@@ -10371,6 +10371,7 @@ T __vectorDotImpl(vector<T, N> x, vector<T, N> y)
 // generic code that cannot prove which family `T` belongs to can still use the broad overload.
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
@@ -10379,6 +10380,7 @@ T dot(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
@@ -10387,6 +10389,7 @@ T dot(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
+[ForceInline]
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
