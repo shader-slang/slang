@@ -10372,9 +10372,9 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
-    // Preserve the established concrete floating-point intrinsic path. A forwarding wrapper
-    // changes when surrounding caller control flow is optimized or leaves a helper in textual
-    // output, so this overload deliberately keeps its original target switch.
+    // Preserve the established concrete floating-point intrinsic path. A non-forced forwarding
+    // wrapper leaves a helper in textual output, while forcing it inline changes when surrounding
+    // caller control flow is optimized. This overload therefore keeps its original target switch.
     if (N == 1)
     {
         return x[0] * y[0];

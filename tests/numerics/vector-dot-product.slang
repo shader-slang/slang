@@ -7,7 +7,8 @@
 
 // Verify that one vector IDotProduct conformance applies when the element type is known only to be
 // a builtin numeric scalar. The witness must work for floating-point, signed-integer, and
-// unsigned-integer specializations and lower to the corresponding target-native dot operation.
+// unsigned-integer specializations, using a target-native operation where supported and the
+// scalar fallback otherwise.
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 70
@@ -27,8 +28,10 @@
 // HLSL: dot(
 // HLSL-NOT: dot_
 
-// GLSL: dot(
-// METAL: dot(
+// GLSL-LABEL: float invokeDotProduct_{{[0-9]+}}(
+// GLSL: return dot(
+// METAL-LABEL: float invokeDotProduct_{{[0-9]+}}(
+// METAL: return dot(
 
 // SPIRV-DAG: OpDot
 // SPIRV-DAG: OpSDot
