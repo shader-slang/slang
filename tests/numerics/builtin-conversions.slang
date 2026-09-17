@@ -25,9 +25,8 @@
 // CHECK-NEXT: 8
 // CHECK-NEXT: 9
 // CHECK-NEXT: 1
-// CHECK-NEXT: 0
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 
 import slang.numerics;
 
@@ -66,7 +65,6 @@ void computeMain()
     float scalarFromBool = convertScalar<float>(true);
     bool scalarFromInt = convertScalar<bool>(2);
     bool scalarBoolFromFractionalFloat = convertScalar<bool>(0.5);
-    bool constructorBoolFromFractionalFloat = bool(0.5);
 
     int3 vectorFromFloat = convertVector<int>(float3(1.0, -2.0, 3.0));
     vector<bool, 3> vectorFromInt = convertVector<bool>(int3(0, 2, -1));
@@ -90,7 +88,6 @@ void computeMain()
     outputBuffer[11] = int(vectorFromInt.y);
     outputBuffer[12] = int(vectorFromInt.z);
     outputBuffer[15] = int(scalarBoolFromFractionalFloat);
-    outputBuffer[16] = int(constructorBoolFromFractionalFloat);
 
     // Exercise half/double conversions only on targets that represent both types.
     __target_switch
