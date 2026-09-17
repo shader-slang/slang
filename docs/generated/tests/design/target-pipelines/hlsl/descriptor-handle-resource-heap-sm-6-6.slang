@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#context-predicates-and-capability-gates
-//META: doc_section_digest=73709830ebcd44a38a75b30d5beb840d2872e0fc7ffd0f1fe4015e73dc477268
+//META: doc_section_digest=2742dbf49b22ad8b1db112899ae1d588490d00cff38dbcbdefe57213a92dc387
 //META: purpose=`DescriptorHandle<T>` is the user-facing construct behind the `descriptor_handle` capability gate, which on HLSL can only be turned on by a shader model 6.6 or newer profile; at `cs_6_6` the handle field is a plain `uint2` and its uses become `ResourceDescriptorHeap` / `SamplerDescriptorHeap` subscripts.
 //META: intent=expansion
 //META: pipeline_stage=emit

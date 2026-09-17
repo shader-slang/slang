@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#what-the-core-module-provides
-//META: doc_section_digest=d5f0effc9a6866c35191d883a901be38534ac7a715ab357584db096360bfa37e
+//META: doc_section_digest=4a82c8790b727c7aae88269a6ea5191f833f130a8d6f5db56427ef3aabca8b92
 //META: purpose=A core-module Tuple's positional members compose into a swizzle, so t._2_1_0 yields a reordered Tuple with no import.
 //META: intent=functional
 //META: pipeline_stage=check

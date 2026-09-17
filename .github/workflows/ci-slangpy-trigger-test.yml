@@ -27,6 +27,20 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
   cancel-in-progress: true
 
+env:
+  # Names a SlangPy PR to merge into SlangPy `main` before SlangPy CI builds. Empty
+  # means "no cherry-pick": every run tests against SlangPy `main` as-is, which is the
+  # normal state.
+  #
+  # A Slang change that breaks SlangPy is a chicken-and-egg problem: until the matching
+  # SlangPy PR lands, every Slang PR fails SlangPy CI. Setting this to that PR's number
+  # asks SlangPy CI to merge it in before building, so both halves are tested together.
+  # SlangPy CI owns the checkout (see ci-latest-slang.yml in shader-slang/slangpy).
+  #
+  # Setting this applies to every Slang PR, so keep the window short: land the SlangPy
+  # PR right after the Slang one, then set this back to "".
+  SLANGPY_CHERRY_PICK_PR: ""
+
 jobs:
   filter:
     runs-on: ubuntu-latest
@@ -38,14 +52,15 @@ jobs:
         id: pr_number
         run: |
           echo "number=${{ github.event.pull_request.number || inputs.pr_number }}" >> "$GITHUB_OUTPUT"
-      # A minimal checkout pinned to master, just to get the composite
-      # action definition. This never touches PR/fork content: the ref is
-      # explicit rather than relying on checkout's default (which for
-      # pull_request_target does already resolve to the base branch).
+      # A minimal checkout pinned to the workflow revision, just to get the
+      # composite action definition. This never touches PR/fork content on
+      # pull_request_target: github.workflow_sha names the trusted commit that
+      # supplied the workflow file, while keeping workflow_dispatch branch runs
+      # in sync with action changes from the same branch.
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         if: steps.pr_number.outputs.number != ''
         with:
-          ref: master
+          ref: ${{ github.workflow_sha }}
           sparse-checkout: .github/actions/docs-only-filter
       - name: List changed files
         id: changed_files
@@ -54,17 +69,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.pr_number.outputs.number }}
         run: |
-          files="$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')"
-          {
-            echo "files<<EOF"
-            echo "$files"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          filesPath="${RUNNER_TEMP}/changed-files.txt"
+          gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename' > "$filesPath"
+          echo "files-path=$filesPath" >> "$GITHUB_OUTPUT"
       - id: filter
         if: steps.pr_number.outputs.number != ''
         uses: ./.github/actions/docs-only-filter
         with:
-          files: ${{ steps.changed_files.outputs.files }}
+          files-path: ${{ steps.changed_files.outputs.files-path }}
 
   trigger-slangpy-tests:
     needs: [filter]
@@ -165,9 +177,17 @@ jobs:
                 slang_ref: `${{ steps.pr_mq.outputs.ref || steps.pr_auto.outputs.sha || steps.pr_manual.outputs.sha }}`,
                 slang_checkout_mode: `${{ steps.pr_mq.outputs.checkout_mode }}` || 'pr',
                 slang_checkout_repo: `${{ steps.pr_mq.outputs.checkout_repo }}` || '${{ github.repository }}',
-                is_fork_pr: `${{ steps.pr_auto.outputs.is_fork_pr || steps.pr_manual.outputs.is_fork_pr || steps.pr_mq.outputs.is_fork_pr }}`,
-                slang_pr_head_repo: `${{ steps.pr_auto.outputs.head_repo || steps.pr_manual.outputs.head_repo || steps.pr_mq.outputs.head_repo }}`,
-                slang_trigger_source: '${{ github.event_name }}',
+                // `client_payload` is capped at 10 top-level properties by the
+                // repository-dispatch API, and the flat form was already at 10. These
+                // three are informational only -- SlangPy CI reads none of them -- so
+                // they are grouped here to keep the cap free for fields SlangPy acts
+                // on. Nesting does not count against the cap.
+                slang_pr_meta: {
+                  is_fork_pr: `${{ steps.pr_auto.outputs.is_fork_pr || steps.pr_manual.outputs.is_fork_pr || steps.pr_mq.outputs.is_fork_pr }}`,
+                  slang_pr_head_repo: `${{ steps.pr_auto.outputs.head_repo || steps.pr_manual.outputs.head_repo || steps.pr_mq.outputs.head_repo }}`,
+                  slang_trigger_source: '${{ github.event_name }}'
+                },
+                slangpy_cherry_pick_pr: process.env.SLANGPY_CHERRY_PICK_PR || '',
                 slang_pr_title: process.env.PR_TITLE || '',
                 slang_pr_author: `${{ steps.pr_auto.outputs.author || steps.pr_manual.outputs.author || steps.pr_mq.outputs.author }}`
               }

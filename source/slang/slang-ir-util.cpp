@@ -847,6 +847,80 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     case kIROp_TextureFootprintType:
         sb << "TextureFootprint";
         break;
+    // The following opaque builtin types carry no name-hint/linkage decoration, and their operands
+    // form the type's identity. Each case renders the surface name plus those operands, so
+    // consumers (chiefly SPIR-V debug info) get a real name instead of the empty hint that would
+    // collapse distinct instantiations into the literal "unnamed".
+    case kIROp_DescriptorHandleType:
+        sb << "DescriptorHandle<";
+        getTypeNameHint(sb, as<IRDescriptorHandleType>(type)->getResourceType());
+        sb << ">";
+        break;
+    case kIROp_RayQueryType:
+        // The first operand is the ray-flags value (RayQueryType has min_operands == 1, so
+        // getOperand(0) is in bounds); include it so `RayQuery<flags>` instantiations that differ
+        // only in flags get distinct names.
+        sb << "RayQuery<";
+        getTypeNameHint(sb, type->getOperand(0));
+        sb << ">";
+        break;
+    case kIROp_CoopVectorType:
+        sb << "CoopVec<";
+        getTypeNameHint(sb, as<IRCoopVectorType>(type)->getElementType());
+        sb << ",";
+        getTypeNameHint(sb, as<IRCoopVectorType>(type)->getElementCount());
+        sb << ">";
+        break;
+    case kIROp_CoopMatrixType:
+        {
+            // Include every operand (scope and use as well as element/shape): each is part of the
+            // cooperative-matrix type identity, so omitting any would collide distinct types.
+            auto coopMat = as<IRCoopMatrixType>(type);
+            sb << "CoopMat<";
+            getTypeNameHint(sb, coopMat->getElementType());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getScope());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getRowCount());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getColumnCount());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getMatrixUse());
+            sb << ">";
+        }
+        break;
+    case kIROp_TensorAddressingTensorLayoutType:
+        {
+            auto tensorLayout = as<IRTensorAddressingTensorLayoutType>(type);
+            sb << "TensorLayout<";
+            getTypeNameHint(sb, tensorLayout->getDimension());
+            sb << ",";
+            getTypeNameHint(sb, tensorLayout->getClampMode());
+            sb << ">";
+        }
+        break;
+    case kIROp_TensorAddressingTensorViewType:
+        {
+            // Operands are [dimension, hasDimension, permutation...]; the two leading operands are
+            // rendered by name, so the remaining `getOperandCount() - 2` are the permutation. Only
+            // the first `dimension`-many permutation entries are meaningful; trailing slots are the
+            // sentinel 255 (padding that the OpTypeTensorViewNV writer in the SPIR-V emitter
+            // ignores). This function deliberately renders every slot so the name stays a faithful,
+            // collision-free function of the full operand list.
+            auto tensorView = as<IRTensorAddressingTensorViewType>(type);
+            sb << "TensorView<";
+            getTypeNameHint(sb, tensorView->getDimension());
+            sb << ",";
+            getTypeNameHint(sb, tensorView->getHasDimension());
+            UInt permutationCount = tensorView->getOperandCount() - 2;
+            for (UInt i = 0; i < permutationCount; i++)
+            {
+                sb << ",";
+                getTypeNameHint(sb, tensorView->getPermutation((int)i));
+            }
+            sb << ">";
+        }
+        break;
     case kIROp_Specialize:
         {
             auto specialize = as<IRSpecialize>(type);
@@ -2191,6 +2265,12 @@ UnownedStringSlice getBuiltinFuncName(IRInst* callee)
         return UnownedStringSlice::fromLiteral("IBwdCallable");
     case KnownBuiltinDeclName::NullDifferential:
         return UnownedStringSlice::fromLiteral("NullDifferential");
+    case KnownBuiltinDeclName::OperatorAddressOf:
+        return UnownedStringSlice::fromLiteral("OperatorAddressOf");
+    case KnownBuiltinDeclName::WaveIsFirstLane:
+        return UnownedStringSlice::fromLiteral("WaveIsFirstLane");
+    case KnownBuiltinDeclName::WaveReadLaneFirst:
+        return UnownedStringSlice::fromLiteral("WaveReadLaneFirst");
     default:
         return UnownedStringSlice();
     }
@@ -3077,16 +3157,12 @@ bool isIROpaqueType(IRType* type)
     }
 }
 
-// True if `addr`'s chain bottoms out at `GetOptiXSbtDataPtr` (the OptiX SBT), peeling every
-// forwarding op, including the `BitCast`/`GetOffsetPtr` that `getRootAddr` does not peel.
-static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
+IRInst* peelAddressForwardingOps(IRInst* addr)
 {
     for (;;)
     {
         switch (addr->getOp())
         {
-        case kIROp_GetOptiXSbtDataPtr:
-            return true;
         case kIROp_FieldAddress:
         case kIROp_GetElementPtr:
         case kIROp_GetOffsetPtr:
@@ -3096,9 +3172,16 @@ static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
             addr = addr->getOperand(0);
             continue;
         default:
-            return false;
+            return addr;
         }
     }
+}
+
+// True if `addr`'s chain bottoms out at `GetOptiXSbtDataPtr` (the OptiX SBT), peeling every
+// forwarding op, including the `BitCast`/`GetOffsetPtr` that `getRootAddr` does not peel.
+static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
+{
+    return peelAddressForwardingOps(addr)->getOp() == kIROp_GetOptiXSbtDataPtr;
 }
 
 bool isPointerToImmutableLocation(IRInst* loc)
@@ -3283,6 +3366,68 @@ bool isReadNoneCallee(IRInst* callee)
 
     // Default: cannot assume that unknown op-codes are read-none
     return false;
+}
+
+bool isReadNoneCalleeAndAllDerivatives(IRInst* callee)
+{
+    // The primary callee must be read-none first; the carry-set gate cannot
+    // weaken its existing guarantee.
+    if (!isReadNoneCallee(callee))
+        return false;
+
+    // Look annotations up on the resolved inner function rather than on the
+    // unresolved callee. This is intentionally conservative: stdlib generics
+    // (e.g. `sqrt`) attach `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]`
+    // annotations on the `IRSpecialize` wrapper, and those derivatives are
+    // genuinely pure but typically NOT marked `[__readNone]` (the stdlib
+    // doesn't bother). Looking them up on the unresolved callee would find
+    // them and force a non-readNone verdict on every call site to a stdlib
+    // math function, regressing the false-positive fixes from #11286.
+    //
+    // The trade-off is that user-defined generic primaries (whose
+    // `[ForwardDerivative]` / `[BackwardDerivative]` annotations also live
+    // on the `IRSpecialize`) bypass this gate. That's an under-approximation
+    // — a generic `[__readNone]` primary with a side-effecting user-supplied
+    // derivative is not currently caught. A more accurate fix would
+    // distinguish "stdlib-style pure derivative not explicitly annotated"
+    // from "user-supplied derivative with possible side effects" without
+    // requiring stdlib annotation churn; see follow-up tracking.
+    IRInst* annotated = getResolvedInstForDecorations(callee);
+    if (!annotated)
+        return true;
+
+    IRBuilder builder(annotated->getModule());
+
+    auto isAssociatedDerivativeReadNone = [&](AnnotationKind kind) -> bool
+    {
+        IRInst* derivativeFunc = builder.tryLookupAnnotation(annotated, kind);
+        if (!derivativeFunc)
+            return true;
+        return isReadNoneCallee(derivativeFunc);
+    };
+
+    // ForwardDerivative points directly at the user's fwd-diff function.
+    if (!isAssociatedDerivativeReadNone(AnnotationKind::ForwardDerivative))
+        return false;
+
+    // BackwardDerivativePropagate points at the synthesized propagate-phase
+    // wrapper. `isReadNoneCallee`'s `IRTranslateBase` switch above unwraps
+    // that wrapper via `kIROp_BackwardPropagateFromLegacyBwdDiffFunc`
+    // (operand 1 = user's bwd-diff function copy), so the wrapper's
+    // readNone-ness correctly inherits from the user-supplied backward
+    // function.
+    //
+    // `AnnotationKind::BackwardDerivativeApply` is intentionally NOT
+    // consulted: its wrapper is `BackwardPrimalFromLegacyBwdDiffFunc(primary,
+    // bwd_diff)`, which the same switch unwraps via
+    // `kIROp_BackwardPrimalFromLegacyBwdDiffFunc` -> operand 0 = primary.
+    // Apply therefore inherits its readNone-ness from the already-checked
+    // primary callee and adds no information beyond the first
+    // `isReadNoneCallee(callee)` gate above.
+    if (!isAssociatedDerivativeReadNone(AnnotationKind::BackwardDerivativePropagate))
+        return false;
+
+    return true;
 }
 
 

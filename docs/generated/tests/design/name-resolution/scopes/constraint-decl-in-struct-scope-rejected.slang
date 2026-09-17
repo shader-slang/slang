@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#edge-cases-and-failure-modes
-//META: doc_section_digest=b57e81781278bd6752bd817f50c238aae4f56d4fda646e22befd826b34d6cab4
+//META: doc_section_digest=7b8fdedc5a4069b7a10da3f6dcaf8b3268c6f74fbb85dd4ea2edff960fab2b8b
 //META: purpose=A GenericTypeConstraintDecl is only allowed as a child of an InterfaceDecl or a GenericDecl; `isDeclAllowed` rejects a `__constraint` written in a struct scope with declaration-not-allowed-here (E30102).
 //META: intent=negative
 //META: pipeline_stage=parse

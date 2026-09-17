@@ -268,6 +268,12 @@ here:
 
 ## Doc gaps observed
 
+(none) — no gaps remain open against this bundle's source document.
+
+Every gap previously listed here was fixed on the documentation side and
+recorded in `docs/generated/design/_meta/doc-gap-state.json`; the answers
+are now in the source document itself.
+
 All seven gap rows this bundle previously recorded have been answered by
 the current revision of the page: the trace-coverage CLI spellings and
 counter instruction names, the note that A3/A9 land on the unprinted module
@@ -279,9 +285,3 @@ D8 only marks the instruction while `E33180` is raised post-link, and the
 statement that no dump isolates prelink's auto-diff clone policy. Those rows
 are retired here. The rows below are what re-reading the filled page against
 the compiler turned up.
-
-| Anchor                                                                                                                                                                         | Kind            | Gap                                                                                                                                                                                                                                                                                                    | Suggested addition                                                                                                                                                                                                                             |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [#phase-d-non-essential-validation-stripping-and-finalization](../../../../design/pipeline/04b-pre-link-passes.md#phase-d-non-essential-validation-stripping-and-finalization) | ambiguous-claim | The D3 row of the diagnostics table pairs two codes, `E40012` *expected a compile-time constant* and `E40013` *argument is not a compile-time constant*, with a single trigger. That trigger produces only `E40013`: passing a `uniform` to a `constexpr` parameter reports the argument form and nothing else. | Split the D3 row so each code has its own minimal trigger, or say which of the two the given trigger produces and what other shape reaches `E40012`.                                                                                            |
-| [#phase-d-non-essential-validation-stripping-and-finalization](../../../../design/pipeline/04b-pre-link-passes.md#phase-d-non-essential-validation-stripping-and-finalization) | missing-example | `W41034` is described in prose as covering "a *non*-literal shift amount whose type is wider than a narrow (under 32-bit) left operand", but unlike the other validators it has no row in the minimal-trigger table, so a reader has to construct the two-operand shape themselves.                        | Add a `W41034` row to the diagnostics table with a minimal trigger such as `s << n` where `s` is a `uniform int16_t` and `n` a `uniform int`, matching the form the other rows use.                                                             |
-| [#pre-link-mandatory-passes](../../../../design/pipeline/04b-pre-link-passes.md#pre-link-mandatory-passes)                                                                     | missing-example | The page opens by stating the calls here are plain `passName(module)` calls rather than the macro-wrapped post-link form, but does not say what a reader sees as a result. The observable difference is that `-dump-ir` prints no `### AFTER <pass>:` heading anywhere before the `### LOWER-TO-IR:` block. | Add a sentence noting that, because these calls are unwrapped, a `-dump-ir` listing shows a single `### LOWER-TO-IR:` snapshot for the whole region and the `### AFTER <pass>:` headings only begin after the link step.                        |
