@@ -27590,13 +27590,14 @@ interface IOpaqueDescriptor
     /// `spvBindlessTextureNV` (converted with the `SPV_NV_bindless_texture` opcodes) rather than a
     /// `uint2` heap index. True exactly for texture and sampler types; `DescriptorKind` is too coarse
     /// to answer this (e.g. `SubpassInput` and `TextureBuffer` share a texture/texel kind but are not
-    /// texture types).
-    ///
-    /// This is the core-module (`.slang`) face of a single classification that each compiler phase must
-    /// spell in its own vocabulary: the IR twin is `isBindlessTextureNVEncodableResourceType`
-    /// (`slang-ir-util.cpp`, over `IRType`) and the AST twin is `_isBindlessTextureNVUInt64ElementType`
-    /// (`slang-type-layout.cpp`, over `Type`, for layout/reflection). All three must stay in agreement.
+    /// texture types). Compiler-defined and user-inert: user code may read it, but its value is fixed
+    /// per type by the compiler.
     static const bool isBindlessTextureNVEncodable;
+    // `isBindlessTextureNVEncodable` is the core-module (`.slang`) face of a single classification that
+    // each compiler phase spells in its own vocabulary: the IR twin is
+    // `isBindlessTextureNVEncodableResourceType` (`slang-ir-util.cpp`, over `IRType`) and the AST twin is
+    // `_isBindlessTextureNVUInt64ElementType` (`slang-type-layout.cpp`, over `Type`, for
+    // layout/reflection). All three must stay in agreement.
 }
 
 /// True when `T`'s `DescriptorHandle` uses the native `SPV_NV_bindless_texture` `uint64` representation
@@ -27685,7 +27686,7 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
         {
         case hlsl:
         case spvDescriptorHeapEXT:
-            static_assert(This.kind != DescriptorKind.CombinedTextureSampler, "a combined texture-sampler needs separate resource and sampler descriptor-heap indices on this target, so it cannot be initialized directly from a single ResourceDescriptorHeap index; use the explicit .Handle(uint2(resourceIndex, samplerIndex)) form to specify both");
+            static_assert(This.kind != DescriptorKind.CombinedTextureSampler, "Cannot initialize a combined texture-sampler from a single ResourceDescriptorHeap index; load the texture and sampler separately from ResourceDescriptorHeap and SamplerDescriptorHeap.");
             break;
         case spirv:
             // Explicit plain-SPIR-V arm: without it the `spvDescriptorHeapEXT` case claims the whole
@@ -27763,7 +27764,10 @@ for (auto type : kDynamicResourceCastableTypes) {
     bool isSampler = (strcmp(dynamicKind, "Sampler") == 0);
     // Only the sampler types lower to `IRSamplerStateTypeBase`; every other generated type here
     // (structured/byte-address buffers, `ConstantBuffer`, `TextureBuffer`, acceleration structures)
-    // is not a texture or sampler type, so `isBindlessTextureNVEncodableResourceType` rejects it.
+    // is not a texture or sampler type, so `isBindlessTextureNVEncodableResourceType` rejects it. The
+    // ternary is therefore correct only while this loop emits no texture-family type: a future
+    // texture-family entry added to `kDynamicResourceCastableTypes` would be encodable and must set
+    // `true` here (matching the IR classifier), not take the `false` default.
     auto encodableStr = isSampler ? "true" : "false";
     auto untypedHandleType = isSampler ? "UntypedSamplerHandle" : "UntypedResourceHandle";
     auto untypedHandleIndexFn = isSampler ? "__getUntypedSamplerHandleIndex" : "__getUntypedResourceHandleIndex";
@@ -27977,19 +27981,18 @@ extension DescriptorHandle<T>
     __init(UntypedResourceHandle h)
     {
         // A `ResourceDescriptorHeap[i]` index cannot be stored in a native bindless `.Handle` (a
-        // `uint64` under `spvBindlessTextureNV` for an encodable texture/sampler type): there is no
-        // faithful place for the index, so diagnose rather than reinterpret the bits.
-        // `usesNativeSpirvDescriptorHandle<T>()` is the single source of that representation decision,
-        // shared with `DescriptorHandle.lessThan` and `getDescriptorFromExplicitHeapIndex`. Its
-        // `[ForceInline]` folds it to the compile-time constant a `static_assert` condition requires, and
-        // its `case spirv:`/`default` arm keeps the check from forcing a spurious NV capability on a
-        // plain-SPIR-V compile. Non-native and heap-index representations (including
-        // `spvDescriptorHeapEXT`-only) convert normally and are not diagnosed here.
+        // `uint64` under `spvBindlessTextureNV` for an encodable texture/sampler): there is no faithful
+        // place for the index, so we diagnose rather than reinterpret the bits. The decision comes from
+        // `usesNativeSpirvDescriptorHandle<T>()` (see its definition for why the query folds to the
+        // constant a `static_assert` needs without leaking an NV capability onto plain SPIR-V). Non-native
+        // and heap-index-only representations (including `spvDescriptorHeapEXT` alone) convert normally
+        // and are not diagnosed here.
         static_assert(!usesNativeSpirvDescriptorHandle<T>(), "Cannot convert a descriptor heap index to a native bindless DescriptorHandle; with spvDescriptorHeapEXT, assign the heap entry directly to the resource or sampler type instead");
         // A single `ResourceDescriptorHeap[i]` index also cannot build a combined texture-sampler on the
-        // targets that consume a separate sampler index (HLSL, SPIR-V `spvDescriptorHeapEXT`). These
-        // `case`s mirror the combined-sampler branches in `defaultGetDescriptorFromHandle`; the two lists
-        // are kept in agreement.
+        // targets whose `defaultGetDescriptorFromHandle` combined-sampler branch consumes a separate
+        // sampler index (HLSL, SPIR-V `spvDescriptorHeapEXT`). Under NV+EXT the native-handle assertion
+        // above already owns the diagnosis, so the check below is refined to `spvDescriptorHeapEXT`
+        // without NV (the nested switch).
         __target_switch
         {
         case hlsl:
@@ -28252,13 +28255,12 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
     // `SPV_NV_bindless_texture` opcode. The native cast runs ahead of the shared switch because the
     // `spvDescriptorHeapEXT` arm below is more specialized (two capability atoms) and would otherwise be
     // selected for the whole function under both capabilities, reinterpreting the `uint64` handle as a
-    // `uint2` heap index (issue #13070). `usesNativeSpirvDescriptorHandle<T>()` centralizes the
-    // native-vs-heap-index decision; its `[ForceInline]` folds it to a compile-time constant, so
-    // dead-branch elimination keeps `__castDescriptorHandleToResource<T>` (which lowers to
-    // `SPV_NV_bindless_texture`) from being instantiated for a non-encodable `T`, whose result type the
-    // SPIR-V emitter cannot cast. The query's own `case spirv:`/`default` arm keeps the guard from forcing
-    // a spurious NV capability on a plain-SPIR-V compile. On any non-SPIR-V target the query is false and
-    // execution falls through to the shared switch below.
+    // `uint2` heap index (issue #13070). The native-vs-heap-index decision is centralized in the
+    // `[ForceInline] usesNativeSpirvDescriptorHandle<T>()` query — see its definition for why that shape
+    // is required (folding to a compile-time constant lets dead-branch elimination drop the NV cast for a
+    // non-encodable `T`, whose result type the SPIR-V emitter cannot cast, and its `case spirv:` sibling
+    // avoids leaking an NV capability). On any non-SPIR-V target the query is false and execution falls
+    // through to the shared switch below.
     if (usesNativeSpirvDescriptorHandle<T>())
         return __castDescriptorHandleToResource<T>(handleValue);
 
