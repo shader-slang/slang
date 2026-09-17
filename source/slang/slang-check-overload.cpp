@@ -915,9 +915,12 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         {
             Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
 
-            // Check if concrete-to-interface coercion caused loss of l-valueness.
+            // Check if concrete-to-existential coercion caused loss of l-valueness. The parameter
+            // type of an interface-typed parameter is now the existential box `dyn IFoo`, so match
+            // that as well as a bare interface type.
             if (coercedExpr && !coercedExpr->type.isLeftValue && paramType.isLeftValue &&
-                !isInterfaceType(arg.type) && isInterfaceType(paramType.type))
+                !isInterfaceType(arg.type) && !getExistentialInterfaceType(arg.type) &&
+                (isInterfaceType(paramType.type) || getExistentialInterfaceType(paramType.type)))
             {
                 if (context.mode != OverloadResolveContext::Mode::JustTrying)
                 {

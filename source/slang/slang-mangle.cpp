@@ -282,6 +282,15 @@ void emitType(ManglingContext* context, Type* type)
         emitType(context, andType->getLeft());
         emitType(context, andType->getRight());
     }
+    else if (auto existentialType = as<ExistentialType>(type))
+    {
+        // An existential box `dyn IFoo` is a *distinct* type from the interface `IFoo`, so it
+        // gets its own mangling opcode rather than aliasing the interface's. `Td` (for `dyn`)
+        // is a prefix, so the mangling stays self-delimiting when an existential appears in a
+        // concatenated type sequence (e.g. a function parameter list).
+        emitRaw(context, "Td");
+        emitType(context, existentialType->getInterfaceType());
+    }
     else if (auto expandType = as<ExpandType>(type))
     {
         emitRaw(context, "Tx");

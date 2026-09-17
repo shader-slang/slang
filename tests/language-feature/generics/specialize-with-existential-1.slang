@@ -28,7 +28,10 @@ void helper(IFoo g){g.doSomething();}
 
 void caller(IFoo f)
 {
+    // Builtin generic specialization with an existential argument must not emit either
+    // existential-specialization rejection diagnostic.
     // CHECK-NOT: error 33180
+    // CHECK-NOT: error 38029
     let a = fooBuffer.Load(0);
     let b = byteBuffer.Load<IFoo>(0);
     let c = createDynamicObject<IFoo>(0, 0);

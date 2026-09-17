@@ -1329,6 +1329,31 @@ class ExistentialSpecializedType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+/// The existential type of an interface (or conjunction of interfaces), written `dyn IFoo`.
+///
+/// This is the type of a value that is known to conform to `getInterfaceType()` but whose
+/// concrete type is erased. It is distinct from a `DeclRefType` that refers to the
+/// `InterfaceDecl` itself: the latter names the interface (e.g. as a generic constraint
+/// `T : IFoo`), while `ExistentialType(IFoo)` names the box that holds some conforming value.
+///
+/// The distinction is load-bearing: `ExistentialType(IFoo)` does *not* conform to `IFoo` (a
+/// box is not itself a conforming concrete type), so passing `dyn IFoo` where a `T : IFoo` is
+/// required must be rejected. See `checkAndConstructSubtypeWitness`.
+FIDDLE()
+class ExistentialType : public Type
+{
+    FIDDLE(...)
+    /// The interface or interface-conjunction this is the existential type of.
+    Type* getInterfaceType() { return as<Type>(getOperand(0)); }
+
+    ExistentialType(Type* interfaceType) { setOperands(interfaceType); }
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 /// The type of `this` within a polymorphic declaration
 FIDDLE()
 class ThisType : public DeclRefType

@@ -2,6 +2,7 @@
 #include "slang-parameter-binding.h"
 
 #include "compiler-core/slang-artifact-desc-util.h"
+#include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
@@ -2509,6 +2510,11 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     // `type` to something else, in that case we simply call the lambda recursively.
     auto processParamOfType = [&](auto&& processParamOfTypeFunc, Type* type) -> RefPtr<TypeLayout>
     {
+        // An existential value `dyn IFoo` shares the interface's varying-parameter handling
+        // (interfaces are not valid varying parameters); unwrap so it reaches the interface case.
+        if (auto existentialInterfaceType = getExistentialInterfaceType(type))
+            type = existentialInterfaceType;
+
         // Scalar and vector types are treated as outputs directly
         if (auto basicType = as<BasicExpressionType>(type))
         {
