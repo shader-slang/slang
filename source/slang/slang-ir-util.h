@@ -231,6 +231,45 @@ inline bool isScalarIntegerType(IRType* type)
     return getTypeStyle(type->getOp()) == kIROp_IntType;
 }
 
+// Returns true for the integer arithmetic and bitwise op-kinds through which a
+// NonUniformResourceIndex mark propagates. Nonuniformity is contagious: an
+// elementwise integer op with a non-uniform operand yields a non-uniform result
+// (Vulkan VUID-RuntimeSpirv-None-10148). This is the single source of truth for
+// that op-set, shared by the SPIR-V float pass that bubbles the wrapper past such
+// an op (slang-ir-float-non-uniform-resource-index.cpp) and by the function-call
+// specializer that detects a non-uniform index passed through arithmetic across a
+// call boundary (slang-ir-specialize-function-call.cpp). Comparison/logical ops
+// are excluded (they yield a bool, not an index); IntCast is handled separately by
+// both consumers.
+//
+// This classifies by op-kind and assumes the operands are the integer index the
+// caller guarantees. That matters because `kIROp_Div` is the type-polymorphic divide
+// (there is no separate integer-divide op, unlike the integer-specific `kIROp_IRem`
+// whose float sibling `kIROp_FRem` is deliberately absent): the set is sound only
+// because the value asked about is always a NonUniformResourceIndex-derived integer
+// index, not because the op-kinds alone are integer-only.
+inline bool isNonUniformIndexArithmeticOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_IRem:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_BitNot:
+    case kIROp_Neg:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // No side effect can take place through a value of a "Value" type.
 bool isValueType(IRInst* type);
 

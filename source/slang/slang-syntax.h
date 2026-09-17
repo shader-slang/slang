@@ -745,6 +745,19 @@ ModuleDecl* getModuleDecl(Scope* scope);
 /// Get the module that a declaration is associated with, if any.
 Module* getModule(Decl* decl);
 
+/// If `decl` is an unscoped `enum` declaration, return it; otherwise return
+/// null. "Unscoped" is defined here by the marker this predicate tests: the enum
+/// carries `UnscopedEnumAttribute`. The parser attaches that attribute via two
+/// independent routes — `-unscoped-enum` (only for non-generic enums) and an
+/// explicit `[UnscopedEnum]` (any enum, a generic one included) — so a generic
+/// enum can be unscoped through the explicit attribute alone. For a non-generic
+/// unscoped enum the parser additionally injects its enumerators into the
+/// enclosing scope, but that injection is a consequence, not the definition: a
+/// generic `[UnscopedEnum]` enum is unscoped here yet gets no injection. This is
+/// the single source of truth for "is this enum unscoped"; it also matches a
+/// still-unchecked `[UnscopedEnum]` so it can be used during parsing.
+EnumDecl* isUnscopedEnum(Decl* decl);
+
 /// Get the parent decl, skipping any generic decls in between.
 ContainerDecl* getParentDecl(Decl* decl);
 AggTypeDecl* getParentAggTypeDecl(Decl* decl);
