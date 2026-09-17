@@ -370,7 +370,11 @@ interface __BuiltinType
 {
 }
 
-/// A non-void builtin scalar type with compiler-defined conversion semantics.
+/// A compiler-supported, non-void scalar representation.
+///
+/// Implemented by `bool`, the builtin signed and unsigned integer scalar types, and the `half`,
+/// `float`, and `double` types. This sealed marker supports representation-level dispatch such as
+/// compiler-defined casts; it does not imply any particular mathematical capabilities.
 [sealed]
 [builtin]
 interface __BuiltinScalarType : __BuiltinType

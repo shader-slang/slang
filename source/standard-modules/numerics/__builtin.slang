@@ -11,9 +11,10 @@
 // these distinguished forwarding names should be removed in favor of direct qualified calls.
 module __builtin;
 
-// Keep the public conversion wrappers from redispatching through generic constructors. BuiltinCast
-// represents the same explicit scalar conversion semantics used by the concrete builtin types and
-// applies those semantics component-wise to vectors and matrices.
+// Keep the public conversion wrappers from redispatching through generic constructors. For each
+// concrete source and destination scalar pair, BuiltinCast produces the same value as an explicit
+// `TDestination(value)` conversion. The vector and matrix forms apply that scalar conversion to
+// every component without changing the shape or matrix layout.
 [__readNone]
 [__unsafeForceInlineEarly]
 __intrinsic_op(BuiltinCast)

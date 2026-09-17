@@ -262,8 +262,9 @@ int3 convertCoordinates(float3 value)
 }
 ```
 
-`convertBuiltinScalar`, `convertBuiltinVector`, and `convertBuiltinMatrix` use the ordinary explicit conversion semantics of the destination built-in type.
-Vector and matrix conversions apply the scalar conversion component-wise and preserve the input shape; matrix conversion also preserves the input layout.
+For each concrete source and destination scalar pair, `convertBuiltinScalar` produces the same value as an explicit `DestinationType(value)` conversion.
+`convertBuiltinVector` and `convertBuiltinMatrix` apply that same scalar conversion to each component.
+Both shaped conversions preserve the input shape, and matrix conversion also preserves the input layout.
 The helpers do not perform bit reinterpretation, scalar splatting, or shape conversion.
 
 `IBuiltinScalarTypeDispatchMarker` admits `bool`, the built-in integer types, and `half`, `float`, and `double`.

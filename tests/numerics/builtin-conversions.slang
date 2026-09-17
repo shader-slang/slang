@@ -1,10 +1,12 @@
-// Verify explicit conversion between generic builtin scalar element types and preserve vector and
-// matrix shapes, including a non-default matrix layout.
+// Verify representative explicit conversions between generic builtin scalar element types. The
+// matrix case also type-checks conversion of a non-default matrix layout.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
 //TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o builtin-conversions.hlsl -experimental-feature
 //TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o builtin-conversions.spv -experimental-feature
 //TEST:SIMPLE: -target wgsl -entry computeMain -stage compute -o builtin-conversions.wgsl -experimental-feature
+//TEST:SIMPLE: -target metal -entry computeMain -stage compute -o builtin-conversions.metal -experimental-feature
+//TEST:SIMPLE: -target cuda -entry computeMain -stage compute -o builtin-conversions.cuda.cpp -experimental-feature
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 3
@@ -20,8 +22,10 @@
 // CHECK-NEXT: 0
 // CHECK-NEXT: 1
 // CHECK-NEXT: 1
+// CHECK-NEXT: 8
+// CHECK-NEXT: 9
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 
 import slang.numerics;
 
@@ -81,4 +85,18 @@ void computeMain()
     outputBuffer[10] = int(vectorFromInt.x);
     outputBuffer[11] = int(vectorFromInt.y);
     outputBuffer[12] = int(vectorFromInt.z);
+
+    // Exercise half/double conversions only on targets that represent both types.
+    __target_switch
+    {
+    case cpp:
+    case cuda:
+        half halfFromDouble = convertScalar<half>(double(8.5));
+        double doubleFromHalf = convertScalar<double>(half(9.5));
+        outputBuffer[13] = int(halfFromDouble);
+        outputBuffer[14] = int(doubleFromHalf);
+    default:
+        outputBuffer[13] = 0;
+        outputBuffer[14] = 0;
+    }
 }
