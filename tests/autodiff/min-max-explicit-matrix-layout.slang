@@ -1,7 +1,7 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cpu
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 typealias RowMajorFloat2x2 = matrix<float, 2, 2, MatrixLayoutMode.RowMajor>;
@@ -14,6 +14,18 @@ RowMajorFloat2x2 rowMajorMinimum(RowMajorFloat2x2 left, RowMajorFloat2x2 right)
 
 [Differentiable]
 RowMajorFloat2x2 rowMajorMaximum(RowMajorFloat2x2 left, RowMajorFloat2x2 right)
+{
+    return max(left, right);
+}
+
+[Differentiable]
+float2 vectorMinimum(float2 left, float2 right)
+{
+    return min(left, right);
+}
+
+[Differentiable]
+float2 vectorMaximum(float2 left, float2 right)
 {
     return max(left, right);
 }
@@ -71,4 +83,20 @@ void computeMain()
     outputBuffer[29] = maximumRight.d[0][1];  // CHECK: 0.0
     outputBuffer[30] = maximumRight.d[1][0];  // CHECK: 0.0
     outputBuffer[31] = maximumRight.d[1][1];  // CHECK: 1.0
+
+    var vectorMinimumLeft = diffPair(float2(1.0, 4.0), float2(0.0));
+    var vectorMinimumRight = diffPair(float2(3.0, 2.0), float2(0.0));
+    bwd_diff(vectorMinimum)(vectorMinimumLeft, vectorMinimumRight, float2(1.0));
+    outputBuffer[32] = vectorMinimumLeft.d.x;   // CHECK: 1.0
+    outputBuffer[33] = vectorMinimumLeft.d.y;   // CHECK: 0.0
+    outputBuffer[34] = vectorMinimumRight.d.x;  // CHECK: 0.0
+    outputBuffer[35] = vectorMinimumRight.d.y;  // CHECK: 1.0
+
+    var vectorMaximumLeft = diffPair(float2(1.0, 4.0), float2(0.0));
+    var vectorMaximumRight = diffPair(float2(3.0, 2.0), float2(0.0));
+    bwd_diff(vectorMaximum)(vectorMaximumLeft, vectorMaximumRight, float2(1.0));
+    outputBuffer[36] = vectorMaximumLeft.d.x;   // CHECK: 0.0
+    outputBuffer[37] = vectorMaximumLeft.d.y;   // CHECK: 1.0
+    outputBuffer[38] = vectorMaximumRight.d.x;  // CHECK: 1.0
+    outputBuffer[39] = vectorMaximumRight.d.y;  // CHECK: 0.0
 }

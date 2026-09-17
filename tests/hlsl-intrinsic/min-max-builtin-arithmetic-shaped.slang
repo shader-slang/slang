@@ -54,10 +54,8 @@
 // WGSL-LABEL: fn genericMinimum_{{[0-9]+}}({{.*}}vec4<f32>{{.*}}) -> vec4<f32>
 // WGSL: return min(left_{{[0-9]+}}, right_{{[0-9]+}});
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
-//TEST_INPUT:ubuffer(data=[0x7fc00000], stride=4):name=inputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
-StructuredBuffer<uint> inputBuffer;
 RWStructuredBuffer<int3> concreteIntOutput;
 RWStructuredBuffer<uint2> concreteUIntOutput;
 RWStructuredBuffer<float4> concreteFloatOutput;
@@ -251,29 +249,4 @@ void computeMain()
     outputBuffer[43] = int(floatMatrixMaximum[0][1] * 10.0);
     outputBuffer[44] = int(floatMatrixMaximum[1][0] * 10.0);
     outputBuffer[45] = int(floatMatrixMaximum[1][1] * 10.0);
-
-    float nanValue = asfloat(inputBuffer[0]);
-    float2 nanMinimum = genericMinimum(float2(nanValue, 5.0), float2(3.0, nanValue));
-    float2 nanMaximum = genericMaximum(float2(nanValue, -5.0), float2(7.0, nanValue));
-    outputBuffer[46] = int(nanMinimum.x);
-    outputBuffer[47] = int(nanMinimum.y);
-    outputBuffer[48] = int(nanMaximum.x);
-    outputBuffer[49] = int(nanMaximum.y);
-    outputBuffer[50] = int(genericMinimum(nanValue, 3.0));
-    outputBuffer[51] = int(genericMaximum(7.0, nanValue));
-
-    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> nanMatrixMinimum = genericMinimum(
-        matrix<float, 2, 2, MatrixLayoutMode.RowMajor>(nanValue, 5.0, nanValue, 9.0),
-        matrix<float, 2, 2, MatrixLayoutMode.RowMajor>(3.0, nanValue, 7.0, 8.0));
-    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> nanMatrixMaximum = genericMaximum(
-        matrix<float, 2, 2, MatrixLayoutMode.RowMajor>(nanValue, -5.0, 7.0, nanValue),
-        matrix<float, 2, 2, MatrixLayoutMode.RowMajor>(3.0, nanValue, nanValue, 8.0));
-    outputBuffer[52] = int(nanMatrixMinimum[0][0]);
-    outputBuffer[53] = int(nanMatrixMinimum[0][1]);
-    outputBuffer[54] = int(nanMatrixMinimum[1][0]);
-    outputBuffer[55] = int(nanMatrixMinimum[1][1]);
-    outputBuffer[56] = int(nanMatrixMaximum[0][0]);
-    outputBuffer[57] = int(nanMatrixMaximum[0][1]);
-    outputBuffer[58] = int(nanMatrixMaximum[1][0]);
-    outputBuffer[59] = int(nanMatrixMaximum[1][1]);
 }

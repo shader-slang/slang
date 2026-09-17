@@ -1810,6 +1810,11 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         dpy = diffPair(dpy.p, right_d_result);                                               \
     }
 
+// The derivative signature must spell the same matrix layout parameters as the primal overload so
+// `[ForwardDerivativeOf]` and `[BackwardDerivativeOf]` can bind the pair. Builtins such as `atan2`,
+// `fmod`, and `pow` have default-layout matrix primals and use this macro. The `min` and `max`
+// primals preserve an explicit `MatrixLayoutMode`, so they use `MATRIX_LAYOUT_BINARY_DIFF_IMPL`.
+//
 // Matrix derivatives for builtins whose matrix overloads use the default layout spelling.
 #define MATRIX_BINARY_DIFF_IMPL(NAME)                                                        \
     __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
@@ -1854,6 +1859,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     }
 
 // Preserve the matrix layout through both the primal extrema operations and their derivatives.
+// See `MATRIX_BINARY_DIFF_IMPL` above for the primal/derivative signature-coupling rule.
 #define MATRIX_LAYOUT_BINARY_DIFF_IMPL(NAME)                                                 \
     __generic<                                                                               \
         T : __BuiltinFloatingPointType,                                                       \

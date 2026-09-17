@@ -12940,6 +12940,21 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
     }
 }
 
+//@ hidden:
+// Tests a value for NaN on the LLVM path without requiring the caller's generic constraint to
+// expose `__BuiltinFloatingPointType`. Use explicit classification rather than `value != value`:
+// the latter currently lowers to an ordered comparison and is false for NaN (see #13144). Calls
+// are guarded by `__isFloat<T>()`, so specialization removes this helper for integer and
+// application-defined `IComparable` types.
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+[__readNone]
+[require(llvm)]
+bool __llvmExtremaIsNaN(T value)
+{
+    __intrinsic_asm "%result = call i1 @llvm.is.fpclass($0, i32 3)";
+}
+
 // Internal helper for max - contains the intrinsic implementations.
 // Caller must ensure T is a builtin scalar type (float, int, etc.).
 //@ hidden:
@@ -12967,10 +12982,8 @@ T __max_impl(T x, T y)
     case llvm:
         if (__isFloat<T>())
         {
-            // Equality is ordered for floating-point values, so negating it detects NaN without
-            // requiring this broadly-constrained helper to call `isnan`.
-            if (!(x == x)) return y;
-            if (!(y == y)) return x;
+            if (__llvmExtremaIsNaN(x)) return y;
+            if (__llvmExtremaIsNaN(y)) return x;
             return x > y ? x : y;
         }
         else if (__isSignedInt<T>())
@@ -13019,7 +13032,8 @@ T max(T x, T y)
 }
 
 // Implements the target-specific vector maximum behavior shared by all builtin arithmetic
-// element types.
+// element types. Family-specific public overloads forward here so a generic element type still
+// reaches the same native shaped operation as a concrete integer or floating-point element type.
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
 [ForceInline]
@@ -13057,8 +13071,8 @@ vector<T, N> __vectorMaxImpl(vector<T, N> x, vector<T, N> y)
     {
         if (__isFloat<T>())
         {
-            // Unfortunately, as of LLVM 21.1.1, maximumnum seems to generate invalid code on
-            // x86. Preserve the floating-point overload's NaN behavior in the scalar fallback.
+            // LLVM 21.1.1's `maximumnum` intrinsic miscompiles on x86. Use the scalar worker to
+            // preserve the established floating-point NaN behavior on every LLVM architecture.
             VECTOR_MAP_BINARY(T, N, __max_impl, x, y);
         }
         else if (__isSignedInt<T>())
@@ -13087,6 +13101,9 @@ matrix<T, N, M, L> __matrixMaxImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
     {
     case hlsl: __intrinsic_asm "max";
     default:
+        // HLSL has a native matrix operation. Other targets decompose the logical rows so each
+        // row reaches the intrinsic-aware vector worker; indexing a logical row is independent of
+        // the matrix storage layout carried by `L`.
         matrix<T, N, M, L> result;
         for (int i = 0; i < N; ++i)
             result[i] = __vectorMaxImpl(x[i], y[i]);
@@ -13118,6 +13135,7 @@ matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
     return __matrixMaxImpl(x, y);
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -13127,8 +13145,8 @@ T max(T x, T y)
     __target_switch
     {
     case llvm:
-        // Unfortunately, as of LLVM 21.1.1, maximumnum seems to generate
-        // invalid code on x86.
+        // LLVM 21.1.1's `maximumnum` intrinsic miscompiles on x86, so implement the operation
+        // explicitly while preserving its established NaN behavior.
         //__intrinsic_asm "%result = call $T0 @llvm.maximumnum($0, $1)";
         if (isnan(x)) return y;
         if (isnan(y)) return x;
@@ -13139,6 +13157,7 @@ T max(T x, T y)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
@@ -13148,14 +13167,12 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     return __vectorMaxImpl(x, y);
 }
 
-/// Component-wise maximum for builtin arithmetic vectors.
-/// @remarks This overload allows generic code constrained only by `__BuiltinArithmeticType` to
-/// call `max`. Its rank is below the integer- and floating-point-specific shaped overloads, while
-/// all three overloads share the same target-specific implementation.
 /// @category math
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
 [ForceInline]
+// Concrete integer and floating-point calls should retain their established overloads; this
+// lower-ranked overload exists for generic code that knows only the common arithmetic domain.
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
@@ -13163,6 +13180,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     return __vectorMaxImpl(x, y);
 }
 
+/// @category math
 __generic<
     T : __BuiltinFloatingPointType,
     let N : int,
@@ -13176,10 +13194,6 @@ matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
     return __matrixMaxImpl(x, y);
 }
 
-/// Component-wise maximum for builtin arithmetic matrices.
-/// @remarks This overload allows generic code constrained only by `__BuiltinArithmeticType` to
-/// call `max`. Its rank is below the integer- and floating-point-specific shaped overloads, while
-/// all three overloads share the same target-specific implementation.
 /// @category math
 __generic<
     T : __BuiltinArithmeticType,
@@ -13188,6 +13202,7 @@ __generic<
     let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
+// See the vector overload above for why the common-arithmetic overload has a lower rank.
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
@@ -13321,10 +13336,8 @@ T __min_impl(T x, T y)
     case llvm:
         if (__isFloat<T>())
         {
-            // Equality is ordered for floating-point values, so negating it detects NaN without
-            // requiring this broadly-constrained helper to call `isnan`.
-            if (!(x == x)) return y;
-            if (!(y == y)) return x;
+            if (__llvmExtremaIsNaN(x)) return y;
+            if (__llvmExtremaIsNaN(y)) return x;
             return x < y ? x : y;
         }
         else if (__isSignedInt<T>())
@@ -13352,7 +13365,8 @@ T min(T x, T y)
 }
 
 // Implements the target-specific vector minimum behavior shared by all builtin arithmetic
-// element types.
+// element types. Family-specific public overloads forward here so a generic element type still
+// reaches the same native shaped operation as a concrete integer or floating-point element type.
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
 [ForceInline]
@@ -13390,8 +13404,8 @@ vector<T, N> __vectorMinImpl(vector<T, N> x, vector<T, N> y)
     {
         if (__isFloat<T>())
         {
-            // Unfortunately, as of LLVM 21.1.1, minimumnum seems to generate invalid code on
-            // x86. Preserve the floating-point overload's NaN behavior in the scalar fallback.
+            // LLVM 21.1.1's `minimumnum` intrinsic miscompiles on x86. Use the scalar worker to
+            // preserve the established floating-point NaN behavior on every LLVM architecture.
             VECTOR_MAP_BINARY(T, N, __min_impl, x, y);
         }
         else if (__isSignedInt<T>())
@@ -13420,6 +13434,9 @@ matrix<T, N, M, L> __matrixMinImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
     {
     case hlsl: __intrinsic_asm "min";
     default:
+        // HLSL has a native matrix operation. Other targets decompose the logical rows so each
+        // row reaches the intrinsic-aware vector worker; indexing a logical row is independent of
+        // the matrix storage layout carried by `L`.
         matrix<T, N, M, L> result;
         for (int i = 0; i < N; ++i)
             result[i] = __vectorMinImpl(x[i], y[i]);
@@ -13451,6 +13468,7 @@ matrix<T,N,M,L> min(matrix<T,N,M,L> x, matrix<T,N,M,L> y)
     return __matrixMinImpl(x, y);
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -13472,6 +13490,7 @@ T min(T x, T y)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
@@ -13481,14 +13500,12 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
     return __vectorMinImpl(x, y);
 }
 
-/// Component-wise minimum for builtin arithmetic vectors.
-/// @remarks This overload allows generic code constrained only by `__BuiltinArithmeticType` to
-/// call `min`. Its rank is below the integer- and floating-point-specific shaped overloads, while
-/// all three overloads share the same target-specific implementation.
 /// @category math
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
 [ForceInline]
+// Concrete integer and floating-point calls should retain their established overloads; this
+// lower-ranked overload exists for generic code that knows only the common arithmetic domain.
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
@@ -13496,6 +13513,7 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
     return __vectorMinImpl(x, y);
 }
 
+/// @category math
 __generic<
     T : __BuiltinFloatingPointType,
     let N : int,
@@ -13509,10 +13527,6 @@ matrix<T,N,M,L> min(matrix<T,N,M,L> x, matrix<T,N,M,L> y)
     return __matrixMinImpl(x, y);
 }
 
-/// Component-wise minimum for builtin arithmetic matrices.
-/// @remarks This overload allows generic code constrained only by `__BuiltinArithmeticType` to
-/// call `min`. Its rank is below the integer- and floating-point-specific shaped overloads, while
-/// all three overloads share the same target-specific implementation.
 /// @category math
 __generic<
     T : __BuiltinArithmeticType,
@@ -13521,6 +13535,7 @@ __generic<
     let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
+// See the vector overload above for why the common-arithmetic overload has a lower rank.
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M, L> min(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
