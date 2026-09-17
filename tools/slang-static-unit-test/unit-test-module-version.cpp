@@ -314,7 +314,7 @@ SLANG_UNIT_TEST(serializedModuleVersionValidation)
                 patched.getBuffer(),
                 patched.getCount(),
                 diagnostics.writeRef()) == nullptr);
-        SLANG_CHECK(getDiagnosticText(diagnostics).indexOf(toSlice("error[E00117]")) >= 0);
+        SLANG_CHECK(getDiagnosticText(diagnostics).indexOf(toSlice("error[E00130]")) >= 0);
     }
 
     {
@@ -334,7 +334,7 @@ SLANG_UNIT_TEST(serializedModuleVersionValidation)
             patched.getCount(),
             diagnostics.writeRef());
         SLANG_CHECK(loaded == nullptr);
-        SLANG_CHECK(getDiagnosticText(diagnostics).indexOf(toSlice("error[E00117]")) >= 0);
+        SLANG_CHECK(getDiagnosticText(diagnostics).indexOf(toSlice("error[E00130]")) >= 0);
 
         SlangInt version = 0;
         const char* compilerVersion = nullptr;
@@ -366,7 +366,7 @@ SLANG_UNIT_TEST(serializedModuleVersionValidation)
                 patched.getBuffer(),
                 patched.getCount(),
                 diagnostics.writeRef()) == nullptr);
-        SLANG_CHECK(getDiagnosticText(diagnostics).indexOf(toSlice("error[E00117]")) >= 0);
+        SLANG_CHECK(getDiagnosticText(diagnostics).indexOf(toSlice("error[E00130]")) >= 0);
     }
 
     {
@@ -405,7 +405,7 @@ SLANG_UNIT_TEST(serializedModuleVersionValidation)
                 patched.getBuffer(),
                 patched.getCount(),
                 diagnostics.writeRef()) == nullptr);
-        SLANG_CHECK(getDiagnosticText(diagnostics).indexOf(toSlice("error[E00119]")) >= 0);
+        SLANG_CHECK(getDiagnosticText(diagnostics).indexOf(toSlice("error[E00132]")) >= 0);
 
         SlangInt version = 0;
         const char* compilerVersion = nullptr;
@@ -479,7 +479,7 @@ SLANG_UNIT_TEST(serializedModuleVersionLibraryReference)
             "version_test_library.slang-module",
             patched.getBuffer(),
             patched.getCount())));
-        SLANG_CHECK(diagnostics.getUnownedSlice().indexOf(toSlice("error[E00117]")) >= 0);
+        SLANG_CHECK(diagnostics.getUnownedSlice().indexOf(toSlice("error[E00130]")) >= 0);
     }
 
     {
@@ -499,7 +499,7 @@ SLANG_UNIT_TEST(serializedModuleVersionLibraryReference)
             "version_test_library.slang-module",
             patched.getBuffer(),
             patched.getCount())));
-        SLANG_CHECK(diagnostics.getUnownedSlice().indexOf(toSlice("error[E00119]")) >= 0);
+        SLANG_CHECK(diagnostics.getUnownedSlice().indexOf(toSlice("error[E00132]")) >= 0);
     }
 }
 
@@ -539,7 +539,7 @@ SLANG_UNIT_TEST(serializedModuleVersionImportFallback)
         SLANG_CHECK(!moduleHasDirectDeclaration(module, toSlice("binaryOnly")));
 
         auto text = getDiagnosticText(diagnostics);
-        SLANG_CHECK(countOccurrences(text, toSlice("warning[E00118]")) == 1);
+        SLANG_CHECK(countOccurrences(text, toSlice("warning[E00131]")) == 1);
     }
 
     {
@@ -559,6 +559,6 @@ SLANG_UNIT_TEST(serializedModuleVersionImportFallback)
         SLANG_CHECK(!moduleHasDirectDeclaration(module, toSlice("binaryOnly")));
 
         auto text = getDiagnosticText(diagnostics);
-        SLANG_CHECK(countOccurrences(text, toSlice("warning[E00120]")) == 1);
+        SLANG_CHECK(countOccurrences(text, toSlice("warning[E00133]")) == 1);
     }
 }

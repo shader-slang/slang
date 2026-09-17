@@ -148,8 +148,8 @@ Changes to how data is serialized (not what data) require updating `serializatio
 
    - Reject module versions outside the inclusive range from `k_minSupportedModuleVersion` to
      `k_maxSupportedModuleVersion` before deserializing debug information, the AST, or instructions
-   - Explicit IR-blob and module-library loads report diagnostic E00117 immediately
-   - Automatic imports report diagnostic `E00118` as a warning when ignoring an incompatible
+   - Explicit IR-blob and module-library loads report diagnostic `E00130` immediately
+   - Automatic imports report diagnostic `E00131` as a warning when ignoring an incompatible
      serialized module, then continue probing source and other candidates
    - Metadata inspection still reports the recorded version without enforcing the semantic range
 
@@ -165,11 +165,11 @@ Changes to how data is serialized (not what data) require updating `serializatio
 ### Error Handling
 
 - Incompatible serialization versions: Fail before module deserialization; explicit IR-blob and
-  module-library loads report diagnostic `E00119` as an error, while speculative imports report
-  diagnostic `E00120` as a warning
+  module-library loads report diagnostic `E00132` as an error, while speculative imports report
+  diagnostic `E00133` as a warning
 - Module version out of range: Fail before module deserialization; explicit IR-blob and
-  module-library loads report diagnostic `E00117` as an error, while speculative imports report
-  diagnostic `E00118` as a warning
+  module-library loads report diagnostic `E00130` as an error, while speculative imports report
+  diagnostic `E00131` as a warning
 - Unknown instructions: Mark as unrecognized, fail after full deserialization
   (this should be caught by the next check)
 
