@@ -14,7 +14,8 @@ implementing numerics;
 //   and min/max win at -9, while component-wise Mask-valued relations remain fallback behavior at
 //   -11 for types that also conform to IComparable.
 
-/// Explicitly converts between non-void builtin scalar representations.
+/// Converts between non-void builtin scalar representations using compiler numeric-cast semantics.
+/// Conversion to `bool` tests whether the source is nonzero; this is not bit reinterpretation.
 __generic<
     TDestination : IBuiltinScalarTypeDispatchMarker,
     TSource : IBuiltinScalarTypeDispatchMarker>
@@ -25,7 +26,8 @@ public TDestination convertBuiltinScalar(TSource value)
     return __numericsBuiltinConvertScalar<TDestination>(value);
 }
 
-/// Explicitly converts every component of a builtin vector to `TDestination`.
+/// Converts every component of a builtin vector to `TDestination` using `convertBuiltinScalar`
+/// semantics.
 __generic<
     TDestination : IBuiltinScalarTypeDispatchMarker,
     TSource : IBuiltinScalarTypeDispatchMarker,
@@ -37,8 +39,8 @@ public vector<TDestination, N> convertBuiltinVector(vector<TSource, N> value)
     return __numericsBuiltinConvertVector<TDestination>(value);
 }
 
-/// Explicitly converts every component of a builtin matrix to `TDestination` while preserving its
-/// dimensions and layout.
+/// Converts every component of a builtin matrix to `TDestination` using `convertBuiltinScalar`
+/// semantics while preserving its dimensions and layout.
 __generic<
     TDestination : IBuiltinScalarTypeDispatchMarker,
     TSource : IBuiltinScalarTypeDispatchMarker,

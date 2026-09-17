@@ -2,7 +2,7 @@
 // matrix case also type-checks conversion of a non-default matrix layout.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
-//TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o builtin-conversions.hlsl -experimental-feature
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute -experimental-feature
 //TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o builtin-conversions.spv -experimental-feature
 //TEST:SIMPLE: -target wgsl -entry computeMain -stage compute -o builtin-conversions.wgsl -experimental-feature
 //TEST:SIMPLE: -target metal -entry computeMain -stage compute -o builtin-conversions.metal -experimental-feature
@@ -25,8 +25,20 @@
 // CHECK-NEXT: 8
 // CHECK-NEXT: 9
 // CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 0
+// CHECK-NEXT: 1
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+
+// Specialization must expose the ordinary builtin casts rather than leaving numerics adapters or
+// dispatch-marker abstractions in the emitted program.
+// HLSL-NOT: __numericsBuiltinConvert
+// HLSL-NOT: __BuiltinScalarType
+// HLSL: return int3(value_{{[0-9]+}});
+// HLSL: return value_{{[0-9]+}} != 0.0f;
+// HLSL-NOT: __numericsBuiltinConvert
+// HLSL-NOT: __BuiltinScalarType
 
 import slang.numerics;
 
@@ -68,6 +80,7 @@ void computeMain()
 
     int3 vectorFromFloat = convertVector<int>(float3(1.0, -2.0, 3.0));
     vector<bool, 3> vectorFromInt = convertVector<bool>(int3(0, 2, -1));
+    vector<bool, 3> vectorBoolFromFloat = convertVector<bool>(float3(0.5, 0.0, -0.5));
 
     matrix<float, 2, 2, MatrixLayoutMode.RowMajor> sourceMatrix =
         matrix<float, 2, 2, MatrixLayoutMode.RowMajor>(4.0, 5.0, 6.0, 7.0);
@@ -88,6 +101,9 @@ void computeMain()
     outputBuffer[11] = int(vectorFromInt.y);
     outputBuffer[12] = int(vectorFromInt.z);
     outputBuffer[15] = int(scalarBoolFromFractionalFloat);
+    outputBuffer[16] = int(vectorBoolFromFloat.x);
+    outputBuffer[17] = int(vectorBoolFromFloat.y);
+    outputBuffer[18] = int(vectorBoolFromFloat.z);
 
     // Exercise half/double conversions only on targets that represent both types.
     __target_switch
