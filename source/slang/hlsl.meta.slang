@@ -10296,7 +10296,9 @@ T __vectorDotFallback(vector<T, N> x, vector<T, N> y)
 }
 
 // Implements the target-specific vector dot product behavior for the broad builtin-arithmetic
-// overload below.
+// overload below. Keep its target arms and `N == 1` rule synchronized with the retained
+// floating-point and integer overloads below. Their pre-existing zero-width behavior remains
+// target-path-specific and is not normalized here.
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
 [ForceInline]
@@ -10375,7 +10377,9 @@ T dot(vector<T, N> x, vector<T, N> y)
     // Preserve the established concrete floating-point intrinsic path. A non-forced forwarding
     // wrapper leaves a helper in textual output, while forcing the worker inline expands it early
     // enough to perturb existing CUDA caller-control-flow optimization. Keeping this overload's
-    // original target switch preserves both behaviors.
+    // original target switch preserves both behaviors; `tests/cuda/vector-dot-unroll.slang`
+    // protects the emitted CUDA and C++ structure. Keep this switch and the `N == 1` rule
+    // synchronized with `__vectorDotImpl` above.
     if (N == 1)
     {
         return x[0] * y[0];
@@ -10405,7 +10409,8 @@ __generic<T : __BuiltinIntegerType, let N : int>
 T dot(vector<T, N> x, vector<T, N> y)
 {
     // Preserve the established concrete integer intrinsic path for the same reason as the
-    // floating-point overload above.
+    // floating-point overload above. Keep this switch and the `N == 1` rule synchronized with
+    // `__vectorDotImpl`.
     if (N == 1)
     {
         return x[0] * y[0];
@@ -10451,9 +10456,9 @@ T dot(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
 [ForceInline]
-// Keep this broad overload below the default-rank family-specific overloads. Since removal of the
-// generic-parameter-count tie-breaker, rank -1 is what preserves those overloads for concrete calls
-// while still making this one available to generic code that can prove only
+// Keep this broad overload below the default-rank family-specific overloads. Slang 202c removes the
+// deprecated generic-parameter-count tie-breaker, so rank -1 preserves those overloads for concrete
+// calls while still making this one available to generic code that can prove only
 // __BuiltinArithmeticType.
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
