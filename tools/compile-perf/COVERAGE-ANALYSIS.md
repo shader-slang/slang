@@ -14,11 +14,15 @@ one of them was reproduced on at least two independently built binaries.
 
 ## 1. Summary
 
-The suite is deep on the front end and the target-independent IR pipeline, and
-**one shader wide** on the back end.
+As measured before this PR's additions, the suite was deep on the front end
+and the target-independent IR pipeline, and **one shader wide** on the back
+end. (`tools/compile-perf/lib/manifest.py` has grown since — check
+`len(manifest.WORKLOADS)` for the current count rather than trusting a number
+here, which this section deliberately does not update: it is the motivating
+gap this PR closes, not a running tally.)
 
 - 41 workloads. **36 of them are SPIR-V, front-end-only, or API-path.**
-- The six that are not (`emit_metal`, `emit_wgsl`, `emit_hlsl`, `emit_glsl`,
+- The seven that are not (`emit_metal`, `emit_wgsl`, `emit_hlsl`, `emit_glsl`,
   `emit_cuda`, plus `codegen_dxil`/`codegen_ptx`) all compile **the same
   source** — `gen_codegen`, N lines of straight-line float math over a single
   `RWStructuredBuffer`.
@@ -349,9 +353,10 @@ Ordered by value per unit of risk.
    0.67) — the widest back-end divergence measured anywhere, from a workload
    that was already in the suite and only ever run on the target where its
    pass is cheapest. _(Implemented: `resource_aggregate_{metal,glsl,cuda}`.)_
-`reflection_layout`was checked the same way and does **not** justify extra
-targets — 1.40x spread, exponents within 0.2 of each other.`mdl_dxr`compiles to HLSL and GLSL today with an explicit`-entry` and is still worth
-   adding.
+   `reflection_layout` was checked the same way and does **not** justify
+   extra targets — 1.40x spread, exponents within 0.2 of each other.
+   `mdl_dxr` compiles to HLSL and GLSL today with an explicit `-entry` and is
+   still worth adding.
 4. **Add the option dimensions**: a `-g` variant and an `-O3` variant of
    `mdl_dxr`, which is where they show their real cost.
 5. **Fill the construct gaps**, in rough order of how much real code uses them:

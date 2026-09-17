@@ -830,7 +830,22 @@ for _family in ("backend_loads", "backend_samplers", "backend_matrix"):
     assert f"{_family}_spirv" in _members, (
         f"{_family}: no SPIR-V control entry; the family's numbers are only "
         f"meaningful as ratios against it. Members: {_members}")
-del _family, _members
+    # Same invariant as resource_aggregate below: a variant pointed at a
+    # different generator, size or ladder than its family's control would
+    # pass every check above while producing a plausible-looking, but not
+    # actually comparable, cross-target ratio -- a copy-paste error here is
+    # the same silent-failure shape §"Every back-end family..." above warns
+    # about, just one property down (generator/size drift instead of a
+    # missing control).
+    _control = BY_NAME[f"{_family}_spirv"]
+    for _member_name in _members:
+        _m = BY_NAME[_member_name]
+        assert (_m.gen is _control.gen and _m.default_size == _control.default_size
+                and _m.sweep_sizes == _control.sweep_sizes), (
+            f"{_member_name} must match {_family}_spirv's generator/size/ladder "
+            "exactly; the family's members are only interpretable as a "
+            "cross-target comparison")
+del _family, _members, _control, _member_name, _m
 
 # resource_aggregate is the same shape with the SPIR-V entry named without a
 # suffix, because it predates the family and renaming it would break its

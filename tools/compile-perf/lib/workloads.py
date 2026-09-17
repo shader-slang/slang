@@ -822,6 +822,18 @@ def gen_matrix_chain(n):
     return {"matrix_chain.slang": "".join(s)}
 
 
+# Import-time smoke checks for the three new back-end-coverage generators,
+# same rationale as the block above gen_interface_depth: their output is only
+# ever compiled by the nightly bench, so a broken template would otherwise
+# merge cleanly and surface as a lost nightly data point.
+assert "tex_3.SampleLevel(samp," in \
+    gen_resource_load_chain(4)["resource_load_chain.slang"]
+assert "Sampler2D tex_3;" in \
+    gen_combined_samplers(4)["combined_samplers.slang"]
+assert "m = mul(m, matBuf[" in \
+    gen_matrix_chain(4)["matrix_chain.slang"]
+
+
 def gen_module_link(n):
     """n importable modules plus a main that imports and uses all of them. The
     harness precompiles each module to .slang-module, then compiles main against
