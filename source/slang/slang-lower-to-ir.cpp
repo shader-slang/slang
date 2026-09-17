@@ -8948,6 +8948,24 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 return;
             }
 
+            if (as<RefAccessorDecl>(context->funcDecl))
+            {
+                // The IR signature of a `ref` accessor returns Ptr(T), so return the address of
+                // the l-value instead of loading and returning its value.
+                auto lvalue = lowerLValueExpr(context, expr);
+                if (IRInst* address = getAddress(context, lvalue, expr->loc))
+                {
+                    getBuilder()->emitReturn(address);
+                }
+                else
+                {
+                    // `getAddress` diagnosed the invalid return expression. Terminate the block
+                    // with a placeholder of the declared pointer-result type for error recovery.
+                    getBuilder()->emitReturn(getBuilder()->getNullVoidPtrValue());
+                }
+                return;
+            }
+
             // If the AST `return` statement had an expression, then we
             // need to lower it to the IR at this point, both to
             // compute its value and (in case we are returning a
