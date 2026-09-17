@@ -162,16 +162,7 @@ SLANG_NUMERICS_VECTOR_COMPARISON_ADAPTER(__numericsBuiltinLessEqual, <=)
 
 [__readNone]
 [__unsafeForceInlineEarly]
-public T __numericsBuiltinDot<T : __BuiltinFloatingPointType, let N : int>(
-    vector<T, N> left,
-    vector<T, N> right)
-{
-    return ::dot(left, right);
-}
-
-[__readNone]
-[__unsafeForceInlineEarly]
-public T __numericsBuiltinDot<T : __BuiltinIntegerType, let N : int>(
+public T __numericsBuiltinDot<T : __BuiltinArithmeticType, let N : int>(
     vector<T, N> left,
     vector<T, N> right)
 {
