@@ -1,5 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute -experimental-feature
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute -experimental-feature
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -experimental-feature
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute -experimental-feature
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute -experimental-feature
 
@@ -24,6 +26,9 @@
 // HLSL-NOT: dot_
 // HLSL: dot(
 // HLSL-NOT: dot_
+
+// GLSL: dot(
+// METAL: dot(
 
 // SPIRV-DAG: OpDot
 // SPIRV-DAG: OpSDot
