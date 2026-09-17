@@ -3,15 +3,18 @@
 // Keep a declaration here when ordinary user code can name it directly (e.g. `diffPair`, `detach`,
 // the `update*` helpers, `DiffTensorView`/`TorchTensor`), or when semantic checking reaches it
 // without an explicit autodiff trigger (e.g. the `Array`/`Optional`/`Tuple : IDifferentiable`
-// conformances that aggregate-conformance synthesis needs). This cluster must be eager precisely
-// because those uses have no trigger that could load it on demand.
+// conformances that aggregate-conformance synthesis must discover before it has a trigger). A
+// concrete conformance may subsequently synthesize differentiable members and load the lazy
+// supplement, but its base declarations and conformances must already be available for that
+// synthesis to begin.
 //
 // Derivative-implementation machinery belongs in the lazy supplement diff.meta.slang instead. The
-// supplement is loaded only when semantic checking hits a concrete autodiff trigger: a
-// differentiability header modifier (`[Differentiable]` / `[ForwardDifferentiable]` /
-// `[BackwardDifferentiable]`, via `checkDifferentiableCallableCommon`), a `fwd_diff`/`bwd_diff`
-// expression, or a `PrimalSubstituteExpr` synthesized from a `[PrimalSubstitute]`/
-// `[PrimalSubstituteOf]` attribute (both routed through `_checkHigherOrderInvokeExpr`).
+// supplement is loaded only when semantic checking hits a concrete autodiff trigger: a callable
+// header modifier classified by `_callableHasDifferentiabilityHeaderModifier` (including ordinary
+// differentiability, custom-derivative, and maybe-differentiable attributes), a
+// `fwd_diff`/`bwd_diff` expression, or a `PrimalSubstituteExpr` synthesized from a
+// `[PrimalSubstitute]`/`[PrimalSubstituteOf]` attribute (the expression cases are routed through
+// `_checkHigherOrderInvokeExpr`).
 
 // A 'none-type' that acts as a run-time sentinel for zero differentials. This is primarily
 // for internal use.

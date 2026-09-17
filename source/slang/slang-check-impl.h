@@ -1226,8 +1226,14 @@ private:
     /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`.
     void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
 
-    /// Merge candidate extensions from a module that may already be in the aggregate view.
+    /// Add only candidate extensions not already present in the aggregate view. Unlike
+    /// `_addCandidateExtensionsFromModule`, this is safe when normal view construction may already
+    /// have visited `moduleDecl`, and invalidates implicit-cast results for each newly added
+    /// extension.
     void _mergeCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
+
+    /// Invalidate cached implicit-cast results affected by conversion constructors in `extDecl`.
+    void _invalidateImplicitCastCacheForExtension(Decl* typeDecl, ExtensionDecl* extDecl);
 
     /// Mapping from a decl to additional declarations of the same decl.
     /// The additional declarations provide a location to hold extra decorations.
@@ -1239,7 +1245,9 @@ private:
     /// Add associated decls declared in `moduleDecl` to `m_mapDeclToAssociatedDecls`
     void _addDeclAssociationsFromModule(ModuleDecl* moduleDecl);
 
-    /// Merge associated declarations from a module that may already be in the aggregate view.
+    /// Add only associations not already present in the aggregate view. Unlike
+    /// `_addDeclAssociationsFromModule`, this is safe when normal view construction may already
+    /// have visited `moduleDecl`.
     void _mergeDeclAssociationsFromModule(ModuleDecl* moduleDecl);
 
     ASTBuilder* _getASTBuilder() { return m_linkage->getASTBuilder(); }

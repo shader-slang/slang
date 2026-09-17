@@ -1,7 +1,9 @@
-// The autodiff supplement must stay unloaded until an explicit autodiff trigger is checked. The
-// declarations below are nevertheless part of the ordinary language surface: plain kernels use
-// the tensor types, plain code calls these helpers, and aggregate conformance synthesis needs the
-// Array and Optional extensions.
+// These declarations are part of the eager language surface: plain kernels use the tensor types,
+// plain code calls these helpers, and aggregate conformance synthesis needs the Array and Optional
+// extensions before any supplement declaration is available. This test verifies that the surface
+// remains usable after the split. It does not assert that every use leaves the supplement unloaded:
+// concrete `IDifferentiable` conformance synthesizes differentiable members and therefore triggers
+// a load, as pinned by `lazyAutodiffConcreteDifferentiableConformanceLoadsSupplement`.
 //
 //TEST:SIMPLE:
 

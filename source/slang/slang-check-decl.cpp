@@ -18268,16 +18268,6 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
     //
     _getCandidateExtensionList(typeDecl, m_mapDeclToCandidateExtensions).add(extDecl);
 
-    bool hasImplicitCastMember = false;
-    for (auto member : extDecl->getDirectMemberDecls())
-    {
-        if (auto ctorDecl = as<ConstructorDecl>(member))
-        {
-            if (ctorDecl->hasModifier<ImplicitConversionModifier>())
-                hasImplicitCastMember = true;
-        }
-    }
-
     // A new extension can affect not only `typeDecl` itself, but also any cached
     // type whose linearized facets reference `typeDecl` transitively. Historically
     // we handled that by scanning the entire inheritance/subtype cache and removing
@@ -18292,6 +18282,23 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
     // when they are queried again, without forcing us to iterate the giant global
     // dictionaries up front.
     bumpDeclExtensionEpoch(typeDecl);
+
+    _invalidateImplicitCastCacheForExtension(typeDecl, extDecl);
+}
+
+void SharedSemanticsContext::_invalidateImplicitCastCacheForExtension(
+    Decl* typeDecl,
+    ExtensionDecl* extDecl)
+{
+    bool hasImplicitCastMember = false;
+    for (auto member : extDecl->getDirectMemberDecls())
+    {
+        if (auto ctorDecl = as<ConstructorDecl>(member))
+        {
+            if (ctorDecl->hasModifier<ImplicitConversionModifier>())
+                hasImplicitCastMember = true;
+        }
+    }
 
     if (hasImplicitCastMember)
     {
@@ -18340,7 +18347,9 @@ bool SharedSemanticsContext::addLoadedAutodiffModule(ModuleDecl* moduleDecl)
     // the supplement before this context built a view, so the merge uses canonical declaration
     // identity to keep entries that normal construction already included from being appended twice.
     // If a view has not been built yet, its normal first build will include this module through
-    // `Session::coreModules`.
+    // `Session::coreModules`. This call runs synchronously: no view can be built between the epoch
+    // updates and the conditional merges below, so each view observes either the state before this
+    // call or the complete state after it.
     //
     // Extension epochs are independent of whether either aggregate view has been built. Always
     // advance them so inheritance and subtype cache entries computed before this load are invalid.
@@ -18372,7 +18381,10 @@ void SharedSemanticsContext::_mergeCandidateExtensionsFromModule(ModuleDecl* mod
         for (auto extension : entryValue->candidateExtensions)
         {
             if (!list.contains(extension))
+            {
                 list.add(extension);
+                _invalidateImplicitCastCacheForExtension(entryKey, extension);
+            }
         }
     }
 }

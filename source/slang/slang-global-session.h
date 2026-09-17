@@ -333,6 +333,10 @@ public:
     /// compilation already checks the supplement's declarations itself, so there is no separate
     /// module to merge. Success therefore does *not* imply a module — the out-parameter exists so
     /// that a caller cannot read one without confronting the possibility that there is none.
+    ///
+    /// This mutates builtin-module state shared by every linkage in the global session. Like other
+    /// `IGlobalSession` mutation, concurrent first use requires external synchronization; callers
+    /// must not trigger the first lazy load concurrently on objects sharing a global session.
     SlangResult loadAutodiffModuleIfNeeded(Module*& outModule);
 
     /// Returns whether this session is currently source-compiling a builtin module.
@@ -399,6 +403,9 @@ private:
     };
 
     BuiltinModuleInfo getBuiltinModuleInfo(slang::BuiltinModuleName name);
+
+    /// Validate cross-builtin load ordering before compiling or deserializing `name`.
+    SlangResult _validateBuiltinModuleDependencies(slang::BuiltinModuleName name);
 
     /// Does `name` identify a builtin module that belongs in `coreModules` once compiled? This is
     /// `Core` and `Autodiff`: both become part of the session's globally searched declaration set

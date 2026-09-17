@@ -1,11 +1,16 @@
 // Lazily loaded autodiff derivative implementations.
 //
 // This module depends on the base core module, including the declarations in
-// autodiff-base.meta.slang. Semantic checking loads it before validating a differentiable
-// callable or resolving a differentiation expression. Declarations needed by ordinary lookup or
-// conformance checking must remain in autodiff-base.meta.slang. The declarations here are
-// implementation details consumed through derivative registration, including implementations that
-// share a primal name but accept DifferentialPair arguments.
+// autodiff-base.meta.slang. `Session::loadAutodiffModuleIfNeeded` materializes it, and
+// `SemanticsContext::ensureAutodiffModuleLoaded` merges its derivative associations and candidate
+// extensions before validating a differentiable callable or resolving a differentiation
+// expression.
+//
+// Only declarations consumed through those association/extension caches belong here. Nothing
+// required earlier by ordinary name lookup, type formation, or conformance discovery may depend
+// on this module; such declarations must remain in autodiff-base.meta.slang. The declarations here
+// are implementation details, including derivatives that share a primal name but accept
+// DifferentialPair arguments.
 
 // Matrix transpose
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>

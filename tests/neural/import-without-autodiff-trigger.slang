@@ -12,7 +12,7 @@
 // Compiling is the whole assertion: linking is what resolves the imported symbols, so a
 // regression reappears here as a compile failure rather than a wrong result.
 
-//TEST:SIMPLE:-target spirv -stage compute -entry computeMain -experimental-feature -o import-without-autodiff-trigger.spv
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -experimental-feature
 
 import slang.neural;
 
@@ -35,8 +35,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outBuf[tid.x] = viaTanh[0] + viaExp[1] + viaSine[2] + viaRelu[0];
 }
 
-// No `filecheck=`: compiling at all is the assertion. Linking is what resolves the imported
-// symbols, so the regression this guards reappears as a nonzero exit, not as wrong output. `-o`
-// is required for that: without it, slangc writes the compiled SPIR-V disassembly to stdout, and
-// slang-test's default expectation (no `.expected.txt`, no `filecheck=`) is empty output, so the
-// test would fail on success alone.
+// Linking is what resolves the imported symbols, so the regression this guards reappears as a
+// nonzero exit rather than wrong output. Checking the emitted entry point consumes the successful
+// compiler output without writing a generated SPIR-V file beside this test.
+// CHECK: OpEntryPoint

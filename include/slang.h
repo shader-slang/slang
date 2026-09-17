@@ -4330,6 +4330,8 @@ struct IGlobalSession : public ISlangUnknown
 
     /** Compile from (embedded source) the builtin module on the session.
     Will return a failure if there is already a builtin module available.
+    Compiling BuiltinModuleName::Autodiff requires BuiltinModuleName::Core to have already been
+    loaded or compiled in this session; otherwise this function returns SLANG_E_INVALID_ARG.
     NOTE! API is experimental and not ready for production code.
     @param module The builtin module name.
     @param flags to control compilation
@@ -4338,6 +4340,8 @@ struct IGlobalSession : public ISlangUnknown
     compileBuiltinModule(BuiltinModuleName module, CompileCoreModuleFlags flags) = 0;
 
     /** Load a builtin module. Currently loads modules from the file system.
+    Loading BuiltinModuleName::Autodiff requires BuiltinModuleName::Core to have already been
+    loaded or compiled in this session; otherwise this function returns SLANG_E_INVALID_ARG.
     @param module The builtin module name
     @param moduleData Start address of the serialized core module
     @param sizeInBytes The size in bytes of the serialized builtin module
@@ -6028,11 +6032,11 @@ it resolves references into the core module by looking up "core" in the target s
 way any other cross-module reference is resolved (see Linkage::findOrImportModule). Consumers must
 therefore load the core archive into the same session (e.g. via loadBuiltinModule with
 BuiltinModuleName::Core) before loading this blob; this getter only returns the blob and does not
-enforce that ordering. Violating it does not fail the load outright -- the unresolved references
-deserialize to null and the failure only surfaces later, as a crash or as incorrect behavior,
-wherever code actually uses the affected declarations. The compiler's own internal use of this
-blob (Session::loadAutodiffModuleIfNeeded) never violates the ordering, because the core module is
-always compiled or loaded before any code path that could request the autodiff module.
+enforce that ordering. compileBuiltinModule/loadBuiltinModule do enforce it and return
+SLANG_E_INVALID_ARG when BuiltinModuleName::Autodiff is requested without core. The compiler's own
+internal use of this blob (Session::loadAutodiffModuleIfNeeded) never violates the ordering,
+because the core module is always compiled or loaded before any code path that could request the
+autodiff module.
 
 NOTE! API is experimental and not ready for production code
 */

@@ -107,6 +107,10 @@ SlangResult SemanticsContext::ensureAutodiffModuleLoaded(SourceLoc location)
         // extension/associated-decl caches that `addLoadedAutodiffModule` merges above. Importing
         // it into scope would let the module that happened to trigger the load also spuriously see
         // the supplement's internal helper names by ordinary lookup.
+        // A null current module is valid for transient semantic contexts used by ad-hoc
+        // expression/reflection/completion queries. Those contexts still need the merged caches
+        // for the query, but they have no owning module to serialize and therefore no dependency
+        // or synthetic import to record.
         if (auto currentModule = m_shared->getModule())
         {
             auto syntheticImportDecl = getASTBuilder()->create<ImportDecl>();

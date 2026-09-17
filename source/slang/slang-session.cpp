@@ -1613,11 +1613,20 @@ RefPtr<Module> Linkage::findOrImportModule(
         // `import` does). Either way, resolving the name here just means loading the supplement
         // if it is not already loaded.
         Module* autodiffModule = nullptr;
-        if (SLANG_FAILED(getSessionImpl()->loadAutodiffModuleIfNeeded(autodiffModule)) ||
-            !autodiffModule)
+        const SlangResult loadResult = getSessionImpl()->loadAutodiffModuleIfNeeded(autodiffModule);
+        if (SLANG_FAILED(loadResult))
         {
             sink->diagnose(Diagnostics::UnableToLoadAutodiffModule{.location = requestingLoc});
+            return nullptr;
         }
+
+        // Unlike a semantic trigger, an import/deserialization lookup cannot legitimately occur
+        // while source-compiling a builtin module. Thus the recursion guard's SLANG_OK/null result
+        // is an invariant violation here, not a benign "nothing to merge" result. Diagnose it in
+        // release builds as well as asserting it in debug builds.
+        SLANG_ASSERT(autodiffModule);
+        if (!autodiffModule)
+            sink->diagnose(Diagnostics::UnableToLoadAutodiffModule{.location = requestingLoc});
         return autodiffModule;
     }
 

@@ -168,6 +168,10 @@ Module* Session::getBuiltinModule(slang::BuiltinModuleName name)
 
 SlangResult Session::loadAutodiffModuleIfNeeded(Module*& outModule)
 {
+    // This function mutates the builtin linkage and `coreModules`. The public global-session API
+    // does not make concurrent mutation safe, so the first call must be externally serialized
+    // with any other operation on this global session. Once loaded, the fast path below is read
+    // only.
     outModule = nullptr;
 
     if (auto alreadyLoaded = getBuiltinModule(slang::BuiltinModuleName::Autodiff))
@@ -444,6 +448,17 @@ bool Session::belongsInCoreModulesList(slang::BuiltinModuleName name)
     }
 }
 
+SlangResult Session::_validateBuiltinModuleDependencies(slang::BuiltinModuleName name)
+{
+    // The autodiff supplement contains serialized/source references into core. Rejecting the
+    // request before either load path starts prevents unresolved cross-module declarations from
+    // entering the builtin linkage.
+    if (name == slang::BuiltinModuleName::Autodiff &&
+        !getBuiltinModule(slang::BuiltinModuleName::Core))
+        return SLANG_E_INVALID_ARG;
+    return SLANG_OK;
+}
+
 SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlags)
 {
     return compileBuiltinModule(slang::BuiltinModuleName::Core, compileFlags);
@@ -473,6 +488,8 @@ SlangResult Session::compileBuiltinModule(
     slang::BuiltinModuleName moduleName,
     slang::CompileCoreModuleFlags compileFlags)
 {
+    SLANG_RETURN_ON_FAIL(_validateBuiltinModuleDependencies(moduleName));
+
     SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
 
     const bool wasCompilingBuiltinModule = m_isCompilingBuiltinModule;
@@ -556,6 +573,7 @@ SlangResult Session::loadBuiltinModule(
 {
     SLANG_PROFILE;
 
+    SLANG_RETURN_ON_FAIL(_validateBuiltinModuleDependencies(moduleName));
 
     SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
 

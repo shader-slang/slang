@@ -89,7 +89,14 @@ SLANG_UNIT_TEST(lazyAutodiffModuleLoading)
                 TensorView<float> view;
                 DiffTensorView<float> diffView;
                 TorchTensor<float> tensor;
+                NullDifferential nullDifferential;
+                AtomicAdd atomicAdd;
             }
+
+            void useDiffTensorWrapperConstraint<T : IDiffTensorWrapper>(T value) { }
+
+            [require(cpp)]
+            void useTorchSync() { syncTorchCudaStream(); }
 
             float useAutodiffHelpersWithoutDifferentiating(float value)
             {
@@ -272,13 +279,70 @@ SLANG_UNIT_TEST(lazyAutodiffModuleMergeDoesNotDuplicateEntries)
     SLANG_CHECK(associationsBeforeMerge > 0);
     SLANG_CHECK(extensionsBeforeMerge > 0);
 
-    context.addLoadedAutodiffModule(supplementDecl);
+    SLANG_CHECK(context.addLoadedAutodiffModule(supplementDecl));
 
     SLANG_CHECK(
         context.getAssociatedDeclsForDecl(primalDecl).getCount() == associationsBeforeMerge);
     SLANG_CHECK(
         context.getCandidateExtensionsForTypeDecl(extendedDecl).getCount() ==
         extensionsBeforeMerge);
+
+    // The per-context loaded-module set is itself part of the idempotence contract: a repeated
+    // notification must report that there was no work and leave both aggregate views unchanged.
+    SLANG_CHECK(!context.addLoadedAutodiffModule(supplementDecl));
+    SLANG_CHECK(
+        context.getAssociatedDeclsForDecl(primalDecl).getCount() == associationsBeforeMerge);
+    SLANG_CHECK(
+        context.getCandidateExtensionsForTypeDecl(extendedDecl).getCount() ==
+        extensionsBeforeMerge);
+}
+
+// A differentiation expression is an independent load trigger. Keep it isolated from header
+// modifiers and concrete conformances so the count cannot be satisfied by an earlier trigger.
+SLANG_UNIT_TEST(lazyAutodiffDifferentiateExprLoadsSupplement)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    const Index baseCoreModuleCount = _loadedBuiltinModuleCount(globalSession);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    _loadModule(
+        session,
+        "differentiateExprModule",
+        "float f(float value) { return fwd_diff(sin)(diffPair(value, 1.0)).d; }");
+    SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount + 1);
+}
+
+// The serialized supplement references declarations in core. The public builtin-module loading
+// APIs reject an out-of-order request immediately instead of admitting null cross-module links.
+SLANG_UNIT_TEST(lazyAutodiffBuiltinRequiresCore)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSessionWithoutCoreModule(SLANG_API_VERSION, globalSession.writeRef()) ==
+        SLANG_OK);
+
+    auto supplementBlob = slang_getEmbeddedAutodiffModule();
+    SLANG_CHECK_ABORT(supplementBlob != nullptr);
+    SLANG_CHECK(
+        globalSession->loadBuiltinModule(
+            slang::BuiltinModuleName::Autodiff,
+            supplementBlob->getBufferPointer(),
+            supplementBlob->getBufferSize()) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(
+        globalSession->compileBuiltinModule(slang::BuiltinModuleName::Autodiff, 0) ==
+        SLANG_E_INVALID_ARG);
 }
 
 // Declaring a concrete `struct : IDifferentiable` loads the supplement, even with no
