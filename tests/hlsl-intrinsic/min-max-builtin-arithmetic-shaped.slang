@@ -15,9 +15,8 @@
 // Verify that min and max accept scalar, vector, and matrix operands when generic code knows only
 // that the element type belongs to the sealed builtin arithmetic domain.
 
-// Also verify that concrete vector calls continue to select the higher-ranked family-specific
-// overloads, and that calls dispatched through the broader arithmetic overload emit the same
-// target-native shaped instructions rather than scalarizing.
+// Also verify that concrete calls and calls dispatched through the broader arithmetic overload
+// both emit target-native shaped instructions rather than scalarizing.
 
 // CONCRETE-DAG: %[[V3_INT:[A-Za-z0-9_]+]] = OpTypeVector %int 3
 // CONCRETE-DAG: %[[V2_UINT:[A-Za-z0-9_]+]] = OpTypeVector %uint 2

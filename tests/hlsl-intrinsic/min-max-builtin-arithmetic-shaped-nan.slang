@@ -1,9 +1,8 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
 
-// Exercise the LLVM fallback's established behavior when exactly one operand is NaN. GPU-native
-// min/max operations do not all guarantee this result, so this regression is intentionally limited
-// to the CPU/LLVM paths implemented by `__min_impl` and `__max_impl`.
+// Exercise the LLVM fallback's established behavior when exactly one operand is NaN. Native
+// target and C++ host min/max operations do not all guarantee this result, so this regression is
+// intentionally limited to the LLVM path implemented by `__min_impl` and `__max_impl`.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 //TEST_INPUT:ubuffer(data=[0x7fc00000], stride=4):name=inputBuffer

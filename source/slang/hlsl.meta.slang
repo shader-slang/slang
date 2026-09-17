@@ -12952,6 +12952,7 @@ __generic<T : IComparable>
 [require(llvm)]
 bool __llvmExtremaIsNaN(T value)
 {
+    // LLVM's fpclass mask 3 combines signaling NaN (0x1) and quiet NaN (0x2).
     __intrinsic_asm "%result = call i1 @llvm.is.fpclass($0, i32 3)";
 }
 
@@ -13111,6 +13112,9 @@ matrix<T, N, M, L> __matrixMaxImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
     }
 }
 
+// Keep the established integer and floating-point overloads so existing overload resolution and
+// derivative registrations retain their identities. The lower-ranked common-arithmetic overload
+// exists only for generic bodies whose available element constraint cannot select either family.
 /// @category math
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
@@ -13444,6 +13448,9 @@ matrix<T, N, M, L> __matrixMinImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
     }
 }
 
+// Keep the same three-overload split as `max` above: the family-specific declarations preserve the
+// established public overloads, while the broad declaration makes the operation available through
+// an abstract `__BuiltinArithmeticType` constraint.
 /// @category math
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
