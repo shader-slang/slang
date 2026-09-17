@@ -1,0 +1,23 @@
+{
+	"name": "slang-playground-extension-server",
+	"description": "Extension for the Slang Shading Language",
+	"version": "0.0.1",
+	"engines": {
+		"node": "*"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Microsoft/vscode-extension-samples"
+	},
+	"dependencies": {
+		"vscode-languageserver": "^9.0.1",
+		"vscode-languageserver-textdocument": "^1.0.11",
+		"slang-playground-shared": "0.0.1",
+		"slang-compilation-engine": "0.0.1"
+	},
+	"devDependencies": {
+		"@types/emscripten": "^1.39.13",
+		"@webgpu/types": "^0.1.51"
+	},
+	"scripts": {}
+}
