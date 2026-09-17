@@ -321,10 +321,10 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // This does not diagnose a phi that merges two *different* concrete address spaces. On
     // SPIR-V, phis are eliminated before this pass runs and
     // `SPIRVLegalizationContext::processParam` (slang-ir-spirv-legalize.cpp) already reports such a
-    // conflict while phis still exist. The Metal/WGSL callers now also pass a sink (for the
-    // return-conflict diagnostic), but there a pointer's address space is part of its type, so a
-    // phi merging two classes is a type error caught before this pass. A conflicting phi therefore
-    // just joins to its last concrete arg here.
+    // conflict while phis still exist. The GLSL/Metal/WGSL callers now also pass a sink (for the
+    // return-conflict diagnostic), but none of them infers a pointer's address space in this pass
+    // (Metal/WGSL carry it in the type, GLSL uses the no-op assigner), so a conflicting phi never
+    // needs diagnosing here. A conflicting phi therefore just joins to its last concrete arg here.
     AddressSpace resolvePhiAddrSpace(IRInst* param)
     {
         AddressSpace joined = AddressSpace::Generic;
@@ -756,7 +756,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         AddressSpace storedAddrSpace = AddressSpace::Generic;
         bool conflict = false;
-        auto consider = [&](IRInst* value)
+        SourceLoc conflictLoc;
+        auto consider = [&](IRInst* value, SourceLoc loc)
         {
             auto valueAddrSpace = getStoredValueAddrSpace(value);
             if (valueAddrSpace == AddressSpace::Generic)
@@ -764,7 +765,10 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             if (storedAddrSpace == AddressSpace::Generic)
                 storedAddrSpace = valueAddrSpace;
             else if (storedAddrSpace != valueAddrSpace)
+            {
                 conflict = true;
+                conflictLoc = loc;
+            }
         };
         for (auto use = slot->firstUse; use; use = use->nextUse)
         {
@@ -772,33 +776,45 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             if (auto store = as<IRStore>(user))
             {
                 if (store->getPtr() == slot)
-                    consider(store->getVal());
+                    consider(store->getVal(), store->sourceLoc);
             }
             else if (auto debugValue = as<IRDebugValue>(user))
             {
                 if (debugValue->getDebugVar() == slot)
-                    consider(debugValue->getValue());
+                    consider(debugValue->getValue(), debugValue->sourceLoc);
             }
         }
         if (conflict)
         {
-            // Two writes give the slot pointer values in different concrete address spaces;
-            // a single slot cannot hold both, so diagnose rather than silently picking one.
-            // Only the real variable is diagnosed: a `DebugVar` mirrors that same variable, so
-            // diagnosing it too would double-report, and a debug slot must never be the thing
-            // that rejects an otherwise valid program. The fixpoint may revisit the slot, so
-            // report each conflicting slot exactly once.
+            // A single slot cannot hold pointers in two concrete address spaces. Only the real
+            // variable is diagnosed: a `DebugVar` mirrors it, and a debug slot must never be the
+            // thing that rejects an otherwise valid program.
             //
-            // A slot whose merged value is returned is left to the more specific return-conflict
-            // diagnostic (E58005 `conflicting-return-pointer-storage-classes`, raised from
-            // `reconcileHeldPointerAddressSpace`): the two describe the same defect, but E58005
-            // names the disagreeing return the user must fix, so raising the general
-            // inconsistent-slot diagnostic here as well would only double-report it.
-            if (sink && slot->getOp() == kIROp_Var && !anyLoadReachesReturn(slot) &&
-                diagnosedAddrSpaceConflicts.add(slot))
-                sink->diagnose(Diagnostics::InconsistentPointerAddressSpace{
-                    .inst = slot,
-                    .location = slot->sourceLoc});
+            // When the slot's value reaches a return the conflict is a return conflict owned by
+            // E58005 (`conflicting-return-pointer-storage-classes`), which names the disagreeing
+            // return and is emitted only after dead-clone removal. We record it into
+            // `conflictingReturns` here instead of raising the general inconsistent-slot
+            // diagnostic, so exactly one diagnostic covers the slot. Establishing E58005 at the
+            // same point we suppress the general one keeps the hand-off self-contained: it does
+            // not rely on the later dataflow re-finding the conflict, which would miss a function
+            // this pre-pass scans but the entry-point worklist never reaches. A non-returned
+            // conflict keeps the general diagnostic. `diagnosedAddrSpaceConflicts` reports each
+            // slot once across the fixpoint's repeated visits.
+            if (sink && slot->getOp() == kIROp_Var && diagnosedAddrSpaceConflicts.add(slot))
+            {
+                if (anyLoadReachesReturn(slot))
+                {
+                    // A slot is enumerated from a function's blocks, so it always has a parent
+                    // function; assert that invariant rather than silently dropping the diagnostic.
+                    auto func = getParentFunc(slot);
+                    SLANG_RELEASE_ASSERT(func);
+                    conflictingReturns.addIfNotExists(func, conflictLoc);
+                }
+                else
+                    sink->diagnose(Diagnostics::InconsistentPointerAddressSpace{
+                        .inst = slot,
+                        .location = slot->sourceLoc});
+            }
             return false;
         }
         if (storedAddrSpace == AddressSpace::Generic)
@@ -917,10 +933,10 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // targets the logical-`StorageBuffer`-vs-physical-`Device` slot mismatch that only
         // SPIR-V's split of logical and physical pointers makes ill-typed, so it is gated on the
         // assigner opting in via `shouldReconcileLocalPointerSlots`, not on the presence of a
-        // sink: Metal/WGSL do not model that split (a pointer's address space is part of its
-        // type there), so retyping slots there would be a silent, undiagnosed change to their
-        // address-space handling with no correctness benefit — even though they now supply a sink
-        // for the separate return-conflict diagnostic.
+        // sink: the other targets do not infer a pointer's address space in this pass (Metal/WGSL
+        // carry it in the type, GLSL uses the no-op assigner), so retyping slots there would be a
+        // silent, undiagnosed change to their address-space handling with no correctness benefit —
+        // even though they now supply a sink for the separate return-conflict diagnostic.
         if (addrSpaceAssigner->shouldReconcileLocalPointerSlots())
             reconcilePointerSlots();
 

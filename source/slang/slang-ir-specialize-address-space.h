@@ -45,8 +45,8 @@ struct NoOpInitialAddressSpaceAssigner : public InitialAddressSpaceAssigner
 /// based on the address space of the arguments.
 ///
 /// `sink` (optional) receives diagnostics for target-invalid results this pass detects, such as
-/// a function that returns pointers in more than one storage class. The SPIR-V, Metal, and WGSL
-/// legalizers all pass a sink for that return-conflict diagnostic.
+/// a function that returns pointers in more than one storage class. Every codegen caller (SPIR-V,
+/// GLSL, Metal, WGSL) passes a sink for that return-conflict diagnostic.
 ///
 /// When the assigner opts in via `shouldReconcileLocalPointerSlots` (only the SPIR-V assigner
 /// does), this additionally runs a local-pointer-slot reconciliation pre-pass and reports
