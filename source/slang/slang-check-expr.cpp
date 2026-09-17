@@ -4732,8 +4732,9 @@ SemanticsExprVisitor::BuiltinArithmeticElementFamily SemanticsExprVisitor::
     { return witness && !isWitnessUncheckedOptional(witness); };
 
     // Each accessor returns null before the core module is available to search (see
-    // `SharedASTBuilder::getBuiltinIntegerInterfaceType` and its siblings); the classification for that
-    // family is then left unknown rather than querying conformance against a null interface type.
+    // `SharedASTBuilder::getBuiltinIntegerInterfaceType` and its siblings); the classification for
+    // that family is then left unknown rather than querying conformance against a null interface
+    // type.
     auto astBuilder = getASTBuilder();
     BuiltinArithmeticElementFamily family;
     if (auto integerInterface = astBuilder->getBuiltinIntegerInterfaceType())

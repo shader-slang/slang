@@ -135,8 +135,9 @@ Type* SharedASTBuilder::getDiffInterfaceType()
 // hlsl.meta.slang, autodiff-base.meta.slang all land in the same `Core` module; see
 // `Session::getBuiltinModuleSource`) and any `NamespaceDecl`s nested within them. Returns null
 // before the core module has been compiled or loaded, which callers must tolerate (see
-// `SharedASTBuilder::getBuiltinIntegerInterfaceType` and its siblings). Asserts the found declaration is
-// actually an `InterfaceDecl`: the three names this is used for (see the accessors below) are
+// `SharedASTBuilder::getBuiltinIntegerInterfaceType` and its siblings). Asserts the found
+// declaration is actually an `InterfaceDecl`: the three names this is used for (see the accessors
+// below) are
 // `[sealed]` interfaces declared once in the core module, so a name collision with some other
 // declaration kind would be a core-module authoring bug, not a shape this function should
 // silently tolerate and hand to `DeclRefType::create` regardless.

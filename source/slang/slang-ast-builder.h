@@ -721,12 +721,18 @@ public:
     // See the identically named methods on `SharedASTBuilder` for what these are; these three
     // forward to them so callers can reach them the same way they reach
     // `getDifferentiableInterfaceType()` above.
-    Type* getBuiltinIntegerInterfaceType() { return m_sharedASTBuilder->getBuiltinIntegerInterfaceType(); }
+    Type* getBuiltinIntegerInterfaceType()
+    {
+        return m_sharedASTBuilder->getBuiltinIntegerInterfaceType();
+    }
     Type* getBuiltinFloatingPointInterfaceType()
     {
         return m_sharedASTBuilder->getBuiltinFloatingPointInterfaceType();
     }
-    Type* getBuiltinLogicalInterfaceType() { return m_sharedASTBuilder->getBuiltinLogicalInterfaceType(); }
+    Type* getBuiltinLogicalInterfaceType()
+    {
+        return m_sharedASTBuilder->getBuiltinLogicalInterfaceType();
+    }
 
     MeshOutputType* getMeshOutputTypeFromModifier(
         HLSLMeshShaderOutputModifier* modifier,
