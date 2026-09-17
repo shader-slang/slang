@@ -93,8 +93,19 @@ SLANG_NUMERICS_SIGNED_INTEGER_CONFORMANCE(intptr_t)
 #undef SLANG_NUMERICS_SIGNED_INTEGER_CONFORMANCE
 
 #define SLANG_NUMERICS_INTEGER_CONFORMANCE(TYPE)                                      \
-    public extension TYPE : ITotallyOrdered                                     \
-    {}                                                                           \
+    public extension TYPE : ITotallyOrdered, INumericExtrema                     \
+    {                                                                            \
+        [__unsafeForceInlineEarly]                                               \
+        This minimum(This other)                                                 \
+        {                                                                        \
+            return __numericsBuiltinMinimum(this, other);                       \
+        }                                                                        \
+        [__unsafeForceInlineEarly]                                               \
+        This maximum(This other)                                                 \
+        {                                                                        \
+            return __numericsBuiltinMaximum(this, other);                       \
+        }                                                                        \
+    }                                                                            \
                                                                                  \
     public extension TYPE : IScalarIntegerType                                  \
     {                                                                            \
@@ -300,10 +311,13 @@ public extension<let R : int, let C : int, let L : MatrixLayoutMode>
     }
 }
 
-interface __IIntegerVectorDotProduct : IDotProduct, IIntegerType {}
+// This nominal join lets one integer-vector extension supply the shared numeric witnesses while it
+// implements dot product, integer arithmetic/bitwise operations, and numerical extrema. Separate
+// overlapping extensions currently produce ambiguous witnesses; see #12874.
+interface __IIntegerVectorCapabilities : IDotProduct, IIntegerType, INumericExtrema {}
 
 public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
-    vector<T, N> : __IIntegerVectorDotProduct
+    vector<T, N> : __IIntegerVectorCapabilities
 {
     typealias Scalar = T;
     typealias Mask = vector<bool, N>;
@@ -335,6 +349,10 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     [__unsafeForceInlineEarly]
     Scalar dotProductWith(This other) { return __numericsBuiltinDot(this, other); }
     [__unsafeForceInlineEarly]
+    This minimum(This other) { return __numericsBuiltinMinimum(this, other); }
+    [__unsafeForceInlineEarly]
+    This maximum(This other) { return __numericsBuiltinMaximum(this, other); }
+    [__unsafeForceInlineEarly]
     This quotientWhenDividedBy(This divisor)
     {
         return __numericsBuiltinIntegerDivide(this, divisor);
@@ -362,6 +380,18 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     {
         return __numericsBuiltinShiftRight(this, amount);
     }
+}
+
+public extension<
+    T : __BuiltinIntegerType & IScalarIntegerType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode> matrix<T, R, C, L> : INumericExtrema
+{
+    [__unsafeForceInlineEarly]
+    This minimum(This other) { return __numericsBuiltinMinimum(this, other); }
+    [__unsafeForceInlineEarly]
+    This maximum(This other) { return __numericsBuiltinMaximum(this, other); }
 }
 
 public extension<

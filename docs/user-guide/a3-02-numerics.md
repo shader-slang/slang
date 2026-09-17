@@ -242,6 +242,8 @@ The module provides corresponding built-in restrictions for its scalar capabilit
 
 Use the extensible `IScalar...` interfaces when an algorithm should admit user-defined scalar representations.
 Use the corresponding `IBuiltinScalar...` definition when the algorithm also depends on a compiler-supported built-in representation.
+`IBuiltinScalarNumeric` and the builtin scalar aliases that refine it also include `INumericExtrema`, because every builtin arithmetic scalar representation provides `min` and `max`.
+This additional guarantee belongs only to the closed builtin domain; `IScalarNumeric` remains independent of extrema so that user-defined numeric representations do not need to invent an ordering.
 
 ## Choosing the Right Numeric Interface
 
@@ -346,9 +348,11 @@ bool allLessThan<T : IComponentwiseOrdered>(T left, T right)
 }
 ```
 
-#### Real Number Ordering
+#### Numeric Extrema and Real Number Ordering
 
-The `IRealOrderingFunctions` interface provides element-wise minimum, maximum, and step-function operations whose conventional definitions depend on the ordering behavior of types such as IEEE floating-point numbers.
+The `INumericExtrema` interface provides element-wise minimum and maximum operations for numeric types.
+Its built-in conformances include integer scalars, vectors, matrices, and cooperative vectors, as well as floating-point scalars, vectors, matrices, and cooperative vectors.
+The `IRealOrderingFunctions` interface refines it with the step-function operation, whose conventional definition depends on real-ordering behavior such as that of IEEE floating-point numbers.
 
 ### The `IReal` Convenience Definition
 
@@ -471,7 +475,7 @@ The numerics module defines conformances to the appropriate interfaces for:
 
 - the built-in integer and floating-point scalar types
 - vectors of built-in scalar types
-- matrices of built-in floating-point types
+- matrices of built-in integer or floating-point types
 - cooperative vectors of built-in integer or floating-point types
 
 Cooperative vectors of built-in integer types conform to the applicable integer interfaces.
@@ -480,7 +484,7 @@ Importing `slang.numerics.differentiable` adds the corresponding differentiable 
 
 Known limitations include:
 
-- Matrices of built-in integer types do not currently conform to the numeric interfaces.
+- Matrices of built-in integer types currently conform only to `INumericExtrema`, rather than to the full integer interface hierarchy.
 - Cooperative vectors of built-in floating-point types satisfy `IReal`, but do not currently conform to `IFloatingPoint`.
 - Dot-product conformances currently cover built-in numeric scalars and ordinary vectors, but not matrices or cooperative vectors.
 - Cooperative matrices do not currently conform to the numeric interfaces.
