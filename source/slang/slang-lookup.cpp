@@ -1032,16 +1032,18 @@ static void _lookUpInScopes(
                 }
                 else if (
                     as<RefAccessorDecl>(funcDeclRef.getDecl()) &&
-                    !funcDeclRef.getDecl()->hasModifier<NonmutatingAttribute>())
+                    !funcDeclRef.getDecl()->hasModifier<NonmutatingAttribute>() &&
+                    !funcDeclRef.getDecl()->hasModifier<ConstRefAttribute>())
                 {
                     // An unannotated `ref` accessor is implicitly mutating (like a
                     // `set` accessor), so its implicit `this` is mutable and its body
                     // may write a member of `this`. This mirrors the mutability that
                     // `isEffectivelyMutating` and
                     // `getDeclaredParamPassingModeForImplicitThisParam` already give
-                    // the accessor. A `[nonmutating] ref` carries `NonmutatingAttribute`,
-                    // fails this guard, and falls through to the immutable `else` below,
-                    // so its body-writes stay correctly rejected.
+                    // the accessor. A `[nonmutating]` or `__constref` accessor instead
+                    // receives `this` by value / by const reference (`BorrowIn`), so it
+                    // fails this guard and falls through to the immutable `else` below,
+                    // keeping its body-writes correctly rejected.
                     //
                     thisParameterMode =
                         LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;

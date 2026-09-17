@@ -9092,12 +9092,15 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
             }
             else if (
                 as<RefAccessorDecl>(funcDeclBase) &&
-                !funcDeclBase->hasModifier<NonmutatingAttribute>())
+                !funcDeclBase->hasModifier<NonmutatingAttribute>() &&
+                !funcDeclBase->hasModifier<ConstRefAttribute>())
             {
                 // An unannotated `ref` accessor is implicitly mutating (like `set`), so
                 // `this` is an l-value inside its own body — matching the mutability that
                 // `isEffectivelyMutating` and the `BorrowInOut` `this`-passing already give
-                // it. `[nonmutating] ref` opts out and keeps `this` immutable.
+                // it. A `[nonmutating]` or `__constref` accessor instead receives `this`
+                // by value / by const reference (`BorrowIn`), so those keep `this`
+                // immutable here.
                 expr->type.isLeftValue = true;
             }
 
