@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -std 2026 -stage compute -entry computeMain -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -std 2025 -stage compute -entry computeMain -target spirv
 
 RWStructuredBuffer<float> mutable_float_buffer;
 RWStructuredBuffer<uint> mutable_uint_buffer;
@@ -6,14 +6,13 @@ RWStructuredBuffer<uint> mutable_uint_buffer;
 StructuredBuffer<float> constant_float_buffer;
 StructuredBuffer<uint> constant_uint_buffer;
 
-// We do not allow taking a pointer from a StructuredBuffer/RWStructuredBuffer.
 [shader("compute")]
 [numthreads(1,1,1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
     float* mutablePtr1 = &mutable_float_buffer[threadId.x];
-//diag:                  ^ use of removed declaration
-//diag:                  ^ the '&' operator for taking addresses is no longer supported in Slang
+//diag:                  ^ use of deprecated declaration
+//diag:                  ^ the '&' operator for taking addresses is deprecated
 
     float* mutablePtr2 = __getAddress(mutable_float_buffer[threadId.x]);
 //diag:                  ^^^^^^^^^^^^ invalid __getAddress usage
@@ -21,10 +20,9 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
     InterlockedAdd(mutable_uint_buffer[threadId.x], 1);
 
-    // Constant pointers arent a thing in slang
     float* ptr1 = &constant_float_buffer[threadId.x];
-//diag:           ^ use of removed declaration
-//diag:           ^ the '&' operator for taking addresses is no longer supported in Slang
+//diag:           ^ use of deprecated declaration
+//diag:           ^ the '&' operator for taking addresses is deprecated
 //diag:                                 ^ cannot take address of immutable object
 //diag:                                 ^ Not allowed to take the address of an immutable object
 //diag:                                 ^ argument must be l-value
