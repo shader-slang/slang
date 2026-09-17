@@ -71,3 +71,12 @@
 	# default branch (main3). It is reachable from the v2.1.7 tag, so this override
 	# is required: without it the pin check resolves the remote default and fails.
 	branch = v2.1.7
+[submodule "external/nlohmann-json"]
+	path = external/nlohmann-json
+	url = https://github.com/nlohmann/json
+[submodule "external/catch2"]
+	path = external/catch2
+	url = https://github.com/catchorg/Catch2
+[submodule "external/replxx"]
+	path = external/replxx
+	url = https://github.com/AmokHuginnsson/replxx

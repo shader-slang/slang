@@ -627,6 +627,11 @@ void initCommandOptions(CommandOptions& options)
          "-trace-coverage",
          nullptr,
          "Instrument the shader with per-statement line coverage counters. "
+         "Statements that provably execute together share one counter and one "
+         "runtime probe, which keeps instrumented shader code small without "
+         "changing reported per-line results; the manifest therefore reports "
+         "no more counters than source entries, and fewer whenever a "
+         "straight-line region is coalesced. "
          "When writing compiled output to a file, slangc also emits "
          "`<output>.coverage-manifest.json` mapping source coverage entries to counters."},
         {OptionKind::TraceFunctionCoverage,
@@ -1050,19 +1055,19 @@ void initCommandOptions(CommandOptions& options)
         StringBuilder names;
         for (auto name : namesList)
         {
-            names << "-" << name << "-version,";
+            names << "-get-" << name << "-path,";
         }
         // remove last ,
         names.reduceLength(names.getLength() - 1);
 
         options.add(
             names.getBuffer(),
-            "-<compiler>-version",
-            "Print the version of the downstream <compiler> that Slang would load for that "
-            "pass-through, then continue. Reports \"not found\" if the compiler cannot be "
-            "located. Takes no value.\n",
-            UserValue(OptionKind::CompilerVersion),
-            "-<compiler>-version");
+            "-get-<compiler>-path",
+            "Print the on-disk path of the downstream <compiler> that Slang would load for that "
+            "pass-through, then continue. Reports \"not found\" if the compiler cannot be located, "
+            "or \"not available\" if it has no recoverable shared-library path. Takes no value.\n",
+            UserValue(OptionKind::GetCompilerPath),
+            "-get-<compiler>-path");
     }
 
     const Option downstreamOpts[] = {
@@ -1230,7 +1235,11 @@ void initCommandOptions(CommandOptions& options)
          "-validate-uniformity",
          nullptr,
          "Perform uniformity validation analysis."},
-        {OptionKind::AllowGLSL, "-allow-glsl", nullptr, "Enable GLSL as an input language."},
+        {OptionKind::AllowGLSL,
+         "-allow-glsl",
+         nullptr,
+         "Deprecated. Treat every input translation unit as GLSL. Use a GLSL file-name extension "
+         "or `-lang glsl` for each GLSL input instead."},
         {OptionKind::EnableExperimentalPasses,
          "-enable-experimental-passes",
          nullptr,
@@ -1462,18 +1471,28 @@ struct OptionsParser
         bool writeAsSourceBytes = false;
     };
 
-    int addTranslationUnit(SlangSourceLanguage language, Stage impliedStage);
+    /// Add matching raw/API translation-unit records and preserve explicit-language provenance.
+    int addTranslationUnit(
+        SlangSourceLanguage language,
+        Stage impliedStage,
+        SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
-    void addInputSlangPath(String const& path);
+    /// Add a path to the shared Slang translation unit, preserving an explicit override if present.
+    void addInputSlangPath(
+        String const& path,
+        SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
+    /// Add a foreign-language path in its own translation unit with its extension-implied stage.
     void addInputForeignShaderPath(
         String const& path,
         SlangSourceLanguage language,
-        Stage impliedStage);
+        Stage impliedStage,
+        SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
     static Profile::RawVal findGlslProfileFromPath(const String& path);
 
-    SlangResult addInputStdin(SlangSourceLanguage sourceLanguage);
+    /// Add standard input using the required explicitly selected source language.
+    SlangResult addInputStdin(SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
     SlangResult addInputPath(
         char const* inPath,
@@ -1639,10 +1658,17 @@ struct OptionsParser
     String m_currentOptionName;
 };
 
-int OptionsParser::addTranslationUnit(SlangSourceLanguage language, Stage impliedStage)
+int OptionsParser::addTranslationUnit(
+    SlangSourceLanguage language,
+    Stage impliedStage,
+    SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     auto translationUnitIndex = m_rawTranslationUnits.getCount();
     auto translationUnitID = m_compileRequest->addTranslationUnit(language, nullptr);
+
+    auto translationUnit = m_frontEndReq->getTranslationUnit(translationUnitID);
+    translationUnit->sourceLanguageExplicitlyRequested =
+        SourceLanguage(sourceLanguageExplicitlyRequested);
 
     // As a sanity check: the API should be returning the same translation
     // unit index as we maintain internally. This invariant would only
@@ -1661,17 +1687,28 @@ int OptionsParser::addTranslationUnit(SlangSourceLanguage language, Stage implie
     return int(translationUnitIndex);
 }
 
-void OptionsParser::addInputSlangPath(String const& path)
+void OptionsParser::addInputSlangPath(
+    String const& path,
+    SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     // All of the input .slang files will be grouped into a single logical translation unit,
     // which we create lazily when the first .slang file is encountered.
     if (m_slangTranslationUnitIndex == -1)
     {
         m_translationUnitCount++;
-        m_slangTranslationUnitIndex =
-            addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
+        m_slangTranslationUnitIndex = addTranslationUnit(
+            SLANG_SOURCE_LANGUAGE_SLANG,
+            Stage::Unknown,
+            sourceLanguageExplicitlyRequested);
     }
 
+    auto translationUnit = m_frontEndReq->getTranslationUnit(
+        m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID);
+    if (sourceLanguageExplicitlyRequested != SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    {
+        translationUnit->sourceLanguageExplicitlyRequested =
+            SourceLanguage(sourceLanguageExplicitlyRequested);
+    }
     m_compileRequest->addTranslationUnitSourceFile(
         m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID,
         path.begin());
@@ -1683,10 +1720,12 @@ void OptionsParser::addInputSlangPath(String const& path)
 void OptionsParser::addInputForeignShaderPath(
     String const& path,
     SlangSourceLanguage language,
-    Stage impliedStage)
+    Stage impliedStage,
+    SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     m_translationUnitCount++;
-    m_currentTranslationUnitIndex = addTranslationUnit(language, impliedStage);
+    m_currentTranslationUnitIndex =
+        addTranslationUnit(language, impliedStage, sourceLanguageExplicitlyRequested);
 
     m_compileRequest->addTranslationUnitSourceFile(
         m_rawTranslationUnits[m_currentTranslationUnitIndex].translationUnitID,
@@ -1734,6 +1773,8 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
     static const Entry entries[] = {
         {".slang.md", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
         {".slang", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
+        // Literate Slang historically accepts any Markdown path, not only `.slang.md`.
+        {".md", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
 
         {".hlsl", SLANG_SOURCE_LANGUAGE_HLSL, SLANG_STAGE_NONE},
         {".fx", SLANG_SOURCE_LANGUAGE_HLSL, SLANG_STAGE_NONE},
@@ -1795,7 +1836,7 @@ SlangResult OptionsParser::_readStdin(List<Byte>& outSource)
     SLANG_UNREACHABLE("unexpected stdin read result");
 }
 
-SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
+SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     if (m_stdinConsumed)
     {
@@ -1803,7 +1844,7 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
         return SLANG_FAIL;
     }
 
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         m_sink->diagnose(Diagnostics::CannotDeduceSourceLanguage{.path = kStdinDisplayPath});
         return SLANG_FAIL;
@@ -1814,20 +1855,29 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
     List<Byte> source;
     SLANG_RETURN_ON_FAIL(_readStdin(source));
 
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG)
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_SLANG)
     {
         if (m_slangTranslationUnitIndex == -1)
         {
             m_translationUnitCount++;
-            m_slangTranslationUnitIndex =
-                addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
+            m_slangTranslationUnitIndex = addTranslationUnit(
+                SLANG_SOURCE_LANGUAGE_SLANG,
+                Stage::Unknown,
+                sourceLanguageExplicitlyRequested);
         }
+        m_frontEndReq
+            ->getTranslationUnit(
+                m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID)
+            ->sourceLanguageExplicitlyRequested = SourceLanguage(sourceLanguageExplicitlyRequested);
         m_currentTranslationUnitIndex = m_slangTranslationUnitIndex;
     }
     else
     {
         m_translationUnitCount++;
-        m_currentTranslationUnitIndex = addTranslationUnit(sourceLanguage, Stage::Unknown);
+        m_currentTranslationUnitIndex = addTranslationUnit(
+            sourceLanguageExplicitlyRequested,
+            Stage::Unknown,
+            sourceLanguageExplicitlyRequested);
     }
 
     const char* sourceBegin =
@@ -1844,19 +1894,20 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
 
 SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langOverride)
 {
-    SlangSourceLanguage sourceLanguage = SlangSourceLanguage(langOverride);
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    SlangSourceLanguage sourceLanguageExplicitlyRequested = SlangSourceLanguage(langOverride);
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         auto linkage = m_requestImpl->getLinkage();
         if (linkage->m_optionSet.hasOption(CompilerOptionName::Language))
         {
-            sourceLanguage = linkage->m_optionSet.getEnumOption<SlangSourceLanguage>(
-                CompilerOptionName::Language);
+            sourceLanguageExplicitlyRequested =
+                linkage->m_optionSet.getEnumOption<SlangSourceLanguage>(
+                    CompilerOptionName::Language);
         }
     }
 
     if (strcmp(inPath, kStdinCommandLinePath) == 0)
-        return addInputStdin(sourceLanguage);
+        return addInputStdin(sourceLanguageExplicitlyRequested);
 
     // look at the extension on the file name to determine
     // how we should handle it.
@@ -1866,19 +1917,30 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     {
         return addReferencedModule(path, SourceLoc(), false);
     }
-    else if (
-        path.endsWith(".slang") || hasLiterateFileExtension(path) ||
-        langOverride == SourceLanguage::Slang)
+    Stage stageImpliedByFileExtension = Stage::Unknown;
+    SlangSourceLanguage sourceLanguageImpliedByFileExtension =
+        findSourceLanguageFromPath(path, stageImpliedByFileExtension);
+    SlangSourceLanguage sourceLanguage = sourceLanguageExplicitlyRequested;
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+        sourceLanguage = sourceLanguageImpliedByFileExtension;
+
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG)
     {
         // Plain old slang code
-        addInputSlangPath(path);
+        addInputSlangPath(path, sourceLanguageExplicitlyRequested);
         return SLANG_OK;
     }
 
     Stage impliedStage = Stage::Unknown;
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    // A stage-bearing extension belongs to the source-language convention that defined it.
+    // Consider `shader.vert -lang hlsl`: `.vert` means both GLSL and vertex input, but once the
+    // explicit HLSL selection overrides GLSL, carrying over only the vertex half would combine
+    // incompatible provenance. Require an explicit `-stage` instead; a matching or inferred
+    // language may continue to use the extension-implied stage.
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN ||
+        sourceLanguageExplicitlyRequested == sourceLanguageImpliedByFileExtension)
     {
-        sourceLanguage = findSourceLanguageFromPath(path, impliedStage);
+        impliedStage = stageImpliedByFileExtension;
     }
     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
@@ -1886,7 +1948,11 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         return SLANG_FAIL;
     }
 
-    addInputForeignShaderPath(path, sourceLanguage, impliedStage);
+    addInputForeignShaderPath(
+        path,
+        sourceLanguage,
+        impliedStage,
+        sourceLanguageExplicitlyRequested);
 
     return SLANG_OK;
 }
@@ -2792,9 +2858,14 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
         switch (optionKind)
         {
+        case OptionKind::AllowGLSL:
+            // Unlike ordinary compiler options, this deprecated spelling governs only the input
+            // translation units of the current compile request. Keeping it off the linkage avoids
+            // silently changing the language of source modules loaded by an `import`.
+            m_requestImpl->setLegacyAllowGLSLInput(true);
+            break;
         case OptionKind::NoMangle:
         case OptionKind::ValidateUniformity:
-        case OptionKind::AllowGLSL:
         case OptionKind::EnableExperimentalPasses:
         case OptionKind::EnableExperimentalDynamicDispatch:
         case OptionKind::EmitIr:
@@ -3813,52 +3884,57 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
                 break;
             }
-        case OptionKind::CompilerVersion:
+        case OptionKind::GetCompilerPath:
             {
-                // `-<compiler>-version` is a print-and-continue query option. It has the same
-                // "-<compiler>-..." shape as -<compiler>-path, but instead of consuming a value it
-                // prints the version of the downstream compiler Slang would actually load for that
-                // pass-through, then lets parsing continue (like -version). Recover <compiler> as
-                // the text between the leading '-' and the trailing "-version", exactly as the
-                // CompilerPath case recovers the name before "-path".
-                const Index index = argValue.lastIndexOf('-');
-                if (index >= 0)
+                // `-get-<compiler>-path` is a print-and-continue query option: it prints the
+                // resolved on-disk path of the downstream compiler Slang would load for that
+                // pass-through, then lets parsing continue (like -version). Recover <compiler> by
+                // stripping the fixed "-get-" prefix and "-path" suffix, which -- unlike a
+                // lastIndexOf('-') scan -- also handles compiler names that contain '-' (e.g.
+                // spirv-dis).
+                const UnownedStringSlice getPrefix = UnownedStringSlice("-get-");
+                const UnownedStringSlice pathSuffix = UnownedStringSlice("-path");
+                const UnownedStringSlice argSlice = argValue.getUnownedSlice();
+                const UnownedStringSlice passThroughSlice =
+                    argSlice.tail(getPrefix.getLength())
+                        .head(
+                            argSlice.getLength() - getPrefix.getLength() - pathSuffix.getLength());
+
+                SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
+                if (SLANG_FAILED(TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
                 {
-                    UnownedStringSlice passThroughSlice =
-                        argValue.getUnownedSlice().head(index).tail(1);
-
-                    SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                    if (SLANG_FAILED(TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
-                    {
-                        m_sink->diagnose(Diagnostics::UnknownDownstreamCompiler{
-                            .compiler = passThroughSlice,
-                            .location = arg.loc});
-                        return SLANG_FAIL;
-                    }
-
-                    // getDownstreamCompilerVersion shares the same lazy-discovery funnel used
-                    // during compilation, so the reported version is the library that would
-                    // actually be used for this pass-through (it honors -<compiler>-path and the
-                    // standard search order). It returns SLANG_OK once the compiler is located and
-                    // loaded -- major/minor are then valid, and a loaded-but-versionless compiler
-                    // such as glslang reports 0.0 -- and SLANG_E_NOT_FOUND when it cannot be
-                    // loaded (e.g. the toolchain is not installed).
-                    int major = 0;
-                    int minor = 0;
-                    StringBuilder versionStr;
-                    versionStr << passThroughSlice << " version: ";
-                    if (SLANG_SUCCEEDED(
-                            m_session->getDownstreamCompilerVersion(passThrough, &major, &minor)))
-                    {
-                        versionStr << major << "." << minor;
-                    }
-                    else
-                    {
-                        versionStr << "not found";
-                    }
-                    versionStr << "\n";
-                    m_sink->diagnoseRaw(Severity::Note, versionStr.getUnownedSlice());
+                    m_sink->diagnose(Diagnostics::UnknownDownstreamCompiler{
+                        .compiler = passThroughSlice,
+                        .location = arg.loc});
+                    return SLANG_FAIL;
                 }
+
+                // getDownstreamCompilerPath shares the same lazy-discovery funnel used during
+                // compilation, so the reported path is the library that would actually be used for
+                // this pass-through (it honors -<compiler>-path and the standard search order). It
+                // returns SLANG_OK with the resolved shared-library path, SLANG_E_NOT_AVAILABLE
+                // when the compiler is loaded but has no recoverable on-disk path (an
+                // executable-backed command-line compiler, or a target without shared-library
+                // introspection), and SLANG_E_NOT_FOUND when it cannot be located or loaded.
+                ComPtr<ISlangBlob> pathBlob;
+                const SlangResult pathResult =
+                    m_session->getDownstreamCompilerPath(passThrough, pathBlob.writeRef());
+                StringBuilder pathStr;
+                pathStr << passThroughSlice << " path: ";
+                if (SLANG_SUCCEEDED(pathResult) && pathBlob)
+                {
+                    pathStr << (const char*)pathBlob->getBufferPointer();
+                }
+                else if (pathResult == SLANG_E_NOT_AVAILABLE)
+                {
+                    pathStr << "not available";
+                }
+                else
+                {
+                    pathStr << "not found";
+                }
+                pathStr << "\n";
+                m_sink->diagnoseRaw(Severity::Note, pathStr.getUnownedSlice());
                 break;
             }
         case OptionKind::InputFilesRemain:

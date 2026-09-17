@@ -206,6 +206,20 @@ IRType* getMatrixElementType(IRType* type);
 bool isResourceType(IRType* type);
 bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);
 
+// True if `type` (after unwrapping attributed types) is a texture or a sampler-state-family type,
+// i.e. one the `spvBindlessTextureNV` descriptor-handle-to-resource conversion can produce. This is
+// also the set of `DescriptorHandle` element types that are represented as `uint64` under that
+// capability; every other kind (buffers, acceleration structures) stays `uint2`.
+bool isBindlessTextureNVEncodableResourceType(IRType* type);
+
+// True if `descriptorHandleType` (an `IRDescriptorHandleType`) is represented as `uint64` rather
+// than `uint2` for SPIR-V. Under `spvBindlessTextureNV` (passed in as `hasBindlessTextureNV`, since
+// callers detect the capability in different ways) only the resource kinds that extension can
+// convert — see `isBindlessTextureNVEncodableResourceType` — use the wide form; buffers and
+// acceleration structures stay `uint2`. Returns false when the capability is absent or the type is
+// not a descriptor handle.
+bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool hasBindlessTextureNV);
+
 // True if type is a pointer to a resource
 bool isPointerToResourceType(IRType* type);
 
@@ -215,6 +229,45 @@ IROp getTypeStyle(BaseType op);
 inline bool isScalarIntegerType(IRType* type)
 {
     return getTypeStyle(type->getOp()) == kIROp_IntType;
+}
+
+// Returns true for the integer arithmetic and bitwise op-kinds through which a
+// NonUniformResourceIndex mark propagates. Nonuniformity is contagious: an
+// elementwise integer op with a non-uniform operand yields a non-uniform result
+// (Vulkan VUID-RuntimeSpirv-None-10148). This is the single source of truth for
+// that op-set, shared by the SPIR-V float pass that bubbles the wrapper past such
+// an op (slang-ir-float-non-uniform-resource-index.cpp) and by the function-call
+// specializer that detects a non-uniform index passed through arithmetic across a
+// call boundary (slang-ir-specialize-function-call.cpp). Comparison/logical ops
+// are excluded (they yield a bool, not an index); IntCast is handled separately by
+// both consumers.
+//
+// This classifies by op-kind and assumes the operands are the integer index the
+// caller guarantees. That matters because `kIROp_Div` is the type-polymorphic divide
+// (there is no separate integer-divide op, unlike the integer-specific `kIROp_IRem`
+// whose float sibling `kIROp_FRem` is deliberately absent): the set is sound only
+// because the value asked about is always a NonUniformResourceIndex-derived integer
+// index, not because the op-kinds alone are integer-only.
+inline bool isNonUniformIndexArithmeticOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_IRem:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_BitNot:
+    case kIROp_Neg:
+        return true;
+    default:
+        return false;
+    }
 }
 
 // No side effect can take place through a value of a "Value" type.
@@ -571,6 +624,19 @@ bool isIROpaqueType(IRType* type);
 IRInst* tryGetTranslation(IRModule* module, IRInst* inst);
 
 IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
+
+// Peel `addr` through instructions that forward the address of the same underlying
+// storage without changing which storage it refers to (field/element access, casts,
+// offset computation), stopping at the first instruction that is not one of these.
+// Returns that terminal instruction. This is the shape-independent counterpart to
+// `getRootAddr`: `getRootAddr` only peels `FieldAddress`/`GetElementPtr`/
+// `NodeOutputRecordGetElementPtr`, so a `BitCast`/`Reinterpret`/`PtrCast`/`GetOffsetPtr`
+// inserted by a later legalization pass (e.g. `lowerBufferElementTypeToStorageType`) can
+// make `getRootAddr` stop short of the address's true root. Callers that need to
+// recognize a specific root shape regardless of such legalization (e.g. "is this address
+// into the OptiX SBT" or "is this address into CUDA's `__constant__` global parameter
+// group") should peel with this function first, then test the terminal instruction.
+IRInst* peelAddressForwardingOps(IRInst* addr);
 
 // Returns true if the memory location pointed to by `ptrInst` is immutable.
 // An immutable location is the memory region that can't be modified by the user code.
