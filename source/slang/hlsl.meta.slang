@@ -12944,8 +12944,9 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
 // Tests a value for NaN on the LLVM path without requiring the caller's generic constraint to
 // expose `__BuiltinFloatingPointType`. Use explicit classification rather than `value != value`:
 // the latter currently lowers to an ordered comparison and is false for NaN (see #13144). Calls
-// are guarded by `__isFloat<T>()`, so specialization removes this helper for integer and
-// application-defined `IComparable` types.
+// are guarded by `__isFloat<T>()`. That query folds to a compile-time constant during
+// specialization, so this helper is eliminated for integer and application-defined `IComparable`
+// specializations.
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 [__readNone]
@@ -13035,6 +13036,7 @@ T max(T x, T y)
 // Implements the target-specific vector maximum behavior shared by all builtin arithmetic
 // element types. Family-specific public overloads forward here so a generic element type still
 // reaches the same native shaped operation as a concrete integer or floating-point element type.
+//@ hidden:
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
 [ForceInline]
@@ -13102,9 +13104,10 @@ matrix<T, N, M, L> __matrixMaxImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
     {
     case hlsl: __intrinsic_asm "max";
     default:
-        // HLSL has a native matrix operation. Other targets decompose the logical rows so each
-        // row reaches the intrinsic-aware vector worker; indexing a logical row is independent of
-        // the matrix storage layout carried by `L`.
+        // HLSL has a native matrix operation. Other targets decompose the logical rows so each row
+        // reaches the intrinsic-aware vector worker. `matrix<T, N, M, L>` implements
+        // `IRWArray<vector<T, M>>`, so indexing addresses a logical row independently of storage
+        // layout `L`. Keep the established rolled-loop policy; target compilers may unroll it.
         matrix<T, N, M, L> result;
         for (int i = 0; i < N; ++i)
             result[i] = __vectorMaxImpl(x[i], y[i]);
@@ -13112,10 +13115,10 @@ matrix<T, N, M, L> __matrixMaxImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
     }
 }
 
+//@public:
 // Keep the established integer and floating-point overloads so overload resolution remains
 // stable. The floating-point declarations also retain the identities referenced by derivative
-// registrations. The lower-ranked common-arithmetic overload exists only for generic bodies whose
-// available element constraint cannot select either family.
+// registrations.
 /// @category math
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
@@ -13375,6 +13378,7 @@ T min(T x, T y)
 // Implements the target-specific vector minimum behavior shared by all builtin arithmetic
 // element types. Family-specific public overloads forward here so a generic element type still
 // reaches the same native shaped operation as a concrete integer or floating-point element type.
+//@ hidden:
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
 [ForceInline]
@@ -13442,9 +13446,10 @@ matrix<T, N, M, L> __matrixMinImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
     {
     case hlsl: __intrinsic_asm "min";
     default:
-        // HLSL has a native matrix operation. Other targets decompose the logical rows so each
-        // row reaches the intrinsic-aware vector worker; indexing a logical row is independent of
-        // the matrix storage layout carried by `L`.
+        // HLSL has a native matrix operation. Other targets decompose the logical rows so each row
+        // reaches the intrinsic-aware vector worker. `matrix<T, N, M, L>` implements
+        // `IRWArray<vector<T, M>>`, so indexing addresses a logical row independently of storage
+        // layout `L`. Keep the established rolled-loop policy; target compilers may unroll it.
         matrix<T, N, M, L> result;
         for (int i = 0; i < N; ++i)
             result[i] = __vectorMinImpl(x[i], y[i]);
@@ -13452,9 +13457,10 @@ matrix<T, N, M, L> __matrixMinImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
     }
 }
 
-// Keep the same three-overload split as `max` above: the family-specific declarations preserve the
-// established public overloads, while the broad declaration makes the operation available through
-// an abstract `__BuiltinArithmeticType` constraint.
+//@public:
+// Keep the established integer and floating-point overloads so overload resolution remains
+// stable. The floating-point declarations also retain the identities referenced by derivative
+// registrations.
 /// @category math
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]

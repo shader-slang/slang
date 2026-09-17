@@ -7,25 +7,37 @@ RWStructuredBuffer<float> outputBuffer;
 typealias RowMajorFloat2x2 = matrix<float, 2, 2, MatrixLayoutMode.RowMajor>;
 
 [Differentiable]
-RowMajorFloat2x2 rowMajorMinimum(RowMajorFloat2x2 left, RowMajorFloat2x2 right)
+matrix<T, R, C, L> genericMatrixMinimum<
+    T : __BuiltinFloatingPointType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(matrix<T, R, C, L> left, matrix<T, R, C, L> right)
 {
     return min(left, right);
 }
 
 [Differentiable]
-RowMajorFloat2x2 rowMajorMaximum(RowMajorFloat2x2 left, RowMajorFloat2x2 right)
+matrix<T, R, C, L> genericMatrixMaximum<
+    T : __BuiltinFloatingPointType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(matrix<T, R, C, L> left, matrix<T, R, C, L> right)
 {
     return max(left, right);
 }
 
 [Differentiable]
-float2 vectorMinimum(float2 left, float2 right)
+vector<T, N> genericVectorMinimum<T : __BuiltinFloatingPointType, let N : int>(
+    vector<T, N> left,
+    vector<T, N> right)
 {
     return min(left, right);
 }
 
 [Differentiable]
-float2 vectorMaximum(float2 left, float2 right)
+vector<T, N> genericVectorMaximum<T : __BuiltinFloatingPointType, let N : int>(
+    vector<T, N> left,
+    vector<T, N> right)
 {
     return max(left, right);
 }
@@ -38,7 +50,8 @@ void computeMain()
     RowMajorFloat2x2 leftTangent = RowMajorFloat2x2(10.0, 20.0, 30.0, 40.0);
     RowMajorFloat2x2 rightTangent = RowMajorFloat2x2(1.0, 2.0, 3.0, 4.0);
 
-    let minimumForward = fwd_diff(rowMajorMinimum)(
+    let minimumForward = fwd_diff(
+        genericMatrixMinimum<float, 2, 2, MatrixLayoutMode.RowMajor>)(
         diffPair(left, leftTangent), diffPair(right, rightTangent));
     outputBuffer[0] = minimumForward.p[0][0]; // CHECK: 1.0
     outputBuffer[1] = minimumForward.p[0][1]; // CHECK: 2.0
@@ -49,7 +62,8 @@ void computeMain()
     outputBuffer[6] = minimumForward.d[1][0]; // CHECK: 3.0
     outputBuffer[7] = minimumForward.d[1][1]; // CHECK: 40.0
 
-    let maximumForward = fwd_diff(rowMajorMaximum)(
+    let maximumForward = fwd_diff(
+        genericMatrixMaximum<float, 2, 2, MatrixLayoutMode.RowMajor>)(
         diffPair(left, leftTangent), diffPair(right, rightTangent));
     outputBuffer[8] = maximumForward.p[0][0];   // CHECK: 3.0
     outputBuffer[9] = maximumForward.p[0][1];   // CHECK: 4.0
@@ -62,7 +76,8 @@ void computeMain()
 
     var minimumLeft = diffPair(left, RowMajorFloat2x2(0.0));
     var minimumRight = diffPair(right, RowMajorFloat2x2(0.0));
-    bwd_diff(rowMajorMinimum)(minimumLeft, minimumRight, RowMajorFloat2x2(1.0));
+    bwd_diff(genericMatrixMinimum<float, 2, 2, MatrixLayoutMode.RowMajor>)(
+        minimumLeft, minimumRight, RowMajorFloat2x2(1.0));
     outputBuffer[16] = minimumLeft.d[0][0];   // CHECK: 1.0
     outputBuffer[17] = minimumLeft.d[0][1];   // CHECK: 0.0
     outputBuffer[18] = minimumLeft.d[1][0];   // CHECK: 0.0
@@ -74,7 +89,8 @@ void computeMain()
 
     var maximumLeft = diffPair(left, RowMajorFloat2x2(0.0));
     var maximumRight = diffPair(right, RowMajorFloat2x2(0.0));
-    bwd_diff(rowMajorMaximum)(maximumLeft, maximumRight, RowMajorFloat2x2(1.0));
+    bwd_diff(genericMatrixMaximum<float, 2, 2, MatrixLayoutMode.RowMajor>)(
+        maximumLeft, maximumRight, RowMajorFloat2x2(1.0));
     outputBuffer[24] = maximumLeft.d[0][0];   // CHECK: 0.0
     outputBuffer[25] = maximumLeft.d[0][1];   // CHECK: 1.0
     outputBuffer[26] = maximumLeft.d[1][0];   // CHECK: 1.0
@@ -86,7 +102,8 @@ void computeMain()
 
     var vectorMinimumLeft = diffPair(float2(1.0, 4.0), float2(0.0));
     var vectorMinimumRight = diffPair(float2(3.0, 2.0), float2(0.0));
-    bwd_diff(vectorMinimum)(vectorMinimumLeft, vectorMinimumRight, float2(1.0));
+    bwd_diff(genericVectorMinimum<float, 2>)(
+        vectorMinimumLeft, vectorMinimumRight, float2(1.0));
     outputBuffer[32] = vectorMinimumLeft.d.x;   // CHECK: 1.0
     outputBuffer[33] = vectorMinimumLeft.d.y;   // CHECK: 0.0
     outputBuffer[34] = vectorMinimumRight.d.x;  // CHECK: 0.0
@@ -94,7 +111,8 @@ void computeMain()
 
     var vectorMaximumLeft = diffPair(float2(1.0, 4.0), float2(0.0));
     var vectorMaximumRight = diffPair(float2(3.0, 2.0), float2(0.0));
-    bwd_diff(vectorMaximum)(vectorMaximumLeft, vectorMaximumRight, float2(1.0));
+    bwd_diff(genericVectorMaximum<float, 2>)(
+        vectorMaximumLeft, vectorMaximumRight, float2(1.0));
     outputBuffer[36] = vectorMaximumLeft.d.x;   // CHECK: 0.0
     outputBuffer[37] = vectorMaximumLeft.d.y;   // CHECK: 1.0
     outputBuffer[38] = vectorMaximumRight.d.x;  // CHECK: 1.0
