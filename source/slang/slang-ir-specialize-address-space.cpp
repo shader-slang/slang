@@ -261,13 +261,14 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         {
             // The held pointer would need two storage classes at once. This is the same
             // return-conflict that `reconcilePointerSlotWithStoredValue` (the SPIR-V slot
-            // pre-pass) records: the ownership rule is that a conflicting slot whose value
-            // reaches a return is E58005, and a non-returned conflict is the general
-            // inconsistent-pointer-address-space diagnostic (E58003). Both recorders gate on
+            // pre-pass) records. Ownership rule for a conflicting slot: if a load of it is used
+            // directly by a return (`anyLoadReachesReturn`) it is E58005; otherwise the SPIR-V
+            // pre-pass raises the general inconsistent-pointer-address-space diagnostic (E58003)
+            // for it (this dataflow path records only the returned case). Both recorders gate on
             // `anyLoadReachesReturn` and both funnel into `conflictingReturns`
             // (`addIfNotExists` dedupes), so on SPIR-V this is a redundant safety net behind the
             // pre-pass; on the pre-pass-less callers it is the sole recorder. Do not change one
-            // side's rule without the other, or a returned conflict could lose its diagnostic.
+            // side's predicate without the other, or a returned conflict could lose its diagnostic.
             if (sink && anyLoadReachesReturn(var))
                 conflictingReturns.addIfNotExists(func, conflictLoc);
             return false;
@@ -795,16 +796,18 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             // variable is diagnosed: a `DebugVar` mirrors it, and a debug slot must never be the
             // thing that rejects an otherwise valid program.
             //
-            // When the slot's value reaches a return the conflict is a return conflict owned by
-            // E58005 (`conflicting-return-pointer-storage-classes`), which names the disagreeing
-            // return and is emitted only after dead-clone removal. We record it into
-            // `conflictingReturns` here instead of raising the general inconsistent-slot
-            // diagnostic, so exactly one diagnostic covers the slot. Establishing E58005 at the
-            // same point we suppress the general one keeps the hand-off self-contained: it does
-            // not rely on the later dataflow re-finding the conflict, which would miss a function
-            // this pre-pass scans but the entry-point worklist never reaches. A non-returned
-            // conflict keeps the general diagnostic. `diagnosedAddrSpaceConflicts` reports each
-            // slot once across the fixpoint's repeated visits.
+            // Ownership rule: when a load of the slot is used directly by a return
+            // (`anyLoadReachesReturn`), the conflict is a return conflict owned by E58005
+            // (`conflicting-return-pointer-storage-classes`), which names the disagreeing return
+            // and is emitted only after dead-clone removal. We record it into `conflictingReturns`
+            // here instead of raising the general inconsistent-slot diagnostic, so exactly one
+            // diagnostic covers the slot. Establishing E58005 at the same point we suppress the
+            // general one keeps the hand-off self-contained: it does not rely on the later dataflow
+            // re-finding the conflict, which would miss a function this pre-pass scans but the
+            // entry-point worklist never reaches. Any other conflicting slot (not directly
+            // returned) keeps the general E58003 diagnostic, which this SPIR-V pre-pass owns.
+            // `diagnosedAddrSpaceConflicts` reports each slot once across the fixpoint's repeated
+            // visits.
             if (sink && slot->getOp() == kIROp_Var && diagnosedAddrSpaceConflicts.add(slot))
             {
                 if (anyLoadReachesReturn(slot))
