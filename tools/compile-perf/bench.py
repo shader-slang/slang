@@ -781,8 +781,25 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         # the platform returns.
         sample_missing = [c for c in expected_diags if c not in text]
         missing_diags.update(sample_missing)
+        # A crash is still a crash even if the diagnostic text it managed to
+        # print before dying happens to contain every expected code: the
+        # override below is only for the platform's specific representation
+        # of slangc's compile-error exit(-1), never for an arbitrary nonzero
+        # code. On POSIX the kernel truncates any exit() argument to 8 bits,
+        # so exit(-1) is always 255 there (not macOS-specific, despite the
+        # comment above) -- and a signal-terminated crash is unconditionally
+        # negative (Python's own POSIX contract), so 255 and "negative" never
+        # collide. On Windows there is no such truncation: Popen.returncode
+        # is `_winapi.GetExitCodeProcess`'s raw DWORD with no sign conversion
+        # (verified against this Python's subprocess.py -- the claim two
+        # comments up, that NTSTATUS codes come back signed, does not hold
+        # here), so exit(-1) is the full unsigned 0xFFFFFFFF = 4294967295,
+        # while a real crash (STATUS_ACCESS_VIOLATION 0xC0000005 and similar)
+        # is a different, recognizable NTSTATUS value -- never this one.
+        _EXIT_NEGATIVE_ONE = (255, 0xFFFFFFFF)
         expected_failure = (bool(expected_diags) and not sample_missing
-                            and real_error(text, benign) is None)
+                            and real_error(text, benign) is None
+                            and rc in _EXIT_NEGATIVE_ONE)
         if (rc > 1 or rc < 0) and not expected_failure:
             crash_codes.append(rc)
             sample_ok.append(False)

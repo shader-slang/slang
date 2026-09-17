@@ -298,6 +298,15 @@ WORKLOADS = [
         gen=workloads.gen_diagnostics,
         default_size=9600,
         mode="module",
+        # E30019 ("type mismatch in expression") is an intentional pin, not
+        # an incidental one: `source/slang/diagnostics/type-errors.lua` also
+        # has an experimental "argument_type_mismatch" diagnostic prototyping
+        # the multi-span diagnostic system under the SAME code, commented as
+        # a "guinea pig." If that migration ever renumbers or reassigns
+        # E30019, this workload will report "expected diagnostics absent"
+        # from a diagnostic-numbering change, not a perf regression -- update
+        # this code in lockstep with that migration rather than treating the
+        # failure as a suite bug.
         expected_diagnostics=["E30019"],
         primary_timers=["SemanticChecking", "frontEndExecute", "compileInner"],
         sweep_sizes=[2400, 4800, 9600, 19200],
