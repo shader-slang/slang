@@ -1169,14 +1169,18 @@ def gen_generic_reinterpret_dispatch(n):
     switch, so the workload's OWN generated-code size is O(n^2) by
     construction (unlike this suite's other breadth workloads, which are
     O(n)) -- that quadratic floor is the honest baseline to compare a sweep
-    against, not O(n). Measured at n=8/16/32/64 (2026-09, Release, local):
-    compileInner 34/91/406/2370 ms, i.e. roughly 2.7x/4.5x/5.8x per doubling
-    -- growing FASTER than the O(n^2) floor already predicts, and dominated
-    by `generateOutput` cost not explained by any visible leaf timer (see the
-    WorkloadSpec comment). Not yet root-caused; flagging as an open finding
-    rather than a workload bug, since compile-testing (this file's purpose)
-    confirmed the source is valid and the growth is real, reproducible
-    compiler behavior.
+    against, not O(n). Measured at n=8/16/32 (2026-09, Release, local, inside
+    this workload's registered sweep_sizes) plus one point at n=64 taken
+    manually BEYOND the default sweep (not reproducible from the checked-in
+    ladder -- n=64 would add ~2.4s per sample to every nightly run, so it is
+    reported here rather than swept by default): compileInner 34/91/406/2370
+    ms, i.e. roughly 2.7x/4.5x/5.8x per doubling -- growing FASTER than the
+    O(n^2) floor already predicts, and dominated by `generateOutput` cost not
+    explained by any visible leaf timer (see the WorkloadSpec comment). Not
+    yet root-caused; flagging as an open finding rather than a workload bug,
+    since compile-testing (this file's purpose) confirmed the source is
+    valid and the growth is real, reproducible compiler behavior -- rerun
+    manually with n=64 to reproduce this specific point.
     """
     s = [_HEADER, _buf()]
     s.append("[anyValueSize(16)]\ninterface IShade { float shade(float x); }\n\n")
@@ -1211,25 +1215,26 @@ def gen_generic_reinterpret_dispatch(n):
 
 
 def gen_flat_expr_dag(n):
-    """A single basic block of `n` sequential `float3` locals, each one binary
-    op combining two EARLIER locals (not always the immediately-preceding one),
-    forming a wide expression DAG rather than a linear dependency chain -- the
-    shape of MaterialX-generated code's weight-computation blocks (observed:
-    80+ consecutive `const float3 nNN = nAA * nBB;` statements in one block of
-    real `generated.slang` output, each combining two DIFFERENT earlier
-    temporaries rather than threading one accumulator). No resources, no
-    generics, no control flow: this isolates the pure local-value axis from
-    `backend_loads_*` (resource `Call`s specifically) and from `gen_codegen`
-    (a single serially-dependent accumulator chain, `acc = acc*k +
-    sin(acc)...`, which reuses one variable rather than keeping N live named
-    temporaries). A wide DAG of live locals is what stresses per-block
-    CSE/dedup (`DeduplicateContext::deduplicate` in
-    slang-ir-redundancy-removal.cpp) and the redundant load/store elimination
-    fixed in shader-slang/slang#13012 differently than a resource-heavy or
-    serially-dependent shape: every local is a candidate for the backward scan
-    in `tryRemoveRedundantLoad`, and the DAG's width (many simultaneously-live
-    temporaries) is what real material code produces, not the narrow chains or
-    resource-Call-heavy shapes the rest of the suite already isolates.
+    """A single basic block of `n` sequential `float3` locals. Each one is a
+    binary op combining the immediately-preceding local (`lhs = n{i-1}`) with
+    an earlier one a few positions back (`rhs`, bounded 3-7 positions behind
+    `i`) -- a linear dependency spine with wide FAN-IN at each step, not a DAG
+    whose live-temporary set grows with `n` (the backward window stays a small
+    constant). This is the shape of MaterialX-generated code's
+    weight-computation blocks (observed: 80+ consecutive `const float3 nNN =
+    nAA * nBB;` statements in one block of real `generated.slang` output, each
+    combining two DIFFERENT earlier temporaries rather than threading one
+    accumulator). No resources, no generics, no control flow: this isolates
+    the pure local-value axis from `backend_loads_*` (resource `Call`s
+    specifically) and from `gen_codegen` (a single serially-dependent
+    accumulator chain, `acc = acc*k + sin(acc)...`, which reuses one variable
+    rather than declaring N named locals). What actually scales with `n` here,
+    and what `gen_codegen`'s single reused accumulator cannot exercise, is the
+    NUMBER OF INSTRUCTIONS in one block that per-block CSE/dedup
+    (`DeduplicateContext::deduplicate` in slang-ir-redundancy-removal.cpp) and
+    the redundant load/store elimination fixed in shader-slang/slang#13012
+    must scan: every local is a candidate for the backward scan in
+    `tryRemoveRedundantLoad`, so cost tracks block length, not live-set width.
 
     Scaling null: n scales independent binary-op statements in one block; ideal
     cost is O(n).
@@ -1274,17 +1279,19 @@ def gen_vector_matrix_overload_set(n):
     s.append(
         "float4x4 mx_mix(float4x4 a, float4x4 b, float t) { return a + (b - a) * t; }\n\n"
     )
-    kinds = ["float", "float2", "float3", "float4", "float3x3", "float4x4"]
+    # (type, accessor-to-a-scalar): explicit per kind, not inferred from the
+    # type spelling -- a scalar returns r itself, a vector indexes once, a
+    # matrix indexes twice. Carrying the category alongside the name keeps a
+    # future kind (e.g. a non-square matrix, or a vector name that happens to
+    # contain "x") from silently picking the wrong accessor depth.
+    kinds = [("float", ""), ("float2", "[0]"), ("float3", "[0]"),
+             ("float4", "[0]"), ("float3x3", "[0][0]"), ("float4x4", "[0][0]")]
     for i in range(n):
-        ty = kinds[i % len(kinds)]
+        ty, accessor = kinds[i % len(kinds)]
         s.append(
             f"float call_{i}() {{ {ty} a = {ty}({i % 5}.0); {ty} b = {ty}({i % 7}.0); "
             f"{ty} r = mx_mix(a, b, {i % 11}.0 * 0.1); "
-            + (
-                "return r;\n}\n"
-                if ty == "float"
-                else f"return r[0]{'[0]' if 'x' in ty else ''};\n}}\n"
-            )
+            f"return r{accessor};\n}}\n"
         )
     s.append('\n[shader("compute")]\n[numthreads(1,1,1)]\n')
     s.append("void computeMain()\n{\n    float acc = 0.0;\n")
@@ -1310,10 +1317,16 @@ def gen_generic_method_dispatch(n):
     methods in the rest of this suite, which are all non-generic. `combine`
     stays purely in `U`'s domain (matching `sema_generics`/`complexity_ladder`'s
     own `T : IArithmetic` helpers, which never cast T to/from a concrete type)
-    so it type-checks for ANY `U : IArithmetic`, not only `float`. Each call
-    site instantiates the generic method at a different concrete type AND
-    resolves it through the witness table, so both specializeModule's generic
-    substitution and its witness-table lowering run at every call.
+    so it type-checks for ANY `U : IArithmetic`, not only `float`. Every call
+    site instantiates `combine` at the same concrete `U = float` (via `run`'s
+    fixed `float x` parameter) -- what varies per call site is the WITNESS:
+    which `Unit{i}` implementation `combine<float>` resolves through, exactly
+    the axis `dynamic_dispatch`/`existential_aggregate` also test. What this
+    workload adds over those two is that the dispatched method is itself
+    generic, so specializeModule's generic-substitution machinery (not just
+    its witness-table lowering) runs at every call, against a method that
+    could in principle be called at any `U`, not only the one call sites
+    happen to use here.
 
     Scaling null: n scales implementations and call sites, each O(1); ideal
     cost is O(n).
@@ -1369,6 +1382,11 @@ def gen_conditional_compilation(n):
         s.append("#endif\n")
     s.append('\n[shader("compute")]\n[numthreads(1,1,1)]\n')
     s.append("void computeMain()\n{\n    float acc = outBuf[0];\n")
+    # Cap computeMain call sites at 64: beyond this the entry point itself (not
+    # the preprocessor conditional-skip cost we're measuring) becomes the
+    # bottleneck, matching the existing overload_resolution/implicit_conversion/
+    # specialization/vector_matrix_overload_set convention. n still scales the
+    # #if/#else/#endif pairs above in full -- only the call count is capped.
     for i in range(min(n, 64)):
         s.append(f"    acc = feat_{i}(acc);\n")
     s.append("    outBuf[0] = acc;\n}\n")
@@ -1441,4 +1459,23 @@ def gen_material_module_graph(n):
     main.append("    outBuf[0] = acc;\n}\n")
     files["material_main.slang"] = "".join(main)
     return files
+
+
+# Import-time smoke checks for the six Falcor/MaterialX-shape-gap generators,
+# same rationale as the block above gen_interface_depth: their output is only
+# ever compiled by the nightly bench, so a broken template would otherwise
+# merge cleanly and surface as a lost nightly data point.
+assert "reinterpret<Wrap3, T>(value)" in \
+    gen_generic_reinterpret_dispatch(4)["generic_reinterpret_dispatch.slang"]
+assert "float3 n124 =" in gen_flat_expr_dag(125)["flat_expr_dag.slang"]
+assert "float4x4 mx_mix(" in \
+    gen_vector_matrix_overload_set(4)["vector_matrix_overload_set.slang"]
+assert "U combine<U : IArithmetic>" in \
+    gen_generic_method_dispatch(4)["generic_method_dispatch.slang"]
+_cc = gen_conditional_compilation(50)["conditional_compilation.slang"]
+assert "#if FEATURE_49" in _cc and "#endif" in _cc
+del _cc
+_mm = gen_material_module_graph(4)
+assert "case 3: m = Material3();" in _mm["material_main.slang"]
+del _mm
 
