@@ -372,9 +372,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             }
         }
 
-        HashSet<IRFunc*> newWorkList;
         while (workList.getCount())
         {
+            // Reprocess only callers queued by the preceding round. Keeping this set across
+            // rounds leaves already-converged callers permanently queued once a callee's result
+            // address space changes, so the fixpoint loop never terminates.
+            HashSet<IRFunc*> newWorkList;
             for (Index i = 0; i < workList.getCount(); i++)
             {
                 auto func = workList[i];
