@@ -1747,9 +1747,32 @@ struct IRInterfaceRequirementEntry : IRInst
 FIDDLE()
 struct IRInterfaceType : IRType
 {
-    FIDDLE(leafInst())
+    FIDDLE(leafInst{noIsaImpl = true})
+
+    // Structural ray-tracing stage interfaces use distinct opcodes so their trusted identity
+    // survives serialization and linking. They retain the ordinary interface representation;
+    // shared classifiers and cloning paths use this `isaImpl` instead of exact-op checks. Keep the
+    // generated stage-interface opcode range contiguous when adding another stage.
+    static bool isaImpl(IROp opIn)
+    {
+        const int op = kIROpMask_OpMask & opIn;
+        return op == kIROp_InterfaceType || (op >= kIROp_FirstRaytracingStageInterface &&
+                                             op <= kIROp_LastRaytracingStageInterface);
+    }
+    enum
+    {
+        kOp = kIROp_InterfaceType
+    };
 
     UInt getRequirementCount() { return getOperandCount(); }
+};
+
+FIDDLE()
+struct IRRaytracingStageInterface : IRInterfaceType
+{
+    // This base class lets compiler code classify every structural stage interface without knowing
+    // its individual stage opcode. It adds no operands or runtime representation.
+    FIDDLE(baseInst())
 };
 
 FIDDLE()
@@ -2252,7 +2275,8 @@ public:
     // Version 37 is the earliest module version with the updated AST node numbering, and with
     // the `QualType::isReadOnlyMemoryLocation` field in serialized expressions.
     const static UInt k_minSupportedModuleVersion = 37;
-    const static UInt k_maxSupportedModuleVersion = 37;
+    // Version 38 adds structural ray-tracing IR instructions.
+    const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

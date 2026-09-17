@@ -1805,6 +1805,26 @@ static void collectGenericStructTypeUses(
     }
 }
 
+/// Returns the capability set that describes the selected source-stage role.
+static CapabilitySet _getEntryPointStageCapabilities(EntryPoint* entryPoint)
+{
+    if (!entryPoint->isStructuralRayTracingEntryPoint())
+        return entryPoint->getProfile().getCapabilityName();
+
+    // Consider a structural miss shader compiled for Metal. Its source role is still `miss`, but
+    // Metal has no native miss entry point: later lowering synthesizes dispatch for that role.
+    // Consequently, the native profile capability (`miss`, which also requires native ray
+    // tracing) is not the right target context for checking the source implementation. The
+    // trusted stage interface already declares the exact logical alternatives accepted by the
+    // source contract, including Metal's synthesized path, so keep that declaration as the single
+    // source of truth instead of duplicating a stage-to-capability table in C++.
+    auto& structuralInfo = entryPoint->getStructuralRayTracingInfo();
+    auto& registry = entryPoint->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto stageInterface = registry.getStageInterface(structuralInfo.stageKind);
+    SLANG_RELEASE_ASSERT(stageInterface && stageInterface->inferredCapabilityRequirements);
+    return CapabilitySet{stageInterface->inferredCapabilityRequirements};
+}
+
 // Check a selected entry point's effective requirements against each requested target.
 // Both initial selection and later specialization use this check; the latter must not write
 // its requirements onto the base EntryPoint, which can have other independent specializations.
@@ -1820,10 +1840,23 @@ static void validateEntryPointCapabilities(
 {
     auto linkage = entryPoint->getLinkage();
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
+    Decl* diagnosticDecl = entryPointFuncDecl;
+    if (entryPoint->isStructuralRayTracingEntryPoint())
+    {
+        // A structural entry point is selected by its stage-struct name even though capability
+        // provenance belongs to the chosen `invoke` method. Anchor the primary diagnostic and
+        // profile-upgrade text on that public identity while retaining `invoke` for the provenance
+        // walk below.
+        auto stageType =
+            as<DeclRefType>(entryPoint->getStructuralRayTracingInfo().stageType->resolve());
+        SLANG_RELEASE_ASSERT(stageType);
+        diagnosticDecl = stageType->getDeclRef().getDecl();
+    }
+
     for (auto target : linkage->targets)
     {
         auto targetCaps = target->getTargetCaps();
-        auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
+        auto stageCapabilitySet = _getEntryPointStageCapabilities(entryPoint);
         targetCaps.join(stageCapabilitySet);
         if (targetCaps.isIncompatibleWith(entryPointInferredCaps))
         {
@@ -1839,7 +1872,7 @@ static void validateEntryPointCapabilities(
                 Diagnostics::EntryPointUsesUnavailableCapability{
                     .stage = capabilityNameToString((CapabilityName)stageTarget),
                     .target = capabilityNameToString((CapabilityName)compileTarget),
-                    .decl = entryPointFuncDecl});
+                    .decl = diagnosticDecl});
 
             // Find out what is incompatible (ancestor missing a super set of 'target+stage')
             CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
@@ -1950,7 +1983,7 @@ static void validateEntryPointCapabilities(
                     }
                 }
                 StringBuilder entryPointNameSb;
-                printDiagnosticArg(entryPointNameSb, entryPointFuncDecl);
+                printDiagnosticArg(entryPointNameSb, diagnosticDecl);
                 auto atoms = addedAtoms.getElements<CapabilityAtom>();
                 StringBuilder capsSb;
                 printDiagnosticArg(capsSb, atoms);
@@ -1962,17 +1995,30 @@ static void validateEntryPointCapabilities(
                         .entryPoint = entryPointNameSb.produceString(),
                         .profile = target->getOptionSet().getProfile().getName(),
                         .capabilities = capsSb.produceString(),
-                        .location = entryPointFuncDecl->loc,
+                        .location = diagnosticDecl->loc,
                     },
                     Diagnostics::ProfileImplicitlyUpgradedRestrictive{
                         .entryPoint = entryPointNameSb.produceString(),
                         .profile = target->getOptionSet().getProfile().getName(),
                         .capabilities = capsSb.produceString(),
-                        .location = entryPointFuncDecl->loc,
+                        .location = diagnosticDecl->loc,
                     });
             }
         }
     }
+}
+
+static void _validateEntryPointTargetCapabilities(
+    EntryPoint* entryPoint,
+    CapabilitySet entryPointInferredCaps,
+    const List<GenericStructTypeUse>& signatureStructUses,
+    DiagnosticSink* sink)
+{
+    entryPoint->setInferredCapabilityRequirements(
+        entryPointInferredCaps.freeze(entryPoint->getLinkage()->getASTBuilder()));
+    List<Decl*> referencedDecls;
+    validateEntryPointCapabilities(
+        entryPoint, entryPointInferredCaps, referencedDecls, signatureStructUses, sink);
 }
 
 // Validate that an entry point function conforms to any additional
@@ -2011,6 +2057,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     auto module = getModule(entryPointFuncDecl);
     auto linkage = entryPoint->getLinkage();
+    diagnoseMixedRayTracingAPIUse(entryPoint, sink);
 
     // An entry point is invoked by the pipeline, which has no channel for returning an error, so
     // it cannot declare `throws`. `getErrorCodeType` is used rather than reading `errorType`
@@ -2885,6 +2932,64 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     auto sink = compileRequest->getSink();
 
     auto entryPointName = entryPointReq->getName();
+    auto entryPointProfile = entryPointReq->getProfile();
+    bool foundStructuralStage = false;
+    StructuralRayTracingEntryPointInfo structuralInfo;
+    auto structuralEntryPointDeclRef = findStructuralRayTracingEntryPointByName(
+        linkage,
+        translationUnit->getModule(),
+        entryPointName,
+        entryPointProfile,
+        sink,
+        &foundStructuralStage,
+        &structuralInfo);
+    if (foundStructuralStage)
+    {
+        if (!structuralEntryPointDeclRef)
+            return nullptr;
+
+        auto entryPoint =
+            EntryPoint::create(linkage, structuralEntryPointDeclRef, entryPointProfile);
+        entryPoint->setNameOverride(entryPointName);
+        // A qualified stage type such as `Stages.Miss` is the source lookup identity, but the dot
+        // is not legal in CUDA and other C-like target symbols. Store the compiler-owned physical
+        // default separately so an unrenamed component agrees with trace-program reflection. An
+        // explicit `renameEntryPoint()` still wraps this component and replaces the default.
+        auto sourceTypeName = getStructuralRayTracingSourceTypeName(
+            linkage->getASTBuilder(),
+            structuralInfo.stageType);
+        entryPoint->setEntryPointNameOverride(
+            getStructuralRayTracingEntryPointName(sourceTypeName.getUnownedSlice()));
+        entryPoint->setStructuralRayTracingInfo(structuralInfo);
+
+        // The selected `invoke` method has a logical structural signature, so the native ABI and
+        // varying-parameter checks in `validateEntryPoint` do not apply. Its inferred requirements
+        // must still be checked against the requested stage and every target, however. Reuse the
+        // same target/profile boundary as native entry points, with no native-signature provenance.
+        CapabilitySet entryPointInferredCaps{entryPoint->getInferredCapabilityRequirements()};
+        if (structuralInfo.primitiveType)
+        {
+            // The primitive is an associated type of the stage context, not a source parameter of
+            // `invoke`, but it still selects target ABI behavior. For example, CurvePrimitive
+            // requires Metal even when the stage body never reads CurveData. Join the requirement
+            // from the exact resolved type rather than reconstructing it from hit-attribute kind.
+            auto primitiveType = as<DeclRefType>(structuralInfo.primitiveType->resolve());
+            SLANG_RELEASE_ASSERT(primitiveType);
+            auto primitiveDecl = primitiveType->getDeclRef().getDecl();
+            SLANG_RELEASE_ASSERT(primitiveDecl->inferredCapabilityRequirements);
+            entryPointInferredCaps.nonDestructiveJoin(
+                primitiveDecl->inferredCapabilityRequirements);
+        }
+
+        List<GenericStructTypeUse> signatureStructUses;
+        _validateEntryPointTargetCapabilities(
+            entryPoint,
+            entryPointInferredCaps,
+            signatureStructUses,
+            sink);
+        return sink->getErrorCount() ? nullptr : entryPoint;
+    }
+
     DeclRef<FuncDecl> entryPointFuncDeclRef =
         findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink);
 
@@ -2905,7 +3010,6 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     // then we might be able to infer a stage for the entry point request if
     // it didn't have one, *or* issue a diagnostic if there is a mismatch with the profile.
 
-    auto entryPointProfile = entryPointReq->getProfile();
     resolveStageOfProfileWithEntryPoint(
         entryPointProfile,
         linkage->m_optionSet,
@@ -3348,7 +3452,6 @@ void FrontEndCompileRequest::checkEntryPoints()
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
 
     auto sink = getSink();
-
     // The validation of entry points here will be modal, and controlled
     // by whether the user specified any entry points directly via
     // API or command-line options.
@@ -3407,6 +3510,11 @@ void FrontEndCompileRequest::checkEntryPoints()
             auto translationUnit = translationUnits[tt];
             translationUnit->getModule()->_discoverEntryPoints(sink, this->getLinkage()->targets);
         }
+    }
+
+    for (auto translationUnit : translationUnits)
+    {
+        diagnoseMixedRayTracingAPIsInModule(linkage, translationUnit->getModule(), sink);
     }
 }
 

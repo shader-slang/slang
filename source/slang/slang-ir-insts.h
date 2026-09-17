@@ -4135,8 +4135,12 @@ $(type_info.return_type) $(type_info.method_name)(
         UInt operandCount,
         IRInst* const* operands);
 
-    // Create an empty `interface` type.
+    // Create an empty ordinary `interface` type.
     IRInterfaceType* createInterfaceType(UInt operandCount, IRInst* const* operands);
+
+    // Create an empty interface using a concrete opcode from the `IRInterfaceType` family. This
+    // overload preserves compiler-owned stage identity while using ordinary interface operands.
+    IRInterfaceType* createInterfaceType(IROp op, UInt operandCount, IRInst* const* operands);
 
     // Create a global "key" to use for indexing into a `struct` type.
     IRStructKey* createStructKey();

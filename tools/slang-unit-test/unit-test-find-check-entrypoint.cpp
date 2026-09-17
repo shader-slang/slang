@@ -72,6 +72,63 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
     SLANG_CHECK(code->getBufferSize() != 0);
 }
 
+// Loading the structural ray-tracing module in one compilation must not reinterpret declarations
+// from an independent module in the same session. The trusted-declaration registry is
+// linkage-wide, but structural entry-point lookup is valid only in a module whose dependency graph
+// contains `slang.raytracing`.
+SLANG_UNIT_TEST(structuralRayTracingEntryPointLookupIsModuleLocal)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry experimentalFeature = {};
+    experimentalFeature.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalFeature.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalFeature.value.intValue0 = 1;
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &experimentalFeature;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    auto importingModule = session->loadModuleFromSourceString(
+        "StructuralImporter",
+        "StructuralImporter.slang",
+        "import slang.raytracing;",
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(importingModule != nullptr);
+
+    diagnostics.setNull();
+    auto unrelatedModule = session->loadModuleFromSourceString(
+        "UnrelatedModule",
+        "UnrelatedModule.slang",
+        "struct Plain {}",
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(unrelatedModule != nullptr);
+
+    diagnostics.setNull();
+    ComPtr<slang::IEntryPoint> entryPoint;
+    auto result = unrelatedModule->findAndCheckEntryPoint(
+        "Plain",
+        SLANG_STAGE_MISS,
+        entryPoint.writeRef(),
+        diagnostics.writeRef());
+    SLANG_CHECK(SLANG_FAILED(result));
+    SLANG_CHECK(entryPoint == nullptr);
+    SLANG_CHECK_ABORT(diagnostics != nullptr);
+
+    auto diagnosticText = UnownedStringSlice(
+        (const char*)diagnostics->getBufferPointer(),
+        diagnostics->getBufferSize());
+    SLANG_CHECK(
+        diagnosticText.indexOf(toSlice("no function found matching entry point name 'Plain'")) !=
+        -1);
+    SLANG_CHECK(diagnosticText.indexOf(toSlice("structural ray-tracing")) == -1);
+}
+
 // This test reproduces issue #6507, where it was noticed that compilation of
 // tests/compute/simple.slang for PTX target generates invalid code.
 // TODO: Remove this when issue #4760 is resolved, because at that point

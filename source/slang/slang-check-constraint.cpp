@@ -979,25 +979,6 @@ SemanticsVisitor::SolverConstraint::OrdinaryArgMergeMode getOrdinaryArgMergeMode
     return SemanticsVisitor::SolverConstraint::OrdinaryArgMergeMode::TypeJoin;
 }
 
-// Return the argument index for an ordinary generic parameter.
-Index getGenericParamIndex(Decl* genericParamDecl)
-{
-    // Type parameters, type-pack parameters, value parameters, and value-pack
-    // parameters all share the ordinary-argument index space assigned by their
-    // declarations.
-    if (auto typeParamDecl = as<GenericTypeParamDeclBase>(genericParamDecl))
-        return typeParamDecl->parameterIndex;
-    if (auto valuePackParamDecl = as<GenericValuePackParamDecl>(genericParamDecl))
-        return valuePackParamDecl->parameterIndex;
-    if (auto valueParamDecl = as<GenericValueParamDecl>(genericParamDecl))
-        return valueParamDecl->parameterIndex;
-
-    // Witness arguments deliberately have no index here; they are serialized
-    // after ordinary arguments and are found by scanning source generic
-    // constraint declarations.
-    return -1;
-}
-
 static bool isDeferredValidationWitness(Val* witness)
 {
     // These witness values do not contribute ordinary-argument inference facts

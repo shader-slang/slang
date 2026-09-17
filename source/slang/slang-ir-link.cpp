@@ -342,6 +342,16 @@ IRType* cloneType(IRSpecContextBase* context, IRType* originalType);
 
 IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
 {
+    // Structural stage-interface instructions are concrete subclasses of `IRInterfaceType`, not
+    // aliases for `kIROp_InterfaceType`. Route the whole family through nominal global cloning so
+    // specialization neither treats them as structural types nor drops their compiler-owned op.
+    if (as<IRInterfaceType>(originalValue))
+    {
+        auto clonedInst = cloneGlobalValue(this, originalValue);
+        cloneAnnotations(this, clonedInst, originalValue);
+        return clonedInst;
+    }
+
     switch (originalValue->getOp())
     {
     case kIROp_StructType:
@@ -355,7 +365,6 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_InterfaceRequirementEntry:
     case kIROp_GlobalGenericParam:
     case kIROp_WitnessTable:
-    case kIROp_InterfaceType:
     case kIROp_EnumType:
     case kIROp_SymbolAlias:
         {
@@ -529,6 +538,13 @@ IRGlobalVar* cloneGlobalVarImpl(
 /// that selected requirement, so preserve its capability and execution-mode decorations when
 /// choosing the source module's function body or specializing a generic body.
 ///
+/// Structural stage selection has the same shape. A cached source module can own the preferred
+/// definition of `MyMiss.invoke`, while the selected program owns its checked
+/// `structuralRayTracingEntryPointInfo`. Linking must merge that decoration onto the selected body
+/// so later adapter synthesis receives the semantic stage contract regardless of request order.
+/// Trusted structural trace and callable functions similarly retain their source-operation marker
+/// when a different module contributes the selected definition.
+///
 /// This function scans through all the `originalValues` that were considered for `clonedInst`,
 /// and copies over any decorations that are allowed to come from a non-"best" definition.
 /// For a given decoration opcode, only one such decoration will ever be copied, except that
@@ -573,6 +589,8 @@ static void cloneExtraDecorationsFromInst(
         case kIROp_NonCopyableTypeDecoration:
         case kIROp_DynamicDispatchWitnessDecoration:
         case kIROp_Shader64BitIndexingDecoration:
+        case kIROp_StructuralRayTracingEntryPointInfoDecoration:
+        case kIROp_StructuralRayTracingSourceOperationDecoration:
             if (!clonedInst->findDecorationImpl(decoration->getOp()))
             {
                 cloneInst(context, builder, decoration);
@@ -925,8 +943,12 @@ IRInterfaceType* cloneInterfaceTypeImpl(
     IRInterfaceType* originalInterface,
     IROriginalValuesForClone const& originalValues)
 {
-    auto clonedInterface =
-        builder->createInterfaceType(originalInterface->getOperandCount(), nullptr);
+    // Preserve the concrete opcode. Recreating every interface as `kIROp_InterfaceType` would erase
+    // the trusted structural-stage identity during specialization or linking.
+    auto clonedInterface = builder->createInterfaceType(
+        originalInterface->getOp(),
+        originalInterface->getOperandCount(),
+        nullptr);
     registerClonedValue(context, clonedInterface, originalValues);
 
     for (UInt i = 0; i < originalInterface->getOperandCount(); i++)
@@ -1104,6 +1126,12 @@ void cloneFunctionCommon(
 ///
 static void maybeCopyLayoutInformationToParameters(IRFunc* func, IRBuilder* builder)
 {
+    // A structural `invoke` parameter is a logical, compiler-owned stage-input view. Its native
+    // parameters do not exist until a later pass synthesizes the target adapter, so copying an
+    // entry-point layout onto this source signature would assign physical meaning too early.
+    if (func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+        return;
+
     auto layoutDecor = func->findDecoration<IRLayoutDecoration>();
     if (!layoutDecor)
         return;
@@ -1445,6 +1473,13 @@ IRInst* cloneInst(
     SLANG_DEFER(_debugResetInstBeingCloned());
 #endif
 
+    // The opcode switch below only names the ordinary interface opcode. Use the shared IR base so
+    // compiler-owned stage-interface subclasses receive the same operand-aware cloning behavior.
+    if (auto originalInterface = as<IRInterfaceType>(originalInst))
+    {
+        return cloneInterfaceTypeImpl(context, builder, originalInterface, originalValues);
+    }
+
     switch (originalInst->getOp())
     {
         // We need to special-case any instruction that is not
@@ -1498,13 +1533,6 @@ IRInst* cloneInst(
 
     case kIROp_EnumType:
         return cloneEnumTypeImpl(context, builder, cast<IREnumType>(originalInst), originalValues);
-
-    case kIROp_InterfaceType:
-        return cloneInterfaceTypeImpl(
-            context,
-            builder,
-            cast<IRInterfaceType>(originalInst),
-            originalValues);
 
     case kIROp_Generic:
         return cloneGenericImpl(context, builder, cast<IRGeneric>(originalInst), originalValues);
@@ -2596,6 +2624,15 @@ struct IRPrelinkContext : IRSpecContext
             builderForClone = &shared->builderStorage;
         }
         IRInst* clonedInst = nullptr;
+        // Prelinking must preserve structural interface opcodes for the same reason as ordinary
+        // specialization: later consumers recognize the trusted stage contract from the IR type,
+        // without consulting source names or decorations.
+        if (as<IRInterfaceType>(originalVal))
+        {
+            return completeClonedInst(
+                cloneGlobalValueImpl(this, originalVal, IROriginalValuesForClone(originalVal)));
+        }
+
         switch (originalVal->getOp())
         {
         case kIROp_Generic:
@@ -2605,7 +2642,6 @@ struct IRPrelinkContext : IRSpecContext
         case kIROp_StructKey:
         case kIROp_InterfaceRequirementEntry:
         case kIROp_GlobalGenericParam:
-        case kIROp_InterfaceType:
             return completeClonedInst(
                 cloneGlobalValueImpl(this, originalVal, IROriginalValuesForClone(originalVal)));
         case kIROp_WitnessTable:

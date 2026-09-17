@@ -73,6 +73,20 @@ void buildEntryPointReferenceGraph(
             {
                 auto call = as<IRCall>(inst);
                 addToWorkList({entryPoint, call->getCallee()});
+
+                // Consider this call before generic specialization has run:
+                //
+                //     call specialize(specialize(%trace, %Schema), %Payload)(...)
+                //
+                // The outer specialization's base is another `IRSpecialize`, so walking only the
+                // direct callee never reaches `%trace`. The function can already carry semantic
+                // decorations that a pre-specialization consumer needs, though. Follow the
+                // canonical generic return value as well as the unspecialized callee graph so the
+                // referenced function and its body are attributed to this entry point without
+                // discarding references made by specialization arguments.
+                auto resolvedCallee = getResolvedInstForDecorations(call->getCallee());
+                if (resolvedCallee != call->getCallee())
+                    addToWorkList({entryPoint, resolvedCallee});
             }
             break;
         case kIROp_SPIRVAsmOperandInst:

@@ -882,5 +882,12 @@ return {
 	["DebugLexicalBlock"] = 906,
 	["Decoration.fileOrNamespaceScopeMutableVar"] = 907,
 	["Decoration.uninitializedGlobalCheckFoundPossibleWrite"] = 908,
-	["Decoration.glslPatch"] = 909
+	["Decoration.glslPatch"] = 909,
+	["Type.RaytracingStageInterface.closest_hit_stage_interface"] = 910,
+	["Type.RaytracingStageInterface.any_hit_stage_interface"] = 911,
+	["Type.RaytracingStageInterface.intersection_stage_interface"] = 912,
+	["Type.RaytracingStageInterface.miss_stage_interface"] = 913,
+	["Type.RaytracingStageInterface.callable_stage_interface"] = 914,
+	["Decoration.structuralRayTracingEntryPointInfo"] = 915,
+	["Decoration.structuralRayTracingSourceOperation"] = 916
 }

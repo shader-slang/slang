@@ -1515,6 +1515,36 @@ alias callable = _callable + raytracing;
 /// [Stage]
 alias miss = _miss + raytracing;
 
+// Logical stages implemented by the structural ray-tracing API. Metal has no native shader
+// stages for these roles, so the compiler synthesizes their physical dispatch there.
+/// Logical closest-hit role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_closesthit = closesthit | _closesthit + metal;
+/// Logical any-hit role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_anyhit = anyhit | _anyhit + metal;
+/// Logical intersection role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_intersection = intersection | _intersection + metal;
+/// Logical miss role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_miss = miss | _miss + metal;
+/// Logical callable role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_callable = callable | _callable + metal;
+
+/// Stages that may invoke a callable shader through the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_call_shader = cuda_glsl_hlsl_spirv + raygen
+                                         | cuda_glsl_hlsl_spirv + closesthit
+                                         | cuda_glsl_hlsl_spirv + miss
+                                         | cuda_glsl_hlsl_spirv + callable
+                                         | _raygen + metal
+                                         | compute + metal
+                                         | _closesthit + metal
+                                         | _miss + metal
+                                         | _callable + metal;
+
 /// Mesh shader stage & mesh shader capabilities
 /// [Stage]
 alias mesh = _mesh + _meshshading;
@@ -1558,6 +1588,18 @@ alias anyhit_intersection = anyhit | intersection;
 /// Collection of shader stages
 /// [Compound]
 alias raygen_closesthit_miss = raygen | closesthit | miss;
+
+/// Stages that may trace a ray through the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_trace = cuda_glsl_hlsl_spirv + raygen_closesthit_miss
+                                    | _raygen + metal
+                                    | _closesthit + metal
+                                    | _miss + metal;
+
+/// Instance motion available to the structural ray-tracing API. Metal encodes the requirement on
+/// its intersector type, while Vulkan and OptiX pass a ray time to their native trace operation.
+/// [Compound]
+alias structural_raytracing_instance_motion = metallib_2_4 | raytracing_motionblur;
 
 /// Collection of shader stages
 /// [Compound]

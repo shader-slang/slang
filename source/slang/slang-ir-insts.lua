@@ -752,6 +752,41 @@ local insts = {
 				class = { struct_name = "ClassType", parent = true },
 			},
 			{ interface = { struct_name = "InterfaceType", global = true } },
+			-- The trusted structural ray-tracing stage interfaces retain ordinary interface
+			-- requirements and witness-table behavior, but distinct opcodes preserve each stage's
+			-- compiler-owned identity through serialization and linking. Source lowering emits these
+			-- ops only for declarations registered from the packaged slang.raytracing module; user
+			-- interfaces with the same spelling continue to lower to `interface`.
+			{
+				RaytracingStageInterface = {
+					global = true,
+					{
+						closest_hit_stage_interface = {
+							struct_name = "ClosestHitStageInterface",
+						},
+					},
+					{
+						any_hit_stage_interface = {
+							struct_name = "AnyHitStageInterface",
+						},
+					},
+					{
+						intersection_stage_interface = {
+							struct_name = "IntersectionStageInterface",
+						},
+					},
+					{
+						miss_stage_interface = {
+							struct_name = "MissStageInterface",
+						},
+					},
+					{
+						callable_stage_interface = {
+							struct_name = "CallableStageInterface",
+						},
+					},
+				},
+			},
 			{
 				associated_type = {
 					struct_name = "AssociatedType",
@@ -2119,6 +2154,33 @@ local insts = {
 						{ "name", "IRStringLit" },
 						{ "moduleName", "IRStringLit", optional = true },
 					},
+				},
+			},
+			{
+				-- Records the checked source contract for a selected structural stage. This metadata is
+				-- descriptive: later lowering consumes it when it creates a native entry-point adapter.
+				structuralRayTracingEntryPointInfo = {
+					struct_name = "StructuralRayTracingEntryPointInfoDecoration",
+					operands = {
+						{ "stageKind", "IRIntLit" },
+						{ "stageType", "IRType" },
+						{ "stageSourceTypeName", "IRStringLit" },
+						{ "stageTypeIdentity", "IRStringLit" },
+						{ "contextType", "IRType" },
+						{ "payloadType", "IRType" },
+						{ "recordType", "IRType" },
+						{ "hitAttributesType", "IRType" },
+						{ "callableDataType", "IRType" },
+						{ "hitAttributesKind", "IRIntLit" },
+					},
+				},
+			},
+			{
+				-- Marks a trusted standard-module operation whose source semantics must be lowered before
+				-- ordinary entry-point ABI legalization. This decoration is deliberately non-operational.
+				structuralRayTracingSourceOperation = {
+					struct_name = "StructuralRayTracingSourceOperationDecoration",
+					operands = { { "operationKind", "IRIntLit" } },
 				},
 			},
 			{ CudaKernel = { struct_name = "CudaKernelDecoration" } },

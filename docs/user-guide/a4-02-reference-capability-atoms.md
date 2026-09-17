@@ -1514,6 +1514,31 @@ Compound Capabilities
 `shadermemorycontrol_compute`
 > (gfx targets) Capabilities required to use memory barriers that only work for raytracing & compute shader stages
 
+`structural_raytracing_anyhit`
+> Logical any-hit role used by the structural ray-tracing API.
+
+`structural_raytracing_call_shader`
+> Stages that may invoke a callable shader through the structural ray-tracing API.
+
+`structural_raytracing_callable`
+> Logical callable role used by the structural ray-tracing API.
+
+`structural_raytracing_closesthit`
+> Logical closest-hit role used by the structural ray-tracing API.
+
+`structural_raytracing_instance_motion`
+> Instance motion available to the structural ray-tracing API. Metal encodes the requirement on
+> its intersector type, while Vulkan and OptiX pass a ray time to their native trace operation.
+
+`structural_raytracing_intersection`
+> Logical intersection role used by the structural ray-tracing API.
+
+`structural_raytracing_miss`
+> Logical miss role used by the structural ray-tracing API.
+
+`structural_raytracing_trace`
+> Stages that may trace a ray through the structural ray-tracing API.
+
 `structuredbuffer`
 > Capabilities required to use StructuredBuffer
 
