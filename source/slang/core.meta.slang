@@ -958,10 +958,13 @@ interface __EnumType : ILogical
 
 //@public:
 
-/// Represents types that provide a subscript operator so that they can be used like an immutable array.
+/// Represents types that provide a subscript operator so that they can be used like an immutable
+/// array.
 /// @param T The element type returned by the subscript operator.
-/// @remarks This interface is implemented by `Array`, `vector`, `matrix`, `StructuredBuffer` and `RWStructuredBuffer` types.
-/// @example The follow example shows how to define a generic function that computes the sum of all elements in an array-like type.
+/// @remarks This interface is implemented by `Array`, `vector`, `matrix`, `Buffer`,
+/// `StructuredBuffer`, and `RWStructuredBuffer` types.
+/// @example The following example shows how to define a generic function that computes the sum of
+/// all elements in an array-like type.
 /// ```csharp
 /// T sum<T:IFloat, U:IArray<T>>(U array)
 /// {
