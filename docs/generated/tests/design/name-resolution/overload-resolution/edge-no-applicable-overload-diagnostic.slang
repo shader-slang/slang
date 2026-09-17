@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#edge-cases-and-failure-modes
-//META: doc_section_digest=7aaa4b55b90bf9dc8832d907095aad278bba32f9533b97e07d8e09e58134c060
+//META: doc_section_digest=e6dd79fac380ce187829abe90002109d7b13f470e191affc4c82a5813eb6298b
 //META: purpose=When several non-applicable candidates tie for best the resolver emits no-applicable-overload-for-name-with-args directly, listing the argument types it could not match.
 //META: intent=negative
 //META: pipeline_stage=check

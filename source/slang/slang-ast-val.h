@@ -1376,6 +1376,14 @@ inline bool isTypeEqualityWitness(Val* witness)
     {
         return isTypeEqualityWitness(expandWitness->getPatternTypeWitness());
     }
+    else if (auto firstWitness = as<FirstSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(firstWitness->getPatternTypeWitness());
+    }
+    else if (auto lastWitness = as<LastSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(lastWitness->getPatternTypeWitness());
+    }
     else if (auto trimFirstWitness = as<TrimFirstSubtypeWitness>(witness))
     {
         return isTypeEqualityWitness(trimFirstWitness->getPatternTypeWitness());
@@ -1384,18 +1392,17 @@ inline bool isTypeEqualityWitness(Val* witness)
     {
         return isTypeEqualityWitness(trimLastWitness->getPatternTypeWitness());
     }
+    // Every other `SubtypeWitness` kind -- `Transitive`, `ExtractExistential`, `Dynamic`,
+    // `DiffTypeInfo`, `HigherOrderDiffTypeTranslation`, `PackBranch` -- denotes a genuine,
+    // non-equality subtype relationship, for which `false` is the correct answer; a catch-all
+    // abort here would wrongly reject valid input. Equality is witnessed only by a
+    // `TypeEqualityWitness`, an equality `DeclaredSubtypeWitness`, or one of the pack wrappers
+    // above, which reduce to the equality of their pattern witness (or, for `TypePack`, of every
+    // element witness). A new pack wrapper that should reduce to an inner witness must be given an
+    // arm above; without one it silently answers `false`, a wrong result indistinguishable from a
+    // legitimate non-equality `false`.
     return false;
 }
-
-RequirementWitness getUnspecializedLookupRec(
-    ASTBuilder* astBuilder,
-    Decl* requirementKey,
-    SubtypeWitness* witness);
-
-RequirementWitness specializeLookedUpRec(
-    ASTBuilder* astBuilder,
-    SubtypeWitness* witness,
-    RequirementWitness lookedUpVal);
 
 bool isValuePack(Val* val);
 bool isAbstractValuePack(Val* val);

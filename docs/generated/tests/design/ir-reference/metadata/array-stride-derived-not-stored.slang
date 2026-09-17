@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#typealignment--the-operand-order-exception
-//META: doc_section_digest=1b464e6340173025e21e0129aef42edde338d1c2b441ba933bd965108bf692da
+//META: doc_section_digest=bc5b9e20e494f9beda35c6e2ff424a7eb0695e1b0c4a8b19ac8c246587240957
 //META: purpose=Stride is not stored at all: a float[4] in a constant buffer strides by 16 because the array's own alignment is 16 even though the element reports size and alignment 4.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

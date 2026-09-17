@@ -272,6 +272,10 @@ struct ASTIterator
 
         void visitThisExpr(ThisExpr* expr) { iterator->maybeDispatchCallback(expr); }
         void visitThisTypeExpr(ThisTypeExpr* expr) { iterator->maybeDispatchCallback(expr); }
+        void visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+        }
         void visitThisInterfaceExpr(ThisInterfaceExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);

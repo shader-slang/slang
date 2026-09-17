@@ -49,3 +49,6 @@ void main(uniform RWStructuredBuffer<uint> input, uniform RWStructuredBuffer<uin
 // Loop exits (iter==3 fails condition), entry finishes
 // SPVDB: stopped: EntryFinished
 // SPVDB: read[0][1]: [0, 3, 6, 9]
+
+// This test intentionally omits an optimization option so SPVDB_DEBUGGER must inherit
+// slang-test's -O0 suite default rather than standalone slangc's optimization default.

@@ -1,7 +1,7 @@
 // Tests that a real OpFunctionCall (not inlined) produces a correct two-level
 // backtrace and that stepping over the call with 'next' returns to the caller.
-// The [__NoInline] attribute prevents the compiler from inlining the helper.
-//TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage compute
+// The [__NoInline] attribute prevents -O1 from inlining the helper while preserving debug values.
+//TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage compute -O1
 
 [__NoInline]
 uint multiply(uint x, uint y) { return x * y; }
