@@ -351,6 +351,34 @@ warning(
 )
 
 err(
+    "unsupported-serialized-module-version",
+    130,
+    "cannot load IR module version ~actualVersion; this compiler supports IR module versions ~minimumVersion through ~maximumVersion",
+    span { loc = "location" }
+)
+
+warning(
+    "ignoring-unsupported-serialized-module-version",
+    131,
+    "ignoring IR module version ~actualVersion because this compiler supports IR module versions ~minimumVersion through ~maximumVersion; regenerate or remove the serialized module",
+    span { loc = "location" }
+)
+
+err(
+    "unsupported-serialized-module-format-version",
+    132,
+    "cannot load serialized module format version ~actualVersion; regenerate the serialized module with this compiler",
+    span { loc = "location" }
+)
+
+warning(
+    "ignoring-unsupported-serialized-module-format-version",
+    133,
+    "ignoring unsupported serialized module format version ~actualVersion; regenerate or remove the serialized module",
+    span { loc = "location" }
+)
+
+err(
     "unknown-source-language",
     19,
     "unknown source language '~language'",

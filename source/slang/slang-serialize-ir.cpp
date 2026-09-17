@@ -40,7 +40,10 @@ struct IRModuleInfo
     // IRModuleInst or IRConstants.
     // If we want to support back compat we'll need to change this to a list of
     // accepted values, and branch on that later down.
-    const static UInt64 kSupportedSerializationVersion = 1;
+    // Only this value is accepted, and mismatches are rejected before deserialization.
+    // Version 2 deliberately invalidates version 1 so modules written before
+    // format-version validation was added are rebuilt.
+    const static UInt64 kSupportedSerializationVersion = 2;
     FIDDLE() UInt64 serializationVersion = kSupportedSerializationVersion;
     // Include the specific compiler version in serialized output, in case we
     // ever need to do any version specific workarounds.
@@ -760,9 +763,10 @@ void writeSerializedModuleIR(
 
 Result readSerializedModuleInfo(
     RIFF::Chunk const* chunk,
-    String& compilerVersion,
-    UInt& version,
-    String& name)
+    String* compilerVersion,
+    UInt64& moduleVersion,
+    String* name,
+    UInt64* serializationVersion)
 {
     auto dataChunk = as<RIFF::DataChunk>(chunk);
     if (!dataChunk)
@@ -778,10 +782,20 @@ Result readSerializedModuleInfo(
     }
 
     Fossilized<IRModuleInfo>* fossilizedModuleInfo = cast<Fossilized<IRModuleInfo>>(rootValPtr);
+    if (serializationVersion)
+        *serializationVersion = fossilizedModuleInfo->serializationVersion;
+    if (fossilizedModuleInfo->serializationVersion != IRModuleInfo::kSupportedSerializationVersion)
+        return SLANG_E_NOT_AVAILABLE;
+
     Fossilized<IRModule>* fossilizedModule = fossilizedModuleInfo->module;
-    version = fossilizedModule->m_version;
-    compilerVersion = fossilizedModuleInfo->fullVersion.get();
-    name = fossilizedModuleInfo->module->m_name.get();
+    if (!fossilizedModule)
+        return SLANG_FAIL;
+
+    moduleVersion = fossilizedModule->m_version;
+    if (compilerVersion)
+        *compilerVersion = fossilizedModuleInfo->fullVersion.get();
+    if (name)
+        *name = fossilizedModule->m_name.get();
     return SLANG_OK;
 }
 
@@ -811,6 +825,13 @@ Result readSerializedModuleInfo(
     // Only one version supported so far, if we had multiple versions to
     // support this is where we might branch
     if (fossilizedModuleInfo->serializationVersion != IRModuleInfo::kSupportedSerializationVersion)
+        return SLANG_FAIL;
+
+    Fossilized<IRModule>* fossilizedModule = fossilizedModuleInfo->module;
+    if (!fossilizedModule)
+        return SLANG_FAIL;
+
+    if (!IRModule::isModuleVersionSupported(fossilizedModule->m_version))
         return SLANG_FAIL;
 
     IRModuleInfo info;
