@@ -1377,29 +1377,45 @@ def gen_conditional_compilation(n):
 
 def gen_material_module_graph(n):
     """`n` importable modules, each a MODERATELY COMPLEX "material" (an
-    interface implementation with a branchy helper, a generic call and a small
-    bounded loop -- comparable per-module weight to one rung of
-    `complexity_ladder`), plus a main file that imports all of them and
-    dispatches across them through a common interface. `module_link` already
-    scales module COUNT, but each of its modules is a single one-line
-    function; real Falcor "first_frame_s" compiles and links potentially
-    dozens of ~2000-line generated MaterialX modules TOGETHER in one session
-    (the smallest real example: `capture_material_compilation.py`'s
-    "test-materials" case bundles 10 distinct materials compiled and dispatched
-    together). This is module_link's missing axis: per-module CONTENT weight,
-    not just module count, combined with cross-module dynamic dispatch.
+    implementation of one *shared* interface with a branchy helper, a generic
+    call and a small bounded loop -- comparable per-module weight to one rung
+    of `complexity_ladder`), plus a common module declaring that interface and
+    a main file that imports every material and dispatches across them
+    through it. `module_link` already scales module COUNT, but each of its
+    modules is a single one-line function; real Falcor "first_frame_s"
+    compiles and links potentially dozens of ~2000-line generated MaterialX
+    modules TOGETHER in one session (the smallest real example:
+    `capture_material_compilation.py`'s "test-materials" case bundles 10
+    distinct materials compiled and dispatched together). This is
+    module_link's missing axis: per-module CONTENT weight, not just module
+    count, combined with cross-module dynamic dispatch.
+
+    The dispatch is driven by `(base + i) % n`, not a compile-time constant --
+    the same technique `dynamic_dispatch` uses -- so the concrete type reaching
+    `dispatchMaterial`'s `IMaterial` parameter cannot be resolved statically
+    and specialized away; every one of the n witness tables must actually be
+    materialized and go through `specializeModule`, which is what "cross-module
+    dynamic dispatch" means for this workload as opposed to `module_link`'s
+    statically-resolved one-line calls.
 
     Scaling null: n scales module count, each a fixed-weight O(1) module;
     ideal load+link+specialize cost is O(n) (real Falcor first-frame cost is
     the thing to compare a super-linear finding here against).
     """
-    files = {}
+    files = {
+        "material_common.slang": (
+            _HEADER
+            + "module material_common;\n\n"
+            + "[anyValueSize(16)]\npublic interface IMaterial { float shade(float x); }\n\n"
+            + "public float dispatchMaterial(IMaterial m, float x) { return m.shade(x); }\n"
+        )
+    }
     for i in range(n):
         files[f"material_{i}.slang"] = (
             _HEADER
             + f"module material_{i};\n\n"
-            + f"public interface IMaterial{i} {{ float shade(float x); }}\n\n"
-            + f"public struct Material{i} : IMaterial{i}\n{{\n"
+            + "import material_common;\n\n"
+            + f"public struct Material{i} : IMaterial\n{{\n"
             + f"    public float shade(float x)\n    {{\n"
             + f"        float t = x * {i % 5 + 1}.0009 + sin(x + {i % 7}.0);\n"
             + f"        if (t > {i % 11}.0) t = t * 1.01 + cos(t * 0.5);\n"
@@ -1409,14 +1425,19 @@ def gen_material_module_graph(n):
             + f"        return t;\n    }}\n}}\n\n"
             + f"public T gpoly_{i}<T : IArithmetic>(T a, T b) {{ return a * a + b * a + a; }}\n"
         )
-    main = [_HEADER]
+    main = [_HEADER, "import material_common;\n"]
     for i in range(n):
         main.append(f"import material_{i};\n")
     main.append("\n" + _buf())
     main.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
-    main.append("void computeMain()\n{\n    float acc = outBuf[0];\n")
+    main.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
+    main.append("    float acc = outBuf[0];\n    int base = int(tid.x);\n")
+    main.append(f"    for (int i = 0; i < {n}; ++i)\n    {{\n        IMaterial m;\n")
+    main.append(f"        switch ((base + i) % {n})\n        {{\n")
     for i in range(n):
-        main.append(f"    {{ Material{i} m; acc = m.shade(acc); }}\n")
+        main.append(f"        case {i}: m = Material{i}(); break;\n")
+    main.append("        default: m = Material0(); break;\n        }\n")
+    main.append("        acc = dispatchMaterial(m, acc);\n    }\n")
     main.append("    outBuf[0] = acc;\n}\n")
     files["material_main.slang"] = "".join(main)
     return files
