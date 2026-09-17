@@ -3559,8 +3559,18 @@ public:
         Type* type,
         Type* interfaceType);
 
-    // Try to compute the "join" between two types
-    Type* TryJoinTypes(GenericInferenceContext* constraints, QualType left, QualType right);
+    // Try to compute the "join" between two types.
+    //
+    // `allowEnumScalarJoin` opts in to decaying an enum to its tag type so it can
+    // join with a scalar; it is enabled only for common-type/convertibility
+    // inference of ordinary call arguments (e.g. the arms of `?:`/`select`), and
+    // left off for the witness/subtype/equality constraint solver, where a
+    // fabricated enum->tag join would wrongly constrain a type parameter.
+    Type* TryJoinTypes(
+        GenericInferenceContext* constraints,
+        QualType left,
+        QualType right,
+        bool allowEnumScalarJoin = false);
 
     // Try to solve the ordinary and witness arguments for one generic
     // application. The inference context must be moved into the solver because
