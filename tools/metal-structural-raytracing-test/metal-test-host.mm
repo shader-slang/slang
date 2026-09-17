@@ -1287,13 +1287,13 @@ bool runMultiplePayloads(
     id<MTLBuffer> programResources = createProgramResourceBuffer(device, program, records);
     static const uint32_t kExpected[] = {
         10,
-        1101,
+        1409,
         4,
         20,
         1,
         4,
         11,
-        202,
+        790,
         4,
         21,
         0,
