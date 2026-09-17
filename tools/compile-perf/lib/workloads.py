@@ -1479,14 +1479,25 @@ def gen_material_module_graph(n):
 assert "reinterpret<Wrap3, T>(value)" in \
     gen_generic_reinterpret_dispatch(4)["generic_reinterpret_dispatch.slang"]
 assert "float3 n124 =" in gen_flat_expr_dag(125)["flat_expr_dag.slang"]
-assert "acc += call_3();" in \
-    gen_vector_matrix_overload_set(4)["vector_matrix_overload_set.slang"]
-assert "Unit3 u; u.weight = 3.0; acc += run(u, outBuf[0] + 3.0);" in \
-    gen_generic_method_dispatch(4)["generic_method_dispatch.slang"]
+# vector_matrix_overload_set, generic_method_dispatch and material_module_graph
+# each have TWO scaling loops -- a primary definition loop (what the workload
+# is actually named after: overload declarations, Unit implementations,
+# per-module files) and a secondary call-site loop that merely invokes what
+# the primary loop built. Pinning only the call-site substring would still
+# pass at n=4 if the primary loop broke and emitted nothing to call, so both
+# are pinned for these three.
+_vm = gen_vector_matrix_overload_set(4)["vector_matrix_overload_set.slang"]
+assert "float call_3()" in _vm and "acc += call_3();" in _vm
+del _vm
+_gm = gen_generic_method_dispatch(4)["generic_method_dispatch.slang"]
+assert "struct Unit3 : IUnit" in _gm and \
+    "Unit3 u; u.weight = 3.0; acc += run(u, outBuf[0] + 3.0);" in _gm
+del _gm
 _cc = gen_conditional_compilation(50)["conditional_compilation.slang"]
 assert "#if FEATURE_49" in _cc and "#endif" in _cc
 del _cc
 _mm = gen_material_module_graph(4)
+assert "material_3.slang" in _mm and "struct Material3 : IMaterial" in _mm["material_3.slang"]
 assert "case 3: m = Material3();" in _mm["material_main.slang"]
 del _mm
 
