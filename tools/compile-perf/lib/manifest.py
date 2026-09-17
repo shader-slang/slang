@@ -742,6 +742,22 @@ WORKLOADS = [
                         "legalizeMatrixTypes", "specializeMatrixLayout"],
         sweep_sizes=[64, 128, 256, 512],
     ),
+    # HLSL is the one target with a matrix-unique pass (wrapStructuredBuffersOfMatrices,
+    # the whole reason the comment above cites an "HLSL additionally runs" baseline) --
+    # omitting it, as the family originally did, left the target it was motivated by
+    # unmeasured. backend_loads and backend_samplers both already carry an hlsl entry.
+    WorkloadSpec(
+        name="backend_matrix_hlsl",
+        bucket="backend_legalize",
+        gen=workloads.gen_matrix_chain,
+        default_size=256,
+        mode="target",
+        extra_flags=["-target", "hlsl", "-entry", "computeMain"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout",
+                        "wrapStructuredBuffersOfMatrices"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
     WorkloadSpec(
         name="backend_matrix_glsl",
         bucket="backend_legalize",

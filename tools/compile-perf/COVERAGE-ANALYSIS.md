@@ -250,7 +250,7 @@ entries. Metal, WGSL and CUDA reject it — it uses ray-tracing stages.
 
 Run locally on macOS arm64 against prebuilt release binaries: a release sweep of
 v2026.12 / .13 / .14 / .16 / .17 / .17.1 at default sizes (there is no v2026.15
-{D} the tags jump 14 to 16), and a complexity sweep of v2026.17.1 over each
+— the tags jump 14 to 16), and a complexity sweep of v2026.17.1 over each
 workload's ladder. 5 samples + 1 warmup throughout.
 
 **The headline is that the target-specific legalization passes these workloads
@@ -258,7 +258,7 @@ were built to isolate are not where the time goes.** At the top sweep size on
 v2026.17.1, `legalizeMatrixTypes` measures 0.0 ms on every target,
 `lowerCombinedTextureSamplers` 0.5 ms, and `legalizeResourceTypes` 13-17 ms
 (it does not run on CUDA at all). The cost is the **load/store redundancy
-machinery running over the IR those passes produce** {D} `deferBufferLoad` on
+machinery running over the IR those passes produce** — `deferBufferLoad` on
 targets that pack parameters into a global context, `simplifyNonSSAIR`
 everywhere after phi-elimination. The workloads are still the right workloads:
 they are what reaches that machinery, and they discriminate sharply. The
@@ -331,8 +331,8 @@ Ordered by value per unit of risk.
    no measurable cost. _(Implemented on `perf/backend-coverage`.)_
 2. **Add isolated back-end stressors**, each one axis, each run on the targets
    where its pass actually fires, with SPIR-V as the control.
-   _(Implemented: `backend*loads*_`, `backend*samplers*_`, `backend*matrix*_`
-   — 12 entries, ~9 s added to a nightly.)\*
+   _(Implemented: `backend_loads_*`, `backend_samplers_*`, `backend_matrix_*`
+   — 13 entries, ~9 s added to a nightly.)_
    - `resource_load_chain` - N resource loads in one entry point.
      Catches the CUDA `deferBufferLoad` quadratic; also the sharpest probe for
      `simplifyNonSSAIR`, which is cross-target.

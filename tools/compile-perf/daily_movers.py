@@ -476,14 +476,28 @@ del _K0, _K1, _ov, _contrib, _ex, _st, _names
 # this reads as deferBufferLoad appearing from nothing and
 # "linkAndOptimizeIR (self)" dropping by the same 30 ms -- a synthetic step
 # on both series, not a real one.
+#
+# Also carries two uncovered (extras-candidate) counters at both endpoints,
+# unrelated to the schema transition, to exercise the `relevant` gate
+# (daily_movers.py:247) that this fixture would otherwise never reach: every
+# name in a plain bucket-only fixture lands in `covered` or the schema
+# marker, so `relevant`'s own suppression of a sub-ms drift was previously
+# unexercised and dropping the `max(a, b) >= 1.0` term from it would still
+# pass CI. `subMsPass` moves ~6.7% but stays under both the 1 ms absolute
+# floor and the relevance floor, so it must NOT appear in extras; `bigPass`
+# moves 10% well above 1 ms, so it must.
 _D0 = ("2026-03-01", "eeeeeeeee", {("w", "compileInner"): 100.0,
                                    ("w", "generateOutput"): 60.0,
                                    ("w", "linkAndOptimizeIR"): 60.0,
+                                   ("w", "subMsPass"): 0.060,
+                                   ("w", "bigPass"): 40.0,
                                    ("w", "__timer_schema__"): 0.0})
 _D1 = ("2026-03-02", "fffffffff", {("w", "compileInner"): 100.0,
                                    ("w", "generateOutput"): 60.0,
                                    ("w", "linkAndOptimizeIR"): 60.0,
                                    ("w", "deferBufferLoad"): 30.0,
+                                   ("w", "subMsPass"): 0.064,
+                                   ("w", "bigPass"): 44.0,
                                    ("w", "__timer_schema__"): 1.0})
 _ov3, _contrib3, _ex3, _st3 = workload_progress([_D0, _D1], "w")
 assert not any(name == "deferBufferLoad" for name, *_ in _contrib3), \
@@ -491,7 +505,35 @@ assert not any(name == "deferBufferLoad" for name, *_ in _contrib3), \
 assert all(abs(d_ms) < 1e-9 for _n, d_ms, _own, _pp in _contrib3), \
     "identical underlying compile across a schema transition must show zero " \
     f"bucket movement once folded to comparable granularity, got {_contrib3!r}"
-del _D0, _D1, _ov3, _contrib3, _ex3, _st3
+_ex3_names = {name for name, _d, _own in _ex3}
+assert "subMsPass" not in _ex3_names, \
+    "extras: a sub-ms counter drifting under both the absolute floor and the " \
+    "relevance floor must be suppressed, not reported as a mover"
+assert "bigPass" in _ex3_names, \
+    "extras: a >=1 ms counter moving 10% must clear the relevant gate and be reported"
+del _D0, _D1, _ov3, _contrib3, _ex3, _st3, _ex3_names
+
+# Same schema-transition scenario, but day 1 OMITS __timer_schema__ entirely
+# (schemas[0] is None) rather than recording 0.0 -- the shape of real
+# historical results.json data predating this field, as opposed to a day
+# that was recorded coarse on purpose. _comparable_buckets treats None as a
+# possible mismatch (see its docstring), so this must reach the same "no
+# synthetic mover" conclusion as the explicit 0.0-vs-1.0 case above.
+_N0 = ("2026-03-03", "1111111a1", {("w", "compileInner"): 100.0,
+                                   ("w", "generateOutput"): 60.0,
+                                   ("w", "linkAndOptimizeIR"): 60.0})
+_N1 = ("2026-03-04", "2222222b2", {("w", "compileInner"): 100.0,
+                                   ("w", "generateOutput"): 60.0,
+                                   ("w", "linkAndOptimizeIR"): 60.0,
+                                   ("w", "deferBufferLoad"): 30.0,
+                                   ("w", "__timer_schema__"): 1.0})
+_ov4, _contrib4, _ex4, _st4 = workload_progress([_N0, _N1], "w")
+assert not any(name == "deferBufferLoad" for name, *_ in _contrib4), \
+    "a day with no __timer_schema__ at all (pre-dating the field) must still fold " \
+    "against a detailed day -- None is a possible mismatch, not assumed equal"
+assert all(abs(d_ms) < 1e-9 for _n, d_ms, _own, _pp in _contrib4), \
+    f"expected zero bucket movement for the None-schema case, got {_contrib4!r}"
+del _N0, _N1, _ov4, _contrib4, _ex4, _st4
 
 
 if __name__ == "__main__":

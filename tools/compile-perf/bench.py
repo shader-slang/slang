@@ -2,7 +2,9 @@
 """Slang compile-time perf-suite runner.
 
 Drives a given slangc over the workloads in manifest.py, parses the per-phase
-timers emitted by -report-detailed-perf-benchmark, and writes per-run JSON: a summary
+timers emitted by -report-detailed-perf-benchmark (per-binary fallback to
+the base -report-perf-benchmark via resolve_perf_flag, for a slangc that
+predates the detailed flag), and writes per-run JSON: a summary
 (median/min/max/mean/stdev/n) AND the raw samples per timer; merge-on-write.
 
 Stdlib only (no prettytable / numpy) so it runs unchanged against any release's
@@ -229,6 +231,40 @@ _PERF_FLAG_CACHE["__self_check_fake_slangc__"] = DETAILED_PERF_FLAG
 assert resolve_perf_flag("__self_check_fake_slangc__") == DETAILED_PERF_FLAG, \
     "resolve_perf_flag must return a cached answer without probing"
 del _PERF_FLAG_CACHE["__self_check_fake_slangc__"]
+# The two except branches' distinct caching behavior, checked directly rather
+# than only asserted in a comment. OSError uses a real nonexistent path
+# (FileNotFoundError is immediate -- no need to wait out the 60s subprocess
+# timeout resolve_perf_flag itself uses). SubprocessError is monkeypatched:
+# a real probe timeout would mean waiting 60s at import time, which
+# check-python-core.yml cannot afford.
+_bad_path = "__self_check_this_binary_does_not_exist__"
+assert _bad_path not in _PERF_FLAG_CACHE
+resolve_perf_flag(_bad_path)
+assert _bad_path in _PERF_FLAG_CACHE, \
+    "resolve_perf_flag: OSError (binary cannot exec) must be cached -- a permanent " \
+    "property of the path, so retrying would not help"
+del _PERF_FLAG_CACHE[_bad_path], _bad_path
+
+_orig_subprocess_run = subprocess.run
+
+
+def _self_check_raise_timeout(*_args, **_kwargs):
+    raise subprocess.TimeoutExpired(cmd="slangc", timeout=60)
+
+
+subprocess.run = _self_check_raise_timeout
+try:
+    _timeout_path = "__self_check_simulated_probe_timeout__"
+    resolve_perf_flag(_timeout_path)
+    assert _timeout_path not in _PERF_FLAG_CACHE, \
+        "resolve_perf_flag: a SubprocessError (e.g. a probe timeout) must NOT be " \
+        "cached -- transient, a property of this one attempt, not of the binary, so " \
+        "the next call should retry rather than silently degrading the rest of the " \
+        "run to the coarse timer set"
+finally:
+    subprocess.run = _orig_subprocess_run
+del _self_check_raise_timeout, _orig_subprocess_run, _timeout_path
+
 assert _schema_of([PERF_FLAG, "in.slang"]) == "coarse"
 assert _schema_of([DETAILED_PERF_FLAG, "in.slang"]) == "detailed"
 assert _schema_of(["api-driver.exe", "libslang.dll", "session-create"]) == "coarse", \
