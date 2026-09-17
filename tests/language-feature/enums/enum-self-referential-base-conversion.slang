@@ -1,15 +1,12 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
-// Regression for the re-entrancy guard on the enum tag-conversion sites in
-// slang-check-conversion.cpp (raised in review of issue #12443).
-//
-// `E`'s base `IHasE<E(0)>` constructs an `E` value from an integer (the int -> enum conversion
-// site) while `E` itself is still being checked -- a genuine cycle. Driving a mid-check enum to
-// `ReadyForLookup` from the conversion site used to abort compilation with an internal error
-// (E99997). The `isBeingChecked` guard defers to the checking machinery instead, so the cycle is
-// reported cleanly against the offending base (`$inheritance` / `IHasE<E(0)>`) rather than as a
-// spurious diagnostic on `E` or an abort. This mirrors the guard PR #12927 added in
-// `_calcInheritanceInfo` for `enum E : IFoo<E>` with `IFoo<T : __EnumType>`.
+// `E`'s base `IHasE<E(0)>` constructs an `E` value from an integer while `E` itself is still
+// being checked, so resolving the base runs an int -> enum conversion on a mid-check enum. That
+// is a genuine cycle and must be reported as a clean cyclic-reference diagnostic against the
+// offending base (`$inheritance` / `IHasE<E(0)>`), never as a compilation abort. The int -> enum
+// conversion site in slang-check-conversion.cpp only drives an enum to `ReadyForLookup` when it is
+// not already being checked, so it does not force an in-progress enum here; `_calcInheritanceInfo`
+// guards the enum-inheritance path the same way.
 interface IHasE<let V : E> {}
 enum E : IHasE<E(0)>
 //CHECK: cyclic reference '$inheritance'
