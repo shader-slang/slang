@@ -30,6 +30,16 @@ could live.
 # The ~55 other SLANG_PASS timers stay in the residual on purpose: every one of
 # them measured under 1.5 ms on every workload in the suite, and a band that
 # thin is legend clutter, not signal.
+# The four names below are the DETAIL_ONLY_BUCKETS: absent (not zero) unless
+# the run used -report-detailed-perf-benchmark. A cross-run comparison that
+# does not know which schema each side used (daily_movers.workload_progress)
+# must fold these into "linkAndOptimizeIR (self)" on both sides before
+# diffing, or a schema transition reads as these buckets appearing/
+# disappearing rather than the measurement-granularity change it actually is.
+DETAIL_ONLY_BUCKETS = frozenset(
+    ["deferBufferLoad", "simplifyNonSSAIR", "lowerCombinedTextureSamplers",
+     "legalizeMatrixTypes"])
+
 _LINK_CHILDREN = [
     ("specializeModule", []),
     ("simplifyIR", []),
@@ -179,9 +189,14 @@ def timer_ms(timers, name):
 
 def buckets(timers, tree=None):
     """Mutually-exclusive {bucket: ms} that sum to the given tree's root total
-    (compileInner for the default compiler-phase TREE, apiTotal for API_TREE),
-    allocated TOP-DOWN from that budget. Each parent places its measured
-    children within its budget; the remainder is '<parent> (self)'.
+    (compileInner for both compiler-phase trees, apiTotal for API_TREE),
+    allocated TOP-DOWN from that budget. Omitting `tree` (the default) selects
+    the shape per run via `tree_for(timers)` -- SOURCE_TREE when
+    `emitEntryPointsSourceFromIR` was reported (a source-emission target:
+    metal/wgsl/hlsl/glsl/cuda), TREE otherwise. Every no-arg caller
+    (breakdown.py, sweep_report.py) goes through this per-run selection, not
+    a fixed shape. Each parent places its measured children within its
+    budget; the remainder is '<parent> (self)'.
 
     Slang's phase timers are not perfectly additive — named sub-timers can sum to
     MORE than their parent (e.g. specializeModule + simplifyIR + … exceed
@@ -276,5 +291,20 @@ assert abs(sum(_b.values()) - 100.0) < 1e-9, \
 # unmeasured names to 0.0, and alloc drops zero-width children.
 _b = buckets({"root": 100.0, "a": 100.0}, _FIX_TREE)
 assert _b == {"a": 100.0}, "buckets: an unmeasured child contributes nothing"
+
+# 6. The default (tree=None) shape is selected per run from the data, not
+# fixed to TREE -- the exact attribution fix this module exists for (see the
+# module comment above SOURCE_TREE). None of the fixtures above exercise this
+# default path; every one of them passes _FIX_TREE explicitly.
+assert tree_for({"emitEntryPointsSourceFromIR": 5.0}) is SOURCE_TREE, \
+    "tree_for: a source-emission run must select SOURCE_TREE"
+assert tree_for({"compileInner": 100.0}) is TREE, \
+    "tree_for: a run with no emitEntryPointsSourceFromIR must select TREE"
+_b = buckets({"compileInner": 100.0, "generateOutput": 80.0,
+              "emitEntryPointsSourceFromIR": 80.0, "linkAndOptimizeIR": 75.0,
+              "deferBufferLoad": 70.0})
+assert "emitEntryPointsSourceFromIR (self)" in _b and _b["deferBufferLoad"] == 70.0, \
+    "buckets(): the tree=None default must resolve through SOURCE_TREE for a " \
+    "source-emission run, not silently fall back to TREE"
 
 del _FIX_TREE, _b

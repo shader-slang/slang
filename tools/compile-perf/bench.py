@@ -721,6 +721,15 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         "cmd": " ".join(timed),
         "error": err,
         "crash_codes": crash_codes or None,
+        # Which timer set this run's compiler-phase buckets can be trusted at:
+        # "detailed" means -report-detailed-perf-benchmark's ~67 per-pass
+        # timers were requested (resolve_perf_flag probes per binary), so the
+        # buckets.py detail-only names (deferBufferLoad, simplifyNonSSAIR,
+        # lowerCombinedTextureSamplers, legalizeMatrixTypes) are real
+        # measurements when present and genuine zeros when absent. "coarse"
+        # means those four are structurally unmeasured, not zero, so
+        # daily_movers must not read a schema transition as a bucket move.
+        "timer_schema": "detailed" if DETAILED_PERF_FLAG in timed else "coarse",
     }
 
 
