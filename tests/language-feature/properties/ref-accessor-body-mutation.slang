@@ -1,13 +1,15 @@
 // ref-accessor-body-mutation.slang
 //
 // An unannotated `ref` accessor is implicitly mutating (like `set`, per #9636), so its
-// body may write a `this` field — `this` is an l-value inside the body. Before the fix,
-// `visitThisExpr` granted an l-value `this` only for constructor / `set` / `[mutating]` /
-// `[ref]`, so a plain `ref` body assigning a `this` field was spuriously rejected with
-// "left of '=' is not an l-value", while the equivalent `[mutating] ref` compiled. Here
-// the accessor's body writes a (different) `this` field as a side effect and returns a
-// reference to another; an l-value use invokes the body (the write lands) and yields the
-// caller's storage.
+// body may write a `this` field — `this` is an l-value inside the body. This test uses an
+// unqualified member write (`_witness = 42`), whose mutability comes from the `this`
+// breadcrumb built in `_computeLookupResult`; before the fix that ladder recognized
+// `set` / `[mutating]` / `[ref]` but not a plain `ref` accessor, so the write was
+// spuriously rejected with E30049 ("assign to immutable member") while the equivalent
+// `[mutating] ref` compiled. (The explicit `this.field` form is governed separately, by
+// `visitThisExpr`.) Here the accessor's body writes one `this` field as a side effect and
+// returns a reference to another; an l-value use invokes the body (the write lands) and
+// yields the caller's storage.
 // https://github.com/shader-slang/slang/issues/9636, #12487
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
