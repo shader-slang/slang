@@ -1,5 +1,6 @@
 #include "slang-ir-util.h"
 
+#include "core/slang-short-list.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
@@ -1026,7 +1027,16 @@ IRInst* getRootAddr(IRInst* addr)
     return addr;
 }
 
-IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes)
+// Walk `addr` to its root, appending each access-chain key LEAF-FIRST. Shared by
+// the public `getRootAddr` (which reverses afterwards, so callers see root-first)
+// and by `canAddressesPotentiallyAlias`, which indexes from the end instead so it
+// can keep its chains on the stack. Templated on the list type for exactly that
+// reason -- one walker means the two cannot drift apart.
+template<typename TChainList, typename TTypeList>
+static IRInst* _collectAccessChainLeafFirst(
+    IRInst* addr,
+    TChainList& outAccessChain,
+    TTypeList* outTypes)
 {
     for (;;)
     {
@@ -1045,10 +1055,27 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
         }
         break;
     }
+    return addr;
+}
+
+// Overload for callers that want the chain but not the types. It exists so the
+// common case needs no explicit template arguments: passing `nullptr` for
+// `outTypes` cannot deduce `TTypeList` (its type is `std::nullptr_t`), which
+// would otherwise force every call site to spell out both parameters, the
+// second of them naming the type of a list that is never written.
+template<typename TChainList>
+static IRInst* _collectAccessChainLeafFirst(IRInst* addr, TChainList& outAccessChain)
+{
+    return _collectAccessChainLeafFirst<TChainList, List<IRInst*>>(addr, outAccessChain, nullptr);
+}
+
+IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes)
+{
+    auto root = _collectAccessChainLeafFirst(addr, outAccessChain, outTypes);
     outAccessChain.reverse();
     if (outTypes)
         outTypes->reverse();
-    return addr;
+    return root;
 }
 
 
@@ -1255,8 +1282,17 @@ bool canAddressesPotentiallyAlias(
     // then they cannot alias.
     if (root1 == root2)
     {
-        List<IRInst*> accessChain1;
-        List<IRInst*> accessChain2;
+        // Stack-allocated, and collected leaf-first so no reverse is needed: the
+        // loop below indexes from the end instead. This branch is the hot one
+        // whenever a target flattens shader parameters into one aggregate
+        // (Metal, and the CPU-like targets), because then every address in the
+        // function shares a root and lands here -- at which point two heap
+        // allocations per query, once per (address, instruction) scan step, are
+        // most of what the surrounding pass does. 8 is generous headroom for the access-chain
+        // depths seen in practice, not a hard limit -- nesting is user-controlled and unbounded,
+        // so deeper chains still work, they just spill to the heap as before.
+        ShortList<IRInst*, 8> accessChain1;
+        ShortList<IRInst*, 8> accessChain2;
 
         // Since getRootBufferOrAddr has a different behavior around
         // RWStructuredBufferGetElementPtr compared to getRootAddr,
@@ -1264,14 +1300,18 @@ bool canAddressesPotentiallyAlias(
         // that we can handle here, so that we don't need to handle the nuance
         // of whether or not to trace past any RWStructuredBufferGetElementPtr.
         //
-        root1 = getRootAddr(addr1, accessChain1, nullptr);
-        root2 = getRootAddr(addr2, accessChain2, nullptr);
+        root1 = _collectAccessChainLeafFirst(addr1, accessChain1);
+        root2 = _collectAccessChainLeafFirst(addr2, accessChain2);
         if (root1 != root2)
             return true;
-        for (Index i = 0; i < Math::Min(accessChain1.getCount(), accessChain2.getCount()); i++)
+        const Index count1 = accessChain1.getCount();
+        const Index count2 = accessChain2.getCount();
+        for (Index i = 0; i < Math::Min(count1, count2); i++)
         {
-            auto node1 = accessChain1[i];
-            auto node2 = accessChain2[i];
+            // Indices run root-first, as they did when both chains were reversed
+            // into root-first `List`s; these are leaf-first, so walk from the end.
+            auto node1 = accessChain1[count1 - 1 - i];
+            auto node2 = accessChain2[count2 - 1 - i];
             if (as<IRStructKey>(node1) && as<IRStructKey>(node2))
             {
                 // Two different field keys means the two addresses cannot alias.
@@ -1736,13 +1776,37 @@ bool isSideEffectFreeFunctionalCall(
 template<typename TFunc>
 void forEachAssociatedCallee(IRInst* callee, TFunc callback)
 {
-    traverseUsers<IRAnnotation>(
-        callee,
-        [&](IRAnnotation* annotation)
+    // PRECONDITION: `callback` must not add or remove uses of `callee`. This
+    // walks the use list live, so mutating it invalidates `use->nextUse` under
+    // the iteration. `traverseUsers` snapshots into a `List<IRUse*>` precisely
+    // to tolerate that, and this does not -- because the snapshot costs a heap
+    // allocation and a full copy on every query, and on a hot intrinsic the use
+    // list holds one entry per call site. Callers that memoize the enclosing
+    // query pay that once per callee; the uncached ones that remain
+    // (slang-ir-simplify-for-emit.cpp, the autodiff passes) pay it per query.
+    //
+    // A mutating callback belongs on `traverseUsers`, not here.
+    //
+    // The precondition isn't otherwise enforced, so a future mutating callback would silently
+    // walk a freed `use->nextUse`. Re-check `firstUse` after every callback invocation to turn
+    // the most common violation -- a use added or removed at the head of the list -- into a
+    // debug-build `SLANG_ASSERT` instead of a silent use-after-free. Release builds have no
+    // guard at all (`SLANG_ASSERT` compiles out); the precondition is a hard requirement there,
+    // not just in debug. This also doesn't catch every possible mutation (e.g. one that leaves
+    // `firstUse` unchanged but frees a later use) -- it's a cheap debug-build guard rail for the
+    // shape a mutating callback is most likely to produce, not a substitute for the precondition.
+    for (auto use = callee->firstUse; use; use = use->nextUse)
+    {
+        if (use->usedValue != callee)
+            continue;
+        auto annotation = as<IRAnnotation>(use->getUser());
+        if (annotation && annotation->getTarget() == callee)
         {
-            if (annotation->getTarget() == callee)
-                callback(annotation->getInst());
-        });
+            auto expectedFirstUse = callee->firstUse;
+            callback(annotation->getInst());
+            SLANG_ASSERT(callee->firstUse == expectedFirstUse);
+        }
+    }
 }
 
 bool doesCalleeHaveSideEffect(IRInst* callee)
