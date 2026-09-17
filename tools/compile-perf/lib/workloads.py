@@ -222,6 +222,13 @@ def gen_diagnostics(n):
     workload if it stops appearing -- otherwise this test could rot into a
     clean compile the same way its predecessor did.
 
+    Only `bad_0` is called from `computeMain`; `bad_1..bad_{n-1}` are never
+    reached. The O(n) diagnostic count still holds because Slang semantically
+    checks every module-level function regardless of whether an entry point
+    calls it -- if that stopped being true, this would collapse to a single
+    diagnostic instead of n, so the invariant is load-bearing for the scaling
+    claim below, not incidental.
+
     Scaling null: n scales independent diagnostics; ideal cost is O(n).
     """
     s = [_HEADER, _buf()]

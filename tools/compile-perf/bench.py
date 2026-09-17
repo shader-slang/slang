@@ -685,6 +685,79 @@ def real_error(text, benign=_BENIGN):
     return None
 
 
+# The platform's two representations of slangc's intentional exit(-1)
+# compile-error exit (see classify_sample's docstring for why exactly these
+# two, and only these two). Module-level so both the classifier and its
+# self-check reference the same value rather than restating it.
+_EXIT_NEGATIVE_ONE = (255, 0xFFFFFFFF)
+
+
+def classify_sample(rc, text, expected_diags, benign):
+    """Classify one compiled sample from its exit code and combined output.
+
+    Returns (ok, missing, is_crash):
+      missing   -- expected_diags entries not found in `text`: a diagnostic
+                   the workload declares it emits, but didn't this sample.
+      is_crash  -- whether `rc` indicates the process crashed rather than
+                   exited normally. `rc > 1 or rc < 0` is the crash signature
+                   (see run_spec's comment for the platform-specific values),
+                   EXCEPT when every expected diagnostic is present, no
+                   unexpected error was seen, AND rc is one of
+                   _EXIT_NEGATIVE_ONE -- slangc's intentional, non-portable
+                   exit(-1) for a workload that is SUPPOSED to fail the
+                   compile, not a crash. A crash occurring after slangc had
+                   already printed every expected diagnostic still counts as
+                   a crash: is_crash checks `rc` first and only consults the
+                   expected-failure override for the two exact values it
+                   covers, so an unrelated crash code cannot be excused by
+                   incidentally-complete diagnostic text.
+      ok        -- False if is_crash. Otherwise: for a workload with no
+                   expected_diags, True iff no unexpected compile error was
+                   seen (the ordinary case). For a workload WITH
+                   expected_diags, a clean compile is itself the failure
+                   mode this workload exists to catch, so `ok` does not
+                   require `real_error` to be None there -- only that every
+                   expected diagnostic appeared (`missing` is empty).
+    """
+    missing = [c for c in expected_diags if c not in text]
+    expected_failure = (bool(expected_diags) and not missing
+                         and real_error(text, benign) is None
+                         and rc in _EXIT_NEGATIVE_ONE)
+    is_crash = (rc > 1 or rc < 0) and not expected_failure
+    if is_crash:
+        return False, missing, True
+    ok = real_error(text, benign) is None and not missing
+    return ok, missing, False
+
+
+# Import-time self-check for classify_sample, the pure core of run_spec's
+# sample-classification logic -- otherwise untested, and the PR that added
+# it exists specifically to stop this class of subtle logic rotting silently
+# (see report_suite_health's self-check above for the same rationale applied
+# to the other new logic in this file).
+assert classify_sample(0, "no diagnostics here", [], ()) == (True, [], False), \
+    "classify_sample: an ordinary clean compile with no expected diagnostics is ok"
+assert classify_sample(0, "no diagnostics here", ["E30019"], ()) == (False, ["E30019"], False), \
+    "classify_sample: a clean compile IS the failure mode for a workload with expected_diags"
+assert classify_sample(255, "error[E30019]: type mismatch in expression", ["E30019"],
+                        ("E30019",)) == (True, [], False), \
+    "classify_sample: rc==255 with every expected diagnostic present is the intended " \
+    "exit(-1), not a crash"
+assert classify_sample(0xFFFFFFFF, "error[E30019]: type mismatch in expression",
+                        ["E30019"], ("E30019",)) == (True, [], False), \
+    "classify_sample: rc==0xFFFFFFFF (Windows) with every expected diagnostic present " \
+    "is the intended exit(-1), not a crash"
+assert classify_sample(-11, "error[E30019]: type mismatch in expression", ["E30019"],
+                        ("E30019",)) == (False, [], True), \
+    "classify_sample: a genuine crash code (POSIX SIGSEGV) must count as a crash even " \
+    "when the expected diagnostic text is fully present -- the override is scoped to " \
+    "_EXIT_NEGATIVE_ONE, not to 'diagnostics look complete'"
+assert classify_sample(0xC0000005, "error[E30019]: type mismatch in expression",
+                        ["E30019"], ("E30019",)) == (False, [], True), \
+    "classify_sample: a genuine Windows crash code (STATUS_ACCESS_VIOLATION) must " \
+    "count as a crash even when the expected diagnostic text is fully present"
+
+
 def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
              prepared=False):
     src_dir = os.path.join(src_root, corpus.dir_name(spec, size))
@@ -768,10 +841,10 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         rc, wall, text, rss = run_once(timed)
         last_text = text
         # rc == 0: success. rc == 1: portable slangc compile-error exit,
-        # caught by real_error() below. rc > 1 or rc < 0: a crash, excluded
-        # from timing stats since a crashed sample's wall time is meaningless.
-        # Exit code 2+ from usage errors won't occur here because the bench
-        # harness always builds valid invocations.
+        # caught by real_error() inside classify_sample. rc > 1 or rc < 0: a
+        # crash, excluded from timing stats since a crashed sample's wall
+        # time is meaningless. Exit code 2+ from usage errors won't occur
+        # here because the bench harness always builds valid invocations.
         #
         # Crash rc is platform-specific: on POSIX, _reap_posix sets it via
         # os.waitstatus_to_exitcode, which returns -signal_number for a
@@ -779,37 +852,19 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         # negative. On Windows, Popen.returncode is
         # _winapi.GetExitCodeProcess's raw DWORD with no sign conversion, so a
         # real crash (STATUS_ACCESS_VIOLATION 0xC0000005 and similar) is a
-        # large positive NTSTATUS value.
-        #
-        # A workload declaring expected_diagnostics is SUPPOSED to fail the
-        # compile via slangc's exit(-1), which is not portable either: the
-        # POSIX kernel truncates any exit() argument to 8 bits, so exit(-1) is
-        # always the positive 255 there; Windows reports the same value
-        # unsigned, 0xFFFFFFFF (4294967295). _EXIT_NEGATIVE_ONE below is
-        # exactly those two representations -- neither collides with a real
-        # crash's rc, POSIX or Windows.
-        sample_missing = [c for c in expected_diags if c not in text]
+        # large positive NTSTATUS value. See classify_sample's docstring for
+        # the expected-exit-vs-crash distinction this feeds into.
+        sample_is_ok, sample_missing, is_crash = classify_sample(
+            rc, text, expected_diags, benign)
         missing_diags.update(sample_missing)
-        # The override is scoped to _EXIT_NEGATIVE_ONE specifically (not "any
-        # nonzero rc") so a genuine crash after slangc has already printed
-        # every expected diagnostic still counts as a crash rather than
-        # folding its meaningless wall time into the timing stats.
-        _EXIT_NEGATIVE_ONE = (255, 0xFFFFFFFF)
-        expected_failure = (bool(expected_diags) and not sample_missing
-                            and real_error(text, benign) is None
-                            and rc in _EXIT_NEGATIVE_ONE)
-        if (rc > 1 or rc < 0) and not expected_failure:
+        if is_crash:
             crash_codes.append(rc)
             sample_ok.append(False)
             continue
         walls.append(wall)
         if rss is not None:
             rsses.append(rss)
-        err = real_error(text, benign)
-        # A sample that did not emit what the workload declares it emits is not
-        # a good sample, even though it compiled without error -- for these
-        # workloads a CLEAN compile is the failure mode.
-        sample_ok.append(err is None and not sample_missing)
+        sample_ok.append(sample_is_ok)
         for name, ms in parse_timers(text).items():
             per_timer.setdefault(name, []).append(ms)
         for name, kb in parse_mem(text).items():
@@ -942,10 +997,16 @@ def report_suite_health(runs):
 # module-load assert is this package's test mechanism, per workloads.py's
 # established convention). "minimal" and "parse" are real manifest entries
 # so the mode/default_size gating in the floor loop runs as it would live.
+# "size" must equal each workload's manifest default_size, or the floor
+# loop's `if r["size"] != spec.default_size: continue` gate silently drops
+# the fixture and the second assertion below stops testing anything -- taken
+# from the manifest rather than hardcoded so a future default_size resize
+# (as this PR itself does to four workloads) cannot desync this fixture from
+# what it is meant to simulate.
 _HEALTH_RUNS = [
-    {"workload": "minimal", "ok": True, "size": 0,
+    {"workload": "minimal", "ok": True, "size": manifest.BY_NAME["minimal"].default_size,
      "missing_primary_timers": [], "timers": {"compileInner": {"median": 10.0}}},
-    {"workload": "parse", "ok": True, "size": 2000,
+    {"workload": "parse", "ok": True, "size": manifest.BY_NAME["parse"].default_size,
      "missing_primary_timers": ["writeSerializedModuleIR"],
      "timers": {"compileInner": {"median": 20.0}}},  # under SIGNAL_FLOOR_RATIO x 10.0
 ]
