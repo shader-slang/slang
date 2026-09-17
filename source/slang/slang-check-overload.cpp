@@ -1013,21 +1013,6 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     return true;
 }
 
-bool isEffectivelyMutating(CallableDecl* decl)
-{
-    if (decl->hasModifier<MutatingAttribute>())
-        return true;
-    if (decl->hasModifier<RefAttribute>())
-        return true;
-    if (decl->hasModifier<NonmutatingAttribute>())
-        return false;
-
-    if (as<SetterDecl>(decl))
-        return true;
-
-    return false;
-}
-
 ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(Expr* inExpr)
 {
     auto expr = inExpr;

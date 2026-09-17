@@ -22,6 +22,7 @@ struct RefCell : IDifferentiable
 
     __subscript(int index) -> float
     {
+        get { return value; }
         ref { return value; }
     }
 }
@@ -48,9 +49,8 @@ void testRefAccessorDerivativeReference()
     let primal = RefCell(2.0);
     let differential = RefCell(20.0);
 
-    let getResult = fwd_diff(RefCell::__subscript::ref)(
-        diffPair(primal, differential),
-        1);
+    var getPair = diffPair(primal, differential);
+    let getResult = fwd_diff(RefCell::__subscript::ref)(getPair, 1);
 
     var getSelf = diffPair(primal);
     bwd_diff(RefCell::__subscript::ref)(getSelf, 0, 7.0);

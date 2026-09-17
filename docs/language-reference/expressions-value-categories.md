@@ -49,5 +49,6 @@ L-values are required in the following places:
 - Left-hand-side operand of an assignment operator, including compound assignment operators
 - Operand to pre-increment, pre-decrement, post-increment, and post-decrement operators
 - Object receiving a `[mutating]` or `[ref]` member function call
-- Object receiving a property setter call or a user-defined subscript operator setter call, unless the setter
-  has been explicitly marked as `[nonmutating]`.
+- Object receiving a property setter call, a user-defined subscript operator setter call, or a property or
+  subscript `ref` accessor call, unless the accessor has been explicitly marked as `[nonmutating]`.
+  A `[constref]` accessor does not mutate its receiver, but still requires an addressable receiver.

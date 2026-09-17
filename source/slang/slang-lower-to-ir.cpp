@@ -3885,10 +3885,11 @@ ParamPassingMode getDeclaredParamPassingModeForImplicitThisParam(
     // For example, a `set` accessor (e.g., on a `property` or
     // `subscript` declaration) defaults to having a mutable
     // `this` parameter, unless the programmer explicitly
-    // opts out using `[nomutating]` (which was already checked
+    // opts out using `[nonmutating]` (which was already checked
     // for above).
     //
-    if (as<SetterDecl>(declWithImplicitThisParam))
+    if (auto callable = as<CallableDecl>(declWithImplicitThisParam);
+        callable && isEffectivelyMutating(callable))
     {
         return ParamPassingMode::BorrowInOut;
     }
@@ -8945,6 +8946,24 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 // return this;
                 lowerRValueExprWithDestination(context, context->thisVal, expr);
                 getBuilder()->emitReturn(getSimpleVal(context, context->thisVal));
+                return;
+            }
+
+            if (as<RefAccessorDecl>(context->funcDecl))
+            {
+                // The IR signature of a `ref` accessor returns Ptr(T), so return the address of
+                // the l-value instead of loading and returning its value.
+                auto lvalue = lowerLValueExpr(context, expr);
+                if (IRInst* address = getAddress(context, lvalue, expr->loc))
+                {
+                    getBuilder()->emitReturn(address);
+                }
+                else
+                {
+                    // `getAddress` diagnosed the invalid return expression. Terminate the block
+                    // with a placeholder of the declared pointer-result type for error recovery.
+                    getBuilder()->emitReturn(getBuilder()->getNullVoidPtrValue());
+                }
                 return;
             }
 

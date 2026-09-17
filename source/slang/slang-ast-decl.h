@@ -1187,6 +1187,12 @@ bool isGenericConstraintParameterDecl(Decl* decl);
 
 bool isLocalVar(const Decl* decl);
 
+/// Return whether a callable's implicit `this` parameter is mutable.
+///
+/// Explicit receiver-mode attributes take precedence over accessor defaults. Setters and `ref`
+/// accessors are implicitly mutating when no explicit mode is present.
+bool isEffectivelyMutating(CallableDecl* decl);
+
 
 // Add a sibling lookup scope for `dest` to refer to `source`.
 void addSiblingScopeForContainerDecl(

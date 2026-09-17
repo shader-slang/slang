@@ -9105,14 +9105,8 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
         }
         else if (auto funcDeclBase = as<FunctionDeclBase>(containerDecl))
         {
-            if (funcDeclBase->hasModifier<MutatingAttribute>())
-            {
+            if (isEffectivelyMutating(funcDeclBase))
                 expr->type.isLeftValue = true;
-            }
-            else if (funcDeclBase->hasModifier<RefAttribute>())
-            {
-                expr->type.isLeftValue = true;
-            }
 
             // When a function has been reparented into an AggTypeDeclBase
             // (e.g., a __func_extension's inner function moved into a
