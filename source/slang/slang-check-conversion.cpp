@@ -2203,20 +2203,26 @@ bool SemanticsVisitor::_coerce(
     {
         // `tagType` is only assigned once the `EnumDecl` reaches `ReadyForLookup`, and a
         // conversion can be checked before that (e.g. an array bound in the signature of a
-        // declaration that precedes any other use of the enum). Without this, `tagType` is null
-        // and the comparison below silently declines to offer the conversion.
+        // declaration that precedes any other use of the enum). Drive the enum there so the
+        // conversion below is offered rather than silently declined.
         //
-        // Requesting `ReadyForLookup` here is re-entrancy-safe: an enum's case initializers are
-        // checked at `DefinitionChecked`, which is past `ReadyForLookup`, so an enum reached from
-        // inside its own checking already satisfies this state and `ensureDecl` returns at its
-        // already-checked early-out rather than reaching the cyclic-reference path. See
-        // tests/language-feature/enums/mutually-referencing-enums.slang.
-        ensureDecl(enumDecl, DeclCheckState::ReadyForLookup);
+        // Skip that while the enum is itself mid-check. An enum reached during its own base
+        // resolution is a genuine cycle -- consider `enum E : IHas<int(E.a)>`, where evaluating
+        // the base's generic argument `int(E.a)` coerces an `E` value to its tag while `E` is
+        // still being checked. Forcing `ReadyForLookup` on an in-progress enum makes `ensureDecl`
+        // emit `CyclicReference` on the enum, degrading the diagnostic the checking machinery
+        // otherwise reports against the offending base. This mirrors the `isBeingChecked` guard
+        // PR #12927 added in `_calcInheritanceInfo` for the same shape.
+        if (!enumDecl->checkState.isBeingChecked())
+            ensureDecl(enumDecl, DeclCheckState::ReadyForLookup);
 
-        // `ReadyForLookup` assigns `tagType` on every path (a default, explicit, or error type), so
-        // it is non-null here.
+        // `tagType` is null only when the enum was skipped above because it is mid-check and has
+        // not yet reached the state that assigns it. Decline the conversion and let the cycle be
+        // reported at the offending base. See
+        // tests/language-feature/enums/enum-self-referential-base-conversion.slang.
         Type* tagType = enumDecl->tagType;
-        SLANG_ASSERT(tagType);
+        if (!tagType)
+            return false;
         if (tagType == toType)
         {
             if (outCost)
@@ -2294,12 +2300,17 @@ bool SemanticsVisitor::_coerce(
     {
         if (auto toEnumDeclRef = isDeclRefTypeOf<EnumDecl>(toType))
         {
-            // As above: the enum may not have reached the state that assigns `tagType` yet, and
-            // the same re-entrancy-safety argument applies.
-            ensureDecl(toEnumDeclRef, DeclCheckState::ReadyForLookup);
+            // As above: drive the enum to `ReadyForLookup` so `tagType` is assigned, but skip
+            // that while it is mid-check so an enum reached during its own base resolution
+            // (`enum E : IHasE<E(0)>`) gets the base-pointing cyclic-reference diagnostic rather
+            // than a spurious one on the enum.
+            if (!toEnumDeclRef.getDecl()->checkState.isBeingChecked())
+                ensureDecl(toEnumDeclRef, DeclCheckState::ReadyForLookup);
 
             auto tagType = getTagType(m_astBuilder, toEnumDeclRef);
-            SLANG_ASSERT(tagType);
+            // Null only when skipped above (enum mid-check); decline the conversion.
+            if (!tagType)
+                return false;
 
             Expr* tagExpr = nullptr;
             ConversionCost tagCost = kConversionCost_None;
