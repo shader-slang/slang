@@ -11,10 +11,11 @@
 // these distinguished forwarding names should be removed in favor of direct qualified calls.
 module __builtin;
 
-// Keep the public conversion wrappers from redispatching through generic constructors. For each
-// concrete source and destination scalar pair, BuiltinCast produces the same value as an explicit
-// `TDestination(value)` conversion. The vector and matrix forms apply that scalar conversion to
-// every component without changing the shape or matrix layout.
+// These intrinsic declarations give the public explicit-conversion wrappers direct access to the
+// compiler's canonical BuiltinCast operation. In particular, conversion to `bool` tests whether
+// the source is nonzero; this differs from constructor overload resolution for some source types.
+// The vector and matrix forms apply BuiltinCast to every component without changing the shape or
+// matrix layout.
 [__readNone]
 [__unsafeForceInlineEarly]
 __intrinsic_op(BuiltinCast)
@@ -40,9 +41,11 @@ public matrix<TDestination, R, C, L> __numericsBuiltinConvertMatrix<
     let C : int,
     let L : MatrixLayoutMode>(matrix<TSource, R, C, L> value);
 
-// These conversion adapters keep constructor bodies in `slang.numerics` from redispatching to
-// the very generic constructor requirement they implement. Because this module does not import
-// `slang.numerics`, each construction below can only resolve to an established core constructor.
+// The adapters below serve a different purpose: they implement the integer and floating-point
+// constructor requirements of the numeric interfaces. Their bodies deliberately use the narrower
+// core conversion operations instead of the all-pairs BuiltinCast surface above. Because this
+// module does not import `slang.numerics`, each construction can only resolve to an established
+// core constructor and cannot redispatch to the generic requirement it implements.
 [__readNone]
 [__unsafeForceInlineEarly]
 public TDestination __numericsBuiltinConstructFromInteger<
