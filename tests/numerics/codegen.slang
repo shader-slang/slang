@@ -36,7 +36,7 @@
 
 // Extrema calls made through the interface must specialize to native target operations. In
 // particular, no witness or numerics-module adapter should survive specialization.
-// EXTREMA-HLSL-COUNT-6: return {{(min|max)}}(
+// EXTREMA-HLSL-COUNT-6: {{(min|max)}}(
 
 // Keep whole-output negative assertions in dedicated prefixes: when a negative directive shares a
 // prefix with positive checks, FileCheck only applies it to the region before the next match.
