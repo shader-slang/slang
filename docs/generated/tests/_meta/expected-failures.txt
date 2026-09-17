@@ -134,9 +134,10 @@ docs/generated/tests/design/target-pipelines/metal/append-buffer-params-carry-bu
 #   - The remaining three entries are NOT compiler bugs. The fixed compiler now emits
 #     *correct* output; they fail only because the frozen generated CHECK text still
 #     expects the un-inlined `Cell_value_ref` helper that the fix removes on these
-#     targets (the emitted result is otherwise correct — e.g. the SPIR-V function type
-#     already matches the call). They are stale-content failures, kept only until the
-#     generated bundles are regenerated.
+#     targets (the emitted result is otherwise correct — on SPIR-V the helper is inlined
+#     away entirely and the store targets the field pointer directly, rather than the old
+#     mistyped `OpFunctionCall` result). They are stale-content failures, kept only until
+#     the generated bundles are regenerated.
 # Cleanup owner: the design-docs regeneration pass
 # (docs/generated/design/_meta/regenerate.md, run via the
 # `design-docs-incremental-update` skill) rebuilds these bundles from the current

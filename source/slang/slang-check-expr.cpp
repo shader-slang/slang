@@ -9090,6 +9090,16 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
             {
                 expr->type.isLeftValue = true;
             }
+            else if (
+                as<RefAccessorDecl>(funcDeclBase) &&
+                !funcDeclBase->hasModifier<NonmutatingAttribute>())
+            {
+                // An unannotated `ref` accessor is implicitly mutating (like `set`), so
+                // `this` is an l-value inside its own body — matching the mutability that
+                // `isEffectivelyMutating` and the `BorrowInOut` `this`-passing already give
+                // it. `[nonmutating] ref` opts out and keeps `this` immutable.
+                expr->type.isLeftValue = true;
+            }
 
             // When a function has been reparented into an AggTypeDeclBase
             // (e.g., a __func_extension's inner function moved into a

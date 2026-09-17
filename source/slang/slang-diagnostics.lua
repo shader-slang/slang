@@ -1509,8 +1509,8 @@ err(
 err(
     "nonmutating-ref-accessor-returns-this-storage",
     30073,
-    "a `[nonmutating] ref` accessor cannot return a reference rooted in `this`",
-    span { loc = "location", message = "a `[nonmutating] ref` accessor receives `this` by value, so a reference to a member of `this` would point into a temporary copy and the write would be lost; return storage not rooted in `this` (a global, or storage reached through a pointer member), or remove `[nonmutating]`" }
+    "a `[nonmutating] ref` accessor cannot return storage rooted in `this`",
+    span { loc = "location", message = "a `[nonmutating] ref` accessor cannot return storage rooted in `this`" }
 )
 
 err(

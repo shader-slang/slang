@@ -1168,6 +1168,11 @@ void SemanticsVisitor::checkNonmutatingRefAccessorReturn(
     if (isDeclRefTypeOf<ClassDecl>(rootThis->type.type))
         return;
 
+    // The reference is rooted in `this`, which a `[nonmutating]` accessor receives by
+    // value; the returned address would point into that temporary copy, so the caller's
+    // write through the `ref` would be silently lost. Reject it. The remedies — return
+    // storage not rooted in `this` (a global, or storage reached through a pointer member),
+    // or drop `[nonmutating]` — belong in the user guide, so the span message stays compact.
     getSink()->diagnose(
         Diagnostics::NonmutatingRefAccessorReturnsThisStorage{.location = returnExpr->loc});
 }

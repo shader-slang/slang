@@ -24,8 +24,7 @@ struct PropThisRooted
     {
         get { return _v; }
         [nonmutating] ref { return _v; }
-//CHECK:                           ^^ a `[nonmutating] ref` accessor cannot return a reference rooted in `this`
-//CHECK:                           ^^ a `[nonmutating] ref` accessor receives `this` by value, so a reference to a member of `this` would point into a temporary copy and the write would be lost; return storage not rooted in `this` (a global, or storage reached through a pointer member), or remove `[nonmutating]`
+//CHECK:                           ^^ a `[nonmutating] ref` accessor cannot return storage rooted in `this`
     }
 }
 
@@ -38,8 +37,7 @@ struct SubscriptThisRooted
     {
         get { return _arr[i]; }
         [nonmutating] ref { return _arr[i]; }
-//CHECK:                               ^ a `[nonmutating] ref` accessor cannot return a reference rooted in `this`
-//CHECK:                               ^ a `[nonmutating] ref` accessor receives `this` by value, so a reference to a member of `this` would point into a temporary copy and the write would be lost; return storage not rooted in `this` (a global, or storage reached through a pointer member), or remove `[nonmutating]`
+//CHECK:                               ^ a `[nonmutating] ref` accessor cannot return storage rooted in `this`
     }
 }
 
@@ -51,8 +49,7 @@ struct SwizzleThisRooted
     {
         get { return _vec.x; }
         [nonmutating] ref { return _vec.x; }
-//CHECK:                                ^ a `[nonmutating] ref` accessor cannot return a reference rooted in `this`
-//CHECK:                                ^ a `[nonmutating] ref` accessor receives `this` by value, so a reference to a member of `this` would point into a temporary copy and the write would be lost; return storage not rooted in `this` (a global, or storage reached through a pointer member), or remove `[nonmutating]`
+//CHECK:                                ^ a `[nonmutating] ref` accessor cannot return storage rooted in `this`
     }
 }
 
@@ -64,8 +61,7 @@ struct MatrixSwizzleThisRooted
     {
         get { return _mat._11; }
         [nonmutating] ref { return _mat._11; }
-//CHECK:                                ^^^ a `[nonmutating] ref` accessor cannot return a reference rooted in `this`
-//CHECK:                                ^^^ a `[nonmutating] ref` accessor receives `this` by value, so a reference to a member of `this` would point into a temporary copy and the write would be lost; return storage not rooted in `this` (a global, or storage reached through a pointer member), or remove `[nonmutating]`
+//CHECK:                                ^^^ a `[nonmutating] ref` accessor cannot return storage rooted in `this`
     }
 }
 
@@ -130,5 +126,34 @@ extension ClassForExtension
     {
         get { return _v; }
         [nonmutating] ref { return _v; }
+    }
+}
+
+// Allowed: storage reached *through* a pointer member is outside `this` (the pointer value
+// lives in `this`, but the pointee does not), so the `DerefExpr` stops the root walk and no
+// 30073 is reported.
+struct PtrMember
+{
+    Ptr<int> p;
+    property int value
+    {
+        get { return *p; }
+        [nonmutating] ref { return *p; }
+    }
+}
+
+// Rejected: a `[nonmutating]` accessor keeps `this` immutable in its own body, so writing a
+// `this` field is rejected as a non-l-value (E30011) — the counterpart to the implicitly-
+// mutating unannotated `ref`, which may write `this` (see ref-accessor-body-mutation.slang).
+struct NonmutatingBodyWrite
+{
+    int _v;
+    property int value
+    {
+        get { return _v; }
+        [nonmutating] ref { _v = _v + 1; return gBacking; }
+//CHECK:                    ^^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+//CHECK:                       ^ left of '=' is not an l-value
+//CHECK:                       ^ left of '=' is not an l-value.
     }
 }
