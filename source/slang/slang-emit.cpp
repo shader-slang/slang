@@ -430,6 +430,11 @@ void calcRequiredLoweringPassSet(
             result.autodiff = true;
     }
 
+    // The replacement pass owns the opcode classification so this scan cannot silently omit a
+    // location-operand role that the pass knows how to consume.
+    if (isRayTracingLocationOperand(inst->getOp()))
+        result.rayTracingLocationOperand = true;
+
     switch (inst->getOp())
     {
     case kIROp_DebugValue:
@@ -643,6 +648,16 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_LateRequireCapability:
         result.lateRequireCapability = true;
+        break;
+    case kIROp_MatrixType:
+        // An `Unknown` layout needs the pass. So does `Unknown` passed as a generic argument,
+        // which this scan cannot recognize, so a generic (non-literal) layout requests it too.
+        if (auto matrixType = as<IRMatrixType>(inst))
+        {
+            auto layout = as<IRIntLit>(matrixType->getLayout());
+            if (!layout || layout->getValue() == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+                result.unresolvedMatrixLayout = true;
+        }
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1448,6 +1463,12 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.lValueCast)
         SLANG_PASS(lowerLValueCast, targetProgram);
 
+    // Fill in the default matrix layout where the source left it unspecified. Must run before
+    // specialization, so `row_major float4x4` and `float4x4` match as one type, and before
+    // `lowerEnumType`, which erases the `MatrixLayoutMode` type this pass looks for.
+    if (requiredLoweringPassSet.unresolvedMatrixLayout)
+        SLANG_PASS(specializeMatrixLayout, targetProgram);
+
     // Lower enum types early since enums and enum casts may appear in
     // specialization & not resolving them here would block specialization.
     //
@@ -1473,9 +1494,6 @@ Result linkAndOptimizeIR(
         if (sink->getErrorCount() != 0)
             return SLANG_FAIL;
     }
-
-    // Fill in default matrix layout into matrix types that left layout unspecified.
-    SLANG_PASS(specializeMatrixLayout, targetProgram);
 
     // It's important that this takes place before defunctionalization as we
     // want to be able to easily discover the cooperate and fallback funcitons
@@ -1851,6 +1869,11 @@ Result linkAndOptimizeIR(
     // selector is not yet a phi the pass finds nothing to thread and is a no-op.
     SLANG_PASS(threadSwitchOnConstantPhi);
 
+    if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader)
+    {
+        SLANG_PASS(legalizeOptiXReportIntersectionsForCUDA, sink);
+    }
+
     // Report checkpointing information.
     if (codeGenContext->shouldReportCheckpointIntermediates())
     {
@@ -1977,11 +2000,29 @@ Result linkAndOptimizeIR(
             SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
         }
 
+        // Vulkan (SPIR-V + GLSL): an empty `CallShader` payload is backed by a
+        // `[__vulkanCallablePayload]` global; if it legalizes to `none`, type legalization aborts
+        // with "non-simple operand(s)!" — via `OpExecuteCallableKHR` on SPIR-V, or
+        // `__callablePayloadLocation` on GLSL. Pad it so a real Callable Data variable survives.
+        // Must run before legalizeResourceTypes erases the empty payload struct.
+        if (isKhronosTarget(targetRequest))
+        {
+            SLANG_PASS(legalizeEmptyCallableDataPayloadsForVulkan);
+        }
+
         // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions
         // (must run before legalizeExistentialTypeLayout removes empty struct parameters)
         if (isD3DTarget(targetRequest))
         {
             SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+
+            // A callable entry point must keep exactly one argument parameter for DXC, and a
+            // `CallShader(index, payload)` must keep its payload argument, but an empty
+            // callable-data struct would be erased by the empty-struct legalization below. Pad it
+            // with a dummy field first (must run before legalizeExistentialTypeLayout /
+            // legalizeResourceTypes remove the empty struct). `targetCaps` lets the pass recognize
+            // the `CallShader` intrinsic call via `findTargetIntrinsicDefinition`.
+            SLANG_PASS(legalizeEmptyCallableDataPayloadsForHLSL, targetRequest->getTargetCaps());
 
             // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
             // both a `read(...)` and a `write(...)` qualifier. The call-site fill above
@@ -2739,9 +2780,10 @@ Result linkAndOptimizeIR(
         }
     }
 
-    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    if (isKhronosTarget(targetRequest) && emitSpirvDirectly &&
+        requiredLoweringPassSet.rayTracingLocationOperand)
     {
-        SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, targetProgram, sink);
+        SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, sink);
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -3268,6 +3310,7 @@ static SlangResult stripDbgSpirvFromArtifact(
     // to check if the instruction number is for a debug instruction as
     // listed in slang-emit-spirv-ops-debug-info-ext.h
     static const uint32_t debugExtInstVals[] = {
+        NonSemanticShaderDebugInfo100DebugInfoNone,
         NonSemanticShaderDebugInfo100DebugCompilationUnit,
         NonSemanticShaderDebugInfo100DebugTypeBasic,
         NonSemanticShaderDebugInfo100DebugTypePointer,

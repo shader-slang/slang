@@ -121,3 +121,14 @@ reachable ceiling visible.
 | The `fits = false` paths in the existential-layout arm (concrete type larger than the interface's any-value size).                                                                                                     | link-stage-only     | Requires existential specialization arguments to be supplied to layout; the surrounding code marks the result `SLANG_UNUSED(fits)` anyway, so there is no observable consequence to pin.                                                                                                                   |
 | Layout of a `struct` inheriting from a non-interface `struct` base.                                                                                                                                                    | deprecated          | Reachable (`struct D : B` lays the base out as field 0), but the compiler emits `E30816 support for inheritance is unstable and will be removed in future language versions`. Not worth pinning behaviour that is scheduled for removal.                                                                   |
 | Obfuscated-module layout reuse / caching paths.                                                                                                                                                                        | link-stage-only     | Link-stage bookkeeping with no member-offset surface in single-file emit; not observable through a `//TEST` directive in this bundle.                                                                                                                                                                      |
+
+## Drift review
+
+Reviewed at `d592afa9b9` against `ef1068b548`, the commit this bundle was
+generated from. 10 commits touched its watched paths in between; all
+22 existing tests still pass.
+
+No diagnostic new since the base commit is raised from
+`slang-type-layout.cpp`. The ten commits in the window either change layout
+results that existing tests in this bundle already pin, or belong to other
+bundles' targets. No test was added, and no citation in this bundle had drifted.

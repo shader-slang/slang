@@ -377,8 +377,12 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
             else if (initExpr)
             {
                 DiagnosticSink sink;
-                SharedSemanticsContext semanticContext(version->linkage, module, &sink);
-                SemanticsVisitor semanticsVisitor(&semanticContext);
+                auto semanticContext = SharedSemanticsContext::createForOptionalModule(
+                    version->linkage,
+                    module,
+                    version->linkage->m_optionSet.getLanguageVersion(),
+                    &sink);
+                SemanticsVisitor semanticsVisitor(semanticContext);
                 if (auto intVal = semanticsVisitor.tryFoldIntegerConstantExpression(
                         declRef.substitute(version->linkage->getASTBuilder(), initExpr),
                         SemanticsVisitor::ConstantFoldingKind::LinkTime,
@@ -704,13 +708,14 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
             if (auto funcDecl = as<FunctionDeclBase>(declRef.getDecl()))
             {
                 DiagnosticSink sink;
-                SharedSemanticsContext semanticContext(
+                auto semanticContext = SharedSemanticsContext::createForOptionalModule(
                     version->linkage,
                     getModule(funcDecl),
+                    version->linkage->m_optionSet.getLanguageVersion(),
                     &sink);
-                SemanticsVisitor semanticsVisitor(&semanticContext);
+                SemanticsVisitor semanticsVisitor(semanticContext);
 
-                auto assocDecls = semanticContext.getAssociatedDeclsForDecl(funcDecl);
+                auto assocDecls = semanticContext->getAssociatedDeclsForDecl(funcDecl);
                 Decl* bwdDiff = nullptr;
                 Decl* fwdDiff = nullptr;
                 Decl* primalSubst = nullptr;
@@ -1855,7 +1860,13 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     // on the best candidate.
     //
     DiagnosticSink sink;
-    SharedSemanticsContext semanticsContext(version->linkage, nullptr, &sink);
+    // Signature help performs ad hoc checking without a primary module so that extension lookup
+    // retains its existing linkage-wide point of view. Its language rules still come from the
+    // parsed document module, including any `#language` directive in that file.
+    SharedSemanticsContext semanticsContext(
+        version->linkage,
+        parsedModule->getModuleDecl()->languageVersion,
+        &sink);
     SemanticsVisitor semanticsVisitor(&semanticsContext);
 
     auto addDeclRef = [&](DeclRef<Decl> declRef)
