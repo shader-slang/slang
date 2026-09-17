@@ -2205,7 +2205,8 @@ local insts = {
 					-- passes add because the inlining is required for correctness. A pure user hint
 					-- receives this decoration *instead of* the generic `ForceInlineDecoration`, so a
 					-- CUDA-only gate can defer it: the callee is kept as a separate
-					-- `__forceinline__ __device__` function and inlining is left to NVRTC. See #12623.
+					-- `__forceinline__` function and inlining is left to the downstream CUDA compiler
+					-- (NVRTC for device code, nvcc for host code). See #12623.
 					struct_name = "UserForceInlineDecoration",
 				},
 			},

@@ -494,6 +494,13 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
     }
     else if (inst->findDecoration<IRCudaHostDecoration>())
     {
+        // A user-force-inline host function is deferred just like a device one (issue #12623): it
+        // survives as a real `__host__` function, so emit `__forceinline__` here too — otherwise
+        // the hint is silently dropped for host functions. `__forceinline__ __host__` is a valid
+        // CUDA specifier sequence for the nvcc host compile (host functions are not emitted for the
+        // NVRTC JIT path, which rejects `__host__`).
+        if (inst->findDecoration<IRUserForceInlineDecoration>())
+            m_writer->emit("__forceinline__ ");
         m_writer->emit("__host__ ");
     }
     else

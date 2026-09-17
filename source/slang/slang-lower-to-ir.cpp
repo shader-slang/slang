@@ -14272,9 +14272,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Always force inline diff setter accessor to prevent downstream compiler from
         // complaining fields are not fully initialized for the first `inout` parameter.
         // This is a compiler correctness requirement independent of any user `[ForceInline]`, so it
-        // adds its own generic `ForceInlineDecoration` (never deferred to NVRTC on CUDA) rather
-        // than relying on a user attribute the author may or may not have written
-        // (shader-slang/slang#12623).
+        // adds its own generic `ForceInlineDecoration` (never deferred to the downstream CUDA
+        // compiler on CUDA) rather than relying on a user attribute the author may or may not have
+        // written (shader-slang/slang#12623).
         if (as<SetterDecl>(decl))
         {
             getBuilder()->addForceInlineDecoration(irFunc);
@@ -14962,7 +14962,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // builtin lowers to the generic `ForceInlineDecoration`: its result may feed an
                 // intrinsic operand or a `static_assert` that must fold to a literal before emit,
                 // so it must always be inlined. A user hint lowers to `UserForceInlineDecoration`
-                // instead, which the CUDA path is free to defer to NVRTC (see `shouldInline`).
+                // instead, which the CUDA path is free to defer to the downstream CUDA compiler
+                // (see `shouldInline`).
                 if (decl->findModifier<CompilerGeneratedForceInlineModifier>() ||
                     isFromCoreModule(decl))
                 {
@@ -15027,8 +15028,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // (unsafe-early / intrinsic-op / a compiler-synthesized force-inline). A user
         // `[ForceInline]` sets only the deferrable `UserForceInlineDecoration` and leaves
         // `isInline` false, so this block still adds its own generic `ForceInlineDecoration` — a
-        // compiler correctness inline that is never deferred to NVRTC on CUDA
-        // (shader-slang/slang#12623).
+        // compiler correctness inline that is never deferred to the downstream CUDA compiler on
+        // CUDA (shader-slang/slang#12623).
         if (!isInline)
         {
             // TODO: consider specializing them instead of inlining.

@@ -24,8 +24,9 @@ bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedF
 void performForceInlining(IRModule* module);
 
 /// As above, but `target` lets the pass defer a *user* `[ForceInline]` on CUDA so it is emitted
-/// as a separate `__forceinline__ __device__` function and inlined by NVRTC instead; every
-/// compiler-inserted `[ForceInline]` still inlines here. See shader-slang/slang#12623.
+/// as a separate `__forceinline__` function and inlined by the downstream CUDA compiler instead
+/// (NVRTC for device code, nvcc for host code); every compiler-inserted `[ForceInline]` still
+/// inlines here. See shader-slang/slang#12623.
 void performForceInlining(IRModule* module, CodeGenTarget target);
 
 /// Inline any call sites to functions marked `[ForceInline]` inside `func`.
