@@ -19,7 +19,9 @@ Examples:
         --only autodiff --samples 7
 """
 import argparse
+import contextlib
 import ctypes  # for the Win32 peak-RSS struct; import is safe on every platform
+import io
 import json
 import os
 import re
@@ -765,37 +767,33 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
     for _ in range(samples):
         rc, wall, text, rss = run_once(timed)
         last_text = text
-        # rc == 0: success; rc == 1: slangc-reported compile error (caught by
-        # real_error(), which marks the sample as failed). rc > 1 or
-        # rc < 0: slangc crashed or was killed by a signal (SIGSEGV=139, SIGABRT=134
-        # on Linux; large negative values on Windows — Python converts NTSTATUS codes
-        # such as 0xC0000005 to signed int: -1073741819). Exit code 2+ from usage errors
-        # won't occur here because the bench harness always builds valid invocations.
-        # Exclude crashed samples from timing stats; their wall time is meaningless.
-        # A workload that declares expected_diagnostics is SUPPOSED to fail the
-        # compile, and slangc's failure exit code is not portable: it is 1 on
-        # some platforms and 255 (i.e. -1 truncated) on macOS, which the crash
-        # rule above would otherwise discard along with the timers we came for.
-        # Decide from the output instead of the code — every expected
-        # diagnostic present, and no unexpected error — which holds whatever
-        # the platform returns.
+        # rc == 0: success. rc == 1: portable slangc compile-error exit,
+        # caught by real_error() below. rc > 1 or rc < 0: a crash, excluded
+        # from timing stats since a crashed sample's wall time is meaningless.
+        # Exit code 2+ from usage errors won't occur here because the bench
+        # harness always builds valid invocations.
+        #
+        # Crash rc is platform-specific: on POSIX, _reap_posix sets it via
+        # os.waitstatus_to_exitcode, which returns -signal_number for a
+        # signal-terminated process (e.g. -11 SIGSEGV, -6 SIGABRT) -- always
+        # negative. On Windows, Popen.returncode is
+        # _winapi.GetExitCodeProcess's raw DWORD with no sign conversion, so a
+        # real crash (STATUS_ACCESS_VIOLATION 0xC0000005 and similar) is a
+        # large positive NTSTATUS value.
+        #
+        # A workload declaring expected_diagnostics is SUPPOSED to fail the
+        # compile via slangc's exit(-1), which is not portable either: the
+        # POSIX kernel truncates any exit() argument to 8 bits, so exit(-1) is
+        # always the positive 255 there; Windows reports the same value
+        # unsigned, 0xFFFFFFFF (4294967295). _EXIT_NEGATIVE_ONE below is
+        # exactly those two representations -- neither collides with a real
+        # crash's rc, POSIX or Windows.
         sample_missing = [c for c in expected_diags if c not in text]
         missing_diags.update(sample_missing)
-        # A crash is still a crash even if the diagnostic text it managed to
-        # print before dying happens to contain every expected code: the
-        # override below is only for the platform's specific representation
-        # of slangc's compile-error exit(-1), never for an arbitrary nonzero
-        # code. On POSIX the kernel truncates any exit() argument to 8 bits,
-        # so exit(-1) is always 255 there (not macOS-specific, despite the
-        # comment above) -- and a signal-terminated crash is unconditionally
-        # negative (Python's own POSIX contract), so 255 and "negative" never
-        # collide. On Windows there is no such truncation: Popen.returncode
-        # is `_winapi.GetExitCodeProcess`'s raw DWORD with no sign conversion
-        # (verified against this Python's subprocess.py -- the claim two
-        # comments up, that NTSTATUS codes come back signed, does not hold
-        # here), so exit(-1) is the full unsigned 0xFFFFFFFF = 4294967295,
-        # while a real crash (STATUS_ACCESS_VIOLATION 0xC0000005 and similar)
-        # is a different, recognizable NTSTATUS value -- never this one.
+        # The override is scoped to _EXIT_NEGATIVE_ONE specifically (not "any
+        # nonzero rc") so a genuine crash after slangc has already printed
+        # every expected diagnostic still counts as a crash rather than
+        # folding its meaningless wall time into the timing stats.
         _EXIT_NEGATIVE_ONE = (255, 0xFFFFFFFF)
         expected_failure = (bool(expected_diags) and not sample_missing
                             and real_error(text, benign) is None
@@ -838,8 +836,11 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
     # that function had no SLANG_PROFILE, so its headline could not respond to
     # the regression it existed to catch. Reported rather than fatal: a release
     # sweep measures old binaries that legitimately predate a newer timer.
-    missing_timers = [t for t in spec.primary_timers
-                      if t != "compileInner" and t not in per_timer]
+    # compileInner is exempt: it is the base -report-perf-benchmark wall-clock
+    # total, not a SLANG_PROFILE-gated pass timer, so its absence is not this
+    # check's failure mode -- it is already caught by got_timers/ok below.
+    missing_primary_timers = [t for t in spec.primary_timers
+                              if t != "compileInner" and t not in per_timer]
 
     got_timers = bool(per_timer)
     # A run that produced no timers and no recognizable diagnostic would report
@@ -859,7 +860,7 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         "ok": ok,
         "setup_ok": setup_ok,
         "got_timers": got_timers,
-        "missing_primary_timers": missing_timers,
+        "missing_primary_timers": missing_primary_timers,
         "samples": samples,
         "warmup": warmup,
         "wall_ms": stats(walls),
@@ -894,9 +895,12 @@ SIGNAL_FLOOR_RATIO = 3.0
 
 
 def report_suite_health(runs):
-    """Print the two checks that would have caught `diagnostics_clean`'s dead
-    noise-floor and `serialize`'s missing timer when those workloads were
-    added, rather than months later."""
+    """Print, for this completed run, any workload declaring a primary timer
+    the compiler did not emit, and any tracked workload whose compileInner
+    median sits under SIGNAL_FLOOR_RATIO times the `minimal` floor -- the two
+    checks that would have caught `diagnostics_clean`'s dead noise-floor and
+    `serialize`'s missing timer when those workloads were added, rather than
+    months later."""
     notes = []
 
     for r in runs:
@@ -931,6 +935,28 @@ def report_suite_health(runs):
         print("\n[suite health] issues that make a workload unable to do its job:")
         for n in notes:
             print(n)
+
+
+# Import-time self-check for report_suite_health's two checks, which
+# otherwise have no test coverage (bench.py has no pytest/GPU harness; the
+# module-load assert is this package's test mechanism, per workloads.py's
+# established convention). "minimal" and "parse" are real manifest entries
+# so the mode/default_size gating in the floor loop runs as it would live.
+_HEALTH_RUNS = [
+    {"workload": "minimal", "ok": True, "size": 0,
+     "missing_primary_timers": [], "timers": {"compileInner": {"median": 10.0}}},
+    {"workload": "parse", "ok": True, "size": 2000,
+     "missing_primary_timers": ["writeSerializedModuleIR"],
+     "timers": {"compileInner": {"median": 20.0}}},  # under SIGNAL_FLOOR_RATIO x 10.0
+]
+with contextlib.redirect_stdout(io.StringIO()) as _out:
+    report_suite_health(_HEALTH_RUNS)
+_health_report = _out.getvalue()
+assert "writeSerializedModuleIR" in _health_report, \
+    "report_suite_health must flag a declared primary timer the compiler did not emit"
+assert "under" in _health_report and "per-compile floor" in _health_report, \
+    "report_suite_health must flag a workload whose median sits under the signal floor"
+del _HEALTH_RUNS, _out, _health_report
 
 
 def main():
