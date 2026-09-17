@@ -21,8 +21,8 @@ struct Counter
         get { return _v; }
         ref
         {
-            _a = 42;      // unqualified `this`-member write
-            this._b = 43; // explicit `this.`-member write
+            _a = 42;
+            this._b = 43;
             return _v;
         }
     }
@@ -39,8 +39,8 @@ void computeMain()
     c._a = 0;
     c._b = 0;
 
-    // An l-value use invokes the `ref` accessor: its body writes `_a` / `_b` (the this-field
-    // writes the fix enables) and returns a reference to `_v`, into which 7 is stored.
+    // An l-value use invokes the `ref` accessor: its body writes `_a` and `_b` and returns a
+    // reference to `_v`, into which 7 is then stored.
     c.value = 7;
 
     // CHECK: 7

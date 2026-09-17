@@ -157,3 +157,23 @@ struct NonmutatingBodyWrite
 //CHECK:                       ^ left of '=' is not an l-value.
     }
 }
+
+// Rejected: a `[constref]` accessor receives `this` by const reference, so it too keeps
+// `this` immutable in its own body. Both an unqualified member write (governed by the
+// `_lookUpInScopes` mutability ladder) and an explicit `this.` write (governed by
+// `visitThisExpr`) are rejected, confirming both l-value paths honor `[constref]`.
+struct ConstRefBodyWrite
+{
+    int _v;
+    property int value
+    {
+        get { return _v; }
+        [constref] ref { _v = 1; this._v = 2; return gBacking; }
+//CHECK:                 ^^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+//CHECK:                    ^ left of '=' is not an l-value
+//CHECK:                    ^ left of '=' is not an l-value.
+//CHECK:                              ^^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+//CHECK:                                 ^ left of '=' is not an l-value
+//CHECK:                                 ^ left of '=' is not an l-value.
+    }
+}

@@ -1040,7 +1040,7 @@ static void _lookUpInScopes(
                     // may write a member of `this`. This mirrors the mutability that
                     // `isEffectivelyMutating` and
                     // `getDeclaredParamPassingModeForImplicitThisParam` already give
-                    // the accessor. A `[nonmutating]` or `__constref` accessor instead
+                    // the accessor. A `[nonmutating]` or `[constref]` accessor instead
                     // receives `this` by value / by const reference (`BorrowIn`), so it
                     // fails this guard and falls through to the immutable `else` below,
                     // keeping its body-writes correctly rejected.
