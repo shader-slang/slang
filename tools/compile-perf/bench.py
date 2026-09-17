@@ -161,6 +161,24 @@ DETAILED_PERF_FLAG = "-report-detailed-perf-benchmark"
 _PERF_FLAG_CACHE = {}
 
 
+def _detailed_flag_supported(help_text):
+    """Whether `-help` output demonstrates the binary accepts
+    DETAILED_PERF_FLAG. Factored out of resolve_perf_flag so the pure
+    substring decision can be pinned by an import-time self-check
+    independent of spawning a real slangc."""
+    return DETAILED_PERF_FLAG in help_text
+
+
+def _schema_of(timed):
+    """The "timer_schema" label for a built command list: "detailed" if it
+    requested DETAILED_PERF_FLAG, "coarse" otherwise -- including an api-mode
+    `timed`, which carries neither perf flag (see build_commands) and so is
+    always "coarse". daily_movers._comparable_buckets depends on this label
+    to fold DETAIL_ONLY_BUCKETS across a schema transition; a bucket wrongly
+    labeled here would defeat that fold silently."""
+    return "detailed" if DETAILED_PERF_FLAG in timed else "coarse"
+
+
 def resolve_perf_flag(slangc):
     """Return the most detailed timer flag `slangc` accepts.
 
@@ -168,6 +186,15 @@ def resolve_perf_flag(slangc):
     binary that predates the detailed flag is detected without running a
     compile - and without the probe's own timings ever being mistaken for a
     sample.
+
+    The result is cached per binary path ONLY when the probe actually ran
+    (success or a binary-level OSError, e.g. not executable): both are
+    permanent properties of that path, so a repeat probe would just repeat
+    the answer. A subprocess.SubprocessError (a probe timeout on a loaded
+    machine, most likely) is NOT cached -- that is a property of this one
+    probe attempt, not of the binary, and caching it would silently degrade
+    every remaining workload in the run to the coarse timer set over one
+    slow probe. The next call retries instead.
     """
     cached = _PERF_FLAG_CACHE.get(slangc)
     if cached:
@@ -175,16 +202,37 @@ def resolve_perf_flag(slangc):
     flag = PERF_FLAG
     try:
         res = subprocess.run([slangc, "-help"], capture_output=True, text=True, timeout=60)
-        if DETAILED_PERF_FLAG in (res.stdout + res.stderr):
+        if _detailed_flag_supported(res.stdout + res.stderr):
             flag = DETAILED_PERF_FLAG
-    except (OSError, subprocess.SubprocessError):
-        # Leave the base flag in place: a binary we cannot even probe is a
-        # binary whose compile will fail loudly a moment later, and guessing
-        # the detailed flag here would turn that into a confusing option error.
-        pass
-    _PERF_FLAG_CACHE[slangc] = flag
+        _PERF_FLAG_CACHE[slangc] = flag
+    except OSError:
+        # A binary we cannot even exec will fail loudly a moment later at
+        # the real compile; guessing the detailed flag here would only turn
+        # that into a confusing option error instead. Cached: this is a
+        # permanent property of `slangc`'s path, so retrying would not help.
+        _PERF_FLAG_CACHE[slangc] = flag
+    except subprocess.SubprocessError:
+        pass  # transient (e.g. TimeoutExpired) -- not cached, see docstring
     return flag
 
+
+# Import-time self-checks for the three resolve_perf_flag/timer-schema
+# behaviors that had none: the pure -help substring decision, the per-binary
+# cache hit, and the schema label (including the api-mode "carries neither
+# flag" case). A silent regression in any of these produces a plausible-but-
+# wrong chart (every detail-only band quietly vanishing) rather than a loud
+# failure, which is exactly the failure mode this file's other 30+ import-
+# time asserts already guard against elsewhere.
+assert _detailed_flag_supported("... -report-detailed-perf-benchmark ...")
+assert not _detailed_flag_supported("... -report-perf-benchmark ...")
+_PERF_FLAG_CACHE["__self_check_fake_slangc__"] = DETAILED_PERF_FLAG
+assert resolve_perf_flag("__self_check_fake_slangc__") == DETAILED_PERF_FLAG, \
+    "resolve_perf_flag must return a cached answer without probing"
+del _PERF_FLAG_CACHE["__self_check_fake_slangc__"]
+assert _schema_of([PERF_FLAG, "in.slang"]) == "coarse"
+assert _schema_of([DETAILED_PERF_FLAG, "in.slang"]) == "detailed"
+assert _schema_of(["api-driver.exe", "libslang.dll", "session-create"]) == "coarse", \
+    "an api-mode command carries neither perf flag and must still resolve to coarse"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -729,7 +777,7 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         # measurements when present and genuine zeros when absent. "coarse"
         # means those four are structurally unmeasured, not zero, so
         # daily_movers must not read a schema transition as a bucket move.
-        "timer_schema": "detailed" if DETAILED_PERF_FLAG in timed else "coarse",
+        "timer_schema": _schema_of(timed),
     }
 
 

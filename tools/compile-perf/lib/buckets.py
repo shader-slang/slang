@@ -307,4 +307,20 @@ assert "emitEntryPointsSourceFromIR (self)" in _b and _b["deferBufferLoad"] == 7
     "buckets(): the tree=None default must resolve through SOURCE_TREE for a " \
     "source-emission run, not silently fall back to TREE"
 
+# 7. DETAIL_ONLY_BUCKETS must stay coupled to two things it is hand-kept in
+# sync with: it must be a subset of _LINK_CHILDREN (the names it folds are
+# real children of linkAndOptimizeIR), and every one of its names needs a
+# BUCKET_COLOR entry or it silently drops out of the stacked chart. Adding a
+# fifth detail-only pass to _LINK_CHILDREN while forgetting DETAIL_ONLY_BUCKETS
+# would make daily_movers._fold_detail_only_buckets stop folding it, quietly
+# reintroducing the coarse/detailed schema-transition bug that module's own
+# self-check exists to catch.
+_link_names = {c[0] for c in _LINK_CHILDREN}
+assert DETAIL_ONLY_BUCKETS <= _link_names, \
+    "DETAIL_ONLY_BUCKETS must all be linkAndOptimizeIR children (_LINK_CHILDREN)"
+assert DETAIL_ONLY_BUCKETS <= BUCKET_COLOR.keys(), \
+    "every DETAIL_ONLY_BUCKETS name needs a BUCKET_COLOR entry or it drops " \
+    "from the stacked chart"
+del _link_names
+
 del _FIX_TREE, _b
