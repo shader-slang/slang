@@ -4590,6 +4590,21 @@ attribute_syntax [instance(count: int)]         : InstanceAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
 
+/// Used on a fragment shader entry point so that its input `SV_Coverage` reports only the samples
+/// that survived the early depth/stencil test, rather than every sample the fragment covers.
+/// @remarks On SPIR-V this requires the `SampleMaskPostDepthCoverage` capability, declares
+/// `OpExtension "SPV_KHR_post_depth_coverage"`, and enables the `PostDepthCoverage` execution mode.
+/// On GLSL it requires `GL_ARB_post_depth_coverage` and emits `layout(post_depth_coverage) in;`.
+/// Post-depth coverage is only meaningful with early depth/stencil testing, so the compiler also
+/// enables `EarlyFragmentTests` (which Vulkan requires to accompany `PostDepthCoverage`); pairing
+/// this attribute with `[earlydepthstencil]` is therefore optional but harmless.
+/// @remarks This attribute currently takes effect on SPIR-V/Vulkan and GLSL only. On any other
+/// target (HLSL, Metal, WGSL, CUDA) no post-depth-coverage execution mode is emitted and the
+/// compiler warns that the attribute has no effect, rather than silently changing `SV_Coverage`
+/// semantics.
+__attributeTarget(FuncDecl)
+attribute_syntax [postdepthcoverage]    : PostDepthCoverageAttribute;
+
 // SPIR-V 64-bit indexing
 /// Used on a function to require the `SPV_EXT_shader_64bit_indexing` SPIR-V extension.
 /// @remarks When this attribute is applied to a SPIR-V entry point, or to any function in the

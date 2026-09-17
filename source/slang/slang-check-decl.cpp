@@ -556,8 +556,7 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         if (isGlobalDecl(decl) && (hasConst || hasUniform) && !hasStatic &&
             !hasSpecializationConstant && decl->initExpr)
         {
-            auto moduleDecl = getModuleDecl(decl);
-            if (!moduleDecl || !moduleDecl->hasModifier<GLSLModuleModifier>())
+            if (!getShared()->isGLSLSourceLanguage())
             {
                 getSink()->diagnose(
                     Diagnostics::ConstGlobalVarWithInitRequiresStatic{.decl = decl});
@@ -735,6 +734,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void checkCallableDeclCommon(CallableDecl* decl);
     void maybeInferPrefixModifierForOperator(CallableDecl* decl);
+    void maybeDiagnoseOperatorDeclaredAsMember(FuncDecl* decl);
     void checkPublicCallableOperandVisibility(CallableDecl* decl);
 
     void checkCallableConstraints(CallableDecl* decl);
@@ -2882,7 +2882,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     if (as<NamespaceDeclBase>(varDecl->parentDecl))
     {
-        if (getModuleDecl(varDecl)->hasModifier<GLSLModuleModifier>())
+        if (getShared()->isGLSLSourceLanguage())
         {
             // If we are in GLSL compatiblity mode, we want to treat all global variables
             // without any `uniform` modifiers as true global variables by default.
@@ -16176,6 +16176,30 @@ void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
     }
 }
 
+// True if `name` is an *actual* operator: a name that can appear as the operator in a prefix,
+// postfix, or infix operator expression (`-a`, `a++`, `a + b`). This is intentionally not every
+// name that may be spelled with `operator <op>` syntax -- `operator()`, `operator[]`/`__subscript`,
+// and `operator=` are written that way for historical reasons but are not operators in this sense
+// (call and subscript are resolved by member lookup on the operand; assignment is checked as an
+// `AssignExpr`), so this predicate returns false for them.
+static bool isOperatorName(Name* name)
+{
+    if (!name)
+        return false;
+    auto text = name->text.getUnownedSlice();
+    static const char* const kOperatorNames[] = {
+        "+",  "-",  "*",  "/",   "%",   "!",  "~",  "<<", ">>", "==", "!=", ">",
+        "<",  ">=", "<=", "&&",  "||",  "&",  "|",  "^",  "++", "--", "+=", "-=",
+        "*=", "/=", "%=", "<<=", ">>=", "&=", "|=", "^=", ",",  "?:",
+    };
+    for (auto op : kOperatorNames)
+    {
+        if (text == op)
+            return true;
+    }
+    return false;
+}
+
 // True if `name` is an operator that can appear in prefix (unary) position:
 // `-`, `+`, `~`, or `!`. These are the unary operators the core module declares
 // with `__prefix` and that a user may overload. `~`/`!` are unary-only, while
@@ -16238,6 +16262,27 @@ void SemanticsDeclHeaderVisitor::maybeInferPrefixModifierForOperator(CallableDec
     auto prefixModifier = m_astBuilder->create<PrefixModifier>();
     prefixModifier->loc = decl->loc;
     addModifier(decl, prefixModifier);
+}
+
+// Diagnose an operator function declared as a member of a type or extension. A prefix/postfix/infix
+// operator call site (`a + b`) resolves the operator name only through the enclosing lexical
+// scopes, never by member lookup on the operand type, so an operator declared as a member can never
+// be found from such a call and the user hits a confusing "no overload" at every use. We reject it
+// at the declaration and steer the user to the free-function spelling instead (see #12761).
+void SemanticsDeclHeaderVisitor::maybeDiagnoseOperatorDeclaredAsMember(FuncDecl* decl)
+{
+    // Only an actual operator name is relevant; `operator()`/`__subscript` (member-looked-up) and
+    // ordinary function names are not.
+    if (!isOperatorName(decl->getName()))
+        return;
+
+    // `getParentAggTypeDeclBase` (which walks past a wrapping `GenericDecl`) is null at
+    // module/namespace scope -- where a free operator function is the supported form -- and
+    // non-null for a type/interface/extension member.
+    if (getParentAggTypeDeclBase(decl) == nullptr)
+        return;
+
+    getSink()->diagnose(Diagnostics::OperatorDeclaredAsMember{.decl = decl});
 }
 
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
@@ -16359,6 +16404,7 @@ void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
     }
 
     checkCallableDeclCommon(funcDecl);
+    maybeDiagnoseOperatorDeclaredAsMember(funcDecl);
 }
 
 IntegerLiteralValue SemanticsVisitor::GetMinBound(IntVal* val)
@@ -17719,8 +17765,11 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
 
     if (getText(moduleDecl->getName()) == "glsl")
     {
-        getShared()->glslModuleDecl = moduleDecl;
-        getShared()->m_isGLSLModuleImported = true;
+        // This is deliberately narrower than selecting GLSL as the source language. The parser
+        // has already run, and all other language-dependent behavior continues to use the
+        // translation unit's effective `sourceLanguage`. Retain only the historical effect that
+        // importing this module enables GLSL's builtin operator rules.
+        getShared()->m_hasImportedGLSLModule = true;
     }
 
     importedModulesList.add(moduleDecl);
@@ -17764,6 +17813,7 @@ void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
     auto name = decl->moduleNameAndLoc.name;
     if (!name)
         return;
+
     auto scope = getModuleDecl(decl)->ownedScope;
 
     // Try to load a module matching the name
@@ -20479,6 +20529,50 @@ bool tryCheckDerivativeOfAttributeImpl(
 
 void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
+    // This producer check is selected by the semantic `GLSLAtomicUintType`, independently of the
+    // source language. A supported GLSL global atomic counter has a `layout(binding = ...)`
+    // modifier; parsing that modifier also creates an explicit or implicit offset that the checked
+    // modifier and parameter-layout paths preserve for the backing-storage rewrite. By contrast,
+    // `import glsl; atomic_uint counter;` in Slang source creates the same semantic type but does
+    // not pass through that GLSL layout producer, so it is deliberately rejected here. Otherwise
+    // the declaration would become a decoration-less `kIROp_GLSLAtomicUintType` global that no
+    // target can emit.
+    //
+    // Existing atomic-counter legalization supports only directly-declared globals. Reject arrays
+    // at this producer boundary even when they have a binding; otherwise their element type
+    // remains an unhandled placeholder at emission. Supporting arrays requires a corresponding
+    // aggregate representation and legalization design, not a recursive scan in the linker.
+    if (isGlobalDecl(varDecl))
+    {
+        Type* declaredType = varDecl->getType();
+        Type* arrayElementType = unwrapArrayType(declaredType);
+        if (as<GLSLAtomicUintType>(arrayElementType))
+        {
+            const bool isAtomicCounterArray = as<ArrayExpressionType>(declaredType) != nullptr;
+            if (isAtomicCounterArray)
+            {
+                getSink()->diagnose(Diagnostics::GlslAtomicCounterArraysNotSupported{
+                    .location = varDecl->nameAndLoc.loc});
+            }
+            else
+            {
+                const bool hasBinding = varDecl->findModifier<GLSLBindingAttribute>() != nullptr;
+                const bool hasOffset =
+                    varDecl->findModifier<GLSLOffsetLayoutAttribute>() != nullptr;
+
+                // The earlier ModifiersChecked phase emits MissingLayoutBindingModifier for
+                // `hasOffset && !hasBinding`. Diagnose the remaining binding-less shape here:
+                // `!hasOffset && !hasBinding`, such as an `atomic_uint` introduced into Slang
+                // source by `import glsl`. A binding-producing GLSL declaration has both.
+                if (!hasBinding && !hasOffset)
+                {
+                    getSink()->diagnose(Diagnostics::GlslAtomicCounterRequiresBinding{
+                        .location = varDecl->nameAndLoc.loc});
+                }
+            }
+        }
+    }
+
     bool hasSpecConstAttr = false;
     bool hasPushConstAttr = false;
     for (auto modifier : varDecl->modifiers)

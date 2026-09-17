@@ -97,7 +97,12 @@ enum class AllowCaseDefaultStatements : bool
 struct ParserOptions
 {
     bool enableEffectAnnotations = false;
-    bool allowGLSLInput = false;
+
+    /// The effective source language whose grammar and builtin scope the parser applies.
+    ///
+    /// Callers pass the language already resolved for the translation unit. `Unknown` keeps the
+    /// parser language-neutral and must not enable any dialect-specific syntax or builtin import.
+    SourceLanguage sourceLanguage = SourceLanguage::Unknown;
     bool isInLanguageServer = false;
     bool isCoreModule = false;
     ParsingStage stage = ParsingStage::Body;
@@ -110,12 +115,13 @@ class Parser
 {
 public:
     NamePool* namePool;
-    SourceLanguage sourceLanguage;
     ASTBuilder* astBuilder;
     SemanticsVisitor* semanticsVisitor = nullptr;
 
     NamePool* getNamePool() { return namePool; }
-    SourceLanguage getSourceLanguage() { return sourceLanguage; }
+
+    /// Returns the single effective source language used for every dialect-specific parse rule.
+    SourceLanguage getSourceLanguage() const { return options.sourceLanguage; }
 
     int anonymousCounter = 0;
 
@@ -1278,7 +1284,7 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                     AddModifier(&modifierLink, parsedModifier);
                     continue;
                 }
-                else if (parser->options.allowGLSLInput)
+                else if (parser->getSourceLanguage() == SourceLanguage::GLSL)
                 {
                     if (AdvanceIf(parser, "flat"))
                     {
@@ -1362,6 +1368,33 @@ static NodeBase* parseImportDecl(Parser* parser, void* /*userData*/)
 {
     auto decl = parser->astBuilder->create<ImportDecl>();
     parseFileReferenceDeclBase(parser, decl);
+
+    if (decl->moduleNameAndLoc.name && getText(decl->moduleNameAndLoc.name) == "glsl")
+    {
+        // Actual GLSL receives a synthetic import in `parseSourceFile`, so spelling it in the
+        // source is redundant. Importing GLSL declarations and operator rules into HLSL is
+        // suspicious but remains a warning for compatibility. Legacy Slang source may still use
+        // the import, but Slang 202c removes that compatibility path.
+        if (parser->getSourceLanguage() == SourceLanguage::GLSL)
+        {
+            parser->sink->diagnose(
+                Diagnostics::RedundantGlslModuleImport{.location = decl->moduleNameAndLoc.loc});
+        }
+        else if (parser->getSourceLanguage() == SourceLanguage::HLSL)
+        {
+            parser->sink->diagnose(
+                Diagnostics::GlslModuleImportInHlsl{.location = decl->moduleNameAndLoc.loc});
+        }
+        else if (
+            parser->getSourceLanguage() == SourceLanguage::Slang &&
+            parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_202C)
+        {
+            // `parseTranslationUnit` installs the preprocessed module-wide language version before
+            // parsing any primary file, so this also applies when a later file selects 202c.
+            parser->sink->diagnose(Diagnostics::GlslModuleImportNotAllowedInSlang202c{
+                .location = decl->moduleNameAndLoc.loc});
+        }
+    }
     return decl;
 }
 
@@ -3617,7 +3650,7 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
 
 static Modifier* findPotentialGLSLInterfaceBlockModifier(Parser* parser, Modifiers& mods)
 {
-    if (!parser->options.allowGLSLInput)
+    if (parser->getSourceLanguage() != SourceLanguage::GLSL)
         return nullptr;
 
     for (auto mod : mods)
@@ -4213,7 +4246,8 @@ static Decl* ParseBufferBlockDecl(
         parser->ReadToken(TokenType::Semicolon);
     }
     else if (
-        parser->options.allowGLSLInput && parser->LookAheadToken(TokenType::Identifier) &&
+        parser->getSourceLanguage() == SourceLanguage::GLSL &&
+        parser->LookAheadToken(TokenType::Identifier) &&
         parser->LookAheadToken(TokenType::LBracket, 1))
     {
         // GLSL bindless buffers are denoted with [] after the name.
@@ -4273,8 +4307,8 @@ static Decl* ParseBufferBlockDecl(
 
 static NodeBase* parseHLSLCBufferDecl(Parser* parser, void* /*userData*/)
 {
-    // Check for GLSL layout qualifiers when GLSL input is allowed
-    if (parser->options.allowGLSLInput && parser->pendingModifiers)
+    // Check for GLSL layout qualifiers only when parsing a GLSL translation unit.
+    if (parser->getSourceLanguage() == SourceLanguage::GLSL && parser->pendingModifiers)
     {
         auto getLayoutArg = [&](const char* defaultLayout)
         {
@@ -5737,30 +5771,6 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
     }
 }
 
-static EnumDecl* isUnscopedEnum(Decl* decl)
-{
-    EnumDecl* enumDecl = as<EnumDecl>(decl);
-    if (!enumDecl)
-        return nullptr;
-    for (auto mod : enumDecl->modifiers)
-    {
-        if (as<UnscopedEnumAttribute>(mod))
-        {
-            return enumDecl;
-        }
-        else if (auto uncheckedAttribute = as<UncheckedAttribute>(mod))
-        {
-            // We have to perform an ugly string comparison here, because the attributes
-            // haven't been checked during parsing.
-            if (getText(uncheckedAttribute->keywordName) == "UnscopedEnum")
-            {
-                return enumDecl;
-            }
-        }
-    }
-    return nullptr;
-}
-
 // Finish up work on a declaration that was parsed
 static void CompleteDecl(
     Parser* parser,
@@ -5801,7 +5811,7 @@ static void CompleteDecl(
     }
     else
     {
-        if (parser->options.allowGLSLInput)
+        if (parser->getSourceLanguage() == SourceLanguage::GLSL)
         {
             addSpecialGLSLModifiersBasedOnType(parser, declToModify, &modifiers);
         }
@@ -5936,7 +5946,7 @@ static DeclBase* ParseDeclWithModifiers(
             }
 
             // This can also be a GLSL style buffer block declaration.
-            if (parser->options.allowGLSLInput)
+            if (parser->getSourceLanguage() == SourceLanguage::GLSL)
             {
                 auto getLayoutArg = [&](const char* defaultLayout)
                 {
@@ -6316,7 +6326,7 @@ static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedToke
     bool parentIsInterface = containerDecl->astNodeType == ASTNodeType::InterfaceDecl;
     while (!AdvanceIfMatch(parser, matchType, &closingBraceToken))
     {
-        if (parser->options.allowGLSLInput)
+        if (parser->getSourceLanguage() == SourceLanguage::GLSL)
         {
             if (parseGLSLGlobalDecl(parser, containerDecl))
                 continue;
@@ -6400,7 +6410,7 @@ void Parser::parseSourceFile(ContainerDecl* program)
     currentModule = getModuleDecl(program);
 
     // Verify that the language version is valid.
-    if (sourceLanguage == SourceLanguage::Slang)
+    if (getSourceLanguage() == SourceLanguage::Slang)
     {
         if (!isValidSlangLanguageVersion(currentModule->languageVersion))
         {
@@ -6434,7 +6444,7 @@ void Parser::parseSourceFile(ContainerDecl* program)
         program->loc = tokenReader.peekLoc();
     }
 
-    if (options.allowGLSLInput)
+    if (getSourceLanguage() == SourceLanguage::GLSL)
     {
         auto glslName = getName(this, "glsl");
         if (program->nameAndLoc.name != glslName)
@@ -6444,8 +6454,6 @@ void Parser::parseSourceFile(ContainerDecl* program)
             importDecl->scope = currentScope;
             AddMember(currentScope, importDecl);
         }
-        auto glslModuleModifier = astBuilder->create<GLSLModuleModifier>();
-        addModifier(currentModule, glslModuleModifier);
     }
 
     parseDecls(this, program, MatchedTokenType::File);
@@ -8986,7 +8994,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                     // but rather as a tuple element separator.
                     //
                     Precedence exprLevel = Precedence::Comma;
-                    if (parser->sourceLanguage == SourceLanguage::Slang &&
+                    if (parser->getSourceLanguage() == SourceLanguage::Slang &&
                         parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
                     {
                         // Setting exprLevel to Assignment here will allow the following
@@ -10063,12 +10071,11 @@ Expr* parseTermFromSourceFile(
     SourceLanguage sourceLanguage)
 {
     ParserOptions options;
-    options.allowGLSLInput = sourceLanguage == SourceLanguage::GLSL;
+    options.sourceLanguage = sourceLanguage;
     options.stage = ParsingStage::Body;
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.currentScope = outerScope;
     parser.namePool = namePool;
-    parser.sourceLanguage = sourceLanguage;
     return parser.ParseExpression();
 }
 
@@ -10086,9 +10093,7 @@ Stmt* parseUnparsedStmt(
     options.stage = ParsingStage::Body;
     options.enableEffectAnnotations = translationUnit->compileRequest->optionSet.getBoolOption(
         CompilerOptionName::EnableEffectAnnotations);
-    options.allowGLSLInput =
-        translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::AllowGLSL) ||
-        sourceLanguage == SourceLanguage::GLSL;
+    options.sourceLanguage = sourceLanguage;
     options.isInLanguageServer =
         translationUnit->compileRequest->getLinkage()->isInLanguageServer();
     options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
@@ -10097,7 +10102,6 @@ Stmt* parseUnparsedStmt(
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.currentScope = outerScope;
     parser.namePool = translationUnit->getNamePool();
-    parser.sourceLanguage = sourceLanguage;
     parser.semanticsVisitor = semanticsVisitor;
     parser.currentScope = parser.currentLookupScope = currentScope;
     parser.currentModule = semanticsVisitor->getShared()->getModule()->getModuleDecl();
@@ -10118,9 +10122,7 @@ void parseSourceFile(
     options.stage = ParsingStage::Decl;
     options.enableEffectAnnotations = translationUnit->compileRequest->optionSet.getBoolOption(
         CompilerOptionName::EnableEffectAnnotations);
-    options.allowGLSLInput =
-        translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::AllowGLSL) ||
-        sourceLanguage == SourceLanguage::GLSL;
+    options.sourceLanguage = sourceLanguage;
     options.isInLanguageServer =
         translationUnit->compileRequest->getLinkage()->isInLanguageServer();
     options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
@@ -10128,8 +10130,6 @@ void parseSourceFile(
 
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.namePool = translationUnit->getNamePool();
-    parser.sourceLanguage = sourceLanguage;
-
     return parser.parseSourceFile(parentDecl);
 }
 
@@ -10387,9 +10387,8 @@ static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
 {
     Modifier* modifier = nullptr;
 
-    // While in GLSL compatibility mode, 'shared' = 'groupshared' and not the
-    // D3D11 effect syntax.
-    if (parser->options.allowGLSLInput)
+    // In GLSL source, 'shared' = 'groupshared' and not the D3D11 effect syntax.
+    if (parser->getSourceLanguage() == SourceLanguage::GLSL)
     {
         modifier = parser->astBuilder->create<HLSLGroupSharedModifier>();
     }
@@ -10404,7 +10403,7 @@ static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
 
 static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
 {
-    if ((!parser->options.allowGLSLInput) &&
+    if ((parser->getSourceLanguage() != SourceLanguage::GLSL) &&
         (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026))
     {
         parser->sink->diagnose(Diagnostics::RemovedModifierUsage{
@@ -10413,7 +10412,7 @@ static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
             .location = parser->tokenReader.peekLoc()});
     }
     else if (
-        (!parser->options.allowGLSLInput) &&
+        (parser->getSourceLanguage() != SourceLanguage::GLSL) &&
         (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025))
     {
         parser->sink->diagnose(Diagnostics::DeprecatedModifierUsage{

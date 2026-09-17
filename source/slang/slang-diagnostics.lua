@@ -267,6 +267,89 @@ err(
     span { loc = "location" }
 )
 
+warning(
+    "deprecated-allow-glsl-option",
+    117,
+    "`-allow-glsl` and `setAllowGLSLInput()` are deprecated and now treat every input translation unit as GLSL; select GLSL for each translation unit instead"
+)
+
+warning(
+    "redundant-glsl-module-import",
+    119,
+    "redundant import of the builtin `glsl` module",
+    span { loc = "location", message = "GLSL input already imports the builtin `glsl` module implicitly" }
+)
+
+warning(
+    "source-language-directive-overrides-selected-language",
+    120,
+    "source-language directive selects ~directiveLanguage and overrides the ~selectionSource ~selectedLanguage source language",
+    span { loc = "location", message = "the source directive selects ~directiveLanguage instead of ~selectedLanguage" }
+)
+
+err(
+    "conflicting-source-language-directives",
+    121,
+    "conflicting source-language directives in one translation unit",
+    span { loc = "location", message = "this directive selects a different source language" },
+    note { message = "the translation unit's first source-language directive is here", span { loc = "firstLocation" } }
+)
+
+err(
+    "conflicting-source-file-extension-languages",
+    122,
+    "input files '~firstPath' and '~conflictingPath' have extensions that imply different source languages, but belong to the same translation unit"
+)
+
+err(
+    "source-language-directive-conflicts-with-translation-unit",
+    123,
+    "source-language directive conflicts with the effective source language of its translation unit",
+    span { loc = "location", message = "the translation unit has already been parsed using a different source language" }
+)
+
+err(
+    "glsl-module-import-not-allowed-in-slang-202c",
+    124,
+    "importing the builtin `glsl` module is not allowed in Slang 202c or later",
+    span { loc = "location", message = "select GLSL as the source language instead of importing its builtin module into Slang source" }
+)
+
+warning(
+    "glsl-module-import-in-hlsl",
+    125,
+    "importing the builtin `glsl` module into HLSL source may introduce conflicting language semantics",
+    span { loc = "location", message = "the module exposes GLSL declarations and operator rules without enabling GLSL syntax" }
+)
+
+err(
+    "conflicting-slang-language-version-directives",
+    126,
+    "conflicting Slang language-version directives in one translation unit",
+    span { loc = "location", message = "this directive selects a different Slang language version" },
+    note { message = "the translation unit's first Slang language-version directive is here", span { loc = "firstLocation" } }
+)
+
+err(
+    "glsl-atomic-counter-requires-binding",
+    127,
+    "global `atomic_uint` declarations require a GLSL `layout(binding = ...)` qualifier",
+    span { loc = "location", message = "this atomic counter has no GLSL binding layout" }
+)
+
+err(
+    "glsl-atomic-counter-arrays-not-supported",
+    128,
+    "arrays of `atomic_uint` are not supported",
+    span { loc = "location", message = "declare each supported atomic counter as a directly-bound global" }
+)
+
+warning(
+    "legacy-allow-glsl-overrides-explicit-source-language",
+    129,
+    "the deprecated `AllowGLSL` compatibility option selects GLSL and overrides an explicit ~language source-language selection on the same translation unit"
+)
+
 err(
     "unknown-source-language",
     19,
@@ -1434,6 +1517,13 @@ err(
     30069,
     "'[NoDiscard]' applied to a function returning 'void'",
     span { loc = "decl:Decl", message = "'[NoDiscard]' is not allowed on a function that returns 'void'; there is no result to discard." }
+)
+
+err(
+    "operator-declared-as-member",
+    30073,
+    "operator declared as a member",
+    span { loc = "decl:Decl", message = "operator '~decl' cannot be declared as a member of a type or extension; a call site for this operator resolves its name by lexical scope lookup rather than by member lookup on the operand type, so member operators are not supported. Declare it as a free function 'operator~decl(...)' at module or namespace scope instead." }
 )
 
 err(
@@ -5472,6 +5562,13 @@ err(
     span { loc = "location", message = "Invalid output topology '~topology' for stage '~stage', must be one of: ~validTopologies" }
 )
 
+warning(
+    "post-depth-coverage-target-not-supported",
+    50062,
+    "`[postdepthcoverage]` is not supported on this target and will be ignored",
+    span { loc = "location", message = "the `[postdepthcoverage]` attribute has no effect on target '~target'; `SV_Coverage` will report all covered samples (pre-depth), not only those that survived the early depth/stencil test. Post-depth coverage is currently emitted only for SPIR-V and GLSL." }
+)
+
 err(
     "no-type-conformances-found-for-interface",
     50100,
@@ -5588,6 +5685,13 @@ err(
     "global-param-not-supported-by-interpreter",
     52013,
     "global shader parameter '~name' is not supported by the Slang interpreter (slangi), which runs on the CPU and does not support global parameters or GPU resource types; compile this program with slangc to a GPU target instead."
+)
+
+err(
+    "type-not-representable-by-interpreter",
+    52014,
+    "type has no HostVM layout; use 'NativeString' for a null-terminated string, or compile for a host target",
+    span { loc = "location", message = "'~type:IRInst' has no HostVM layout and cannot be used at runtime" }
 )
 
 warning(
