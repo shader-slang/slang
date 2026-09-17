@@ -4732,14 +4732,14 @@ SemanticsExprVisitor::BuiltinArithmeticElementFamily SemanticsExprVisitor::
     { return witness && !isWitnessUncheckedOptional(witness); };
 
     // Each accessor returns null before the core module is available to search (see
-    // `SharedASTBuilder::getBuiltinIntegerType` and its siblings); the classification for that
+    // `SharedASTBuilder::getBuiltinIntegerInterfaceType` and its siblings); the classification for that
     // family is then left unknown rather than querying conformance against a null interface type.
     auto astBuilder = getASTBuilder();
     BuiltinArithmeticElementFamily family;
-    if (auto integerInterface = astBuilder->getBuiltinIntegerType())
+    if (auto integerInterface = astBuilder->getBuiltinIntegerInterfaceType())
         family.isInteger =
             isProvenConformance(tryGetInterfaceConformanceWitness(elementType, integerInterface));
-    if (auto floatInterface = astBuilder->getBuiltinFloatingPointType())
+    if (auto floatInterface = astBuilder->getBuiltinFloatingPointInterfaceType())
         family.isFloat =
             isProvenConformance(tryGetInterfaceConformanceWitness(elementType, floatInterface));
     // `__BuiltinLogicalType` is implemented by `bool` AND every builtin integer type (it also
@@ -4748,7 +4748,7 @@ SemanticsExprVisitor::BuiltinArithmeticElementFamily SemanticsExprVisitor::
     // generic parameter can never prove `isBool`: there is no sealed marker interface `bool`
     // alone implements, so only the concrete-type branch above (`baseType == BaseType::Bool`)
     // ever sets it.
-    if (auto logicalInterface = astBuilder->getBuiltinLogicalType())
+    if (auto logicalInterface = astBuilder->getBuiltinLogicalInterfaceType())
         family.isLogical =
             isProvenConformance(tryGetInterfaceConformanceWitness(elementType, logicalInterface));
     return family;

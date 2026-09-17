@@ -135,7 +135,7 @@ Type* SharedASTBuilder::getDiffInterfaceType()
 // hlsl.meta.slang, autodiff-base.meta.slang all land in the same `Core` module; see
 // `Session::getBuiltinModuleSource`) and any `NamespaceDecl`s nested within them. Returns null
 // before the core module has been compiled or loaded, which callers must tolerate (see
-// `SharedASTBuilder::getBuiltinIntegerType` and its siblings). Asserts the found declaration is
+// `SharedASTBuilder::getBuiltinIntegerInterfaceType` and its siblings). Asserts the found declaration is
 // actually an `InterfaceDecl`: the three names this is used for (see the accessors below) are
 // `[sealed]` interfaces declared once in the core module, so a name collision with some other
 // declaration kind would be a core-module authoring bug, not a shape this function should
@@ -170,17 +170,31 @@ static Decl* _findCoreModuleDeclByName(Session* session, Name* name)
 }
 
 // The three `[sealed]` marker interfaces (`__BuiltinIntegerType`, `__BuiltinFloatingPointType`,
-// `__BuiltinLogicalType`) have no dedicated C++ `Type` subclass the way `IDifferentiable` does
-// (`getDiffInterfaceType` above), so they cannot be registered with `__magic_type`: that
-// mechanism resolves its name argument against the AST node class registry
-// (`ASTBuilder::findSyntaxClass`) to fill in `MagicTypeModifier::magicNodeType`, and a name with
-// no matching class leaves that field default-constructed rather than diagnosing the mismatch
-// (a gap the parser's own `// TODO: print diagnostic...` comment on `parseMagicTypeModifierImpl`
-// already acknowledges). `_findCoreModuleDeclByName` looks each one up directly from the core
-// module's own declarations instead, the same declarations `T : __BuiltinFloatingPointType`
-// itself resolves against, and each accessor below caches the result once found so the scan
-// (linear in the size of the core module) runs at most once per session.
-Type* SharedASTBuilder::getBuiltinIntegerType()
+// `__BuiltinLogicalType`) are NOT a mutually-exclusive partition of the builtin scalar types:
+// every builtin integer type conforms to both `__BuiltinIntegerType` and `__BuiltinLogicalType`
+// (the latter also backs bitwise-operator codegen), so only `bool` conforms to
+// `__BuiltinLogicalType` without also conforming to `__BuiltinIntegerType`. Because they are
+// sealed, only the compiler's own builtin scalar types can conform to them at all, so a generic
+// type parameter constrained to one is guaranteed to be instantiated with a type from that
+// (possibly overlapping) set.
+//
+// They have no dedicated C++ `Type` subclass the way `IDifferentiable` does (`getDiffInterfaceType`
+// above), so they cannot be registered with `__magic_type`: that mechanism resolves its name
+// argument against the AST node class registry (`ASTBuilder::findSyntaxClass`) to fill in
+// `MagicTypeModifier::magicNodeType`, and a name with no matching class leaves that field
+// default-constructed rather than diagnosing the mismatch (a gap the parser's own `// TODO: print
+// diagnostic...` comment on `parseMagicTypeModifierImpl` already acknowledges).
+//
+// Ordinary unqualified-name lookup (`lookupUnqualifiedName` and friends) is not a fit either: it
+// resolves a reference from a specific lexical `Scope*` at a specific checking-time use site, and
+// applies visibility/overload rules meant for that. `SharedASTBuilder` has no such scope -- these
+// accessors are called from arbitrary points, including outside any checking pass, to answer a
+// simpler question than lookup is built for: "does the core module declare a top-level interface
+// with exactly this name". `_findCoreModuleDeclByName` answers that directly from the module's
+// own declarations, the same declarations `T : __BuiltinFloatingPointType` itself resolves
+// against, and each accessor below caches the result once found so the scan (linear in the size
+// of the core module) runs at most once per session.
+Type* SharedASTBuilder::getBuiltinIntegerInterfaceType()
 {
     if (!m_builtinIntegerType)
     {
@@ -191,7 +205,7 @@ Type* SharedASTBuilder::getBuiltinIntegerType()
     return m_builtinIntegerType;
 }
 
-Type* SharedASTBuilder::getBuiltinFloatingPointType()
+Type* SharedASTBuilder::getBuiltinFloatingPointInterfaceType()
 {
     if (!m_builtinFloatingPointType)
     {
@@ -203,7 +217,7 @@ Type* SharedASTBuilder::getBuiltinFloatingPointType()
     return m_builtinFloatingPointType;
 }
 
-Type* SharedASTBuilder::getBuiltinLogicalType()
+Type* SharedASTBuilder::getBuiltinLogicalInterfaceType()
 {
     if (!m_builtinLogicalType)
     {

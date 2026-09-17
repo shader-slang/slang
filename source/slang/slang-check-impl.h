@@ -4342,10 +4342,11 @@ private:
         // be `bool`-shaped: taking the fast path for a `__BuiltinLogicalType`-constrained
         // generic instantiated with an integer would build a `Not` node typed as that integer.
         bool isBool = false;
-        // True for any element type -- concrete or generic -- that conforms to
-        // `__BuiltinLogicalType` (`bool` and every builtin integer type; see core.meta.slang).
-        // Safe for an operator whose builtin semantics don't depend on which of those the
-        // element actually is, e.g. equality (`==`/`!=`, which lower to the same
+        // True for a *generic* element type that conforms to `__BuiltinLogicalType` (`bool` and
+        // every builtin integer type; see core.meta.slang) -- the concrete-type branch never sets
+        // this, since a concrete `bool`/integer is already fully classified by `isBool`/
+        // `isInteger`. Safe for an operator whose builtin semantics don't depend on which of
+        // those the element actually is, e.g. equality (`==`/`!=`, which lower to the same
         // `kIROp_Eql`/`kIROp_Neq` regardless): a generic parameter constrained only to
         // `__BuiltinLogicalType` still needs equality fast-pathed, but must NOT take the
         // logical-not fast path -- that's exactly why this is a separate flag from `isBool`

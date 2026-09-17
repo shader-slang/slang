@@ -43,28 +43,16 @@ public:
     Type* getDiffInterfaceType();
 
     // Three `[sealed]` marker interfaces over the builtin scalar types (`__BuiltinIntegerType`,
-    // `__BuiltinFloatingPointType`, `__BuiltinLogicalType`; see core.meta.slang). These are NOT a
-    // mutually-exclusive partition: every builtin integer type conforms to both
-    // `__BuiltinIntegerType` and `__BuiltinLogicalType` (the latter also backs bitwise-operator
-    // codegen), so `isInteger` and `isLogical` can both be true for the same element type -- only
-    // `bool` conforms to `__BuiltinLogicalType` without also conforming to `__BuiltinIntegerType`.
-    // Because they are sealed, only the compiler's own builtin scalar types can conform to them
-    // at all, so a generic type parameter constrained to one of them is guaranteed to be
-    // instantiated with a type from that (possibly overlapping) set. `SemanticsExprVisitor::
-    // classifyBuiltinArithmeticElementType` uses these to widen the builtin-operator fast path to
-    // such a parameter, the same way it already recognizes a concrete `BasicExpressionType` --
-    // see `BuiltinArithmeticElementFamily`'s own field comments for why `isBool` and `isLogical`
-    // are tracked separately rather than folded into one flag.
-    //
-    // None of the three has a dedicated C++ `Type` subclass the way `IDifferentiable` does, so
-    // they cannot be registered with `__magic_type`, which requires one (it resolves the name
-    // against the AST node class registry, not against a Slang-level declaration). Each is
-    // instead found by a one-time, cached scan of the core module's own top-level declarations
-    // for an exact name match; see the .cpp for why the ordinary scope/lookup machinery is not a
-    // better fit here.
-    Type* getBuiltinIntegerType();
-    Type* getBuiltinFloatingPointType();
-    Type* getBuiltinLogicalType();
+    // `__BuiltinFloatingPointType`, `__BuiltinLogicalType`; see core.meta.slang), used by
+    // `SemanticsExprVisitor::classifyBuiltinArithmeticElementType` to widen the builtin-operator
+    // fast path to a generic parameter constrained by one of them -- see
+    // `BuiltinArithmeticElementFamily` in slang-check-impl.h for that usage, and the .cpp for why
+    // these are found by a core-module scan rather than `__magic_type` or scope lookup. Each
+    // accessor returns null before the core module is available to search, and caches its result
+    // (a linear scan of the core module) once found, so it runs at most once per session.
+    Type* getBuiltinIntegerInterfaceType();
+    Type* getBuiltinFloatingPointInterfaceType();
+    Type* getBuiltinLogicalInterfaceType();
 
     Type* getIBufferDataLayoutType();
 
@@ -733,12 +721,12 @@ public:
     // See the identically named methods on `SharedASTBuilder` for what these are; these three
     // forward to them so callers can reach them the same way they reach
     // `getDifferentiableInterfaceType()` above.
-    Type* getBuiltinIntegerType() { return m_sharedASTBuilder->getBuiltinIntegerType(); }
-    Type* getBuiltinFloatingPointType()
+    Type* getBuiltinIntegerInterfaceType() { return m_sharedASTBuilder->getBuiltinIntegerInterfaceType(); }
+    Type* getBuiltinFloatingPointInterfaceType()
     {
-        return m_sharedASTBuilder->getBuiltinFloatingPointType();
+        return m_sharedASTBuilder->getBuiltinFloatingPointInterfaceType();
     }
-    Type* getBuiltinLogicalType() { return m_sharedASTBuilder->getBuiltinLogicalType(); }
+    Type* getBuiltinLogicalInterfaceType() { return m_sharedASTBuilder->getBuiltinLogicalInterfaceType(); }
 
     MeshOutputType* getMeshOutputTypeFromModifier(
         HLSLMeshShaderOutputModifier* modifier,

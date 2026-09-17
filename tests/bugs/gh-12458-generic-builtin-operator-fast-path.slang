@@ -38,8 +38,8 @@
 // matching `operator+` and reports a normal diagnostic. That file also explains why the stronger
 // negative case the fix's own `isWitnessUncheckedOptional` guard exists for -- a `where optional
 // T : __BuiltinFloatingPointType` constraint used outside an `if (T is ...)` check -- is not
-// covered anywhere yet: instantiating it with a concretely non-conforming type currently crashes
-// the compiler for a reason unrelated to this PR (shader-slang/slang#13018).
+// covered anywhere yet: see that file for the full explanation and the tracking issue
+// (shader-slang/slang#13061).
 //
 // A THIRD negative case -- `vector<T,N> == vector<T,N>` specifically -- is covered separately by
 // `gh-12458-generic-vector-equality-decline.slang` (a `COMPARE_COMPUTE` test, not `INTERPRET`:
