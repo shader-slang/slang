@@ -13090,6 +13090,7 @@ vector<T, N> __vectorMaxImpl(vector<T, N> x, vector<T, N> y)
 
 // Implements the target-specific matrix maximum behavior shared by all builtin arithmetic
 // element types.
+//@ hidden:
 __generic<
     T : __BuiltinArithmeticType,
     let N : int,
@@ -13432,6 +13433,7 @@ vector<T, N> __vectorMinImpl(vector<T, N> x, vector<T, N> y)
 
 // Implements the target-specific matrix minimum behavior shared by all builtin arithmetic
 // element types.
+//@ hidden:
 __generic<
     T : __BuiltinArithmeticType,
     let N : int,
