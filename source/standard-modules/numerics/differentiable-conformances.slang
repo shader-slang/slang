@@ -352,9 +352,9 @@ public extension<
         reciprocalSquareRoot, __differentiableNumericsRsqrt)
 
 #define SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_ORDERING_REQUIREMENTS                    \
-    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
         minimum, __differentiableNumericsMinimum)                               \
-    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
         maximum, __differentiableNumericsMaximum)
 
 public extension<

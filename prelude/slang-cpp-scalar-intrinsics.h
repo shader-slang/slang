@@ -999,6 +999,16 @@ SLANG_FORCE_INLINE uint32_t U16_countbits(uint16_t v)
 #endif
 }
 
+SLANG_FORCE_INLINE uint16_t U16_min(uint16_t a, uint16_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE uint16_t U16_max(uint16_t a, uint16_t b)
+{
+    return a > b ? a : b;
+}
+
 SLANG_FORCE_INLINE half U16_ashalf(uint16_t x)
 {
     Union16 u;
@@ -1012,6 +1022,16 @@ SLANG_FORCE_INLINE uint32_t I16_countbits(int16_t v)
     return U16_countbits(uint16_t(v));
 }
 
+SLANG_FORCE_INLINE int16_t I16_min(int16_t a, int16_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE int16_t I16_max(int16_t a, int16_t b)
+{
+    return a > b ? a : b;
+}
+
 // ----------------------------- U8 -----------------------------------------
 SLANG_FORCE_INLINE uint32_t U8_countbits(uint8_t v)
 {
@@ -1019,10 +1039,30 @@ SLANG_FORCE_INLINE uint32_t U8_countbits(uint8_t v)
     return U16_countbits(uint16_t(v));
 }
 
+SLANG_FORCE_INLINE uint8_t U8_min(uint8_t a, uint8_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE uint8_t U8_max(uint8_t a, uint8_t b)
+{
+    return a > b ? a : b;
+}
+
 // ----------------------------- I8 -----------------------------------------
 SLANG_FORCE_INLINE uint32_t I8_countbits(int16_t v)
 {
     return U8_countbits(uint8_t(v));
+}
+
+SLANG_FORCE_INLINE int8_t I8_min(int8_t a, int8_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE int8_t I8_max(int8_t a, int8_t b)
+{
+    return a > b ? a : b;
 }
 
 // ----------------------------- U32 -----------------------------------------
