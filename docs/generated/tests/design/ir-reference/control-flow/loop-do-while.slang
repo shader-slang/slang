@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#loop
-//META: doc_section_digest=4246818bbad3a8ae8ca598731acc24e52393b997901fb8ec83554a8705bc12d4
+//META: doc_section_digest=11bb8e0156989c885bddf35636b284cd6a60a3e29d0c1d38b73c6df665c61b1f
 //META: purpose=A do-while loop lowers to a loop terminator; the trailing test is implemented by negating the condition so the ifElse branches to break on true.
 //META: intent=functional
 //META: pipeline_stage=lower

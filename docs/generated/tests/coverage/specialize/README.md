@@ -156,3 +156,21 @@ misbehaviour, and unreachable code has neither.
 | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [#dispatchers-and-existential-specialization](../../../design/ir-reference/generics-and-existentials.md#dispatchers-and-existential-specialization) | undocumented-behavior | When an entry point takes a `uniform` interface-typed parameter and the linkage has no conforming type, the compiler emits E50100 "no type conformances found", but on SPIR-V/HLSL/GLSL/Metal/WGSL/CPP it prints the short form with no source location and repeated 2–3 times, while CUDA prints a single located span. The doc does not describe the no-conformances requirement or this per-target inconsistency. | Add a note that interface-typed entry-point parameters require at least one conforming type in the linkage, document the E50100 diagnostic, and treat the no-location / repeated emission on non-CUDA targets as a diagnostic-quality bug to fix. |
 | [#dispatchers-and-existential-specialization](../../../design/ir-reference/generics-and-existentials.md#dispatchers-and-existential-specialization) | undocumented-behavior | A potentially-uninitialized interface object used in dynamic dispatch reports E50101 twice on CUDA. The doc does not state that an interface local must be definitely-assigned on all paths before a dynamic-dispatch call, nor that the diagnostic may repeat.                                                                                                                                                      | Document the definite-assignment requirement for interface objects before dynamic dispatch and de-duplicate the repeated E50101 emission.                                                                                                         |
+
+## Drift review
+
+Reviewed at `d592afa9b9` against `ef1068b548`, the commit this bundle was
+generated from. 8 commits touched its watched paths in between; all
+10 existing tests still pass.
+
+One diagnostic new since the base commit is raised from
+`slang-ir-specialize.cpp`, E38207 (a global generic parameter used in code with
+no concrete binding), and it is already pinned by
+`design/ast-reference/declarations/globalgenericparamdecl-use-without-binding-rejected.slang`.
+No test was added.
+
+`115965e06c` (#12518, diagnosing unresolved dynamic dispatch in
+entry-point-reachable helpers) is in this window and is the change behind the
+`typeflow-report-dynamic-dispatch-sites` entry still listed in
+`_meta/expected-failures.txt`; that entry is tracked in `_meta/triage/`, not
+here.

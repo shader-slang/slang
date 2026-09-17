@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#loweredvalinfo-and-the-lowering-environment
-//META: doc_section_digest=9127ecfc310ffdc4aecbad1b96d176cf66095ac4dcbdc84a1ac4106e6bf98dd2
+//META: doc_section_digest=b811ef439a253bd37ab607f1ac1de7706df1cebe7013e2fd2ae6c1702a518c0c
 //META: purpose=A swizzle used as an assignment target stays symbolic through lowering (the `SwizzledLValue` flavor) and is resolved at the write site into a single store carrying the component indices.
 //META: intent=functional
 //META: pipeline_stage=lower
