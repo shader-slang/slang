@@ -17,8 +17,11 @@
 //TEST_INPUT:ubuffer(data=[1 2 3 4 8 7 6 5], stride=16):name=unsignedInput
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=output
 
+// HLSL-NOT: dot_
 // HLSL: dot(
+// HLSL-NOT: dot_
 // HLSL: dot(
+// HLSL-NOT: dot_
 // HLSL: dot(
 // HLSL-NOT: dot_
 
@@ -26,8 +29,11 @@
 // SPIRV-DAG: OpSDot
 // SPIRV-DAG: OpUDot
 
+// WGSL-NOT: dot_
 // WGSL: dot(
+// WGSL-NOT: dot_
 // WGSL: dot(
+// WGSL-NOT: dot_
 // WGSL: dot(
 // WGSL-NOT: dot_
 

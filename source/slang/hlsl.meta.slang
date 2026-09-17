@@ -10390,6 +10390,7 @@ T dot(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
 [ForceInline]
+// Keep this below the family-specific overloads; see the shared rationale above.
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)

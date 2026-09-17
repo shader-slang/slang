@@ -300,12 +300,12 @@ public extension<let R : int, let C : int, let L : MatrixLayoutMode>
     }
 }
 
-// This extension owns the common shape witnesses for every builtin arithmetic vector. Unlike the
-// scalar conformances above, vectors publish `IDotProduct` separately instead of joining it with
-// each narrower numeric refinement. This gives integer and floating-point vectors one shared
-// conformance under the broad `IBuiltinScalarNumeric` constraint. The narrower refinements below
-// reuse its Scalar, Mask, and fromScalar witnesses instead of publishing duplicate witness paths,
-// which would run into the ambiguity tracked by #12874.
+// This extension owns the common shape witnesses for every vector over an `IBuiltinScalarNumeric`
+// element. Unlike the scalar conformances above, vectors publish `IDotProduct` separately instead
+// of joining it with each narrower numeric refinement. This gives integer and floating-point
+// vectors one shared conformance under the broad `IBuiltinScalarNumeric` constraint. The narrower
+// refinements below reuse its Scalar, Mask, and fromScalar witnesses instead of publishing
+// duplicate witness paths, which would run into the ambiguity tracked by #12874.
 public extension<T : IBuiltinScalarNumeric, let N : int>
     vector<T, N> : IDotProduct
 {
