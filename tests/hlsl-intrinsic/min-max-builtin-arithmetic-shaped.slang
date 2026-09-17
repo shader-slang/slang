@@ -10,6 +10,8 @@
 //TEST:SIMPLE(filecheck=CONCRETE): -target spirv-asm -entry concreteMain -stage compute
 //TEST:SIMPLE(filecheck=GENERIC): -target spirv-asm -entry genericCodegenMain -stage compute
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry genericMatrixCodegenMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry genericMatrixCodegenMain -stage compute
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry genericMatrixCodegenMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry genericVectorCodegenMain -stage compute
 
 // Verify that min and max accept scalar, vector, and matrix operands when generic code knows only
@@ -47,6 +49,12 @@
 // HLSL: return max(left_{{[0-9]+}}, right_{{[0-9]+}});
 // HLSL-LABEL: row_major int2x2 genericMinimum_{{[0-9]+}}(row_major int2x2
 // HLSL: return min(left_{{[0-9]+}}, right_{{[0-9]+}});
+
+// GLSL-DAG: = max(left_{{[0-9]+}}[i_{{[0-9]+}}], right_{{[0-9]+}}[i_{{[0-9]+}}]);
+// GLSL-DAG: = min(left_{{[0-9]+}}[i_{{[0-9]+}}], right_{{[0-9]+}}[i_{{[0-9]+}}]);
+
+// METAL-DAG: = max((*left_{{[0-9]+}})[i_{{[0-9]+}}], (*right_{{[0-9]+}})[i_{{[0-9]+}}]);
+// METAL-DAG: = min((*left_{{[0-9]+}})[i_{{[0-9]+}}], (*right_{{[0-9]+}})[i_{{[0-9]+}}]);
 
 // WGSL-LABEL: fn genericMaximum_{{[0-9]+}}({{.*}}vec4<f32>{{.*}}) -> vec4<f32>
 // WGSL: return max(left_{{[0-9]+}}, right_{{[0-9]+}});

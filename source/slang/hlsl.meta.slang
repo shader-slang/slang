@@ -13112,9 +13112,10 @@ matrix<T, N, M, L> __matrixMaxImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
     }
 }
 
-// Keep the established integer and floating-point overloads so existing overload resolution and
-// derivative registrations retain their identities. The lower-ranked common-arithmetic overload
-// exists only for generic bodies whose available element constraint cannot select either family.
+// Keep the established integer and floating-point overloads so overload resolution remains
+// stable. The floating-point declarations also retain the identities referenced by derivative
+// registrations. The lower-ranked common-arithmetic overload exists only for generic bodies whose
+// available element constraint cannot select either family.
 /// @category math
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
@@ -13177,6 +13178,9 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 // Concrete integer and floating-point calls should retain their established overloads; this
 // lower-ranked overload exists for generic code that knows only the common arithmetic domain.
+// It is primal-only because that domain includes integers and cannot share the floating-point
+// derivative registration. Differentiable generic code must constrain `T` to
+// `__BuiltinFloatingPointType` so overload resolution selects the overload above.
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
@@ -13206,7 +13210,7 @@ __generic<
     let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
-// See the vector overload above for why the common-arithmetic overload has a lower rank.
+// See the vector overload above for the common-arithmetic rank and primal-only contract.
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
@@ -13513,6 +13517,9 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 // Concrete integer and floating-point calls should retain their established overloads; this
 // lower-ranked overload exists for generic code that knows only the common arithmetic domain.
+// It is primal-only because that domain includes integers and cannot share the floating-point
+// derivative registration. Differentiable generic code must constrain `T` to
+// `__BuiltinFloatingPointType` so overload resolution selects the overload above.
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
@@ -13542,7 +13549,7 @@ __generic<
     let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
-// See the vector overload above for why the common-arithmetic overload has a lower rank.
+// See the vector overload above for the common-arithmetic rank and primal-only contract.
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M, L> min(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
