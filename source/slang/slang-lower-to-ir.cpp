@@ -3885,10 +3885,11 @@ ParamPassingMode getDeclaredParamPassingModeForImplicitThisParam(
     // For example, a `set` accessor (e.g., on a `property` or
     // `subscript` declaration) defaults to having a mutable
     // `this` parameter, unless the programmer explicitly
-    // opts out using `[nomutating]` (which was already checked
+    // opts out using `[nonmutating]` (which was already checked
     // for above).
     //
-    if (as<SetterDecl>(declWithImplicitThisParam))
+    if (auto callable = as<CallableDecl>(declWithImplicitThisParam);
+        callable && isEffectivelyMutating(callable))
     {
         return ParamPassingMode::BorrowInOut;
     }

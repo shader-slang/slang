@@ -1014,19 +1014,10 @@ static void _lookUpInScopes(
                     //
                     thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
                 }
-                else if (funcDeclRef.getDecl()->hasModifier<MutatingAttribute>())
+                else if (isEffectivelyMutating(funcDeclRef.getDecl()))
                 {
-                    // In a non-`static` method marked `[mutating]` there is
-                    // an implicit `this` parameter that is mutable.
-                    //
-                    thisParameterMode =
-                        LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
-                }
-                else if (funcDeclRef.getDecl()->hasModifier<RefAttribute>())
-                {
-                    // In a non-`static` method marked `[ref]` there is
-                    // an implicit `this` parameter that is mutable.
-                    //
+                    // Explicitly mutating methods and implicitly mutating accessors expose a
+                    // mutable receiver to unqualified member lookup.
                     thisParameterMode =
                         LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
                 }

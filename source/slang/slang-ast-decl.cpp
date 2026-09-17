@@ -521,6 +521,16 @@ bool isLocalVar(const Decl* decl)
     return false;
 }
 
+bool isEffectivelyMutating(CallableDecl* decl)
+{
+    if (decl->hasModifier<MutatingAttribute>() || decl->hasModifier<RefAttribute>())
+        return true;
+    if (decl->hasModifier<NonmutatingAttribute>() || decl->hasModifier<ConstRefAttribute>())
+        return false;
+
+    return as<SetterDecl>(decl) || as<RefAccessorDecl>(decl);
+}
+
 ThisTypeDecl* InterfaceDecl::getThisTypeDecl()
 {
     auto thisTypeDecl = findFirstDirectMemberDeclOfType<ThisTypeDecl>();

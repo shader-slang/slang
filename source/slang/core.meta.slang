@@ -4688,7 +4688,8 @@ attribute_syntax [mutating] : MutatingAttribute;
 /// as an `in` parameter, so mutations to members accessed from `this` argument will be prohibited by the compiler.
 /// @remarks
 /// Member functions of a type are non-mutating by default, so this attribute is not necessary in most cases.
-/// However, the `set` accessor of a property or subscript is mutating by default, and you can use `[nonmutating]` to mark it as non-mutating.
+/// However, the `set` and `ref` accessors of a property or subscript are mutating by default, and
+/// you can use `[nonmutating]` to mark them as non-mutating.
 /// For example:
 /// ```csharp
 /// struct S
