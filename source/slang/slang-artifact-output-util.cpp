@@ -2,6 +2,7 @@
 
 #include "core/slang-hex-dump-util.h"
 #include "core/slang-io.h"
+#include "core/slang-performance-profiler.h"
 #include "core/slang-platform.h"
 #include "core/slang-string-util.h"
 #include "core/slang-type-text-util.h"
@@ -66,7 +67,12 @@ namespace Slang
         return SLANG_FAIL;
     }
     auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-    SLANG_RETURN_ON_FAIL(compiler->convert(artifact, assemblyDesc, outArtifact));
+    {
+        // Named so it shows up in -report-perf-benchmark; see the sibling wrapped call sites in
+        // slang-emit.cpp and slang-code-gen.cpp.
+        SLANG_PROFILE_SECTION(downstreamCompile);
+        SLANG_RETURN_ON_FAIL(compiler->convert(artifact, assemblyDesc, outArtifact));
+    }
     auto downstreamElapsedTime =
         (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
     session->addDownstreamCompileTime(downstreamElapsedTime);

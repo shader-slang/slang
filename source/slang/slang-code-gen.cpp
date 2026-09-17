@@ -2,6 +2,7 @@
 #include "slang-code-gen.h"
 
 #include "compiler-core/slang-slice-allocator.h"
+#include "core/slang-performance-profiler.h"
 #include "core/slang-type-convert-util.h"
 #include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
@@ -1026,7 +1027,13 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     // Compile
     ComPtr<IArtifact> artifact;
     auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-    SlangResult compileResult = compiler->compile(options, artifact.writeRef());
+    SlangResult compileResult;
+    {
+        // Named so it shows up in -report-perf-benchmark; see the sibling wrapped call sites in
+        // slang-emit.cpp and slang-artifact-output-util.cpp.
+        SLANG_PROFILE_SECTION(downstreamCompile);
+        compileResult = compiler->compile(options, artifact.writeRef());
+    }
     auto downstreamElapsedTime =
         (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
     getSession()->addDownstreamCompileTime(downstreamElapsedTime);
