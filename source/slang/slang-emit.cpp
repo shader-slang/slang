@@ -997,6 +997,59 @@ void removeWeakUseInsts(IRModule* module)
     }
 }
 
+// Inline large-state helpers while the IR simplifier can still eliminate
+// unused aggregate storage. For example, a helper that reads a few fields through
+// a 2 KiB state pointer can otherwise keep the entire state addressable across a
+// CUDA call. Doing this before CUDA emission avoids leaving all cleanup to NVRTC.
+static void markLargeOptixHelpersForInlining(IRModule* module, TargetRequest* targetRequest)
+{
+    bool hasEntryPoint = false;
+    for (auto global : module->getGlobalInsts())
+    {
+        if (auto entry = global->findDecoration<IREntryPointDecoration>())
+        {
+            hasEntryPoint = true;
+            const auto stage = entry->getProfile().getStage();
+            if (stage != Stage::Miss && stage != Stage::ClosestHit && stage != Stage::AnyHit &&
+                stage != Stage::Intersection)
+                return;
+        }
+    }
+    if (!hasEntryPoint)
+        return;
+
+    // This is a storage-cost heuristic, not an ABI limit. Leave smaller pointees
+    // and other shader stages to the downstream compiler's normal inlining policy.
+    const IRIntegerValue largeStateThreshold = 2 * 1024;
+    IRBuilder builder(module);
+    for (auto global : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(global);
+        if (!func || !func->isDefinition() || func->findDecoration<IREntryPointDecoration>() ||
+            func->findDecoration<IRCudaDeviceExportDecoration>() ||
+            func->findDecoration<IRNoInlineDecoration>() ||
+            func->findDecoration<IRForceInlineDecoration>())
+            continue;
+        // Source exports may have their local calls inlined: the linker's keep-alive
+        // decoration preserves their externally callable definitions and signatures.
+        for (auto param : func->getParams())
+        {
+            auto pointer = as<IRPtrTypeBase>(param->getDataType());
+            if (!pointer)
+                continue;
+            IRSizeAndAlignment layout;
+            if (SLANG_SUCCEEDED(
+                    getNaturalSizeAndAlignment(targetRequest, pointer->getValueType(), &layout)) &&
+                layout.size != IRSizeAndAlignment::kIndeterminateSize &&
+                layout.size >= largeStateThreshold)
+            {
+                builder.addForceInlineDecoration(func);
+                break;
+            }
+        }
+    }
+}
+
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
     LinkingAndOptimizationOptions const& options,
@@ -2656,6 +2709,10 @@ Result linkAndOptimizeIR(
     {
         SLANG_PASS(lowerImmutableBufferLoadForCUDA, targetProgram);
     }
+
+    if (target == CodeGenTarget::CUDASource &&
+        targetProgram->getOptionSet().getOptimizationLevel() != OptimizationLevel::None)
+        SLANG_PASS(markLargeOptixHelpersForInlining, targetRequest);
 
     SLANG_PASS(performForceInlining);
 
