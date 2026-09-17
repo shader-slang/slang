@@ -4,20 +4,25 @@
 # Requires driver 580.65.06 or newer
 #
 # Used by:
+# - .github/workflows/ci-rhi-test-container.yml
 # - .github/workflows/ci-slang-build-container.yml
 # - .github/workflows/ci-slang-test-container.yml
+# - .github/workflows/cmake-options-build-container.yml
+# - extras/ci-gpu-stress-loop.py
 #
 # Build and push:
-#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1 .
-#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
+#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0 .
+#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0
 #
 # IMPORTANT: After pushing a new version, update all references in:
+#   - .github/workflows/ci-rhi-test-container.yml
 #   - .github/workflows/ci-slang-build-container.yml
 #   - .github/workflows/ci-slang-test-container.yml
-#   - .github/workflows/ci-slangpy-tests-container.yml
+#   - .github/workflows/cmake-options-build-container.yml
+#   - extras/ci-gpu-stress-loop.py
 #
 # Find all references:
-#   grep -rn "ghcr.io/shader-slang/slang-linux-gpu-ci" .github/workflows/
+#   grep -rn "ghcr.io/shader-slang/slang-linux-gpu-ci" .github/workflows/ extras/ci-gpu-stress-loop.py
 #
 # The check-container-consistency.yml workflow will verify all references match.
 
@@ -57,19 +62,19 @@ RUN apt-get update && apt-get install -y \
     gdb \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Vulkan SDK 1.4.341.1 from tarball (apt packages discontinued after 1.4.313)
-# Using tarball to get the fixed validation layers that resolve cooperative vector issues
-ENV VULKAN_SDK=/opt/vulkan-sdk/1.4.341.1/x86_64
+# Install Vulkan SDK 1.4.350.0 from tarball (apt packages discontinued after 1.4.313).
+# This is the first SDK containing the validation-layer fix for VUID 10904 (see #13148).
+ENV VULKAN_SDK=/opt/vulkan-sdk/1.4.350.0/x86_64
 ENV PATH="${VULKAN_SDK}/bin:${PATH}"
 ENV LD_LIBRARY_PATH="${VULKAN_SDK}/lib:${LD_LIBRARY_PATH}"
 ENV VK_LAYER_PATH="${VULKAN_SDK}/share/vulkan/explicit_layer.d"
 
-RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.341.1/linux/vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
-    echo "3bf0f762afb6c79bc6a9d9fb5998745ccff928800a29619b501ed9de7fd9789b  vulkansdk-linux-x86_64-1.4.341.1.tar.xz" | sha256sum -c - && \
-    tar -xf vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
+RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.350.0/linux/vulkansdk-linux-x86_64-1.4.350.0.tar.xz && \
+    echo "b65f068ab36263559da49d7cacd7e7b9df23824ca8b68ccc522a2b06f5725df2  vulkansdk-linux-x86_64-1.4.350.0.tar.xz" | sha256sum -c - && \
+    tar -xf vulkansdk-linux-x86_64-1.4.350.0.tar.xz && \
     mkdir -p /opt/vulkan-sdk && \
-    mv 1.4.341.1 /opt/vulkan-sdk/ && \
-    rm -rf vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
+    mv 1.4.350.0 /opt/vulkan-sdk/ && \
+    rm -rf vulkansdk-linux-x86_64-1.4.350.0.tar.xz && \
     echo "${VULKAN_SDK}/lib" > /etc/ld.so.conf.d/vulkan-sdk.conf && \
     ldconfig
 
