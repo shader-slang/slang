@@ -39,9 +39,10 @@ public matrix<TDestination, R, C, L> __numericsBuiltinConvertMatrix<
     let C : int,
     let L : MatrixLayoutMode>(matrix<TSource, R, C, L> value)
 {
-    // Keep the conversion in terms of the canonical vector BuiltinCast. A whole-matrix cast to
-    // bool lowers to a matrix comparison, which C-like targets do not uniformly provide. Logical
-    // row access preserves `L` while giving every target a supported shaped conversion.
+    // Do not replace this body with a whole-matrix BuiltinCast. A floating-point-to-Boolean cast
+    // would then emit a matrix-to-scalar comparison, which CUDA's emitted C-like matrix types do
+    // not support. Casting each logical row through the canonical vector BuiltinCast preserves `L`
+    // while giving every target a supported shaped conversion.
     matrix<TDestination, R, C, L> result;
     [ForceUnroll]
     for (int row = 0; row < R; ++row)
