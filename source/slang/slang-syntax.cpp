@@ -1180,6 +1180,34 @@ ModuleDecl* getModuleDecl(Scope* scope)
     return nullptr;
 }
 
+EnumDecl* isUnscopedEnum(Decl* decl)
+{
+    EnumDecl* enumDecl = as<EnumDecl>(decl);
+    if (!enumDecl)
+        return nullptr;
+    for (auto mod : enumDecl->modifiers)
+    {
+        if (as<UnscopedEnumAttribute>(mod))
+        {
+            return enumDecl;
+        }
+        else if (auto uncheckedAttribute = as<UncheckedAttribute>(mod))
+        {
+            // TODO: This unchecked, string-based attribute match exists only so that this
+            // predicate can be used during parsing, before attributes are checked. It is
+            // both ugly and fragile, and we should aspire to remove the need for it -- e.g.
+            // by not requiring an enum's unscoped-ness to be known at parse time -- so that
+            // "is this enum unscoped" can rely solely on the checked `UnscopedEnumAttribute`
+            // handled above.
+            if (getText(uncheckedAttribute->keywordName) == "UnscopedEnum")
+            {
+                return enumDecl;
+            }
+        }
+    }
+    return nullptr;
+}
+
 ContainerDecl* getParentDecl(Decl* decl)
 {
     auto parentDecl = decl->parentDecl;

@@ -7,7 +7,9 @@ permalink: /user-guide/language-version
 
 Like many programming languages, Slang experiences a tension between the desire for rapid innovation/evolution and stability. One of the benefits that users of Slang have so far enjoyed has been the rapid pace of innovation in the language and its standard library. However, as developers start to have larger bodies of Slang code, they may become concerned that changes to the language could break existing code. There is no magical way to keep innovating while also keeping the language static.
 
-Slang supports using the `#language` preprocessor directive, as well as the `-std` compiler option (`CompilerOptionName::LanguageVersion`) to specify the language version that a source file is written against. The source file will then be parsed and checked by the compiler using the rules from the specified language version.
+Slang supports using the `#language` preprocessor directive, as well as the `-std` compiler option (`CompilerOptionName::LanguageVersion`) to specify the language version that a translation unit is written against.
+The translation unit will then be parsed and checked by the compiler using the rules from the specified language version.
+If a translation unit has multiple primary source files, a `#language` directive in any of them selects the version for the complete module, and all such directives must agree.
 
 Users are advised to provide a `#language` directive as the first non-whitespace line in their source file, such as:
 
@@ -42,6 +44,8 @@ Slang language version 2025 brings these changes on top of the legacy language:
 - Modifier `volatile` has been deprecated in Slang. See GitHub issue
   [#10614](https://github.com/shader-slang/slang/issues/10614) for details. The modifier is still accepted
   in GLSL source code for compatibility reasons.
+- Compile-time for (`$for`) has been deprecated. Use `[ForceUnroll] for` instead. See GitHub issue
+  [#13065](https://github.com/shader-slang/slang/issues/13065) for details.
 
 ## Slang 2026
 
@@ -87,3 +91,5 @@ Slang language version 202c brings these changes on top of Slang 2026:
   it is now a regular conversion. To maintain the previous semantics, a constructor call with no arguments can
   be used instead (e.g., `MyStruct()`). See GitHub issue
   [#12045](https://github.com/shader-slang/slang/issues/12045) for details.
+- Compile-time for (`$for`) has been removed from the language. Use `[ForceUnroll] for` instead. See GitHub issue
+  [#13065](https://github.com/shader-slang/slang/issues/13065) for details.
