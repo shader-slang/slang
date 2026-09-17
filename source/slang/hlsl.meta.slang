@@ -27982,11 +27982,11 @@ extension DescriptorHandle<T>
     {
         // A `ResourceDescriptorHeap[i]` index cannot be stored in a native bindless `.Handle` (a
         // `uint64` under `spvBindlessTextureNV` for an encodable texture/sampler): there is no faithful
-        // place for the index, so we diagnose rather than reinterpret the bits. The decision comes from
-        // `usesNativeSpirvDescriptorHandle<T>()` (see its definition for why the query folds to the
-        // constant a `static_assert` needs without leaking an NV capability onto plain SPIR-V). Non-native
-        // and heap-index-only representations (including `spvDescriptorHeapEXT` alone) convert normally
-        // and are not diagnosed here.
+        // place for the index, so we diagnose rather than reinterpret the bits.
+        // `usesNativeSpirvDescriptorHandle<T>()` is the single source of that decision (see its
+        // definition for the `[ForceInline]`/capability-scoping rationale). Non-native and
+        // heap-index-only representations (including `spvDescriptorHeapEXT` alone) convert normally and
+        // are not diagnosed here.
         static_assert(!usesNativeSpirvDescriptorHandle<T>(), "Cannot convert a descriptor heap index to a native bindless DescriptorHandle; with spvDescriptorHeapEXT, assign the heap entry directly to the resource or sampler type instead");
         // A single `ResourceDescriptorHeap[i]` index also cannot build a combined texture-sampler on the
         // targets whose `defaultGetDescriptorFromHandle` combined-sampler branch consumes a separate
@@ -28256,11 +28256,9 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
     // `spvDescriptorHeapEXT` arm below is more specialized (two capability atoms) and would otherwise be
     // selected for the whole function under both capabilities, reinterpreting the `uint64` handle as a
     // `uint2` heap index (issue #13070). The native-vs-heap-index decision is centralized in the
-    // `[ForceInline] usesNativeSpirvDescriptorHandle<T>()` query — see its definition for why that shape
-    // is required (folding to a compile-time constant lets dead-branch elimination drop the NV cast for a
-    // non-encodable `T`, whose result type the SPIR-V emitter cannot cast, and its `case spirv:` sibling
-    // avoids leaking an NV capability). On any non-SPIR-V target the query is false and execution falls
-    // through to the shared switch below.
+    // `[ForceInline] usesNativeSpirvDescriptorHandle<T>()` query (see its definition for the
+    // `[ForceInline]`/capability-scoping rationale). On any non-SPIR-V target the query is false and
+    // execution falls through to the shared switch below.
     if (usesNativeSpirvDescriptorHandle<T>())
         return __castDescriptorHandleToResource<T>(handleValue);
 
