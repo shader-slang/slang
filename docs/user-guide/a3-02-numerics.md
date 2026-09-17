@@ -245,6 +245,37 @@ Use the corresponding `IBuiltinScalar...` definition when the algorithm also dep
 `IBuiltinScalarNumeric` and the builtin scalar aliases that refine it also include `INumericExtrema`, because every builtin arithmetic scalar representation provides `min` and `max`.
 This additional guarantee belongs only to the closed builtin domain; `IScalarNumeric` remains independent of extrema so that user-defined numeric representations do not need to invent an ordering.
 
+## Converting Built-In Scalar Representations
+
+Generic code cannot always express a conversion between two independently chosen built-in scalar types through constructor syntax.
+The numerics module provides explicit helpers for scalar, vector, and matrix conversions:
+
+```slang
+TDestination convertValue<
+    TDestination : IBuiltinScalarTypeDispatchMarker,
+    TSource : IBuiltinScalarTypeDispatchMarker>(TSource value)
+{
+    return convertBuiltinScalar<TDestination>(value);
+}
+
+int3 convertCoordinates(float3 value)
+{
+    return convertBuiltinVector<int>(value);
+}
+```
+
+`convertBuiltinScalar` uses the compiler's `BuiltinCast` operation directly rather than resolving a constructor overload.
+Integer and floating-point conversions use the corresponding numeric cast, while conversion to `bool` tests whether the source value is nonzero.
+For example, `convertBuiltinScalar<bool>(0.5)` is `true`.
+Conversion from `bool` to a numeric destination maps `false` to zero and `true` to one.
+`convertBuiltinVector` and `convertBuiltinMatrix` apply `BuiltinCast` to each component.
+Both shaped conversions preserve the input shape, and matrix conversion also preserves the input layout.
+The helpers do not perform bit reinterpretation, scalar splatting, or shape conversion.
+
+`IBuiltinScalarTypeDispatchMarker` admits `bool`, the built-in integer types, and `half`, `float`, and `double`.
+It excludes `void`, user-defined types, enums, and specialized storage types such as `BFloat16`, `FloatE4M3`, and `FloatE5M2`.
+It is a sealed representation marker rather than a mathematical capability, so generic algorithms should combine it with the appropriate numeric interface when they also perform arithmetic.
+
 ## Choosing the Right Numeric Interface
 
 Different numeric types support different operations, and sometimes the same symbol will denote semantically distinct operations between types (e.g., the infix `/` operator acts quite differently between the built-in integer and floating-point types).
