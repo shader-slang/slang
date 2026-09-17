@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -allow-glsl -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -allow-glsl
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/flat-in.slang -target spirv -stage fragment -entry main -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/flat-in.slang -target spirv -stage fragment -entry main
 
 #version 310 es
 precision highp float;

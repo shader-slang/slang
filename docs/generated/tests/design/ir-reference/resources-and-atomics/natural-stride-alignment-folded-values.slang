@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#getnaturalstride-and-getnaturalalignment
-//META: doc_section_digest=f9dd6ab11230caa957996ff65d806f0c11d79b3dcbcd7bdefa014d3e4c00fa43
+//META: doc_section_digest=792b1b4036f3ed1226ec59130a64d83a4702d7d365ec498bcf1ad7e928280a12
 //META: purpose=Peephole folds both opcodes to literals before emit: `float4` has stride 16 and alignment 16, `float2` and `half4` have alignment 8, and `float3` has stride 12 but alignment 4 because 12 is not a power of two.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

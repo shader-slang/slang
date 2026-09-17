@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#option-set-toggles-and-emit-side-options
-//META: doc_section_digest=50a146895994e911cc46818c5e9119d818f6d3745a677728ecde705d3636ba92
+//META: doc_section_digest=c8c1f9acea26a5ada5d62c5f07eb8c833ee50d30ff427d3f509049f99b007370
 //META: purpose=Negative - slangc -trace-coverage-counter-width accepts only 32 or 64 and rejects any other value as E45113 on the command line, before the E45114 byte-width check inside linkAndOptimizeIR can be reached.
 //META: intent=negative
 //META: pipeline_stage=preprocess

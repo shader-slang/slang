@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#struct-and-class-containers
-//META: doc_section_digest=0a354de05012835336b3c276acede5bc3e74e766304e49cb482449117371f325
+//META: doc_section_digest=35e316a9e45af6f156a356bfecea45802765e6938f01700b134ee12ff89ff959
 //META: purpose=Expansion: a struct field of Double lowers to a field(...) row carrying Double.
 //META: intent=expansion
 //META: pipeline_stage=lower

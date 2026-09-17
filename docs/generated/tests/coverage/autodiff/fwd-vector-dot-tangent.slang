@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T12:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#forward-mode
-//META: doc_section_digest=9e9f064c6da87187f2564f01994893ebb0371637146be4019d7b0f9e4145ca01
+//META: doc_section_digest=ff7339aef6c3ffedb9466f9df10a8adb3a5ae02fe094735a717bd998cd8bc62a
 //META: purpose=Verifies fwd_diff propagates a float3 tangent through dot(v,v), producing primal and directional-derivative scalars.
 //META: intent=characterization
 //META: covers=source/slang/slang-ir-autodiff-fwd.cpp

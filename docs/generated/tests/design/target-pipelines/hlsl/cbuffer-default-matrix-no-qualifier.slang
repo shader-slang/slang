@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#wrapstructuredbuffersofmatrices
-//META: doc_section_digest=8041b8729de3f94a856ac55d2d8461ddffd491518349fcd47c2422a784e25a3a
+//META: doc_section_digest=b6892a07f20e1bed38c81e547c6032137e43442412b027b4add1d9d062142325
 //META: purpose=Boundary: a matrix declared in a cbuffer without a row_major/column_major qualifier emits as plain `float4x4` under the default column_major pragma.
 //META: intent=boundary
 //META: pipeline_stage=emit

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#raytracing-payload
-//META: doc_section_digest=67617f4eb68ef6a0c6b50b0fba002690b874dbf4cf412014b8b61a11403f1548
+//META: doc_section_digest=62e382bfde21cbd8b5988a74ec48d0f0a4a6bb7aa79436a40a159583650f8b33
 //META: purpose=A single scalar `uniform` **parameter** on a non-compute entry point is enough to produce `getOptiXSbtDataPointer`, typed `ConstantBuffer(%ShaderRecordParams, DefaultLayout)` in the IR dump and read as `((ShaderRecordParams_0*)optixGetSbtDataPointer())->scale_0` in the emitted CUDA.
 //META: intent=functional
 //META: pipeline_stage=lower
