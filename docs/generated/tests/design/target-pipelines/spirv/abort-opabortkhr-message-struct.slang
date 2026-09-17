@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#abort-lowering-processabort--emitabort
-//META: doc_section_digest=37869e044803615be95565e8d71025859ca728fe6823a4aa22f92a69a6d8de90
+//META: doc_section_digest=1e2f091ab9ffa28d637ab1449ede4b781132c53b9819873e7b5d2bc06a41ab29
 //META: purpose=An abort() call declares SPV_KHR_abort and the AbortKHR capability and emits OpAbortKHR with an explicitly-laid-out AbortMessage struct operand.
 //META: intent=functional
 //META: pipeline_stage=emit

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#operator-precedence-and-parenthesization
-//META: doc_section_digest=ac5209f47969a57048460bb2059320973fc1da4f9fbf7670b21dda1072978507
+//META: doc_section_digest=2bcdc86ee27b73811bf8b13b5f937bcf71604c62f9e13615fb2e059b050b28e5
 //META: purpose=Relational operands of an equality comparison are parenthesized on emit — `a < b == c < d` comes out as `(a < b) == (c < d)` — even though C precedence already groups them that way.
 //META: intent=functional
 //META: pipeline_stage=emit

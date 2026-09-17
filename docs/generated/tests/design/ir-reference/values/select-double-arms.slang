@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#select
-//META: doc_section_digest=e40d6712a2443477b9dd87fd4146f5ac3852042d7d571c4f7aa5a1ef274fdbc1
+//META: doc_section_digest=6a246596e363472d4dea3a9f4c80799257cdcad05d5bbe71a9d627181a6e8654
 //META: purpose=Expansion: `select` with widest-rank float arms lowers to `select(%c, %a, %b)` with `Double` result.
 //META: intent=expansion
 //META: pipeline_stage=lower

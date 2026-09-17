@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#generic
-//META: doc_section_digest=b9f30006218f6bb377aa5edcb42ee78a54d51bcb2a455553e2fcca8e08a738f2
+//META: doc_section_digest=faf666db781a3fcbd6288e008d54470278967589fcb5acebdb17824caa2ceb06
 //META: purpose=A generic's single block ends with a return_val whose operand is the type-level result; for a generic function that result is the inner func value.
 //META: intent=functional
 //META: pipeline_stage=lower

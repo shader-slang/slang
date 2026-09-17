@@ -5454,7 +5454,26 @@ struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
         if (!mapSrcDeclToCapturedDecl->tryGetValue(srcDecl, capturedVarDecl))
         {
             capturedVarDecl = astBuilder->create<VarDecl>();
-            capturedVarDecl->nameAndLoc = srcDecl->nameAndLoc;
+            // A captured local variable keeps its own name. A captured `this` instead
+            // has a *type* as its source decl (a struct, or an interface's `This`
+            // generic parameter), so its closure field gets a synthesized name rather
+            // than the type's name. The interface `This` parameter is literally named
+            // "This", and a closure field named "This" is hijacked by the reserved-name
+            // member lookup when the synthesized `$init` re-checks `this.<field> = ...`,
+            // breaking constructor synthesis (issue #12923).
+            if (as<VarDeclBase>(srcDecl))
+            {
+                capturedVarDecl->nameAndLoc = srcDecl->nameAndLoc;
+            }
+            else
+            {
+                // The only non-VarDeclBase capture is a `this`: visitVarExpr passes a VarDeclBase,
+                // and visitThisExpr passes the this-type decl for a ThisExpr. Assert that contract
+                // so a future caller passing another Decl kind is caught rather than mis-named.
+                SLANG_RELEASE_ASSERT(as<ThisExpr>(exprIn));
+                capturedVarDecl->nameAndLoc.name = astBuilder->getNamePool()->getName("$this");
+                capturedVarDecl->nameAndLoc.loc = exprIn->loc;
+            }
             SLANG_ASSERT(exprIn->type.type);
             capturedVarDecl->type.type = exprIn->type.type;
             mapSrcDeclToCapturedDecl->add(srcDecl, capturedVarDecl);
@@ -6369,9 +6388,13 @@ static bool _isTypeOrValValidForCountOf(Type* type)
         return true;
     }
 
-    if (as<ArrayExpressionType>(type))
+    if (auto arrayType = as<ArrayExpressionType>(type))
     {
-        return true;
+        // Only a fixed-size array has a statically known element count. An
+        // unsized array has none, so `countof` on it is not a compile-time
+        // constant and must be diagnosed here rather than lowered to a
+        // `kIROp_CountOf` that no pass can fold and no backend can emit.
+        return !arrayType->isUnsized();
     }
 
     if (as<ValuePackType>(type))
@@ -7389,8 +7412,10 @@ static PtrType* getValidTypeForAddressOf(
     }
     else if (auto invokeExpr = as<InvokeExpr>(baseExpr))
     {
-        // We only want to allow function calls if we are getting the address
-        // of a `GetOffsetPtr` to a pointer-variable
+        // A subscript such as `buf[i]` desugars to an `InvokeExpr` of the subscript's
+        // `ref` accessor. We allow taking its address only for accessors whose intrinsic
+        // op names an addressable location: a pointer's `GetOffsetPtr`, or a mutable
+        // structured buffer's `RWStructuredBufferGetElementPtr`.
         auto functionMemberExpr = as<MemberExpr>(invokeExpr->functionExpr);
         if (!functionMemberExpr)
             return nullptr;
@@ -7398,19 +7423,66 @@ static PtrType* getValidTypeForAddressOf(
         if (!subscriptDecl)
             return nullptr;
         bool isOffsetIntrinsicOp = false;
+        bool isStructuredBufferElementPtrOp = false;
         for (auto refAccessor : subscriptDecl->getMembersOfType<RefAccessorDecl>())
         {
             auto intrinsicOp = refAccessor->findModifier<IntrinsicOpModifier>();
             if (!intrinsicOp)
                 continue;
-            if (intrinsicOp->op != kIROp_GetOffsetPtr)
-                continue;
-            isOffsetIntrinsicOp = true;
+            if (intrinsicOp->op == kIROp_GetOffsetPtr)
+                isOffsetIntrinsicOp = true;
+            else if (intrinsicOp->op == kIROp_RWStructuredBufferGetElementPtr)
+                isStructuredBufferElementPtrOp = true;
         }
-        if (!isOffsetIntrinsicOp)
-            return nullptr;
 
-        return getPtrTypeFromBaseOfDerefLikeOperation(functionMemberExpr->baseExpression);
+        // A subscript declares at most one of these two ref-accessor intrinsic ops: a
+        // `Ptr<T>`-like subscript uses `GetOffsetPtr`, a mutable structured buffer's uses
+        // `RWStructuredBufferGetElementPtr`, and those accessors live on different, unrelated
+        // types. Assert they are mutually exclusive so the ordered checks below read as
+        // exhaustive rather than priority-dependent — if both were somehow set, the
+        // `GetOffsetPtr` branch would silently win and the structured-buffer branch (with its
+        // release-assert) would never run.
+        SLANG_ASSERT(!(isOffsetIntrinsicOp && isStructuredBufferElementPtrOp));
+
+        // Address of a pointer element: `ptr[i]` where `ptr` is a `Ptr<T>`-like value. The
+        // base is a pointer-typed variable, so `getPtrTypeFromBaseOfDerefLikeOperation`
+        // recovers its pointer type; that helper does not apply to the buffer case below
+        // because a structured buffer is not itself a `Ptr`-typed value.
+        if (isOffsetIntrinsicOp)
+            return getPtrTypeFromBaseOfDerefLikeOperation(functionMemberExpr->baseExpression);
+
+        // Address of a mutable structured-buffer element: `buf[i]` where `buf` is an
+        // `RWStructuredBuffer` or `RasterizerOrderedStructuredBuffer`. These two types are also
+        // addressable via `&buf[i]` through `operator&`, and `__getAddress(buf[i])` must be
+        // equivalent to `&buf[i]`, so it produces the same pointer type here. The AST pointer is
+        // typed `UserPointer` (== `AddressSpace.Device`) to match how `&buf[i]` is typed at the
+        // AST level; the SPIR-V address-space specialization pass later reconciles the surviving
+        // slot to the element's real logical `StorageBuffer` space. The layout is
+        // `DefaultDataLayout` to match
+        // `&buf[i]` (the element offset is resolved from the buffer type's own layout at IR
+        // generation, so this pointer's layout argument does not affect stride).
+        if (isStructuredBufferElementPtrOp)
+        {
+            // The `kIROp_RWStructuredBufferGetElementPtr` ref accessor is generated by only
+            // one place in the core module — the `kMutableStructuredBufferCases` template
+            // (`hlsl.meta.slang`), which emits it for exactly `RWStructuredBuffer` and
+            // `RasterizerOrderedStructuredBuffer`. Read-only `StructuredBuffer` has a
+            // `get`-only subscript (no `ref`), so it never reaches here. The base type is
+            // therefore always one of the two mutable structured-buffer types; assert that
+            // invariant so a future accessor reusing this op surfaces rather than silently
+            // producing a spurious E31160.
+            auto baseType = unwrapModifiedType(functionMemberExpr->baseExpression->type.type);
+            SLANG_RELEASE_ASSERT(
+                as<HLSLRWStructuredBufferType>(baseType) ||
+                as<HLSLRasterizerOrderedStructuredBufferType>(baseType));
+            return m_astBuilder->getPtrType(
+                targetType,
+                AccessQualifier::ReadWrite,
+                AddressSpace::UserPointer,
+                m_astBuilder->getDefaultLayoutType());
+        }
+
+        return nullptr;
     }
     else if (auto swizzleExpr = as<SwizzleExpr>(baseExpr))
     {
@@ -9145,6 +9217,13 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
         {
             expr->type.type =
                 DeclRefType::create(m_astBuilder, DeclRef<Decl>(defaultImplDecl->thisTypeDecl));
+            // A `this` referenced from a lambda body must be registered as a closure
+            // capture, mirroring the AggTypeDeclBase branch above; otherwise the
+            // synthesized closure struct has no field for it (issue #12923).
+            if (m_parentLambdaExpr)
+            {
+                return maybeRegisterLambdaCapture(expr);
+            }
             return expr;
         }
 #if 0
@@ -9333,7 +9412,7 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
                         matrixType->getRowCount(),
                         matrixType->getColumnCount(),
                         m_astBuilder->getIntVal(
-                            m_astBuilder->getIntType(),
+                            matrixType->getLayout()->getType(),
                             kMatrixLayoutMode_ColumnMajor));
                 }
                 else
@@ -9343,7 +9422,7 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
                         matrixType->getRowCount(),
                         matrixType->getColumnCount(),
                         m_astBuilder->getIntVal(
-                            m_astBuilder->getIntType(),
+                            matrixType->getLayout()->getType(),
                             kMatrixLayoutMode_RowMajor));
                 }
                 expr->type = m_astBuilder->getTypeType(baseType);

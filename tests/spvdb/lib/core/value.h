@@ -38,20 +38,20 @@ struct Value
     } scalar = {};
 
     // Non-empty when kind == Composite.
-    std::vector<Value> elements;
+    std::vector<Value> elements = {};
     // Parallel to elements; non-empty only for struct composites where member
     // names are known (e.g. values built from DebugTypeComposite/SpvOpTypeStruct).
     // Empty for vectors, matrices, and arrays.
-    std::vector<std::string> member_names;
+    std::vector<std::string> member_names = {};
 
     // Non-empty when kind == Pointer.
     // Logical pointer: (storage_class, base_variable_result_id, access_chain).
     uint32_t ptr_storage_class = 0;
     uint32_t ptr_base_var = 0;
-    std::vector<uint32_t> ptr_chain;
+    std::vector<uint32_t> ptr_chain = {};
 
     // Human-readable type name; populated by inspection functions.
-    std::string type_name;
+    std::string type_name = {};
 
     // --- Factories ---
     static Value make_bool(bool v)

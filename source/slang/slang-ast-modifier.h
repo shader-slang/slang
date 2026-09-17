@@ -162,6 +162,11 @@ class GLSLPrecisionModifier : public Modifier
     FIDDLE(...)
 };
 
+/// Legacy marker retained so module ASTs serialized by older Slang versions can be deserialized.
+///
+/// `FIDDLE` must continue registering this node type for those artifacts, but the current
+/// front-end intentionally neither creates nor interprets it. New code reads the effective
+/// language exclusively from `TranslationUnitRequest::sourceLanguage`.
 FIDDLE()
 class GLSLModuleModifier : public Modifier
 {
@@ -1193,6 +1198,13 @@ class EarlyDepthStencilAttribute : public Attribute
     FIDDLE(...)
 };
 // `[earlydepthstencil]`
+
+FIDDLE()
+class PostDepthCoverageAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+// `[postdepthcoverage]`
 
 FIDDLE()
 class Shader64BitIndexingAttribute : public Attribute

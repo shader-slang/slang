@@ -89,6 +89,7 @@ bool isSimpleDecoration(IROp op)
     switch (op)
     {
     case kIROp_EarlyDepthStencilDecoration:
+    case kIROp_PostDepthCoverageDecoration:
     case kIROp_GLSLFragDepthGreaterDecoration:
     case kIROp_GLSLFragDepthLessDecoration:
     case kIROp_Shader64BitIndexingDecoration:
@@ -172,7 +173,7 @@ void IRUse::init(IRInst* u, IRInst* v)
 
         v->firstUse = this;
     }
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
     debugValidate();
 #endif
 }
@@ -189,13 +190,13 @@ void IRUse::clear()
 {
     // This `IRUse` is part of the linked list
     // of uses for  `usedValue`.
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
     debugValidate();
 #endif
 
     if (usedValue)
     {
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
         auto uv = usedValue;
 #endif
         *prevLink = nextUse;
@@ -209,7 +210,7 @@ void IRUse::clear()
         nextUse = nullptr;
         prevLink = nullptr;
 
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
         if (uv->firstUse)
             uv->firstUse->debugValidate();
 #endif
