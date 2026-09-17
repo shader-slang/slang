@@ -1391,7 +1391,7 @@ The experimental [`slang.numerics`](a3-02-numerics.md) module provides a more sy
 - `IRangedValue` provides methods for retrieving the minimum and maximum values in the range of a type.
   All integer and floating-point scalar types implement it.
 - `IArray<T>` represents a logical array from which code can retrieve an element of type `T` by index.
-  Arrays, vectors, matrices, and `StructuredBuffer` implement it.
+  Arrays, vectors, matrices, `Buffer`, and `StructuredBuffer` implement it.
 - `IRWArray<T>` represents a logical array whose elements are mutable.
   Arrays, vectors, matrices, `RWStructuredBuffer`, and `RasterizerOrderedStructuredBuffer` implement it.
 - `IFunc<TResult, TParams...>` represents a callable object whose `operator()` returns `TResult` and takes `TParams...` as arguments.
