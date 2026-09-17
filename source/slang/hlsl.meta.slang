@@ -10373,8 +10373,9 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 T dot(vector<T, N> x, vector<T, N> y)
 {
     // Preserve the established concrete floating-point intrinsic path. A non-forced forwarding
-    // wrapper leaves a helper in textual output, while forcing it inline changes when surrounding
-    // caller control flow is optimized. This overload therefore keeps its original target switch.
+    // wrapper leaves a helper in textual output, while forcing the worker inline expands it early
+    // enough to perturb existing CUDA caller-control-flow optimization. Keeping this overload's
+    // original target switch preserves both behaviors.
     if (N == 1)
     {
         return x[0] * y[0];
