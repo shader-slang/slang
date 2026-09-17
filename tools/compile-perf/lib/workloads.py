@@ -1169,18 +1169,23 @@ def gen_generic_reinterpret_dispatch(n):
     switch, so the workload's OWN generated-code size is O(n^2) by
     construction (unlike this suite's other breadth workloads, which are
     O(n)) -- that quadratic floor is the honest baseline to compare a sweep
-    against, not O(n). Measured at n=8/16/32 (2026-09, Release, local, inside
-    this workload's registered sweep_sizes) plus one point at n=64 taken
-    manually BEYOND the default sweep (not reproducible from the checked-in
-    ladder -- n=64 would add ~2.4s per sample to every nightly run, so it is
-    reported here rather than swept by default): compileInner 34/91/406/2370
-    ms, i.e. roughly 2.7x/4.5x/5.8x per doubling -- growing FASTER than the
-    O(n^2) floor already predicts, and dominated by `generateOutput` cost not
-    explained by any visible leaf timer (see the WorkloadSpec comment). Not
-    yet root-caused; flagging as an open finding rather than a workload bug,
-    since compile-testing (this file's purpose) confirmed the source is
-    valid and the growth is real, reproducible compiler behavior -- rerun
-    manually with n=64 to reproduce this specific point.
+    against, not O(n).
+
+    THIS IS THE ONE PLACE the open finding's measured figures live; the
+    WorkloadSpec comment in manifest.py points back here rather than
+    restating them, so the two cannot drift apart. Measured at n=8/16/32
+    (2026-09, Release, local, inside this workload's registered sweep_sizes)
+    plus one point at n=64 taken manually BEYOND the default sweep (not
+    reproducible from the checked-in ladder -- n=64 would add ~2.4s per
+    sample to every nightly run, so it is reported here rather than swept by
+    default): compileInner 34/91/406/2370 ms, i.e. roughly 2.7x/4.5x/5.8x per
+    doubling -- growing FASTER than the O(n^2) floor already predicts, and at
+    n=64 dominated by ~2352ms of `generateOutput` cost against well under
+    half that summed across every visible leaf timer (linkAndOptimizeIR,
+    specializeModule, lowerReinterpret, simplifyIR). Not yet root-caused;
+    filed as shader-slang/slang#13016, which is authoritative for the LIVE
+    figures if this compiler-behavior finding advances -- treat the numbers
+    above as the state as of this PR, not a promise they still hold.
     """
     s = [_HEADER, _buf()]
     s.append("[anyValueSize(16)]\ninterface IShade { float shade(float x); }\n\n")
@@ -1216,11 +1221,14 @@ def gen_generic_reinterpret_dispatch(n):
 
 def gen_flat_expr_dag(n):
     """A single basic block of `n` sequential `float3` locals. Each one is a
-    binary op combining the immediately-preceding local (`lhs = n{i-1}`) with
-    an earlier one a few positions back (`rhs`, bounded 3-7 positions behind
-    `i`) -- a linear dependency spine with wide FAN-IN at each step, not a DAG
-    whose live-temporary set grows with `n` (the backward window stays a small
-    constant). This is the shape of MaterialX-generated code's
+    binary op combining exactly two earlier locals -- the immediately-
+    preceding one (`lhs = n{i-1}`) and a second one further back (`rhs =
+    max(0, i-3-(i%5))`, which for most `i` names a distinct, non-adjacent
+    local, though it clamps to `n0` for the first several `i`) -- so per-node
+    fan-in is always 2, not wide. What scales with `n` is that the block
+    declares `n` distinct named locals, each its own instruction, rather than
+    repeatedly reassigning one variable -- this is the shape of MaterialX-
+    generated code's
     weight-computation blocks (observed: 80+ consecutive `const float3 nNN =
     nAA * nBB;` statements in one block of real `generated.slang` output, each
     combining two DIFFERENT earlier temporaries rather than threading one
@@ -1462,15 +1470,18 @@ def gen_material_module_graph(n):
 
 
 # Import-time smoke checks for the six Falcor/MaterialX-shape-gap generators,
-# same rationale as the block above gen_interface_depth: their output is only
-# ever compiled by the nightly bench, so a broken template would otherwise
-# merge cleanly and surface as a lost nightly data point.
+# same rationale as the smoke-check block following gen_interface_depth's
+# definition: their output is only ever compiled by the nightly bench, so a
+# broken template would otherwise merge cleanly and surface as a lost
+# nightly data point. Each assertion pins a highest-INDEX substring (not
+# just a fixed, unconditionally-emitted declaration) so it actually exercises
+# the `for i in range(n)` loop that scales the workload, not only its header.
 assert "reinterpret<Wrap3, T>(value)" in \
     gen_generic_reinterpret_dispatch(4)["generic_reinterpret_dispatch.slang"]
 assert "float3 n124 =" in gen_flat_expr_dag(125)["flat_expr_dag.slang"]
-assert "float4x4 mx_mix(" in \
+assert "acc += call_3();" in \
     gen_vector_matrix_overload_set(4)["vector_matrix_overload_set.slang"]
-assert "U combine<U : IArithmetic>" in \
+assert "Unit3 u; u.weight = 3.0; acc += run(u, outBuf[0] + 3.0);" in \
     gen_generic_method_dispatch(4)["generic_method_dispatch.slang"]
 _cc = gen_conditional_compilation(50)["conditional_compilation.slang"]
 assert "#if FEATURE_49" in _cc and "#endif" in _cc

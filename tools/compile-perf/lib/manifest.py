@@ -449,15 +449,13 @@ WORKLOADS = [
         default_size=16,
         mode="target",
         extra_flags=SPIRV,
-        # generateOutput is included despite not being a leaf timer: measured
-        # manually at n=64 (2026-09, beyond this spec's registered
-        # sweep_sizes -- see gen_generic_reinterpret_dispatch's docstring for
-        # why), generateOutput was 2352ms while its visible children
-        # (linkAndOptimizeIR 238ms + specializeModule 74ms + lowerReinterpret
-        # 49ms + simplifyIR 71ms + everything else) summed to well under half
-        # that -- a large, currently-unattributed cost this workload is the
-        # first to surface. Kept as a real open finding, not smoothed over by
-        # only listing timers that already explain the total.
+        # generateOutput is included despite not being a leaf timer: it is a
+        # large, currently-unattributed cost this workload is the first to
+        # surface, kept as a real open finding rather than smoothed over by
+        # only listing timers that already explain the total. See
+        # gen_generic_reinterpret_dispatch's docstring for the measured
+        # figures -- kept in that one place, not restated here, so the two
+        # cannot drift apart.
         primary_timers=["compileInner", "generateOutput", "specializeModule", "lowerReinterpret"],
         sweep_sizes=[4, 8, 16, 32],
     ),
