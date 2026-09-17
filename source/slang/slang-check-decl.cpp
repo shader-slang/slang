@@ -1,4 +1,7 @@
 // slang-check-decl.cpp
+
+#include "core/slang-math.h"
+#include "core/slang-math-precision.h"
 #include "slang-ast-clone.h"
 #include "slang-ast-modifier.h"
 #include "slang-ast-support-types.h"
@@ -27,6 +30,33 @@
 
 namespace Slang
 {
+
+void TypedIntegerLiteralValue::setValue(ConstantIntVal &val)
+{
+    auto basicType = as<BasicExpressionType>(unwrapModifiedType(val.getType()));
+    SLANG_RELEASE_ASSERT(basicType);
+
+    auto baseType = basicType->getBaseType();
+
+    const auto baseTypeInfo = BaseTypeInfo::getInfo(baseType);
+    SLANG_RELEASE_ASSERT((baseTypeInfo.flags & BaseTypeInfo::Flag::Integer) || (baseType == BaseType::Bool));
+
+    m_rawValue = val.getValue();
+    m_isSignedType = (baseTypeInfo.flags & BaseTypeInfo::Flag::Signed) != 0U;
+}
+
+int TypedIntegerLiteralValue::getMinimumBitWidth() const
+{
+    if (isSignedType())
+    {
+        if (getSignedValue() >= 0)
+            return std::bit_width(static_cast<std::uint64_t>(getSignedValue()));
+        else
+            return std::bit_width(~static_cast<std::uint64_t>(getSignedValue())) + 1;
+    }
+    else
+        return std::bit_width(getUnsignedValue());
+}
 
 static Val* _getNonEmptyConstraintPackVal(
     ASTBuilder* astBuilder,
@@ -12711,6 +12741,20 @@ bool SemanticsVisitor::isScalarIntegerType(Type* type)
     return isIntegerBaseType(baseType) || baseType == BaseType::Bool;
 }
 
+bool SemanticsVisitor::isUnsignedIntegerType(Type* type)
+{
+    auto basicType = as<BasicExpressionType>(unwrapModifiedType(type));
+    if (!basicType)
+        return false;
+    auto baseType = basicType->getBaseType();
+
+    const auto baseTypeInfo = BaseTypeInfo::getInfo(baseType);
+
+    return
+        (baseTypeInfo.flags & BaseTypeInfo::Flag::Integer) &&
+        (!(baseTypeInfo.flags & BaseTypeInfo::Flag::Signed));
+}
+
 Type* SemanticsVisitor::getMatchingIntType(Type* type)
 {
     if (isScalarIntegerType(type))
@@ -12730,6 +12774,25 @@ bool SemanticsVisitor::isHalfType(Type* type)
     return baseType == BaseType::Half;
 }
 
+bool SemanticsVisitor::isFloatingPointType(Type* type)
+{
+    auto basicType = as<BasicExpressionType>(type);
+    if (!basicType)
+        return false;
+    auto baseType = basicType->getBaseType();
+
+    switch (baseType)
+    {
+    case BaseType::Half:
+    case BaseType::Float:
+    case BaseType::Double:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
 bool SemanticsVisitor::isValidSpecializationConstantType(Type* type)
 {
     return as<BasicExpressionType>(type) || isEnumType(type);
@@ -12740,7 +12803,60 @@ bool SemanticsVisitor::isValidCompileTimeConstantType(Type* type)
     return isScalarIntegerType(type) || isEnumType(type);
 }
 
-bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* type)
+template <typename TargetIntType>
+static bool isTypedIntegerLiteralInRange(const TypedIntegerLiteralValue &value, TargetIntType minValue, TargetIntType maxValue)
+{
+    if (value.isSignedType())
+    {
+        if constexpr (std::is_signed_v<TargetIntType>)
+        {
+            // signedness match, regular compares
+            return
+                (value.getSignedValue() >= minValue) &&
+                (value.getSignedValue() <= maxValue);
+        }
+        else
+        {
+            // value is signed, target type is unsigned
+            if (value.getSignedValue() < 0)
+                return false;
+
+            return
+                (value.getUnsignedValue() >= minValue) &&
+                (value.getUnsignedValue() <= maxValue);
+        }
+    }
+    else
+    {
+        // unsigned source value
+        uint64_t unsignedMinValue;
+        uint64_t unsignedMaxValue;
+
+        if constexpr (std::is_signed_v<TargetIntType>)
+        {
+            // signed target, restrict the bounds to non-negative range
+            if (maxValue < 0)
+                return false;
+
+            if (minValue < 0)
+                minValue = 0;
+
+            unsignedMinValue = minValue;
+            unsignedMaxValue = maxValue;
+        }
+        else
+        {
+            unsignedMinValue = minValue;
+            unsignedMaxValue = maxValue;
+        }
+
+        return
+            (value.getUnsignedValue() >= unsignedMinValue) &&
+            (value.getUnsignedValue() <= unsignedMaxValue);
+    }
+}
+
+bool SemanticsVisitor::isIntValueInRangeOfType(const TypedIntegerLiteralValue &value, Type* type)
 {
     auto basicType = as<BasicExpressionType>(type);
     if (!basicType)
@@ -12749,33 +12865,75 @@ bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* 
     switch (basicType->getBaseType())
     {
     case BaseType::UInt8:
-        return (value >= 0 && value <= std::numeric_limits<uint8_t>::max()) || (value == -1);
+        return isTypedIntegerLiteralInRange(value, std::numeric_limits<uint8_t>::min(), std::numeric_limits<uint8_t>::max());
+
     case BaseType::UInt16:
-        return (value >= 0 && value <= std::numeric_limits<uint16_t>::max()) || (value == -1);
+        return isTypedIntegerLiteralInRange(value, std::numeric_limits<uint16_t>::min(), std::numeric_limits<uint16_t>::max());
+
     case BaseType::UInt:
-        return (value >= 0 && value <= std::numeric_limits<uint32_t>::max()) || (value == -1);
+        return isTypedIntegerLiteralInRange(value, std::numeric_limits<uint32_t>::min(), std::numeric_limits<uint32_t>::max());
+
     case BaseType::UInt64:
         // IntPtr & UIntPtr are assumed to be 64-bit, because we don't want
         // spurious warnings from assuming a smaller size than what's possible
         // at this point during compilation.
     case BaseType::UIntPtr:
-        return true;
+        return isTypedIntegerLiteralInRange(value, std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::max());
+
     case BaseType::Int8:
-        return value >= std::numeric_limits<int8_t>::min() &&
-               value <= std::numeric_limits<int8_t>::max();
+        return isTypedIntegerLiteralInRange(value, std::numeric_limits<int8_t>::min(), std::numeric_limits<int8_t>::max());
+
     case BaseType::Int16:
-        return value >= std::numeric_limits<int16_t>::min() &&
-               value <= std::numeric_limits<int16_t>::max();
+        return isTypedIntegerLiteralInRange(value, std::numeric_limits<int16_t>::min(), std::numeric_limits<int16_t>::max());
+
     case BaseType::Int:
-        return value >= std::numeric_limits<int32_t>::min() &&
-               value <= std::numeric_limits<int32_t>::max();
+        return isTypedIntegerLiteralInRange(value, std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max());
+
     case BaseType::Int64:
+        // IntPtr & UIntPtr are assumed to be 64-bit, because we don't want
+        // spurious warnings from assuming a smaller size than what's possible
+        // at this point during compilation.
     case BaseType::IntPtr:
-        return value >= std::numeric_limits<int64_t>::min() &&
-               value <= std::numeric_limits<int64_t>::max();
+        return isTypedIntegerLiteralInRange(value, std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::max());
 
     case BaseType::Half:
-        return value >= -2048 && value <= 2048;
+        return isTypedIntegerLiteralInRange(value, -65504, 65504);
+
+    case BaseType::Float:
+    case BaseType::Double:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+bool SemanticsVisitor::isIntValuePreciselyRepresentableByFloatingPointType(const TypedIntegerLiteralValue &value, Type* type)
+{
+    auto basicType = as<BasicExpressionType>(type);
+    if (!basicType)
+        return false;
+
+    switch (basicType->getBaseType())
+    {
+    case BaseType::Half:
+        if (value.isSignedType())
+            return IntToFloatPrecisionHelper<16, 11, decltype(value.getSignedValue())>::isPreciselyRepresentable(value.getSignedValue());
+        else
+            return IntToFloatPrecisionHelper<16, 11, decltype(value.getUnsignedValue())>::isPreciselyRepresentable(value.getUnsignedValue());
+
+    case BaseType::Float:
+        if (value.isSignedType())
+            return isPreciselyRepresentableByFloatingPointType<float>(value.getSignedValue());
+        else
+            return isPreciselyRepresentableByFloatingPointType<float>(value.getUnsignedValue());
+
+    case BaseType::Double:
+        if (value.isSignedType())
+            return isPreciselyRepresentableByFloatingPointType<double>(value.getSignedValue());
+        else
+            return isPreciselyRepresentableByFloatingPointType<double>(value.getUnsignedValue());
+
     default:
         return false;
     }

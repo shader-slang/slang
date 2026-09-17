@@ -14,6 +14,51 @@
 
 namespace Slang
 {
+
+struct TypedIntegerLiteralValue
+{
+    uint64_t m_rawValue = 0U;
+    bool m_isSignedType = false;
+
+    inline bool isSignedType() const
+    {
+        return m_isSignedType;
+    }
+
+    inline int64_t getSignedValue() const
+    {
+        return static_cast<int64_t>(m_rawValue);
+    }
+
+    inline uint64_t getUnsignedValue() const
+    {
+        return m_rawValue;
+    }
+
+    // Minimum bit width integer that can hold the value. For negative values,
+    // sign extension is assumed. Minimum returned bit width is 1.
+    //
+    // For positive values, the returned value is the highest index of a set bit + 1.
+    //
+    // For negative values, the returned value is the sign bit that gets extended + 1
+    //
+    // For example:
+    // 0   = 0b0000'0000 -- 1 bits (by minimum width exception)
+    // 1   = 0b0000'0001 -- 1 bits
+    // 2   = 0b0000'0010 -- 2 bits
+    // 123 = 0b1111'1011 -- 8 bits
+    // -1  = 0b....'...1 -- 1 bits (... = sign extension)
+    // -32 = 0b..10'0000 -- 6 bits (... = sign extension)
+    int getMinimumBitWidth() const;
+
+    void setValue(ConstantIntVal &val);
+
+    TypedIntegerLiteralValue(ConstantIntVal &val)
+    {
+        setValue(val);
+    }
+};
+
 template<typename P, typename... Args>
 bool diagnoseCapabilityErrors(
     DiagnosticSink* sink,
@@ -2969,6 +3014,9 @@ public:
     /// Is `type` a scalar integer type.
     bool isScalarIntegerType(Type* type);
 
+    /// Is `type` an unsigned integer type
+    bool isUnsignedIntegerType(Type* type);
+
     // This function is used to get the best integer type that matches the given type.
     // If `type` is already an integer type, return it as is.
     // If `type` is a enum type, return the tag type if it exists.
@@ -2978,13 +3026,20 @@ public:
     /// Is `type` a scalar half type.
     bool isHalfType(Type* type);
 
+    /// Is `type` a scalar floating-point type.
+    bool isFloatingPointType(Type* type);
+
     /// Is `type` something we allow for specialization constants, i.e. scalar and enum types.
     bool isValidSpecializationConstantType(Type* type);
 
     /// Is `type` something we allow as compile time constants, i.e. scalar integer and enum types.
     bool isValidCompileTimeConstantType(Type* type);
 
-    bool isIntValueInRangeOfType(IntegerLiteralValue value, Type* type);
+    /// Check whether the value is in the range of the target type
+    bool isIntValueInRangeOfType(const TypedIntegerLiteralValue& value, Type* type);
+
+    /// Check whether the conversion is precise (i.e., no precision loss)
+    bool isIntValuePreciselyRepresentableByFloatingPointType(const TypedIntegerLiteralValue& value, Type* type);
 
     // Validate that `type` is a suitable type to use
     // as the tag type for an `enum`
