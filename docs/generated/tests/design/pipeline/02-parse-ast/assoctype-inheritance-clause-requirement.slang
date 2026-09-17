@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#interface-associated-type-and-__constraint-requirements
-//META: doc_section_digest=87eaa476e05e936a2bb0b7cd0ad066839d24b61d75d234809ccf6e876c8763e3
+//META: doc_section_digest=07e0564d1c48eeb19c8e6877826e05d7116df8f42bbd0d9267706b86c4134327
 //META: purpose=An `associatedtype A : IBar` inheritance-clause constraint becomes an interface-level requirement visible to generic code constrained by the interface.
 //META: intent=functional
 //META: pipeline_stage=parse

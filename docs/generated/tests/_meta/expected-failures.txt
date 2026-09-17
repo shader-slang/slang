@@ -72,10 +72,18 @@ docs/generated/tests/conformance/types-extension/enum-extension-static-members.s
 # (no tracking issue filed yet; pending user triage). Both pass locally
 # on macOS but fail in the slang-linux-clang-ci container — same
 # stricter-Linux-spirv-val class as Cluster C.
-#  - pointer-arithmetic-spirv-emission: the `OpPtrAccessChain` CHECK for
-#    local-array pointer arithmetic is not found in the Linux SPIR-V
-#    output (validation/lowering differs). Newly added; test-vs-compiler
-#    cause still to be determined.
+#  - pointer-arithmetic-spirv-emission: root-caused 2026-09-12. Not a
+#    host difference -- it reproduces anywhere once
+#    SLANG_RUN_SPIRV_VALIDATION=1 is set, which is what the CI container
+#    does. The emitter emits `OpPtrAccessChain` for pointer arithmetic on
+#    a function-local array while declaring none of the capabilities that
+#    opcode requires, so spirv-val rejects the module and slangc produces
+#    no output for the CHECK to match. `requireVariableBufferCapabilityIfNeeded`
+#    (slang-emit-spirv.cpp:12038) selects by address space and handles only
+#    StorageBuffer and GroupShared; AddressSpace::Function falls through.
+#    Keep this entry until the capability logic is fixed -- see
+#    _meta/findings/ptraccesschain-function-storage-missing-capability.yaml
+#    and _meta/triage/01-pointer-arithmetic-stale-entry.md.
 #  - 29106: the `spirv-instruction-with-too-many-operands` diagnostic
 #    test. Removed 2026-08-05: the diagnostics-catalog bundle no longer
 #    generates that test, so the entry no longer resolved to a file.
@@ -159,30 +167,6 @@ docs/generated/tests/design/ir-reference/differentiation/builtin-requirement-dec
 
 # Surfaced on nightly run 34310111817:
 # https://github.com/shader-slang/slang/actions/runs/34310111817
-# Test bug rather than a compiler bug. `//CHECK: new C` used to match only
-# because the compiler aborted on `new C(7)` and the `E99997` note echoed the
-# offending source line `C a = new C(7);` back into the output.
-# https://github.com/shader-slang/slang/pull/12519 fixed that abort, so the
-# file compiles — and since `a` is never read, DCE drops the allocation and
-# the emitted C++ entry point body is empty, so nothing can match. Remove
-# once the bundle is regenerated with an observation point that keeps the
-# allocation live (for example storing `a.v` into a buffer).
-docs/generated/tests/design/ast-reference/declarations/classdecl-reference-type.slang
-
-# Surfaced on nightly run 34310111817:
-# https://github.com/shader-slang/slang/actions/runs/34310111817
-# Obsolete test. https://github.com/shader-slang/slang/pull/12182 added
-# CUDA/OptiX callable support, so
-# `CUDALayoutRulesFamilyImpl::getCallablePayloadParameterRules()` returns
-# real rules and the `E39032` rejection this test asserts no longer happens;
-# the entry point now emits as `__direct_callable__main_0`. The doc the test
-# is anchored to went stale the same way — docs/generated/design/pipeline/
-# 04c-layout-ir.md still lists CUDA as returning `nullptr` from that
-# accessor. Remove once that doc and this bundle are regenerated.
-docs/generated/tests/design/pipeline/04c-layout-ir/raytracing-callable-payload-rejected-on-cuda.slang
-
-# Surfaced on nightly run 34310111817:
-# https://github.com/shader-slang/slang/actions/runs/34310111817
 # Diagnostic text drift rather than a compiler bug.
 # https://github.com/shader-slang/slang/pull/12616 merges type-flow sets
 # directly instead of through an intermediate hash set, so `E50102` now
@@ -191,22 +175,3 @@ docs/generated/tests/design/pipeline/04c-layout-ir/raytracing-callable-payload-r
 # the diagnostic sorts the list, which would make the text order-stable by
 # construction rather than a reflection of the merge order.
 docs/generated/tests/design/pipeline/05-ir-passes/typeflow-report-dynamic-dispatch-sites.slang
-
-# Surfaced on nightly run 34561421312:
-# https://github.com/shader-slang/slang/actions/runs/34561421312
-# Generated expectations awaiting bundle regeneration. PR #12986 changed
-# the matrix-layout operand's dumped IR type from `Int` to `Enum(Int)`,
-# and PR #12884 added the `base_instance` parameter to Metal vertex
-# entry-point signatures. The compiler output is intentional; these
-# failures are stale generated test content.
-docs/generated/tests/coverage/legalize/metal-vertex-compute-sysvals.slang
-docs/generated/tests/design/ir-reference/types/mat1x1-minimum-shape.slang
-docs/generated/tests/design/ir-reference/types/mat-shape-operands.slang
-docs/generated/tests/design/ir-reference/types/mat-rectangular-2x3.slang
-docs/generated/tests/design/pipeline/04-ast-to-ir/cbuffer-mixed-types-lowers-to-struct-with-mixed-fields.slang
-docs/generated/tests/design/pipeline/04-ast-to-ir/lower-double-matrix.slang
-docs/generated/tests/design/pipeline/04-ast-to-ir/lower-half-matrix.slang
-docs/generated/tests/design/pipeline/04-ast-to-ir/lower-mat-double-rectangular.slang
-docs/generated/tests/design/pipeline/04-ast-to-ir/lower-mat-half-rectangular.slang
-docs/generated/tests/design/pipeline/04-ast-to-ir/lower-mat2x4-rectangular.slang
-docs/generated/tests/design/pipeline/04-ast-to-ir/lower-mat4x2-rectangular.slang

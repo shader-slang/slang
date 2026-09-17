@@ -1127,6 +1127,10 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     // Maximum number of payload registers (32 registers = 128 bytes)
     static const int kMaxPayloadRegisters = 32;
 
+    // Maximum number of OptiX hit attribute registers (8 registers = 32 bytes). Shared by the read
+    // path (`emitOptiXAttributeFetch`) and the `ReportHit` write path.
+    static const int kMaxOptiXHitAttributeRegisters = 8;
+
     // Track payload write-back info for inout parameters
     struct PayloadWritebackInfo
     {
@@ -2190,6 +2194,177 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         EntryPointVaryingParamLegalizeContext::processEntryPoint(entryPointFunc, entryPointDecor);
     }
 
+    static bool isSupportedOptiXHitAttributeLeaf(IRBasicType* basicType)
+    {
+        switch (basicType->getBaseType())
+        {
+        case BaseType::Float:
+        case BaseType::Bool:
+        case BaseType::Int8:
+        case BaseType::Int16:
+        case BaseType::Int:
+        case BaseType::UInt8:
+        case BaseType::UInt16:
+        case BaseType::UInt:
+        case BaseType::Char:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    // OptiX has no aggregate hit-attribute ABI: attributes are passed only as individual 32-bit
+    // registers (`optixReportIntersection` / `optixGetAttribute_N`), so a `ReportHit` aggregate
+    // must be flattened into per-register scalars. Append `value`'s scalar leaves to `outLeaves` in
+    // the same order the reader (`emitOptiXAttributeFetch`) consumes registers — struct fields,
+    // then array/vector/matrix elements, in index order — so the value round-trips. Returns false
+    // (the caller diagnoses) for an unsized array or an unsupported leaf type.
+    bool flattenOptiXHitAttributes(
+        IRInst* value,
+        IRType* type,
+        IRBuilder* builder,
+        List<IRInst*>& outLeaves)
+    {
+        // Attributes are reported by value, so a scalar attribute register never round-trips a
+        // pointer: extracting a field from a pointer value would emit `(&a).x`, and dereferencing
+        // would silently change which value is reported. Reject any pointer type rather than
+        // miscompile it.
+        if (tryGetPointedToType(builder, type))
+            return false;
+
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (auto field : structType->getFields())
+            {
+                auto fieldType = field->getFieldType();
+                auto fieldVal = builder->emitFieldExtract(fieldType, value, field->getKey());
+                if (!flattenOptiXHitAttributes(fieldVal, fieldType, builder, outLeaves))
+                    return false;
+            }
+            return true;
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
+            if (!elementCountInst)
+                return false;
+            auto elementType = arrayType->getElementType();
+            for (IRIntegerValue ii = 0; ii < elementCountInst->getValue(); ++ii)
+            {
+                auto idx = builder->getIntValue(builder->getIntType(), ii);
+                auto elementVal = builder->emitElementExtract(elementType, value, idx);
+                if (!flattenOptiXHitAttributes(elementVal, elementType, builder, outLeaves))
+                    return false;
+            }
+            return true;
+        }
+        else if (auto matType = as<IRMatrixType>(type))
+        {
+            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
+            auto colCountInst = as<IRIntLit>(matType->getColumnCount());
+            if (!rowCountInst || !colCountInst)
+                return false;
+            auto elementType = matType->getElementType();
+            auto rowType = builder->getVectorType(elementType, matType->getColumnCount());
+            for (IRIntegerValue row = 0; row < rowCountInst->getValue(); ++row)
+            {
+                auto rowIdx = builder->getIntValue(builder->getIntType(), row);
+                auto rowVal = builder->emitElementExtract(rowType, value, rowIdx);
+                for (IRIntegerValue col = 0; col < colCountInst->getValue(); ++col)
+                {
+                    auto colIdx = builder->getIntValue(builder->getIntType(), col);
+                    auto elementVal = builder->emitElementExtract(elementType, rowVal, colIdx);
+                    if (!flattenOptiXHitAttributes(elementVal, elementType, builder, outLeaves))
+                        return false;
+                }
+            }
+            return true;
+        }
+        else if (auto vecType = as<IRVectorType>(type))
+        {
+            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
+            if (!elementCountInst)
+                return false;
+            auto elementType = vecType->getElementType();
+            for (IRIntegerValue ii = 0; ii < elementCountInst->getValue(); ++ii)
+            {
+                auto idx = builder->getIntValue(builder->getIntType(), ii);
+                auto elementVal = builder->emitElementExtract(elementType, value, idx);
+                if (!flattenOptiXHitAttributes(elementVal, elementType, builder, outLeaves))
+                    return false;
+            }
+            return true;
+        }
+        else if (auto basicType = as<IRBasicType>(type))
+        {
+            if (!isSupportedOptiXHitAttributeLeaf(basicType))
+                return false;
+            outLeaves.add(value);
+            return true;
+        }
+
+        return false;
+    }
+
+    // Rewrite each `ReportOptiXIntersection(tHit, hitKind, attributes)` produced by the core-module
+    // `ReportHit` into a call carrying the aggregate's flattened scalar leaves, so the CUDA emitter
+    // can render a single `optixReportIntersection(tHit, hitKind, a0..aN)`. Collect the marker
+    // insts first, then rewrite: the rewrite creates a new (already-flattened) inst that must not
+    // be re-collected, and the pass runs exactly once per module.
+    void legalizeOptiXReportIntersections(IRModule* module, DiagnosticSink* sink)
+    {
+        List<IRInst*> workList;
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            for (auto block : func->getBlocks())
+                for (auto inst : block->getChildren())
+                    if (inst->getOp() == kIROp_ReportOptiXIntersection &&
+                        inst->getOperandCount() == 3)
+                        workList.add(inst);
+        }
+
+        for (auto inst : workList)
+        {
+            IRBuilder builder(module);
+            builder.setInsertBefore(inst);
+
+            auto tHit = inst->getOperand(0);
+            auto hitKind = inst->getOperand(1);
+            auto attrs = inst->getOperand(2);
+
+            List<IRInst*> leaves;
+            if (!flattenOptiXHitAttributes(attrs, attrs->getDataType(), &builder, leaves))
+            {
+                sink->diagnose(
+                    Diagnostics::OptixHitAttributeTypeNotSupported{.location = inst->sourceLoc});
+                continue;
+            }
+            if (leaves.getCount() > kMaxOptiXHitAttributeRegisters)
+            {
+                sink->diagnose(Diagnostics::OptixHitAttributeTooLarge{
+                    .registerCount = int(leaves.getCount()),
+                    .location = inst->sourceLoc});
+                continue;
+            }
+
+            List<IRInst*> args;
+            args.add(tHit);
+            args.add(hitKind);
+            args.addRange(leaves);
+            auto newInst = builder.emitIntrinsicInst(
+                inst->getFullType(),
+                kIROp_ReportOptiXIntersection,
+                args.getCount(),
+                args.getBuffer());
+            newInst->sourceLoc = inst->sourceLoc;
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+        }
+    }
+
     void beginModuleImpl() SLANG_OVERRIDE
     {
         // Because many of the varying parameters are defined
@@ -2425,7 +2600,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     /*ioBaseAttributeIndex*/ ioBaseAttributeIndex,
                     /* type to fetch */ info.type,
                     /*the builder in use*/ &builder);
-                if (ioBaseAttributeIndex > 8)
+                if (ioBaseAttributeIndex > kMaxOptiXHitAttributeRegisters)
                 {
                     // A hit attribute is always a parameter, never a result, so
                     // `m_param` is set here; guard the deref in release too.
@@ -2624,6 +2799,12 @@ void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* si
     // ray terminates (issue #11658).
     context.inlineShaderTerminatingCalleesForRayEntryPoints(module, sink);
     context.processModule(module, sink);
+}
+
+void legalizeOptiXReportIntersectionsForCUDA(IRModule* module, DiagnosticSink* sink)
+{
+    CUDAEntryPointVaryingParamLegalizeContext context;
+    context.legalizeOptiXReportIntersections(module, sink);
 }
 
 void depointerizeInputParams(IRFunc* entryPointFunc)
