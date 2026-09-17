@@ -18,10 +18,10 @@
       }
     },
     {
-      "name": "dist",
+      "name": "performance",
       "inherits": "default",
       "description": "Match the distributed binaries' build configuration",
-      "binaryDir": "${sourceDir}/build.dist",
+      "binaryDir": "${sourceDir}/build.performance",
       "cacheVariables": {
         "SLANG_ENABLE_RELEASE_LTO": "ON",
         "SLANG_STANDARD_MODULE_DEVELOP_BUILD": "OFF"
@@ -193,8 +193,8 @@
       "configuration": "MinSizeRel"
     },
     {
-      "name": "dist-release",
-      "configurePreset": "dist",
+      "name": "performance",
+      "configurePreset": "performance",
       "configuration": "Release"
     },
     {
