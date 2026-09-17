@@ -3,10 +3,14 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
+// Integer matrices are not supported in WGSL.
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-mtl -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
 //TEST:SIMPLE(filecheck=CONCRETE): -target spirv-asm -entry concreteMain -stage compute
 //TEST:SIMPLE(filecheck=GENERIC): -target spirv-asm -entry genericCodegenMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry genericMatrixCodegenMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry genericVectorCodegenMain -stage compute
 
 // Verify that min and max accept scalar, vector, and matrix operands when generic code knows only
 // that the element type belongs to the sealed builtin arithmetic domain.
@@ -23,6 +27,7 @@
 // CONCRETE: OpExtInst %[[V4_FLOAT]] {{.*}} FMax
 
 // GENERIC-DAG: %[[V3_INT:[A-Za-z0-9_]+]] = OpTypeVector %int 3
+// GENERIC-DAG: %[[V2_INT:[A-Za-z0-9_]+]] = OpTypeVector %int 2
 // GENERIC-DAG: %[[V2_UINT:[A-Za-z0-9_]+]] = OpTypeVector %uint 2
 // GENERIC-DAG: %[[V4_FLOAT:[A-Za-z0-9_]+]] = OpTypeVector %float 4
 // GENERIC-DAG: OpExtInst %[[V3_INT]] {{.*}} SMin
@@ -31,12 +36,23 @@
 // GENERIC-DAG: OpExtInst %[[V2_UINT]] {{.*}} UMax
 // GENERIC-DAG: OpExtInst %[[V4_FLOAT]] {{.*}} FMin
 // GENERIC-DAG: OpExtInst %[[V4_FLOAT]] {{.*}} FMax
+// GENERIC-DAG: OpExtInst %[[V2_INT]] {{.*}} SMin
+// GENERIC-DAG: OpExtInst %[[V2_INT]] {{.*}} SMax
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+// HLSL-DAG: min(
+// HLSL-DAG: max(
+
+// WGSL-DAG: min(
+// WGSL-DAG: max(
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0x7fc00000], stride=4):name=inputBuffer
 RWStructuredBuffer<int> outputBuffer;
+StructuredBuffer<uint> inputBuffer;
 RWStructuredBuffer<int3> concreteIntOutput;
 RWStructuredBuffer<uint2> concreteUIntOutput;
 RWStructuredBuffer<float4> concreteFloatOutput;
+RWStructuredBuffer<int2x2> genericIntMatrixOutput;
 
 [numthreads(1, 1, 1)]
 void concreteMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -74,22 +90,59 @@ vector<T, N> genericMaximum<T : __BuiltinArithmeticType, let N : int>(
     return max(left, right);
 }
 
-matrix<T, R, C> genericMinimum<T : __BuiltinArithmeticType, let R : int, let C : int>(
-    matrix<T, R, C> left,
-    matrix<T, R, C> right)
+matrix<T, R, C, L> genericMinimum<
+    T : __BuiltinArithmeticType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(
+    matrix<T, R, C, L> left,
+    matrix<T, R, C, L> right)
 {
     return min(left, right);
 }
 
-matrix<T, R, C> genericMaximum<T : __BuiltinArithmeticType, let R : int, let C : int>(
-    matrix<T, R, C> left,
-    matrix<T, R, C> right)
+matrix<T, R, C, L> genericMaximum<
+    T : __BuiltinArithmeticType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(
+    matrix<T, R, C, L> left,
+    matrix<T, R, C, L> right)
 {
     return max(left, right);
 }
 
 [numthreads(1, 1, 1)]
 void genericCodegenMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    int3 signedValue = int3(dispatchThreadID);
+    uint2 unsignedValue = dispatchThreadID.xy;
+    float4 floatingValue = float4(float3(dispatchThreadID), 1.0);
+
+    concreteIntOutput[0] = genericMinimum(signedValue, int3(4, 5, 6));
+    concreteIntOutput[1] = genericMaximum(signedValue, int3(4, 5, 6));
+    concreteUIntOutput[0] = genericMinimum(unsignedValue, uint2(7, 8));
+    concreteUIntOutput[1] = genericMaximum(unsignedValue, uint2(7, 8));
+    concreteFloatOutput[0] = genericMinimum(floatingValue, float4(1.0, 2.0, 3.0, 4.0));
+    concreteFloatOutput[1] = genericMaximum(floatingValue, float4(1.0, 2.0, 3.0, 4.0));
+
+    matrix<int, 2, 2, MatrixLayoutMode.RowMajor> matrixValue = int2x2(1, 2, 3, 4);
+    matrix<int, 2, 2, MatrixLayoutMode.RowMajor> otherMatrixValue = int2x2(4, 3, 2, 1);
+    genericIntMatrixOutput[0] = genericMinimum(matrixValue, otherMatrixValue);
+    genericIntMatrixOutput[1] = genericMaximum(matrixValue, otherMatrixValue);
+}
+
+[numthreads(1, 1, 1)]
+void genericMatrixCodegenMain()
+{
+    matrix<int, 2, 2, MatrixLayoutMode.RowMajor> left = int2x2(1, 2, 3, 4);
+    matrix<int, 2, 2, MatrixLayoutMode.RowMajor> right = int2x2(4, 3, 2, 1);
+    genericIntMatrixOutput[0] = genericMinimum(left, right);
+    genericIntMatrixOutput[1] = genericMaximum(left, right);
+}
+
+[numthreads(1, 1, 1)]
+void genericVectorCodegenMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int3 signedValue = int3(dispatchThreadID);
     uint2 unsignedValue = dispatchThreadID.xy;
@@ -176,4 +229,14 @@ void computeMain()
     outputBuffer[43] = int(floatMatrixMaximum[0][1] * 10.0);
     outputBuffer[44] = int(floatMatrixMaximum[1][0] * 10.0);
     outputBuffer[45] = int(floatMatrixMaximum[1][1] * 10.0);
+
+    float nanValue = asfloat(inputBuffer[0]);
+    float2 nanMinimum = genericMinimum(float2(nanValue, 5.0), float2(3.0, nanValue));
+    float2 nanMaximum = genericMaximum(float2(nanValue, -5.0), float2(7.0, nanValue));
+    outputBuffer[46] = int(nanMinimum.x);
+    outputBuffer[47] = int(nanMinimum.y);
+    outputBuffer[48] = int(nanMaximum.x);
+    outputBuffer[49] = int(nanMaximum.y);
+    outputBuffer[50] = int(genericMinimum(nanValue, 3.0));
+    outputBuffer[51] = int(genericMaximum(7.0, nanValue));
 }

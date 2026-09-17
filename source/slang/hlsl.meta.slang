@@ -12967,10 +12967,10 @@ T __max_impl(T x, T y)
     case llvm:
         if (__isFloat<T>())
         {
-            // We can only handle NaN for __BuiltinFloatingPointType,
-            // but not types conforming to IFloat for now
-            // if (isnan(x)) return y;
-            // if (isnan(y)) return x;
+            // Equality is ordered for floating-point values, so negating it detects NaN without
+            // requiring this broadly-constrained helper to call `isnan`.
+            if (!(x == x)) return y;
+            if (!(y == y)) return x;
             return x > y ? x : y;
         }
         else if (__isSignedInt<T>())
@@ -13062,9 +13062,11 @@ vector<T, N> __vectorMaxImpl(vector<T, N> x, vector<T, N> y)
             vector<T, N> result;
             for (int i = 0; i < N; ++i)
             {
-                if (x[i] != x[i])
+                // Equality is ordered for floating-point values, so negating it detects NaN even
+                // though this helper's broad arithmetic constraint cannot call `isnan`.
+                if (!(x[i] == x[i]))
                     result[i] = y[i];
-                else if (y[i] != y[i])
+                else if (!(y[i] == y[i]))
                     result[i] = x[i];
                 else
                     result[i] = x[i] > y[i] ? x[i] : y[i];
@@ -13083,23 +13085,31 @@ vector<T, N> __vectorMaxImpl(vector<T, N> x, vector<T, N> y)
 
 // Implements the target-specific matrix maximum behavior shared by all builtin arithmetic
 // element types.
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<
+    T : __BuiltinArithmeticType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T, N, M> __matrixMaxImpl(matrix<T, N, M> x, matrix<T, N, M> y)
+matrix<T, N, M, L> __matrixMaxImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "max";
     default:
-        MATRIX_MAP_BINARY(T, N, M, __vectorMaxImpl, x, y);
+        matrix<T, N, M, L> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = __vectorMaxImpl(x[i], y[i]);
+        return result;
     }
 }
 
 /// @category math
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
@@ -13107,10 +13117,15 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
 }
 
 /// @category math
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__generic<
+    T : __BuiltinIntegerType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
+matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     return __matrixMaxImpl(x, y);
 }
@@ -13138,6 +13153,7 @@ T max(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
@@ -13151,6 +13167,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
 /// @category math
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
+[ForceInline]
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
@@ -13158,10 +13175,15 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     return __vectorMaxImpl(x, y);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__generic<
+    T : __BuiltinFloatingPointType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
+matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     return __matrixMaxImpl(x, y);
 }
@@ -13171,11 +13193,16 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 /// call `max`. Its rank is below the integer- and floating-point-specific shaped overloads, while
 /// all three overloads share the same target-specific implementation.
 /// @category math
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<
+    T : __BuiltinArithmeticType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
 [__readNone]
+[ForceInline]
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
+matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     return __matrixMaxImpl(x, y);
 }
@@ -13306,10 +13333,10 @@ T __min_impl(T x, T y)
     case llvm:
         if (__isFloat<T>())
         {
-            // We can only handle NaN for __BuiltinFloatingPointType,
-            // but not types conforming to IFloat for now
-            // if (isnan(x)) return y;
-            // if (isnan(y)) return x;
+            // Equality is ordered for floating-point values, so negating it detects NaN without
+            // requiring this broadly-constrained helper to call `isnan`.
+            if (!(x == x)) return y;
+            if (!(y == y)) return x;
             return x < y ? x : y;
         }
         else if (__isSignedInt<T>())
@@ -13380,9 +13407,11 @@ vector<T, N> __vectorMinImpl(vector<T, N> x, vector<T, N> y)
             vector<T, N> result;
             for (int i = 0; i < N; ++i)
             {
-                if (x[i] != x[i])
+                // Equality is ordered for floating-point values, so negating it detects NaN even
+                // though this helper's broad arithmetic constraint cannot call `isnan`.
+                if (!(x[i] == x[i]))
                     result[i] = y[i];
-                else if (y[i] != y[i])
+                else if (!(y[i] == y[i]))
                     result[i] = x[i];
                 else
                     result[i] = x[i] < y[i] ? x[i] : y[i];
@@ -13401,32 +13430,47 @@ vector<T, N> __vectorMinImpl(vector<T, N> x, vector<T, N> y)
 
 // Implements the target-specific matrix minimum behavior shared by all builtin arithmetic
 // element types.
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<
+    T : __BuiltinArithmeticType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T, N, M> __matrixMinImpl(matrix<T, N, M> x, matrix<T, N, M> y)
+matrix<T, N, M, L> __matrixMinImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "min";
     default:
-        MATRIX_MAP_BINARY(T, N, M, __vectorMinImpl, x, y);
+        matrix<T, N, M, L> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = __vectorMinImpl(x[i], y[i]);
+        return result;
     }
 }
 
+/// @category math
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
     return __vectorMinImpl(x, y);
 }
 
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+/// @category math
+__generic<
+    T : __BuiltinIntegerType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
+matrix<T,N,M,L> min(matrix<T,N,M,L> x, matrix<T,N,M,L> y)
 {
     return __matrixMinImpl(x, y);
 }
@@ -13454,6 +13498,7 @@ T min(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
@@ -13467,6 +13512,7 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
 /// @category math
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
+[ForceInline]
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
@@ -13474,10 +13520,15 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
     return __vectorMinImpl(x, y);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__generic<
+    T : __BuiltinFloatingPointType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
+matrix<T,N,M,L> min(matrix<T,N,M,L> x, matrix<T,N,M,L> y)
 {
     return __matrixMinImpl(x, y);
 }
@@ -13487,11 +13538,16 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 /// call `min`. Its rank is below the integer- and floating-point-specific shaped overloads, while
 /// all three overloads share the same target-specific implementation.
 /// @category math
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<
+    T : __BuiltinArithmeticType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
 [__readNone]
+[ForceInline]
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T, N, M> min(matrix<T, N, M> x, matrix<T, N, M> y)
+matrix<T, N, M, L> min(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     return __matrixMinImpl(x, y);
 }
