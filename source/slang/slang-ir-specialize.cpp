@@ -1023,6 +1023,25 @@ struct SpecializationContext
             break;
         }
 
+        // Fold only when the element count is a concrete `IRIntLit`; a `T[N]`
+        // whose `N` is still a generic parameter has a non-literal count and
+        // must wait for a later specialization round (matching the pack case
+        // below, which bails while any element is still abstract).
+        if (auto arrayType = as<IRArrayType>(operand))
+        {
+            if (auto count = as<IRIntLit>(arrayType->getElementCount()))
+            {
+                IRBuilder builder(module);
+                builder.setInsertBefore(inst);
+                auto newInst = builder.getIntValue(inst->getDataType(), count->getValue());
+                addUsersToWorkList(inst);
+                inst->replaceUsesWith(newInst);
+                inst->removeAndDeallocate();
+                return true;
+            }
+            return false;
+        }
+
         // We can only figure out the count of a type pack or tuple type.
         switch (operand->getOp())
         {

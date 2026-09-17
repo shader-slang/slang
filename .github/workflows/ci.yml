@@ -257,6 +257,25 @@ jobs:
       config: release
       runs-on: '["macos-latest"]'
 
+  # Exercise the default macOS DXC source-build path on macOS 27, which catches
+  # host-specific failures such as #13077 where DXC's clang-tblgen is not
+  # executable. macos-latest currently uses macOS 26.
+  build-macos-27-release-clang-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["xcode-27"]'
+      build-llvm: false
+      artifact-name-suffix: -macos-27
+
   # Linux ARM64 builds (GitHub-hosted)
   build-linux-debug-gcc-aarch64:
     needs: [filter, wait-for-human-priority]
@@ -947,6 +966,7 @@ jobs:
         build-linux-release-gcc-aarch64,
         build-macos-debug-clang-aarch64,
         build-macos-release-clang-aarch64,
+        build-macos-27-release-clang-aarch64,
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
         static-unit-test-linux-debug-gcc-aarch64,
@@ -1013,39 +1033,3 @@ jobs:
           fi
 
           echo "All CI jobs completed successfully!"
-
-  # Automatically retry GPU health check failures by dispatching ci-retry.yml,
-  # which watches this run until it completes, then reruns only failed jobs.
-  # Capped at 2 automatic retries via run_attempt check.
-  retry-on-gpu-failure:
-    needs: [check-ci]
-    if: failure() && github.event_name == 'merge_group' && fromJSON(github.run_attempt) < 3
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - name: Check for GPU health check failures and dispatch retry
-        env:
-          GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gpu_failures=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
-            --jq '[.jobs[]
-              | select(.conclusion == "failure")
-              | select(any(.steps[]?;
-                  (.name == "GPU health check" and .conclusion == "failure") or
-                  (.name == "GPU post-test diagnostics" and .conclusion == "failure")
-                ))
-            ] | length' \
-            || echo "0")
-          gpu_failures=${gpu_failures:-0}
-          if ! [[ "$gpu_failures" =~ ^[0-9]+$ ]]; then
-            gpu_failures=0
-          fi
-
-          if [ "$gpu_failures" -gt 0 ]; then
-            echo "Found $gpu_failures GPU failure(s) — dispatching retry workflow..."
-            gh workflow run ci-retry.yml -F run_id=${{ github.run_id }}
-          else
-            echo "No GPU failures — not retrying."
-          fi

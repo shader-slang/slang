@@ -5575,6 +5575,10 @@ TestResult runSpvdbDebuggerTest(TestContext* context, TestInput& input)
         for (auto arg : input.testOptions->args)
             slangcCmdLine.addArg(arg);
 
+        SlangTest::addDefaultSlangOptimization(
+            slangcCmdLine,
+            context->options.defaultOptimizationLevel);
+
         ExecuteResult slangcRes;
         TEST_RETURN_ON_DONE(
             spawnAndWait(context, outputStem, SpawnType::UseExe, slangcCmdLine, slangcRes));

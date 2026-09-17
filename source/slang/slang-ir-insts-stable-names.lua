@@ -875,5 +875,7 @@ return {
 	["getNaturalAlignment"] = 899,
 	["Type.PtrTypeBase.SPIRVUntypedPtr"] = 900,
 	["Attr.TypeAlignment"] = 901,
-	["Decoration.UserForceInline"] = 902
+	["reportOptiXIntersection"] = 902,
+	["Decoration.postDepthCoverage"] = 903,
+	["Decoration.UserForceInline"] = 904
 }

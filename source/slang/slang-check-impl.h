@@ -967,9 +967,6 @@ struct SharedSemanticsContext : public RefObject
 
     DiagnosticSink* m_sink = nullptr;
 
-    // Whether the current module has imported the GLSL module.
-    ModuleDecl* glslModuleDecl = nullptr;
-
     /// (optional) modules that comes from previously processed translation units in the
     /// front-end request that are made visible to the module being checked. This allows
     /// `import` to use them instead of trying to find the files in file system.
@@ -1023,20 +1020,33 @@ struct SharedSemanticsContext : public RefObject
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
 
-    // Whether the `glsl` module has been imported into this checking session. Set when the
-    // `glsl` import is handled (see `importModuleIntoScope`), rather than scanning the imported
-    // module list on demand, because the builtin-operator fast path consults
-    // `isGLSLOperatorScope()` for every operator expression.
-    bool m_isGLSLModuleImported = false;
+    /// Whether semantic checking has imported the `glsl` module.
+    bool m_hasImportedGLSLModule = false;
 
 public:
-    /// Is the current checking session in GLSL operator scope? True when `-allow-glsl` is set or
-    /// the `glsl` module has been imported (its overloads give builtin operators GLSL semantics).
-    bool isGLSLOperatorScope()
+    /// Whether the translation unit being checked uses the GLSL source language.
+    ///
+    /// A null translation-unit request denotes a module/reflection checking context that has no
+    /// parser-language provenance, so it cannot establish GLSL source semantics and returns false.
+    bool isGLSLSourceLanguage()
     {
-        return getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL) ||
-               m_isGLSLModuleImported;
+        if (!m_translationUnitRequest)
+        {
+            // Reflection, specialization, and API expression-checking contexts can perform
+            // semantic work without originating in a parsed translation unit. Such a context has
+            // no source-language provenance, so it must not enable GLSL-specific semantic rules.
+            return false;
+        }
+
+        return m_translationUnitRequest->sourceLanguage == SourceLanguage::GLSL;
     }
+
+    /// Whether builtin operators should use the legacy GLSL operator rules.
+    ///
+    /// Actual GLSL source always uses those rules. For backward compatibility, explicitly
+    /// importing the `glsl` module into non-GLSL source also opts operator checking into them
+    /// without changing the source language or parser behavior.
+    bool isGLSLOperatorScope() { return isGLSLSourceLanguage() || m_hasImportedGLSLModule; }
 
 private:
     static SlangLanguageVersion _getModuleLanguageVersion(Module* module)
@@ -2348,6 +2358,15 @@ public:
         DiagnosticSink* sink,
         ConversionCost* outCost,
         TypeCoercionWitness** outWitnessOfConversion);
+
+    /// Determine whether an unscoped enum may implicitly convert to the builtin
+    /// scalar type `toType`. This is an HLSL-compatibility widening: it holds
+    /// only for an enum that `isUnscopedEnum`
+    /// accepts (one carrying `UnscopedEnumAttribute`, from either `-unscoped-enum`
+    /// or an explicit `[UnscopedEnum]` — see that predicate for the exact routes),
+    /// in a translation unit using the HLSL-flavored dialect, and never for `bool`
+    /// (which already has its own implicit conversion from any `__EnumType`).
+    bool isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
     ///
@@ -4219,6 +4238,7 @@ public:
 
     Expr* visitThisExpr(ThisExpr* expr);
     Expr* visitThisTypeExpr(ThisTypeExpr* expr);
+    Expr* visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr* expr);
     Expr* visitThisInterfaceExpr(ThisInterfaceExpr* expr);
     Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr);
     Expr* visitReturnValExpr(ReturnValExpr* expr);
@@ -4306,9 +4326,9 @@ private:
         Expr*& outLeftArg,
         Expr*& outRightArg);
 
-    // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either
-    // `-allow-glsl` is set, or the `glsl` module is in scope (its `operator*` overloads
-    // make `mat * mat` a matrix product). The builtin-operator fast path is disabled then.
+    // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either the
+    // translation unit is GLSL, or the `glsl` module is in scope (its `operator*` overloads make
+    // `mat * mat` a matrix product). The builtin-operator fast path is disabled then.
     bool isGLSLOperatorScope();
 };
 
