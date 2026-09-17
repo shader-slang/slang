@@ -46,7 +46,24 @@ private:
             {
                 checkOutputTopologyDecoration(outputTopologyDecoration, stage);
             }
+            else if (auto postDepthCoverage = as<IRPostDepthCoverageDecoration>(decoration))
+            {
+                checkPostDepthCoverageDecoration(postDepthCoverage);
+            }
         }
+    }
+
+    // `[postdepthcoverage]` only lowers to an execution mode on the Khronos targets (SPIR-V and
+    // GLSL). On any other target the decoration is silently dropped, which would leave a shader
+    // that reads `SV_Coverage` running with ordinary pre-depth coverage — a different result with
+    // no compile-time signal. Warn so that mismatch is visible rather than silent.
+    void checkPostDepthCoverageDecoration(IRPostDepthCoverageDecoration* decoration)
+    {
+        if (isKhronosTarget(m_target))
+            return;
+        m_sink->diagnose(Diagnostics::PostDepthCoverageTargetNotSupported{
+            .target = String(TypeTextUtil::getCompileTargetName(SlangCompileTarget(m_target))),
+            .location = decoration->sourceLoc});
     }
 
     void checkOutputTopologyDecoration(IROutputTopologyDecoration* decoration, Stage stage)
