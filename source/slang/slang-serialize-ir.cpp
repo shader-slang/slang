@@ -713,31 +713,6 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     /// caller supplied a blob; deferral is disabled otherwise.
     ComPtr<ISlangBlob> blobHoldingSerializedData;
 
-    /// Set when this decoder allocates an instruction whose opcode this build does not
-    /// know. Named apart from `IRSerialReadContext::_foundUnrecognizedInstructions`, which
-    /// accumulates the same fact for the caller: the `|=` between them is easy to misread
-    /// when both spell it the same way.
-    ///
-    /// Recorded here rather than on the `IRSerialReadContext`, which this must not
-    /// reference: that would close the cycle `IRModule -> decoder -> context -> IRModule`
-    /// and leak every module for the life of the process, while a raw pointer would
-    /// dangle.
-    ///
-    /// **Deferral does not hide an unknown opcode**, and it is worth being precise about
-    /// why, because the reverse is an easy thing to conclude. Reading the flat table
-    /// decodes `instAllocInfo` for *every* instruction, deferred ones included, and
-    /// `serialize(S const&, IROp&)` is what turns an unknown stable name into
-    /// `kIROp_Unrecognized` -- setting the context's flag as it goes. That happens during
-    /// `serialize(serializer, flat)`, before anything decides whether to defer. So both
-    /// load paths learn of an unknown opcode at the same point, and both turn it into the
-    /// same recoverable read failure.
-    ///
-    /// Which leaves this flag with nothing to observe: by the time any instruction is
-    /// allocated, its op has already been mapped away from `kIROp_Invalid`. It is kept as
-    /// a belt-and-braces record for a future reader that allocates from a source other
-    /// than the flat table.
-    bool sawUnrecognizedOpDuringDecode = false;
-
     /// Where each deferred body's encoding begins.
     ///
     /// Recorded when the load walk reaches a global value's first non-decoration
@@ -863,22 +838,16 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     /// payload entries are consumed anyway, to keep the cursors aligned.
     IRInst* decodeInst(IRInst* parent, Int64 depth);
 
-    /// The opcode to decode instruction `index` as, mapping an opcode this build does
-    /// not know to `kIROp_Unrecognized` and recording that it happened.
+    /// The opcode to decode instruction `index` as.
     ///
-    /// The single spelling of that mapping, used by both paths that allocate: the
-    /// load-time pass and the deferred materialization that allocates the same
-    /// instructions later. Having one also gives the flag one home -- a deferred decode
-    /// runs with no `IRSerialReadContext` to reach, so it has to be recorded here and
-    /// propagated once the load walk is done.
-    IROp getInstOpAndNoteIfUnrecognized(Int64 index)
+    /// Already mapped away from `kIROp_Invalid`: reading the flat table decodes
+    /// `instAllocInfo` for every instruction, and `serialize(S const&, IROp&)` turns an
+    /// unknown stable name into `kIROp_Unrecognized` -- setting the read context's flag as
+    /// it goes -- before anything here runs.
+    IROp getInstOp(Int64 index) const
     {
         const IROp op = flat.instAllocInfo[index].op;
-        if (op == kIROp_Invalid) [[unlikely]]
-        {
-            sawUnrecognizedOpDuringDecode = true;
-            return kIROp_Unrecognized;
-        }
+        SLANG_ASSERT(op != kIROp_Invalid);
         return op;
     }
 
@@ -1052,7 +1021,7 @@ static size_t _takeInstMinSizeInBytes(
 IRInst* FlatModuleDecoder::allocateInstAt(Int64 instIndexToAlloc, Int64& ioStringLengthCursor)
 {
     const auto& allocInfo = flat.instAllocInfo[instIndexToAlloc];
-    const IROp op = getInstOpAndNoteIfUnrecognized(instIndexToAlloc);
+    const IROp op = getInstOp(instIndexToAlloc);
     const size_t minSizeInBytes = _takeInstMinSizeInBytes(op, flat, ioStringLengthCursor);
     return module->_allocateInst(op, allocInfo.operandCount, minSizeInBytes);
 }
@@ -1379,7 +1348,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     for (Int64 instIndex = 0; instIndex < numInsts; ++instIndex)
     {
         const auto& a = flat.instAllocInfo[instIndex];
-        const IROp op = decoder->getInstOpAndNoteIfUnrecognized(instIndex);
+        const IROp op = decoder->getInstOp(instIndex);
         const size_t minSizeInBytes = _takeInstMinSizeInBytes(op, flat, allocStringLengthCursor);
         // Under on-demand load the skipped instructions are never allocated; the
         // preorder walk below still consumes their operand and payload cursors so
@@ -1412,11 +1381,9 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     // Unknown future opcodes intentionally become a recoverable read failure later.
     // This reader cannot know whether those opcodes consume literal or string payloads.
     //
-    // Everything that allocates records this on the decoder, since a body decoded after
-    // this function returns has no context to reach. Propagate it here, while the context
-    // is still alive and before the end-state checks below consult it.
-    readContext._foundUnrecognizedInstructions |= decoder->sawUnrecognizedOpDuringDecode;
-
+    // The flag was set while the flat table was read, by `serialize(S const&, IROp&)`, so
+    // it already reflects every instruction -- deferred ones included -- regardless of
+    // which load path ran.
     if (!readContext._foundUnrecognizedInstructions)
     {
         SLANG_RELEASE_ASSERT(decoder->literalCursor == flat.literals.getCount());
