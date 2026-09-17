@@ -1,10 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
-
-// Verify the integer `dot` fallback (the `[ForceUnroll]`'d helper used by
-// `__vectorDotImpl` in `hlsl.meta.slang`) emits straight-line multiply-adds — no runtime `for`
-// loop — on GLSL, Metal, and CUDA, which reach that fallback rather than a native arm.
+// Verify the integer `dot` fallback (the `[ForceUnroll]`'d `default:` arm of the
+// `T : __BuiltinIntegerType` overload in `hlsl.meta.slang`) emits straight-line multiply-adds — no
+// runtime `for` loop — on GLSL, Metal, and CUDA, which reach that fallback rather than a native arm.
 //
 // Each prefix asserts no `for` loop (`-NOT`) both before AND after its entry-point anchor so the checked region
 // spans the whole output: the `dot` helper carrying the loop is emitted ahead of the entry point
@@ -14,6 +10,10 @@
 // are exercised so the loop appears three times when unrolling regresses, independent of inlining.
 //
 // GLSL renames the compute entry point to `main`; Metal and CUDA keep `computeMain`.
+
+//TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outputBuffer;
 

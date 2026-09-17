@@ -10295,8 +10295,8 @@ T __vectorDotFallback(vector<T, N> x, vector<T, N> y)
     return result;
 }
 
-// Implements the target-specific vector dot product behavior shared by all builtin arithmetic
-// element types.
+// Implements the target-specific vector dot product behavior for the broad builtin-arithmetic
+// overload below.
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
 [ForceInline]
@@ -10372,7 +10372,30 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
-    return __vectorDotImpl(x, y);
+    // Preserve the established concrete floating-point intrinsic path. A forwarding wrapper
+    // changes when surrounding caller control flow is optimized or leaves a helper in textual
+    // output, so this overload deliberately keeps its original target switch.
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "dot";
+    case hlsl: __intrinsic_asm "dot";
+    case metal: __intrinsic_asm "dot";
+    case spirv: return spirv_asm {
+        OpDot $$T result $x $y
+    };
+    case wgsl: __intrinsic_asm "dot";
+    default:
+        T result = T(0);
+        [ForceUnroll]
+        for(int i = 0; i < N; ++i)
+            result += x[i] * y[i];
+        return result;
+    }
 }
 
 __generic<T : __BuiltinIntegerType, let N : int>
@@ -10380,7 +10403,48 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
-    return __vectorDotImpl(x, y);
+    // Preserve the established concrete integer intrinsic path for the same reason as the
+    // floating-point overload above.
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dot";
+    case wgsl: __intrinsic_asm "dot";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability DotProduct;
+            OpCapability DotProductInputAll;
+            OpExtension "SPV_KHR_integer_dot_product";
+        };
+
+        if (__isSignedInt<T>())
+        {
+            return spirv_asm
+            {
+                result:$$T = OpSDot $x $y;
+            };
+        }
+        else
+        {
+            return spirv_asm
+            {
+                result:$$T = OpUDot $x $y;
+            };
+        }
+    }
+    default:
+        T result = T(0);
+        [ForceUnroll]
+        for(int i = 0; i < N; ++i)
+            result += x[i] * y[i];
+        return result;
+    }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>

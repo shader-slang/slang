@@ -4,10 +4,9 @@
 //TEST:SIMPLE(filecheck=CPP_NO_LOOP):-target cpp -entry computeMain -stage compute -line-directive-mode none
 
 // The generic `dot` fallback in `hlsl.meta.slang` accumulates over a loop, and the C-like
-// targets have no native `dot` arm to replace it. The forwarding overload and fallback are
-// inlined, while `[ForceUnroll]` turns each specialization into straight-line component
-// arithmetic. Without unrolling, the emitted code reaches each component through
-// `_slang_vector_get_element` in a runtime loop.
+// targets have no native `dot` arm to replace it. Without `[ForceUnroll]` the emitted code
+// keeps the loop and reaches each component through `_slang_vector_get_element`, so a
+// specialized `dot` costs a helper call plus dynamic indexing per element.
 //
 // The negative assertions live under their own prefixes because a `CHECK-NOT` followed by a
 // positive directive only covers the region up to that match; alone in a prefix it covers the
@@ -41,33 +40,25 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // so it must lower to component arithmetic rather than a `_slang_vector_get_element` loop.
     int3 h = int3((int)inputBuffer[0], (int)inputBuffer[1], (int)inputBuffer[2]);
     int3 k = int3((int)inputBuffer[3], (int)inputBuffer[4], (int)inputBuffer[5]);
-    // Keep the specializations in separate assignments. The forwarding overloads are inlined on
-    // these targets, so each assignment gives FileCheck a stable boundary for its component count.
-    outputBuffer[0] = dot(a, b);
-    outputBuffer[1] = dot(c, d);
-    outputBuffer[2] = dot(e, f);
-    outputBuffer[3] = dot(g, g);
-    outputBuffer[4] = (float)dot(h, k);
+    outputBuffer[0] = dot(a, b) + dot(c, d) + dot(e, f) + dot(g, g) + (float)dot(h, k);
 }
 
-// CUDA-DAG: outputBuffer_{{[0-9]+}})[int(0)]) = {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}};
-// CUDA-DAG: outputBuffer_{{[0-9]+}})[int(1)]) = {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}};
-// CUDA-DAG: outputBuffer_{{[0-9]+}})[int(2)]) = {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}};
+// CUDA-DAG: return x_{{[0-9]+}}.x * y_{{[0-9]+}}.x + x_{{[0-9]+}}.y * y_{{[0-9]+}}.y;
+// CUDA-DAG: return x_{{[0-9]+}}.x * y_{{[0-9]+}}.x + x_{{[0-9]+}}.y * y_{{[0-9]+}}.y + x_{{[0-9]+}}.z * y_{{[0-9]+}}.z;
+// CUDA-DAG: return x_{{[0-9]+}}.x * y_{{[0-9]+}}.x + x_{{[0-9]+}}.y * y_{{[0-9]+}}.y + x_{{[0-9]+}}.z * y_{{[0-9]+}}.z + x_{{[0-9]+}}.w * y_{{[0-9]+}}.w;
 
-// CPP-DAG: outputBuffer_{{[0-9]+}})[int(0)]) = {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}};
-// CPP-DAG: outputBuffer_{{[0-9]+}})[int(1)]) = {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}};
-// CPP-DAG: outputBuffer_{{[0-9]+}})[int(2)]) = {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}};
+// CPP-DAG: return x_{{[0-9]+}}.x * y_{{[0-9]+}}.x + x_{{[0-9]+}}.y * y_{{[0-9]+}}.y;
+// CPP-DAG: return x_{{[0-9]+}}.x * y_{{[0-9]+}}.x + x_{{[0-9]+}}.y * y_{{[0-9]+}}.y + x_{{[0-9]+}}.z * y_{{[0-9]+}}.z;
+// CPP-DAG: return x_{{[0-9]+}}.x * y_{{[0-9]+}}.x + x_{{[0-9]+}}.y * y_{{[0-9]+}}.y + x_{{[0-9]+}}.z * y_{{[0-9]+}}.z + x_{{[0-9]+}}.w * y_{{[0-9]+}}.w;
 
-// CUDA-DAG: outputBuffer_{{[0-9]+}})[int(3)]) = 0.0f;
-// CPP-DAG: outputBuffer_{{[0-9]+}})[int(3)]) = 0.0f;
+// CUDA-DAG: return 0.0f;
+// CPP-DAG: return 0.0f;
 
-// CUDA-DAG: outputBuffer_{{[0-9]+}})[int(4)]) = float({{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}});
-// CPP-DAG: outputBuffer_{{[0-9]+}})[int(4)]) = float({{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}} + {{[^+;]+}} * {{[^+;]+}});
+// CUDA-DAG: return x_{{[0-9]+}}.x * y_{{[0-9]+}}.x + x_{{[0-9]+}}.y * y_{{[0-9]+}}.y + x_{{[0-9]+}}.z * y_{{[0-9]+}}.z;
+// CPP-DAG: return x_{{[0-9]+}}.x * y_{{[0-9]+}}.x + x_{{[0-9]+}}.y * y_{{[0-9]+}}.y + x_{{[0-9]+}}.z * y_{{[0-9]+}}.z;
 
 // CUDA_NO_LOOP-NOT: for(;;)
 // CUDA_NO_LOOP-NOT: _slang_vector_get_element
-// CUDA_NO_LOOP-NOT: dot_
 
 // CPP_NO_LOOP-NOT: for(;;)
 // CPP_NO_LOOP-NOT: _slang_vector_get_element
-// CPP_NO_LOOP-NOT: dot_
