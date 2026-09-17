@@ -14,8 +14,7 @@ module __builtin;
 // These intrinsic declarations give the public explicit-conversion wrappers direct access to the
 // compiler's canonical BuiltinCast operation. In particular, conversion to `bool` tests whether
 // the source is nonzero; this differs from constructor overload resolution for some source types.
-// The vector and matrix forms apply BuiltinCast to every component without changing the shape or
-// matrix layout.
+// The vector form applies BuiltinCast to every component without changing the shape.
 [__readNone]
 [__unsafeForceInlineEarly]
 __intrinsic_op(BuiltinCast)
@@ -33,13 +32,22 @@ public vector<TDestination, N> __numericsBuiltinConvertVector<
 
 [__readNone]
 [__unsafeForceInlineEarly]
-__intrinsic_op(BuiltinCast)
 public matrix<TDestination, R, C, L> __numericsBuiltinConvertMatrix<
     TDestination : __BuiltinScalarType,
     TSource : __BuiltinScalarType,
     let R : int,
     let C : int,
-    let L : MatrixLayoutMode>(matrix<TSource, R, C, L> value);
+    let L : MatrixLayoutMode>(matrix<TSource, R, C, L> value)
+{
+    // Keep the conversion in terms of the canonical vector BuiltinCast. A whole-matrix cast to
+    // bool lowers to a matrix comparison, which C-like targets do not uniformly provide. Logical
+    // row access preserves `L` while giving every target a supported shaped conversion.
+    matrix<TDestination, R, C, L> result;
+    [ForceUnroll]
+    for (int row = 0; row < R; ++row)
+        result[row] = __numericsBuiltinConvertVector<TDestination>(value[row]);
+    return result;
+}
 
 // The adapters below serve a different purpose: they implement the integer and floating-point
 // constructor requirements of the numeric interfaces. The BuiltinCast adapters above accept any
