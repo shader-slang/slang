@@ -291,7 +291,7 @@ WORKLOADS = [
     # 2026-09-10 a single perturbed sample carried its median 18.7% past the
     # trend gate and back again the next night -- the suite's only false alarm
     # in 73 nights. At 9600 this measures ~122 ms with run-to-run spread under
-    # 1%. See SUITE-AUDIT.md.
+    # 1%.
     WorkloadSpec(
         name="diagnostics",
         bucket="diagnostics",

@@ -100,8 +100,7 @@ Workloads run per release. Synthetic ones are generated deterministically by
 > and 4.2 ms they sat below the trend check's 2 ms absolute gate, so they would
 > have needed a +69%/+48% regression to report anything and never fired in 73
 > nights; and the exponential they were built for is gone (`SemanticChecking`
-> measures 0.45 ms at nesting depth 16 and 0.90 ms at depth 64). See
-> `SUITE-AUDIT.md`.
+> measures 0.45 ms at nesting depth 16 and 0.90 ms at depth 64).
 
 ### Type-checking tests
 

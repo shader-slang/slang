@@ -877,8 +877,9 @@ SIGNAL_FLOOR_RATIO = 3.0
 
 
 def report_suite_health(runs):
-    """Print the two checks that would have caught the SUITE-AUDIT.md findings
-    when the workloads were added, rather than months later."""
+    """Print the two checks that would have caught `diagnostics_clean`'s dead
+    noise-floor and `serialize`'s missing timer when those workloads were
+    added, rather than months later."""
     notes = []
 
     for r in runs:
