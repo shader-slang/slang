@@ -12089,11 +12089,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto initVal = lowerRValueExpr(context, initExpr);
                 initVal = LoweredValInfo::simple(getSimpleVal(context, initVal));
 
-                // For debug builds, still create debug information for let variables
-                // even though we're not creating an actual variable
-                // Requires Standard level or higher for variable debug info
+                // An immutable `let` lowers to the initializer's SSA value with no backing IRVar,
+                // so this is the only site that can attach debug info to it.
                 if (context->debugInfoLevel >= DebugInfoLevel::Standard && decl->loc.isValid() &&
-                    context->shared->debugValueContext.isDebuggableType(initVal.val->getDataType()))
+                    context->shared->debugValueContext.isDebugVarTypeSupported(
+                        initVal.val->getDataType()))
                 {
                     // Create a debug variable for this let declaration
                     auto builder = context->irBuilder;
@@ -14877,6 +14877,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (as<EarlyDepthStencilAttribute>(modifier))
             {
                 getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
+            }
+            else if (auto postDepthCoverageAttr = as<PostDepthCoverageAttribute>(modifier))
+            {
+                // Preserve the attribute's location on the decoration so a later
+                // unsupported-target diagnostic can point at `[postdepthcoverage]` itself.
+                auto decoration =
+                    getBuilder()->addSimpleDecoration<IRPostDepthCoverageDecoration>(irFunc);
+                decoration->sourceLoc = postDepthCoverageAttr->loc;
             }
             else if (auto domainAttr = as<DomainAttribute>(modifier))
             {

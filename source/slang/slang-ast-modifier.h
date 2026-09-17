@@ -1255,6 +1255,13 @@ class EarlyDepthStencilAttribute : public Attribute
 // `[earlydepthstencil]`
 
 FIDDLE()
+class PostDepthCoverageAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+// `[postdepthcoverage]`
+
+FIDDLE()
 class Shader64BitIndexingAttribute : public Attribute
 {
     FIDDLE(...)

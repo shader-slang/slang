@@ -5562,6 +5562,13 @@ err(
     span { loc = "location", message = "Invalid output topology '~topology' for stage '~stage', must be one of: ~validTopologies" }
 )
 
+warning(
+    "post-depth-coverage-target-not-supported",
+    50062,
+    "`[postdepthcoverage]` is not supported on this target and will be ignored",
+    span { loc = "location", message = "the `[postdepthcoverage]` attribute has no effect on target '~target'; `SV_Coverage` will report all covered samples (pre-depth), not only those that survived the early depth/stencil test. Post-depth coverage is currently emitted only for SPIR-V and GLSL." }
+)
+
 err(
     "no-type-conformances-found-for-interface",
     50100,
@@ -5678,6 +5685,13 @@ err(
     "global-param-not-supported-by-interpreter",
     52013,
     "global shader parameter '~name' is not supported by the Slang interpreter (slangi), which runs on the CPU and does not support global parameters or GPU resource types; compile this program with slangc to a GPU target instead."
+)
+
+err(
+    "type-not-representable-by-interpreter",
+    52014,
+    "type has no HostVM layout; use 'NativeString' for a null-terminated string, or compile for a host target",
+    span { loc = "location", message = "'~type:IRInst' has no HostVM layout and cannot be used at runtime" }
 )
 
 warning(

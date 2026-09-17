@@ -2344,8 +2344,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             return;
         }
 
-        // Unsupported type, remove the DebugValue.
-        if (!isSimpleDataType(valueType))
+        // Keep the DebugValue only when its value is representable as an OpDebugValue operand: a
+        // plain data value, or a leaf opaque handle (texture/sampler). A combined texture-sampler
+        // is an OpTypeSampledImage value, which SPIR-V does not permit as an OpDebugValue operand,
+        // so drop it — the variable is left without a current location rather than binding a
+        // forbidden value.
+        bool representable = valueType && isSimpleDataType(valueType);
+        if (auto textureType = as<IRTextureTypeBase>(valueType))
+            representable = !textureType->isCombined();
+        else if (as<IRSamplerStateTypeBase>(valueType))
+            representable = true;
+        if (!representable)
             inst->removeAndDeallocate();
     }
 

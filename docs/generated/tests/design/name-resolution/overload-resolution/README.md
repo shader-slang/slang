@@ -44,11 +44,11 @@ signed/unsigned edges of the fast path's common-type rule.
 
 Overload resolution is fixed at semantic check, so almost every test uses a
 single target-independent directive. Two claims are exceptions and say so: the
-GLSL-operator-scope carve-out needs `-allow-glsl` and therefore runs as
-`COMPARE_COMPUTE -cpu`, and the parameter-group auto-dereference cost needs a
-`ConstantBuffer` global that the interpreter cannot host, so it is observed in
-emitted HLSL. One further test carries a `-std 2026` option because the claim it
-pins is about a language-version boundary.
+GLSL-operator-scope carve-out uses an explicit `import glsl;` and therefore runs
+as `COMPARE_COMPUTE -cpu`, and the parameter-group auto-dereference cost needs
+a `ConstantBuffer` global that the interpreter cannot host, so it is observed
+in emitted HLSL. One further test carries a `-std 2026` option because the
+claim it pins is about a language-version boundary.
 
 The source doc mixes user-observable rules with a description of the checker's
 own structure (the `OverloadCandidate` fields, the filter-step function names,
@@ -228,7 +228,7 @@ the two tables below; every claim appears in exactly one of them.
 128. The fast path declines the short-circuiting `&&` / `\|\|`, which `convertToLogicOperatorExpr` has already handled.
 129. The fast path declines user-defined operand types and mixed shapes that are not broadcast-compatible.
 130. The fast path declines mixed-type shift operands, because `a << b` keeps the type of `a` and converts the shift amount independently.
-131. In GLSL operator scope only, the fast path declines matrix operands and vector equality; `isGLSLOperatorScope` is true when `-allow-glsl` is set or the `glsl` module is in scope.
+131. In GLSL operator scope only, the fast path declines matrix operands and vector equality; `isGLSLOperatorScope` is true for GLSL source or when non-GLSL source explicitly imports the `glsl` module.
 132. A bitwise or shift operator with a builtin floating-point operand is diagnosed by the fast path with `Diagnostics::BitwiseOperatorRequiresIntegerOperands`.
 133. Unary `~` on a builtin floating-point operand is diagnosed the same way.
 134. There is no operator-resolution cache at `source_commit`: `TypeCheckingCache` holds only `conversionCostCache`, which `canCoerce` consults and fills for scalar and vector operand pairs.
@@ -402,11 +402,9 @@ the two tables below; every claim appears in exactly one of them.
 
 ## Doc gaps observed
 
-(none) — no gaps remain open against this bundle's source document.
-
-Every gap previously listed here was fixed on the documentation side and
-recorded in `docs/generated/design/_meta/doc-gap-state.json`; the answers
-are now in the source document itself.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#the-builtin-operator-fast-path](../../../../design/name-resolution/overload-resolution.md#the-builtin-operator-fast-path) | drift-from-source | The section says `isGLSLOperatorScope` is true when `-allow-glsl` is set or the `glsl` module is in scope. The checker now uses the resolved GLSL source language or an explicit `glsl` import; deprecated `-allow-glsl` reaches that state only indirectly by selecting GLSL and emits a warning. | Describe resolved GLSL source and explicit `import glsl;` as the two operator-scope inputs. Mark `-allow-glsl` as deprecated and warn readers not to combine it with the explicit import. |
 
 ## Sibling-bundle overlap
 
