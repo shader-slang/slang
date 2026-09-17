@@ -105,8 +105,8 @@ void computeMain()
     // the integer overflow warning, but do trigger the general implicit
     // conversion warning since they exceed half's exact integer range.
     funcHalf(131072);
-//CHECK:     ^^^^^^ implicit conversion not recommended
-//CHECK:     ^^^^^^ implicit conversion from 'int' to 'half' is not recommended
+//CHECK:     ^^^^^^ implicit conversion not recommended: value out of range
+//CHECK:     ^^^^^^ value '131072' out of range in conversion to 'half'
 
     // Bit-width boundary: max values that fit exactly in the type's bit width
     funcInt8(255);
