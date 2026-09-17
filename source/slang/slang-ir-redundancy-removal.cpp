@@ -7,6 +7,36 @@
 namespace Slang
 {
 
+// Control-flow / structural instructions that `mightHaveSideEffects()` flags but that neither read
+// nor write memory, so both callers -- the between-walk and the callee-body eligibility walk -- can
+// step over them. Every listed op only transfers or marks control flow and touches no memory
+// itself: the branch/switch/loop/if-else terminators and the `Unreachable`/`MissingReturn` edge
+// markers, plus `Yield`, `Throw`, and `Defer` (which likewise only transfer or *schedule* control;
+// `Defer`'s deferred body is a normal block the walk visits on its own, so the marker reads/writes
+// nothing). `TryCall` and `GenericAsm` are deliberately excluded (a `TryCall` may have arbitrary
+// effects), so they fall through to the conservative "clobber" handling.
+static bool isMemoryInertControlFlow(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_UnconditionalBranch:
+    case kIROp_ConditionalBranch:
+    case kIROp_Switch:
+    case kIROp_TargetSwitch:
+    case kIROp_Return:
+    case kIROp_Yield:
+    case kIROp_Throw:
+    case kIROp_Defer:
+    case kIROp_Unreachable:
+    case kIROp_MissingReturn:
+    case kIROp_IfElse:
+    case kIROp_Loop:
+        return true;
+    default:
+        return false;
+    }
+}
+
 struct RedundancyRemovalContext
 {
     RefPtr<IRDominatorTree> dom;
@@ -64,6 +94,228 @@ struct RedundancyRemovalContext
         return changed;
     }
 
+    // Returns true if nothing that may write or synchronize memory (a store, atomic, barrier, or
+    // opaque/side-effecting call) runs on any path strictly between `dominator` and `dominated`,
+    // which `dominator` must dominate. A bare `globallycoherent`/`volatile` LOAD is a read, not a
+    // clobber, so it never blocks reuse; only writes/synchronization do. Used to decide whether a
+    // dominated call to a repeatable read-only callee can reuse an identical dominating call's
+    // result: safe only when nothing in between could have changed (through aliasing) the memory
+    // the callee reads.
+    //
+    // No per-address alias analysis is attempted -- a call has no single load address, and the
+    // memory model permits distinct resource bindings to alias the same storage -- so the gate is
+    // the strict one: ANY `mightHaveSideEffects()` instruction between the two calls blocks reuse.
+    // Control-flow terminators report side effects but touch no memory, so
+    // `isMemoryInertControlFlow` steps over them.
+    //
+    // The dominance-bounded predecessor walk mirrors `isMemoryLocationUnmodifiedBetweenLoadAndUser`
+    // (`slang-ir-defer-buffer-load.cpp`): collect every block dominated by `dominator`'s block that
+    // is a transitive predecessor of `dominated`'s block (so a back-edge into a loop containing
+    // both is handled), then scan the instructions that can run strictly between the two.
+    bool noMemoryClobberBetween(IRInst* dominator, IRInst* dominated)
+    {
+        IRBlock* rootBlock = as<IRBlock>(dominator->getParent());
+        IRBlock* userBlock = as<IRBlock>(dominated->getParent());
+        if (!rootBlock || !userBlock)
+            return false;
+
+        // Precondition (asserted): `dominator` instruction-dominates `dominated`. The sole caller
+        // (the dedup `onMatch`) has already checked `dom->dominates(existing, candidate)`, so this
+        // is an assertion, not a runtime guard. It must be an instruction-level check, not
+        // block-level: the deduplicate map records the most recent representative for a key, and
+        // the recursive operand walk can present an EARLIER inst as `dominated` against a LATER
+        // `dominator` recorded after a declined reuse. A block-level test is reflexive within a
+        // block and would admit such a backward pair, after which the forward scan starts past
+        // `dominated` and vacuously succeeds -- replacing the earlier value with the later one
+        // across an intervening write. See shader-slang/slang#12785.
+        SLANG_ASSERT(dom->dominates(dominator, dominated));
+
+        HashSet<IRBlock*> searchBlocks;
+        List<IRBlock*> blockWorkList;
+        blockWorkList.add(userBlock);
+        bool userIsOwnPredecessor = false;
+
+        while (blockWorkList.getCount() > 0)
+        {
+            IRBlock* block = blockWorkList.getLast();
+            blockWorkList.removeLast();
+
+            // If userBlock is re-reached, it is its own predecessor (a loop), so the whole
+            // userBlock must be scanned rather than just up to `dominated`.
+            if (block == userBlock && searchBlocks.getCount() > 0)
+                userIsOwnPredecessor = true;
+
+            // Every block that can run between `dominator` and `dominated` must be dominated by
+            // `dominator`'s block, so predecessors outside that region cannot matter.
+            if (!dom->dominates(rootBlock, block) || searchBlocks.contains(block))
+                continue;
+
+            searchBlocks.add(block);
+
+            // Predecessors of rootBlock run before `dominator`; they cannot affect anything
+            // between the two insts (they can still be dominated by rootBlock inside a loop, which
+            // is why they are skipped explicitly here rather than via the dominance test).
+            if (block == rootBlock)
+                continue;
+
+            for (IRBlock* predecessor : block->getPredecessors())
+                blockWorkList.add(predecessor);
+        }
+
+        for (IRBlock* block : searchBlocks)
+        {
+            IRInst* startInst =
+                block == rootBlock ? dominator->getNextInst() : block->getFirstInst();
+            for (IRInst* inst = startInst; inst; inst = inst->getNextInst())
+            {
+                if (inst == dominated && !userIsOwnPredecessor)
+                    break;
+
+                // Only a memory write/synchronization clobbers the callee's reads. A bare
+                // `globallycoherent`/`volatile` LOAD in between is intentionally NOT a clobber: it
+                // is a read, and `mightHaveSideEffects()` is false for a load, so it is skipped
+                // here. (Cross-invocation visibility of a remote write needs an actual
+                // acquire/atomic/barrier, which is side-effecting and blocks below.)
+                if (!inst->mightHaveSideEffects())
+                    continue;
+
+                // Control-flow terminators are flagged by `mightHaveSideEffects` but do not write
+                // memory; everything else that has a side effect is a potential clobber.
+                if (!isMemoryInertControlFlow(inst))
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Cache for `calleeIsRepeatableReadOnly`, keyed by the resolved `IRFunc` (two callee spellings
+    // that resolve to the same function share one entry). Computed on demand and never persisted,
+    // so it needs no serialized decoration and cannot go stale.
+    Dictionary<IRFunc*, bool> repeatableReadOnlyCache;
+
+    // Returns true if two identical dominated calls to `callee` may be commoned (subject to the
+    // between-walk). This is the "repeatable read-only access" tier: the callee has no observable
+    // side effect and every memory location it reads -- transitively, through its own calls -- is
+    // IMMUTABLE and unqualified, so re-calling it always yields the same value. Stronger than
+    // `NoSideEffect` (which permits reads of mutable / coherent / volatile / RW memory), weaker
+    // than `ReadNone` (which permits no memory reads at all, and so is also hoistable -- which this
+    // tier deliberately is NOT). Entry point: seeds the recursion-guard set for the worker.
+    bool isRepeatableReadOnlyCallee(IRInst* callee)
+    {
+        HashSet<IRInst*> visiting;
+        return calleeIsRepeatableReadOnly(callee, visiting);
+    }
+
+    // Worker for `isRepeatableReadOnlyCallee`: walks `callee`'s body (recursing into its own calls)
+    // and returns true only if every instruction is repeatable-read-only. `visiting` is the
+    // in-progress set used to detect cycles across mutually-recursive wrappers.
+    //
+    // The per-read test is `isRepeatableReadLocation` (which builds on
+    // `isPointerToImmutableLocation` but additionally rejects `globallycoherent`/`volatile`
+    // qualifiers and any root that is not a module-scope global). Obscured provenance is rejected
+    // by that global-root allow-list, NOT by a type check: a read-only-typed `StructuredBuffer`
+    // reached through a parameter / phi / `select` still fails, because its root is not a global
+    // (see `gh-12785-param-provenance.slang`).
+    //
+    // Only `kIROp_Load` and `isResourceLoad` instructions are location-checked in the walk. Of the
+    // rest: a call is recursed, memory-inert control flow is stepped over, and anything that
+    // reports a side effect is rejected by `mightHaveSideEffects()`; a remaining side-effect-free
+    // instruction in neither read category (e.g. a descriptor-heap load) is inert here because its
+    // value is observable only through a subsequent `Load`/`isResourceLoad`, whose fail-closed
+    // `isRepeatableReadLocation` terminal rejects any non-global root.
+    bool calleeIsRepeatableReadOnly(IRInst* callee, HashSet<IRInst*>& visiting)
+    {
+        auto func = as<IRFunc>(getResolvedInstForDecorations(callee));
+        if (!func || !func->getFirstBlock())
+            return false; // no visible definition -> cannot prove; be conservative
+        if (auto cached = repeatableReadOnlyCache.tryGetValue(func))
+            return *cached;
+        if (visiting.contains(func))
+            // Recursion cycle: this occurrence cannot be proven in one demand-driven pass, so
+            // return `false` without caching it *here*. The `false` still propagates to each
+            // enclosing caller on the cycle, which caches its own `result = false` -- so a self- or
+            // mutually-recursive read-only wrapper is recorded ineligible (a sound missed
+            // optimization), not re-evaluated on a later query.
+            return false;
+        visiting.add(func);
+
+        bool result = true;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (auto call = as<IRCall>(inst))
+                {
+                    if (!calleeIsRepeatableReadOnly(call->getCallee(), visiting))
+                    {
+                        result = false;
+                        break;
+                    }
+                    continue;
+                }
+                if (isMemoryInertControlFlow(inst))
+                    continue;
+                // Any inst with a side effect -- a store, atomic, barrier, discard, wave/quad op,
+                // `TryCall`, opaque intrinsic, or a status-returning buffer load that writes its
+                // status out-param -- is not repeatable. Checked before the read cases below so a
+                // side-effecting resource load (e.g. `StructuredBufferLoadStatus`) is rejected even
+                // though its operand 0 is an immutable resource. Note this also conservatively
+                // rejects the pure-read resource loads that `mightHaveSideEffects()` still flags
+                // (`ImageLoad`, `ByteAddressBufferLoad`, `SubpassLoad`): only the side-effect-free
+                // structured-buffer loads reach the `isResourceLoad` branch below, so this tier
+                // commons `StructuredBuffer` wrappers but not read-only texture / byte-address
+                // wrappers -- a deliberate narrower scope.
+                if (inst->mightHaveSideEffects())
+                {
+                    result = false;
+                    break;
+                }
+                // A pure read must come from a repeatable location AND load a repeatable value.
+                // Two independent qualifier checks, because a `globallycoherent`/`volatile`
+                // qualifier can hide in two places:
+                //
+                //   (1) On the accessed LOCATION or a field key on its access chain (e.g. a
+                //       coherent scalar member `load(fieldAddr(cb, key))`). Hand the raw
+                //       pointer/handle to `isRepeatableReadLocation` and let it peel the chain,
+                //       inspecting the qualifier at every step including the field key. Do NOT
+                //       pre-strip with `getRootAddr` -- it peels `FieldAddress`/`GetElementPtr`
+                //       without checking their keys, so a qualified field would slip past.
+                //   (2) On a member of the loaded VALUE'S TYPE, when a qualified member is read by
+                //       value inside an aggregate (e.g. `buf[i].coherentMember` lowers to
+                //       `getField(structuredBufferLoad(buf, i), key)` -- the by-value extract
+                //       carries no location provenance, so only the loaded element type reveals
+                //       it). `typeContainsNonRepeatableQualifiedMember` rejects such a load.
+                if (inst->getOp() == kIROp_Load)
+                {
+                    if (!isRepeatableReadLocation(as<IRLoad>(inst)->getPtr()) ||
+                        typeContainsNonRepeatableQualifiedMember(inst->getDataType()))
+                    {
+                        result = false;
+                        break;
+                    }
+                    continue;
+                }
+                if (isResourceLoad(inst->getOp()))
+                {
+                    if (!isRepeatableReadLocation(inst->getOperand(0)) ||
+                        typeContainsNonRepeatableQualifiedMember(inst->getDataType()))
+                    {
+                        result = false;
+                        break;
+                    }
+                    continue;
+                }
+            }
+            if (!result)
+                break;
+        }
+
+        visiting.remove(func);
+        repeatableReadOnlyCache[func] = result;
+        return result;
+    }
+
     bool removeRedundancyInBlock(
         Dictionary<IRBlock*, DeduplicateContext>& mapBlockToDedupContext,
         IRGlobalValueWithCode* func,
@@ -83,7 +335,41 @@ struct RedundancyRemovalContext
                         return false;
                     if (dom->isUnreachable(parentBlock))
                         return false;
-                    return isMovableInst(inst);
+                    if (isMovableInst(inst))
+                        return true;
+                    // A call to a "repeatable read-only access" callee (e.g. a `[noinline]` wrapper
+                    // around a `StructuredBuffer` load) is not movable -- it must not be
+                    // hoisted/speculated onto a new control-flow path -- but a dominated identical
+                    // call CAN reuse a dominating one when nothing writes the read memory in
+                    // between. Eligibility (the callee reads only immutable memory) is decided
+                    // here; the "nothing in between" aliased-write check happens at the match below
+                    // (it needs both insts). See shader-slang/slang#12785.
+                    if (auto call = as<IRCall>(inst))
+                        return isRepeatableReadOnlyCallee(call->getCallee());
+                    return false;
+                },
+                [&](IRInst* existing, IRInst* candidate)
+                {
+                    // A movable inst has no memory dependence, so any dominating occurrence may be
+                    // reused unconditionally.
+                    if (isMovableInst(candidate))
+                        return DedupMatchAction::Reuse;
+
+                    // Otherwise `candidate` is a repeatable read-only call (reads only immutable
+                    // memory). It may reuse `existing` only when `existing` dominates it and no
+                    // store/atomic/barrier/opaque call that could write the read-through-aliasing
+                    // memory lies in between. When `existing` dominates `candidate`
+                    // but a clobber intervenes, `candidate` still becomes the nearest dominating
+                    // occurrence for later calls, so it replaces the representative. When
+                    // `existing` does NOT dominate `candidate` -- e.g. an earlier call reached
+                    // through the operand recursion, whose recorded representative is a later call
+                    // -- reusing or recording it would be unsound/regressive, so the representative
+                    // is kept.
+                    if (!dom->dominates(existing, candidate))
+                        return DedupMatchAction::KeepRepresentative;
+                    if (noMemoryClobberBetween(existing, candidate))
+                        return DedupMatchAction::Reuse;
+                    return DedupMatchAction::ReplaceRepresentative;
                 });
             if (resultInst != instP)
             {
