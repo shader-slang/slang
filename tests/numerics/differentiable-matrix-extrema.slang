@@ -1,8 +1,8 @@
-// Verify that differentiable generic matrix extrema use the layout-preserving shaped adapters.
-
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry codegenMain -stage compute -experimental-feature
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry codegenMain -stage compute -experimental-feature
+
+// Verify that differentiable generic matrix extrema use the layout-preserving shaped adapters.
 
 // CHECK: type: float
 // CHECK-NEXT: 1.0
@@ -21,8 +21,12 @@
 // CHECK-NEXT: 20.0
 // CHECK-NEXT: 30.0
 // CHECK-NEXT: 4.0
+// CHECK-NEXT: 1.0
+// CHECK-NEXT: 0.0
+// CHECK-NEXT: 0.0
+// CHECK-NEXT: 1.0
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 
 // HLSL-DAG: return min(left_{{[0-9]+}}, right_{{[0-9]+}});
 // HLSL-DAG: return max(left_{{[0-9]+}}, right_{{[0-9]+}});
@@ -99,4 +103,16 @@ void computeMain()
             outputBuffer[index + 12] = maximumResult.d[row][column];
         }
     }
+
+    var minimumLeft = diffPair(left, Matrix(0.0));
+    var minimumRight = diffPair(right, Matrix(0.0));
+    bwd_diff(matrixMinimum)(minimumLeft, minimumRight, Matrix(1.0));
+    outputBuffer[16] = minimumLeft.d[0][0];
+    outputBuffer[17] = minimumRight.d[0][0];
+
+    var maximumLeft = diffPair(left, Matrix(0.0));
+    var maximumRight = diffPair(right, Matrix(0.0));
+    bwd_diff(matrixMaximum)(maximumLeft, maximumRight, Matrix(1.0));
+    outputBuffer[18] = maximumLeft.d[0][0];
+    outputBuffer[19] = maximumRight.d[0][0];
 }
