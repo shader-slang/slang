@@ -713,23 +713,29 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     /// caller supplied a blob; deferral is disabled otherwise.
     ComPtr<ISlangBlob> blobHoldingSerializedData;
 
-    /// Set when this decoder sees an unrecognized opcode, during the load walk or a body
-    /// decoded later. Named apart from `IRSerialReadContext::_foundUnrecognizedInstructions`,
-    /// which accumulates the same fact for the caller: the `|=` between them is easy to
-    /// misread when both spell it the same way.
+    /// Set when this decoder allocates an instruction whose opcode this build does not
+    /// know. Named apart from `IRSerialReadContext::_foundUnrecognizedInstructions`, which
+    /// accumulates the same fact for the caller: the `|=` between them is easy to misread
+    /// when both spell it the same way.
     ///
     /// Recorded here rather than on the `IRSerialReadContext`, which this must not
     /// reference: that would close the cycle `IRModule -> decoder -> context -> IRModule`
     /// and leak every module for the life of the process, while a raw pointer would
     /// dangle.
     ///
-    /// **Only the load walk's observation reaches a caller.** `deserializeFromFlatModule`
-    /// propagates this into the context once, before returning, and the end-state checks
-    /// consult it there. An unknown opcode first seen inside a body decoded later sets
-    /// this flag and nothing reads it: by then the read has already returned `SLANG_OK`,
-    /// so there is no result left to turn into the recoverable read failure the eager
-    /// path produces. Reaching that state needs a module from a future version whose
-    /// unknown instruction sits below module scope.
+    /// **Deferral does not hide an unknown opcode**, and it is worth being precise about
+    /// why, because the reverse is an easy thing to conclude. Reading the flat table
+    /// decodes `instAllocInfo` for *every* instruction, deferred ones included, and
+    /// `serialize(S const&, IROp&)` is what turns an unknown stable name into
+    /// `kIROp_Unrecognized` -- setting the context's flag as it goes. That happens during
+    /// `serialize(serializer, flat)`, before anything decides whether to defer. So both
+    /// load paths learn of an unknown opcode at the same point, and both turn it into the
+    /// same recoverable read failure.
+    ///
+    /// Which leaves this flag with nothing to observe: by the time any instruction is
+    /// allocated, its op has already been mapped away from `kIROp_Invalid`. It is kept as
+    /// a belt-and-braces record for a future reader that allocates from a source other
+    /// than the flat table.
     bool sawUnrecognizedOpDuringDecode = false;
 
     /// Where each deferred body's encoding begins.

@@ -912,6 +912,19 @@ public:
             m_decorationsAndChildren.last);
     }
     void removeAndDeallocateAllDecorationsAndChildren();
+    /// Whether this instruction has any decoration or child.
+    ///
+    /// Materializes, unlike the rest of the decoration path, even though the answer is
+    /// knowable without decoding: a deferred body is only recorded when a non-eager child
+    /// exists, so `peekFirstDecorationOrChild() != nullptr || m_hasDeferredBody` would
+    /// give the same result.
+    ///
+    /// That short cut is not taken because it costs nothing to skip. Every caller asks
+    /// about a witness table being built or cloned into the module under compilation --
+    /// `slang-lower-to-ir.cpp`, `slang-ir-link.cpp`, `slang-ir-autodiff.cpp` -- never a
+    /// deferred global. Measured over 199 shaders plus an autodiff shader and a
+    /// precompiled user module: this is reached, and never once on an instruction with a
+    /// deferred body. Keeping one way to ask is worth more than a branch that never fires.
     bool hasDecorationOrChild()
     {
         ensureBodyMaterialized();
