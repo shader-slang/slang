@@ -350,13 +350,9 @@ bool allLessThan<T : IComponentwiseOrdered>(T left, T right)
 
 #### Numeric Extrema and Real Number Ordering
 
-The `INumericExtrema` interface provides element-wise minimum and maximum operations for numeric
-types.
-Its built-in conformances include integer scalars, vectors, and cooperative vectors, as well as
-floating-point scalars, vectors, matrices, and cooperative vectors.
-The `IRealOrderingFunctions` interface refines it with the step-function operation, whose
-conventional definition depends on real-ordering behavior such as that of IEEE floating-point
-numbers.
+The `INumericExtrema` interface provides element-wise minimum and maximum operations for numeric types.
+Its built-in conformances include integer scalars, vectors, matrices, and cooperative vectors, as well as floating-point scalars, vectors, matrices, and cooperative vectors.
+The `IRealOrderingFunctions` interface refines it with the step-function operation, whose conventional definition depends on real-ordering behavior such as that of IEEE floating-point numbers.
 
 ### The `IReal` Convenience Definition
 
@@ -479,7 +475,7 @@ The numerics module defines conformances to the appropriate interfaces for:
 
 - the built-in integer and floating-point scalar types
 - vectors of built-in scalar types
-- matrices of built-in floating-point types
+- matrices of built-in integer or floating-point types
 - cooperative vectors of built-in integer or floating-point types
 
 Cooperative vectors of built-in integer types conform to the applicable integer interfaces.
@@ -488,7 +484,7 @@ Importing `slang.numerics.differentiable` adds the corresponding differentiable 
 
 Known limitations include:
 
-- Matrices of built-in integer types do not currently conform to the numeric interfaces.
+- Matrices of built-in integer types currently conform only to `INumericExtrema`, rather than to the full integer interface hierarchy.
 - Cooperative vectors of built-in floating-point types satisfy `IReal`, but do not currently conform to `IFloatingPoint`.
 - Dot-product conformances currently cover built-in numeric scalars and ordinary vectors, but not matrices or cooperative vectors.
 - Cooperative matrices do not currently conform to the numeric interfaces.

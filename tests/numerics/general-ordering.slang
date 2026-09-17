@@ -117,10 +117,10 @@ void computeMain()
     outputBuffer[10] = threeWayMinimum(7, -2, 4);
     outputBuffer[11] = threeWayMaximum(7, -2, 4);
 
-    int2x2 boundedIntegerMatrix = bound(
-        int2x2(-2, 4, 9, 1),
-        int2x2(0, 1, 2, 2),
-        int2x2(3, 5, 7, 6));
+    matrix<int, 2, 2, MatrixLayoutMode.RowMajor> boundedIntegerMatrix = bound(
+        matrix<int, 2, 2, MatrixLayoutMode.RowMajor>(-2, 4, 9, 1),
+        matrix<int, 2, 2, MatrixLayoutMode.RowMajor>(0, 1, 2, 2),
+        matrix<int, 2, 2, MatrixLayoutMode.RowMajor>(3, 5, 7, 6));
     outputBuffer[12] = boundedIntegerMatrix[0][0];
     outputBuffer[13] = boundedIntegerMatrix[0][1];
     outputBuffer[14] = boundedIntegerMatrix[1][0];
