@@ -1,12 +1,12 @@
-// Verify representative explicit conversions between generic builtin scalar element types. The
-// matrix case also type-checks conversion of a non-default matrix layout.
-
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute -experimental-feature
 //TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o builtin-conversions.spv -experimental-feature
 //TEST:SIMPLE: -target wgsl -entry computeMain -stage compute -o builtin-conversions.wgsl -experimental-feature
 //TEST:SIMPLE: -target metal -entry computeMain -stage compute -o builtin-conversions.metal -experimental-feature
 //TEST:SIMPLE: -target cuda -entry computeMain -stage compute -o builtin-conversions.cuda.cpp -experimental-feature
+
+// Verify representative explicit conversions between generic builtin scalar element types. The
+// matrix case also type-checks conversion of a non-default matrix layout.
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 3
@@ -28,8 +28,12 @@
 // CHECK-NEXT: 1
 // CHECK-NEXT: 0
 // CHECK-NEXT: 1
+// CHECK-NEXT: 0
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 0
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 
 // Specialization must expose the ordinary builtin casts rather than leaving numerics adapters or
 // dispatch-marker abstractions in the emitted program.
@@ -86,6 +90,10 @@ void computeMain()
         matrix<float, 2, 2, MatrixLayoutMode.RowMajor>(4.0, 5.0, 6.0, 7.0);
     matrix<uint, 2, 2, MatrixLayoutMode.RowMajor> matrixFromFloat =
         convertMatrix<uint>(sourceMatrix);
+    matrix<float, 2, 2, MatrixLayoutMode.ColumnMajor> columnMajorSource =
+        matrix<float, 2, 2, MatrixLayoutMode.ColumnMajor>(0.0, 0.5, -0.5, 0.0);
+    matrix<bool, 2, 2, MatrixLayoutMode.ColumnMajor> columnMajorBoolFromFloat =
+        convertMatrix<bool>(columnMajorSource);
 
     outputBuffer[0] = scalarFromFloat;
     outputBuffer[1] = int(scalarFromBool);
@@ -104,6 +112,10 @@ void computeMain()
     outputBuffer[16] = int(vectorBoolFromFloat.x);
     outputBuffer[17] = int(vectorBoolFromFloat.y);
     outputBuffer[18] = int(vectorBoolFromFloat.z);
+    outputBuffer[19] = int(columnMajorBoolFromFloat[0][0]);
+    outputBuffer[20] = int(columnMajorBoolFromFloat[0][1]);
+    outputBuffer[21] = int(columnMajorBoolFromFloat[1][0]);
+    outputBuffer[22] = int(columnMajorBoolFromFloat[1][1]);
 
     // Exercise half/double conversions only on targets that represent both types.
     __target_switch

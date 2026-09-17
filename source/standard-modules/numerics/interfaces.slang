@@ -3,6 +3,7 @@ implementing numerics;
 /// Identifies the non-void builtin scalar representations supported by compiler-defined casts.
 /// This sealed interface is a dispatch marker, not a mathematical capability. Prefer a more
 /// specific `IScalar...` or `IBuiltinScalar...` interface when an algorithm requires arithmetic.
+/// The `DispatchMarker` suffix distinguishes this alias from the capability conjunctions below.
 public typealias IBuiltinScalarTypeDispatchMarker = __BuiltinScalarType;
 
 // The remaining aliases combine an extensible scalar capability with the sealed builtin

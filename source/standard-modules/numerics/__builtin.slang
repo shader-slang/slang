@@ -42,8 +42,10 @@ public matrix<TDestination, R, C, L> __numericsBuiltinConvertMatrix<
     let L : MatrixLayoutMode>(matrix<TSource, R, C, L> value);
 
 // The adapters below serve a different purpose: they implement the integer and floating-point
-// constructor requirements of the numeric interfaces. Their bodies deliberately use the narrower
-// core conversion operations instead of the all-pairs BuiltinCast surface above. Because this
+// constructor requirements of the numeric interfaces. The BuiltinCast adapters above accept any
+// source/destination pair in `__BuiltinScalarType`; these construction adapters intentionally
+// support only integer-to-integer, integer-to-floating-point, and floating-point-to-floating-point
+// pairs. Their bodies use the corresponding narrower core conversion operations. Because this
 // module does not import `slang.numerics`, each construction can only resolve to an established
 // core constructor and cannot redispatch to the generic requirement it implements.
 [__readNone]
