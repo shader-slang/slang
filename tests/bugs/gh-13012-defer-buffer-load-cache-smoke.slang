@@ -1,14 +1,17 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-// Regression test for the `DeferBufferLoadContext::calleeSideEffectCache` invariant added in
-// PR #13012 (fixes #13010): the cache must never let load/store redundancy removal forward a
-// value across a call to a function that writes the same address. `deferBufferLoadInFunc` calls
-// `removeRedundancyInFunc(func, false, &calleeSideEffectCache)` on every function this pass
-// processes, so a stale "no side effect" entry there would let `canInstHaveSideEffectAtAddress`
-// (slang-ir-util.cpp) treat `mutate` below as pure and eliminate the second load of
-// `outputBuffer[0]`, reusing the pre-call store's value (1) instead of re-reading the post-call
-// value (42). `mutate` is `[noinline]` so it survives as a real `IRCall` at redundancy-removal
-// time instead of being inlined away before this pass runs.
+// Smoke test that the cache-threaded `doesCalleeHaveSideEffect` signature added in PR #13012
+// (fixes #13010) still detects impurity correctly on a real, non-inlined call: `mutate` is
+// `[noinline]` so it survives as a real `IRCall` at redundancy-removal time, and a correct
+// compile must re-read `outputBuffer[0]` after the call rather than reuse the pre-call store's
+// value. This does NOT exercise a *stale* cache entry -- `deferBufferLoadInFunc`'s cache starts
+// empty and queries `mutate` exactly once, so it produces the same result cached or uncached, and
+// would not catch a regression in the staleness contract itself (see
+// `DeferBufferLoadContext::calleeSideEffectCache`'s doc comment in slang-ir-defer-buffer-load.cpp
+// and the shared-cache contract in slang-ir-redundancy-removal.h). Constructing a genuinely
+// discriminating test requires a callee whose purity changes *while* a shared cache from an
+// earlier query is still live, which isn't reliably expressible from `.slang` source -- it
+// depends on internal pass-iteration scheduling this test can't observe or control.
 
 RWStructuredBuffer<uint> outputBuffer;
 

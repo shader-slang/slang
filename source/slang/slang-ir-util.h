@@ -375,9 +375,10 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
 
 bool isPtrLikeOrHandleType(IRInst* type);
 
-// `calleeSideEffectCache` is optional; see `slang-ir-redundancy-removal.h` for the sharing and
-// staleness contract this function implements. Turns the `kIROp_Call` case's
-// `doesCalleeHaveSideEffect` query O(1) after the first lookup per callee.
+// `calleeSideEffectCache` is optional; see `IRDeadCodeEliminationOptions::calleeSideEffectCache`
+// in slang-ir-dce.h for the authoritative sharing/staleness contract this function depends on.
+// Turns the `kIROp_Call` case's `doesCalleeHaveSideEffect` query O(1) after the first lookup per
+// callee.
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,

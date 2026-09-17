@@ -57,13 +57,15 @@ void simplifyIR(
 {
     SLANG_PROFILE;
 
-    // Callee-side-effect memo shared by DCE and the removeRedundancyInFunc call below (see
-    // IRDeadCodeEliminationOptions::calleeSideEffectCache and slang-ir-redundancy-removal.h).
-    // Cleared each outer iteration, before propagateFuncProperties updates purity facts for that
-    // iteration. Unlike the sibling simplifyNonSSAIR/simplifyFunc, this omits a clear inside the
-    // inner per-func loop that calls removeRedundancyInFunc -- safe because
-    // propagateFuncProperties is this pass's only purity mutator, and it runs once per outer
-    // iteration, before the inner loop starts.
+    // Callee-side-effect memo shared by DCE and the removeRedundancyInFunc call below -- see
+    // IRDeadCodeEliminationOptions::calleeSideEffectCache in slang-ir-dce.h for the authoritative
+    // staleness contract. `propagateFuncProperties`, the only purity mutator this contract's
+    // monotonicity invariant is about, runs once per outer iteration below, so clearing here
+    // (before it runs) is a correctness requirement for that iteration. Unlike the sibling
+    // simplifyNonSSAIR/simplifyFunc, this deliberately omits a second clear inside the inner
+    // per-function loop (up to `kMaxFuncIterations` calls to `removeRedundancyInFunc` per
+    // function, per outer iteration): safe because `propagateFuncProperties` already ran before
+    // that inner loop starts, and nothing inside it mutates purity.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
@@ -133,9 +135,12 @@ void simplifyNonSSAIR(
     DiagnosticSink* sink)
 {
     // Shared with removeRedundancy below, not just eliminateDeadCode -- see
-    // slang-ir-redundancy-removal.h for why staleness is unsafe there. No step in this loop
-    // mutates callee purity, so the per-iteration `clear()` is defensive, not required -- it
-    // mirrors simplifyIR's clear, and also empties a caller-supplied cache if one was passed in.
+    // IRDeadCodeEliminationOptions::calleeSideEffectCache in slang-ir-dce.h for the authoritative
+    // staleness contract. Unlike simplifyIR, no step in this loop calls `propagateFuncProperties`
+    // or otherwise mutates callee purity, so the per-iteration `clear()` below is NOT a
+    // correctness requirement -- it is a deliberate, defensive choice mirroring simplifyIR's
+    // clear for symmetry, at the cost of discarding cross-iteration cache reuse (including a
+    // caller-supplied cache's entries, if one was passed in via `options`) every iteration.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
@@ -174,9 +179,10 @@ void simplifyFunc(
     IRSimplificationOptions options,
     DiagnosticSink* sink)
 {
-    // See the identical comment in simplifyNonSSAIR above: this cache is shared with
-    // removeRedundancyInFunc below, not just eliminateDeadCode, so it is cleared every
-    // iteration rather than relying on this loop never mutating callee purity.
+    // Same situation as simplifyNonSSAIR above: shared with removeRedundancyInFunc below, and
+    // cleared every iteration as a defensive choice, not a correctness requirement -- see that
+    // function's comment and IRDeadCodeEliminationOptions::calleeSideEffectCache in
+    // slang-ir-dce.h.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;

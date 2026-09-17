@@ -213,9 +213,16 @@ struct DeferBufferLoadContext
     CodeGenContext* codeGenContext;
 
     // Shared across every function in the module and never cleared for this pass's lifetime (see
-    // `slang-ir-redundancy-removal.h` for the staleness contract this depends on). Safe because
+    // `IRDeadCodeEliminationOptions::calleeSideEffectCache` in slang-ir-dce.h for the authoritative
+    // staleness contract this depends on). Safe because
     // this pass never mutates callee purity -- it only rewrites load shape and moves per-load
-    // decorations.
+    // decorations, never touching a callee's `IRAnnotation`s or purity decorations. Also safe on
+    // key lifetime: entries are keyed by the callee `IRInst*` itself, this pass never frees a
+    // call's callee (only rewritten loads/`GetElement`/`FieldExtract` insts are freed), and IR
+    // insts are bump-arena allocated, so a cached pointer can never be re-observed as a different,
+    // later-allocated inst. `deferBufferLoad` below re-derives every cached entry from scratch and
+    // asserts agreement in debug builds, so a future violation of the purity half of this is
+    // caught rather than silently miscompiling.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
 
     void deferBufferLoadInst(IRBuilder& builder, List<IRInst*>& workList, IRInst* loadInst)
@@ -392,6 +399,21 @@ void deferBufferLoad(IRModule* module, CodeGenContext* codeGenContext)
             context.deferBufferLoad(code);
         }
     }
+
+#ifdef _DEBUG
+    // Pin the invariant `calleeSideEffectCache`'s doc comment claims but does not enforce: this
+    // pass never changes a cached callee's purity. Re-derive each cached entry from scratch
+    // (bypassing the cache) and assert it still agrees -- a future edit to this pass that starts
+    // creating/removing `IRAnnotation`s or purity decorations would flip a cached entry stale and
+    // trip this, instead of silently letting `canInstHaveSideEffectAtAddress` forward a load/store
+    // across a now-impure call. Debug-only: re-deriving is exactly the linear-scan cost the cache
+    // exists to avoid, so this cannot run in release builds without reintroducing the complexity
+    // this PR fixes.
+    for (const auto& [callee, cachedSideEffect] : context.calleeSideEffectCache)
+    {
+        SLANG_ASSERT(doesCalleeHaveSideEffect(callee) == cachedSideEffect);
+    }
+#endif
 }
 
 } // namespace Slang
