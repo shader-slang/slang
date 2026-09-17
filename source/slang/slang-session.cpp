@@ -1603,6 +1603,37 @@ bool Linkage::isBeingImported(Module* module)
     return false;
 }
 
+RefPtr<Module> Linkage::_getImportableModuleOrDiagnose(
+    Module* module,
+    Name* moduleName,
+    SourceLoc const& requestingLoc,
+    DiagnosticSink* sink)
+{
+    if (!module)
+        return nullptr;
+
+    // The checked AST attribute is the source of truth for this module-level contract. Every
+    // discovery producer constructs or deserializes a checked ModuleDecl before making a module
+    // importable. Language-server sessions may deliberately omit IR, so import validation must not
+    // depend on the derived IR decoration.
+    auto moduleDecl = module->getModuleDecl();
+    SLANG_RELEASE_ASSERT(moduleDecl);
+    bool isExperimentalModule = moduleDecl->findModifier<ExperimentalModuleAttribute>() != nullptr;
+
+    if (isExperimentalModule && !m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
+    {
+        if (sink)
+        {
+            sink->diagnose(Diagnostics::NeedToEnableExperimentFeature{
+                .module = getText(moduleName),
+                .loc = requestingLoc});
+        }
+        return nullptr;
+    }
+
+    return module;
+}
+
 // Derive a file name for the module, by taking the given
 // identifier, replacing all occurrences of `_` with `-`,
 // and then appending `.slang`.
@@ -1635,6 +1666,16 @@ String getFileNameFromModuleName(Name* name, bool translateUnderScore)
 }
 
 RefPtr<Module> Linkage::findOrImportModule(
+    Name* moduleName,
+    SourceLoc const& requestingLoc,
+    DiagnosticSink* sink,
+    const LoadedModuleDictionary* loadedModules)
+{
+    auto module = _findOrImportModuleWithoutPolicy(moduleName, requestingLoc, sink, loadedModules);
+    return _getImportableModuleOrDiagnose(module, moduleName, requestingLoc, sink);
+}
+
+RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
     Name* moduleName,
     SourceLoc const& requestingLoc,
     DiagnosticSink* sink,
@@ -1919,17 +1960,6 @@ RefPtr<Module> Linkage::findOrImportModule(
                     /*isSpeculativeLoad*/ true);
                 if (module)
                 {
-                    if (auto irModule = module->getIRModule())
-                    {
-                        if (irModule->getModuleInst()
-                                ->findDecoration<IRExperimentalModuleDecoration>() &&
-                            !m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
-                        {
-                            sink->diagnose(Diagnostics::NeedToEnableExperimentFeature{
-                                .module = getText(moduleName),
-                                .loc = requestingLoc});
-                        }
-                    }
                     return module;
                 }
             }

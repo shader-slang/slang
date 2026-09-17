@@ -2704,7 +2704,9 @@ local insts = {
 			},
 			{
 				experimentalModule = {
-					-- Marks a module as an experimental module
+					-- Opcode 683, introduced in module semantic version 4. Current import
+					-- validation reads the checked AST, but compatible pre-change readers inspect
+					-- this marker when loading packaged standard modules.
 					struct_name = "ExperimentalModuleDecoration"
 				},
 			},

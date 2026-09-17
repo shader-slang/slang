@@ -491,6 +491,27 @@ private:
     /// Is the given module in the middle of being imported?
     bool isBeingImported(Module* module);
 
+    /// Discovers a module without applying restrictions that belong to the importing consumer.
+    ///
+    /// This is the implementation of `findOrImportModule`; callers must use that public wrapper so
+    /// every successful discovery passes through `_getImportableModuleOrDiagnose`.
+    RefPtr<Module> _findOrImportModuleWithoutPolicy(
+        Name* moduleName,
+        SourceLoc const& requestingLoc,
+        DiagnosticSink* sink,
+        const LoadedModuleDictionary* loadedModules);
+
+    /// Returns `module` when it may be imported, or `nullptr` when it is absent or rejected.
+    ///
+    /// A rejected import is non-importable: this helper returns `nullptr` and diagnoses it when
+    /// `sink` is present. The public `findOrImportModule` wrapper applies this validation to every
+    /// import request after discovery, including cache hits.
+    RefPtr<Module> _getImportableModuleOrDiagnose(
+        Module* module,
+        Name* moduleName,
+        SourceLoc const& requestingLoc,
+        DiagnosticSink* sink);
+
     /// Diagnose that an error occured in the process of importing a module
     void _diagnoseErrorInImportedModule(DiagnosticSink* sink);
 
