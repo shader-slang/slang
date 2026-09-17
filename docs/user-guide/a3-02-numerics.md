@@ -265,6 +265,7 @@ int3 convertCoordinates(float3 value)
 `convertBuiltinScalar` uses the compiler's `BuiltinCast` operation directly rather than resolving a constructor overload.
 Integer and floating-point conversions use the corresponding numeric cast, while conversion to `bool` tests whether the source value is nonzero.
 For example, `convertBuiltinScalar<bool>(0.5)` is `true`.
+Conversion from `bool` to a numeric destination maps `false` to zero and `true` to one.
 `convertBuiltinVector` and `convertBuiltinMatrix` apply `BuiltinCast` to each component.
 Both shaped conversions preserve the input shape, and matrix conversion also preserves the input layout.
 The helpers do not perform bit reinterpretation, scalar splatting, or shape conversion.

@@ -30,10 +30,12 @@
 // CHECK-NEXT: 1
 // CHECK-NEXT: 0
 // CHECK-NEXT: 1
+// CHECK-NEXT: 0
 // CHECK-NEXT: 1
 // CHECK-NEXT: 0
+// CHECK-NEXT: 1
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 
 // Specialization must expose the ordinary builtin casts rather than leaving numerics adapters or
 // dispatch-marker abstractions in the emitted program.
@@ -90,9 +92,9 @@ void computeMain()
         matrix<float, 2, 2, MatrixLayoutMode.RowMajor>(4.0, 5.0, 6.0, 7.0);
     matrix<uint, 2, 2, MatrixLayoutMode.RowMajor> matrixFromFloat =
         convertMatrix<uint>(sourceMatrix);
-    matrix<float, 2, 2, MatrixLayoutMode.ColumnMajor> columnMajorSource =
-        matrix<float, 2, 2, MatrixLayoutMode.ColumnMajor>(0.0, 0.5, -0.5, 0.0);
-    matrix<bool, 2, 2, MatrixLayoutMode.ColumnMajor> columnMajorBoolFromFloat =
+    matrix<float, 2, 3, MatrixLayoutMode.ColumnMajor> columnMajorSource =
+        matrix<float, 2, 3, MatrixLayoutMode.ColumnMajor>(0.0, 0.5, 0.0, -0.5, 0.0, 2.0);
+    matrix<bool, 2, 3, MatrixLayoutMode.ColumnMajor> columnMajorBoolFromFloat =
         convertMatrix<bool>(columnMajorSource);
 
     outputBuffer[0] = scalarFromFloat;
@@ -114,8 +116,10 @@ void computeMain()
     outputBuffer[18] = int(vectorBoolFromFloat.z);
     outputBuffer[19] = int(columnMajorBoolFromFloat[0][0]);
     outputBuffer[20] = int(columnMajorBoolFromFloat[0][1]);
-    outputBuffer[21] = int(columnMajorBoolFromFloat[1][0]);
-    outputBuffer[22] = int(columnMajorBoolFromFloat[1][1]);
+    outputBuffer[21] = int(columnMajorBoolFromFloat[0][2]);
+    outputBuffer[22] = int(columnMajorBoolFromFloat[1][0]);
+    outputBuffer[23] = int(columnMajorBoolFromFloat[1][1]);
+    outputBuffer[24] = int(columnMajorBoolFromFloat[1][2]);
 
     // Exercise half/double conversions only on targets that represent both types.
     __target_switch
