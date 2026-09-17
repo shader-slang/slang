@@ -66,7 +66,9 @@ RUN apt-get update && apt-get install -y \
 # This is the first SDK containing the validation-layer fix for VUID 10904 (see #13148).
 ENV VULKAN_SDK=/opt/vulkan-sdk/1.4.350.0/x86_64
 ENV PATH="${VULKAN_SDK}/bin:${PATH}"
-ENV LD_LIBRARY_PATH="${VULKAN_SDK}/lib:${LD_LIBRARY_PATH}"
+# SDK 1.4.350 moved the loader under lib/VulkanLoader/lib. Keep the general SDK
+# library directory as well for validation layers and the other SDK components.
+ENV LD_LIBRARY_PATH="${VULKAN_SDK}/lib/VulkanLoader/lib:${VULKAN_SDK}/lib:${LD_LIBRARY_PATH}"
 ENV VK_LAYER_PATH="${VULKAN_SDK}/share/vulkan/explicit_layer.d"
 
 RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.350.0/linux/vulkansdk-linux-x86_64-1.4.350.0.tar.xz && \
@@ -75,7 +77,8 @@ RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.350.0/linux/vulkansdk-linux-
     mkdir -p /opt/vulkan-sdk && \
     mv 1.4.350.0 /opt/vulkan-sdk/ && \
     rm -rf vulkansdk-linux-x86_64-1.4.350.0.tar.xz && \
-    echo "${VULKAN_SDK}/lib" > /etc/ld.so.conf.d/vulkan-sdk.conf && \
+    printf '%s\n' "${VULKAN_SDK}/lib/VulkanLoader/lib" "${VULKAN_SDK}/lib" \
+        > /etc/ld.so.conf.d/vulkan-sdk.conf && \
     ldconfig
 
 # Install runtime libraries for test execution
