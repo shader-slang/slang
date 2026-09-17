@@ -118,8 +118,7 @@ Slang can compile shader code to the following targets:
 
 > \*\*WGSL support is still work in-progress.
 
-For greater detail, see the [Supported Compilation
-Targets](https://shader-slang.com/slang/user-guide/targets.html) section of the
+For greater detail, see the [Supported Compilation Targets](https://shader-slang.com/slang/user-guide/targets.html) section of the
 [User Guide](https://shader-slang.github.io/slang/user-guide/)
 
 The Slang project has been used for production applications and large shader

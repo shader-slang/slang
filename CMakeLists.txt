@@ -167,6 +167,27 @@ option(
     SLANG_ENABLE_ASAN
     "Enable AddressSanitizer (ASan), and UndefinedBehaviorSanitizer (UBSan) if available as well"
 )
+option(
+    SLANG_ENABLE_TSAN
+    "Enable ThreadSanitizer (TSan); clang/gcc on non-Windows only. Mutually exclusive with SLANG_ENABLE_ASAN."
+)
+# The compiler driver rejects combining -fsanitize=address and -fsanitize=thread,
+# so a build with both options enabled would otherwise fail at compile time on
+# the first instrumented file. Reject the combination here at configure time to
+# fail fast with a clear message instead.
+if(SLANG_ENABLE_ASAN AND SLANG_ENABLE_TSAN)
+    message(
+        FATAL_ERROR
+        "SLANG_ENABLE_ASAN and SLANG_ENABLE_TSAN are mutually exclusive; enable at most one."
+    )
+endif()
+# ThreadSanitizer has no Windows implementation in clang-cl, MinGW, or MSVC.
+# Reject it here alongside the mutual-exclusion check so both SLANG_ENABLE_TSAN
+# constraints fail fast at configure time in one place, rather than surfacing
+# later during per-target setup.
+if(SLANG_ENABLE_TSAN AND WIN32)
+    message(FATAL_ERROR "SLANG_ENABLE_TSAN is not supported on Windows.")
+endif()
 option(SLANG_ENABLE_COVERAGE "Enable code coverage instrumentation")
 option(
     SLANG_ENABLE_TIME_TRACE
@@ -385,6 +406,12 @@ if(SLANG_ENABLE_MIMALLOC AND SLANG_ENABLE_ASAN)
     message(
         WARNING
         "SLANG_ENABLE_MIMALLOC is enabled with SLANG_ENABLE_ASAN, but this mimalloc configuration does not enable ASan tracking"
+    )
+endif()
+if(SLANG_ENABLE_MIMALLOC AND SLANG_ENABLE_TSAN)
+    message(
+        WARNING
+        "SLANG_ENABLE_MIMALLOC is enabled with SLANG_ENABLE_TSAN, but this mimalloc configuration is not built with TSan instrumentation (MI_DEBUG_TSAN), so data races inside mimalloc's own allocator are not detected"
     )
 endif()
 

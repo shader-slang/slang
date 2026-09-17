@@ -5421,19 +5421,12 @@ struct ExprLoweringContext
         for (Index i = 0; i < argCount; ++i)
             args[i] = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[i]));
 
-        // Determine whether the operand element type is floating-point (selects FRem vs
-        // IRem for `%`).
-        bool isFloatingPoint = false;
-        {
-            Type* elementType = expr->arguments[0]->type.type;
-            if (auto vecType = as<VectorExpressionType>(elementType))
-                elementType = vecType->getElementType();
-            else if (auto matType = as<MatrixExpressionType>(elementType))
-                elementType = matType->getElementType();
-            if (auto basicType = as<BasicExpressionType>(elementType))
-                isFloatingPoint = (BaseTypeInfo::getInfo(basicType->getBaseType()).flags &
-                                   BaseTypeInfo::Flag::FloatingPoint) != 0;
-        }
+        // Selects FRem vs IRem for `%`, resolved by `convertToBuiltinArithmeticOp` at check time
+        // and stored on the node rather than re-derived here: the operand element type can still
+        // be an abstract, unspecialized generic parameter at this point (see
+        // `elementTypeIsFloatingPoint`'s declaration comment), which carries no concrete
+        // `BaseType` to inspect.
+        bool isFloatingPoint = expr->elementTypeIsFloatingPoint;
 
         IROp op = kIROp_Add;
         switch (expr->op)
@@ -12089,11 +12082,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto initVal = lowerRValueExpr(context, initExpr);
                 initVal = LoweredValInfo::simple(getSimpleVal(context, initVal));
 
-                // For debug builds, still create debug information for let variables
-                // even though we're not creating an actual variable
-                // Requires Standard level or higher for variable debug info
+                // An immutable `let` lowers to the initializer's SSA value with no backing IRVar,
+                // so this is the only site that can attach debug info to it.
                 if (context->debugInfoLevel >= DebugInfoLevel::Standard && decl->loc.isValid() &&
-                    context->shared->debugValueContext.isDebuggableType(initVal.val->getDataType()))
+                    context->shared->debugValueContext.isDebugVarTypeSupported(
+                        initVal.val->getDataType()))
                 {
                     // Create a debug variable for this let declaration
                     auto builder = context->irBuilder;
@@ -14877,6 +14870,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (as<EarlyDepthStencilAttribute>(modifier))
             {
                 getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
+            }
+            else if (auto postDepthCoverageAttr = as<PostDepthCoverageAttribute>(modifier))
+            {
+                // Preserve the attribute's location on the decoration so a later
+                // unsupported-target diagnostic can point at `[postdepthcoverage]` itself.
+                auto decoration =
+                    getBuilder()->addSimpleDecoration<IRPostDepthCoverageDecoration>(irFunc);
+                decoration->sourceLoc = postDepthCoverageAttr->loc;
             }
             else if (auto domainAttr = as<DomainAttribute>(modifier))
             {
