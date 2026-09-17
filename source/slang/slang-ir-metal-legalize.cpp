@@ -189,6 +189,17 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
         return AddressSpace::Generic;
     }
 
+    virtual AddressSpace getDefaultAddressSpaceForExportedFunctionParam() override
+    {
+        // An exported (library-boundary) function has no caller to specialize its mutable-reference
+        // parameter address spaces from, so its `out`/`inout`/pointer parameters would otherwise
+        // reach emission as `Generic` and hit the emitter's strict address-space switch. Metal
+        // renders such a parameter as `thread T*`; `thread` is the same default this assigner uses
+        // for local mutable storage (`kIROp_Var → ThreadLocal` above), which is the correct
+        // by-value out/inout semantic for a plain reference parameter in MSL.
+        return AddressSpace::ThreadLocal;
+    }
+
     virtual AddressSpace getLeafInstAddressSpace(IRInst* inst) override
     {
         if (as<IRGroupSharedRate>(inst->getRate()))

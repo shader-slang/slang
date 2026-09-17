@@ -15,6 +15,14 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     InitialAddressSpaceAssigner* addrSpaceAssigner;
     HashSet<IRFunc*> functionsToConsiderRemoving;
 
+    // The exported (library-boundary) originals we seeded a default parameter address space into.
+    // Only populated when the target supplies a concrete default (i.e. Metal); empty otherwise, so
+    // no other target's DCE behavior is perturbed. These originals must survive dead-code removal
+    // even when their only internal call is replaced by a specialized clone, because a library
+    // boundary is emitted with its own signature. Specialization *clones* are deliberately
+    // excluded: a clone that ends up unused is ordinary dead code and must still be removable.
+    HashSet<IRFunc*> seededExportedFuncs;
+
     AddressSpaceContext(IRModule* inModule, InitialAddressSpaceAssigner* inAddrSpaceAssigner)
         : module(inModule), addrSpaceAssigner(inAddrSpaceAssigner)
     {
@@ -356,8 +364,75 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         }
     }
 
+    // Return true if `func` is a library-boundary function — one carrying `export`/`public`
+    // linkage — that is emitted with its own signature (as opposed to being inlined or
+    // specialized away at its call sites).
+    static bool isExportedFunc(IRFunc* func)
+    {
+        return func->findDecoration<IRHLSLExportDecoration>() != nullptr ||
+               func->findDecoration<IRPublicDecoration>() != nullptr;
+    }
+
+    // Assign `defaultAddrSpace` to every pointer parameter of an exported function that has not
+    // otherwise been given an address space, and return whether any parameter was actually changed.
+    // An exported function is a library boundary with no caller to specialize its mutable-reference
+    // (`out`/`inout`) parameters from, so a target that needs a concrete address space at emission
+    // (e.g. Metal, which renders `thread T*`) supplies one here. Only the parameter's own type is
+    // rewritten now; the address space is propagated through the body by the normal worklist run
+    // and baked into body instructions later by `applyAddressSpaceToInstType`, so a caller that
+    // specializes this function from a concrete argument address space still clones a clean,
+    // independent variant. The return value lets the caller seed only functions that genuinely
+    // needed a default — a function whose pointer parameters already carry a concrete space (e.g.
+    // an earlier pass already specialized it) is left completely untouched.
+    bool assignDefaultAddressSpaceToExportedParams(IRFunc* func, AddressSpace defaultAddrSpace)
+    {
+        IRBuilder builder(module);
+        bool changed = false;
+        for (auto param : func->getParams())
+        {
+            if (mapInstToAddrSpace.containsKey(param))
+                continue;
+            auto ptrType = as<IRPtrTypeBase>(param->getFullType());
+            if (!ptrType || ptrType->getAddressSpace() != AddressSpace::Generic)
+                continue;
+            auto newType = builder.getPtrType(
+                ptrType->getOp(),
+                ptrType->getValueType(),
+                ptrType->getAccessQualifier(),
+                defaultAddrSpace,
+                ptrType->getDataLayout());
+            param->setFullType(newType);
+            mapInstToAddrSpace[param] = defaultAddrSpace;
+            changed = true;
+        }
+        if (changed)
+            fixUpFuncType(func);
+        return changed;
+    }
+
+    // Register the seeded exported function as the specialization of itself for the address spaces
+    // its own parameters now carry. An exported function is emitted with its own signature, so when
+    // another function calls it with arguments whose address spaces already match those parameters
+    // (e.g. one exported out-param helper calling another with `thread`-local locals), the
+    // call-site specialization in `processFunction` would otherwise clone an identical variant and
+    // leave the seeded original as dead, duplicated exported code. Seeding this entry makes such a
+    // call reuse the original — keeping one canonical function per exported boundary. A caller
+    // passing a *different* address space (e.g. a `device` pointer) still misses this key and
+    // specializes a distinct variant, exactly as before.
+    void registerExportedFuncAsOwnSpecialization(IRFunc* func)
+    {
+        List<AddressSpace> paramAddrSpaces;
+        for (auto param : func->getParams())
+            paramAddrSpaces.add(getAddrSpace(param));
+        FuncSpecializationKey key(func, paramAddrSpaces);
+        functionSpecializations.addIfNotExists(key, func);
+    }
+
     void processModule()
     {
+        auto exportedParamDefaultAddrSpace =
+            addrSpaceAssigner->getDefaultAddressSpaceForExportedFunctionParam();
+
         for (auto globalInst : module->getGlobalInsts())
         {
             auto addrSpace = getLeafInstAddressSpace(globalInst);
@@ -369,6 +444,44 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             {
                 if (func->findDecoration<IREntryPointDecoration>())
                     workList.add(func);
+            }
+        }
+
+        // When the target supplies a concrete default for exported-function parameters, also seed
+        // exported (library-boundary) functions. They are emitted with their own signature and are
+        // never reached from the entry-point-only worklist above, so without this pass they reach
+        // emission unspecialized. Targets whose default is `Generic` (the base behavior) skip this
+        // block entirely, leaving their output byte-identical.
+        //
+        // Two independent things happen per exported function, and they must not be conflated:
+        //   (A) Its body is added to the worklist so `processFunction` runs on it. This specializes
+        //       the *internal calls* it makes, including calls to non-exported `out`/`inout`
+        //       helpers. An exported root with no pointer parameters of its own still needs this:
+        //       otherwise the helper it calls is never visited, keeps `AddressSpace::Generic`, and
+        //       hits the same emitter crash one call level down.
+        //   (B) Its own still-`Generic` pointer parameters are defaulted, and only then is it
+        //       registered as its own specialization and protected from the end-of-run
+        //       dead-function removal. This is the library-boundary signature itself.
+        // (B) is gated on an *actual* assignment. An earlier pass (e.g.
+        // `specializeFuncsForBufferLoadArgs`) can leave a fully-specialized clone that inherited
+        // the copied `hlslExport` marker but whose pointer parameters already carry a concrete
+        // space; registering or DCE-protecting that clone would spawn a redundant, dead duplicate.
+        // (A) is safe for such a clone (re-running `processFunction` on an already-specialized body
+        // is idempotent — every inst is already in `mapInstToAddrSpace`) and for a dead function
+        // (it is removed below regardless), so it applies to every exported function.
+        if (exportedParamDefaultAddrSpace != AddressSpace::Generic)
+        {
+            for (auto globalInst : module->getGlobalInsts())
+            {
+                auto func = as<IRFunc>(globalInst);
+                if (!func || !func->getFirstBlock() || !isExportedFunc(func))
+                    continue;
+                if (assignDefaultAddressSpaceToExportedParams(func, exportedParamDefaultAddrSpace))
+                {
+                    registerExportedFuncAsOwnSpecialization(func);
+                    seededExportedFuncs.add(func);
+                }
+                workList.add(func);
             }
         }
 
@@ -400,6 +513,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         for (IRFunc* func : functionsToConsiderRemoving)
         {
             SLANG_ASSERT(!func->findDecoration<IREntryPointDecoration>());
+            // Keep only the exported originals we seeded above: a library boundary must be emitted
+            // with its own signature even when its only internal call was replaced by a specialized
+            // clone. We deliberately do *not* key this off `isExportedFunc`: a dead specialization
+            // clone must still be removable, and on non-Metal targets `seededExportedFuncs` is
+            // empty so this loop behaves exactly as it did before this change.
+            if (seededExportedFuncs.contains(func))
+                continue;
             if (!func->hasUses())
                 func->removeAndDeallocate();
         }
@@ -487,6 +607,11 @@ AddressSpace NoOpInitialAddressSpaceAssigner::getAddressSpaceFromVarType(IRInst*
 }
 
 AddressSpace NoOpInitialAddressSpaceAssigner::getLeafInstAddressSpace(IRInst*)
+{
+    return AddressSpace::Generic;
+}
+
+AddressSpace InitialAddressSpaceAssigner::getDefaultAddressSpaceForExportedFunctionParam()
 {
     return AddressSpace::Generic;
 }
