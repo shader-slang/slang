@@ -259,10 +259,15 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         }
         if (conflict)
         {
-            // The held pointer would need two storage classes at once. Diagnose it
-            // only when the merged pointer is actually returned — a conflicting local
-            // that is not returned (e.g. only dereferenced) is a separate,
-            // pre-existing gap that would need its own, non-return-worded diagnostic.
+            // The held pointer would need two storage classes at once. This is the same
+            // return-conflict that `reconcilePointerSlotWithStoredValue` (the SPIR-V slot
+            // pre-pass) records: the ownership rule is that a conflicting slot whose value
+            // reaches a return is E58005, and a non-returned conflict is the general
+            // inconsistent-pointer-address-space diagnostic (E58003). Both recorders gate on
+            // `anyLoadReachesReturn` and both funnel into `conflictingReturns`
+            // (`addIfNotExists` dedupes), so on SPIR-V this is a redundant safety net behind the
+            // pre-pass; on the pre-pass-less callers it is the sole recorder. Do not change one
+            // side's rule without the other, or a returned conflict could lose its diagnostic.
             if (sink && anyLoadReachesReturn(var))
                 conflictingReturns.addIfNotExists(func, conflictLoc);
             return false;
