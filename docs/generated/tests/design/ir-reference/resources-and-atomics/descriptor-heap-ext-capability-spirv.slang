@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#descriptor-heaps
-//META: doc_section_digest=6fb78bde656b3463d18dbb75963aabf532ca2ab334b749f2f1069ad2e3d8e548
+//META: doc_section_digest=1a1e880673b2aae2e042536106de3f5c4b9c1f2f837c81b4352a5a7e5a4f6312
 //META: purpose=Compiled with `-capability spvDescriptorHeapEXT`, dereferencing a `DescriptorHandle<T>` takes the `spvDescriptorHeapEXT` arm, so `SPIRVResourceHeap`, `SPIRVSamplerHeap`, and `SPIRVLoadDescriptorFromHeap` are already present in the `-dump-ir` snapshot as core-module intrinsics, and the emitted SPIR-V names `slang_resourceHeap` / `slang_samplerHeap` and requests `SPV_EXT_descriptor_heap`.
 //META: intent=functional
 //META: pipeline_stage=lower

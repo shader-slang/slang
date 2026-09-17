@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#sampling-and-combined-samplers
-//META: doc_section_digest=a0ab646bb8b7c3f2d7e5acb9f418e3f9850e9bd5e2a629c46fdeeeb725e4652c
+//META: doc_section_digest=796a186ea07715a784b97724aaeb7a3b60b2a410eea1fc6f2ea9cc87d5100072
 //META: purpose=`Texture2D::Gather(samp, uv)` surfaces in `main` as a `call specialize(%Gather, ..., TextureShape2DType, ...)(%tex, %samp, %uv)`. The doc's sampling table catalogs `sample` / `sampleGrad`; `Gather` is part of the same sampling family.
 //META: intent=expansion
 //META: pipeline_stage=lower

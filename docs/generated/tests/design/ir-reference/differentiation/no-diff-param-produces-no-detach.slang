@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#detachderivative
-//META: doc_section_digest=01132bdcdbc1c50944722b06abe5d963b03cd1175d44d81a16fc40d947d9c916
+//META: doc_section_digest=2d9c586271d84829bc8507a623949ff3b07f378f4cab8990c857359a815b285d
 //META: purpose=no_diff on a parameter declaration is a modifier rather than an expression and produces no detachDerivative inst at all.
 //META: intent=boundary
 //META: pipeline_stage=lower

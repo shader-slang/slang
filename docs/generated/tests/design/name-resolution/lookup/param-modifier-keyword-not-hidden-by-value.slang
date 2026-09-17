@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#concepts
-//META: doc_section_digest=66115897ba3bf509762cdb486bd39ade9574d8d8ea06eb5213c6d9a683af6562
+//META: doc_section_digest=d82114f6d4f3a1709d4ec40612e4a5271110c0dabacf3223cc6947cdceaf8ef6
 //META: purpose=A parameter's modifier list is read with a keyword-only mask, so a same-named value declaration does not stop the keyword from being recognised there while the identifier still names the value in an expression.
 //META: intent=functional
 //META: pipeline_stage=parse
