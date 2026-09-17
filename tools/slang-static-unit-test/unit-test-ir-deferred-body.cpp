@@ -663,6 +663,101 @@ TrailingDecorationResult _roundTripTrailingDecoration(slang::IGlobalSession* glo
     return result;
 }
 
+
+/// What a round trip made of a module that does, or does not, contain a reference from an
+/// eager instruction into another global's body.
+struct CrossRegionResult
+{
+    bool loaderInstalled = false;
+    /// Instructions counted on the module before serializing and on the one read back.
+    /// The two shapes differ between the control and the crossing case, so each round
+    /// trip is only ever compared against its own original.
+    Index expectedInstCount = 0;
+    Index actualInstCount = 0;
+};
+
+/// Counts every global, its decorations and children, and their children.
+Index _countModuleInsts(IRModule* module)
+{
+    Index count = 0;
+    for (IRInst* global : module->getModuleInst()->getDecorationsAndChildren())
+    {
+        count++;
+        for (IRInst* child : global->getDecorationsAndChildren())
+        {
+            count++;
+            count += _countChildrenOf(child);
+        }
+    }
+    return count;
+}
+
+/// Round-trips two functions. When `withCrossRegionReference`, a decoration on the second
+/// -- eager, since decorations lead a global's child list -- takes an instruction from
+/// *inside the first function's body* as its operand.
+///
+/// That is the shape deferral cannot support: the eager decoration is wired at load time,
+/// but its operand sits in a region the load walk deliberately left unallocated, so it
+/// would resolve to a null slot. `IRBuilder` never produces this shape, which is why the
+/// module is built by hand.
+CrossRegionResult _roundTripCrossRegion(
+    slang::IGlobalSession* globalSession,
+    bool withCrossRegionReference)
+{
+    CrossRegionResult result;
+    Session* session = static_cast<Session*>(globalSession);
+
+    RefPtr<IRModule> original = IRModule::create(session);
+    {
+        IRBuilder builder(original);
+        builder.setInsertInto(original->getModuleInst());
+
+        IRInst* first = builder.createFunc();
+        builder.addNameHintDecoration(first, UnownedStringSlice("first"));
+        builder.setInsertInto(first);
+        builder.emitBlock();
+        IRType* floatType = builder.getFloatType();
+        IRInst* insideFirstsBody = nullptr;
+        for (Index i = 0; i < 6; ++i)
+        {
+            insideFirstsBody = builder.emitAdd(
+                floatType,
+                builder.getFloatValue(floatType, IRFloatingPointValue(i)),
+                builder.getFloatValue(floatType, IRFloatingPointValue(1)));
+        }
+        builder.emitReturn();
+
+        builder.setInsertInto(original->getModuleInst());
+        IRInst* second = builder.createFunc();
+        if (withCrossRegionReference)
+        {
+            // The operand is deliberately ill-typed for a name hint; only the operand
+            // *edge* matters, and the serializer records it as a plain index.
+            builder.addDecoration(second, kIROp_NameHintDecoration, insideFirstsBody);
+        }
+        else
+        {
+            builder.addNameHintDecoration(second, UnownedStringSlice("second"));
+        }
+        builder.setInsertInto(second);
+        builder.emitBlock();
+        builder.emitReturn();
+    }
+
+    result.expectedInstCount = _countModuleInsts(original);
+
+    ComPtr<ISlangBlob> blob;
+    RefPtr<IRModule> reloaded;
+    if (SLANG_FAILED(_roundTripModule(original, session, blob, reloaded)))
+        return result;
+
+    result.loaderInstalled = (reloaded->getDeferredBodyLoader() != nullptr);
+    // Counting forces every body to materialize if any was deferred, and reads every body
+    // if none was -- so the same total must come back either way.
+    result.actualInstCount = _countModuleInsts(reloaded);
+    return result;
+}
+
 } // namespace
 
 
@@ -988,6 +1083,46 @@ SLANG_UNIT_TEST(irDeferredBodyTreatsATrailingDecorationAsBody)
     // And the decoration walk still ends at the first non-decoration rather than running
     // on into the body to collect the trailing one.
     SLANG_CHECK(result.walkedDecorations == 1);
+}
+
+// Checks that deferral declines when an eager instruction references another global's body.
+//
+// `_deferralRegionsAreClosed` exists to catch exactly this: an operand crossing from the
+// eager skeleton into a deferred body, or from one body into another, would resolve
+// against a slot the load walk left empty and trip the release assert in `readInstRef` --
+// aborting the whole compile, far from the cause. Rather than abort, the load declines
+// deferral and proceeds eagerly, the same response the blob-containment guard gives.
+//
+// The invariant that makes deferral sound was measured over the builtin modules, and
+// `IRBuilder` does not produce a violating shape, so nothing exercised the guard: the
+// existing fallback test covers a null blob and a mismatched blob, neither of which is a
+// cross-region operand. This builds one directly.
+//
+// The control matters as much as the case. Without it a green result could mean the guard
+// fired, or merely that this module never deferred for some unrelated reason -- so the
+// same module is round-tripped without the cross-region edge and must install a loader.
+SLANG_UNIT_TEST(irDeferralDeclinesOnACrossRegionReference)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    const CrossRegionResult control = _roundTripCrossRegion(globalSession, false);
+    const CrossRegionResult crossing = _roundTripCrossRegion(globalSession, true);
+
+    // Guards the premise: without the offending edge this module does defer, so a decline
+    // below is caused by the edge and not by the module's shape.
+    SLANG_CHECK_ABORT(control.expectedInstCount > 0);
+    SLANG_CHECK_ABORT(crossing.expectedInstCount > 0);
+    SLANG_CHECK(control.loaderInstalled);
+
+    // The guard fired: no loader, so every body was materialized during the load.
+    SLANG_CHECK(!crossing.loaderInstalled);
+
+    // And declining cost correctness nothing -- each module still round-tripped whole.
+    // The two shapes differ, so each is compared against its own original.
+    SLANG_CHECK(control.actualInstCount == control.expectedInstCount);
+    SLANG_CHECK(crossing.actualInstCount == crossing.expectedInstCount);
 }
 
 // Checks that a mutation reaching a global whose body is still encoded neither destroys
