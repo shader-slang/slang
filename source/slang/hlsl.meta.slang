@@ -10309,9 +10309,10 @@ T __vectorDotImpl(vector<T, N> x, vector<T, N> y)
         return x[0] * y[0];
     }
 
-    // HLSL and WGSL provide native dot operations for both integer and floating-point vectors.
-    // GLSL and Metal provide them only for floating-point vectors, while SPIR-V uses OpDot for
-    // floating-point vectors and the integer-dot-product extension for integer vectors. Other
+    // Follow the builtin signatures defined by each target language. The HLSL `dot` type table and
+    // WGSL section 17.5.20 include integer and floating-point vectors. GLSL 4.60 section 8.5 and
+    // Metal Shading Language section 6.8 declare `dot` only for floating-point vectors. SPIR-V uses
+    // OpDot for floating-point vectors and SPV_KHR_integer_dot_product for integer vectors. Other
     // targets use the scalar-arithmetic fallback above.
     __target_switch
     {
@@ -10365,10 +10366,7 @@ T __vectorDotImpl(vector<T, N> x, vector<T, N> y)
 // Keep the established floating-point and integer overloads so that concrete calls retain their
 // overload ranking and floating-point calls retain the derivative registrations on `__d_dot` in
 // `diff.meta.slang`. Those registrations bind to the floating-point signature by overload
-// resolution, so that overload remains distinct from the broader arithmetic signature. The
-// arithmetic overload has rank -1 so that the default-rank family-specific overloads remain
-// preferred for concrete calls after removal of the generic-parameter-count tie-breaker, while
-// generic code that cannot prove which family `T` belongs to can still use the broad overload.
+// resolution, so that overload remains distinct from the broader arithmetic signature.
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
@@ -10390,7 +10388,10 @@ T dot(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
 [ForceInline]
-// Keep this below the family-specific overloads; see the shared rationale above.
+// Keep this broad overload below the default-rank family-specific overloads. Since removal of the
+// generic-parameter-count tie-breaker, rank -1 is what preserves those overloads for concrete calls
+// while still making this one available to generic code that can prove only
+// __BuiltinArithmeticType.
 [OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
