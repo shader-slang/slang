@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#legalizelogicalandor
-//META: doc_section_digest=6ccd530f856cc533b6af482353d594b904fc925de647213df1fea8069c0317f2
+//META: doc_section_digest=cf46eb658ec5a58fd8d24cfc9418d9bb7f6dc375544f571f3fc248ceee86422b
 //META: purpose=Logical AND over vector operands is legalized with vector-of-bool operand and result types and emits as a WGSL select over vec3<bool> operands
 //META: intent=functional
 //META: pipeline_stage=ir-pass

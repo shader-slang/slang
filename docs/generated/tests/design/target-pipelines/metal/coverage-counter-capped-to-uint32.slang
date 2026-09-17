@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#metal-caps-coverage-counters-to-32-bits
-//META: doc_section_digest=bdf089cd96aae34d768b3ab1a8777280f191af87dae6923fd22a599aad29aeaa
+//META: doc_section_digest=1eca355a8a7e68b27eca13356e1559b6902c710a60b029ac2853e332b15e72f2
 //META: purpose=With counting-mode coverage on Metal the synthesized `__slang_coverage` buffer is a `uint device*` and each slot is bumped by a 32-bit `atomic_fetch_add_explicit`.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

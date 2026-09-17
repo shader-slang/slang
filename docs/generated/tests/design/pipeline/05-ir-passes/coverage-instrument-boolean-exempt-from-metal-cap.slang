@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#instrumentation
-//META: doc_section_digest=138b9939ba5bbb4e52a45b224e1ac3fdd87ee9defa3e1c0614c72903418b616e
+//META: doc_section_digest=2aa52c361c9d1b3b72037f432655f171020b93e4992095bf03506278a5c87ff4
 //META: purpose=Boundary: boolean coverage mode is exempt from the Metal counter-width cap because it stores rather than accumulates, so an explicitly requested 64-bit width draws no warning there.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass
