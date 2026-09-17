@@ -13059,19 +13059,7 @@ vector<T, N> __vectorMaxImpl(vector<T, N> x, vector<T, N> y)
         {
             // Unfortunately, as of LLVM 21.1.1, maximumnum seems to generate invalid code on
             // x86. Preserve the floating-point overload's NaN behavior in the scalar fallback.
-            vector<T, N> result;
-            for (int i = 0; i < N; ++i)
-            {
-                // Equality is ordered for floating-point values, so negating it detects NaN even
-                // though this helper's broad arithmetic constraint cannot call `isnan`.
-                if (!(x[i] == x[i]))
-                    result[i] = y[i];
-                else if (!(y[i] == y[i]))
-                    result[i] = x[i];
-                else
-                    result[i] = x[i] > y[i] ? x[i] : y[i];
-            }
-            return result;
+            VECTOR_MAP_BINARY(T, N, __max_impl, x, y);
         }
         else if (__isSignedInt<T>())
             __intrinsic_asm "%result = call $T0 @llvm.smax($0, $1)";
@@ -13404,19 +13392,7 @@ vector<T, N> __vectorMinImpl(vector<T, N> x, vector<T, N> y)
         {
             // Unfortunately, as of LLVM 21.1.1, minimumnum seems to generate invalid code on
             // x86. Preserve the floating-point overload's NaN behavior in the scalar fallback.
-            vector<T, N> result;
-            for (int i = 0; i < N; ++i)
-            {
-                // Equality is ordered for floating-point values, so negating it detects NaN even
-                // though this helper's broad arithmetic constraint cannot call `isnan`.
-                if (!(x[i] == x[i]))
-                    result[i] = y[i];
-                else if (!(y[i] == y[i]))
-                    result[i] = x[i];
-                else
-                    result[i] = x[i] < y[i] ? x[i] : y[i];
-            }
-            return result;
+            VECTOR_MAP_BINARY(T, N, __min_impl, x, y);
         }
         else if (__isSignedInt<T>())
             __intrinsic_asm "%result = call $T0 @llvm.smin($0, $1)";

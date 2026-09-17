@@ -29,23 +29,32 @@
 // GENERIC-DAG: %[[V3_INT:[A-Za-z0-9_]+]] = OpTypeVector %int 3
 // GENERIC-DAG: %[[V2_INT:[A-Za-z0-9_]+]] = OpTypeVector %int 2
 // GENERIC-DAG: %[[V2_UINT:[A-Za-z0-9_]+]] = OpTypeVector %uint 2
+// GENERIC-DAG: %[[V2_FLOAT:[A-Za-z0-9_]+]] = OpTypeVector %float 2
 // GENERIC-DAG: %[[V4_FLOAT:[A-Za-z0-9_]+]] = OpTypeVector %float 4
-// GENERIC-DAG: OpExtInst %[[V3_INT]] {{.*}} SMin
-// GENERIC-DAG: OpExtInst %[[V3_INT]] {{.*}} SMax
-// GENERIC-DAG: OpExtInst %[[V2_UINT]] {{.*}} UMin
-// GENERIC-DAG: OpExtInst %[[V2_UINT]] {{.*}} UMax
-// GENERIC-DAG: OpExtInst %[[V4_FLOAT]] {{.*}} FMin
-// GENERIC-DAG: OpExtInst %[[V4_FLOAT]] {{.*}} FMax
-// GENERIC-DAG: OpExtInst %[[V2_INT]] {{.*}} SMin
-// GENERIC-DAG: OpExtInst %[[V2_INT]] {{.*}} SMax
+// GENERIC: OpExtInst %[[V3_INT]] {{.*}} SMin
+// GENERIC: OpExtInst %[[V3_INT]] {{.*}} SMax
+// GENERIC: OpExtInst %[[V2_UINT]] {{.*}} UMin
+// GENERIC: OpExtInst %[[V2_UINT]] {{.*}} UMax
+// GENERIC: OpExtInst %[[V4_FLOAT]] {{.*}} FMin
+// GENERIC: OpExtInst %[[V4_FLOAT]] {{.*}} FMax
+// GENERIC: OpExtInst %[[V2_INT]] {{.*}} SMin
+// GENERIC: OpExtInst %[[V2_INT]] {{.*}} SMax
+// GENERIC: OpExtInst %[[V2_UINT]] {{.*}} UMin
+// GENERIC: OpExtInst %[[V2_UINT]] {{.*}} UMax
+// GENERIC: OpExtInst %[[V2_FLOAT]] {{.*}} FMin
+// GENERIC: OpExtInst %[[V2_FLOAT]] {{.*}} FMax
 
-// HLSL-DAG: min(
-// HLSL-DAG: max(
+// HLSL-LABEL: row_major int2x2 genericMaximum_{{[0-9]+}}(row_major int2x2
+// HLSL: return max(left_{{[0-9]+}}, right_{{[0-9]+}});
+// HLSL-LABEL: row_major int2x2 genericMinimum_{{[0-9]+}}(row_major int2x2
+// HLSL: return min(left_{{[0-9]+}}, right_{{[0-9]+}});
 
-// WGSL-DAG: min(
-// WGSL-DAG: max(
+// WGSL-LABEL: fn genericMaximum_{{[0-9]+}}({{.*}}vec4<f32>{{.*}}) -> vec4<f32>
+// WGSL: return max(left_{{[0-9]+}}, right_{{[0-9]+}});
+// WGSL-LABEL: fn genericMinimum_{{[0-9]+}}({{.*}}vec4<f32>{{.*}}) -> vec4<f32>
+// WGSL: return min(left_{{[0-9]+}}, right_{{[0-9]+}});
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 //TEST_INPUT:ubuffer(data=[0x7fc00000], stride=4):name=inputBuffer
 RWStructuredBuffer<int> outputBuffer;
 StructuredBuffer<uint> inputBuffer;
@@ -53,6 +62,8 @@ RWStructuredBuffer<int3> concreteIntOutput;
 RWStructuredBuffer<uint2> concreteUIntOutput;
 RWStructuredBuffer<float4> concreteFloatOutput;
 RWStructuredBuffer<int2x2> genericIntMatrixOutput;
+RWStructuredBuffer<uint2x2> genericUIntMatrixOutput;
+RWStructuredBuffer<float2x2> genericFloatMatrixOutput;
 
 [numthreads(1, 1, 1)]
 void concreteMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -130,6 +141,17 @@ void genericCodegenMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     matrix<int, 2, 2, MatrixLayoutMode.RowMajor> otherMatrixValue = int2x2(4, 3, 2, 1);
     genericIntMatrixOutput[0] = genericMinimum(matrixValue, otherMatrixValue);
     genericIntMatrixOutput[1] = genericMaximum(matrixValue, otherMatrixValue);
+
+    matrix<uint, 2, 2, MatrixLayoutMode.RowMajor> uintMatrixValue = uint2x2(1, 2, 3, 4);
+    matrix<uint, 2, 2, MatrixLayoutMode.RowMajor> otherUIntMatrixValue = uint2x2(4, 3, 2, 1);
+    genericUIntMatrixOutput[0] = genericMinimum(uintMatrixValue, otherUIntMatrixValue);
+    genericUIntMatrixOutput[1] = genericMaximum(uintMatrixValue, otherUIntMatrixValue);
+
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> floatMatrixValue = float2x2(1, 2, 3, 4);
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> otherFloatMatrixValue =
+        float2x2(4, 3, 2, 1);
+    genericFloatMatrixOutput[0] = genericMinimum(floatMatrixValue, otherFloatMatrixValue);
+    genericFloatMatrixOutput[1] = genericMaximum(floatMatrixValue, otherFloatMatrixValue);
 }
 
 [numthreads(1, 1, 1)]
@@ -239,4 +261,19 @@ void computeMain()
     outputBuffer[49] = int(nanMaximum.y);
     outputBuffer[50] = int(genericMinimum(nanValue, 3.0));
     outputBuffer[51] = int(genericMaximum(7.0, nanValue));
+
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> nanMatrixMinimum = genericMinimum(
+        matrix<float, 2, 2, MatrixLayoutMode.RowMajor>(nanValue, 5.0, nanValue, 9.0),
+        matrix<float, 2, 2, MatrixLayoutMode.RowMajor>(3.0, nanValue, 7.0, 8.0));
+    matrix<float, 2, 2, MatrixLayoutMode.RowMajor> nanMatrixMaximum = genericMaximum(
+        matrix<float, 2, 2, MatrixLayoutMode.RowMajor>(nanValue, -5.0, 7.0, nanValue),
+        matrix<float, 2, 2, MatrixLayoutMode.RowMajor>(3.0, nanValue, nanValue, 8.0));
+    outputBuffer[52] = int(nanMatrixMinimum[0][0]);
+    outputBuffer[53] = int(nanMatrixMinimum[0][1]);
+    outputBuffer[54] = int(nanMatrixMinimum[1][0]);
+    outputBuffer[55] = int(nanMatrixMinimum[1][1]);
+    outputBuffer[56] = int(nanMatrixMaximum[0][0]);
+    outputBuffer[57] = int(nanMatrixMaximum[0][1]);
+    outputBuffer[58] = int(nanMatrixMaximum[1][0]);
+    outputBuffer[59] = int(nanMatrixMaximum[1][1]);
 }
