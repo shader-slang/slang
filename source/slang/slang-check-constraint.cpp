@@ -299,10 +299,46 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
     return nullptr;
 }
 
-Type* SemanticsVisitor::TryJoinTypes(
+// Join an enum with a scalar for common-type inference by decaying the enum to
+// its tag type: `join(EnumType, scalar)` recurses as `join(tagType, scalar)`, so
+// the common type is whichever of the tag type and the other scalar both convert
+// to (e.g. `join(E : int, uint)` yields `uint`). The decay only makes a common
+// scalar reachable; overload applicability (the normal `_coerce` path) remains
+// the sole arbiter of whether each arm actually converts to it. Returns null
+// when neither operand is an enum with a tag type — including enum-with-enum,
+// since each branch requires the *other* operand to be a scalar.
+Type* SemanticsVisitor::TryJoinEnumAndScalarType(
     GenericInferenceContext* constraints,
     QualType left,
     QualType right)
+{
+    // The recursive join is one-shot: a tag type is always a builtin scalar
+    // (never an `EnumDecl` `DeclRefType`), so it resolves through the
+    // basic-vs-basic path and cannot decay again — hence `false` below.
+    if (as<BasicExpressionType>(right))
+        if (auto leftEnumDeclRef = isDeclRefTypeOf<EnumDecl>(left))
+            if (auto tagType = getTagType(m_astBuilder, leftEnumDeclRef))
+                return TryJoinTypes(
+                    constraints,
+                    QualType(tagType, left.isLeftValue),
+                    right,
+                    /*allowEnumScalarJoin*/ false);
+    if (as<BasicExpressionType>(left))
+        if (auto rightEnumDeclRef = isDeclRefTypeOf<EnumDecl>(right))
+            if (auto tagType = getTagType(m_astBuilder, rightEnumDeclRef))
+                return TryJoinTypes(
+                    constraints,
+                    left,
+                    QualType(tagType, right.isLeftValue),
+                    /*allowEnumScalarJoin*/ false);
+    return nullptr;
+}
+
+Type* SemanticsVisitor::TryJoinTypes(
+    GenericInferenceContext* constraints,
+    QualType left,
+    QualType right,
+    bool allowEnumScalarJoin)
 {
     // Easy case: they are the same type!
     if (left->equals(right))
@@ -359,6 +395,10 @@ Type* SemanticsVisitor::TryJoinTypes(
             return TryJoinVectorAndScalarType(constraints, leftVector, rightBasic);
         }
     }
+
+    if (allowEnumScalarJoin)
+        if (auto joined = TryJoinEnumAndScalarType(constraints, left, right))
+            return joined;
 
     // HACK: trying to work trait types in here...
     if (auto leftDeclRefType = as<DeclRefType>(left))
@@ -1977,8 +2017,11 @@ private:
 
         // Non-exact type constraints use the join path. This preserves existing
         // common-type behavior for ordinary call inference, such as picking a
-        // type that several arguments can convert to.
-        auto joinType = m_visitor->TryJoinTypes(&m_context, ioType, cType);
+        // type that several arguments can convert to. This is the one place an
+        // enum may decay to its tag type to join with a scalar, since here the
+        // join proposes a type both arguments will be coerced to.
+        auto joinType =
+            m_visitor->TryJoinTypes(&m_context, ioType, cType, /*allowEnumScalarJoin*/ true);
         if (!joinType)
         {
             // If no join exists, priority decides whether a newer constraint

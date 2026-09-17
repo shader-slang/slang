@@ -3559,8 +3559,37 @@ public:
         Type* type,
         Type* interfaceType);
 
-    // Try to compute the "join" between two types
-    Type* TryJoinTypes(GenericInferenceContext* constraints, QualType left, QualType right);
+    // Try to compute the "join" between two types: a common type both operands
+    // can convert to, or null if none exists.
+    //
+    // `allowEnumScalarJoin` opts in to decaying an enum to its tag type so it can
+    // join with a scalar (via `TryJoinEnumAndScalarType`). It is enabled only for
+    // common-type inference of ordinary generic call arguments — which covers
+    // *all* such calls (any `__generic<T> f(T, T)`), with the arms of `?:` /
+    // `select` as the motivating example — and left off for the "better subject
+    // type" derivation the constraint solver uses to solve a type parameter
+    // directly, where a fabricated enum->tag join would wrongly constrain it
+    // (e.g. `where optional T == int` with an enum argument). Constraints
+    // discovered while solving optional `where` clauses still reconcile through
+    // the enabled ordinary-argument merge, so inference there is widened exactly
+    // like the pre-existing (unconditional) vector/scalar decay — that accepted
+    // behavior is pinned by enum-witness-optional-join-13158.slang. The decay
+    // applies only to a top-level scalar join; it is not threaded through the
+    // vector-element / type-pack recursions.
+    Type* TryJoinTypes(
+        GenericInferenceContext* constraints,
+        QualType left,
+        QualType right,
+        bool allowEnumScalarJoin = false);
+
+    // Join an enum with a scalar for common-type inference by decaying the enum
+    // to its tag type. Returns null when neither operand is an enum with a tag
+    // type (including the enum-with-enum case), so the caller falls through to
+    // its other join cases.
+    Type* TryJoinEnumAndScalarType(
+        GenericInferenceContext* constraints,
+        QualType left,
+        QualType right);
 
     // Try to solve the ordinary and witness arguments for one generic
     // application. The inference context must be moved into the solver because
