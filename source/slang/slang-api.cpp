@@ -349,10 +349,9 @@ SLANG_API void slang_replayMarker(const char* label)
 
 #else
 
-// Record-replay is compiled out (SLANG_ENABLE_RECORD_REPLAY=0). We keep the full C API exported as
-// disabled stubs so the shared library's ABI is unchanged: existing callers still resolve these
-// symbols, recording is simply inert, the directory/path getters report "nothing", and the replay
-// loaders report SLANG_E_NOT_AVAILABLE.
+// Record-replay is compiled out (SLANG_ENABLE_RECORD_REPLAY=0). We keep these eight public C API
+// entry points exported as disabled stubs so their ABI is unchanged — existing callers still
+// resolve the symbols and get well-defined inert behavior.
 SLANG_API void slang_enableRecordLayer(bool /*enable*/) {}
 
 SLANG_API bool slang_isRecordLayerEnabled()
@@ -364,7 +363,10 @@ SLANG_API void slang_setReplayDirectory(const char* /*path*/) {}
 
 SLANG_API const char* slang_getReplayDirectory()
 {
-    return nullptr;
+    // The enabled build never returns null here (ReplayContext defaults to ".slang-replays"), so
+    // the disabled stub returns the same default — a caller that dereferences the result must not
+    // crash.
+    return ".slang-replays";
 }
 
 SLANG_API const char* slang_getCurrentReplayPath()
