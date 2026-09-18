@@ -76,15 +76,20 @@ struct SpvSnippet : public RefObject
         UInt2,
     };
 
+    // Capacity of a `const(...)` operand's value arrays below, and the largest number of
+    // comma-separated values the parser accepts before treating the list as malformed. The widest
+    // emitted ASMType is two components (Float2/UInt2), so four is ample headroom.
+    static const int kMaxASMConstantValues = 4;
+
     struct ASMConstant
     {
         ASMType type;
-        SpvWord intValues[4];
-        float floatValues[4];
+        SpvWord intValues[kMaxASMConstantValues];
+        float floatValues[kMaxASMConstantValues];
         HashCode getHashCode() const
         {
             HashCode result = (HashCode)type;
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < kMaxASMConstantValues; i++)
             {
                 switch (type)
                 {

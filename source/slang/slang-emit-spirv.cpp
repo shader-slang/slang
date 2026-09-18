@@ -8443,6 +8443,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRTargetIntrinsicDecoration* intrinsic)
     {
         SpvSnippet* snippet = getParsedSpvSnippet(intrinsic);
+        // Non-null here relies on emitSPIRVFromIR bailing once legalization reported an error, so a
+        // snippet that failed to parse (already diagnosed E29000) never reaches emission. Snippets
+        // that parse but are invalid at emit are a separate, still-unguarded class (see #13168).
         SLANG_ASSERT(snippet);
         SpvSnippetEmitContext context;
         context.irResultType = inst->getDataType();
@@ -12203,7 +12206,13 @@ SlangResult emitSPIRVFromIR(
 #endif
 
     SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
+    // A malformed target-intrinsic snippet is the motivating case, but legalization can diagnose
+    // other malformed IR too; it leaves the offending instruction in place, so this is the sole
+    // gate that conservatively refuses to emit after legalization reported any error.
+    const auto errorCountBeforeLegalize = sink->getErrorCount();
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
+    if (sink->getErrorCount() > errorCountBeforeLegalize)
+        return SLANG_FAIL;
 
 #if 0
     {
