@@ -1117,6 +1117,13 @@ public:
     /// Register a candidate extension `extDecl` for `typeDecl` encountered during checking.
     void registerCandidateExtension(Decl* typeDecl, ExtensionDecl* extDecl);
 
+    /// Makes the autodiff supplement loaded during checking visible to this context's caches.
+    /// Returns `true` the first time `moduleDecl` is recorded for this context (the module being
+    /// checked has not previously merged this supplement), `false` on a later call for the same
+    /// `moduleDecl` -- so a caller that also needs a once-per-module signal (e.g. recording the
+    /// supplement as a dependency of the module being checked) does not need a second dedup.
+    bool addLoadedAutodiffModule(ModuleDecl* moduleDecl);
+
     /// Invalidate inheritance info for `type`
     void invalidateInheritanceInfo(Type* type);
 
@@ -1216,6 +1223,9 @@ private:
     /// Mapping from type declarations to the known extensions that apply to them
     Dictionary<Decl*, RefPtr<CandidateExtensionList>> m_mapDeclToCandidateExtensions;
 
+    /// Autodiff supplement modules already handled by this semantic context.
+    HashSet<ModuleDecl*> m_loadedAutodiffModules;
+
     /// Is the `m_mapTypeDeclToCandidateExtensions` dictionary valid and up to date?
     bool m_candidateExtensionListsBuilt = false;
 
@@ -1226,6 +1236,15 @@ private:
     /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`.
     void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
 
+    /// Add only candidate extensions not already present in the aggregate view. Unlike
+    /// `_addCandidateExtensionsFromModule`, this is safe when normal view construction may already
+    /// have visited `moduleDecl`, and invalidates implicit-cast results for each newly added
+    /// extension.
+    void _mergeCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
+
+    /// Invalidate cached implicit-cast results affected by conversion constructors in `extDecl`.
+    void _invalidateImplicitCastCacheForExtension(Decl* typeDecl, ExtensionDecl* extDecl);
+
     /// Mapping from a decl to additional declarations of the same decl.
     /// The additional declarations provide a location to hold extra decorations.
     OrderedDictionary<Decl*, RefPtr<DeclAssociationList>> m_mapDeclToAssociatedDecls;
@@ -1235,6 +1254,11 @@ private:
 
     /// Add associated decls declared in `moduleDecl` to `m_mapDeclToAssociatedDecls`
     void _addDeclAssociationsFromModule(ModuleDecl* moduleDecl);
+
+    /// Add only associations not already present in the aggregate view. Unlike
+    /// `_addDeclAssociationsFromModule`, this is safe when normal view construction may already
+    /// have visited `moduleDecl`.
+    void _mergeDeclAssociationsFromModule(ModuleDecl* moduleDecl);
 
     ASTBuilder* _getASTBuilder() { return m_linkage->getASTBuilder(); }
 
@@ -1445,6 +1469,11 @@ public:
     DiagnosticSink* getSink() { return m_sink; }
 
     Session* getSession() { return m_shared->getSession(); }
+
+    /// Loads the autodiff supplement and merges it into this context's semantic caches.
+    /// Diagnoses and returns load failures so the caller can stop its current checking path.
+    /// Builtin source compilation intentionally succeeds without a module to merge.
+    SlangResult ensureAutodiffModuleLoaded(SourceLoc location);
 
     Linkage* getLinkage() { return m_shared->m_linkage; }
     NamePool* getNamePool() { return getLinkage()->getNamePool(); }
