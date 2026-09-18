@@ -36,7 +36,7 @@ int* pick(bool c, uint i)
     return result;
 }
 //CHECK: 58005
-//CHECK: same storage class
+//CHECK: single address space
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID)

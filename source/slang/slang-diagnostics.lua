@@ -6079,10 +6079,10 @@ err(
 err(
     "conflicting-return-pointer-storage-classes",
     58005,
-    "function returns pointers in more than one storage class",
+    "function returns pointers in more than one address space",
     span {
         loc = "location",
-        message = "all returns must yield pointers in the same storage class",
+        message = "a returned pointer must have a single address space; this one would need more than one",
     }
 )
 

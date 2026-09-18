@@ -35,10 +35,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     HashSet<IRInst*> diagnosedAddrSpaceConflicts;
 
     // Conflicting slots whose load is not returned, pending the general E58003
-    // (`InconsistentPointerAddressSpace`) report. Deferred and keyed like `conflictingReturns`:
-    // emitted after dead-clone removal and deduped by specialization root, so specialized clones of
-    // one source slot report once and a slot surviving only in a removed clone reports not at all.
-    // Maps each slot to its parent function for the removed-clone check and the root lookup.
+    // (`InconsistentPointerAddressSpace`) report. Deferred like `conflictingReturns` (emitted after
+    // dead-clone removal so a slot surviving only in a removed clone reports not at all), but
+    // deduped by *source-slot identity* — `(specialization root, slot ordinal)` — not by function
+    // root: specialized clones of one source slot collapse to one diagnostic, while two genuinely
+    // distinct conflicting slots in the same function each keep their own. Maps each slot to its
+    // parent function for the removed-clone check and the root lookup.
     OrderedDictionary<IRInst*, IRFunc*> inconsistentAddrSpaceSlots;
 
     AddressSpaceContext(
@@ -180,11 +182,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         return getAddressSpaceFromVarType(funcType->getResultType());
     }
 
-    // Return true if a value loaded from `var` is directly returned by its
-    // function. Used to scope the held-pointer conflict diagnostic (E58005) to a
-    // merged pointer that actually reaches a return — the shape #12563 is about and
-    // what the E58005 message describes.
-    bool anyLoadReachesReturn(IRInst* var)
+    // Return true if a value loaded from `var` is *directly* returned by its function (the load's
+    // immediate user is a `Return`). Used to scope the held-pointer conflict to the return conflict
+    // E58005 — the merged-pointer-that-reaches-a-return shape #12563 is about and what the E58005
+    // message describes. A pointer routed to the return indirectly (through a cast/copy/another
+    // slot) does not match and falls to the general E58003, which is also correct: it is still a
+    // slot that cannot hold one concrete class.
+    bool anyLoadDirectlyReturned(IRInst* var)
     {
         for (auto use = var->firstUse; use; use = use->nextUse)
         {
@@ -196,6 +200,43 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     return true;
         }
         return false;
+    }
+
+    // The index of `slot` among the `IRVar`s of `func`, enumerated in structural order. A
+    // specialized clone preserves that order, so `(getSpecializationRoot(func), ordinal)`
+    // identifies the *source* slot across all of a function's clones — which is how the deferred
+    // E58003 report dedups by source slot rather than by function (see the report loop in
+    // `processModule`). Returns -1 only if `slot` is not a var of `func`, which never happens for a
+    // slot enumerated from it.
+    Index getSlotOrdinalInFunc(IRFunc* func, IRInst* slot)
+    {
+        Index ordinal = 0;
+        for (auto block : func->getBlocks())
+            for (auto inst : block->getChildren())
+            {
+                if (inst == slot)
+                    return ordinal;
+                if (as<IRVar>(inst))
+                    ordinal++;
+            }
+        return -1;
+    }
+
+    // Record a local pointer slot that would need two different concrete address spaces at once, so
+    // the conflict is diagnosed exactly once after dead-clone removal. A slot whose load is
+    // directly returned is the return conflict E58005 (`conflictingReturns`); any other conflicting
+    // slot is the general E58003 (`inconsistentAddrSpaceSlots`). Both buckets are reported after
+    // dead-clone removal — E58005 deduped by specialization root (a function has one result type),
+    // E58003 by source-slot identity. `diagnosedAddrSpaceConflicts` gates so each IR slot instance
+    // is recorded once across the fixpoint's repeated visits.
+    void recordSlotConflict(IRFunc* func, IRInst* slot, SourceLoc conflictLoc)
+    {
+        if (!sink || !diagnosedAddrSpaceConflicts.add(slot))
+            return;
+        if (anyLoadDirectlyReturned(slot))
+            conflictingReturns.addIfNotExists(func, conflictLoc);
+        else
+            inconsistentAddrSpaceSlots.addIfNotExists(slot, func);
     }
 
     // Reconcile the address space of the pointer *held by* a local variable that
@@ -219,13 +260,14 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // is reported as E58005 (returned) or E58003 (not returned); see the conflict
     // branch. Returns whether anything changed.
     //
-    // Gated to the same targets as the slot pre-pass (`shouldReconcileLocalPointerSlots`,
-    // SPIR-V only): this reconciliation is meaningful only where a pointer's address space is
-    // inferred in this pass. On Metal/WGSL/GLSL the address space is part of the pointer type, so
-    // a merge of two classes is a type error (E30019) caught in semantic checking before this pass
-    // ever runs (see the conflicting-returnable-addrspace-{metal,wgsl,glsl} tests). Running it off
-    // SPIR-V would retype slots and raise SPIR-V-shaped diagnostics on targets that never needed
-    // either.
+    // Gated to the same targets as the slot pre-pass (`shouldReconcileLocalPointerSlots`, SPIR-V
+    // only): only SPIR-V's split of logical and physical pointers makes a slot that would hold two
+    // concrete classes ill-typed. Metal and WGSL do assign pointer address spaces in this pass, but
+    // a merged slot is not a type error for them here — on those targets a function returning
+    // pointers in two address spaces is already a type mismatch (E30019) caught in semantic
+    // checking before this pass runs (see the conflicting-returnable-addrspace-{metal,wgsl,glsl}
+    // tests); GLSL's assigner infers nothing. Running this off SPIR-V would retype slots and raise
+    // SPIR-V-shaped diagnostics on targets that never needed either.
     bool reconcileHeldPointerAddressSpace(IRFunc* func, IRInst* storePtr)
     {
         if (!addrSpaceAssigner->shouldReconcileLocalPointerSlots())
@@ -277,25 +319,15 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         }
         if (conflict)
         {
-            // The held pointer would need two storage classes at once — the same defect the slot
-            // pre-pass `reconcilePointerSlotWithStoredValue` detects; both run only on SPIR-V (this
-            // one is gated above, the pre-pass by the same predicate). Same ownership rule: a load
-            // used directly by a return (`anyLoadReachesReturn`) is the return conflict E58005
-            // (`conflictingReturns`); otherwise it is the general E58003
-            // (`inconsistentAddrSpaceSlots`). Both are deferred and deduped by specialization root
-            // at report time. This branch catches non-returned conflicts the pre-pass misses — e.g.
-            // a slot fed by two pointer-returning calls, whose classes only become concrete after
-            // the calls resolve (the pre-pass's `getStoredValueAddrSpace` has no call case and sees
-            // `Generic`) — that would otherwise emit invalid SPIR-V with disagreeing OpStore/OpLoad
-            // types. `diagnosedAddrSpaceConflicts` is shared with the pre-pass, so each slot enters
-            // exactly one bucket regardless of which recorder reaches it first.
-            if (sink && diagnosedAddrSpaceConflicts.add(var))
-            {
-                if (anyLoadReachesReturn(var))
-                    conflictingReturns.addIfNotExists(func, conflictLoc);
-                else
-                    inconsistentAddrSpaceSlots.addIfNotExists(var, func);
-            }
+            // The held pointer would need two concrete address spaces at once — the same defect the
+            // slot pre-pass `reconcilePointerSlotWithStoredValue` detects; both run only on SPIR-V
+            // (this one is gated above, the pre-pass by the same predicate) and route the conflict
+            // through the shared `recordSlotConflict`. This branch catches a non-returned conflict
+            // the pre-pass misses — e.g. a slot fed by two pointer-returning calls, whose classes
+            // only become concrete after the calls resolve (the pre-pass's
+            // `getStoredValueAddrSpace` has no call case and sees `Generic`) — that would otherwise
+            // emit invalid SPIR-V with disagreeing OpStore/OpLoad types.
+            recordSlotConflict(func, var, conflictLoc);
             return false;
         }
         if (held == AddressSpace::Generic)
@@ -353,8 +385,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // SPIR-V, phis are eliminated before this pass runs and
     // `SPIRVLegalizationContext::processParam` (slang-ir-spirv-legalize.cpp) already reports such a
     // conflict while phis still exist. The GLSL/Metal/WGSL callers now also pass a sink (for the
-    // return-conflict diagnostic), but none of them infers a pointer's address space in this pass
-    // (Metal/WGSL carry it in the type, GLSL uses the no-op assigner), so a conflicting phi never
+    // return-conflict diagnostic), but only SPIR-V's split of logical and physical pointers makes a
+    // merged pointer ill-typed, so a merged phi is not a target error on those targets and never
     // needs diagnosing here. A conflicting phi therefore just joins to its last concrete arg here.
     AddressSpace resolvePhiAddrSpace(IRInst* param)
     {
@@ -819,25 +851,15 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         {
             // A single slot cannot hold pointers in two concrete address spaces. Only the real
             // variable is diagnosed: a `DebugVar` mirrors it, and a debug slot must never be the
-            // thing that rejects an otherwise valid program.
-            //
-            // Ownership rule: when a load of the slot is used directly by a return
-            // (`anyLoadReachesReturn`), the conflict is a return conflict owned by E58005
-            // (`conflicting-return-pointer-storage-classes`, `conflictingReturns`); otherwise it is
-            // the general E58003 (`InconsistentPointerAddressSpace`, `inconsistentAddrSpaceSlots`).
-            // Both are deferred and reported only after dead-clone removal, deduped by
-            // specialization root, so exactly one diagnostic covers each source slot and a slot
-            // that survives only in a removed clone is not reported at all.
-            if (sink && slot->getOp() == kIROp_Var && diagnosedAddrSpaceConflicts.add(slot))
+            // thing that rejects an otherwise valid program. The shared `recordSlotConflict` owns
+            // the E58005-vs-E58003 ownership rule and the deferred, deduped reporting.
+            if (slot->getOp() == kIROp_Var)
             {
                 // A slot is enumerated from a function's blocks, so it always has a parent
                 // function; assert that invariant rather than silently dropping the diagnostic.
                 auto func = getParentFunc(slot);
                 SLANG_RELEASE_ASSERT(func);
-                if (anyLoadReachesReturn(slot))
-                    conflictingReturns.addIfNotExists(func, conflictLoc);
-                else
-                    inconsistentAddrSpaceSlots.addIfNotExists(slot, func);
+                recordSlotConflict(func, slot, conflictLoc);
             }
             return false;
         }
@@ -957,10 +979,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // targets the logical-`StorageBuffer`-vs-physical-`Device` slot mismatch that only
         // SPIR-V's split of logical and physical pointers makes ill-typed, so it is gated on the
         // assigner opting in via `shouldReconcileLocalPointerSlots`, not on the presence of a
-        // sink: the other targets do not infer a pointer's address space in this pass (Metal/WGSL
-        // carry it in the type, GLSL uses the no-op assigner), so retyping slots there would be a
-        // silent, undiagnosed change to their address-space handling with no correctness benefit —
-        // even though they now supply a sink for the separate return-conflict diagnostic.
+        // sink: Metal and WGSL do assign pointer address spaces in this pass, but a merged slot is
+        // not a type error for them, and GLSL's assigner infers nothing — so retyping slots there
+        // would be a silent, SPIR-V-shaped change to their address-space handling with no
+        // correctness benefit, even though they now supply a sink for the separate return-conflict
+        // diagnostic.
         if (addrSpaceAssigner->shouldReconcileLocalPointerSlots())
             reconcilePointerSlots();
 
@@ -1048,15 +1071,20 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                         Diagnostics::ConflictingReturnPointerStorageClasses{.location = loc});
             }
 
-            // The non-returned held/slot conflicts (E58003) share the deferral so specialized
-            // clones of one source slot report once and a slot surviving only in a removed clone
-            // reports not at all; keyed on the specialization root, as the return conflicts above.
-            HashSet<IRFunc*> reportedSlotRoots;
+            // The non-returned held/slot conflicts (E58003) share the deferral, but — unlike the
+            // return conflicts above, where a function has one result type — a single function may
+            // have several genuinely distinct conflicting slots, each of which must be reported.
+            // So we dedup by *source slot*, keyed on `(specialization root, slot ordinal)`: clones
+            // of one source slot share both and collapse to one diagnostic, while distinct slots in
+            // the same function differ in ordinal and each report. `reportedSlots` maps a root to
+            // the set of source-slot ordinals already reported for it.
+            Dictionary<IRFunc*, HashSet<Index>> reportedSlots;
             for (auto& [slot, func] : inconsistentAddrSpaceSlots)
             {
                 if (removedFuncs.contains(func))
                     continue;
-                if (reportedSlotRoots.add(getSpecializationRoot(func)))
+                auto root = getSpecializationRoot(func);
+                if (reportedSlots[root].add(getSlotOrdinalInFunc(func, slot)))
                     sink->diagnose(Diagnostics::InconsistentPointerAddressSpace{
                         .inst = slot,
                         .location = slot->sourceLoc});

@@ -33,7 +33,7 @@ int* mixed(bool c, uint i)
 //CHECK: E58003
 //CHECK: use of pointer with inconsistent address space
 //CHECK: E58005
-//CHECK: all returns must yield pointers in the same storage class
+//CHECK: single address space
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID)

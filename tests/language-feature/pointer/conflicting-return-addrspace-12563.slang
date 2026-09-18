@@ -32,7 +32,7 @@ int* pick(int* fp, bool c)
     return &gShared;
     /*CHECK:
     ^^^^^^ E58005
-    ^^^^^^ same storage class
+    ^^^^^^ single address space
     */
 }
 

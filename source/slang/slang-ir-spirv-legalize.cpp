@@ -3068,6 +3068,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     // address spaces are concrete, rather than let it reach emission as invalid
     // SPIR-V. Mirrors the validator's returnable-class set in
     // external/spirv-tools/source/val/validate_function.cpp.
+    //
+    // Unlike the E58003/E58005 reports in `specializeAddressSpace`, this scan is not deduped by
+    // specialization root: if one source function survives as several clones that each return a
+    // non-returnable-class pointer, it reports once per surviving clone, all at the shared source
+    // location. That over-report is benign — the program is rejected either way and the duplicates
+    // share a location — so unifying it with the sibling reports' root-dedup is left as a follow-up
+    // (tracked in #13039) rather than fixed here.
     void diagnoseUnreturnableStorageClassPointerReturns()
     {
         for (auto globalInst : m_module->getGlobalInsts())
