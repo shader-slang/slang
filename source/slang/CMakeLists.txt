@@ -166,6 +166,19 @@ set(SLANG_RECORD_REPLAY_SYSTEM
     "${slang_SOURCE_DIR}/source/slang-record-replay/proxy"
 )
 
+# When SLANG_ENABLE_RECORD_REPLAY is OFF we exclude the record-replay sources from both the slang
+# library and the slang-common-objects object target. slang_add_target reports an error for a
+# keyword given no values, so we omit the whole EXTRA_SOURCE_DIRS fragment rather than pass it an
+# empty list.
+if(SLANG_ENABLE_RECORD_REPLAY)
+    set(slang_record_replay_source_args
+        EXTRA_SOURCE_DIRS
+        ${SLANG_RECORD_REPLAY_SYSTEM}
+    )
+else()
+    set(slang_record_replay_source_args)
+endif()
+
 add_custom_command(
     OUTPUT ${SLANG_LOOKUP_GENERATED_SOURCE}
     COMMAND
@@ -255,8 +268,9 @@ set(slang_build_args
     SLANG
     EXPORT_TYPE_AS
     ${SLANG_LIB_TYPE}
-    EXTRA_SOURCE_DIRS
-    ${SLANG_RECORD_REPLAY_SYSTEM}
+    ${slang_record_replay_source_args}
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+    SLANG_ENABLE_RECORD_REPLAY=$<BOOL:${SLANG_ENABLE_RECORD_REPLAY}>
     REQUIRES
     copy_slang_headers
     generate_standard_module_config_header
