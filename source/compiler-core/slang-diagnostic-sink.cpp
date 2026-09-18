@@ -963,6 +963,7 @@ void outputExceptionDiagnostic(
     DiagnosticSink& sink,
     slang::IBlob** outDiagnostics)
 {
+#if SLANG_HAS_EXCEPTIONS
     try
     {
         sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
@@ -972,11 +973,21 @@ void outputExceptionDiagnostic(
         // Catch and ignore the AbortCompilationException that diagnoseRaw throws
         // for Internal severity to prevent exception leak from loadModule
     }
+#else
+    // Defensive: every caller of outputExceptionDiagnostic is itself inside a
+    // `#if SLANG_HAS_EXCEPTIONS catch` block, so with exceptions disabled this function has no live
+    // caller — this branch is kept only so the body stays well-formed. If a caller ever appears,
+    // diagnoseRaw cannot throw here; for Internal severity it routes through the signal path
+    // (SLANG_ABORT_COMPILATION → handleSignal → exit(-1)) and does not return, so unlike the
+    // exceptions-on path it never reaches the getBlobIfNeeded below.
+    sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
+#endif
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
 void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics)
 {
+#if SLANG_HAS_EXCEPTIONS
     try
     {
         sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
@@ -986,6 +997,13 @@ void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnosti
         // Catch and ignore the AbortCompilationException that diagnoseRaw throws
         // for Fatal severity to prevent exception leak from loadModule
     }
+#else
+    // Defensive (see the Internal-severity overload above): with exceptions disabled this function
+    // has no live caller, and diagnoseRaw for Fatal severity routes through the signal path
+    // (SLANG_ABORT_COMPILATION → handleSignal → exit(-1)) and does not return, so the
+    // getBlobIfNeeded below is never reached in that build.
+    sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
+#endif
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
