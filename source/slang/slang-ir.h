@@ -15,6 +15,7 @@
 #include "slang-ir-insts-enum.h"
 #include "slang-type-system-shared.h"
 
+#include <atomic>
 #include <functional>
 #include <mutex>
 
@@ -34,6 +35,66 @@ class Type;
 class Session;
 class Name;
 class TargetRequest;
+
+//
+// Publication of a deferred body, and the links it attaches to.
+//
+// A deferred body is built as a detached chain and attached with a single release store,
+// so a reader sees either no body or a fully written one. The decoration walk is the one
+// reader that must not materialize first -- doing so during decoration lookup would
+// defeat on-demand loading -- so it loads links with acquire. Every other reader
+// materializes and synchronizes on the deferred flag instead.
+//
+// The acquire is paid on every link read rather than only on that walk, so the rule is
+// simply "read a link through an accessor". On x86-64 that is a plain `mov`.
+//
+
+/// Release-stores `value` into `slot`, publishing everything written before it.
+///
+/// Paired with `irLoadInstLink`, which every traversal of an instruction list uses.
+SLANG_FORCE_INLINE void irPublishInstLink(IRInst*& slot, IRInst* value)
+{
+    std::atomic_ref<IRInst*>(slot).store(value, std::memory_order_release);
+}
+
+/// Acquire-loads a `next`/`first` link of an instruction list.
+///
+/// Only the non-materializing readers need it -- the decoration walk
+/// (`getFirstDecoration`, `IRDecoration::getNextDecoration`,
+/// `IRDecorationList::Iterator::operator++`), which alone can observe a publication in
+/// progress. A reader that materialized first has already synchronized on the deferred
+/// flag, which is why `getFirstDecorationOrChild` and friends may then read
+/// `m_decorationsAndChildren` directly.
+SLANG_FORCE_INLINE IRInst* irLoadInstLink(IRInst* const& slot)
+{
+    return std::atomic_ref<IRInst*>(const_cast<IRInst*&>(slot)).load(std::memory_order_acquire);
+}
+
+/// Supplies instruction bodies that were not materialized when a module was
+/// deserialized.
+///
+/// A serialized module is mostly bodies that a given compile never looks at, so
+/// deserialization can stop at each global value's decorations and leave the rest
+/// encoded. This applies to any module read from a blob the caller keeps alive --
+/// the builtin modules, and precompiled user modules loaded through
+/// `Linkage::loadSerializedModuleContents` alike. Whoever deserialized the module
+/// installs one of these on the `IRModule`, and the first access to a global value's
+/// children asks it to decode that one body.
+struct IRDeferredBodyLoader : RefObject
+{
+    virtual ~IRDeferredBodyLoader() = default;
+
+    /// Decodes the children of `inst`, a global value whose body was deferred, and
+    /// links them after its decorations.
+    ///
+    /// May be *called* more than once for the same instruction: two threads can both
+    /// observe the deferred flag before either has finished, since the flag is cleared
+    /// by this implementation after linking rather than by the caller beforehand. An
+    /// implementation therefore owes the deduplication — decode a given instruction
+    /// once, and make later calls for it no-ops — rather than assuming one call.
+    virtual void materializeDeferredBody(IRInst* inst) = 0;
+};
+
 struct IRBuilder;
 struct IRFunc;
 struct IRGlobalValueWithCode;
@@ -180,6 +241,54 @@ struct IRInstListBase
 
     Iterator begin();
     Iterator end();
+};
+
+/// The decorations of an instruction, as a list that ends where the decorations do.
+///
+/// Terminates on the first non-decoration rather than on a saved `last->next` sentinel,
+/// unlike every other instruction list. That matters only under on-demand loading:
+/// `last->next` on a deferred global is the slot the body is published into, so a walker
+/// that snapshots `end` captures null and, if a body appears mid-walk, iterates body
+/// instructions as though they were decorations. An end value that cannot be raced
+/// removes the question.
+///
+/// The alternative is to keep returning `IRInstList<IRDecoration>` and rely on all ~111
+/// call sites to re-check the opcode, which they happen to do today. Putting the
+/// type-terminated end in the list itself makes that a property of the type rather than a
+/// habit every current and future caller has to share.
+///
+/// The narrower interface is deliberate. `IRInstList`'s `getFirst`/`getLast` and its
+/// `last`-based random access are dropped, because both rest on the saved sentinel this
+/// type exists to do without. Iteration is what every `getDecorations()` caller needed.
+struct IRDecorationList
+{
+    IRDecorationList() {}
+    explicit IRDecorationList(IRInst* first)
+        : first(first)
+    {
+    }
+
+    IRInst* first = nullptr;
+
+    struct Iterator
+    {
+        IRInst* inst = nullptr;
+
+        Iterator() {}
+        explicit Iterator(IRInst* inst)
+            : inst(inst)
+        {
+        }
+
+        void operator++();
+        IRDecoration* operator*();
+        bool operator!=(Iterator const& other) const { return inst != other.inst; }
+    };
+
+    Iterator begin() { return Iterator(first); }
+    /// Always null: a list that ends by type needs no sentinel from the list itself,
+    /// which is exactly why this one cannot be invalidated by a concurrent publication.
+    Iterator end() { return Iterator(nullptr); }
 };
 
 // Specialization of `IRInstListBase` for the case where
@@ -556,6 +665,20 @@ struct IRInst
     // pointer.
     uint32_t operandCount = 0;
 
+    /// True while this instruction's children are still encoded rather than
+    /// materialized. Only set on global values of a lazily deserialized module,
+    /// and cleared once the body is decoded.
+    ///
+    /// Sits next to `operandCount` so it lands in existing padding rather than growing
+    /// `IRInst`, which is allocated in enormous numbers.
+    ///
+    /// Atomic because the parallel-backend workflow in docs/user-guide/08-compiling.md
+    /// can reach the same deferred body from several threads. Cleared with release
+    /// ordering once the body is linked and read with acquire, so a thread that observes
+    /// `false` also observes the children; one that observes `true` enters the loader,
+    /// which takes its own lock.
+    std::atomic<bool> m_hasDeferredBody{false};
+
     UInt getOperandCount() { return operandCount; }
 
     // Source location information for this value, if any
@@ -568,10 +691,21 @@ struct IRInst
     //
     IRDecoration* getFirstDecoration();
     IRDecoration* getLastDecoration();
-    IRInstList<IRDecoration> getDecorations();
+    IRDecorationList getDecorations();
 
     // Look up a decoration in the list of decorations
     IRDecoration* findDecorationImpl(IROp op);
+
+    /// Out-of-line slow path behind `ensureBodyMaterialized`.
+    void _materializeDeferredBody();
+
+    /// Materializes the parent's body, if this instruction has a parent. The sibling
+    /// links are the parent's to publish, so this is what makes them trustworthy.
+    SLANG_FORCE_INLINE void _materializeParent()
+    {
+        if (auto p = getParent())
+            p->ensureBodyMaterialized();
+    }
     template<typename T>
     T* findDecoration();
 
@@ -618,12 +752,56 @@ struct IRInst
 
     IRInst* getParent() { return parent; }
 
-    // The next and previous instructions with the same parent
+    /// The next and previous instructions with the same parent.
+    ///
+    /// Private, and reached only through the accessors below. A deferred body is
+    /// published by writing these links with release ordering, so a plain read can
+    /// observe a link to instructions whose contents are not yet visible. Making them
+    /// private turns that from something every call site must remember into something it
+    /// cannot get wrong.
+    ///
+    /// The names are deliberately unchanged, for the same reason as
+    /// `m_decorationsAndChildren` below: the debugger scripts walk them by name.
+private:
     IRInst* next;
     IRInst* prev;
 
-    IRInst* getNextInst() { return next; }
-    IRInst* getPrevInst() { return prev; }
+public:
+    /// The next/previous instruction with the same parent.
+    ///
+    /// Materializes the parent's body first. The link lives in the parent's child
+    /// list, and a deferred body is published into it, so the parent is what has to
+    /// be materialized before the link can be trusted. Doing that here rather than at
+    /// the call sites is the point: a caller who does not know the nuance cannot get
+    /// it wrong, and when nothing is deferred the check is one relaxed load of a flag
+    /// that is already in cache.
+    IRInst* getNextInst()
+    {
+        _materializeParent();
+        return irLoadInstLink(next);
+    }
+    IRInst* getPrevInst()
+    {
+        _materializeParent();
+        return irLoadInstLink(prev);
+    }
+
+    /// The same links *without* materializing.
+    ///
+    /// For the decoration walk only, which must not materialize: forcing a body while
+    /// looking up a decoration would defeat on-demand loading entirely, and decoration
+    /// lookup is the hottest walk in the compiler. Named `peek` so that reaching for it
+    /// is a deliberate act rather than the path of least resistance -- `getNextInst`
+    /// is what ordinary traversal should use.
+    IRInst* peekNextInst() { return irLoadInstLink(next); }
+    IRInst* peekPrevInst() { return irLoadInstLink(prev); }
+
+    /// Publish `value` as this instruction's next/previous link.
+    ///
+    /// A release store, so everything written to `value` before this call is visible
+    /// to any thread that reaches it by following the link.
+    void setNextInst(IRInst* value) { irPublishInstLink(next, value); }
+    void setPrevInst(IRInst* value) { irPublishInstLink(prev, value); }
 
     // An instruction can have zero or more children, although
     // only certain instruction opcodes are allowed to have
@@ -633,6 +811,16 @@ struct IRInst
     // its basic blocks, and the basic blocks will have children
     // that represent parameters and ordinary executable instructions.
     //
+    /// Materializes this instruction's children if they were left encoded.
+    ///
+    /// Called from the accessors that expose children. For every instruction of
+    /// every eagerly loaded module this is a predictable not-taken branch.
+    SLANG_FORCE_INLINE void ensureBodyMaterialized()
+    {
+        if (m_hasDeferredBody.load(std::memory_order_acquire)) [[unlikely]]
+            _materializeDeferredBody();
+    }
+
     IRInst* getFirstChild();
     IRInst* getLastChild();
     IRInstList<IRInst> getChildren() { return IRInstList<IRInst>(getFirstChild(), getLastChild()); }
@@ -648,26 +836,100 @@ struct IRInst
     /// in the same list, to conserve space in the instruction itself
     /// (rather than storing distinct lists for decorations and children).
     ///
-    // Note: This field is *not* being declared `private` because doing so could
-    // mess with our required memory layout, where `typeUse` below is assumed
-    // to be the last field in `IRInst` and to come right before any additional
-    // `IRUse` values that represent operands.
-    //
+    /// The decorations and children of this instruction, as a list.
+    ///
+    /// Private for the same reason as `next`/`prev`: this is the other slot a deferred
+    /// body is published into. Two readers are safe. One that has not materialized must
+    /// use `peekFirstDecorationOrChild()`/`peekLastDecorationOrChild()`, whose acquire
+    /// pairs with the publishing release store -- that is the decoration walk's path. One
+    /// that calls `ensureBodyMaterialized()` first may read the members directly, as
+    /// `getFirstDecorationOrChild()` and friends do, because observing
+    /// `m_hasDeferredBody == false` is itself an acquire that pairs with the release
+    /// clearing it after the chain is linked.
+    ///
+    /// Beyond ordering, a direct read from outside would also see only the decorations of
+    /// a still-deferred global, and report success -- silently, far from the cause.
+    ///
+    /// The name is deliberately unchanged: `slang.natvis` and `slang_lldb.py` walk it by
+    /// name, and neither is checked by the compiler.
+private:
     IRInstListBase m_decorationsAndChildren;
 
+public:
+    /// Reads the head of the list *without* materializing a deferred body.
+    ///
+    /// Decoration lookup depends on not paying for materialization -- materializing
+    /// during a decoration walk would defeat on-demand loading entirely -- so it reads
+    /// the head directly. Acquire, pairing with the release store that publishes a body.
+    IRInst* peekFirstDecorationOrChild() { return irLoadInstLink(m_decorationsAndChildren.first); }
 
-    IRInst* getFirstDecorationOrChild() { return m_decorationsAndChildren.first; }
-    IRInst* getLastDecorationOrChild() { return m_decorationsAndChildren.last; }
-    IRInstListBase getDecorationsAndChildren() { return m_decorationsAndChildren; }
+    /// Reads the tail of the list without materializing a deferred body.
+    IRInst* peekLastDecorationOrChild() { return irLoadInstLink(m_decorationsAndChildren.last); }
+
+    /// Publishes `value` as the head of the list, releasing everything written to the
+    /// chain behind it.
+    void setFirstDecorationOrChild(IRInst* value)
+    {
+        irPublishInstLink(m_decorationsAndChildren.first, value);
+    }
+
+    /// Publishes `value` as the tail of the list.
+    void setLastDecorationOrChild(IRInst* value)
+    {
+        irPublishInstLink(m_decorationsAndChildren.last, value);
+    }
+
+
+    /// Returns the head of the combined decoration/child list, materializing first.
+    ///
+    /// Materializes even though the returned pointer alone can only reach a decoration,
+    /// because callers use it as the head of a loop that walks on into the children;
+    /// against an unmaterialized body such a loop reports no children rather than
+    /// crashing. Decoration lookup does not come through here -- `getFirstDecoration`
+    /// reads the head directly with acquire.
+    IRInst* getFirstDecorationOrChild()
+    {
+        ensureBodyMaterialized();
+        return m_decorationsAndChildren.first;
+    }
+
+    IRInst* getLastDecorationOrChild()
+    {
+        ensureBodyMaterialized();
+        return m_decorationsAndChildren.last;
+    }
+    IRInstListBase getDecorationsAndChildren()
+    {
+        ensureBodyMaterialized();
+        return m_decorationsAndChildren;
+    }
     IRModifiableInstList<IRInst> getModifiableDecorationsAndChildren()
     {
+        ensureBodyMaterialized();
         return IRModifiableInstList<IRInst>(
             this,
             m_decorationsAndChildren.first,
             m_decorationsAndChildren.last);
     }
     void removeAndDeallocateAllDecorationsAndChildren();
-    bool hasDecorationOrChild() { return m_decorationsAndChildren.first != nullptr; }
+    /// Whether this instruction has any decoration or child.
+    ///
+    /// Materializes, unlike the rest of the decoration path, even though the answer is
+    /// knowable without decoding: a deferred body is only recorded when a non-eager child
+    /// exists, so `peekFirstDecorationOrChild() != nullptr || m_hasDeferredBody` would
+    /// give the same result.
+    ///
+    /// That short cut is not taken because it costs nothing to skip. Every caller asks
+    /// about a witness table being built or cloned into the module under compilation --
+    /// `slang-lower-to-ir.cpp`, `slang-ir-link.cpp`, `slang-ir-autodiff.cpp` -- never a
+    /// deferred global. Measured over 199 shaders plus an autodiff shader and a
+    /// precompiled user module: this is reached, and never once on an instruction with a
+    /// deferred body. Keeping one way to ask is worth more than a branch that never fires.
+    bool hasDecorationOrChild()
+    {
+        ensureBodyMaterialized();
+        return m_decorationsAndChildren.first != nullptr;
+    }
 
 #ifdef SLANG_ENABLE_IR_BREAK_ALLOC
     // Unique allocation ID for this instruction since start of current process.
@@ -880,14 +1142,14 @@ T* IRInst::findDecoration()
 template<typename T>
 typename IRInstList<T>::Iterator IRInstList<T>::end()
 {
-    return Iterator(last ? last->next : nullptr);
+    return Iterator(last ? last->getNextInst() : nullptr);
 }
 
 template<typename T>
 IRModifiableInstList<T>::IRModifiableInstList(T* inParent, T* first, T* last)
 {
     parent = inParent;
-    for (auto item = first; item; item = item->next)
+    for (auto item = first; item; item = item->getNextInst())
     {
         workList.add(item);
         if (item == last)
@@ -922,33 +1184,33 @@ IRFilteredInstList<T>::IRFilteredInstList(IRInst* fst, IRInst* lst)
     first = fst;
     last = lst;
 
-    auto lastIter = last ? last->next : nullptr;
+    auto lastIter = last ? last->getNextInst() : nullptr;
     while (first != lastIter && !as<T>(first))
-        first = first->next;
+        first = first->getNextInst();
     while (last && last != first && !as<T>(last))
-        last = last->prev;
+        last = last->getPrevInst();
 }
 
 template<typename T>
 void IRFilteredInstList<T>::Iterator::operator++()
 {
-    inst = inst->next;
+    inst = inst->getNextInst();
     while (inst != exclusiveLast && !as<T>(inst))
     {
-        inst = inst->next;
+        inst = inst->getNextInst();
     }
 }
 template<typename T>
 typename IRFilteredInstList<T>::Iterator IRFilteredInstList<T>::begin()
 {
-    auto lastIter = last ? last->next : nullptr;
+    auto lastIter = last ? last->getNextInst() : nullptr;
     return IRFilteredInstList<T>::Iterator(first, lastIter);
 }
 
 template<typename T>
 typename IRFilteredInstList<T>::Iterator IRFilteredInstList<T>::end()
 {
-    auto lastIter = last ? last->next : nullptr;
+    auto lastIter = last ? last->getNextInst() : nullptr;
     return IRFilteredInstList<T>::Iterator(lastIter, lastIter);
 }
 
@@ -2157,6 +2419,11 @@ public:
 
     void buildMangledNameToGlobalInstMap();
 
+    /// Installs the loader that supplies deferred instruction bodies for this
+    /// module. See `IRDeferredBodyLoader`.
+    void setDeferredBodyLoader(IRDeferredBodyLoader* loader) { m_deferredBodyLoader = loader; }
+    IRDeferredBodyLoader* getDeferredBodyLoader() const { return m_deferredBodyLoader; }
+
     IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
 
     Dictionary<IRInst*, UInt>* getUniqueIdMap() { return &m_mapInstToUniqueId; }
@@ -2308,6 +2575,9 @@ private:
     Dictionary<IRInst*, IRAnalysis> m_mapInstToAnalysis;
 
     Dictionary<ImmutableHashedString, List<IRInst*>> m_mapMangledNameToGlobalInst;
+
+    /// Non-null only for modules deserialized with bodies left encoded.
+    RefPtr<IRDeferredBodyLoader> m_deferredBodyLoader;
 
     /// Hold a mapping for inst -> uniqueID. This mapping is generated on
     /// demand if passes need them, rather than eagerly storing them on
