@@ -189,7 +189,10 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         auto refName = tokenReader.ReadToken().Content;
                         if (!mapInstNameToIndex.tryGetValue(refName, operand.content))
                         {
-                            SLANG_ASSERT(!"Invalid SPV ASM: referenced inst is not defined.");
+                            throw Misc::TextFormatException(
+                                "Text parsing error: SPIR-V snippet references an undefined "
+                                "instruction: %" +
+                                refName);
                         }
                         inst.operands.add(operand);
                     }
@@ -270,7 +273,8 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                             tokenReader.Read("(");
                             constant.type = parseASMType(tokenReader);
                             int i = 0;
-                            while (tokenReader.AdvanceIf(","))
+                            while (i < SpvSnippet::kMaxASMConstantValues &&
+                                   tokenReader.AdvanceIf(","))
                             {
                                 switch (constant.type)
                                 {
@@ -302,8 +306,9 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         }
                         else
                         {
-                            SLANG_UNEXPECTED(
-                                ("Invalid SPV ASM operand: \"" + identifier + "\"").getBuffer());
+                            throw Misc::TextFormatException(
+                                "Text parsing error: Invalid SPIR-V ASM operand: \"" + identifier +
+                                "\"");
                         }
                     }
                     break;
