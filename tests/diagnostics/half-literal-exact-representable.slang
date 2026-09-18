@@ -12,37 +12,65 @@ RWStructuredBuffer<half> output;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
+    half sum = 0;
+
     // Exactly representable in half -> NO warning.
-    half a = 2048;   // contiguous-exact-range boundary
-    half b = 4096;   // 2^12
-    half c = 8192;   // 2^13
-    half d = 65504;  // largest finite half
-    half e = -4096;  // negative, exact
-    half f = 4096u;  // exact, unsigned
-    half k = 3072;   // non-power-of-two, exact (locks the (2048, 4096) band)
+    sum   += 2048;   // contiguous-exact-range boundary
+    sum   += 4096;   // 2^12
+    sum   += 8192;   // 2^13
+    sum   += 65504;  // largest finite half
+    sum   += -65504; // smallest finite half
+    sum   += 65472;  // largest finite half - ulp
+    sum   += -65472; // smallest finite half + ulp
+    sum   += -4096;  // negative, exact
+    sum   += 4096u;  // exact, unsigned
+    sum   += -4100;  // negative, exact
+    sum   += 4100;   // non-power-of-two, exact
+    sum   += 4100u;  // non-power-of-two, exact, unsigned
+    sum   += 3072;   // non-power-of-two, exact (locks the (2048, 4096) band)
 
     // Lose precision when rounded to half -> WARN.
-    half g = 4097;
+    sum   += 2049;
 //CHECK:     ^^^^ implicit conversion not recommended: precision loss
-//CHECK:     ^^^^ precision lost in conversion from 'int' to 'half'
-    half h = 65505;
-//CHECK:     ^^^^^ implicit conversion not recommended: out of range
-//CHECK:     ^^^^^ value out of range in conversion from 'int' to 'half'
-    half i = 4097u;
+//CHECK:     ^^^^ precision loss in converting value '2049' to 'half'
+    sum   += 4097;
+//CHECK:     ^^^^ implicit conversion not recommended: precision loss
+//CHECK:     ^^^^ precision loss in converting value '4097' to 'half'
+    sum   += 4098;
+//CHECK:     ^^^^ implicit conversion not recommended: precision loss
+//CHECK:     ^^^^ precision loss in converting value '4098' to 'half'
+    sum   += 4099;
+//CHECK:     ^^^^ implicit conversion not recommended: precision loss
+//CHECK:     ^^^^ precision loss in converting value '4099' to 'half'
+    sum   += 65503;
 //CHECK:     ^^^^^ implicit conversion not recommended: precision loss
-//CHECK:     ^^^^^ precision lost in conversion from 'uint' to 'half'
-    half m = -4097;  // negative, lossy (rounds to -4096)
+//CHECK:     ^^^^^ precision loss in converting value '65503' to 'half'
+    sum   += 4097u;
+//CHECK:     ^^^^^ implicit conversion not recommended: precision loss
+//CHECK:     ^^^^^ precision loss in converting value '4097' to 'half'
+    sum   += -2049; // negative, lossy
 //CHECK:      ^^^^ implicit conversion not recommended: precision loss
-//CHECK:      ^^^^ precision lost in conversion from 'int' to 'half'
+//CHECK:      ^^^^ precision loss in converting value '-2049' to 'half'
+    sum   += -4097; // negative, lossy (rounds to -4096)
+//CHECK:      ^^^^ implicit conversion not recommended: precision loss
+//CHECK:      ^^^^ precision loss in converting value '-4097' to 'half'
 
     // Exceed half's finite range (overflow to +inf) -> WARN.
-    half j = 131072u;
-//CHECK:     ^^^^^^^ implicit conversion not recommended: out of range
-//CHECK:     ^^^^^^^ value out of range in conversion from 'uint' to 'half'
+    sum   += 65505;
+//CHECK:     ^^^^^ implicit conversion not recommended: value out of range
+//CHECK:     ^^^^^ value '65505' out of range in conversion to 'half'
+    sum   += -65505;
+//CHECK:      ^^^^^ implicit conversion not recommended: value out of range
+//CHECK:      ^^^^^ value '-65505' out of range in conversion to 'half'
+    sum   += 131072u;
+//CHECK:     ^^^^^^^ implicit conversion not recommended: value out of range
+//CHECK:     ^^^^^^^ value '131072' out of range in conversion to 'half'
 
     // Special case: uint64_t out-of-range value that is in range if
     // incorrectly interpreted as int64_t
-    half n = 18446744073709551615u; // -1 as int64_t
+    sum   += 18446744073709551615u; // -1 as int64_t
+//CHECK:     ^^^^^^^^^^^^^^^^^^^^^ implicit conversion not recommended: value out of range
+//CHECK:     ^^^^^^^^^^^^^^^^^^^^^ value '18446744073709551615' out of range in conversion to 'half'
 
-    output[0] = a + b + c + d + e + f + g + h + i + j + k + m + n;
+    output[0] = sum;
 }

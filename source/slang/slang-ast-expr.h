@@ -120,6 +120,11 @@ class IntegerLiteralExpr : public LiteralExpr
     //
     // See also docs/language-reference/expressions-literal.md
     FIDDLE() bool signedMinimumIntException;
+
+    // True if the literal expresses a bit pattern rather than a magnitude.
+    //
+    // See also docs/language-reference/expressions-conversions.md
+    FIDDLE() bool bitwiseLiteral;
 };
 
 FIDDLE()

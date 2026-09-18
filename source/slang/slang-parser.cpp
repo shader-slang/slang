@@ -8816,6 +8816,7 @@ static Expr* parseIntegerLiteralExpr(Parser* parser)
     constExpr->value = value;
     constExpr->suffixType = suffixBaseType;
     constExpr->signedMinimumIntException = signedMinimumIntException;
+    constExpr->bitwiseLiteral = !isDecimalBase;
 
     return constExpr;
 }
@@ -9997,6 +9998,9 @@ static Expr* parsePrefixExpr(Parser* parser)
                     }
 
                     newLiteral->value = value;
+
+                    if (tokenType == TokenType::OpBitNot)
+                        newLiteral->bitwiseLiteral = true;
                 }
 
                 return newLiteral;
