@@ -1200,6 +1200,13 @@ err(
 )
 
 err(
+    "invalid-spirv-snippet-operand",
+    29003,
+    "invalid operand in SPIR-V snippet",
+    span { loc = "location", message = "~problem '~item' in target intrinsic snippet: ~snippet" }
+)
+
+err(
     "unrecognized-spirv-opcode",
     29100,
     "unrecognized SPIR-V opcode",

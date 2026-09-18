@@ -8474,6 +8474,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRTargetIntrinsicDecoration* intrinsic)
     {
         SpvSnippet* snippet = getParsedSpvSnippet(intrinsic);
+        // Reaching a non-null, emittable snippet here relies on emitSPIRVFromIR bailing once
+        // legalization reported an error: a snippet that failed to parse is diagnosed
+        // (E29000-E29002) and cached as null, and one that parses but uses an operand the emitter
+        // cannot lower is diagnosed by validateSpvSnippet (E29003); either error stops emission
+        // before this runs.
         SLANG_ASSERT(snippet);
         SpvSnippetEmitContext context;
         context.irResultType = inst->getDataType();
@@ -8507,8 +8512,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     Dictionary<SpvSnippet::ASMConstant, SpvInst*> m_spvSnippetConstantInsts;
 
-    // Emit SPV Inst that represents a constant defined in a SpvSnippet.
-    SpvInst* maybeEmitSpvConstant(SpvSnippet::ASMConstant constant)
+    // Returns the SPIR-V `OpConstant` for a snippet `const(...)` operand, creating it once and
+    // caching by value. The caller must first resolve a `FloatOrDouble` (`_p`) constant to a
+    // concrete type via resolveSnippetConstantType, since isEmittableASMType(FloatOrDouble) is
+    // false. Given that, this always returns a valid instruction or aborts -- it never returns null
+    // -- because validateSpvSnippet (slang-ir-spirv-legalize.cpp) has already rejected any
+    // un-emittable constant during legalization; the asserts below enforce that contract.
+    SpvInst* emitSpvConstant(SpvSnippet::ASMConstant constant)
     {
         SpvInst* result = nullptr;
         if (m_spvSnippetConstantInsts.tryGetValue(constant, result))
@@ -8516,10 +8526,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         IRBuilder builder(m_irModule);
         builder.setInsertInto(m_irModule->getModuleInst());
+        SLANG_RELEASE_ASSERT(SpvSnippet::isEmittableASMType(constant.type));
         switch (constant.type)
         {
         case SpvSnippet::ASMType::Float:
             result = emitFloatConstant(constant.floatValues[0], builder.getType(kIROp_FloatType));
+            break;
+        case SpvSnippet::ASMType::Half:
+            result = emitFloatConstant(constant.floatValues[0], builder.getType(kIROp_HalfType));
             break;
         case SpvSnippet::ASMType::Float2:
             {
@@ -8534,6 +8548,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case SpvSnippet::ASMType::Int:
             result = emitIntConstant((IRIntegerValue)constant.intValues[0], builder.getIntType());
+            break;
+        case SpvSnippet::ASMType::UInt:
+            result = emitIntConstant((IRIntegerValue)constant.intValues[0], builder.getUIntType());
             break;
         case SpvSnippet::ASMType::UInt16:
             result = emitIntConstant(
@@ -8551,6 +8568,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     makeArray(element1, element2));
             }
             break;
+        default:
+            // The release-assert above restricts input to the handled set; a fall-through means the
+            // predicate and this switch have drifted, so fail loudly rather than returning the null
+            // operand that segfaults later in emitOperand -> getID.
+            SLANG_UNEXPECTED("unhandled constant type in emitSpvConstant");
         }
         m_spvSnippetConstantInsts[constant] = result;
         return result;
@@ -8559,6 +8581,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Emit SPV Inst that represents a type defined in a SpvSnippet.
     void emitSpvSnippetASMTypeOperand(SpvSnippet::ASMType type)
     {
+        // The release-assert and the switch's `default: SLANG_UNEXPECTED` guard two distinct
+        // invariants (as in emitSpvConstant): the assert catches an un-emittable type, which
+        // validateSpvSnippet rejects during legalization; the default catches drift between
+        // isEmittableASMType and the cases below. SLANG_RELEASE_ASSERT (not SLANG_ASSERT) keeps the
+        // first check live in release, where SLANG_ASSERT degrades to SLANG_ASSUME.
+        SLANG_RELEASE_ASSERT(SpvSnippet::isEmittableASMType(type));
         IRBuilder builder(m_irModule);
         builder.setInsertInto(m_irModule->getModuleInst());
         IRType* irType = nullptr;
@@ -8668,21 +8696,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 case SpvSnippet::ASMOperandType::ConstantReference:
                     {
                         auto constant = snippet->constants[operand.content];
-                        if (constant.type == SpvSnippet::ASMType::FloatOrDouble)
-                        {
-                            switch (extractBaseType(context.irResultType))
-                            {
-                            case BaseType::Float:
-                                constant.type = SpvSnippet::ASMType::Float;
-                                break;
-                            case BaseType::Double:
-                                constant.type = SpvSnippet::ASMType::Double;
-                                break;
-                            default:
-                                break;
-                            }
-                        }
-                        SpvInst* spvConstant = maybeEmitSpvConstant(constant);
+                        constant.type =
+                            resolveSnippetConstantType(constant.type, context.irResultType);
+                        SpvInst* spvConstant = emitSpvConstant(constant);
                         emitOperand(spvConstant);
                     }
                     break;

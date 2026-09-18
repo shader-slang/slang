@@ -78,6 +78,16 @@ struct SpvSnippet : public RefObject
         UInt2,
     };
 
+    // Returns whether the SPIR-V emitter can lower `type`, both as a `_type(...)` operand
+    // (emitSpvSnippetASMTypeOperand) and as a `const(...)` operand (emitSpvConstant); those two
+    // switches handle exactly this set. A `const(...)` operand of type `FloatOrDouble` is first
+    // resolved to `Float`/`Double` (resolveSnippetConstantType) before this predicate applies.
+    static bool isEmittableASMType(ASMType type);
+
+    // Returns a human-readable spelling of `type` for diagnostics, since a snippet diagnostic can
+    // only point at the intrinsic call site, not at the offending token inside the snippet string.
+    static UnownedStringSlice getASMTypeName(ASMType type);
+
     static const int kMaxASMConstantValues = 4;
 
     struct ASMConstant
@@ -137,6 +147,9 @@ struct SpvSnippet : public RefObject
     {
         SpvWord opCode = 0;
         List<ASMOperand> operands;
+        // The `%name` this instruction defines (empty if unnamed). Retained so a diagnostic about
+        // an InstReference can echo the name the user wrote rather than its resolved index.
+        String resultName;
     };
 
     List<ASMInst> instructions;
