@@ -2704,8 +2704,8 @@ local insts = {
 			},
 			{
 				experimentalModule = {
-					-- Marks serialized experimental modules for version-compatible readers
-					-- that enforce the import policy from IR metadata.
+					-- Serialized compatibility marker for semantic-version-30 readers whose
+					-- packaged-standard-module path emits E00104 from IR metadata.
 					struct_name = "ExperimentalModuleDecoration"
 				},
 			},

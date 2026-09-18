@@ -25,6 +25,12 @@ static const char kOrdinaryDependencySource[] = R"(
     public struct Marker {}
 )";
 
+static const char kOrdinaryWrapperSource[] = R"(
+    module OrdinaryWrapper;
+    import ExperimentalDependency;
+    public struct WrappedMarker { Marker value; }
+)";
+
 static const UnownedStringSlice kExperimentalFeatureDiagnosticCode("error[E00104]");
 
 // Reports whether diagnostic text contains the experimental-feature import error.
@@ -290,4 +296,99 @@ SLANG_UNIT_TEST(precompiledExperimentalModuleStillRequiresFeature)
 
     SLANG_CHECK(consumer == nullptr);
     SLANG_CHECK(_diagnosticsRequireExperimentalFeature(diagnostics));
+}
+
+// An ordinary precompiled module must not hide an experimental dependency from its consumer. The
+// dependency is re-resolved while the ordinary module's AST is deserialized, and that transitive
+// import must pass through the same policy boundary as a direct source import.
+SLANG_UNIT_TEST(precompiledOrdinaryModuleCannotHideExperimentalDependency)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry experimentalFeatureOption = {};
+    experimentalFeatureOption.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalFeatureOption.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalFeatureOption.value.intValue0 = 1;
+
+    slang::SessionDesc producerSessionDesc = {};
+    producerSessionDesc.compilerOptionEntries = &experimentalFeatureOption;
+    producerSessionDesc.compilerOptionEntryCount = 1;
+    ComPtr<slang::ISession> producerSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(producerSessionDesc, producerSession.writeRef()) == SLANG_OK);
+
+    ComPtr<ISlangBlob> diagnostics;
+    auto experimentalModule = producerSession->loadModuleFromSourceString(
+        "ExperimentalDependency",
+        "ExperimentalDependency.slang",
+        kExperimentalDependencySource,
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(experimentalModule != nullptr);
+    SLANG_CHECK_ABORT(!diagnostics || diagnostics->getBufferSize() == 0);
+
+    diagnostics.setNull();
+    auto ordinaryWrapper = producerSession->loadModuleFromSourceString(
+        "OrdinaryWrapper",
+        "OrdinaryWrapper.slang",
+        kOrdinaryWrapperSource,
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(ordinaryWrapper != nullptr);
+    SLANG_CHECK_ABORT(!diagnostics || diagnostics->getBufferSize() == 0);
+
+    ComPtr<ISlangBlob> serializedExperimentalModule;
+    SLANG_CHECK_ABORT(
+        experimentalModule->serialize(serializedExperimentalModule.writeRef()) == SLANG_OK);
+    ComPtr<ISlangBlob> serializedOrdinaryWrapper;
+    SLANG_CHECK_ABORT(ordinaryWrapper->serialize(serializedOrdinaryWrapper.writeRef()) == SLANG_OK);
+
+    ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(fileSystem->saveFileBlob(
+        "ExperimentalDependency.slang-module",
+        serializedExperimentalModule)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        fileSystem->saveFileBlob("OrdinaryWrapper.slang-module", serializedOrdinaryWrapper)));
+
+    slang::SessionDesc consumerSessionDesc = {};
+    consumerSessionDesc.fileSystem = fileSystem;
+    ComPtr<slang::ISession> consumerSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(consumerSessionDesc, consumerSession.writeRef()) == SLANG_OK);
+
+    diagnostics.setNull();
+    auto consumer = consumerSession->loadModuleFromSourceString(
+        "TransitivePrecompiledConsumer",
+        "TransitivePrecompiledConsumer.slang",
+        "import OrdinaryWrapper; WrappedMarker marker;",
+        diagnostics.writeRef());
+
+    SLANG_CHECK(consumer == nullptr);
+    SLANG_CHECK(_diagnosticsRequireExperimentalFeature(diagnostics));
+    SLANG_CHECK_ABORT(diagnostics != nullptr);
+    auto diagnosticText = UnownedStringSlice(
+        (const char*)diagnostics->getBufferPointer(),
+        diagnostics->getBufferSize());
+    SLANG_CHECK(diagnosticText.indexOf(UnownedStringSlice("ExperimentalDependency")) != Index(-1));
+
+    // Use a fresh session because the rejected load can leave failed discovery state behind. The
+    // same serialized dependency graph must load when this consuming linkage opts in.
+    slang::SessionDesc enabledConsumerSessionDesc = consumerSessionDesc;
+    enabledConsumerSessionDesc.compilerOptionEntries = &experimentalFeatureOption;
+    enabledConsumerSessionDesc.compilerOptionEntryCount = 1;
+    ComPtr<slang::ISession> enabledConsumerSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(
+            enabledConsumerSessionDesc,
+            enabledConsumerSession.writeRef()) == SLANG_OK);
+
+    diagnostics.setNull();
+    auto enabledConsumer = enabledConsumerSession->loadModuleFromSourceString(
+        "EnabledTransitivePrecompiledConsumer",
+        "EnabledTransitivePrecompiledConsumer.slang",
+        "import OrdinaryWrapper; WrappedMarker marker;",
+        diagnostics.writeRef());
+
+    SLANG_CHECK(enabledConsumer != nullptr);
+    SLANG_CHECK(!diagnostics || diagnostics->getBufferSize() == 0);
 }

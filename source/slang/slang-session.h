@@ -491,7 +491,9 @@ private:
     /// Is the given module in the middle of being imported?
     bool isBeingImported(Module* module);
 
-    /// Discovers a module without applying restrictions that belong to the importing consumer.
+    /// Discovers a module without applying the import policy that belongs to the consumer.
+    ///
+    /// Import policy currently consists of the experimental-module feature gate.
     ///
     /// This is the implementation of `findOrImportModule`; callers must use that public wrapper so
     /// every successful discovery passes through `_getImportableModuleOrDiagnose`.
