@@ -264,6 +264,15 @@ WORKLOADS = [
         sweep_sizes=[250, 500, 1000, 2000],
     ),
     WorkloadSpec(
+        name="conditional_compilation",
+        bucket="parse",
+        gen=workloads.gen_conditional_compilation,
+        default_size=200,
+        mode="module",
+        primary_timers=["parseTranslationUnit", "frontEndExecute"],
+        sweep_sizes=[50, 100, 200, 400],
+    ),
+    WorkloadSpec(
         name="diagnostics_clean",
         bucket="diagnostics",
         gen=workloads.gen_diagnostics_clean,
@@ -369,6 +378,15 @@ WORKLOADS = [
         primary_timers=["SemanticChecking", "frontEndExecute"],
         sweep_sizes=[250, 500, 1000, 2000],
     ),
+    WorkloadSpec(
+        name="vector_matrix_overload_set",
+        bucket="typecheck",
+        gen=workloads.gen_vector_matrix_overload_set,
+        default_size=200,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[50, 100, 200, 400],
+    ),
     # ---- shared-infrastructure / scaling stressors -----------------------
     WorkloadSpec(
         name="ir_builder",
@@ -390,6 +408,20 @@ WORKLOADS = [
         sweep_sizes=[375, 750, 1500, 3000],
     ),
     WorkloadSpec(
+        name="flat_expr_dag",
+        bucket="ir_infra",
+        gen=workloads.gen_flat_expr_dag,
+        default_size=500,
+        mode="target",
+        # CUDA specifically: this is where deferBufferLoad's global-context
+        # packing and simplifyNonSSAIR's redundancy-removal pass (the two
+        # #13012 fixed a cubic blowup in) actually run over locals; SPIR-V
+        # keeps resources/locals closer to SSA and rarely triggers either.
+        extra_flags=["-target", "cuda"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR", "deferBufferLoad"],
+        sweep_sizes=[125, 250, 500, 1000],
+    ),
+    WorkloadSpec(
         name="module_link",
         bucket="module_link",
         gen=workloads.gen_module_link,
@@ -400,6 +432,16 @@ WORKLOADS = [
         sweep_sizes=[50, 100, 200, 400],
     ),
     WorkloadSpec(
+        name="material_module_graph",
+        bucket="module_link",
+        gen=workloads.gen_material_module_graph,
+        default_size=16,
+        mode="link",
+        extra_flags=SPIRV,
+        primary_timers=["linkIR", "specializeModule", "compileInner"],
+        sweep_sizes=[4, 8, 16, 32],
+    ),
+    WorkloadSpec(
         name="specialization",
         bucket="specialization",
         gen=workloads.gen_specialization,
@@ -408,6 +450,23 @@ WORKLOADS = [
         extra_flags=SPIRV,
         primary_timers=["specializeModule", "linkAndOptimizeIR", "compileInner"],
         sweep_sizes=[75, 150, 300, 600],
+    ),
+    WorkloadSpec(
+        name="generic_reinterpret_dispatch",
+        bucket="specialization",
+        gen=workloads.gen_generic_reinterpret_dispatch,
+        default_size=16,
+        mode="target",
+        extra_flags=SPIRV,
+        # generateOutput is included despite not being a leaf timer: it is a
+        # large, currently-unattributed cost this workload is the first to
+        # surface, kept as a real open finding rather than smoothed over by
+        # only listing timers that already explain the total. See
+        # gen_generic_reinterpret_dispatch's docstring for the measured
+        # figures -- kept in that one place, not restated here, so the two
+        # cannot drift apart.
+        primary_timers=["compileInner", "generateOutput", "specializeModule", "lowerReinterpret"],
+        sweep_sizes=[4, 8, 16, 32],
     ),
     WorkloadSpec(
         name="dynamic_dispatch",
@@ -435,6 +494,16 @@ WORKLOADS = [
         primary_timers=["compileInner", "specializeModule",
                         "legalizeExistentialTypeLayout", "simplifyIR"],
         sweep_sizes=[50, 100, 200, 400],
+    ),
+    WorkloadSpec(
+        name="generic_method_dispatch",
+        bucket="dynamic_dispatch",
+        gen=workloads.gen_generic_method_dispatch,
+        default_size=32,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["compileInner", "specializeModule", "linkAndOptimizeIR"],
+        sweep_sizes=[8, 16, 32, 64],
     ),
     # ---- suspected-regression features -----------------------------------
     WorkloadSpec(
