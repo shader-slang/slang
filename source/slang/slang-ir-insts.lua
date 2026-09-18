@@ -2704,10 +2704,8 @@ local insts = {
 			},
 			{
 				experimentalModule = {
-					-- Stable serialization ID 683, introduced in module semantic version 4.
-					-- Current import validation reads the checked AST, but older
-					-- Linkage::findOrImportModule implementations inspect this marker in the
-					-- packaged standard-module fallback.
+					-- Marks serialized experimental modules for version-compatible readers
+					-- that enforce the import policy from IR metadata.
 					struct_name = "ExperimentalModuleDecoration"
 				},
 			},

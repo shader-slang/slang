@@ -503,9 +503,11 @@ private:
 
     /// Returns `module` when it may be imported, or `nullptr` when it is absent or rejected.
     ///
-    /// A rejected import is non-importable: this helper returns `nullptr` and diagnoses it when
-    /// `sink` is present. The public `findOrImportModule` wrapper applies this validation to every
-    /// import request after discovery, including cache hits.
+    /// Discovery owns diagnostics for an absent module, so this helper deliberately passes its
+    /// `nullptr` through without another diagnostic. A rejected import is non-importable: this
+    /// helper returns `nullptr` and diagnoses it when `sink` is present. The public
+    /// `findOrImportModule` wrapper applies this validation to every import request after
+    /// discovery, including cache hits.
     RefPtr<Module> _getImportableModuleOrDiagnose(
         Module* module,
         Name* moduleName,
