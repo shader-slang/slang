@@ -429,6 +429,9 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             SLANG_SHARED_LIBRARY_TOOL
             SLANG_NO_DEPRECATION
+            # The record-replay unit tests call into the record-replay subsystem, which is compiled
+            # out when SLANG_ENABLE_RECORD_REPLAY is OFF; the tests guard their bodies on this macro.
+            SLANG_ENABLE_RECORD_REPLAY=$<BOOL:${SLANG_ENABLE_RECORD_REPLAY}>
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
             core

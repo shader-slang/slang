@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 #include "core/slang-io.h"
 #include "scoped-env-var.h"
 #include "slang-record-replay/replay-stream-decoder.h"
@@ -373,3 +374,4 @@ SLANG_UNIT_TEST(replayStreamDecoderDecodesValidArray)
     SLANG_CHECK(!containsString(decoded, "ERROR:"));
     SLANG_CHECK(!containsString(decoded, "exceeds"));
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

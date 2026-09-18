@@ -1,5 +1,12 @@
 // slang-api.cpp
 
+// SLANG_ENABLE_RECORD_REPLAY is normally provided by the build system (see the top-level
+// CMakeLists.txt). Default it to enabled so a build that does not define it still compiles the
+// record-replay layer, matching the option's default.
+#ifndef SLANG_ENABLE_RECORD_REPLAY
+#define SLANG_ENABLE_RECORD_REPLAY 1
+#endif
+
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "core/slang-builtin-module-cache.h"
 #include "core/slang-performance-profiler.h"
@@ -10,9 +17,11 @@
 #include "slang-capability.h"
 #include "slang-compiler.h"
 #include "slang-internal.h"
+#if SLANG_ENABLE_RECORD_REPLAY
 #include "slang-record-replay/proxy/proxy-base.h"
 #include "slang-record-replay/proxy/proxy-macros.h"
 #include "slang-record-replay/replay-context.h"
+#endif
 #include "slang-repro.h"
 #include "slang-tag-version.h"
 
@@ -258,6 +267,7 @@ SLANG_API SlangResult slang_createGlobalSession2(
     const SlangGlobalSessionDesc* desc,
     slang::IGlobalSession** outGlobalSession)
 {
+#if SLANG_ENABLE_RECORD_REPLAY
     using namespace SlangRecord;
     RECORD_STATIC_CALL();
     RECORD_INPUT(*desc);
@@ -273,6 +283,12 @@ SLANG_API SlangResult slang_createGlobalSession2(
     _ctx.record(RecordFlag::ReturnValue, result);
 
     return result;
+#else
+    // Record-replay compiled out: there is no proxy to wrap the session in, so return the raw
+    // internal session directly.
+    Slang::GlobalSessionInternalDesc internalDesc = {};
+    return slang_createGlobalSessionImpl(desc, &internalDesc, outGlobalSession);
+#endif
 }
 
 SLANG_API void slang_shutdown()
@@ -281,8 +297,12 @@ SLANG_API void slang_shutdown()
     Slang::SPIRVCoreGrammarInfo::freeEmbeddedGrammerInfo();
     Slang::RttiInfo::deallocateAll();
     Slang::freeCapabilityDefs();
+#if SLANG_ENABLE_RECORD_REPLAY
     SlangRecord::ReplayContext::destroySingleton();
+#endif
 }
+
+#if SLANG_ENABLE_RECORD_REPLAY
 
 SLANG_API void slang_enableRecordLayer(bool enable)
 {
@@ -326,6 +346,45 @@ SLANG_API void slang_replayMarker(const char* label)
 {
     SlangRecord::ReplayContext::get().marker(label);
 }
+
+#else
+
+// Record-replay is compiled out (SLANG_ENABLE_RECORD_REPLAY=0). We keep the full C API exported as
+// disabled stubs so the shared library's ABI is unchanged: existing callers still resolve these
+// symbols, recording is simply inert, the directory/path getters report "nothing", and the replay
+// loaders report SLANG_E_NOT_AVAILABLE.
+SLANG_API void slang_enableRecordLayer(bool /*enable*/) {}
+
+SLANG_API bool slang_isRecordLayerEnabled()
+{
+    return false;
+}
+
+SLANG_API void slang_setReplayDirectory(const char* /*path*/) {}
+
+SLANG_API const char* slang_getReplayDirectory()
+{
+    return nullptr;
+}
+
+SLANG_API const char* slang_getCurrentReplayPath()
+{
+    return nullptr;
+}
+
+SLANG_API SlangResult slang_loadReplay(const char* /*folderPath*/)
+{
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+SLANG_API SlangResult slang_loadLatestReplay()
+{
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+SLANG_API void slang_replayMarker(const char* /*label*/) {}
+
+#endif
 
 SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
     SlangInt apiVersion,

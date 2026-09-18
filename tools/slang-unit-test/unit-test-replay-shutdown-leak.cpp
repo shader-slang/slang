@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-shutdown-leak.cpp
 //
 // Regression test for https://github.com/shader-slang/slang/issues/10624
@@ -67,3 +68,4 @@ SLANG_UNIT_TEST(replayContextDestroyedByShutdown)
     ReplayContext::destroySingleton();
     SLANG_CHECK(ReplayContext::tryGet() == nullptr);
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY
