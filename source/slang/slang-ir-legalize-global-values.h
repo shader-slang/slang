@@ -45,6 +45,13 @@ struct GlobalInstInliningContextGeneric
         IRCloneEnv& cloneEnv);
 };
 
+// Fold module-scope calls to a synthesized member-wise constructor into the
+// equivalent `makeStruct`, restoring the canonical constant representation that
+// a function-local initializer would already have. Run before
+// `inlineGlobalConstantsForLegalization` so a `static const` struct table can
+// stay a legal global constant instead of being reconstructed per-invocation.
+void legalizeConstantConstructorCallsForGlobalScope(IRModule* module);
+
 // For global constant values that are resource typed or struct containing resource types,
 // we need to inline their uses to concrete function bodies so they can be legalized during
 // resource legalization.
