@@ -1000,6 +1000,100 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return;
     }
 
+    // Diagnoses a parsed snippet operand the SPIR-V emitter cannot lower, returning false after the
+    // first offending operand. Validation runs here, during legalization, rather than at emit
+    // because the offending call stays in the IR: the emitSPIRVFromIR error-count gate then stops
+    // emission before emitSpvSnippet reaches the operand and aborts or dereferences a null.
+    bool validateSpvSnippet(
+        IRCall* inst,
+        IRTargetIntrinsicDecoration* intrinsic,
+        SpvSnippet* snippet)
+    {
+        const auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : intrinsic->sourceLoc;
+        // emitSpvSnippet fills context.argumentIds with exactly one id per call argument, so
+        // getArgCount() is the same bound its `_N` (ObjectReference) access indexes against.
+        const auto argCount = (SpvWord)inst->getArgCount();
+        for (Index i = 0; i < snippet->instructions.getCount(); i++)
+        {
+            for (const auto& operand : snippet->instructions[i].operands)
+            {
+                // operand.content is interpreted per kind: an ASMType enum for a TypeReference, an
+                // index into snippet->constants for a ConstantReference, an argument number for an
+                // ObjectReference (_N), and an earlier-instruction index for an InstReference
+                // (%name).
+                switch (operand.type)
+                {
+                case SpvSnippet::ASMOperandType::TypeReference:
+                case SpvSnippet::ASMOperandType::ConstantReference:
+                    {
+                        const bool isType =
+                            operand.type == SpvSnippet::ASMOperandType::TypeReference;
+                        auto asmType = isType ? (SpvSnippet::ASMType)operand.content
+                                              : snippet->constants[operand.content].type;
+                        // A `const(_p, ...)` constant resolves to `float`/`double` from the
+                        // intrinsic's result type exactly as emitSpvSnippet does, so it is checked
+                        // in its resolved form; a `_type(_p)` operand has no such resolution and is
+                        // checked as written.
+                        if (!isType)
+                            asmType = SPIRVEmitSharedContext::resolveSnippetConstantType(
+                                asmType,
+                                inst->getDataType());
+                        if (!SpvSnippet::isEmittableASMType(asmType))
+                        {
+                            StringBuilder reason;
+                            reason << "the snippet uses a" << (isType ? " type" : " constant")
+                                   << " operand of type '" << SpvSnippet::getASMTypeName(asmType)
+                                   << "' that the SPIR-V backend cannot emit";
+                            m_sink->diagnose(Diagnostics::InvalidSpirvSnippetOperand{
+                                .reason = reason.produceString(),
+                                .location = loc});
+                            return false;
+                        }
+                    }
+                    break;
+                case SpvSnippet::ASMOperandType::ObjectReference:
+                    if (operand.content >= argCount)
+                    {
+                        StringBuilder reason;
+                        reason << "the snippet references argument _" << operand.content
+                               << ", but the call passes only " << argCount
+                               << (argCount == 1 ? " argument" : " arguments");
+                        m_sink->diagnose(Diagnostics::InvalidSpirvSnippetOperand{
+                            .reason = reason.produceString(),
+                            .location = loc});
+                        return false;
+                    }
+                    break;
+                case SpvSnippet::ASMOperandType::InstReference:
+                    // A `%name` operand emits as an index into the instructions already emitted
+                    // before this one (emitSpvSnippet's emittedInsts), so it must name a strictly
+                    // earlier instruction. The parser registers a result name before parsing that
+                    // instruction's own operands, so a self-reference like `%a = OpNop %a` resolves
+                    // to its own not-yet-emitted index (content == i) and slips past the parser's
+                    // undefined-name check; at emit, content >= i indexes past emittedInsts.
+                    if (operand.content >= (SpvWord)i)
+                    {
+                        StringBuilder reason;
+                        reason << "the snippet references instruction %"
+                               << snippet->instructions[operand.content].resultName
+                               << ", which is not defined by an earlier instruction";
+                        m_sink->diagnose(Diagnostics::InvalidSpirvSnippetOperand{
+                            .reason = reason.produceString(),
+                            .location = loc});
+                        return false;
+                    }
+                    break;
+                default:
+                    // The remaining operand kinds carry nothing this validator can reject: SpvWord
+                    // and the Float*Selection operands are raw SPIR-V words, ResultId/ResultTypeId
+                    // are compiler-generated, and GLSL450ExtInstSet is a fixed ext-inst-set id.
+                    break;
+                }
+            }
+        }
+        return true;
+    }
+
     void processCall(IRCall* inst)
     {
         auto funcValue = inst->getOperand(0);
@@ -1009,6 +1103,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             SpvSnippet* snippet = m_sharedContext->getParsedSpvSnippet(targetIntrinsic);
             if (!snippet)
+                return;
+            if (!validateSpvSnippet(inst, targetIntrinsic, snippet))
                 return;
             if (snippet->resultStorageClass != SpvStorageClassMax)
                 SLANG_UNIMPLEMENTED_X(
@@ -3099,6 +3195,23 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 };
+
+SpvSnippet::ASMType SPIRVEmitSharedContext::resolveSnippetConstantType(
+    SpvSnippet::ASMType type,
+    IRType* resultType)
+{
+    if (type != SpvSnippet::ASMType::FloatOrDouble)
+        return type;
+    switch (SourceEmitterBase::extractBaseType(resultType))
+    {
+    case BaseType::Float:
+        return SpvSnippet::ASMType::Float;
+    case BaseType::Double:
+        return SpvSnippet::ASMType::Double;
+    default:
+        return SpvSnippet::ASMType::FloatOrDouble;
+    }
+}
 
 SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic)
 {

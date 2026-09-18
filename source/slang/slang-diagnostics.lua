@@ -1165,6 +1165,13 @@ err(
 )
 
 err(
+    "invalid-spirv-snippet-operand",
+    29001,
+    "invalid SPIR-V target-intrinsic snippet operand",
+    span { loc = "location", message = "~reason" }
+)
+
+err(
     "unrecognized-spirv-opcode",
     29100,
     "unrecognized SPIR-V opcode",

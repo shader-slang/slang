@@ -66,6 +66,15 @@ struct SPIRVEmitSharedContext
     // snippet-parsing-failed (E29000) diagnostic is emitted exactly once and the null is cached, so
     // a repeated lookup neither re-parses nor re-diagnoses.
     SpvSnippet* getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic);
+
+    // Resolves a `const(...)` operand's ASMType against the intrinsic's result type: a
+    // `FloatOrDouble` (`_p`) constant becomes `Float` or `Double` to match the result type, and any
+    // other type (including a `FloatOrDouble` whose result type is neither) passes through
+    // unchanged. Shared by the emitter and the legalization-time validator so both agree on which
+    // constant operands are emittable.
+    static SpvSnippet::ASMType resolveSnippetConstantType(
+        SpvSnippet::ASMType type,
+        IRType* resultType);
 };
 
 void legalizeIRForSPIRV(
