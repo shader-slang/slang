@@ -2094,6 +2094,61 @@ static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* in
     return LegalVal();
 }
 
+// Legalize a whole-object `bit_cast`, the shape the AnyValue bulk-copy marshalling fast path emits
+// to box a byte-compatible value. This is the legalization case for *every* `bit_cast`, but
+// `legalizeInst` re-uses (short-circuits) any instruction whose operands are all simple and whose
+// result type is simple before reaching this switch (see the `!anyComplex && ...Flavor::simple`
+// check below), so an ordinary cast such as `bit_cast<uint>(aFloat)` never arrives here and never
+// hits the final `SLANG_UNEXPECTED`. What does arrive has a non-simple result or a non-simple
+// operand; and
+// since a byte-compatible value never legalizes to a non-simple *tuple* (a tuple requires a special
+// resource/existential field, which the fast-path predicate rejects), only two degenerate forms
+// occur — the result type has no representation, or the source value's type is an empty aggregate
+// carrying no payload words. Any other non-simple bit-cast is out of contract and keeps the loud
+// failure the generic `default` path gives.
+static LegalVal legalizeBitCast(IRTypeLegalizationContext* context, IRInst* inst, LegalType type)
+{
+    auto builder = context->builder;
+
+    // Result has no representation: produce no value, as the generic `default` path does for an
+    // empty-typed instruction. The empty-*result* unpack (`bit_cast<EmptyCtx>(anyValue)`) lands
+    // here.
+    if (type.flavor == LegalType::Flavor::none)
+        return LegalVal();
+
+    // Empty source boxed into a fixed-size struct payload: zero-fill it, matching what the
+    // field-wise marshalling path writes.
+    //
+    // How does this cast reach here with an empty source at all? The marshalling pass emits it only
+    // for a type `canBulkCopyMarshal` accepted, which requires a *non-zero* emitted size — so at
+    // emission the source is not empty. It becomes empty in between: when the boxed context's
+    // payload is dead (e.g. a stateless conformer, or `Foo2`'s constant-derivative context in
+    // `tests/autodiff/dyn-interface-differentiable-bug.slang`, whose saved primal is never read),
+    // later optimization eliminates that payload, so by the time type legalization runs the source
+    // type has collapsed to an empty aggregate that legalizes to `none`.
+    //
+    // Three conditions must all hold; any that fails leaves the
+    // instruction on the loud `SLANG_UNEXPECTED` below in every build configuration:
+    //  - the result is a `simple` `IRStructType` carrying an `IRAnyValueSizeDecoration`, i.e. it is
+    //    the concrete `AnyValueN` storage struct that `ensureAnyValueType` produced — the only
+    //    destination for which zero-filling an empty source is the correct lowering. A
+    //    user-authored `bit_cast<Word>(Empty{})` targets a `Word` with no such marker, so it falls
+    //    through to the loud failure instead of being silently rewritten to `Word{0}` (which would
+    //    mask the intended size-mismatch diagnostic). The `AnyValueN` struct is this pass's own
+    //    product, so the marker is a reliable provenance boundary;
+    //  - the *source type* legalizes away to `none`. Gate on the source type, not the operand
+    //    value: `legalizeUndefined` also lowers an undefined value of a non-empty type to an empty
+    //    `LegalVal`, and such a value must stay loud rather than be silently zeroed.
+    if (type.flavor == LegalType::Flavor::simple && as<IRStructType>(type.getSimple()) &&
+        type.getSimple()->findDecoration<IRAnyValueSizeDecoration>() &&
+        legalizeType(context, inst->getOperand(0)->getDataType()).flavor == LegalType::Flavor::none)
+    {
+        return LegalVal::simple(builder->emitDefaultConstruct(type.getSimple()));
+    }
+
+    SLANG_UNEXPECTED("non-simple operand(s) in bit-cast");
+}
+
 static LegalVal legalizeInst(
     IRTypeLegalizationContext* context,
     IRInst* inst,
@@ -2195,6 +2250,9 @@ static LegalVal legalizeInst(
         // out structured buffer
         SLANG_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
+    case kIROp_BitCast:
+        result = legalizeBitCast(context, inst, type);
+        break;
     default:
         if (type.flavor == LegalType::Flavor::none)
         {
@@ -4164,22 +4222,11 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
             return false;
         }
 
-        // If type is used as public interface, then treat it as simple.
-        for (auto decor : type->getDecorations())
-        {
-            switch (decor->getOp())
-            {
-            case kIROp_LayoutDecoration:
-            case kIROp_PublicDecoration:
-            case kIROp_ExternCppDecoration:
-            case kIROp_DllImportDecoration:
-            case kIROp_DllExportDecoration:
-            case kIROp_HLSLExportDecoration:
-            case kIROp_BinaryInterfaceTypeDecoration:
-                return true;
-            }
-        }
-        return false;
+        // If type is used as public interface, then treat it as simple. The decoration set that
+        // marks a type ABI/layout-significant lives in one place (see
+        // typeHasAbiSignificantDecoration) so AnyValue bulk-copy eligibility cannot drift from what
+        // this pass actually preserves.
+        return typeHasAbiSignificantDecoration(type);
     }
 
     LegalType createLegalUniformBufferType(IROp, LegalType, IRInst*) override
