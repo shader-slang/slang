@@ -2657,6 +2657,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 return AddressSpace::Generic;
             return getAddressSpaceFromVarType(type);
         }
+
+        // SPIR-V's logical/physical pointer split makes a local pointer slot written pointers in
+        // two different concrete storage classes ill-typed, so the address-space pass reconciles
+        // (and diagnoses) such slots for SPIR-V.
+        virtual bool shouldReconcileLocalPointerSlots() override { return true; }
     };
 
     void propagateAddressAlignment()
@@ -3040,10 +3045,65 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         SpirvAddressSpaceAssigner addressSpaceAssigner;
         specializeAddressSpace(m_module, &addressSpaceAssigner, m_sink);
 
+        // Must run after specialization: it makes each function's result address
+        // space concrete (so we test the final value, not the pre-specialization
+        // default) and removes dead specialized clones at the end of its own
+        // processModule (so a surviving flagged function is one that is genuinely
+        // emitted, not a clone that will be deleted).
+        diagnoseUnreturnableStorageClassPointerReturns();
+
         // For SPIR-V, we don't skip this validation, because we might then be generating
         // invalid SPIR-V.
         bool skipFuncParamValidation = false;
         validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
+    }
+
+    // SPIR-V's Logical addressing model permits a function to return a pointer only
+    // in one of an explicit set of storage classes: PhysicalStorageBuffer, or
+    // StorageBuffer/Workgroup (which Slang pairs with the VariablePointers
+    // capabilities). This is a fixed whitelist: a result pointer in any other
+    // concrete class is rejected by spirv-val ("functions may not return a pointer
+    // in this storage class") regardless of the pointee's lifetime — e.g. Function
+    // (function-local storage) or Private (a static global). Report it here once
+    // address spaces are concrete, rather than let it reach emission as invalid
+    // SPIR-V. Mirrors the validator's returnable-class set in
+    // external/spirv-tools/source/val/validate_function.cpp.
+    //
+    // Unlike the E58003/E58005 reports in `specializeAddressSpace`, this scan is not deduped by
+    // specialization root: if one source function survives as several clones that each return a
+    // non-returnable-class pointer, it reports once per surviving clone, all at the shared source
+    // location. That over-report is benign — the program is rejected either way and the duplicates
+    // share a location — so unifying it with the sibling reports' root-dedup is left as a follow-up
+    // (tracked in #13039) rather than fixed here.
+    void diagnoseUnreturnableStorageClassPointerReturns()
+    {
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            // Only functions defined here (with a body) emit the OpReturn this
+            // diagnoses; a bodyless import/extern declaration's result is the
+            // defining module's concern, so skip it (matches the getFirstBlock
+            // idiom used elsewhere in this file).
+            if (!func || !func->getFirstBlock())
+                continue;
+            auto funcType = as<IRFuncType>(func->getDataType());
+            if (!funcType)
+                continue;
+            auto resultPtrType = as<IRPtrTypeBase>(funcType->getResultType());
+            if (!resultPtrType || !resultPtrType->hasAddressSpace())
+                continue;
+            switch (resultPtrType->getAddressSpace())
+            {
+            case AddressSpace::UserPointer: // emitted as PhysicalStorageBuffer
+            case AddressSpace::StorageBuffer:
+            case AddressSpace::GroupShared: // emitted as Workgroup
+                continue;
+            default:
+                break;
+            }
+            m_sink->diagnose(
+                Diagnostics::CannotReturnPointerInThisStorageClass{.location = func->sourceLoc});
+        }
     }
 
     void updateFunctionTypes()
