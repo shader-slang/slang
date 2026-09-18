@@ -764,6 +764,314 @@ SLANG_UNIT_TEST(linkTimeConditionalReflection)
     SLANG_CHECK(spirvStr.indexOf(toSlice("Location 2")) == -1);
 }
 
+// Test for issue #10749: Link-time type specialization of a struct member results in segfault.
+// When an extern struct is used as a direct member of another struct, computing the type layout
+// should not crash, and reflecting the type via findTypeByName + getTypeLayout should resolve the
+// extern member to its concrete link-time definition.
+
+SLANG_UNIT_TEST(linkTimeTypeReflectionStructMember)
+{
+    const char* userSourceBody = R"(
+        interface IAccelerationStructure { int getType(); }
+        extern struct AccelerationStructure : IAccelerationStructure;
+
+        struct Scene {
+            AccelerationStructure accelStruct;
+        }
+
+        ParameterBlock<Scene> gScene;
+
+        [numthreads(1,1,1)]
+        [shader("compute")]
+        void computeMain() {
+            int x = gScene.accelStruct.getType();
+        }
+    )";
+
+    String moduleName = "linkTimeStructMember_Compute";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        moduleName.getBuffer(),
+        (moduleName + ".slang").getBuffer(),
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    String configModuleSource = "import " + moduleName + ";\n" + R"(
+        struct HWAccelerationStructure : IAccelerationStructure {
+            uint bufferHandle;
+            int getType() { return 1; }
+        }
+        export struct AccelerationStructure : IAccelerationStructure = HWAccelerationStructure;
+    )";
+    auto configModule = session->loadModuleFromSourceString(
+        "config",
+        "config.slang",
+        configModuleSource.getBuffer(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(configModule != nullptr);
+
+    slang::IComponentType* components[] = {module, configModule};
+
+    ComPtr<slang::IComponentType> compositeProgram;
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(compositeProgram != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+
+    // Computing the layout for `Scene` (which has an extern struct member) used to
+    // segfault in lookupExternDeclRefType; now it succeeds.
+    auto programLayout = linkedProgram->getLayout();
+    SLANG_CHECK(programLayout != nullptr);
+
+    auto var0 = programLayout->getParameterByIndex(0);
+    SLANG_CHECK(var0 != nullptr);
+
+    // The Scene struct should have a valid layout with the resolved AccelerationStructure type.
+    auto typeLayout = var0->getTypeLayout();
+    SLANG_CHECK(typeLayout != nullptr);
+
+    // Now exercise the findTypeByName + getTypeLayout reflection path. Because
+    // spReflection_GetTypeLayout threads the ProgramLayout through to
+    // TargetRequest::getTypeLayout, the extern `AccelerationStructure` member must
+    // resolve to its concrete link-time definition (HWAccelerationStructure), not
+    // the bare unresolved extern declaration. We assert the resolved shape so a
+    // regression that silently produces an empty (zero-field) layout is caught,
+    // rather than only checking for non-null.
+    auto sceneType = programLayout->findTypeByName("Scene");
+    SLANG_CHECK(sceneType != nullptr);
+    if (sceneType)
+    {
+        auto sceneLayout = programLayout->getTypeLayout(sceneType);
+        SLANG_CHECK(sceneLayout != nullptr);
+        SLANG_CHECK(sceneLayout->getFieldCount() == 1);
+        if (sceneLayout->getFieldCount() == 1)
+        {
+            // Scene.accelStruct resolves to HWAccelerationStructure, which has one
+            // field (uint bufferHandle).
+            auto accelStructFieldLayout = sceneLayout->getFieldByIndex(0);
+            SLANG_CHECK(accelStructFieldLayout != nullptr);
+            auto accelStructTypeLayout = accelStructFieldLayout->getTypeLayout();
+            SLANG_CHECK(accelStructTypeLayout != nullptr);
+            SLANG_CHECK(accelStructTypeLayout->getFieldCount() == 1);
+        }
+    }
+}
+
+// Test for issue #10749 (variant with associated types): More closely matches the user's actual
+// code pattern where the extern struct implements an interface with an associated type.
+
+SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberAssocType)
+{
+    const char* userSourceBody = R"(
+        interface IRayQuery { int status(); }
+        interface IAccelerationStructure {
+            associatedtype RayQueryImpl : IRayQuery;
+            RayQueryImpl trace();
+        }
+        extern struct SceneAS : IAccelerationStructure;
+
+        struct Scene {
+            SceneAS as;
+        }
+
+        ParameterBlock<Scene> gScene;
+
+        [numthreads(1,1,1)]
+        [shader("compute")]
+        void computeMain() {
+            let rq = gScene.as.trace();
+        }
+    )";
+
+    String moduleName = "linkTimeStructMemberAssoc_Compute";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        moduleName.getBuffer(),
+        (moduleName + ".slang").getBuffer(),
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    String configModuleSource = "import " + moduleName + ";\n" + R"(
+        struct HWRayQuery : IRayQuery { int status() { return 1; } }
+        struct HWAccelerationStructure : IAccelerationStructure {
+            RaytracingAccelerationStructure rtAS;
+            typealias RayQueryImpl = HWRayQuery;
+            RayQueryImpl trace() { HWRayQuery rq; return rq; }
+        }
+        export struct SceneAS : IAccelerationStructure = HWAccelerationStructure;
+    )";
+    auto configModule = session->loadModuleFromSourceString(
+        "config",
+        "config.slang",
+        configModuleSource.getBuffer(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(configModule != nullptr);
+
+    slang::IComponentType* components[] = {module, configModule};
+
+    ComPtr<slang::IComponentType> compositeProgram;
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(compositeProgram != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+
+    auto programLayout = linkedProgram->getLayout();
+    SLANG_CHECK(programLayout != nullptr);
+
+    // Exercise getTypeLayout() on the Scene type directly via findTypeByName +
+    // getTypeLayout. This is the user's actual scenario: the extern struct `SceneAS`
+    // implements an interface with an associated type and resolves to
+    // HWAccelerationStructure. spReflection_GetTypeLayout threads the ProgramLayout
+    // through, so the extern member resolves to its concrete linked type; we assert
+    // the resolved field count so a silently-empty layout regression is caught.
+    if (programLayout)
+    {
+        auto sceneType = programLayout->findTypeByName("Scene");
+        SLANG_CHECK(sceneType != nullptr);
+        if (sceneType)
+        {
+            auto sceneLayout = programLayout->getTypeLayout(sceneType);
+            SLANG_CHECK(sceneLayout != nullptr);
+            SLANG_CHECK(sceneLayout->getFieldCount() == 1);
+            if (sceneLayout->getFieldCount() == 1)
+            {
+                // Scene.as resolves to HWAccelerationStructure, which has one field
+                // (RaytracingAccelerationStructure rtAS).
+                auto asFieldLayout = sceneLayout->getFieldByIndex(0);
+                SLANG_CHECK(asFieldLayout != nullptr);
+                auto asTypeLayout = asFieldLayout->getTypeLayout();
+                SLANG_CHECK(asTypeLayout != nullptr);
+                SLANG_CHECK(asTypeLayout->getFieldCount() == 1);
+            }
+        }
+    }
+}
+
+// Test for issue #10749 (program-less reflection path): `ISession::getTypeLayout`
+// (i.e. `Linkage::getTypeLayout`) computes a layout without a linked `ProgramLayout`,
+// so it reaches the `programLayout == nullptr` branch of `buildExternTypeMap`. This is
+// the path whose unguarded dereference originally segfaulted; this test exercises that
+// guard directly (the other two tests go through the program-ful
+// `spReflection_GetTypeLayout` path, which now threads a non-null `ProgramLayout`).
+//
+// A module is loaded but never linked with a definition for its `extern` member, so
+// there is no link-time type to resolve to. The intended, in-contract behavior for this
+// path is: do not crash, and leave the `extern` member unresolved rather than
+// fabricate a definition. We assert exactly that so a regression in either direction
+// (a re-introduced crash, or a change in the unresolved-layout contract) is caught.
+SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberSessionGetTypeLayout)
+{
+    const char* userSourceBody = R"(
+        interface IAccelerationStructure { int getType(); }
+        extern struct AccelerationStructure : IAccelerationStructure;
+
+        struct Scene {
+            AccelerationStructure accelStruct;
+        }
+    )";
+
+    String moduleName = "linkTimeStructMember_SessionLayout";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        moduleName.getBuffer(),
+        (moduleName + ".slang").getBuffer(),
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    // Module-level reflection: no link step, so there is no resolved program.
+    auto moduleReflection = module->getLayout();
+    SLANG_CHECK_ABORT(moduleReflection != nullptr);
+
+    auto sceneType = moduleReflection->findTypeByName("Scene");
+    SLANG_CHECK_ABORT(sceneType != nullptr);
+
+    // Go through ISession::getTypeLayout (Linkage::getTypeLayout), which passes
+    // programLayout=nullptr to TargetRequest::getTypeLayout. This used to segfault
+    // in buildExternTypeMap for a type with an extern member.
+    ComPtr<slang::IBlob> layoutDiagnostics;
+    auto sceneLayout = session->getTypeLayout(
+        sceneType,
+        0,
+        slang::LayoutRules::Default,
+        layoutDiagnostics.writeRef());
+
+    // Must not crash and must return a layout. The single field (the extern member)
+    // is present, but its element type stays unresolved because there is no linked
+    // definition available on the program-less path.
+    SLANG_CHECK(sceneLayout != nullptr);
+    if (sceneLayout)
+    {
+        SLANG_CHECK(sceneLayout->getFieldCount() == 1);
+        if (sceneLayout->getFieldCount() == 1)
+        {
+            // The extern member is present in the layout, but its element type
+            // stays unresolved on the program-less path: there is no linked
+            // definition, so the extern struct has no fields of its own. This
+            // pins the intended contract so a regression in either direction is
+            // caught -- a re-introduced crash, or an accidental change that
+            // resolves (or drops) the extern member here.
+            auto accelStructFieldLayout = sceneLayout->getFieldByIndex(0);
+            SLANG_CHECK(accelStructFieldLayout != nullptr);
+            auto accelStructTypeLayout =
+                accelStructFieldLayout ? accelStructFieldLayout->getTypeLayout() : nullptr;
+            SLANG_CHECK(accelStructTypeLayout != nullptr);
+            if (accelStructTypeLayout)
+                SLANG_CHECK(accelStructTypeLayout->getFieldCount() == 0);
+        }
+    }
+}
+
 // Test that loading a module that defines an `export` type, but not linking with the module should
 // not affect the type layout.
 
@@ -837,4 +1145,322 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionWithLoadedButNotLinkedModule)
     auto spirvStr = UnownedStringSlice((const char*)codeBlob->getBufferPointer());
 
     SLANG_CHECK(spirvStr.indexOf(toSlice("OpDecorate %tex Binding 0")) != -1);
+}
+
+// Test for issue #10749 (global-generic-param path): computing a layout for a type
+// that references a module-scope `type_param` (a `GlobalGenericParamDecl`) via the
+// program-less `ISession::getTypeLayout` reaches the other two null-guards added in
+// this PR -- `findGlobalGenericSpecializationArg` (no program => no specialization
+// argument) and `_createTypeLayoutForGlobalGenericTypeParam` (no program => no global
+// param index, `paramIndex = -1`). The extern-member tests above do not reach these,
+// so this pins them: a regression that turned either guard back into an unconditional
+// `programLayout->...` dereference would crash here.
+SLANG_UNIT_TEST(linkTimeTypeReflectionGlobalTypeParamSessionGetTypeLayout)
+{
+    const char* userSourceBody = R"(
+        interface IBase {}
+        type_param TParam : IBase;
+
+        struct Wrap {
+            TParam field;
+        }
+    )";
+
+    String moduleName = "linkTimeGlobalTypeParam_SessionLayout";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        moduleName.getBuffer(),
+        (moduleName + ".slang").getBuffer(),
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    // Module-level reflection: no link step, so there is no resolved program.
+    auto moduleReflection = module->getLayout();
+    SLANG_CHECK_ABORT(moduleReflection != nullptr);
+
+    auto wrapType = moduleReflection->findTypeByName("Wrap");
+    SLANG_CHECK_ABORT(wrapType != nullptr);
+
+    // Go through ISession::getTypeLayout (Linkage::getTypeLayout), which passes
+    // programLayout=nullptr. Laying out `Wrap` reaches the field of type `TParam`
+    // (a GlobalGenericParamDecl), exercising the two global-generic-param null guards.
+    ComPtr<slang::IBlob> layoutDiagnostics;
+    auto wrapLayout = session->getTypeLayout(
+        wrapType,
+        0,
+        slang::LayoutRules::Default,
+        layoutDiagnostics.writeRef());
+
+    // Must not crash and must return a layout with the single `TParam` field.
+    SLANG_CHECK(wrapLayout != nullptr);
+    if (wrapLayout)
+    {
+        SLANG_CHECK(wrapLayout->getFieldCount() == 1);
+        if (wrapLayout->getFieldCount() == 1)
+        {
+            // Pin the documented program-less contract for the field's type layout
+            // (see the comment on `_createTypeLayoutForGlobalGenericTypeParam` in
+            // slang-type-layout.cpp and on `spReflectionTypeLayout_getGenericParamIndex`
+            // in slang-reflection-api.cpp): the field is still reflected as a genuine
+            // GenericTypeParameter kind, but its global-generic index is unavailable
+            // without a program, so `getGenericParamIndex()` returns the same -1 value
+            // used elsewhere for "not a generic-param layout". A caller must check
+            // `getKind()` first to disambiguate; this test exercises exactly that
+            // two-step contract so a regression in either the kind or the index value
+            // is caught.
+            auto fieldTypeLayout = wrapLayout->getFieldByIndex(0)->getTypeLayout();
+            SLANG_CHECK(fieldTypeLayout != nullptr);
+            if (fieldTypeLayout)
+            {
+                SLANG_CHECK(
+                    fieldTypeLayout->getKind() ==
+                    slang::TypeReflection::Kind::GenericTypeParameter);
+                SLANG_CHECK(fieldTypeLayout->getGenericParamIndex() == -1);
+            }
+        }
+    }
+}
+
+// Link `baseModule` (which exports `perProgramCacheBase`, containing `Scene` with an
+// `extern AccelerationStructure` member) against the given config module in `session`,
+// and return the resolved field count of `Scene.accelStruct` as seen through
+// `programLayout->getTypeLayout`. Used by
+// `linkTimeTypeReflectionStructMemberPerProgramCache` to link the same base module
+// against two different configs and check that each linked program's cached type
+// layout reflects its own resolved shape rather than aliasing the other program's.
+static int getResolvedAccelStructFieldCount(
+    slang::ISession* session,
+    slang::IComponentType* baseModule,
+    const char* configName,
+    const char* configBody)
+{
+    ComPtr<slang::IBlob> diagnosticBlob;
+    String configSource = "import perProgramCacheBase;\n" + String(configBody);
+    auto configModule = session->loadModuleFromSourceString(
+        configName,
+        (String(configName) + ".slang").getBuffer(),
+        configSource.getBuffer(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(configModule != nullptr);
+
+    slang::IComponentType* components[] = {baseModule, configModule};
+    ComPtr<slang::IComponentType> compositeProgram;
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(compositeProgram != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+
+    auto programLayout = linkedProgram->getLayout();
+    SLANG_CHECK_ABORT(programLayout != nullptr);
+
+    auto sceneType = programLayout->findTypeByName("Scene");
+    SLANG_CHECK_ABORT(sceneType != nullptr);
+
+    auto sceneLayout = programLayout->getTypeLayout(sceneType);
+    SLANG_CHECK_ABORT(sceneLayout != nullptr);
+
+    // Two back-to-back calls on the same program must be memoized to the same pointer.
+    SLANG_CHECK(programLayout->getTypeLayout(sceneType) == sceneLayout);
+
+    SLANG_CHECK_ABORT(sceneLayout->getFieldCount() == 1);
+    auto accelStructTypeLayout = sceneLayout->getFieldByIndex(0)->getTypeLayout();
+    SLANG_CHECK_ABORT(accelStructTypeLayout != nullptr);
+    return (int)accelStructTypeLayout->getFieldCount();
+}
+
+// Test for issue #10749 (per-program cache correctness): the same base module with an
+// `extern` struct member is linked against two different config modules that resolve
+// the extern to concrete types of different shape, and each linked program is reflected
+// via `programLayout->getTypeLayout`. Because the reflection type-layout cache is scoped
+// to the owning `TargetProgram` (not the session-long `TargetRequest`), each program
+// must report its own resolved shape.
+//
+// This pins the lifetime/scoping invariant the cache fix relies on: a refactor that
+// folded the two caches back onto `TargetRequest` keyed only by `{type, rules}` would
+// return program A's layout for program B's identical `Scene`/`Type*` query, and this
+// test would catch it.
+SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberPerProgramCache)
+{
+    const char* baseSourceBody = R"(
+        interface IAccelerationStructure { int getType(); }
+        extern struct AccelerationStructure : IAccelerationStructure;
+
+        struct Scene {
+            AccelerationStructure accelStruct;
+        }
+
+        ParameterBlock<Scene> gScene;
+
+        [numthreads(1,1,1)]
+        [shader("compute")]
+        void computeMain() {
+            int x = gScene.accelStruct.getType();
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    // A single session: the base module and its `Scene`/`AccelerationStructure` decls
+    // (and thus the `Type*` that `findTypeByName("Scene")` yields) are shared across
+    // both linked programs, and both programs' `TargetProgram`s hang off the same
+    // session-long `TargetRequest`. This is exactly the setup where a `TargetRequest`
+    // cache keyed only by `{type, rules}` would alias between programs.
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto baseModule = session->loadModuleFromSourceString(
+        "perProgramCacheBase",
+        "perProgramCacheBase.slang",
+        baseSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(baseModule != nullptr);
+
+    // Config A resolves AccelerationStructure to a type with one field.
+    const char* configA = R"(
+        struct HWAccelerationStructureA : IAccelerationStructure {
+            uint handle;
+            int getType() { return 1; }
+        }
+        export struct AccelerationStructure : IAccelerationStructure = HWAccelerationStructureA;
+    )";
+
+    // Config B resolves the same extern to a type with two fields.
+    const char* configB = R"(
+        struct HWAccelerationStructureB : IAccelerationStructure {
+            float x;
+            float y;
+            int getType() { return 2; }
+        }
+        export struct AccelerationStructure : IAccelerationStructure = HWAccelerationStructureB;
+    )";
+
+    int fieldsA =
+        getResolvedAccelStructFieldCount(session, baseModule, "perProgramCacheConfigA", configA);
+    int fieldsB =
+        getResolvedAccelStructFieldCount(session, baseModule, "perProgramCacheConfigB", configB);
+
+    // Each program reports its own resolved shape. If the cache were shared across
+    // programs keyed only by {type, rules}, the second query would alias the first
+    // and both would report the same field count.
+    SLANG_CHECK(fieldsA == 1);
+    SLANG_CHECK(fieldsB == 2);
+}
+
+// Test for issue #10749 (per-target cache memoization): the same linked program is
+// reflected via `programLayout->getTypeLayout` against two different targets in the
+// same session, and each target's `TypeLayout` query is memoized to a stable pointer on
+// repeat calls. Each target has its own `TargetRequest`/`TargetProgram` pair, so this
+// does not discriminate the per-program cache-scoping fix itself (that scoping is pinned
+// by `linkTimeTypeReflectionStructMemberPerProgramCache` above, which keeps the target
+// fixed and varies the program instead); it exists to confirm memoization still works
+// correctly when a session has more than one target.
+SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberPerTargetCache)
+{
+    const char* sourceBody = R"(
+        interface IAccelerationStructure { int getType(); }
+        struct HWAccelerationStructure : IAccelerationStructure {
+            uint handle;
+            int getType() { return 1; }
+        }
+        export struct AccelerationStructure : IAccelerationStructure = HWAccelerationStructure;
+
+        struct Scene {
+            AccelerationStructure accelStruct;
+        }
+
+        ParameterBlock<Scene> gScene;
+
+        [numthreads(1,1,1)]
+        [shader("compute")]
+        void computeMain() {
+            int x = gScene.accelStruct.getType();
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    // Two distinct SPIRV targets (different SPIR-V versions) in the same session, so
+    // both `TargetProgram`s for the linked program hang off the same session-long
+    // `Linkage`, and the same `Type*` for `Scene` is shared across both targets'
+    // reflection queries.
+    slang::TargetDesc targetDescs[2] = {};
+    targetDescs[0].format = SLANG_SPIRV_ASM;
+    targetDescs[0].profile = globalSession->findProfile("spirv_1_3");
+    targetDescs[1].format = SLANG_SPIRV_ASM;
+    targetDescs[1].profile = globalSession->findProfile("spirv_1_5");
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 2;
+    sessionDesc.targets = targetDescs;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "perTargetCache",
+        "perTargetCache.slang",
+        sourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    module->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+
+    // Reflect `Scene` through each target's `ProgramLayout`. Each call reaches
+    // `TargetRequest::getTypeLayout` for a different `TargetRequest`/`TargetProgram`
+    // pair, but with the identical `Type*` (the same linked program, the same `Scene`
+    // declaration) and the identical `LayoutRules::Default`.
+    auto programLayoutTarget0 = linkedProgram->getLayout(0, diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(programLayoutTarget0 != nullptr);
+    auto sceneTypeTarget0 = programLayoutTarget0->findTypeByName("Scene");
+    SLANG_CHECK_ABORT(sceneTypeTarget0 != nullptr);
+    auto sceneLayoutTarget0 = programLayoutTarget0->getTypeLayout(sceneTypeTarget0);
+    SLANG_CHECK_ABORT(sceneLayoutTarget0 != nullptr);
+
+    auto programLayoutTarget1 = linkedProgram->getLayout(1, diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(programLayoutTarget1 != nullptr);
+    auto sceneTypeTarget1 = programLayoutTarget1->findTypeByName("Scene");
+    SLANG_CHECK_ABORT(sceneTypeTarget1 != nullptr);
+    auto sceneLayoutTarget1 = programLayoutTarget1->getTypeLayout(sceneTypeTarget1);
+    SLANG_CHECK_ABORT(sceneLayoutTarget1 != nullptr);
+
+    // Each target's own cache is still memoized: a repeated query on the same target
+    // returns the same pointer. (This test does not add discriminating coverage beyond
+    // memoization: each target has its own `TargetRequest`/`TargetProgram` pair, so the
+    // two queries land in separate caches regardless of whether the cache is keyed
+    // per-`TargetProgram` (this PR's fix) or per-`TargetRequest` (the pre-fix design) --
+    // the per-program scoping fix itself is pinned by
+    // `linkTimeTypeReflectionStructMemberPerProgramCache`, which keeps the target fixed
+    // and varies the program.)
+    SLANG_CHECK(programLayoutTarget0->getTypeLayout(sceneTypeTarget0) == sceneLayoutTarget0);
+    SLANG_CHECK(programLayoutTarget1->getTypeLayout(sceneTypeTarget1) == sceneLayoutTarget1);
 }
