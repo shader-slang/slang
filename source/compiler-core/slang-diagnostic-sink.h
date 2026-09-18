@@ -449,6 +449,23 @@ public:
     /// If a writer is set output will *not* be written to the outputBuffer
     ISlangWriter* writer = nullptr;
 
+    /// Internal per-diagnostic callback, fired from diagnoseRichImpl before rendering.
+    /// Carries the structured diagnostic and source manager for location resolution.
+    /// Set by Linkage to forward diagnostics to the user-supplied
+    /// SlangStructuredDiagnosticCallback.
+    typedef void (*StructuredDiagnosticCallback)(
+        const GenericDiagnostic& diag,
+        SourceManager* sm,
+        void* userData);
+    StructuredDiagnosticCallback m_structuredCallback = nullptr;
+    void* m_structuredCallbackData = nullptr;
+
+    void setStructuredCallback(StructuredDiagnosticCallback cb, void* data)
+    {
+        m_structuredCallback = cb;
+        m_structuredCallbackData = data;
+    }
+
 protected:
     // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal
     bool diagnoseImpl(
