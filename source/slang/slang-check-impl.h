@@ -15,35 +15,67 @@
 namespace Slang
 {
 
-struct TypedIntegerLiteralValue
+/// @brief Wrapper over integer literals, containing also the signedness of the
+/// type and whether the integer is a bitwise value.
+class TypedIntegerLiteralValue
 {
+private:
     uint64_t m_rawValue = 0U;
-    bool m_isSignedType = false;
+    bool m_signedType = false;
+    bool m_bitwiseValue = false;
 
-    inline bool isSignedType() const
-    {
-        return m_isSignedType;
-    }
+public:
+    inline bool isSignedType() const { return m_signedType; }
 
+    /// @brief Determines whether the value originates from a literal that
+    /// expresses a bit pattern, i.e. one written in a binary, octal, or
+    /// hexadecimal base, or produced by applying bitwise NOT to a literal of
+    /// any base.
+    inline bool isBitwiseValue() const { return m_bitwiseValue; }
+
+    /// @brief Returns the literal as a signed integer.
+    ///
+    /// @pre The integer type is signed (#m_signedType == true)
     inline int64_t getSignedValue() const
     {
+        SLANG_RELEASE_ASSERT(m_signedType);
         return static_cast<int64_t>(m_rawValue);
     }
 
+    /// @brief Returns the literal as an unsigned integer.
+    ///
+    /// @pre The integer type is unsigned (#m_signedType == false)
     inline uint64_t getUnsignedValue() const
     {
+        SLANG_RELEASE_ASSERT(!m_signedType);
         return m_rawValue;
     }
 
+    inline TypedIntegerLiteralValue toSignedType() const
+    {
+        TypedIntegerLiteralValue ret = *this;
+        ret.m_signedType = true;
+        return ret;
+    }
+
+    inline TypedIntegerLiteralValue toUnsignedType() const
+    {
+        TypedIntegerLiteralValue ret = *this;
+        ret.m_signedType = false;
+        return ret;
+    }
+
     // Minimum bit width integer that can hold the value. For negative values,
-    // sign extension is assumed. Minimum returned bit width is 1.
+    // sign extension is assumed.
+    //
+    // For 0, the returned value is 0.
     //
     // For positive values, the returned value is the highest index of a set bit + 1.
     //
     // For negative values, the returned value is the sign bit that gets extended + 1
     //
     // For example:
-    // 0   = 0b0000'0000 -- 1 bits (by minimum width exception)
+    // 0   = 0b0000'0000 -- 0 bits
     // 1   = 0b0000'0001 -- 1 bits
     // 2   = 0b0000'0010 -- 2 bits
     // 123 = 0b1111'1011 -- 8 bits
@@ -51,12 +83,13 @@ struct TypedIntegerLiteralValue
     // -32 = 0b..10'0000 -- 6 bits (... = sign extension)
     int getMinimumBitWidth() const;
 
-    void setValue(ConstantIntVal &val);
-
-    TypedIntegerLiteralValue(ConstantIntVal &val)
-    {
-        setValue(val);
-    }
+    TypedIntegerLiteralValue() = default;
+    TypedIntegerLiteralValue(const TypedIntegerLiteralValue&) = default;
+    TypedIntegerLiteralValue(TypedIntegerLiteralValue&&) = default;
+    TypedIntegerLiteralValue& operator=(const TypedIntegerLiteralValue&) & = default;
+    TypedIntegerLiteralValue& operator=(TypedIntegerLiteralValue&&) & = default;
+    TypedIntegerLiteralValue(ConstantIntVal& val);
+    TypedIntegerLiteralValue(IntegerLiteralExpr& val);
 };
 
 template<typename P, typename... Args>
@@ -3014,17 +3047,17 @@ public:
     /// Is `type` a scalar integer type.
     bool isScalarIntegerType(Type* type);
 
-    /// Is `type` an unsigned integer type
-    bool isUnsignedIntegerType(Type* type);
+    /// Is `type` a scalar integer type, not counting `bool`? Conversions that reason about the
+    /// range or precision of an integer value need this narrower test, because `bool` is a
+    /// truth value rather than a two-valued integer: converting `2` to `bool` yields `true`
+    /// rather than overflowing.
+    bool isScalarNonBoolIntegerType(Type* type);
 
     // This function is used to get the best integer type that matches the given type.
     // If `type` is already an integer type, return it as is.
     // If `type` is a enum type, return the tag type if it exists.
     // Otherwise, return the 32-bit signed integer type.
     Type* getMatchingIntType(Type* type);
-
-    /// Is `type` a scalar half type.
-    bool isHalfType(Type* type);
 
     /// Is `type` a scalar floating-point type.
     bool isFloatingPointType(Type* type);
@@ -3039,7 +3072,9 @@ public:
     bool isIntValueInRangeOfType(const TypedIntegerLiteralValue& value, Type* type);
 
     /// Check whether the conversion is precise (i.e., no precision loss)
-    bool isIntValuePreciselyRepresentableByFloatingPointType(const TypedIntegerLiteralValue& value, Type* type);
+    bool isIntValuePreciselyRepresentableByFloatingPointType(
+        const TypedIntegerLiteralValue& value,
+        Type* type);
 
     // Validate that `type` is a suitable type to use
     // as the tag type for an `enum`

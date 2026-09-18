@@ -2846,16 +2846,19 @@ bool SemanticsVisitor::_coerce(
             bool suppressGeneralWarning = false;
 
             // Check integer -> integer and integer -> float constant value conversions
-            if (!suppressGeneralWarning && cost < kConversionCost_Explicit && (getMaximumTypeBitSize(fromType) > 0) &&
-                (isFloatingPointType(toType) || isScalarIntegerType(toType)))
+            if (cost < kConversionCost_Explicit && (getMaximumTypeBitSize(fromType) > 0) &&
+                (isFloatingPointType(toType) || isScalarNonBoolIntegerType(toType)))
             {
                 // Check if we have a known integer value
                 std::optional<TypedIntegerLiteralValue> val{};
 
-                if (auto valNode = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
-                                                          fromExpr,
-                                                          ConstantFoldingKind::CompileTime,
-                                                          nullptr)))
+                if (auto litNode = as<IntegerLiteralExpr>(fromExpr))
+                    val = TypedIntegerLiteralValue(*litNode);
+                else if (
+                    auto valNode = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
+                        fromExpr,
+                        ConstantFoldingKind::CompileTime,
+                        nullptr)))
                     val = TypedIntegerLiteralValue(*valNode);
 
                 if (val)
@@ -2864,27 +2867,74 @@ bool SemanticsVisitor::_coerce(
                     // all the implicit conversion checks here
                     suppressGeneralWarning = true;
 
-                    // special case: -1 to signed/unsigned int is always allowed
-                    // by exception (set all bits)
-                    if (val->isSignedType() && (val->getSignedValue() == -1) && (getMaximumTypeBitSize(toType) > 0))
-                    {
-                        // intentionally empty
-                    }
                     // overflow check
-                    else if (!isIntValueInRangeOfType(*val, toType))
+                    if (!isIntValueInRangeOfType(*val, toType))
                     {
-                        if (isScalarIntegerType(toType))
+                        if (isScalarNonBoolIntegerType(toType))
                         {
-                            // We have a general overflow. However, we'll still allow implicit conversion without a
-                            // warning for things like:
+                            // We have a general integer overflow. However, we'll still allow an
+                            // implicit conversion without a warning for things like:
                             //
-                            // int8_t x = 0xFF; // technically, 0xFF == 255 and it won't fit in int8_t
-                            // uint8_t y = ~3;  // technically, ~3 == 0xFFFFFFFC, but the intention is clearly just 0xFC
-                            if (val->getMinimumBitWidth() > getMaximumTypeBitSize(toType))
+                            // int8_t x = 0xFF; // technically, 0xFF == 255 and it won't fit in
+                            // int8_t uint8_t y = ~3;  // technically, ~3 == 0xFFFFFFFC, but the
+                            // intention is clearly just 0xFC
+                            //
+                            // Also, we always allow -1 to be converted to an integer (all bits set
+                            // idiom)
+
+                            // special case: -1
+                            if (val->isSignedType() && (val->getSignedValue() == -1))
                             {
+                                // intentionally empty
+                            }
+                            // overflow is still allowed if the value is from non-decimal-base
+                            // origin AND it fits within the type (ignoring signedness)
+                            else if (val->isBitwiseValue())
+                            {
+                                if (val->toSignedType().getMinimumBitWidth() >
+                                    getMaximumTypeBitSize(toType))
+                                {
+                                    // bin/oct/hex base, so we report the overflowing number in the
+                                    // target signedness
+                                    if (isSigned(toType))
+                                    {
+                                        if (sink)
+                                            sink->diagnose(Diagnostics::IntegerConstantOverflow{
+                                                .value =
+                                                    String(val->toSignedType().getSignedValue()),
+                                                .toType = toType,
+                                                .expr = fromExpr});
+                                    }
+                                    else
+                                    {
+                                        // Truncate the value based on the source type bit width
+                                        // for better diagnostics. Constant folding may set excess
+                                        // high bits in the value after expressions such as ~300U.
+                                        const int sourceTypeBitWidth{
+                                            getMaximumTypeBitSize(fromType)};
+
+                                        uint64_t mask = ~uint64_t{0};
+                                        if (sourceTypeBitWidth >= 1 && sourceTypeBitWidth <= 63)
+                                            mask = (uint64_t{1} << sourceTypeBitWidth) - 1U;
+
+                                        if (sink)
+                                            sink->diagnose(Diagnostics::IntegerConstantOverflow{
+                                                .value = String(
+                                                    val->toUnsignedType().getUnsignedValue() &
+                                                    mask),
+                                                .toType = toType,
+                                                .expr = fromExpr});
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // decimal base
                                 if (sink)
                                     sink->diagnose(Diagnostics::IntegerConstantOverflow{
-                                        .value = val->isSignedType() ? String(val->getSignedValue()) : String(val->getUnsignedValue()),
+                                        .value = val->isSignedType()
+                                                     ? String(val->getSignedValue())
+                                                     : String(val->getUnsignedValue()),
                                         .toType = toType,
                                         .expr = fromExpr});
                             }
@@ -2893,17 +2943,21 @@ bool SemanticsVisitor::_coerce(
                         {
                             if (sink)
                                 sink->diagnose(Diagnostics::OutOfRangeInConversion{
-                                    .value = val->isSignedType() ? String(val->getSignedValue()) : String(val->getUnsignedValue()),
+                                    .value = val->isSignedType() ? String(val->getSignedValue())
+                                                                 : String(val->getUnsignedValue()),
                                     .toType = toType,
                                     .expr = fromExpr});
                         }
                     }
                     // int -> float precision check
-                    else if (isFloatingPointType(toType) && !isIntValuePreciselyRepresentableByFloatingPointType(*val, toType))
+                    else if (
+                        isFloatingPointType(toType) &&
+                        !isIntValuePreciselyRepresentableByFloatingPointType(*val, toType))
                     {
                         if (sink)
                             sink->diagnose(Diagnostics::PrecisionLossInConversion{
-                                .value = val->isSignedType() ? String(val->getSignedValue()) : String(val->getUnsignedValue()),
+                                .value = val->isSignedType() ? String(val->getSignedValue())
+                                                             : String(val->getUnsignedValue()),
                                 .toType = toType,
                                 .expr = fromExpr});
                     }

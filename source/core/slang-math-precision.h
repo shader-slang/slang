@@ -12,9 +12,10 @@ namespace Slang
 ///
 /// @tparam fpMaxExponent    Maximum exponent for a floating point number in 0.111.. * 2^exp format
 ///                          (same as std::numeric_limits<FloatType>::max_exponent)
-/// @tparam fpNumDigits      Number of mantissa bits (same as std::numeric_limits<FloatType>::digits)
+/// @tparam fpNumDigits      Number of mantissa bits (same as
+///                          std::numeric_limits<FloatType>::digits)
 /// @tparam IntType          Integer type
-template <int fpMaxExponent, int fpNumDigits, typename IntType>
+template<int fpMaxExponent, int fpNumDigits, typename IntType>
 struct IntToFloatPrecisionHelper
 {
     static_assert(fpMaxExponent >= 1);
@@ -25,7 +26,7 @@ struct IntToFloatPrecisionHelper
     ///
     /// @tparam lb     Lowest bit set (inclusive)
     /// @tparam hb     Highest bit set (inclusive)
-    template <int lb, int hb>
+    template<int lb, int hb>
     static constexpr IntType computeBitMask()
     {
         static_assert(hb >= lb);
@@ -38,7 +39,7 @@ struct IntToFloatPrecisionHelper
         if (hb >= (std::numeric_limits<UnsignedIntType>::digits - 1))
             bits0ToHB = std::numeric_limits<UnsignedIntType>::max();
         else
-            bits0ToHB = (UnsignedIntType { 1U } << (static_cast<unsigned>(hb) + 1U)) - 1U;
+            bits0ToHB = (UnsignedIntType{1U} << (static_cast<unsigned>(hb) + 1U)) - 1U;
 
         if constexpr (lb <= 0)
         {
@@ -47,7 +48,8 @@ struct IntToFloatPrecisionHelper
         else
         {
             // bits 0 (inclusive) to lb (exclusive)
-            UnsignedIntType bits0ToLBExcl = ((UnsignedIntType { 1U } << static_cast<unsigned>(lb)) - 1U);
+            UnsignedIntType bits0ToLBExcl =
+                ((UnsignedIntType{1U} << static_cast<unsigned>(lb)) - 1U);
 
             return static_cast<IntType>(bits0ToHB - bits0ToLBExcl);
         }
@@ -56,7 +58,7 @@ struct IntToFloatPrecisionHelper
     /// @brief Returns the maximum integer value that is representable by a floating-point type
     static constexpr IntType getMaximumRepresentableValue()
     {
-        constexpr int intDigits { std::numeric_limits<IntType>::digits };
+        constexpr int intDigits{std::numeric_limits<IntType>::digits};
 
         // Float max > int max? (only matters for std::float16_t)
         if constexpr (fpMaxExponent <= intDigits)
@@ -97,7 +99,7 @@ struct IntToFloatPrecisionHelper
         }
         else
         {
-            constexpr int intDigits { std::numeric_limits<IntType>::digits };
+            constexpr int intDigits{std::numeric_limits<IntType>::digits};
 
             if (fpMaxExponent > intDigits)
             {
@@ -163,23 +165,23 @@ struct IntToFloatPrecisionHelper
 
         // do the digit span test
         using UnsignedIntType = std::make_unsigned_t<IntType>;
-        const UnsignedIntType u { static_cast<UnsignedIntType>(v) };
+        const UnsignedIntType u{static_cast<UnsignedIntType>(v)};
 
         // handle 0 - always representable by a float
         if (u == 0U)
             return true;
 
         // highest and lowest set bit indexes
-        const int hb { std::bit_width(u) - 1 };
-        const int lb { std::countr_zero(u) };
+        const int hb{std::bit_width(u) - 1};
+        const int lb{std::countr_zero(u)};
 
         // check if the span of set bits fits in the float mantissa
-        const int spanBits { hb - lb + 1 };
+        const int spanBits{hb - lb + 1};
         return spanBits <= fpNumDigits;
     }
 };
 
-template <typename FloatType, typename IntType>
+template<typename FloatType, typename IntType>
 constexpr bool isPreciselyRepresentableByFloatingPointType(IntType v)
 {
     return IntToFloatPrecisionHelper<
@@ -188,7 +190,6 @@ constexpr bool isPreciselyRepresentableByFloatingPointType(IntType v)
         IntType>::isPreciselyRepresentable(v);
 }
 
-
-}
+} // namespace Slang
 
 #endif

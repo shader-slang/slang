@@ -9,6 +9,7 @@ void funcUint16(uint16_t x) {}
 void funcUint32(uint x) {}
 void funcUint64(uint64_t x) {}
 void funcHalf(half x) {}
+void funcBool(bool x) {}
 
 int8_t returnOverflow() { return 256; }
 //CHECK:                         ^^^ integer constant overflow in conversion
@@ -84,6 +85,8 @@ void computeMain()
     // reinterpreted as unsigned, so no integer-constant-overflow fires.
     funcInt64(9223372036854775808);
 //CHECK:      ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+//CHECK:      ^^^^^^^^^^^^^^^^^^^ integer constant overflow in conversion
+//CHECK:      ^^^^^^^^^^^^^^^^^^^ integer value '9223372036854775808' does not fit in type 'int64_t'
     funcUint64(9223372036854775808);
 //CHECK:       ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
@@ -101,15 +104,57 @@ void computeMain()
     funcHalf(2048);
 
     // Half is excluded from the integer overflow check (getMaximumTypeBitSize
-    // returns 0 for half). Values beyond 16-bit integers still don't trigger
-    // the integer overflow warning, but do trigger the general implicit
-    // conversion warning since they exceed half's exact integer range.
+    // returns 0 for half), but we still check that the integer value must be in range of half
     funcHalf(131072);
 //CHECK:     ^^^^^^ implicit conversion not recommended: value out of range
 //CHECK:     ^^^^^^ value '131072' out of range in conversion to 'half'
 
-    // Bit-width boundary: max values that fit exactly in the type's bit width
+    // decimal values must be within range
     funcInt8(255);
+//CHECK:     ^^^ integer constant overflow in conversion
+//CHECK:     ^^^ integer value '255' does not fit in type 'int8_t'
+
+    funcUint8(-128);
+//CHECK:       ^^^ integer constant overflow in conversion
+//CHECK:       ^^^ integer value '-128' does not fit in type 'uint8_t'
+
+
+    // non-decimal values are allowed to exceed the type range as long as the
+    // bit pattern fits in the type bits
+    funcInt8(0xff);
+    funcInt8(0xffU);
+    funcInt8(0b11111111);
+    funcInt8(0b11111111U);
+
+    funcUint8(-0x80); // -128 == 0x80 is ok, since hex base is used
+    funcUint8(~0x7f); // -128 == 0x80 is ok, since hex base is used
+
+    // '~' turns the number into "hex-originated", since it's a bitwise op
+    // so these don't trigger diagnostics
+    funcUint8(~3U);
+    funcUint8(~3);
+    funcInt8(~3U);
+    funcInt8(~3);
+
+    // ... but these do, since they don't fit in int8_t/uint8_t. However,
+    // depending on the target signedness, the number is reported either as
+    // signed or unsigned int (matching target)
+    funcUint8(~128U);
+//CHECK:       ^^^^ integer constant overflow in conversion
+//CHECK:       ^^^^ integer value '4294967167' does not fit in type 'uint8_t'
+
+    funcUint8(~128);
+//CHECK:       ^^^ integer constant overflow in conversion
+//CHECK:       ^^^ integer value '4294967167' does not fit in type 'uint8_t'
+
+    funcInt8(~128U);
+//CHECK:      ^^^^ integer constant overflow in conversion
+//CHECK:      ^^^^ integer value '-129' does not fit in type 'int8_t'
+
+    funcInt8(~128);
+//CHECK:      ^^^ integer constant overflow in conversion
+//CHECK:      ^^^ integer value '-129' does not fit in type 'int8_t'
+
     funcUint32(4294967295u);
 
     // Positive values outside the signed range but within the type's bit width
@@ -118,20 +163,50 @@ void computeMain()
     // where hex constants serve as bit patterns
     // (e.g. packed bytes: int x = 0xFF030206).
     funcInt32(0xFFFFFFFFu);
+
+    funcInt8(127);  // ok: value in range
+    funcInt8(127U); // ok: signedness mismatch but value in range
+
+    funcInt8(0x80);  // ok: bitwise literal
+    funcInt8(0x80U); // ok: signedness mismatch but bitwise literal
+    funcInt8(128U);
+//CHECK:     ^^^^ integer constant overflow in conversion
+//CHECK:     ^^^^ integer value '128' does not fit in type 'int8_t'
     funcInt8(128);
-    funcInt16(40000);
+//CHECK:     ^^^ integer constant overflow in conversion
+//CHECK:     ^^^ integer value '128' does not fit in type 'int8_t'
 
-    // Negative boundary for unsigned: -128 fits in 8 bits (two's complement),
-    // so no overflow warning fires despite not being representable in [0, 255].
-    funcUint8(-128);
+    funcInt16(0x8000); // ok: bitwise literal
+    funcInt16(32768);
+//CHECK:      ^^^^^ integer constant overflow in conversion
+//CHECK:      ^^^^^ integer value '32768' does not fit in type 'int16_t'
 
-    // -2 to unsigned: bit-width fits and getImplicitConversionCostWithKnownArg
-    // reduces cost below kConversionCost_Default, so no warning from either check.
     funcUint32(-2);
+//CHECK:        ^ integer constant overflow in conversion
+//CHECK:        ^ integer value '-2' does not fit in type 'uint'
 
     // -1 to unsigned is allowed (common "all ones" pattern)
     funcUint32(-1);
     funcUint8(-1);
+
+    // A `bool` target is a truth value rather than a two-valued integer: 2
+    // converts to `true` instead of overflowing, so integer -> bool is
+    // reported as a general unrecommended conversion and never as an overflow.
+    funcBool(0);
+//CHECK:     ^ implicit conversion not recommended
+//CHECK:     ^ implicit conversion from 'int' to 'bool' is not recommended
+    funcBool(1);
+//CHECK:     ^ implicit conversion not recommended
+//CHECK:     ^ implicit conversion from 'int' to 'bool' is not recommended
+    funcBool(2);
+//CHECK:     ^ implicit conversion not recommended
+//CHECK:     ^ implicit conversion from 'int' to 'bool' is not recommended
+    funcBool(256);
+//CHECK:     ^^^ implicit conversion not recommended
+//CHECK:     ^^^ implicit conversion from 'int' to 'bool' is not recommended
+    bool bv = 1;
+//CHECK:      ^ implicit conversion not recommended
+//CHECK:      ^ implicit conversion from 'int' to 'bool' is not recommended
 
     // Explicit casts should NOT warn (handled as ExplicitCoercion)
     int8_t y = int8_t(256);
