@@ -75,6 +75,12 @@ protected:
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
         SLANG_OVERRIDE;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) SLANG_OVERRIDE;
+
+    /// If `inst` carries a coherent memory qualifier, emit its HLSL spelling
+    /// (`globallycoherent`) followed by `separator` (a newline for a variable
+    /// declaration, a space when the qualifier prefixes a function parameter), and
+    /// return true; otherwise emit nothing and return false.
+    bool maybeEmitMemoryQualifier(IRInst* inst, const char* separator);
     virtual void emitParamTypeModifier(IRType* type) SLANG_OVERRIDE
     {
         emitMatrixLayoutModifiersImpl(type);
