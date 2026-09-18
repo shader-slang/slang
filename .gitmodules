@@ -80,3 +80,6 @@
 [submodule "external/replxx"]
 	path = external/replxx
 	url = https://github.com/AmokHuginnsson/replxx
+[submodule "external/slang-user-skills"]
+	path = external/slang-user-skills
+	url = https://github.com/shader-slang/slang-user-skills.git

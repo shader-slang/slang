@@ -6,8 +6,13 @@ slangc's -report-perf-benchmark timers are nested:
     compileInner
       frontEndExecute ── parseTranslationUnit, SemanticChecking, generateIR
       generateOutput ─── linkAndOptimizeIR ── specializeModule, simplifyIR, linkIR,
-                                               unrollLoopsInModule, legalize*, inlining*
-                         emitEntryPointsSourceFromIR
+                                               unrollLoopsInModule, legalize*, inlining*,
+                                               deferBufferLoad, simplifyNonSSAIR
+
+  On a SOURCE target (metal/wgsl/hlsl/glsl/cuda) `emitEntryPointsSourceFromIR`
+  sits BETWEEN generateOutput and linkAndOptimizeIR -- it calls it. With
+  `-emit-spirv-directly` there is no such timer and linkAndOptimizeIR hangs
+  directly off generateOutput. lib/buckets.tree_for picks the shape per run.
 
 A parent's time is usually larger than the sum of its named children; the gap is
 real work with no dedicated timer (e.g. the autodiff IR transform shows up as
@@ -34,7 +39,7 @@ sys.path.insert(0, HERE)  # allow running from any directory
 
 from lib import analyze, corpus, manifest
 
-from lib.buckets import (TREE, BUCKET_ORDER, BUCKET_COLOR, API_TREE,
+from lib.buckets import (TREE, SOURCE_TREE, tree_for, BUCKET_ORDER, BUCKET_COLOR, API_TREE,
                          API_BUCKET_ORDER, buckets, api_buckets, timer_ms)
 
 
@@ -118,7 +123,10 @@ def tree_view(runs, workload):
                 print(f"{'  ' * (depth + 1)}{'(self / unnamed)':30s}"
                       f"{self_ms:9.1f} ms  ({100*self_ms/ci:5.1f}%)")
 
-    show(TREE, 0)
+    # tree_for, not TREE: on a source target emitEntryPointsSourceFromIR is
+    # the PARENT of linkAndOptimizeIR, and printing them as siblings shows
+    # the same milliseconds twice.
+    show(tree_for(timers), 0)
 
 
 def render_stacked_svg(runs, label, metric):

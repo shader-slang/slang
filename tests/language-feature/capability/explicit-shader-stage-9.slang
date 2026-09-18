@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -allow-glsl -stage raygeneration -profile sm_6_5
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -stage raygeneration -profile sm_6_5
 
 // Our code compiles here since 'raygeneration' stage implies 'raygen+raytracing' capabilities
 //CHECK-NOT: warning[E36113]

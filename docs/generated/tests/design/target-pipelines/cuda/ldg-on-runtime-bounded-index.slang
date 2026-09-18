@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#lowerimmutablebufferloadforcuda
-//META: doc_section_digest=372c7f6b7656c8bbbab96f3db229bae75b2d8ca93faa1c4e767d89f31a2c3386
+//META: doc_section_digest=031d306ccbb9670357e2a8af6d7e786afcb208ea0c4a357ccf9a309fc8034205
 //META: purpose=Verifies lowerImmutableBufferLoadForCUDA still emits __ldg when the index is a runtime-bounded value sourced from another buffer.
 //META: intent=boundary
 //META: pipeline_stage=emit

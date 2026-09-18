@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -allow-glsl -profile sm_5_0
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -profile sm_5_0
 
 // Our code does not warn here since we specify profile 'sm_5_0' and a raygen shader.
 // raygen implicitly uses "raygen + raytracing" capabilities

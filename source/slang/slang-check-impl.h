@@ -967,9 +967,6 @@ struct SharedSemanticsContext : public RefObject
 
     DiagnosticSink* m_sink = nullptr;
 
-    // Whether the current module has imported the GLSL module.
-    ModuleDecl* glslModuleDecl = nullptr;
-
     /// (optional) modules that comes from previously processed translation units in the
     /// front-end request that are made visible to the module being checked. This allows
     /// `import` to use them instead of trying to find the files in file system.
@@ -1023,20 +1020,33 @@ struct SharedSemanticsContext : public RefObject
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
 
-    // Whether the `glsl` module has been imported into this checking session. Set when the
-    // `glsl` import is handled (see `importModuleIntoScope`), rather than scanning the imported
-    // module list on demand, because the builtin-operator fast path consults
-    // `isGLSLOperatorScope()` for every operator expression.
-    bool m_isGLSLModuleImported = false;
+    /// Whether semantic checking has imported the `glsl` module.
+    bool m_hasImportedGLSLModule = false;
 
 public:
-    /// Is the current checking session in GLSL operator scope? True when `-allow-glsl` is set or
-    /// the `glsl` module has been imported (its overloads give builtin operators GLSL semantics).
-    bool isGLSLOperatorScope()
+    /// Whether the translation unit being checked uses the GLSL source language.
+    ///
+    /// A null translation-unit request denotes a module/reflection checking context that has no
+    /// parser-language provenance, so it cannot establish GLSL source semantics and returns false.
+    bool isGLSLSourceLanguage()
     {
-        return getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL) ||
-               m_isGLSLModuleImported;
+        if (!m_translationUnitRequest)
+        {
+            // Reflection, specialization, and API expression-checking contexts can perform
+            // semantic work without originating in a parsed translation unit. Such a context has
+            // no source-language provenance, so it must not enable GLSL-specific semantic rules.
+            return false;
+        }
+
+        return m_translationUnitRequest->sourceLanguage == SourceLanguage::GLSL;
     }
+
+    /// Whether builtin operators should use the legacy GLSL operator rules.
+    ///
+    /// Actual GLSL source always uses those rules. For backward compatibility, explicitly
+    /// importing the `glsl` module into non-GLSL source also opts operator checking into them
+    /// without changing the source language or parser behavior.
+    bool isGLSLOperatorScope() { return isGLSLSourceLanguage() || m_hasImportedGLSLModule; }
 
 private:
     static SlangLanguageVersion _getModuleLanguageVersion(Module* module)
@@ -2349,6 +2359,15 @@ public:
         ConversionCost* outCost,
         TypeCoercionWitness** outWitnessOfConversion);
 
+    /// Determine whether an unscoped enum may implicitly convert to the builtin
+    /// scalar type `toType`. This is an HLSL-compatibility widening: it holds
+    /// only for an enum that `isUnscopedEnum`
+    /// accepts (one carrying `UnscopedEnumAttribute`, from either `-unscoped-enum`
+    /// or an explicit `[UnscopedEnum]` — see that predicate for the exact routes),
+    /// in a translation unit using the HLSL-flavored dialect, and never for `bool`
+    /// (which already has its own implicit conversion from any `__EnumType`).
+    bool isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType);
+
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
     ///
     /// If conversion is possible, returns `true` and sets `outCost` to the cost
@@ -3633,6 +3652,12 @@ public:
 
         // Full list of all candidates being considered, in the ambiguous case
         List<OverloadCandidate> bestCandidates;
+
+        // Generic candidates whose recorded inference failure is a constraint failure (an
+        // unsatisfied interface conformance or `where`-clause). Status-based pruning usually keeps
+        // them out of `bestCandidates`, so they are retained here purely to render notes on the "no
+        // overload applicable" error (issue #12965); this list never participates in selection.
+        List<OverloadCandidate> constraintFailedGenericCandidates;
     };
 
     struct ParamCounts
@@ -4219,6 +4244,7 @@ public:
 
     Expr* visitThisExpr(ThisExpr* expr);
     Expr* visitThisTypeExpr(ThisTypeExpr* expr);
+    Expr* visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr* expr);
     Expr* visitThisInterfaceExpr(ThisInterfaceExpr* expr);
     Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr);
     Expr* visitReturnValExpr(ReturnValExpr* expr);
@@ -4305,6 +4331,47 @@ private:
         Expr* rightArg,
         Expr*& outLeftArg,
         Expr*& outRightArg);
+
+    /// The scalar family (integer, floating-point, or boolean) that an operand element type is
+    /// known to belong to for the purposes of the builtin-operator fast path. All three fields
+    /// are false when the type is not known to belong to any of them.
+    struct BuiltinArithmeticElementFamily
+    {
+        bool isInteger = false;
+        bool isFloat = false;
+        // True only for a genuinely `bool`-typed element: the concrete-type branch of
+        // `classifyBuiltinArithmeticElementType` sets this from `baseType == BaseType::Bool`
+        // directly. There is no sealed marker interface implemented by `bool` alone --
+        // `__BuiltinLogicalType` (see `isLogical` below) is implemented by `bool` AND every
+        // builtin integer type -- so a generic type parameter can never prove `isBool`; only a
+        // concrete `bool` operand can. Required for unary logical-not (`!`), whose result must
+        // be `bool`-shaped: taking the fast path for a `__BuiltinLogicalType`-constrained
+        // generic instantiated with an integer would build a `Not` node typed as that integer.
+        bool isBool = false;
+        // True for a *generic* element type that conforms to `__BuiltinLogicalType` (`bool` and
+        // every builtin integer type; see core.meta.slang) -- the concrete-type branch never sets
+        // this, since a concrete `bool`/integer is already fully classified by `isBool`/
+        // `isInteger`. Safe for an operator whose builtin semantics don't depend on which of
+        // those the element actually is, e.g. equality (`==`/`!=`, which lower to the same
+        // `kIROp_Eql`/`kIROp_Neq` regardless): a generic parameter constrained only to
+        // `__BuiltinLogicalType` still needs equality fast-pathed, but must NOT take the
+        // logical-not fast path -- that's exactly why this is a separate flag from `isBool`
+        // rather than folded into it.
+        bool isLogical = false;
+        bool isKnown() const { return isInteger || isFloat || isBool || isLogical; }
+    };
+
+    /// Classifies `elementType`'s scalar family for the builtin-operator fast path in
+    /// `convertToBuiltinArithmeticOp`. A concrete `BasicExpressionType` (`int`, `float`, `bool`,
+    /// ...) is classified directly from `BaseTypeInfo`. A generic type parameter constrained to
+    /// one of the `[sealed]` builtin marker interfaces (`__BuiltinIntegerType`,
+    /// `__BuiltinFloatingPointType`, `__BuiltinLogicalType`; see core.meta.slang) is classified
+    /// the same way: those interfaces are sealed, so only the compiler's own builtin scalar types
+    /// can conform to them, which means every legal instantiation of such a parameter is itself a
+    /// `BasicExpressionType` of that family, even though the parameter is not one yet. Any other
+    /// type (aggregates, an unconstrained or differently-constrained generic parameter, etc.)
+    /// classifies as unknown, which the caller treats as "not eligible for the fast path."
+    BuiltinArithmeticElementFamily classifyBuiltinArithmeticElementType(Type* elementType);
 
     // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either
     // `-allow-glsl` is set, or the `glsl` module is in scope (its `operator*` overloads

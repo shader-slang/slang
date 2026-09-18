@@ -1,20 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8[1m]
-//META: generated_at=2026-06-11T14:00:00+00:00
-//META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
+//META: model=gpt-5.6-sol
+//META: generated_at=2026-09-18T09:14:37+00:00
+//META: source_commit=55e3dbdd739d0fa97570be60754f7c2543321d7c
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#dispatchers-and-existential-specialization
 //META: doc_section_digest=ce4222b88f152eca2d447fe87928f2933e7dd7c80a82eede281299e44001afc3
 //META: purpose=An interface value assigned one of two concrete conformers on different paths lowers to a dynamic-dispatch switch over the runtime tag.
 //META: intent=characterization
-//META: covers=source/slang/slang-ir-typeflow-specialize.cpp
+//META: covers=source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Characterizes the success path of the typeflow specialization pass: when an
-// interface object can hold two conformers depending on control flow, the pass
-// builds a tagged-union dispatch rather than monomorphizing. CHECK asserts the
-// emitted CUDA contains a `s_dispatch_IShape_area_*` function with a
-// `switch(...)` over the runtime tag, proving dynamic dispatch was generated.
+// Characterizes closed-world dynamic dispatch after its synthesized dispatcher
+// is force-inlined. CHECK finds the runtime-tag switch inside computeMain and
+// both concrete area calls, proving neither control-flow path was folded away.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cuda -entry computeMain -stage compute
 
@@ -31,5 +29,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     else { Square sq; sq.s = 3.0; shape = sq; }
     outputBuffer[0] = shape.area();
 }
-// CHECK-DAG: s_dispatch_IShape_area_{{[0-9]+}}(
-// CHECK-DAG: switch(
+// CHECK-LABEL: void computeMain(
+// CHECK: switch(
+// CHECK-DAG: Circle_area_
+// CHECK-DAG: Square_area_

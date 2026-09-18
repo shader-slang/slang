@@ -2,7 +2,9 @@
 """Slang compile-time perf-suite runner.
 
 Drives a given slangc over the workloads in manifest.py, parses the per-phase
-timers emitted by -report-perf-benchmark, and writes per-run JSON: a summary
+timers emitted by -report-detailed-perf-benchmark (per-binary fallback to
+the base -report-perf-benchmark via resolve_perf_flag, for a slangc that
+predates the detailed flag), and writes per-run JSON: a summary
 (median/min/max/mean/stdev/n) AND the raw samples per timer; merge-on-write.
 
 Stdlib only (no prettytable / numpy) so it runs unchanged against any release's
@@ -17,7 +19,9 @@ Examples:
         --only autodiff --samples 7
 """
 import argparse
+import contextlib
 import ctypes  # for the Win32 peak-RSS struct; import is safe on every platform
+import io
 import json
 import os
 import re
@@ -137,10 +141,136 @@ def stats(values):
     }
 
 
-# Base flag (not -report-detailed-perf-benchmark): the base flag already emits
-# every phase timer the suite uses and is supported across the whole release
-# window; the detailed flag was added mid-window and only adds finer sub-timers.
+# The timer flag, resolved per binary by `resolve_perf_flag`.
+#
+# `-report-detailed-perf-benchmark` is preferred and is what the suite asks for:
+# it emits every timer the base flag does, with IDENTICAL meaning, plus one
+# sub-timer per `SLANG_PASS` inside `linkAndOptimizeIR`. Without it the whole
+# target-specific back end — `deferBufferLoad`, `simplifyNonSSAIR`,
+# `legalizeIRForMetal`, `lowerCombinedTextureSamplers`, ~60 more — collapses
+# into the single `linkAndOptimizeIR (self)` residual and a regression there
+# cannot be attributed to a pass. Measured overhead is <= 1% of compileInner
+# (12-sample A/B, codegen/spirv and a resource-heavy CUDA compile), i.e. inside
+# run-to-run noise, so it does not break the series.
+#
+# The base flag stays as the fallback because `sweep.py` re-measures release
+# binaries going back to the window start, and the detailed flag was added
+# mid-window. `resolve_perf_flag` probes each binary ONCE and remembers the
+# answer, so a release that predates the flag still measures (with the coarse
+# timer set) instead of failing.
 PERF_FLAG = "-report-perf-benchmark"
+DETAILED_PERF_FLAG = "-report-detailed-perf-benchmark"
+
+# slangc path -> flag it accepts. Populated by resolve_perf_flag.
+_PERF_FLAG_CACHE = {}
+
+
+def _detailed_flag_supported(help_text):
+    """Whether `-help` output demonstrates the binary accepts
+    DETAILED_PERF_FLAG. Factored out of resolve_perf_flag so the pure
+    substring decision can be pinned by an import-time self-check
+    independent of spawning a real slangc."""
+    return DETAILED_PERF_FLAG in help_text
+
+
+def _schema_of(timed):
+    """The "timer_schema" label for a built command list: "detailed" if it
+    requested DETAILED_PERF_FLAG, "coarse" otherwise -- including an api-mode
+    `timed`, which carries neither perf flag (see build_commands) and so is
+    always "coarse". daily_movers._comparable_buckets depends on this label
+    to fold DETAIL_ONLY_BUCKETS across a schema transition; a bucket wrongly
+    labeled here would defeat that fold silently."""
+    return "detailed" if DETAILED_PERF_FLAG in timed else "coarse"
+
+
+def resolve_perf_flag(slangc):
+    """Return the most detailed timer flag `slangc` accepts.
+
+    Probed by compiling nothing at all: `-help` prints the option table, so a
+    binary that predates the detailed flag is detected without running a
+    compile - and without the probe's own timings ever being mistaken for a
+    sample.
+
+    The result is cached per binary path ONLY when the probe actually ran
+    (success or a binary-level OSError, e.g. not executable): both are
+    permanent properties of that path, so a repeat probe would just repeat
+    the answer. A subprocess.SubprocessError (a probe timeout on a loaded
+    machine, most likely) is NOT cached -- that is a property of this one
+    probe attempt, not of the binary, and caching it would silently degrade
+    every remaining workload in the run to the coarse timer set over one
+    slow probe. The next call retries instead.
+    """
+    cached = _PERF_FLAG_CACHE.get(slangc)
+    if cached:
+        return cached
+    flag = PERF_FLAG
+    try:
+        res = subprocess.run([slangc, "-help"], capture_output=True, text=True, timeout=60)
+        if _detailed_flag_supported(res.stdout + res.stderr):
+            flag = DETAILED_PERF_FLAG
+        _PERF_FLAG_CACHE[slangc] = flag
+    except OSError:
+        # A binary we cannot even exec will fail loudly a moment later at
+        # the real compile; guessing the detailed flag here would only turn
+        # that into a confusing option error instead. Cached: this is a
+        # permanent property of `slangc`'s path, so retrying would not help.
+        _PERF_FLAG_CACHE[slangc] = flag
+    except subprocess.SubprocessError:
+        pass  # transient (e.g. TimeoutExpired) -- not cached, see docstring
+    return flag
+
+
+# Import-time self-checks for the three resolve_perf_flag/timer-schema
+# behaviors that had none: the pure -help substring decision, the per-binary
+# cache hit, and the schema label (including the api-mode "carries neither
+# flag" case). A silent regression in any of these produces a plausible-but-
+# wrong chart (every detail-only band quietly vanishing) rather than a loud
+# failure, which is exactly the failure mode this file's other 30+ import-
+# time asserts already guard against elsewhere.
+assert _detailed_flag_supported("... -report-detailed-perf-benchmark ...")
+assert not _detailed_flag_supported("... -report-perf-benchmark ...")
+_PERF_FLAG_CACHE["__self_check_fake_slangc__"] = DETAILED_PERF_FLAG
+assert resolve_perf_flag("__self_check_fake_slangc__") == DETAILED_PERF_FLAG, \
+    "resolve_perf_flag must return a cached answer without probing"
+del _PERF_FLAG_CACHE["__self_check_fake_slangc__"]
+# The two except branches' distinct caching behavior, checked directly rather
+# than only asserted in a comment. OSError uses a real nonexistent path
+# (FileNotFoundError is immediate -- no need to wait out the 60s subprocess
+# timeout resolve_perf_flag itself uses). SubprocessError is monkeypatched:
+# a real probe timeout would mean waiting 60s at import time, which
+# check-python-core.yml cannot afford.
+_bad_path = "__self_check_this_binary_does_not_exist__"
+assert _bad_path not in _PERF_FLAG_CACHE
+resolve_perf_flag(_bad_path)
+assert _bad_path in _PERF_FLAG_CACHE, \
+    "resolve_perf_flag: OSError (binary cannot exec) must be cached -- a permanent " \
+    "property of the path, so retrying would not help"
+del _PERF_FLAG_CACHE[_bad_path], _bad_path
+
+_orig_subprocess_run = subprocess.run
+
+
+def _self_check_raise_timeout(*_args, **_kwargs):
+    raise subprocess.TimeoutExpired(cmd="slangc", timeout=60)
+
+
+subprocess.run = _self_check_raise_timeout
+try:
+    _timeout_path = "__self_check_simulated_probe_timeout__"
+    resolve_perf_flag(_timeout_path)
+    assert _timeout_path not in _PERF_FLAG_CACHE, \
+        "resolve_perf_flag: a SubprocessError (e.g. a probe timeout) must NOT be " \
+        "cached -- transient, a property of this one attempt, not of the binary, so " \
+        "the next call should retry rather than silently degrading the rest of the " \
+        "run to the coarse timer set"
+finally:
+    subprocess.run = _orig_subprocess_run
+del _self_check_raise_timeout, _orig_subprocess_run, _timeout_path
+
+assert _schema_of([PERF_FLAG, "in.slang"]) == "coarse"
+assert _schema_of([DETAILED_PERF_FLAG, "in.slang"]) == "detailed"
+assert _schema_of(["api-driver.exe", "libslang.dll", "session-create"]) == "coarse", \
+    "an api-mode command carries neither perf flag and must still resolve to coarse"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -274,7 +404,8 @@ def api_driver_supports_out_dir(driver):
     return b"--out-dir" in r.stdout
 
 
-def build_commands(slangc, spec, src_dir, files, out_dir, size=None, api=None):
+def build_commands(slangc, spec, src_dir, files, out_dir, size=None, api=None,
+                   perf_flag=PERF_FLAG):
     """Return (commands, primary_outfile_for_parsing_index).
 
     `src_dir` holds the workload's .slang sources and is treated as READ-ONLY;
@@ -309,7 +440,7 @@ def build_commands(slangc, spec, src_dir, files, out_dir, size=None, api=None):
         out = os.path.join(out_dir, "out.slang-module")
         return {
             "setup": [],
-            "timed": [slangc, PERF_FLAG, os.path.join(src_dir, f),
+            "timed": [slangc, perf_flag, os.path.join(src_dir, f),
                       *spec.extra_flags, "-o", out],
         }
     if spec.mode == "link":
@@ -331,7 +462,7 @@ def build_commands(slangc, spec, src_dir, files, out_dir, size=None, api=None):
         for d in (out_dir, src_dir):
             if d not in includes:
                 includes += ["-I", d]
-        timed = [slangc, PERF_FLAG, *includes,
+        timed = [slangc, perf_flag, *includes,
                  os.path.join(src_dir, main), *spec.extra_flags, "-o", out]
         return {"setup": setup, "timed": timed}
     # "target" mode: single or multi-file compile to a GPU target. For single-file
@@ -349,7 +480,7 @@ def build_commands(slangc, spec, src_dir, files, out_dir, size=None, api=None):
     # -I src_dir lets multi-file corpora resolve imports; harmless for single files
     return {
         "setup": [],
-        "timed": [slangc, PERF_FLAG, "-I", src_dir, os.path.join(src_dir, f),
+        "timed": [slangc, perf_flag, "-I", src_dir, os.path.join(src_dir, f),
                   *extra, "-o", out],
     }
 
@@ -554,6 +685,79 @@ def real_error(text, benign=_BENIGN):
     return None
 
 
+# The platform's two representations of slangc's intentional exit(-1)
+# compile-error exit (see classify_sample's docstring for why exactly these
+# two, and only these two). Module-level so both the classifier and its
+# self-check reference the same value rather than restating it.
+_EXIT_NEGATIVE_ONE = (255, 0xFFFFFFFF)
+
+
+def classify_sample(rc, text, expected_diags, benign):
+    """Classify one compiled sample from its exit code and combined output.
+
+    Returns (ok, missing, is_crash):
+      missing   -- expected_diags entries not found in `text`: a diagnostic
+                   the workload declares it emits, but didn't this sample.
+      is_crash  -- whether `rc` indicates the process crashed rather than
+                   exited normally. `rc > 1 or rc < 0` is the crash signature
+                   (see run_spec's comment for the platform-specific values),
+                   EXCEPT when every expected diagnostic is present, no
+                   unexpected error was seen, AND rc is one of
+                   _EXIT_NEGATIVE_ONE -- slangc's intentional, non-portable
+                   exit(-1) for a workload that is SUPPOSED to fail the
+                   compile, not a crash. A crash occurring after slangc had
+                   already printed every expected diagnostic still counts as
+                   a crash: is_crash checks `rc` first and only consults the
+                   expected-failure override for the two exact values it
+                   covers, so an unrelated crash code cannot be excused by
+                   incidentally-complete diagnostic text.
+      ok        -- False if is_crash. Otherwise: for a workload with no
+                   expected_diags, True iff no unexpected compile error was
+                   seen (the ordinary case). For a workload WITH
+                   expected_diags, a clean compile is itself the failure
+                   mode this workload exists to catch, so `ok` does not
+                   require `real_error` to be None there -- only that every
+                   expected diagnostic appeared (`missing` is empty).
+    """
+    missing = [c for c in expected_diags if c not in text]
+    expected_failure = (bool(expected_diags) and not missing
+                         and real_error(text, benign) is None
+                         and rc in _EXIT_NEGATIVE_ONE)
+    is_crash = (rc > 1 or rc < 0) and not expected_failure
+    if is_crash:
+        return False, missing, True
+    ok = real_error(text, benign) is None and not missing
+    return ok, missing, False
+
+
+# Import-time self-check for classify_sample, the pure core of run_spec's
+# sample-classification logic -- otherwise untested, and the PR that added
+# it exists specifically to stop this class of subtle logic rotting silently
+# (see report_suite_health's self-check above for the same rationale applied
+# to the other new logic in this file).
+assert classify_sample(0, "no diagnostics here", [], ()) == (True, [], False), \
+    "classify_sample: an ordinary clean compile with no expected diagnostics is ok"
+assert classify_sample(0, "no diagnostics here", ["E30019"], ()) == (False, ["E30019"], False), \
+    "classify_sample: a clean compile IS the failure mode for a workload with expected_diags"
+assert classify_sample(255, "error[E30019]: type mismatch in expression", ["E30019"],
+                        ("E30019",)) == (True, [], False), \
+    "classify_sample: rc==255 with every expected diagnostic present is the intended " \
+    "exit(-1), not a crash"
+assert classify_sample(0xFFFFFFFF, "error[E30019]: type mismatch in expression",
+                        ["E30019"], ("E30019",)) == (True, [], False), \
+    "classify_sample: rc==0xFFFFFFFF (Windows) with every expected diagnostic present " \
+    "is the intended exit(-1), not a crash"
+assert classify_sample(-11, "error[E30019]: type mismatch in expression", ["E30019"],
+                        ("E30019",)) == (False, [], True), \
+    "classify_sample: a genuine crash code (POSIX SIGSEGV) must count as a crash even " \
+    "when the expected diagnostic text is fully present -- the override is scoped to " \
+    "_EXIT_NEGATIVE_ONE, not to 'diagnostics look complete'"
+assert classify_sample(0xC0000005, "error[E30019]: type mismatch in expression",
+                        ["E30019"], ("E30019",)) == (False, [], True), \
+    "classify_sample: a genuine Windows crash code (STATUS_ACCESS_VIOLATION) must " \
+    "count as a crash even when the expected diagnostic text is fully present"
+
+
 def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
              prepared=False):
     src_dir = os.path.join(src_root, corpus.dir_name(spec, size))
@@ -591,7 +795,8 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
             "crash_codes": None,
         }
 
-    cmds = build_commands(slangc, spec, src_dir, files, out_dir, size=size, api=api)
+    cmds = build_commands(slangc, spec, src_dir, files, out_dir, size=size, api=api,
+                          perf_flag=resolve_perf_flag(slangc))
     # A failed setup step (e.g. a module that didn't precompile in link mode) must
     # fail the workload — otherwise the timed compile runs against missing inputs.
     setup_ok = True
@@ -606,6 +811,11 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
 
     benign = (_BENIGN_DOWNSTREAM_REQUIRED
               if getattr(spec, "downstream_required", False) else _BENIGN)
+    # A workload that is SUPPOSED to emit diagnostics (see
+    # WorkloadSpec.expected_diagnostics) declares their codes, which both stops
+    # them failing the run and — below — makes their disappearance fail it.
+    expected_diags = list(getattr(spec, "expected_diagnostics", []) or [])
+    benign = tuple(benign) + tuple(expected_diags)
 
     timed = cmds["timed"]
     for _ in range(warmup):
@@ -622,31 +832,71 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
     # independently make ok=False; crash_codes also fires as a third guard.
     sample_ok = []
     crash_codes = []
+    # Union over samples, not just the last one: the expected diagnostics have
+    # to be present in EVERY timed sample. Checking only the final text would
+    # let a run where the workload compiled clean four times and errored once
+    # report ok, which is the exact rot this guard exists to catch.
+    missing_diags = set()
     for _ in range(samples):
         rc, wall, text, rss = run_once(timed)
         last_text = text
-        # rc == 0: success; rc == 1: slangc-reported compile error (caught by
-        # real_error(), which marks the sample as failed). rc > 1 or
-        # rc < 0: slangc crashed or was killed by a signal (SIGSEGV=139, SIGABRT=134
-        # on Linux; large negative values on Windows — Python converts NTSTATUS codes
-        # such as 0xC0000005 to signed int: -1073741819). Exit code 2+ from usage errors
-        # won't occur here because the bench harness always builds valid invocations.
-        # Exclude crashed samples from timing stats; their wall time is meaningless.
-        if rc > 1 or rc < 0:
+        # rc == 0: success. rc == 1: portable slangc compile-error exit,
+        # caught by real_error() inside classify_sample. rc > 1 or rc < 0: a
+        # crash, excluded from timing stats since a crashed sample's wall
+        # time is meaningless. Exit code 2+ from usage errors won't occur
+        # here because the bench harness always builds valid invocations.
+        #
+        # Crash rc is platform-specific: on POSIX, _reap_posix sets it via
+        # os.waitstatus_to_exitcode, which returns -signal_number for a
+        # signal-terminated process (e.g. -11 SIGSEGV, -6 SIGABRT) -- always
+        # negative. On Windows, Popen.returncode is
+        # _winapi.GetExitCodeProcess's raw DWORD with no sign conversion, so a
+        # real crash (STATUS_ACCESS_VIOLATION 0xC0000005 and similar) is a
+        # large positive NTSTATUS value. See classify_sample's docstring for
+        # the expected-exit-vs-crash distinction this feeds into.
+        sample_is_ok, sample_missing, is_crash = classify_sample(
+            rc, text, expected_diags, benign)
+        missing_diags.update(sample_missing)
+        if is_crash:
             crash_codes.append(rc)
             sample_ok.append(False)
             continue
         walls.append(wall)
         if rss is not None:
             rsses.append(rss)
-        err = real_error(text, benign)
-        sample_ok.append(err is None)  # ok when no compile error
+        sample_ok.append(sample_is_ok)
         for name, ms in parse_timers(text).items():
             per_timer.setdefault(name, []).append(ms)
         for name, kb in parse_mem(text).items():
             per_mem.setdefault(name, []).append(kb)
 
     err = real_error(last_text, benign)
+
+    # The other half of the expected_diagnostics contract. Tolerating a code
+    # without requiring it is how `diagnostics_clean` rotted: it was built to
+    # measure diagnostic production, quietly stopped emitting any, and went on
+    # reporting a healthy green number that measured something else entirely.
+    # A workload that declares it emits E30019 and stops doing so is broken,
+    # not passing.
+    if missing_diags:
+        # Takes priority over whatever else the compile said. If the declared
+        # diagnostic is gone, every other symptom (a stray error, no timers,
+        # a non-zero exit) is downstream of that, and reporting one of those
+        # instead sends the reader looking in the wrong place.
+        err = ("expected diagnostics absent: " + ", ".join(sorted(missing_diags)) +
+               " - the workload no longer exercises what it claims to")
+
+    # Every declared primary timer should be a counter the compiler actually
+    # emits. `serialize` declared `writeSerializedModuleIR` for months while
+    # that function had no SLANG_PROFILE, so its headline could not respond to
+    # the regression it existed to catch. Reported rather than fatal: a release
+    # sweep measures old binaries that legitimately predate a newer timer.
+    # compileInner is exempt: it is the base -report-perf-benchmark wall-clock
+    # total, not a SLANG_PROFILE-gated pass timer, so its absence is not this
+    # check's failure mode -- it is already caught by got_timers/ok below.
+    missing_primary_timers = [t for t in spec.primary_timers
+                              if t != "compileInner" and t not in per_timer]
+
     got_timers = bool(per_timer)
     # A run that produced no timers and no recognizable diagnostic would report
     # a bare "no timers" with the actual output lost — surface the first output
@@ -654,7 +904,8 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
     # debuggable from results.json alone.
     if err is None and not got_timers:
         err = next((ln.strip()[:200] for ln in last_text.splitlines() if ln.strip()), None)
-    ok = setup_ok and got_timers and all(sample_ok) and not crash_codes
+    ok = (setup_ok and got_timers and all(sample_ok) and not crash_codes
+          and not missing_diags)
 
     return {
         "workload": spec.name,
@@ -664,6 +915,7 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         "ok": ok,
         "setup_ok": setup_ok,
         "got_timers": got_timers,
+        "missing_primary_timers": missing_primary_timers,
         "samples": samples,
         "warmup": warmup,
         "wall_ms": stats(walls),
@@ -675,7 +927,97 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         "cmd": " ".join(timed),
         "error": err,
         "crash_codes": crash_codes or None,
+        # Which timer set this run's compiler-phase buckets can be trusted at:
+        # "detailed" means -report-detailed-perf-benchmark's ~67 per-pass
+        # timers were requested (resolve_perf_flag probes per binary), so the
+        # buckets.py detail-only names (deferBufferLoad, simplifyNonSSAIR,
+        # lowerCombinedTextureSamplers, legalizeMatrixTypes) are real
+        # measurements when present and genuine zeros when absent. "coarse"
+        # means those four are structurally unmeasured, not zero, so
+        # daily_movers must not read a schema transition as a bucket move.
+        "timer_schema": _schema_of(timed),
     }
+
+
+# A workload's own cost has to clear the per-compile floor by enough that a
+# single perturbed sample cannot carry its median past the trend gate. The
+# suite's one false alarm in 73 nights (diagnostics_clean, 2026-09-10) was
+# exactly this: 23 ms total with ~9 ms of floor underneath it, so an absolute
+# excursion that is invisible on a 300 ms workload was 23% there. Reported
+# rather than fatal — the floor is machine-dependent, and a contributor
+# spot-checking one workload should not be failed for it.
+SIGNAL_FLOOR_RATIO = 3.0
+
+
+def report_suite_health(runs):
+    """Print, for this completed run, any workload declaring a primary timer
+    the compiler did not emit, and any tracked workload whose compileInner
+    median sits under SIGNAL_FLOOR_RATIO times the `minimal` floor -- the two
+    checks that would have caught `diagnostics_clean`'s dead noise-floor and
+    `serialize`'s missing timer when those workloads were added, rather than
+    months later."""
+    notes = []
+
+    for r in runs:
+        if r.get("missing_primary_timers"):
+            notes.append(
+                f"  {r['workload']}: declares primary timer(s) the compiler did not "
+                f"emit: {', '.join(r['missing_primary_timers'])}")
+
+    # Signal-vs-floor, which needs `minimal` measured in the same run.
+    floor = next((r["timers"]["compileInner"]["median"] for r in runs
+                  if r["workload"] == "minimal" and r["ok"]
+                  and r["timers"].get("compileInner")), None)
+    if floor:
+        for r in runs:
+            spec = manifest.BY_NAME.get(r["workload"])
+            if not r["ok"] or not spec or spec.mode == "api":
+                continue
+            if r["workload"] == "minimal":
+                continue  # minimal IS the floor; it cannot clear a multiple of itself
+            if r["size"] != spec.default_size:
+                continue  # only the tracked point has to clear the bar
+            st = r["timers"].get("compileInner")
+            if not st:
+                continue
+            if st["median"] < floor * SIGNAL_FLOOR_RATIO:
+                notes.append(
+                    f"  {r['workload']}: {st['median']:.1f} ms is under "
+                    f"{SIGNAL_FLOOR_RATIO:g}x the {floor:.1f} ms per-compile floor — "
+                    f"too little signal to survive the trend gate; raise default_size")
+
+    if notes:
+        print("\n[suite health] issues that make a workload unable to do its job:")
+        for n in notes:
+            print(n)
+
+
+# Import-time self-check for report_suite_health's two checks, which
+# otherwise have no test coverage (bench.py has no pytest/GPU harness; the
+# module-load assert is this package's test mechanism, per workloads.py's
+# established convention). "minimal" and "parse" are real manifest entries
+# so the mode/default_size gating in the floor loop runs as it would live.
+# "size" must equal each workload's manifest default_size, or the floor
+# loop's `if r["size"] != spec.default_size: continue` gate silently drops
+# the fixture and the second assertion below stops testing anything -- taken
+# from the manifest rather than hardcoded so a future default_size resize
+# (as this PR itself does to four workloads) cannot desync this fixture from
+# what it is meant to simulate.
+_HEALTH_RUNS = [
+    {"workload": "minimal", "ok": True, "size": manifest.BY_NAME["minimal"].default_size,
+     "missing_primary_timers": [], "timers": {"compileInner": {"median": 10.0}}},
+    {"workload": "parse", "ok": True, "size": manifest.BY_NAME["parse"].default_size,
+     "missing_primary_timers": ["writeSerializedModuleIR"],
+     "timers": {"compileInner": {"median": 20.0}}},  # under SIGNAL_FLOOR_RATIO x 10.0
+]
+with contextlib.redirect_stdout(io.StringIO()) as _out:
+    report_suite_health(_HEALTH_RUNS)
+_health_report = _out.getvalue()
+assert "writeSerializedModuleIR" in _health_report, \
+    "report_suite_health must flag a declared primary timer the compiler did not emit"
+assert "under" in _health_report and "per-compile floor" in _health_report, \
+    "report_suite_health must flag a workload whose median sits under the signal floor"
+del _HEALTH_RUNS, _out, _health_report
 
 
 def main():
@@ -911,6 +1253,8 @@ def main():
     # tree was passed in precisely so its contents survive for inspection.
     for d in scratch_roots:
         shutil.rmtree(d, ignore_errors=True)
+
+    report_suite_health(this_run)
 
     n_ok = sum(1 for r in this_run if r["ok"])
     print(f"\n{n_ok}/{len(this_run)} runs ok")
