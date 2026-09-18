@@ -27602,9 +27602,11 @@ interface IOpaqueDescriptor
 
 /// True when `T`'s `DescriptorHandle` uses the native `SPV_NV_bindless_texture` `uint64` representation
 /// on the current SPIR-V target: `spvBindlessTextureNV` is enabled and `T` is an encodable
-/// texture/sampler. This is the single source of the SPIR-V native-vs-heap-index representation decision,
-/// used by the ordering operators, the native-cast dispatch, the explicit-index conversion, and the
-/// `.Handle`-from-index diagnostic. The `case spirv:`/`default` arm keeps the switch's inferred SPIR-V
+/// texture/sampler. It pairs the capability check with the per-type `isBindlessTextureNVEncodable`
+/// predicate for call sites not already inside a `case spvBindlessTextureNV:` — e.g. a `static_assert`
+/// condition or a target-agnostic comparison. (The native-cast dispatch in `defaultGetDescriptorFromHandle`
+/// tests `isBindlessTextureNVEncodable` directly, since its arms already select the capability.) The
+/// `case spirv:`/`default` arm keeps the switch's inferred SPIR-V
 /// capability at `{spirv}`, so a caller does not inherit a spurious `spvBindlessTextureNV` requirement on
 /// the default model. `[ForceInline]` inlines the `__target_switch` at each call site so it folds to a
 /// compile-time constant — required both to use it as a `static_assert` condition and to let dead-branch
@@ -28251,29 +28253,6 @@ T getDescriptorFromExplicitHeapIndex<T:IOpaqueDescriptor>(uint2 handle)
 [ForceInline]
 T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
 {
-    // A native SPIR-V bindless texture/sampler handle is a `uint64` and must convert with the dedicated
-    // `SPV_NV_bindless_texture` opcode. The native cast runs ahead of the shared switch because the
-    // `spvDescriptorHeapEXT` arm below is more specialized (two capability atoms) and would otherwise be
-    // selected for the whole function under both capabilities, reinterpreting the `uint64` handle as a
-    // `uint2` heap index (issue #13070). The native-vs-heap-index decision is centralized in the
-    // `[ForceInline] usesNativeSpirvDescriptorHandle<T>()` query (see its definition for the
-    // `[ForceInline]`/capability-scoping rationale). On any non-SPIR-V target the query is false and
-    // execution falls through to the shared switch below.
-    if (usesNativeSpirvDescriptorHandle<T>())
-        return __castDescriptorHandleToResource<T>(handleValue);
-
-    // Everything else: non-native descriptors, and the native texture/sampler types on non-SPIR-V-NV
-    // targets. Under CUDA the `default` arm below applies the same native cast. A non-native descriptor
-    // under `spvBindlessTextureNV` alone takes the `spirv` arm (that capability implies `spirv`) and uses
-    // the dynamic-resource-heap path — including acceleration structures, whose `__asuint64((uint2)handle)`
-    // packing feeds `OpConvertUToAccelerationStructureKHR`; when `spvDescriptorHeapEXT` is also enabled it
-    // instead takes the more-specialized EXT arm below and loads from the EXT heap.
-    //
-    // The `case hlsl:` and `case spvDescriptorHeapEXT:` arms below route a `CombinedTextureSampler`
-    // through `__makeCombinedTextureSamplerFromHandle`, which consumes a separate sampler index — exactly
-    // the targets on which the two single-index `__init(UntypedResourceHandle)` conversions above reject
-    // building a combined sampler from a one-index `ResourceDescriptorHeap` handle. If a future target's
-    // combined branch here needs a separate sampler index, add it to those two guards too.
     __target_switch
     {
     case hlsl:
@@ -28285,10 +28264,28 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
             return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
     case spirv:
     case glsl:
+        // This arm also collapses the switch's inferred SPIR-V requirement to `{spirv}`, so the
+        // `spvBindlessTextureNV` cases below do not force that capability onto a plain-SPIR-V compile.
         return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    case spvBindlessTextureNV:
+        if (T.isBindlessTextureNVEncodable)
+            return __castDescriptorHandleToResource<T>(handleValue);
+        return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
     case spvDescriptorHeapEXT:
+        // `spvDescriptorHeapEXT` is more specific than `spvBindlessTextureNV`, so re-check NV here to
+        // keep an encodable texture/sampler on its native `uint64` cast rather than a `uint2` heap index
+        // (#13070); everything else falls through to the EXT heap.
+        __target_switch
+        {
+        case spvBindlessTextureNV:
+            if (T.isBindlessTextureNVEncodable)
+                return __castDescriptorHandleToResource<T>(handleValue);
+            break;
+        default:
+            break;
+        }
         return getDescriptorFromDescriptorHeapEXT<T>((uint2)handleValue);
     default:
         return __castDescriptorHandleToResource<T>(handleValue);
