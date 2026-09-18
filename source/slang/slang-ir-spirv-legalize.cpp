@@ -3113,8 +3113,9 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
         m_sink->diagnose(Diagnostics::SnippetParsingFailed{
             .snippet = intrinsic->getDefinition(),
             .location = intrinsic->sourceLoc});
-        return nullptr;
     }
+    // Cache the failure (null) as well as a success, so a work-list revisit of the same intrinsic
+    // does not re-parse it and diagnose the same failure twice.
     m_parsedSpvSnippets[intrinsic] = snippet;
     return snippet;
 }

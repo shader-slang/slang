@@ -189,7 +189,12 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         auto refName = tokenReader.ReadToken().Content;
                         if (!mapInstNameToIndex.tryGetValue(refName, operand.content))
                         {
-                            SLANG_ASSERT(!"Invalid SPV ASM: referenced inst is not defined.");
+                            // An undefined `%name` reference is malformed user input and must be
+                            // diagnosed.
+                            throw Misc::TextFormatException(
+                                "Text parsing error: SPIR-V snippet references an undefined "
+                                "instruction: %" +
+                                refName);
                         }
                         inst.operands.add(operand);
                     }
@@ -270,7 +275,12 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                             tokenReader.Read("(");
                             constant.type = parseASMType(tokenReader);
                             int i = 0;
-                            while (tokenReader.AdvanceIf(","))
+                            // The value arrays are fixed-size. The bound is tested before
+                            // AdvanceIf(","), so an over-long list leaves its extra comma
+                            // unconsumed for the closing ')' read below to reject as the same
+                            // E29000 parse error the sibling paths produce.
+                            while (i < SpvSnippet::kMaxASMConstantValues &&
+                                   tokenReader.AdvanceIf(","))
                             {
                                 switch (constant.type)
                                 {
@@ -302,8 +312,11 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         }
                         else
                         {
-                            SLANG_UNEXPECTED(
-                                ("Invalid SPV ASM operand: \"" + identifier + "\"").getBuffer());
+                            // An unrecognized operand identifier is malformed user input and must
+                            // be diagnosed.
+                            throw Misc::TextFormatException(
+                                "Text parsing error: Invalid SPIR-V ASM operand: \"" + identifier +
+                                "\"");
                         }
                     }
                     break;
@@ -315,6 +328,8 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
             snippet->instructions.add(inst);
         }
     }
+    // Any parse step throws Misc::TextFormatException on malformed snippet text; returning null
+    // here lets the caller (getParsedSpvSnippet) report it once as snippet-parsing-failed (E29000).
     catch (const Slang::Misc::TextFormatException&)
     {
         return nullptr;
