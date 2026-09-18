@@ -4326,9 +4326,50 @@ private:
         Expr*& outLeftArg,
         Expr*& outRightArg);
 
-    // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either the
-    // translation unit is GLSL, or the `glsl` module is in scope (its `operator*` overloads make
-    // `mat * mat` a matrix product). The builtin-operator fast path is disabled then.
+    /// The scalar family (integer, floating-point, or boolean) that an operand element type is
+    /// known to belong to for the purposes of the builtin-operator fast path. All three fields
+    /// are false when the type is not known to belong to any of them.
+    struct BuiltinArithmeticElementFamily
+    {
+        bool isInteger = false;
+        bool isFloat = false;
+        // True only for a genuinely `bool`-typed element: the concrete-type branch of
+        // `classifyBuiltinArithmeticElementType` sets this from `baseType == BaseType::Bool`
+        // directly. There is no sealed marker interface implemented by `bool` alone --
+        // `__BuiltinLogicalType` (see `isLogical` below) is implemented by `bool` AND every
+        // builtin integer type -- so a generic type parameter can never prove `isBool`; only a
+        // concrete `bool` operand can. Required for unary logical-not (`!`), whose result must
+        // be `bool`-shaped: taking the fast path for a `__BuiltinLogicalType`-constrained
+        // generic instantiated with an integer would build a `Not` node typed as that integer.
+        bool isBool = false;
+        // True for a *generic* element type that conforms to `__BuiltinLogicalType` (`bool` and
+        // every builtin integer type; see core.meta.slang) -- the concrete-type branch never sets
+        // this, since a concrete `bool`/integer is already fully classified by `isBool`/
+        // `isInteger`. Safe for an operator whose builtin semantics don't depend on which of
+        // those the element actually is, e.g. equality (`==`/`!=`, which lower to the same
+        // `kIROp_Eql`/`kIROp_Neq` regardless): a generic parameter constrained only to
+        // `__BuiltinLogicalType` still needs equality fast-pathed, but must NOT take the
+        // logical-not fast path -- that's exactly why this is a separate flag from `isBool`
+        // rather than folded into it.
+        bool isLogical = false;
+        bool isKnown() const { return isInteger || isFloat || isBool || isLogical; }
+    };
+
+    /// Classifies `elementType`'s scalar family for the builtin-operator fast path in
+    /// `convertToBuiltinArithmeticOp`. A concrete `BasicExpressionType` (`int`, `float`, `bool`,
+    /// ...) is classified directly from `BaseTypeInfo`. A generic type parameter constrained to
+    /// one of the `[sealed]` builtin marker interfaces (`__BuiltinIntegerType`,
+    /// `__BuiltinFloatingPointType`, `__BuiltinLogicalType`; see core.meta.slang) is classified
+    /// the same way: those interfaces are sealed, so only the compiler's own builtin scalar types
+    /// can conform to them, which means every legal instantiation of such a parameter is itself a
+    /// `BasicExpressionType` of that family, even though the parameter is not one yet. Any other
+    /// type (aggregates, an unconstrained or differently-constrained generic parameter, etc.)
+    /// classifies as unknown, which the caller treats as "not eligible for the fast path."
+    BuiltinArithmeticElementFamily classifyBuiltinArithmeticElementType(Type* elementType);
+
+    // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either
+    // `-allow-glsl` is set, or the `glsl` module is in scope (its `operator*` overloads
+    // make `mat * mat` a matrix product). The builtin-operator fast path is disabled then.
     bool isGLSLOperatorScope();
 };
 

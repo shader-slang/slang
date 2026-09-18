@@ -992,6 +992,10 @@ public:
     // counter associated with the buffer, most often used for
     // AppendStructuredBuffer or ConsumeStructuredBuffer
     RefPtr<VarLayout> counterVarLayout;
+
+    // The buffer's content as an unbounded array of the element type (vs `elementTypeLayout`, which
+    // is the bare element type). Cached here so the reflection accessor returns a stable pointer.
+    RefPtr<VarLayout> contentVarLayout;
 };
 
 /// Type layout for a logical sequence type
