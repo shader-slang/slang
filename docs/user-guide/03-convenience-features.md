@@ -1015,6 +1015,12 @@ by using the `[ForceInline]` decoration:
 int f(int x) { return x + 1; }
 ```
 
+On most targets Slang performs this inlining itself. On CUDA, where pre-inlining large function
+bodies would inflate the downstream front-end compilation time, Slang normally instead emits the
+function as a `__forceinline__` function and lets the downstream CUDA compiler (NVRTC for device
+code, nvcc for host code) do the inlining. Slang still inlines it itself in the cases where doing so
+is required — for example when a `static_assert` depends on the call folding to a constant.
+
 Error handling
 -----------------
 

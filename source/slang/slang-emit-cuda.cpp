@@ -494,6 +494,13 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
     }
     else if (inst->findDecoration<IRCudaHostDecoration>())
     {
+        // A user-force-inline host function is deferred just like a device one (issue #12623): it
+        // survives as a real `__host__` function, so emit `__forceinline__` here too — otherwise
+        // the hint is silently dropped for host functions. `__forceinline__ __host__` is a valid
+        // CUDA specifier sequence for the nvcc host compile (host functions are not emitted for the
+        // NVRTC JIT path, which rejects `__host__`).
+        if (inst->findDecoration<IRUserForceInlineDecoration>())
+            m_writer->emit("__forceinline__ ");
         m_writer->emit("__host__ ");
     }
     else
@@ -507,12 +514,22 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
         {
             m_writer->emit("static ");
         }
+
+        // A function carrying the user-force-inline marker is deferred to NVRTC on CUDA (issue
+        // #12623): it survives as a real `__device__` function, so emit `__forceinline__` to ask
+        // NVRTC to inline it. The marker is present only for a user hint, so compiler-mandated
+        // inlines are unaffected. `__forceinline__` suppresses a co-occurring `__noinline__`:
+        // `__forceinline__ __device__ __noinline__` is a contradictory specifier sequence NVRTC
+        // rejects, and the request to inline takes precedence.
+        bool userForceInline = inst->findDecoration<IRUserForceInlineDecoration>() != nullptr;
+        if (userForceInline)
+            m_writer->emit("__forceinline__ ");
         m_writer->emit("__device__ ");
 
         // `__noinline__` is a declaration specifier, so it belongs in this specifier
         // sequence. Kernels are call-graph roots with no caller to be inlined into, so the
         // request is honoured for ordinary device functions only.
-        if (inst->findDecoration<IRNoInlineDecoration>())
+        if (!userForceInline && inst->findDecoration<IRNoInlineDecoration>())
         {
             m_writer->emit("__noinline__ ");
         }
