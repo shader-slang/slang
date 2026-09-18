@@ -2704,9 +2704,10 @@ local insts = {
 			},
 			{
 				experimentalModule = {
-					-- Opcode 683, introduced in module semantic version 4. Current import
-					-- validation reads the checked AST, but compatible pre-change readers inspect
-					-- this marker when loading packaged standard modules.
+					-- Stable serialization ID 683, introduced in module semantic version 4.
+					-- Current import validation reads the checked AST, but older
+					-- Linkage::findOrImportModule implementations inspect this marker in the
+					-- packaged standard-module fallback.
 					struct_name = "ExperimentalModuleDecoration"
 				},
 			},

@@ -15794,9 +15794,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
 
     // Import validation now uses the checked AST attribute. Keep emitting the derived IR marker
-    // for compatible readers from before that change: those readers inspect opcode 683 on the
-    // packaged-standard-module path. The opcode was introduced with module semantic version 4,
-    // which remains the minimum supported version, so it is still part of the serialized contract.
+    // because older Linkage::findOrImportModule implementations inspect it in the packaged
+    // standard-module fallback. Its stable serialization ID is 683; it was introduced with module
+    // semantic version 4, which remains the minimum supported version.
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {
         builder->addDecoration(module->getModuleInst(), kIROp_ExperimentalModuleDecoration);
