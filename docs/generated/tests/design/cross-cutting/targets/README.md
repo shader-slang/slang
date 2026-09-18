@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-13T00:00:00+00:00
-source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-watched_paths_digest: e463363722f8f0350be37df9551cba2e504764ba13b54d179f110c539c5bf9d3
+model: gpt-5.6-sol
+generated_at: 2026-09-16T06:40:19Z
+source_commit: d3b56927b854c14fa1ac169b72da6e080ea80833
+watched_paths_digest: ae4ecf3a8d0550a9b7a41fdf512139e37f0f5a520470aa731ef7c12647e3d2f0
 source_doc: docs/generated/design/cross-cutting/targets.md
-source_doc_digest: 32900dc5f475519ad70c2891a8a3bbf178204951fb23058aed1acd712e4231e0
+source_doc_digest: 17c44d8c152f02477de96d75c284561a0a68bbc60055e05c53e5a61396a4760e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -64,7 +64,7 @@ fill (#12477); the rest of the document is not yet enumerated.
 | A `__target_switch` with a single `case` arm: under the matching target the arm body is selected by `slang-ir-specialize-target-switch.cpp` — the minimum non-empty target-switch shape.                                                         | boundary   | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`target-switch-single-arm.slang`](target-switch-single-arm.slang)                                                             |
 | A `__target_switch` with no arm matching the active target and no `default:` is rejected with a stage / capability diagnostic when reached from an entry point on the unmatched target.                                                          | negative   | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`target-switch-missing-arm-rejected.slang`](target-switch-missing-arm-rejected.slang)                                         |
 | Target choice surfaces through target-specific lowering passes; a `[shader("compute")]` entry point emits the target-shaped compute marker on each text-emit backend.                                                                            | functional | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`per-target-entry-point-marker.slang`](per-target-entry-point-marker.slang)                                                   |
-| The CUDA-specific immutable-load lowering pass rewrites reads from `uniform` globals as `__ldg(...)` calls on CUDA only, while HLSL, GLSL, SPIR-V, Metal, WGSL and C++ read the field directly.                                                  | functional | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`cuda-immutable-load-uses-ldg.slang`](cuda-immutable-load-uses-ldg.slang)                                                     |
+| The CUDA-specific immutable-load lowering pass rewrites read-only `StructuredBuffer` loads as `__ldg(...)` calls on CUDA only, while the other text targets use their ordinary buffer-load forms.                                                 | functional | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`cuda-immutable-load-uses-ldg.slang`](cuda-immutable-load-uses-ldg.slang)                                                     |
 | When the active target has no matching `case` arm in `__target_switch` but a `default:` arm exists, `slang-ir-specialize-target-switch.cpp` selects the default — the legal alternative to the negative "no arm, no default" companion.          | boundary   | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`target-switch-missing-arm-falls-to-default.slang`](target-switch-missing-arm-falls-to-default.slang)                         |
 | `slang-ir-specialize-target-switch.cpp` resolves `[target]` switches against the active TargetRequest; a `__target_switch` with per-target branches surfaces the selected branch's body in the target's emitted text.                            | functional | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`target-switch-selects-active-branch.slang`](target-switch-selects-active-branch.slang)                                       |
 | A Profile carries a Stage; `-profile cs_6_5` binds Compute. Asking for `-stage vertex` on the same command line populates the entry point's stage with two different atoms and produces `E00031: conflicting stages`.                            | negative   | [#profiles](../../../../design/cross-cutting/targets.md#profiles)                                                         | [`profile-stage-conflict-with-explicit-stage-rejected.slang`](profile-stage-conflict-with-explicit-stage-rejected.slang)       |

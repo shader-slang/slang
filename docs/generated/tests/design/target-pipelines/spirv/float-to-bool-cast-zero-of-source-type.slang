@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#float-to-bool-casts
-//META: doc_section_digest=ef5e3bf8a912260e0e00801fdba1b7d6107adc1f8add777ad7fcf3adf445658d
+//META: doc_section_digest=07e1a4753a9d553c3c479b21ff5ac392a988d89802f220b2fd33379dc3cae82b
 //META: purpose=A float-to-bool cast compares against a zero constant of the source floating-point type, emitting OpFUnordNotEqual against an OpConstant %float 0.
 //META: intent=functional
 //META: pipeline_stage=emit

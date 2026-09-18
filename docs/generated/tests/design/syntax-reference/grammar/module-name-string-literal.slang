@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#top-level-structure
-//META: doc_section_digest=badf6daf5560f5144e7061f1568abcf04bfa7ece00a5e1441996814b2d18964f
+//META: doc_section_digest=7765d9b15bc3cf94f40f1c43ffc9e275a43cb76b6b512e8bd81fbafd2cf86f06
 //META: purpose=`ModuleName` accepts a `STRING_LIT` alternative in a `module` header.
 //META: intent=functional
 //META: pipeline_stage=parse

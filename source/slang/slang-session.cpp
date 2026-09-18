@@ -412,9 +412,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::loadModuleInfoFromIRBlob(
 
     RefPtr<IRModule> irModule;
     String compilerVersion;
-    UInt version;
+    UInt64 version;
     String name;
-    SLANG_RETURN_ON_FAIL(readSerializedModuleInfo(irChunk, compilerVersion, version, name));
+    SLANG_RETURN_ON_FAIL(readSerializedModuleInfo(irChunk, &compilerVersion, version, &name));
+    // The public metadata API exposes the version as a signed SlangInt, while untrusted serialized
+    // data can contain any UInt64 value.
+    if (version > UInt64((std::numeric_limits<SlangInt>::max)()))
+        return SLANG_FAIL;
     const auto compilerVersionSlice = m_stringSlicePool.addAndGetSlice(compilerVersion);
     const auto nameSlice = m_stringSlicePool.addAndGetSlice(name);
     outModuleCompilerVersion = compilerVersionSlice.begin();
@@ -1079,8 +1083,11 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
     // We need to temporarily replace the SourceManager for this CompileRequest
     ScopeReplaceSourceManager scopeReplaceSourceManager(this, &localSourceManager);
 
-    SourceLanguage sourceLanguage = SourceLanguage::Slang;
     SlangLanguageVersion languageVersion = m_optionSet.getLanguageVersion();
+    // Term strings are always snippets of Slang syntax, rather than translation units that may
+    // select a parser mode. `preprocessSource` requires this output, so discard any directive it
+    // observes and preserve the term parser's Slang-language contract below.
+    SourceLanguageDirective ignoredSourceLanguageDirective;
 
     auto tokens = preprocessSource(
         srcFile,
@@ -1088,11 +1095,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         nullptr,
         Dictionary<String, String>(),
         this,
-        sourceLanguage,
+        ignoredSourceLanguageDirective,
         languageVersion);
-
-    if (sourceLanguage == SourceLanguage::Unknown)
-        sourceLanguage = SourceLanguage::Slang;
 
     return parseTermFromSourceFile(
         getASTBuilder(),
@@ -1100,7 +1104,7 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         &sink,
         scope,
         getNamePool(),
-        sourceLanguage);
+        SourceLanguage::Slang);
 }
 
 UInt Linkage::addTarget(CodeGenTarget target)
@@ -1220,6 +1224,37 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     // If we failed to find a previously-loaded module, then we
     // will go ahead and load the module from the serialized form.
     //
+    auto irChunk = moduleChunk->findIR();
+    // Missing IR is malformed rather than a version mismatch.
+    if (!irChunk)
+        return nullptr;
+
+    UInt64 moduleVersion = 0;
+    UInt64 serializationVersion = 0;
+    const auto readResult =
+        readSerializedModuleInfo(irChunk, nullptr, moduleVersion, nullptr, &serializationVersion);
+    if (SLANG_FAILED(readResult))
+    {
+        if (readResult == SLANG_E_NOT_AVAILABLE)
+        {
+            sink->diagnose(Diagnostics::UnsupportedSerializedModuleFormatVersion{
+                .actualVersion = String(serializationVersion),
+                .location = SourceLoc()});
+        }
+        // Other failures are malformed metadata and retain the existing load-failure behavior.
+        return nullptr;
+    }
+
+    if (!IRModule::isModuleVersionSupported(moduleVersion))
+    {
+        sink->diagnose(Diagnostics::UnsupportedSerializedModuleVersion{
+            .actualVersion = String(moduleVersion),
+            .minimumVersion = String(IRModule::k_minSupportedModuleVersion),
+            .maximumVersion = String(IRModule::k_maxSupportedModuleVersion),
+            .location = SourceLoc()});
+        return nullptr;
+    }
+
     PathInfo filePathInfo;
     return loadSerializedModule(
         moduleName,
@@ -1294,7 +1329,8 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     const PathInfo& moduleFilePathInfo,
     ISlangBlob* moduleFileContents,
     SourceLoc const& requestingLoc,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    bool isSpeculativeLoad)
 {
     auto astBuilder = getASTBuilder();
     SLANG_AST_BUILDER_RAII(astBuilder);
@@ -1311,6 +1347,57 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     auto moduleChunk = ModuleChunk::find(rootChunk);
     if (!moduleChunk)
     {
+        return nullptr;
+    }
+
+    auto irChunk = moduleChunk->findIR();
+    // Missing IR is malformed rather than a version mismatch.
+    if (!irChunk)
+        return nullptr;
+
+    UInt64 moduleVersion = 0;
+    UInt64 serializationVersion = 0;
+    const auto readResult =
+        readSerializedModuleInfo(irChunk, nullptr, moduleVersion, nullptr, &serializationVersion);
+    if (SLANG_FAILED(readResult))
+    {
+        if (readResult == SLANG_E_NOT_AVAILABLE)
+        {
+            if (isSpeculativeLoad)
+            {
+                sink->diagnose(Diagnostics::IgnoringUnsupportedSerializedModuleFormatVersion{
+                    .actualVersion = String(serializationVersion),
+                    .location = requestingLoc});
+            }
+            else
+            {
+                sink->diagnose(Diagnostics::UnsupportedSerializedModuleFormatVersion{
+                    .actualVersion = String(serializationVersion),
+                    .location = requestingLoc});
+            }
+        }
+        // Other failures are malformed metadata and retain the existing load-failure behavior.
+        return nullptr;
+    }
+
+    if (!IRModule::isModuleVersionSupported(moduleVersion))
+    {
+        if (isSpeculativeLoad)
+        {
+            sink->diagnose(Diagnostics::IgnoringUnsupportedSerializedModuleVersion{
+                .actualVersion = String(moduleVersion),
+                .minimumVersion = String(IRModule::k_minSupportedModuleVersion),
+                .maximumVersion = String(IRModule::k_maxSupportedModuleVersion),
+                .location = requestingLoc});
+        }
+        else
+        {
+            sink->diagnose(Diagnostics::UnsupportedSerializedModuleVersion{
+                .actualVersion = String(moduleVersion),
+                .minimumVersion = String(IRModule::k_minSupportedModuleVersion),
+                .maximumVersion = String(IRModule::k_maxSupportedModuleVersion),
+                .location = requestingLoc});
+        }
         return nullptr;
     }
 
@@ -1365,12 +1452,19 @@ RefPtr<Module> Linkage::loadModuleImpl(
     SourceLoc const& requestingLoc,
     DiagnosticSink* sink,
     const LoadedModuleDictionary* additionalLoadedModules,
-    ModuleBlobType blobType)
+    ModuleBlobType blobType,
+    bool isSpeculativeLoad)
 {
     switch (blobType)
     {
     case ModuleBlobType::IR:
-        return loadBinaryModuleImpl(moduleName, modulePathInfo, moduleBlob, requestingLoc, sink);
+        return loadBinaryModuleImpl(
+            moduleName,
+            modulePathInfo,
+            moduleBlob,
+            requestingLoc,
+            sink,
+            isSpeculativeLoad);
 
     case ModuleBlobType::Source:
         return loadSourceModuleImpl(
@@ -1402,15 +1496,24 @@ RefPtr<Module> Linkage::loadSourceModuleImpl(
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(frontEndReq);
     translationUnit->compileRequest = frontEndReq;
     translationUnit->setModuleName(name);
-    Stage impliedStage;
-    translationUnit->sourceLanguage = SourceLanguage::Slang;
-
-    // If we are loading from a file with apparaent glsl extension,
-    // set the source language to GLSL to enable GLSL compatibility mode.
-    if ((SourceLanguage)findSourceLanguageFromPath(filePathInfo.getName(), impliedStage) ==
-        SourceLanguage::GLSL)
+    // The module-loading API has no source-language parameter, so a session-level `Language`
+    // option is its explicit language-selection mechanism. Preserve that provenance on the
+    // translation unit instead of merely using the option as an initial parser mode: extension
+    // validation and source-directive precedence both depend on knowing that the caller made an
+    // explicit choice.
+    if (m_optionSet.hasOption(CompilerOptionName::Language))
     {
-        translationUnit->sourceLanguage = SourceLanguage::GLSL;
+        auto sourceLanguage = SourceLanguage(
+            m_optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language));
+        translationUnit->sourceLanguage = sourceLanguage;
+        translationUnit->sourceLanguageExplicitlyRequested = sourceLanguage;
+    }
+    else
+    {
+        // Imported source modules default to Slang when their file name does not imply a language.
+        // `parseTranslationUnit()` is the single place that resolves a recognized extension for
+        // both imported modules and ordinary compile-request inputs.
+        translationUnit->sourceLanguage = SourceLanguage::Slang;
     }
 
     frontEndReq->addTranslationUnit(translationUnit);
@@ -1667,6 +1770,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     PathInfo requestingPathInfo =
         getSourceManager()->getPathInfo(requestingLoc, SourceLocType::Actual);
 
+    HashSet<String> serializedModulePathsTried;
     for (auto type : typesToTry)
     {
         for (auto sourceFileName : sourceFileNamesToTry)
@@ -1710,6 +1814,13 @@ RefPtr<Module> Linkage::findOrImportModule(
                 // If we failed to find the file at this step, we
                 // will continue the search for our other options.
                 //
+                continue;
+            }
+            if (type == ModuleBlobType::IR &&
+                !serializedModulePathsTried.add(filePathInfo.getMostUniqueIdentity()))
+            {
+                // The source and literate-source candidates can map to the same binary path.
+                // Avoid loading and diagnosing that path more than once.
                 continue;
             }
 
@@ -1765,7 +1876,8 @@ RefPtr<Module> Linkage::findOrImportModule(
                 requestingLoc,
                 sink,
                 loadedModules,
-                type);
+                type,
+                /*isSpeculativeLoad*/ true);
 
             // If the attempt to load the module from the given path
             // was successful, we go ahead and use it, without trying
@@ -1803,7 +1915,8 @@ RefPtr<Module> Linkage::findOrImportModule(
                     requestingLoc,
                     sink,
                     nullptr,
-                    ModuleBlobType::IR);
+                    ModuleBlobType::IR,
+                    /*isSpeculativeLoad*/ true);
                 if (module)
                 {
                     if (auto irModule = module->getIRModule())
@@ -2065,20 +2178,50 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
         sink,
         translationUnit);
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
-    SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
     SlangLanguageVersion slangLanguageVersion = module->getModuleDecl()->languageVersion;
 
     auto segments = extractSourceSegments(sourceFile, getSourceManager());
 
     auto preprocessed = preprocessSourceSegments(
         segments,
-        sourceLanguage,
         slangLanguageVersion,
         sink,
         &includeSystem,
         combinedPreprocessorDefinitions,
         this,
         &preprocessorHandler);
+
+    for (auto& segment : preprocessed)
+    {
+        auto& directive = segment.sourceLanguageDirective;
+        if (directive.language == SourceLanguage::Unknown)
+            continue;
+
+        // A semantic `__include` is parsed only after the containing translation unit has already
+        // selected its effective language and parsed its primary sources. It may confirm that
+        // language, but changing it here would leave the existing AST internally inconsistent.
+        if (directive.language != translationUnit->sourceLanguage)
+        {
+            // Use E00121 when a primary source directive selected the effective language: its
+            // retained location lets the diagnostic identify both conflicting directives. If the
+            // effective language came only from an API request or file extension, there is no
+            // earlier directive to cite, so E00123 instead explains that the unit was already
+            // parsed under the other language. `_tryApplySourceLanguageDirective` emits E00121 for
+            // conflicts within one preprocessing unit, while `_applySourceLanguageDirective`
+            // emits it across primary source files.
+            if (translationUnit->sourceLanguageImpliedBySourceContentsLoc.isValid())
+            {
+                sink->diagnose(Diagnostics::ConflictingSourceLanguageDirectives{
+                    .location = directive.location,
+                    .firstLocation = translationUnit->sourceLanguageImpliedBySourceContentsLoc});
+            }
+            else
+            {
+                sink->diagnose(Diagnostics::SourceLanguageDirectiveConflictsWithTranslationUnit{
+                    .location = directive.location});
+            }
+        }
+    }
 
     if (slangLanguageVersion != module->getModuleDecl()->languageVersion)
     {

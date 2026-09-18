@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "https://github.com/shader-slang/slang-user-skills",
+  "sourceCommit": "@SLANG_USER_SKILLS_SOURCE_COMMIT@",
+  "slangVersion": "@SLANG_VERSION_FULL@"
+}

@@ -11,9 +11,52 @@
 // these distinguished forwarding names should be removed in favor of direct qualified calls.
 module __builtin;
 
-// These conversion adapters keep constructor bodies in `slang.numerics` from redispatching to
-// the very generic constructor requirement they implement. Because this module does not import
-// `slang.numerics`, each construction below can only resolve to an established core constructor.
+// These intrinsic declarations give the public explicit-conversion wrappers direct access to the
+// compiler's canonical BuiltinCast operation. In particular, conversion to `bool` tests whether
+// the source is nonzero; this differs from constructor overload resolution for some source types.
+// The vector form applies BuiltinCast to every component without changing the shape.
+[__readNone]
+[__unsafeForceInlineEarly]
+__intrinsic_op(BuiltinCast)
+public TDestination __numericsBuiltinConvertScalar<
+    TDestination : __BuiltinScalarType,
+    TSource : __BuiltinScalarType>(TSource value);
+
+[__readNone]
+[__unsafeForceInlineEarly]
+__intrinsic_op(BuiltinCast)
+public vector<TDestination, N> __numericsBuiltinConvertVector<
+    TDestination : __BuiltinScalarType,
+    TSource : __BuiltinScalarType,
+    let N : int>(vector<TSource, N> value);
+
+[__readNone]
+[__unsafeForceInlineEarly]
+public matrix<TDestination, R, C, L> __numericsBuiltinConvertMatrix<
+    TDestination : __BuiltinScalarType,
+    TSource : __BuiltinScalarType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(matrix<TSource, R, C, L> value)
+{
+    // Do not replace this body with a whole-matrix BuiltinCast. A floating-point-to-Boolean cast
+    // would then emit a matrix-to-scalar comparison, which CUDA's emitted C-like matrix types do
+    // not support. Casting each logical row through the canonical vector BuiltinCast preserves `L`
+    // while giving every target a supported shaped conversion.
+    matrix<TDestination, R, C, L> result;
+    [ForceUnroll]
+    for (int row = 0; row < R; ++row)
+        result[row] = __numericsBuiltinConvertVector<TDestination>(value[row]);
+    return result;
+}
+
+// The adapters below serve a different purpose: they implement the integer and floating-point
+// constructor requirements of the numeric interfaces. The BuiltinCast adapters above accept any
+// source/destination pair in `__BuiltinScalarType`; these construction adapters intentionally
+// support only integer-to-integer, integer-to-floating-point, and floating-point-to-floating-point
+// pairs. Their bodies use the corresponding narrower core conversion operations. Because this
+// module does not import `slang.numerics`, each construction can only resolve to an established
+// core constructor and cannot redispatch to the generic requirement it implements.
 [__readNone]
 [__unsafeForceInlineEarly]
 public TDestination __numericsBuiltinConstructFromInteger<
@@ -119,16 +162,7 @@ SLANG_NUMERICS_VECTOR_COMPARISON_ADAPTER(__numericsBuiltinLessEqual, <=)
 
 [__readNone]
 [__unsafeForceInlineEarly]
-public T __numericsBuiltinDot<T : __BuiltinFloatingPointType, let N : int>(
-    vector<T, N> left,
-    vector<T, N> right)
-{
-    return ::dot(left, right);
-}
-
-[__readNone]
-[__unsafeForceInlineEarly]
-public T __numericsBuiltinDot<T : __BuiltinIntegerType, let N : int>(
+public T __numericsBuiltinDot<T : __BuiltinArithmeticType, let N : int>(
     vector<T, N> left,
     vector<T, N> right)
 {
