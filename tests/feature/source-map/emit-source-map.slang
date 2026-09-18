@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-target dxil -entry computeMain -profile cs_6_2 -line-directive-mode source-map -o tests/feature/source-map/emit-source-map.zip
+//TEST:SIMPLE:-target dxil -entry computeMain -profile cs_6_2 -line-directive-mode source-map -o tests/feature/source-map/emit-source-map.zip -warnings-disable module-format-not-frozen
 
 RWStructuredBuffer<int> outputBuffer;
 

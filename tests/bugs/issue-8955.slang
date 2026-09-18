@@ -1,4 +1,4 @@
-//TEST:SIMPLE: -o tests/bugs/issue-8955.slang-module
+//TEST:SIMPLE: -o tests/bugs/issue-8955.slang-module -warnings-disable module-format-not-frozen
 //TEST:SIMPLE(filecheck=CHK): -target spirv-asm tests/bugs/issue-8955.slang-module
 
 // Test for issue #8955: Using link-time struct as vertex input crashes if compiled from serialized module

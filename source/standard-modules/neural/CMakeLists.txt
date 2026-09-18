@@ -62,11 +62,15 @@ endif()
 
 # Build neural.slang-module and output to the output directory
 # Pass -I to source dir so that __include "unit-test/..." resolves without copying.
+# -warnings-disable 88 silences module-format-not-frozen: this is the compiler's own bundled module
+# built here, not a user-distributed artifact, so the not-frozen warning is just noise. The numeric
+# id lets an older cross-compile slang-bootstrap ignore it rather than error on an unknown name.
 add_custom_command(
     OUTPUT ${neural_module_file}
     COMMAND
         ${SLANG_COMPILER} ${SLANG_COMPILER_CORE_MODULE_ARGS} ${NEURAL_MODULE_DEFINES} -I
         ${CMAKE_CURRENT_SOURCE_DIR} neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
+        -warnings-disable 88
     DEPENDS
         ${neural_copied_files}
         ${neural_unittest_sources}
