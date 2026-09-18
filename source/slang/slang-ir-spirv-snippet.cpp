@@ -45,6 +45,57 @@ SpvSnippet::ASMType parseASMType(Slang::Misc::TokenReader& tokenReader)
     return SpvSnippet::ASMType::None;
 }
 
+bool SpvSnippet::isEmittableASMType(ASMType type)
+{
+    switch (type)
+    {
+    case ASMType::Int:
+    case ASMType::UInt:
+    case ASMType::UInt16:
+    case ASMType::Half:
+    case ASMType::Float:
+    case ASMType::Float2:
+    case ASMType::UInt2:
+        return true;
+    default:
+        // None (the unknown-token sentinel), Double, and FloatOrDouble have no lowering in either
+        // emitter switch, so an operand of one of these types is diagnosed rather than emitted.
+        return false;
+    }
+}
+
+UnownedStringSlice SpvSnippet::getASMTypeName(ASMType type)
+{
+    switch (type)
+    {
+    case ASMType::Int:
+        return UnownedStringSlice("int");
+    case ASMType::UInt:
+        return UnownedStringSlice("uint");
+    case ASMType::UInt16:
+        return UnownedStringSlice("uint16_t");
+    case ASMType::Half:
+        return UnownedStringSlice("half");
+    case ASMType::Float:
+        return UnownedStringSlice("float");
+    case ASMType::Double:
+        return UnownedStringSlice("double");
+    case ASMType::FloatOrDouble:
+        return UnownedStringSlice("float-or-double (_p)");
+    case ASMType::Float2:
+        return UnownedStringSlice("float2");
+    case ASMType::UInt2:
+        return UnownedStringSlice("uint2");
+    case ASMType::None:
+        // None is the sentinel parseASMType returns for an unrecognized type token; naming it
+        // "unknown" is the spelling the un-emittable-operand diagnostic reports for such a token.
+        return UnownedStringSlice("unknown");
+    }
+    // Every ASMType enumerator is handled above, and omitting `default` lets -Wswitch flag a newly
+    // added one; reaching here means an out-of-contract cast to a non-enumerator value.
+    SLANG_UNEXPECTED("unhandled ASMType in getASMTypeName");
+}
+
 // Read an unsigned integer (a SPIR-V word) or a SPIR-V enum (currently those
 // which are coded into this function).
 //
@@ -112,6 +163,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
             {
                 String instName = tokenReader.ReadToken().Content;
                 mapInstNameToIndex.set(instName, (int)snippet->instructions.getCount());
+                inst.resultName = instName;
                 tokenReader.Read(Slang::Misc::TokenType::OpAssign);
             }
             SpvOp opCode;
@@ -284,7 +336,17 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                             {
                                 switch (constant.type)
                                 {
+                                case ASMType::Half:
                                 case ASMType::Float:
+                                // `Double` is read here even though it is not isEmittableASMType
+                                // and is never emitted: reading its fractional literal lets the
+                                // snippet parse and reach the legalization-time `E29001`
+                                // "un-emittable operand" diagnostic (raised by validateSpvSnippet),
+                                // rather than failing as a misleading `E29000` parse error. It
+                                // lands in `floatValues` (narrowed to 32-bit) because that is the
+                                // field ASMConstant hashes/compares on; the narrowing is harmless
+                                // precisely because a `double` constant never reaches emit.
+                                case ASMType::Double:
                                 case ASMType::Float2:
                                 case ASMType::FloatOrDouble:
                                     constant.floatValues[i] = tokenReader.ReadFloat();
