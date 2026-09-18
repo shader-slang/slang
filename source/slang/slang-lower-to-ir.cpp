@@ -15794,9 +15794,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
 
     // Import validation in this compiler uses the checked AST attribute. Keep emitting the derived
-    // IR marker while this compiler emits module semantic version 30: version-30 readers whose
-    // packaged-standard-module fallback predates the AST gate inspect this decoration to emit
-    // E00104 for an experimental module.
+    // IR marker because this refactor leaves `IRModule::k_maxSupportedModuleVersion` unchanged:
+    // compatible pre-refactor binaries still read newly serialized modules, and their
+    // packaged-standard-module path relies on this marker to emit E00104.
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {
         builder->addDecoration(module->getModuleInst(), kIROp_ExperimentalModuleDecoration);
