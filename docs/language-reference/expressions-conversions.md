@@ -267,29 +267,35 @@ The following implicit type conversions are allowed:
 The following implicit type conversions are allowed but not recommended. A cell marked "after GitHub issue
 #NNNNN" describes the intended behavior tracked by that issue.
 
-| Conversion                                                          | Compiler diagnostic                                                                                                                              |
-|---------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
-| `bool` to a floating-point type                                     | warning                                                                                                                                          |
-| integer type to a `bool`                                            | warning                                                                                                                                          |
-| integer type to a narrower integer type                             | warning, unless the source is a literal with no precision loss (after GitHub issue [#10516](https://github.com/shader-slang/slang/issues/10516)) |
-| integer type to a same-width integer type with different signedness | opt-in warning (after GitHub issue [#12928](https://github.com/shader-slang/slang/issues/12928))                                                 |
-| integer type to `half`                                              | warning, unless the source is a literal with no precision loss (after GitHub issue [#12979](https://github.com/shader-slang/slang/issues/12979)) |
-| integer type to `float` or `double`                                 | warning, unless the source is a literal with no precision loss (after GitHub issue [#12929](https://github.com/shader-slang/slang/issues/12929)) |
-| floating-point type to a `bool`                                     | warning                                                                                                                                          |
-| floating-point type to an integer type                              | warning                                                                                                                                          |
-| floating-point type to a narrower floating-point type               | warning                                                                                                                                          |
-| `float` to `double` (potential unintended performance issue)        | warning, function-call arguments only, literals exempted                                                                                         |
-| vector to vector, matrix to matrix                                  | same as the element type conversion                                                                                                              |
-| `vector<float,N>` to `vector<double,N>`                             | same as the scalar case above (after GitHub issue [#12930](https://github.com/shader-slang/slang/issues/12930))                                  |
-| `matrix<float,R,C>` to `matrix<double,R,C>`                         | same as the scalar case above (after GitHub issue [#12930](https://github.com/shader-slang/slang/issues/12930))                                  |
+| Conversion                                                          | Compiler diagnostic                                                                                                                                           |
+|---------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `bool` to a floating-point type                                     | warning                                                                                                                                                       |
+| integer type to a `bool`                                            | warning                                                                                                                                                       |
+| integer type to a narrower integer type                             | warning, unless the source is a known constant value with no precision loss (after GitHub issue [#10516](https://github.com/shader-slang/slang/issues/10516)) |
+| integer type to a same-width integer type with different signedness | opt-in warning (after GitHub issue [#12928](https://github.com/shader-slang/slang/issues/12928))                                                              |
+| integer type to `half`, `float` or `double`                         | warning, unless the source is a known constant value with no precision loss                                                                                   |
+| floating-point type to a `bool`                                     | warning                                                                                                                                                       |
+| floating-point type to an integer type                              | warning                                                                                                                                                       |
+| floating-point type to a narrower floating-point type               | warning                                                                                                                                                       |
+| `float` to `double` (potential unintended performance issue)        | warning, function-call arguments only, literals exempted                                                                                                      |
+| vector to vector, matrix to matrix                                  | same as the element type conversion                                                                                                                           |
+| `vector<float,N>` to `vector<double,N>`                             | same as the scalar case above (after GitHub issue [#12930](https://github.com/shader-slang/slang/issues/12930))                                               |
+| `matrix<float,R,C>` to `matrix<double,R,C>`                         | same as the scalar case above (after GitHub issue [#12930](https://github.com/shader-slang/slang/issues/12930))                                               |
 
-Where the table says "unless the source is a literal with no precision loss", the conversion is not diagnosed
-when the source is a literal and the value is unchanged by the conversion.
+Where the table says "unless the source is a known constant value with no precision loss", the conversion is
+not diagnosed when the source is a literal or otherwise known constant and the value is unchanged by the
+conversion.
 
-When the source is a binary, octal, or hexadecimal integer literal converted to an integer type, precision is
-considered lost only when set bits are dropped. This allows expressions such as `int16_t v = 0x8000`, where
-the literal value is technically out of range but only unset bits are dropped in truncation. (After GitHub
-issue [#10516](https://github.com/shader-slang/slang/issues/10516).)
+As a special case, a constant value `-1` is always convertible to an unsigned integer without a warning. This
+is the "set all bits" idiom. For example, `uint8_t v = -1;` initializes `v` with value `255`, which has all
+bits set for a `uint8_t`-typed value.
+
+Additionally, when the source is a _bitwise integer literal_ (i.e., it uses binary, octal, or hexadecimal
+base) and it is converted to an integer type, implicit conversion is allowed when only sign bits are
+dropped. This allows expressions such as `int16_t v = 0x8000` and `uint8_t w = ~3`, where the literal value is
+technically out of range but only sign bits are dropped in truncation.
+Note that [bitwise NOT](expressions-operators.md) operator applied on any integer literal makes the resulting
+literal a bitwise literal regardless of the base of the source literal.
 
 Finally, one implicit conversion exists **only as a source-compatibility feature for the HLSL-flavored
 dialect** and is intentionally kept out of the lists above. It is more restricted than the not-recommended
@@ -310,6 +316,10 @@ that rely on an enum decaying to an arithmetic value continue to compile.
 >   parameter type
 > - [Generic argument application](generics.md) where the argument type does not match the generic parameter
 >   type
+
+> 📝 **Remark:** Constant folding of bitwise binary operators does not currently produce bitwise constant
+> values. This is to say that an expression such as `int8_t i = 0x80 | 0x08;` diagnoses a warning.
+> See GitHub issue [#xxxxx](https://github.com/shader-slang/slang/issues/xxxxx).
 
 > ⚠️ **Warning:** The `T` &rarr; `vector<T,2>` implicit conversion is why, in Slang 2025 and earlier,
 > `vector<T,4>` accepted the three-component initializers `(vector<T,2>, T)` and `(T, vector<T,2>)` with

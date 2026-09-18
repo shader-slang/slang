@@ -96,7 +96,8 @@ Description:
   operand is `true`. Otherwise, it returns `false`.
   See [ILogical.or](../../../core-module-reference/interfaces/ilogical-01/or.html) for details.
 - The **bitwise NOT** operator flips all bits in `val` and returns the value. That is, bit value 0 becomes 1,
-  and bit value 1 becomes 0.
+  and bit value 1 becomes 0. When applied to an integer literal, the resulting value is considered a bitwise
+  integer literal regardless of the base of the literal.
   See [ILogical.bitNot](../../../core-module-reference/interfaces/ilogical-01/bitnot-3.html) for details.
 - The **bitwise AND** operator performs the logical AND operation between every corresponding bit in `lhs`
   and `rhs` and returns the value.
