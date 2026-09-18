@@ -1010,6 +1010,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         SpvSnippet* snippet)
     {
         const auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : intrinsic->sourceLoc;
+        // A zero-instruction snippet is a valid parse but has no result value: emitSpvSnippet
+        // returns the last emitted instruction as the call's result, so an empty list would leave
+        // getLast() reading an empty list. E29001 is reused here (its message is the `reason`
+        // string) though its name reads operand-specific.
+        if (snippet->instructions.getCount() == 0)
+        {
+            m_sink->diagnose(Diagnostics::InvalidSpirvSnippetOperand{
+                .reason = "the snippet contains no instructions, so the call has no SPIR-V result "
+                          "value to emit",
+                .location = loc});
+            return false;
+        }
         // emitSpvSnippet fills context.argumentIds with exactly one id per call argument, so
         // getArgCount() is the same bound its `_N` (ObjectReference) access indexes against.
         const auto argCount = (SpvWord)inst->getArgCount();
