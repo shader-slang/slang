@@ -2632,6 +2632,9 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
 
     SemanticsVisitor subVisitor(contextToUse);
     initExpr = subVisitor.CheckExpr(initExpr);
+    // Preserve the checked source before `maybeOpenRef` so the memory-qualifier check below can see
+    // the referenced source decl.
+    Expr* checkedInitExpr = initExpr;
     initExpr = maybeOpenRef(initExpr);
 
     // TODO: We might need some additional steps here to ensure
@@ -2642,6 +2645,13 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
 
     varDecl->initExpr = initExpr;
     varDecl->type.type = initExpr->type;
+
+    // A type-inferred local adopts its initializer's type (assigned just above), so the source and
+    // destination handle types match by construction. Diagnose a dropped memory qualifier here, the
+    // header-phase site that owns the type-inferred case: it marks the decl DefinitionChecked so
+    // the body-visitor's checkVarDeclCommon does not re-diagnose it -- the two sites partition the
+    // cases and E30048 fires once.
+    diagnoseMemoryQualifierDropOnLocalCopy(varDecl, checkedInitExpr);
 
     varDecl->setCheckState(DeclCheckState::DefinitionChecked);
     _validateCircularVarDefinition(varDecl);
@@ -3431,8 +3441,19 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         if (initExpr->type.isWriteOnly)
             getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = initExpr});
 
+        // Remember the checked (pre-coercion) initializer; coercion may wrap the VarExpr in casts
+        // that hide the source decl the memory-qualifier check below needs to inspect.
+        Expr* checkedInitExpr = initExpr;
+
         initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
         varDecl->initExpr = initExpr;
+
+        // A memory qualifier on the source decl is a decl-level modifier, invisible to the
+        // type-only coercion above, so diagnose dropping it into this local -- but only when the
+        // initialization is otherwise valid, so a type-mismatched initializer is not also charged a
+        // spurious qualifier-drop error.
+        if (getSink()->getErrorCount() == errorCountBeforeInitCheck)
+            diagnoseMemoryQualifierDropOnLocalCopy(varDecl, checkedInitExpr);
 
         // We need to ensure that any variable doesn't introduce
         // a constant with a circular definition.
