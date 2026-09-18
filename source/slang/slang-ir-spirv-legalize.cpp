@@ -1008,6 +1008,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         SpvSnippet* snippet)
     {
         const auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : intrinsic->sourceLoc;
+        // emitSpvSnippet returns the last emitted instruction as the call's result, so a snippet
+        // must contain at least one instruction.
+        if (snippet->instructions.getCount() == 0)
+        {
+            m_sink->diagnose(Diagnostics::EmptySpirvSnippet{.location = loc});
+            return false;
+        }
         const auto argCount = (SpvWord)inst->getArgCount();
         for (Index i = 0; i < snippet->instructions.getCount(); i++)
         {

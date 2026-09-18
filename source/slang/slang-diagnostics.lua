@@ -1207,6 +1207,13 @@ err(
 )
 
 err(
+    "empty-spirv-snippet",
+    29004,
+    "empty SPIR-V snippet",
+    span { loc = "location", message = "no SPIR-V instructions in target intrinsic snippet" }
+)
+
+err(
     "unrecognized-spirv-opcode",
     29100,
     "unrecognized SPIR-V opcode",
