@@ -142,18 +142,18 @@ Type* SharedASTBuilder::getDiffInterfaceType()
 // declaration kind would be a core-module authoring bug, not a shape this function should
 // silently tolerate and hand to `DeclRefType::create` regardless.
 //
-// Each container is probed by name via `findLastDirectMemberDeclOfName`, which is backed by a
-// `Dictionary<Name*, Decl*>` built (and cached) by
-// `ContainerDecl::_ensureLookupAcceleratorsAreValid`, rather than by walking
-// `getDirectMemberDecls()` and comparing every member's name. That matters for `core.meta.slang`'s
-// `FileDecl`, which holds every builtin scalar/vector/matrix overload in the core module: the three
-// names this function is called with all live directly on that one `FileDecl`, so with the
-// dictionary probe the discovery-only enumeration below (which exists solely to find nested
-// `FileDecl`/`NamespaceDecl` containers to recurse into) never runs for it — the probe on
-// `core.meta.slang` itself returns the match before reaching that loop. It also avoids forcing full
-// materialization of a container's members on the on-demand-deserialization path
-// (`ContainerDecl::getDirectMemberDecls` calls `_readAllSerializedDecls` unconditionally), where
-// `findLastDirectMemberDeclOfName` instead deserializes only the requested name.
+// Each container is probed by name via `findLastDirectMemberDeclOfName` (a cached
+// `Dictionary<Name*, Decl*>` lookup) before falling back to the `getDirectMemberDecls()`
+// enumeration below, which exists only to discover nested `FileDecl`/`NamespaceDecl` containers to
+// recurse into. All three names this function is called with live directly on `core.meta.slang`'s
+// `FileDecl` -- one of several `FileDecl`s in the core module, but the one holding every builtin
+// scalar/vector/matrix overload declared in that file -- so the probe on it returns the match
+// immediately and the enumeration never runs for it. `findLastDirectMemberDeclOfName` returns the
+// *last* direct member of that name rather than the first one enumeration would hit; harmless here
+// since the `[sealed]` interfaces above are each declared exactly once, so first and last coincide
+// (and the `SLANG_RELEASE_ASSERT` below still catches a violation of that invariant). The probe
+// also sidesteps `getDirectMemberDecls()` forcing full materialization of a container's members on
+// the on-demand-deserialization path; it deserializes only the requested name.
 static Decl* _findCoreModuleDeclByName(Session* session, Name* name)
 {
     auto coreModule = session->getBuiltinModule(slang::BuiltinModuleName::Core);
@@ -206,8 +206,8 @@ static Decl* _findCoreModuleDeclByName(Session* session, Name* name)
 // simpler question than lookup is built for: "does the core module declare a top-level interface
 // with exactly this name". `_findCoreModuleDeclByName` answers that directly from the module's
 // own declarations, the same declarations `T : __BuiltinFloatingPointType` itself resolves
-// against, and each accessor below caches the result once found so the scan (linear in the size
-// of the core module) runs at most once per session.
+// against (see the dictionary-probe comment on `_findCoreModuleDeclByName` above), and each
+// accessor below caches the result once found so the lookup runs at most once per session.
 Type* SharedASTBuilder::getBuiltinIntegerInterfaceType()
 {
     if (!m_builtinIntegerType)
