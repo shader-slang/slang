@@ -62,6 +62,9 @@ struct SPIRVEmitSharedContext
         builder.setInsertInto(module);
         m_voidType = builder.getVoidType();
     }
+    // Returns the parsed snippet for `intrinsic`, or null if it cannot be parsed. On failure the
+    // snippet-parsing-failed (E29000) diagnostic is emitted exactly once and the null is cached, so
+    // a repeated lookup neither re-parses nor re-diagnoses.
     SpvSnippet* getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic);
 };
 
