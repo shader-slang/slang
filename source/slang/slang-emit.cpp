@@ -70,6 +70,7 @@
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-legalize-mesh-outputs.h"
+#include "slang-ir-legalize-resource-globals.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-legalize-vector-types.h"
@@ -2048,6 +2049,21 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
 
         if (!validateStructuredBufferResourceTypes(irModule, sink, targetRequest))
+            return SLANG_FAIL;
+
+        // Make per-invocation resource state explicit while linked identities, initializer bodies,
+        // function decorations/references, and direct calls still expose the relevant boundaries.
+        // This must currently run before resource-type legalization: non-simple resource globals
+        // such as ParameterBlock and append-buffer values can carry initializer bodies that the
+        // type legalizer cannot split while preserving their source-static identity.
+        //
+        // TODO: Investigate whether global-initializer extraction can move here as a general step,
+        // with resource-global localization deferred until after resource-type legalization. That
+        // could eliminate the resource-specific initializer selection mode, but requires the type
+        // legalizer to preserve linkage, initialization dependencies, and boundary-analysis state
+        // across split leaf globals. Correctness and generated-code impact also need validation.
+        SLANG_PASS(legalizeResourceGlobalVars, targetProgram, sink);
+        if (sink->getErrorCount() != 0)
             return SLANG_FAIL;
 
         // Many of our target languages and/or downstream compilers

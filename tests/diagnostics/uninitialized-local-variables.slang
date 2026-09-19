@@ -25,9 +25,9 @@ float3 unconditional(int mode)
 
     return k0 + k1;
 //CHK:        ^ possible use of uninitialized variable
-//CHK:        ^ variable 'k0' may be uninitialized on some paths; it is only conditionally assigned
+//CHK:        ^ variable 'k0' is not definitely initialized before this use
 //CHK:        ^ possible use of uninitialized variable
-//CHK:        ^ variable 'k1' may be uninitialized on some paths; it is only conditionally assigned
+//CHK:        ^ variable 'k1' is not definitely initialized before this use
 }
 
 // Warn here for branches using the variables

@@ -202,6 +202,14 @@ IRType* getVectorOrCoopMatrixElementType(IRType* type);
 // If `type` is a matrix, returns its element type. Otherwise, return `type`.
 IRType* getMatrixElementType(IRType* type);
 
+/// Returns true if `inst` may inspect operand types but cannot observe operand runtime values.
+///
+/// A value-use analysis may ignore these instructions without treating their operands as read.
+bool doesInstOnlyDependOnOperandTypes(IRInst* inst);
+
+/// Returns true if `globalVar` represents file-scope resource state with per-invocation lifetime.
+bool isPerInvocationResourceStateGlobalVar(IRGlobalVar* globalVar);
+
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
 bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);

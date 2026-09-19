@@ -1,5 +1,5 @@
-// Same to gh-4874.slang, but defining the global resource typed variables
-// without the "const" modifier. This should lead to a compile time error.
+// A direct resource global is legal, while an ordinary struct containing a resource remains
+// unsupported.
 //
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 RWStructuredBuffer<uint> outputBuffer;
@@ -7,11 +7,16 @@ RWStructuredBuffer<uint> outputBuffer;
 RWStructuredBuffer<uint> inputBuffer;
 
 static RWStructuredBuffer<uint> gBuffer = inputBuffer;
-/*CHECK:
-                                ^^^^^^^ global variable cannot have opaque type
-                                ^^^^^^^ global variable cannot have opaque type.
-                                ^^^^^^^ do you intend to define a `static const` instead?
-*/
+
+static groupshared RWStructuredBuffer<uint> gSharedBuffer;
+//CHECK:                                    ^^^^^^^^^^^^^ global variable cannot have opaque type
+//CHECK:                                    ^^^^^^^^^^^^^ global variable cannot have opaque type.
+//CHECK:                                    ^^^^^^^^^^^^^ do you intend to define a `uniform` parameter instead?
+
+globallycoherent static RWStructuredBuffer<uint> coherentBuffer = inputBuffer;
+//CHECK:                                         ^^^^^^^^^^^^^^ global variable cannot have opaque type
+//CHECK:                                         ^^^^^^^^^^^^^^ global variable cannot have opaque type.
+//CHECK:                                         ^^^^^^^^^^^^^^ do you intend to define a `static const` instead?
 
 struct Stuff
 {

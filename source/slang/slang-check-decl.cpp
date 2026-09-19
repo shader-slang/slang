@@ -3397,6 +3397,74 @@ static bool _initExprIsRuntimeValue(Expr* expr)
     return false;
 }
 
+static bool _isPerInvocationResourceOrResourceArray(VarDeclBase* varDecl)
+{
+    // Resource-global legalization can replace a resource value, including an array of such values,
+    // only when the declaration requests ordinary per-invocation storage. First classify the value
+    // type precisely, and then reject storage modifiers that an entry-point local cannot reproduce.
+    auto type = varDecl->getType();
+    for (;;)
+    {
+        if (auto modifiedType = as<ModifiedType>(type))
+            type = modifiedType->getBase();
+        else if (auto arrayType = as<ArrayExpressionType>(type))
+            type = arrayType->getElementType();
+        else
+            break;
+    }
+
+    bool isResource =
+        as<ResourceType>(type) || as<SamplerStateType>(type) ||
+        as<UniformParameterGroupType>(type) || as<HLSLStructuredBufferTypeBase>(type) ||
+        as<HLSLByteAddressBufferType>(type) || as<HLSLRWByteAddressBufferType>(type) ||
+        as<HLSLRasterizerOrderedByteAddressBufferType>(type);
+    if (!isResource)
+        return false;
+
+    if (varDecl->hasModifier<HLSLGroupSharedModifier>())
+        return false;
+    if (varDecl->hasModifier<ActualGlobalModifier>())
+        return false;
+    if (varDecl->hasModifier<MemoryQualifierSetModifier>())
+        return false;
+
+    return true;
+}
+
+static void maybeDiagnoseOpaqueTypeGlobalVar(
+    DiagnosticSink* sink,
+    VarDeclBase* varDecl,
+    TypeTag typeTags)
+{
+    // Mutable file-scope `static` variables of opaque type have historically been rejected because
+    // most opaque values cannot use ordinary global storage. Resource-global legalization now
+    // supports one narrow exception. Work from the user-visible declaration categories toward that
+    // exception, with an early return for every case that does not denote an unsupported variable.
+    if ((int(typeTags) & int(TypeTag::Opaque)) == 0)
+        return;
+
+    if (!isGlobalDecl(varDecl))
+        return;
+
+    // Without `static`, a top-level declaration is a shader parameter rather than global storage.
+    if (!varDecl->hasModifier<HLSLStaticModifier>())
+        return;
+
+    // A `static const` declaration denotes a constant rather than a mutable variable.
+    if (varDecl->hasModifier<ConstModifier>())
+        return;
+
+    // This is the one opaque-variable case that later IR legalization knows how to replace.
+    if (_isPerInvocationResourceOrResourceArray(varDecl))
+        return;
+
+    sink->diagnose(Diagnostics::GlobalVarCannotHaveOpaqueType{.decl = varDecl});
+    if (varDecl->initExpr)
+        sink->diagnose(Diagnostics::DoYouMeanStaticConst{.decl = varDecl});
+    else
+        sink->diagnose(Diagnostics::DoYouMeanUniform{.decl = varDecl});
+}
+
 void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     DiagnoseIsAllowedInitExpr(varDecl, getSink());
@@ -3632,17 +3700,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             getSink()->diagnose(Diagnostics::VarCannotBeUnsized{.decl = varDecl});
         }
 
-        bool isOpaque = (((int)varTypeTags & (int)TypeTag::Opaque) != 0);
-        if (isOpaque && isGlobalDecl(varDecl) && !varDecl->hasModifier<ConstModifier>() &&
-            varDecl->hasModifier<HLSLStaticModifier>())
-        {
-            // Opaque type global variable must be const.
-            getSink()->diagnose(Diagnostics::GlobalVarCannotHaveOpaqueType{.decl = varDecl});
-            if (varDecl->initExpr)
-                getSink()->diagnose(Diagnostics::DoYouMeanStaticConst{.decl = varDecl});
-            else
-                getSink()->diagnose(Diagnostics::DoYouMeanUniform{.decl = varDecl});
-        }
+        maybeDiagnoseOpaqueTypeGlobalVar(getSink(), varDecl, varTypeTags);
     }
 
     if (auto elementType = getConstantBufferElementType(varDecl->getType()))

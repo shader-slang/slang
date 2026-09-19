@@ -5195,14 +5195,14 @@ warning(
     "possibly-using-uninitialized-variable",
     41035,
     "possible use of uninitialized variable",
-    span { loc = "location", message = "variable '~varName' may be uninitialized on some paths; it is only conditionally assigned" }
+    span { loc = "location", message = "variable '~varName' is not definitely initialized before this use" }
 )
 
 warning(
     "possibly-using-uninitialized-value",
     41036,
     "possible use of uninitialized value",
-    span { loc = "location", message = "value of type '~typeName' may be uninitialized on some paths; it is only conditionally assigned" }
+    span { loc = "location", message = "value of type '~typeName' is not definitely initialized before this use" }
 )
 
 warning(
@@ -5971,6 +5971,41 @@ warning(
     56005,
     "'precise' qualifier is not supported on target '~target' and will be ignored; Slang does not currently preserve it in generated code, so the value may be optimized with fused/contracted arithmetic",
     span { loc = "location" }
+)
+
+err(
+    "resource-dependent-static-used-by-preserved-function",
+    56006,
+    "resource-dependent static state is not supported in an independently invoked function",
+    span { loc = "location", message = "function '~function:IRInst' may be invoked without an entry-point caller and transitively accesses per-invocation resource-dependent static state; pass the required state explicitly instead" }
+)
+
+err(
+    "resource-static-aliases-threaded-state",
+    56007,
+    "file-scope static resource cannot be accessed both by name and explicit reference",
+    span { loc = "location", message = "file-scope static resource '~variable:IRInst' is passed by reference to function '~function:IRInst', which also accesses it by name; pass the resource through only one of those paths" }
+)
+
+err(
+    "resource-dependent-state-has-preserved-storage",
+    56008,
+    "resource-dependent state cannot have externally preserved storage",
+    span { loc = "location", message = "variable '~variable:IRInst' has storage that must remain externally addressable, but its initialization or resource value must be localized to each entry point" }
+)
+
+err(
+    "resource-static-address-escapes",
+    56009,
+    "address of file-scope static resource cannot escape",
+    span { loc = "location", message = "the address of file-scope static resource '~variable:IRInst' escapes the function; pass the resource value or a caller-owned reference explicitly instead" }
+)
+
+err(
+    "resource-dependent-static-used-by-callable-entry-point",
+    56010,
+    "resource-dependent static state is not supported in a callable entry point",
+    span { loc = "location", message = "entry point '~function:IRInst' is also called as an ordinary function and transitively accesses per-invocation resource-dependent static state; move the shared implementation to an unannotated helper" }
 )
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics

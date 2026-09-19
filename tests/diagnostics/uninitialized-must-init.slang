@@ -22,7 +22,7 @@ float struct_conditional(bool b)
         d.value = 1.0;
     return d.value;
 //CHK: E41035
-//CHK: variable 'd' may be uninitialized on some paths
+//CHK: variable 'd' is not definitely initialized before this use
 }
 
 // Out parameter in conditional path
@@ -35,7 +35,7 @@ int out_param_conditional(bool b)
         set_val(x);
     return x;
 //CHK: E41035
-//CHK: variable 'x' may be uninitialized on some paths
+//CHK: variable 'x' is not definitely initialized before this use
 }
 
 // Conditional via out param, only one variable
@@ -46,7 +46,7 @@ int out_param_conditional_only(bool b)
         set_val(y);
     return y;
 //CHK: E41035
-//CHK: variable 'y' may be uninitialized on some paths
+//CHK: variable 'y' is not definitely initialized before this use
 }
 
 // Loop-initialized variable: should NOT warn
@@ -81,7 +81,7 @@ float switch_fallthrough(int val)
     case 1:
         return d.value;
 //CHK: E41035
-//CHK: variable 'd' may be uninitialized on some paths
+//CHK: variable 'd' is not definitely initialized before this use
     default:
         break;
     }
@@ -187,7 +187,7 @@ uint wave_elect_negated_guard_warn(bool bIsAlive)
     }
     return WaveReadLaneFirst(nBaseIndex) + WavePrefixCountBits(bIsAlive);
 //CHK: E41035
-//CHK: variable 'nBaseIndex' may be uninitialized on some paths
+//CHK: variable 'nBaseIndex' is not definitely initialized before this use
 }
 
 // Same guarded store as the no-warn case above, but read back directly instead of through
@@ -202,7 +202,7 @@ uint wave_elect_plain_read_warn(bool bIsAlive)
     }
     return nBaseIndex + WavePrefixCountBits(bIsAlive);
 //CHK: E41035
-//CHK: variable 'nBaseIndex' may be uninitialized on some paths
+//CHK: variable 'nBaseIndex' is not definitely initialized before this use
 }
 
 // The store is nested inside a further conditional *within* the `WaveIsFirstLane()` guard, so
@@ -222,7 +222,7 @@ uint wave_elect_nested_conditional_store_warn(bool bIsAlive)
     }
     return WaveReadLaneFirst(nBaseIndex) + WavePrefixCountBits(bIsAlive);
 //CHK: E41035
-//CHK: variable 'nBaseIndex' may be uninitialized on some paths
+//CHK: variable 'nBaseIndex' is not definitely initialized before this use
 }
 
 [Shader("compute")]
