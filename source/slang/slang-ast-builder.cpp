@@ -141,6 +141,19 @@ Type* SharedASTBuilder::getDiffInterfaceType()
 // `[sealed]` interfaces declared once in the core module, so a name collision with some other
 // declaration kind would be a core-module authoring bug, not a shape this function should
 // silently tolerate and hand to `DeclRefType::create` regardless.
+//
+// Each container is probed by name via `findLastDirectMemberDeclOfName`, which is backed by a
+// `Dictionary<Name*, Decl*>` built (and cached) by
+// `ContainerDecl::_ensureLookupAcceleratorsAreValid`, rather than by walking
+// `getDirectMemberDecls()` and comparing every member's name. That matters for `core.meta.slang`'s
+// `FileDecl`, which holds every builtin scalar/vector/matrix overload in the core module: the three
+// names this function is called with all live directly on that one `FileDecl`, so with the
+// dictionary probe the discovery-only enumeration below (which exists solely to find nested
+// `FileDecl`/`NamespaceDecl` containers to recurse into) never runs for it — the probe on
+// `core.meta.slang` itself returns the match before reaching that loop. It also avoids forcing full
+// materialization of a container's members on the on-demand-deserialization path
+// (`ContainerDecl::getDirectMemberDecls` calls `_readAllSerializedDecls` unconditionally), where
+// `findLastDirectMemberDeclOfName` instead deserializes only the requested name.
 static Decl* _findCoreModuleDeclByName(Session* session, Name* name)
 {
     auto coreModule = session->getBuiltinModule(slang::BuiltinModuleName::Core);
@@ -154,13 +167,13 @@ static Decl* _findCoreModuleDeclByName(Session* session, Name* name)
     workList.add(moduleDecl);
     for (Index i = 0; i < workList.getCount(); i++)
     {
+        if (auto found = workList[i]->findLastDirectMemberDeclOfName(name))
+        {
+            SLANG_RELEASE_ASSERT(as<InterfaceDecl>(found));
+            return found;
+        }
         for (auto member : workList[i]->getDirectMemberDecls())
         {
-            if (member->getName() == name)
-            {
-                SLANG_RELEASE_ASSERT(as<InterfaceDecl>(member));
-                return member;
-            }
             if (auto fileDecl = as<FileDecl>(member))
                 workList.add(fileDecl);
             else if (auto namespaceDecl = as<NamespaceDecl>(member))
