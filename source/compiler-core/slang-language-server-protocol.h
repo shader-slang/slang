@@ -314,6 +314,20 @@ struct WorkspaceFolder
 struct InitializeParams
 {
     List<WorkspaceFolder> workspaceFolders;
+
+    // The `rootUri` and `rootPath` fields are the older, single-root workspace handshake that
+    // predates `workspaceFolders`. They are deprecated in the LSP spec but remain the only root
+    // some clients send, so we read them as a fallback when `workspaceFolders` is absent. `rootUri`
+    // takes precedence over `rootPath` per the spec.
+    String rootUri;
+    String rootPath;
+
+    // Client-supplied startup configuration. Editors that do not answer the server-initiated
+    // `workspace/configuration` pull (which is VS Code centric) deliver settings here instead, so
+    // we route recognized `slang.*` keys through the same handler used for
+    // `didChangeConfiguration`.
+    JSONValue initializationOptions = JSONValue::makeInvalid();
+
     static const UnownedStringSlice methodName;
     static const StructRttiInfo g_rttiInfo;
 };
