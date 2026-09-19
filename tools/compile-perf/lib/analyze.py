@@ -18,6 +18,27 @@ import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+# Not a real timer name — a per-WORKLOAD marker carried inside the same
+# {workload|timer: value} maps the series already use, so a schema transition is
+# visible downstream without changing any of those return shapes. 1.0 =
+# "detailed", 0.0 = "coarse", absent = unknown (data recorded before bench.py
+# started writing "timer_schema" in #13009).
+#
+# Per workload, NOT per point: the schema is a property of how a given workload
+# was invoked, and the two coexist within one sweep. The api-mode workloads are
+# always coarse (their driver takes no -report-detailed-perf-benchmark) while
+# target/module/link workloads went detailed in #13009, so a nightly point
+# legitimately holds both — permanently. A per-point schema would therefore read
+# "mixed" forever and discriminate nothing.
+SCHEMA_MARKER = "__timer_schema__"
+
+
+def schema_value(schema):
+    """The SCHEMA_MARKER encoding of a record's `timer_schema`, or None when the
+    record predates the field (callers treat None as unknown, never as a match)."""
+    return None if schema is None else (1.0 if schema == "detailed" else 0.0)
+
+
 # The profiler timers are NESTED:
 #   compileInner
 #     frontEndExecute        -> parseTranslationUnit, SemanticChecking, generateIR

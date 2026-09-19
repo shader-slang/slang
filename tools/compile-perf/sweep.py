@@ -95,6 +95,17 @@ def main():
                 if not szs:
                     return False
                 spec = manifest.BY_NAME.get(wl)
+                # The manifest's CURRENT default_size must be among the measured
+                # sizes. Without this the check only asks "was this workload ever
+                # measured at all", so resizing a workload (#13035 moved
+                # interface_depth 64->128, conformance and overload_resolution
+                # 600->2400, resource_aggregate 80->320) leaves every release
+                # looking complete at the stale size and no re-sweep is ever
+                # triggered. That contradicts the ladder rule just below, which
+                # deliberately re-sweeps when the manifest's sweep_sizes are
+                # retuned; default_size is the other half of the same intent.
+                if spec and spec.default_size not in szs:
+                    return False
                 if args.sweep and spec and spec.sweep_sizes:
                     # Every configured ladder size must be present: an
                     # interrupted prior sweep (e.g. a per-run timeout) leaves a

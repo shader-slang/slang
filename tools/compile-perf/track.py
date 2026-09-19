@@ -76,6 +76,14 @@ def _point_metrics(results_json_path):
         for timer, st in r["timers"].items():
             if st is not None:
                 out[f"{r['workload']}|{timer}"] = st["median"]
+        # Carried alongside the timers so trend.py can refuse to compare a
+        # counter across a schema change: which schema a workload ran under
+        # decides how the compiler ATTRIBUTES its time, not merely how many
+        # counters it reports. Absent when the sweep predates the field, which
+        # consumers read as unknown rather than as a match.
+        sv = analyze.schema_value(r.get("timer_schema"))
+        if sv is not None:
+            out[f"{r['workload']}|{analyze.SCHEMA_MARKER}"] = sv
     return out
 
 

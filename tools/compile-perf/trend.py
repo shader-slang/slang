@@ -234,6 +234,7 @@ def main():
     # --baseline-kind any for ad-hoc cross-kind comparisons.
     if args.baseline_kind == "daily":
         prior = [p for p in prior if p.get("kind") == "daily"]
+
     window = prior[-args.window:]
 
     if hist_runner and cur_runner and cur_runner != hist_runner:
@@ -254,12 +255,38 @@ def main():
     base_labels = f"{window[0]['label']}..{window[-1]['label']}"
     regressions = []
     warnings = []
+    schema_skipped = set()
     for key, cur in sorted(current.get("metrics", {}).items()):
         wl, _, counter = key.partition("|")
         if not judged(wl, counter):
             continue
-        baseline = [p["metrics"][key] for p in window if key in p.get("metrics", {})]
+        # The timer schema is a provenance axis like the runner fingerprint and
+        # the point kind, and it is filtered HERE rather than on the window
+        # because it varies per workload within a single point: api-mode
+        # workloads are permanently coarse, while target/module/link workloads
+        # went detailed in #13009. Dropping whole points would throw away the
+        # api baselines to fix the detailed ones.
+        #
+        # This matters because the schema decides how the compiler ATTRIBUTES
+        # time, not just how many counters it reports: the same unchanged
+        # compile read `specializeModule` at 16.4 ms coarse and 33.1 ms detailed,
+        # with `wall_ms` unmoved and the sub-timers summing past their parent.
+        # Judged against a coarse-majority median, that re-attribution was
+        # reported as 14 regressions on the 2026-09-19 nightly.
+        #
+        # An unknown schema (marker absent, i.e. data predating the field) is
+        # treated as NOT matching rather than as a wildcard — the same refusal
+        # the runner check makes. Admitting it risks a false alert; excluding it
+        # costs a few nights of "skipping trend judgement" until the window
+        # refills with comparable points.
+        schema_key = f"{wl}|{analyze.SCHEMA_MARKER}"
+        cur_schema = current["metrics"].get(schema_key)
+        baseline = [p["metrics"][key] for p in window
+                    if key in p.get("metrics", {})
+                    and p["metrics"].get(schema_key) == cur_schema]
         if len(baseline) < args.min_baseline:
+            if len([p for p in window if key in p.get("metrics", {})]) >= args.min_baseline:
+                schema_skipped.add(wl)
             continue
         med = statistics.median(baseline)
         if med <= 0:
@@ -278,6 +305,20 @@ def main():
             regressions.append((wl, counter, med, cur, ratio, delta))
         elif verdict == "warning":
             warnings.append((wl, counter, med, cur, ratio, delta))
+
+    # Surfaced rather than silent: a workload dropping out of judgement looks
+    # identical to a workload that passed, and the whole point of the schema
+    # filter is that it trades coverage for correctness — the reader has to be
+    # able to see which side of that trade a given run landed on.
+    if schema_skipped:
+        shown = sorted(schema_skipped)
+        listed = ", ".join(shown[:6]) + (f", +{len(shown) - 6} more" if len(shown) > 6 else "")
+        msg = (f"{len(shown)} workload(s) not judged: their trailing points were "
+               f"measured under a different timer schema ({listed}). A "
+               f"re-attributed counter is not a regression; judgement resumes "
+               f"once the window refills with same-schema points.")
+        print(f"WARNING: {msg}")
+        emit_gha_command(f"::warning title=Perf timer schema::{msg}")
 
     regressions.sort(key=lambda r: -r[4])
     warnings.sort(key=lambda r: -r[4])
