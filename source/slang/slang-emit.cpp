@@ -2513,7 +2513,10 @@ Result linkAndOptimizeIR(
         if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
             isMetalTarget(targetRequest))
         {
-            SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
+            SLANG_PASS(
+                transformParamsToConstRef,
+                codeGenContext->getSink(),
+                target == CodeGenTarget::CUDASource ? codeGenContext : nullptr);
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
         [[fallthrough]];
