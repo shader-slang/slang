@@ -99,6 +99,40 @@ class TestUserSkillsPackageVerifier(unittest.TestCase):
                 archive.addfile(entry, io.BytesIO(content))
         return archive_path
 
+    def _write_duplicate_directory_archives(
+        self, stem: str, entries: dict[str, bytes]
+    ) -> tuple[Path, Path]:
+        """Write a zip and a tar of `entries` plus a `share/` directory marker repeated twice.
+
+        The doubled marker reproduces a `CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE` archive in which
+        two components share the `share/` prefix -- the exact shape #13184 must tolerate.
+        """
+
+        zip_path = self.root / f"{stem}.zip"
+        with zipfile.ZipFile(zip_path, "w") as archive:
+            # Writing `share/` twice is the shape under test; zipfile emits a "Duplicate name"
+            # UserWarning for it, which we suppress. The tar branch needs no equivalent because
+            # tarfile does not warn on repeated members.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                for entry_name, content in entries.items():
+                    archive.writestr(entry_name, content)
+                archive.writestr("share/", b"")
+                archive.writestr("share/", b"")
+
+        tar_path = self.root / f"{stem}.tar.gz"
+        with tarfile.open(tar_path, "w:gz") as archive:
+            for entry_name, content in entries.items():
+                entry = tarfile.TarInfo(entry_name)
+                entry.size = len(content)
+                archive.addfile(entry, io.BytesIO(content))
+            for _ in range(2):
+                directory = tarfile.TarInfo("share/")
+                directory.type = tarfile.DIRTYPE
+                archive.addfile(directory)
+
+        return zip_path, tar_path
+
     def test_accepts_zip_and_tar_with_or_without_prefix(self) -> None:
         """Both archive formats support bare payloads and one shared top-level prefix."""
 
@@ -225,26 +259,9 @@ class TestUserSkillsPackageVerifier(unittest.TestCase):
         components -- appears once per component. That repeat is benign and must verify.
         """
 
-        zip_path = self.root / "duplicate-directory.zip"
-        with zipfile.ZipFile(zip_path, "w") as archive:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", UserWarning)
-                for entry_name, content in self._valid_entries().items():
-                    archive.writestr(entry_name, content)
-                archive.writestr("share/", b"")
-                archive.writestr("share/", b"")
-
-        tar_path = self.root / "duplicate-directory.tar.gz"
-        with tarfile.open(tar_path, "w:gz") as archive:
-            for entry_name, content in self._valid_entries().items():
-                entry = tarfile.TarInfo(entry_name)
-                entry.size = len(content)
-                archive.addfile(entry, io.BytesIO(content))
-            for _ in range(2):
-                directory = tarfile.TarInfo("share/")
-                directory.type = tarfile.DIRTYPE
-                archive.addfile(directory)
-
+        zip_path, tar_path = self._write_duplicate_directory_archives(
+            "duplicate-directory", self._valid_entries()
+        )
         for archive_path, verify in (
             (zip_path, verifier._verify_zip),
             (tar_path, verifier._verify_tar),
@@ -254,6 +271,27 @@ class TestUserSkillsPackageVerifier(unittest.TestCase):
                     verify(archive_path, self.expected_files, EXPECTED_COMMIT),
                     SLANG_VERSION,
                 )
+
+    def test_duplicate_directory_marker_still_rejects_missing_bundle_file(self) -> None:
+        """Tolerating a repeated directory marker must not mask a missing bundle file.
+
+        The relaxed guard only skips a directory/directory repeat; the exact file-set check
+        still runs afterward, so an archive that carries the duplicate `share/` marker but drops
+        a required bundle file must still fail with `bundle layout mismatch`.
+        """
+
+        incomplete = self._valid_entries()
+        incomplete.pop(f"{verifier.BUNDLE_ROOT}/skills/example/SKILL.md")
+        zip_path, tar_path = self._write_duplicate_directory_archives(
+            "duplicate-directory-missing-file", incomplete
+        )
+        for archive_path, verify in (
+            (zip_path, verifier._verify_zip),
+            (tar_path, verifier._verify_tar),
+        ):
+            with self.subTest(archive=archive_path.name):
+                with self.assertRaisesRegex(verifier.VerificationError, "bundle layout mismatch"):
+                    verify(archive_path, self.expected_files, EXPECTED_COMMIT)
 
     def test_register_seen_path_distinguishes_directory_and_file_duplicates(self) -> None:
         """Only a directory repeating a directory is benign; every file collision is fatal."""

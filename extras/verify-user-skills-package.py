@@ -53,6 +53,10 @@ def _register_seen_path(
     with a file at the same path, stays fatal because it makes the payload there ambiguous.
     """
 
+    # seen_paths encodes three states per path: absent (never seen), False (seen as a
+    # file), and True (seen as a directory). We test `is not None` rather than truthiness
+    # because a previously-seen file stores False, and treating that as "unseen" would
+    # silently drop the file/file and file/directory duplicate rejections below.
     previous_is_directory = seen_paths.get(normalized_name)
     if previous_is_directory is not None:
         if is_directory and previous_is_directory:
