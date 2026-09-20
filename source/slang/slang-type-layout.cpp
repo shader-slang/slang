@@ -5744,12 +5744,11 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         // The pointee is memory addressed through the pointer, so we lay it out with the buffer
         // layout its data-layout argument selects: `Ptr<T, ..., Std430DataLayout>` lays `T` out in
-        // std430. For a pointer carrying an explicit marker this matches the SPIR-V emit path
-        // (getTypeLayoutRuleNameForBuffer in slang-ir-lower-buffer-element-type.cpp). We select
-        // rules on every target, whereas that emit function only reads the marker for SPIR-V /
-        // CPU-via-LLVM targets; and a pointer with no explicit layout (DefaultDataLayout, or a bare
-        // `Ptr<T>`) uses scalar rules here, deliberately not unified with emit's marker-less
-        // default (see #13188).
+        // std430, matching what the SPIR-V emit path produces for a pointer carrying an explicit
+        // marker (getTypeLayoutRuleNameForBuffer, slang-ir-lower-buffer-element-type.cpp). This
+        // selection is target-independent, whereas that emit path is target-gated; a pointer with
+        // no explicit data layout (DefaultDataLayout, or a bare `Ptr<T>`) reflects with scalar
+        // rules, which need not match emit's marker-less default.
         auto pointeeRules = getLayoutRulesForDataLayoutType(ptrType->getDataLayout());
         if (!pointeeRules)
             pointeeRules = &kScalarLayoutRulesImpl_;
