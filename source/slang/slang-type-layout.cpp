@@ -2034,12 +2034,14 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getAnyValueRules()
     return &kGLSLAnyValueLayoutRulesImpl_;
 }
 
-// Return the buffer layout rules that a data-layout marker type explicitly selects, or null when
-// the type imposes no explicit choice (DefaultDataLayout, DefaultPushConstantDataLayout, or an
-// untyped pointer) so the caller can apply its own default. This is the single place that maps a
-// `Std430DataLayout` / `Std140DataLayout` / `ScalarDataLayout` / `CDataLayout` marker type to its
-// LayoutRulesImpl, shared by the ConstantBuffer path and the pointer-pointee path so both agree on
-// how an explicit data layout is interpreted.
+// Return the GLSL-family buffer layout rules that a data-layout marker type explicitly selects, or
+// null when `dataLayoutType` is null, or is a type that imposes no explicit choice
+// (DefaultDataLayout, DefaultPushConstantDataLayout), so the caller can apply its own default. This
+// is the single GLSL-family place that maps a `Std430DataLayout` / `Std140DataLayout` /
+// `ScalarDataLayout` / `CDataLayout` marker type to its LayoutRulesImpl, shared by the
+// ConstantBuffer path and the pointer-pointee path so both interpret an explicit data layout the
+// same way; LLVMLayoutRulesFamilyImpl::getConstantBufferRules keeps its own parallel mapping for
+// that family.
 static LayoutRulesImpl* getLayoutRulesForDataLayoutType(Type* dataLayoutType)
 {
     if (!dataLayoutType)
@@ -5740,12 +5742,14 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         ptrLayout->addResourceUsage(info.kind, info.size);
 
-        // The pointee is a block of memory addressed through the pointer, so we lay it out with the
-        // buffer layout selected by the pointer's data-layout argument: `Ptr<T, ...,
-        // Std430DataLayout>` lays `T` out in std430, matching the rules the SPIR-V emit path
-        // applies to the same pointer (getTypeLayoutRuleNameForBuffer in
-        // slang-ir-lower-buffer-element-type.cpp). A pointer with no explicit data layout
-        // (DefaultDataLayout, or a bare `Ptr<T>`) uses scalar rules.
+        // The pointee is memory addressed through the pointer, so we lay it out with the buffer
+        // layout its data-layout argument selects: `Ptr<T, ..., Std430DataLayout>` lays `T` out in
+        // std430. For a pointer carrying an explicit marker this matches the SPIR-V emit path
+        // (getTypeLayoutRuleNameForBuffer in slang-ir-lower-buffer-element-type.cpp). We select
+        // rules on every target, whereas that emit function only reads the marker for SPIR-V /
+        // CPU-via-LLVM targets; and a pointer with no explicit layout (DefaultDataLayout, or a bare
+        // `Ptr<T>`) uses scalar rules here, deliberately not unified with emit's marker-less
+        // default (see #13188).
         auto pointeeRules = getLayoutRulesForDataLayoutType(ptrType->getDataLayout());
         if (!pointeeRules)
             pointeeRules = &kScalarLayoutRulesImpl_;
