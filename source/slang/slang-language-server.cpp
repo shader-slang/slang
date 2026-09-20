@@ -3118,9 +3118,7 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
     // (createObject -> m_objectValues.addRange), which may reallocate the buffer and dangle the
     // view mid-iteration. Snapshot the entries first so iteration is independent of any container
     // growth the handlers trigger.
-    List<JSONKeyValue> entries;
-    for (auto kv : obj)
-        entries.add(kv);
+    List<JSONKeyValue> entries(obj);
     for (auto kv : entries)
     {
         auto key = m_connection->getContainer()->getStringFromKey(kv.key);
@@ -3211,6 +3209,10 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         else if (key == "slang.workspaceFlavor")
         {
             updateWorkspaceFlavor(kv.value);
+        }
+        else if (key == "slangLanguageServer.trace.server")
+        {
+            updateTraceOptions(kv.value);
         }
         else if (key == "slang.predefinedLanguageVersion")
         {
