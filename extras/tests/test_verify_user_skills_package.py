@@ -262,7 +262,8 @@ class TestUserSkillsPackageVerifier(unittest.TestCase):
         verifier._register_seen_path(tolerated, "share", True)
         verifier._register_seen_path(tolerated, "share", True)
 
-        for first_is_directory, second_is_directory in ((False, False), (True, False), (False, True)):
+        collision_orders = ((False, False), (True, False), (False, True))
+        for first_is_directory, second_is_directory in collision_orders:
             with self.subTest(first=first_is_directory, second=second_is_directory):
                 seen: dict[str, bool] = {}
                 verifier._register_seen_path(seen, "share/slang/entry", first_is_directory)
