@@ -217,6 +217,58 @@ class TestUserSkillsPackageVerifier(unittest.TestCase):
                 with self.assertRaisesRegex(verifier.VerificationError, "duplicate archive path"):
                     verify(archive_path, self.expected_files, EXPECTED_COMMIT)
 
+    def test_accepts_duplicate_directory_markers(self) -> None:
+        """A prefix owned by two CPack components repeats its directory marker harmlessly.
+
+        `CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE` archives emit one directory marker per
+        component, so `share/` -- installed by both the docs and the user-skills
+        components -- appears once per component. That repeat is benign and must verify.
+        """
+
+        zip_path = self.root / "duplicate-directory.zip"
+        with zipfile.ZipFile(zip_path, "w") as archive:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                for entry_name, content in self._valid_entries().items():
+                    archive.writestr(entry_name, content)
+                archive.writestr("share/", b"")
+                archive.writestr("share/", b"")
+
+        tar_path = self.root / "duplicate-directory.tar.gz"
+        with tarfile.open(tar_path, "w:gz") as archive:
+            for entry_name, content in self._valid_entries().items():
+                entry = tarfile.TarInfo(entry_name)
+                entry.size = len(content)
+                archive.addfile(entry, io.BytesIO(content))
+            for _ in range(2):
+                directory = tarfile.TarInfo("share/")
+                directory.type = tarfile.DIRTYPE
+                archive.addfile(directory)
+
+        for archive_path, verify in (
+            (zip_path, verifier._verify_zip),
+            (tar_path, verifier._verify_tar),
+        ):
+            with self.subTest(archive=archive_path.name):
+                self.assertEqual(
+                    verify(archive_path, self.expected_files, EXPECTED_COMMIT),
+                    SLANG_VERSION,
+                )
+
+    def test_register_seen_path_distinguishes_directory_and_file_duplicates(self) -> None:
+        """Only a directory repeating a directory is benign; every file collision is fatal."""
+
+        tolerated: dict[str, bool] = {}
+        verifier._register_seen_path(tolerated, "share", True)
+        verifier._register_seen_path(tolerated, "share", True)
+
+        for first_is_directory, second_is_directory in ((False, False), (True, False), (False, True)):
+            with self.subTest(first=first_is_directory, second=second_is_directory):
+                seen: dict[str, bool] = {}
+                verifier._register_seen_path(seen, "share/slang/entry", first_is_directory)
+                with self.assertRaisesRegex(verifier.VerificationError, "duplicate archive path"):
+                    verifier._register_seen_path(seen, "share/slang/entry", second_is_directory)
+
     def test_rejects_unsafe_entries_in_zip_and_tar(self) -> None:
         """Archive readers normalize every entry, including files outside the bundle."""
 
