@@ -223,17 +223,49 @@ def main():
     print(f"trend: current={current['label']} ({current['date']}, {current['kind']})  "
           f"runner={cur_runner or 'unset'}")
 
-    # Restrict the baseline to points on the same runner, strictly before the
-    # judged point in series order.
-    prior = [p for p in earlier if (p.get("runner") or hist_runner) == cur_runner]
     # Baseline defaults to DAILY points only: release points are official
     # prebuilt binaries while dailies are runner-built with matched flags but a
     # different MSVC toolset — a build-provenance offset (uniform few-%, and
     # 30%+ on single hot loops) that is not a code regression. Judging tonight
     # against recent nights keeps the baseline provenance-consistent; use
     # --baseline-kind any for ad-hoc cross-kind comparisons.
+    #
+    # In that default mode the candidates come from daily/ on disk rather than
+    # from the tracking series, because the series deliberately keeps only the
+    # dailies dated after the last release (`assemble`). That truncation is the
+    # right shape for the rendered line — release history, then the current tail
+    # — but reusing it as the ALERTING baseline means every release erases the
+    # comparable nights alerting depends on: with --min-baseline 3, the three
+    # nights after a release judge nothing at all. v2026.18 shipped 2026-09-15
+    # and the 09-16/09-17/09-18 nightlies each printed "only N comparable
+    # trailing point(s) (need 3); skipping trend judgement" and passed green —
+    # which is how #13008's regression went unreported on the night it landed.
+    # The points are on disk the whole time; only the series had dropped them.
+    #
+    # --baseline-kind any still reads the series, since mixing kinds is an
+    # explicit ad-hoc request and the series is the only place release points
+    # carry comparable metrics.
+    def _order(p):
+        """Series order: date, then the commit's full timestamp for same-date
+        siblings, then the label as a deterministic last resort."""
+        return (p["date"], p.get("commit_time") or "", p["label"])
+
     if args.baseline_kind == "daily":
-        prior = [p for p in prior if p.get("kind") == "daily"]
+        # The UNION of the series' daily points and every daily sweep on disk,
+        # deduped by label. On disk is normally the superset — that is the whole
+        # point — but the series remains the only source when daily/ is absent,
+        # which is the shape the self-checks below construct.
+        by_label = {p["label"]: p for p in earlier if p.get("kind") == "daily"}
+        for p in analyze.daily_series_points(args.results):
+            by_label.setdefault(p["label"], p)
+        cur_order = _order(current)
+        candidates = sorted((p for p in by_label.values() if _order(p) < cur_order),
+                            key=_order)
+    else:
+        candidates = list(earlier)
+
+    # Restrict the baseline to points on the same runner.
+    prior = [p for p in candidates if (p.get("runner") or hist_runner) == cur_runner]
 
     window = prior[-args.window:]
 

@@ -53,6 +53,71 @@ def schema_value(schema):
     return None if schema is None else (1.0 if schema == "detailed" else 0.0)
 
 
+def point_metrics(results_json_path):
+    """{ 'workload|counter': median } for the canonical run of each workload,
+    plus the SCHEMA_MARKER / SIZE_MARKER provenance entries.
+
+    canonical_runs() collapses any swept (multi-size) data to default_size so
+    history and daily points compare like-with-like. The median (not min) is the
+    saved/compared value: it reflects the typical run rather than the single
+    luckiest one, and is steadier when a build's run-to-run spread shifts.
+
+    Lives here rather than in track.py because trend.py builds baseline points
+    straight from daily/ (see daily_series_points) and must encode them
+    identically — two copies of this would let the alerting baseline and the
+    published series disagree about what a point contains.
+    """
+    out = {}
+    for r in canonical_runs(read_json(results_json_path)):
+        for timer, st in r["timers"].items():
+            if st is not None:
+                out[f"{r['workload']}|{timer}"] = st["median"]
+        sv = schema_value(r.get("timer_schema"))
+        if sv is not None:
+            out[f"{r['workload']}|{SCHEMA_MARKER}"] = sv
+        size = r.get("size")
+        if size is not None:
+            out[f"{r['workload']}|{SIZE_MARKER}"] = float(size)
+    return out
+
+
+def daily_series_points(results_dir):
+    """Every daily sweep on disk, oldest first, as tracking-series point dicts.
+
+    The tracking series itself keeps only the dailies dated after the last
+    release — a display choice, so the rendered line reads as "release history,
+    then the current tail". trend.py deliberately does NOT reuse that truncation
+    for its baseline: a release shipping must not erase the comparable nights
+    that alerting depends on.
+    """
+    ddir = os.path.join(results_dir, "daily")
+    if not os.path.isdir(ddir):
+        return []
+    pts = []
+    for label in sorted(os.listdir(ddir)):
+        rj = os.path.join(ddir, label, "results.json")
+        if not os.path.exists(rj):
+            continue
+        meta = {}
+        mp = os.path.join(ddir, label, "meta.json")
+        if os.path.exists(mp):
+            meta = read_json(mp)
+        date = meta.get("date") or label[:10]  # label prefix is YYYY-MM-DD
+        pts.append({"label": label, "date": date, "kind": "daily",
+                    "commit": meta.get("commit", ""),
+                    "commit_time": meta.get("commit_time", ""),
+                    "runner": meta.get("runner", ""),
+                    "metrics": point_metrics(rj)})
+    # Within one date the label tiebreak is the short SHA — lexicographic hex,
+    # unrelated to code order (labels carry only the commit's DATE, and e.g.
+    # master's HEAD is usually committed the previous day, so same-date
+    # siblings are common). Sort by the commit's full timestamp when meta
+    # carries it so siblings land in true code order; the label remains the
+    # deterministic fallback for points registered before commit_time existed.
+    pts.sort(key=lambda p: (p["date"], p.get("commit_time") or "", p["label"]))
+    return pts
+
+
 # The profiler timers are NESTED:
 #   compileInner
 #     frontEndExecute        -> parseTranslationUnit, SemanticChecking, generateIR

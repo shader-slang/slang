@@ -64,34 +64,6 @@ def runner_id():
     return f"{platform.system()}-{platform.machine()}-{cpu}-{cpus}cpu".replace("  ", " ")
 
 
-def _point_metrics(results_json_path):
-    """{ 'workload|timer': median_ms } for the default-size run of each workload.
-    canonical_runs() collapses any swept (multi-size) data to default_size so
-    history and daily points compare like-with-like. The median (not min) is the
-    saved/compared value: it reflects the typical run rather than the single
-    luckiest one, and is steadier when a build's run-to-run spread shifts."""
-    runs = analyze.canonical_runs(analyze.read_json(results_json_path))
-    out = {}
-    for r in runs:
-        for timer, st in r["timers"].items():
-            if st is not None:
-                out[f"{r['workload']}|{timer}"] = st["median"]
-        # Carried alongside the timers so trend.py can refuse to compare a
-        # counter across a schema change: which schema a workload ran under
-        # decides how the compiler ATTRIBUTES its time, not merely how many
-        # counters it reports. Absent when the sweep predates the field, which
-        # consumers read as unknown rather than as a match.
-        sv = analyze.schema_value(r.get("timer_schema"))
-        if sv is not None:
-            out[f"{r['workload']}|{analyze.SCHEMA_MARKER}"] = sv
-        # The size this workload actually ran at, which is not always the
-        # manifest's current default_size — see SIZE_MARKER.
-        size = r.get("size")
-        if size is not None:
-            out[f"{r['workload']}|{analyze.SIZE_MARKER}"] = float(size)
-    return out
-
-
 def _release_points(results_dir, index_path):
     if not os.path.exists(index_path):
         return []
@@ -101,37 +73,8 @@ def _release_points(results_dir, index_path):
         if "slangc" not in rec or not os.path.exists(rj):
             continue
         pts.append({"label": rec["tag"], "date": rec.get("date", ""), "kind": "release",
-                    "commit": rec.get("version", ""), "metrics": _point_metrics(rj)})
+                    "commit": rec.get("version", ""), "metrics": analyze.point_metrics(rj)})
     pts.sort(key=lambda p: p["date"])
-    return pts
-
-
-def _daily_points(results_dir):
-    ddir = os.path.join(results_dir, "daily")
-    if not os.path.isdir(ddir):
-        return []
-    pts = []
-    for label in sorted(os.listdir(ddir)):
-        rj = os.path.join(ddir, label, "results.json")
-        if not os.path.exists(rj):
-            continue
-        meta = {}
-        mp = os.path.join(ddir, label, "meta.json")
-        if os.path.exists(mp):
-            meta = analyze.read_json(mp)
-        date = meta.get("date") or label[:10]  # label prefix is YYYY-MM-DD
-        pts.append({"label": label, "date": date, "kind": "daily",
-                    "commit": meta.get("commit", ""),
-                    "commit_time": meta.get("commit_time", ""),
-                    "runner": meta.get("runner", ""),
-                    "metrics": _point_metrics(rj)})
-    # Within one date the label tiebreak is the short SHA — lexicographic hex,
-    # unrelated to code order (labels carry only the commit's DATE, and e.g.
-    # master's HEAD is usually committed the previous day, so same-date
-    # siblings are common). Sort by the commit's full timestamp when meta
-    # carries it so siblings land in true code order; the label remains the
-    # deterministic fallback for points registered before commit_time existed.
-    pts.sort(key=lambda p: (p["date"], p.get("commit_time") or "", p["label"]))
     return pts
 
 
@@ -139,7 +82,7 @@ def assemble(results_dir, index_path):
     """The tracking series: every release point, then the daily points dated
     strictly after the last release (the post-release ToT tail)."""
     rel = _release_points(results_dir, index_path)
-    daily = _daily_points(results_dir)
+    daily = analyze.daily_series_points(results_dir)
     last_release_date = rel[-1]["date"] if rel else ""
     tail = [d for d in daily if d["date"] > last_release_date]
     runner = ""
