@@ -32,6 +32,20 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # "mixed" forever and discriminate nothing.
 SCHEMA_MARKER = "__timer_schema__"
 
+# The companion marker for the other provenance axis a counter can silently
+# change along: the size the workload ran at. canonical_runs() prefers the
+# manifest's current default_size but FALLS BACK to whatever row it found when
+# no default-size row exists, so a point swept before a resize publishes its
+# counters under the same metric key at the old size. #13035 moved
+# interface_depth 64->128, conformance and overload_resolution 600->2400 and
+# resource_aggregate 80->320; without this marker the 2026-09-20 nightly
+# compared n=128 against an n=64 median and called it an 8.8x regression.
+#
+# Kept as a marker rather than fixed in canonical_runs because the off-default
+# rows are still legitimate data for charts and per-release views — it is only
+# COMPARISON across the change that is invalid.
+SIZE_MARKER = "__size__"
+
 
 def schema_value(schema):
     """The SCHEMA_MARKER encoding of a record's `timer_schema`, or None when the

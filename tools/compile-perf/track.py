@@ -84,6 +84,11 @@ def _point_metrics(results_json_path):
         sv = analyze.schema_value(r.get("timer_schema"))
         if sv is not None:
             out[f"{r['workload']}|{analyze.SCHEMA_MARKER}"] = sv
+        # The size this workload actually ran at, which is not always the
+        # manifest's current default_size — see SIZE_MARKER.
+        size = r.get("size")
+        if size is not None:
+            out[f"{r['workload']}|{analyze.SIZE_MARKER}"] = float(size)
     return out
 
 

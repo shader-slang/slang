@@ -255,38 +255,49 @@ def main():
     base_labels = f"{window[0]['label']}..{window[-1]['label']}"
     regressions = []
     warnings = []
-    schema_skipped = set()
+    provenance_skipped = set()
     for key, cur in sorted(current.get("metrics", {}).items()):
         wl, _, counter = key.partition("|")
         if not judged(wl, counter):
             continue
-        # The timer schema is a provenance axis like the runner fingerprint and
-        # the point kind, and it is filtered HERE rather than on the window
-        # because it varies per workload within a single point: api-mode
-        # workloads are permanently coarse, while target/module/link workloads
-        # went detailed in #13009. Dropping whole points would throw away the
-        # api baselines to fix the detailed ones.
+        # Two more provenance axes, alongside the runner fingerprint and the
+        # point kind that the window was already filtered on. Both are checked
+        # HERE rather than on the window because both vary PER WORKLOAD within a
+        # single point, so dropping whole points would discard good baselines to
+        # repair bad ones:
         #
-        # This matters because the schema decides how the compiler ATTRIBUTES
-        # time, not just how many counters it reports: the same unchanged
-        # compile read `specializeModule` at 16.4 ms coarse and 33.1 ms detailed,
-        # with `wall_ms` unmoved and the sub-timers summing past their parent.
-        # Judged against a coarse-majority median, that re-attribution was
-        # reported as 14 regressions on the 2026-09-19 nightly.
+        #   timer schema — decides how the compiler ATTRIBUTES time, not merely
+        #     how many counters it reports. The same unchanged compile read
+        #     `specializeModule` at 16.4 ms coarse and 33.1 ms detailed, with
+        #     `wall_ms` unmoved and the sub-timers summing past their parent.
+        #     api-mode workloads are permanently coarse (their driver takes no
+        #     such flag) while target/module/link went detailed in #13009, so one
+        #     point legitimately holds both.
         #
-        # An unknown schema (marker absent, i.e. data predating the field) is
-        # treated as NOT matching rather than as a wildcard — the same refusal
-        # the runner check makes. Admitting it risks a false alert; excluding it
-        # costs a few nights of "skipping trend judgement" until the window
-        # refills with comparable points.
-        schema_key = f"{wl}|{analyze.SCHEMA_MARKER}"
-        cur_schema = current["metrics"].get(schema_key)
-        baseline = [p["metrics"][key] for p in window
-                    if key in p.get("metrics", {})
-                    and p["metrics"].get(schema_key) == cur_schema]
+        #   workload size — canonical_runs() falls back to an off-default size
+        #     when no default-size row exists, so a point swept before a resize
+        #     publishes the SAME metric key measured at the old size.
+        #
+        # Both were live on the 2026-09-20 nightly, which flagged 25 regressions
+        # against a commit identical to the night before: 7 from the schema
+        # change, 12 from #13035's resizes. Neither is a code change.
+        #
+        # An absent marker (data predating the field) counts as NOT matching
+        # rather than as a wildcard — the same refusal the runner check makes.
+        # Admitting unknown provenance risks a false alert; excluding it costs a
+        # few nights of reduced coverage while the window refills.
+        prov_keys = (f"{wl}|{analyze.SCHEMA_MARKER}", f"{wl}|{analyze.SIZE_MARKER}")
+        cur_prov = tuple(current["metrics"].get(k) for k in prov_keys)
+        present = [p for p in window if key in p.get("metrics", {})]
+        baseline = [p["metrics"][key] for p in present
+                    if tuple(p["metrics"].get(k) for k in prov_keys) == cur_prov]
         if len(baseline) < args.min_baseline:
-            if len([p for p in window if key in p.get("metrics", {})]) >= args.min_baseline:
-                schema_skipped.add(wl)
+            # Only counts as provenance-skipped when the counter WAS present in
+            # enough trailing points and the provenance filter is what removed
+            # them — otherwise this is the ordinary "not enough history yet"
+            # case (a new workload), which is not worth reporting.
+            if len(present) >= args.min_baseline:
+                provenance_skipped.add(wl)
             continue
         med = statistics.median(baseline)
         if med <= 0:
@@ -310,13 +321,14 @@ def main():
     # identical to a workload that passed, and the whole point of the schema
     # filter is that it trades coverage for correctness — the reader has to be
     # able to see which side of that trade a given run landed on.
-    if schema_skipped:
-        shown = sorted(schema_skipped)
+    if provenance_skipped:
+        shown = sorted(provenance_skipped)
         listed = ", ".join(shown[:6]) + (f", +{len(shown) - 6} more" if len(shown) > 6 else "")
         msg = (f"{len(shown)} workload(s) not judged: their trailing points were "
-               f"measured under a different timer schema ({listed}). A "
-               f"re-attributed counter is not a regression; judgement resumes "
-               f"once the window refills with same-schema points.")
+               f"measured under a different timer schema or at a different size "
+               f"({listed}). A re-attributed or resized counter is not a "
+               f"regression; judgement resumes once the window refills with "
+               f"comparable points.")
         print(f"WARNING: {msg}")
         emit_gha_command(f"::warning title=Perf timer schema::{msg}")
 
