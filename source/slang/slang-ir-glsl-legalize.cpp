@@ -1197,7 +1197,16 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
                 auto unusedBinding =
                     context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
                 varLayoutForKind->offset = (UInt)unusedBinding;
-                context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(unusedBinding);
+
+                auto sizeAttr =
+                    fieldTypeLayout->findSizeAttr(LayoutResourceKind::VaryingOutput);
+                UInt varyingCount =
+                    sizeAttr ? sizeAttr->getFiniteSize() : 1;
+                for (UInt i = 0; i < varyingCount; ++i)
+                {
+                    context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(
+                        unusedBinding + i);
+                }
             }
             builder.addField(field->getKey(), fieldVarLayoutBuilder.build());
         }
@@ -1211,6 +1220,13 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
             irBuilder,
             arrayType->getElementType());
         IRArrayTypeLayout::Builder builder(&irBuilder, elementTypeLayout);
+        if (auto sizeAttr =
+                elementTypeLayout->findSizeAttr(LayoutResourceKind::VaryingOutput))
+        {
+            builder.addResourceUsage(
+                LayoutResourceKind::VaryingOutput,
+                sizeAttr->getSize() * getIntVal(arrayType->getElementCount()));
+        }
         return builder.build();
     }
     else
