@@ -4043,14 +4043,17 @@ void legalizeEntryPointParameterForGLSL(
     // which is what current emit code assumes, but may not be more generally applicable.
     if (auto geomDecor = pp->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {
-        if (!func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
+        // The topology is normally on the function already (recorded at lowering); a parameter
+        // that still carries it must agree. Linked or deserialized IR may carry it only on the
+        // parameter, so lift it in that case. Mirrors the IRStreamOutputTypeDecoration handling
+        // below.
+        if (auto existing = func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
         {
-            builder->addDecoration(func, geomDecor->getOp());
+            SLANG_ASSERT(existing->getOp() == geomDecor->getOp());
         }
         else
         {
-            SLANG_UNEXPECTED("Only expected a single parameter to have "
-                             "IRGeometryInputPrimitiveTypeDecoration decoration");
+            builder->addDecoration(func, geomDecor->getOp());
         }
     }
 
