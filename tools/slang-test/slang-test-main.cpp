@@ -2730,7 +2730,25 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     String fullPath;
     Path::getCanonical(input.filePath, fullPath);
     wsFolder.uri = URI::fromLocalFilePath(Path::getParentDirectory(fullPath).getUnownedSlice()).uri;
-    initParams.workspaceFolders.add(wsFolder);
+    if (input.testOptions->commandOptions.containsKey("root-uri-only"))
+        initParams.rootUri = wsFolder.uri;
+    else
+    {
+        initParams.workspaceFolders.add(wsFolder);
+        if (input.testOptions->commandOptions.containsKey("multi-root"))
+        {
+            // Put an empty root last so the test detects implementations that retain only the
+            // final workspace folder's search paths.
+            LanguageServerProtocol::WorkspaceFolder emptyFolder;
+            emptyFolder.name = "empty";
+            emptyFolder.uri =
+                URI::fromLocalFilePath(
+                    Path::combine(Path::getParentDirectory(fullPath), "__empty_workspace_root__")
+                        .getUnownedSlice())
+                    .uri;
+            initParams.workspaceFolders.add(emptyFolder);
+        }
+    }
     if (SLANG_FAILED(connection->sendCall(
             LanguageServerProtocol::InitializeParams::methodName,
             &initParams,
@@ -2838,7 +2856,12 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 {
                     actualOutputSB << item.label << ": " << item.kind << " " << item.detail << " ";
                     for (auto ch : item.commitCharacters)
-                        actualOutputSB << ch;
+                    {
+                        if (ch == " ")
+                            actualOutputSB << "<space>";
+                        else
+                            actualOutputSB << ch;
+                    }
                     if (item.sortText.hasValue)
                         actualOutputSB << " sort(" << item.sortText.value << ")";
                     actualOutputSB << "\n";

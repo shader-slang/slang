@@ -200,7 +200,8 @@ void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
                 },
                 &context);
         }
-        workspaceSearchPaths = _Move(context.paths);
+        for (auto& searchPath : context.paths)
+            workspaceSearchPaths.add(searchPath);
     }
     slangGlobalSession = globalSession;
 }
