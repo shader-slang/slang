@@ -32,10 +32,12 @@ def workload_complete(measured_sizes, spec, sweep_requested):
     """
     if not measured_sizes:
         return False
-    if spec and spec.default_size not in measured_sizes:
+    typed_sizes = {(type(size), size) for size in measured_sizes}
+    if spec and (type(spec.default_size), spec.default_size) not in typed_sizes:
         return False
     if sweep_requested and spec and spec.sweep_sizes:
-        return set(spec.sweep_sizes) <= measured_sizes
+        expected = {(type(size), size) for size in spec.sweep_sizes}
+        return expected <= typed_sizes
     return True
 
 
@@ -46,10 +48,15 @@ assert not workload_complete({64}, _SPEC, False), \
     "a stale pre-resize default must trigger a re-sweep"
 assert not workload_complete({str(_SPEC.default_size)}, _SPEC, False), \
     "size values with the wrong JSON type must not compare equal"
+assert not workload_complete({float(_SPEC.default_size)}, _SPEC, False), \
+    "an integral float must not satisfy an integer manifest size"
 assert workload_complete(set(_SPEC.sweep_sizes), _SPEC, True)
 assert not workload_complete(set(_SPEC.sweep_sizes[:-1]), _SPEC, True), \
     "a missing ladder rung must trigger a scaling re-sweep"
-del _SPEC
+_BOOL_SPEC = argparse.Namespace(default_size=1, sweep_sizes=[1, 2])
+assert not workload_complete({True, 2}, _BOOL_SPEC, True), \
+    "bool is a distinct JSON type and must not satisfy integer size 1"
+del _SPEC, _BOOL_SPEC
 
 
 def main():
