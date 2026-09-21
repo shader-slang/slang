@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#debug-info-gating
-//META: doc_section_digest=62ea8db2784ef3877410b92997d96e0414adfc1ab018c13cd6fdcaff541c61de
+//META: doc_section_digest=429220b334f4d96169ad9c9953243ea47e493ffd5500ab21c8c1829bc387ee12
 //META: purpose=A user-written `__init` keeps its debug information, and constructor lowering names the by-value object under construction `this` and gives it a debug-location decoration.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -17,7 +17,7 @@
 // debug-location decoration, which is what lets a debugger stopped inside the
 // initializer inspect the members being written.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -g2 -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -g2 -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

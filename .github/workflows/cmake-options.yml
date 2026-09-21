@@ -165,6 +165,12 @@ jobs:
           fi
           echo "All CMake option builds completed successfully!"
 
+      # Requires the SLACK_WEBHOOK_CMAKE_OPTIONS repository secret pointing at
+      # this weekly's own Slack Workflow webhook, whose variable key is
+      # "CMake-Options-Weekly". A dedicated webhook (rather than a shared one)
+      # is needed because a Slack Workflow webhook carries the sender name of
+      # the Slack workflow that owns it, which the payload cannot override,
+      # and it accepts only that workflow's own variable keys.
       - name: success notification
         id: slack-notify-success
         if: ${{ github.event_name == 'schedule' && success() }}
@@ -175,7 +181,7 @@ jobs:
               "CMake-Options-Weekly": ":green-check-mark: CMake options weekly status: ${{ job.status }}"
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_CMAKE_OPTIONS }}
       # TODO: Re-enable the failure notification once this weekly workflow has
       # proven stable enough that a failure means a real regression. Until
       # then we only post the success message, so an infrastructure hiccup
@@ -190,4 +196,4 @@ jobs:
       #         "CMake-Options-Weekly": ":alert: :alert: :alert: :alert: :alert: :alert:\nCMake options weekly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
       #       }
       #   env:
-      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_CMAKE_OPTIONS }}

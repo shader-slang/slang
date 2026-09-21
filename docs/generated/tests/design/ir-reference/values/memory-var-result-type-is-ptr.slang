@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#var-vs-globalvar-vs-alloca
-//META: doc_section_digest=545914b38f219893a8c0b8cfa2e347efdf0f6474fc9476df2449d7564150b623
+//META: doc_section_digest=d302a48dc7760a0a3d4521c15c5a1a761a122cb011db3d05d559faf1c37dc022
 //META: purpose=A local variable becomes a nullary `var` whose result type is `Ptr<T>`, so member and element access chain off it through address opcodes rather than through the value.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -18,7 +18,7 @@
 // `getElementPtr` ending in a `load` — the chain only type-checks if
 // `var` produced a pointer.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Holder
 {

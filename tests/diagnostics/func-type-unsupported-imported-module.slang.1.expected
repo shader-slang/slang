@@ -1,0 +1,6 @@
+result code = -1
+standard error = {
+error[E55216]: function-typed value is not supported on this target
+}
+standard output = {
+}

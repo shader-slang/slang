@@ -24,15 +24,15 @@ uniform Sampler1DShadow.Handle combinedSampler;
 #ifdef SAMPLED_IMAGE
 //SAMPLED_IMAGE: [[IType0:%[0-9]+]] = OpTypeImage
 //SAMPLED_IMAGE: [[IType1:%[0-9]+]] = OpTypeImage
-//SAMPLED_IMAGE: OpConvertUToSampledImageNV [[IType1]]
+//SAMPLED_IMAGE: OpConvertUToImageNV [[IType1]]
 //SAMPLED_IMAGE: OpImageFetch
 uniform Texture1D<float>.Handle texture;
 #endif
 
 #ifdef STORAGE_IMAGE
-//STORAGE_IMAGE: OpConvertUToSampledImageNV
+//STORAGE_IMAGE: OpConvertUToImageNV
 //STORAGE_IMAGE: OpImageRead
-//STORAGE_IMAGE: OpConvertUToSampledImageNV
+//STORAGE_IMAGE: OpConvertUToImageNV
 //STORAGE_IMAGE: OpImageRead
 uniform RWTexture1D<float>.Handle rwTexture1;
 uniform RWTexture2D<float>.Handle rwTexture2;

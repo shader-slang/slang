@@ -19,7 +19,7 @@
 // the pair of assertions is what separates this row from the ordinary
 // forward-mode one, since both produce a member with the same name and type.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float a;
 uniform float d;

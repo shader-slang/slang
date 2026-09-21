@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#interlocked-is-a-wrapper-not-an-opcode
-//META: doc_section_digest=7b87b736cd493e5a9697e064429849fbc9b5f1e3a536c25c80750e511548e528
+//META: doc_section_digest=0f9e490f61ea1fc05c83a8ce9c04c6ed048fd073f8b02580f2f74635073bc4a1
 //META: purpose=HLSL's `InterlockedAdd(dest, value, original)` is a `[ForceInline]` core-module function, so immediately after AST lowering `func %main` holds a `call`, not an `atomicAdd` opcode.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -17,7 +17,7 @@
 // call is ordinary integer arithmetic — no atomic opcode is produced at
 // this stage.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> rwbuf;
 

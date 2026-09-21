@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#varlayout-and-entrypointlayout
-//META: doc_section_digest=0ce1b4071a5a571cfc1945ea83ae995cc4721673793ce1d486650e97ce5658bb
+//META: doc_section_digest=a05fb260f7d47ee1abd511a8a11324bf04dda1c08576336dd8e39bd0213adba4
 //META: purpose=An EntryPointLayout's result layout covers only the return value, so an out parameter is laid out in the parameters layout instead.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass
@@ -17,7 +17,7 @@
 // among the fields of the parameter struct layout -- so the `out` parameter is
 // demonstrably on the parameters side, not the result side.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage fragment
 
 float4 main(float2 uv : TEXCOORD0, out float depth : SV_Depth) : SV_Target
 {

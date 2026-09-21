@@ -238,6 +238,26 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getResultAsFileSystem(
     return SLANG_OK;
 }
 
+// Diagnose an out-of-range `entryPointIndex` into `sink` and return `SLANG_E_INVALID_ARG`, or
+// `SLANG_OK` when it is in range. The bound is the live `getEntryPointCount()` rather than any
+// cached result-array size, because entry points can be added to a program after a `TargetProgram`
+// (and thus its lazily grown result cache) has been created.
+static SlangResult checkEntryPointIndexInRange(
+    ComponentType* program,
+    SlangInt entryPointIndex,
+    DiagnosticSink* sink)
+{
+    auto entryPointCount = program->getEntryPointCount();
+    if (entryPointIndex < 0 || entryPointIndex >= entryPointCount)
+    {
+        sink->diagnose(Diagnostics::EntryPointIndexOutOfRange{
+            .entryPointIndex = (int64_t)entryPointIndex,
+            .entryPointCount = (int64_t)entryPointCount});
+        return SLANG_E_INVALID_ARG;
+    }
+    return SLANG_OK;
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     SlangInt entryPointIndex,
     Int targetIndex,
@@ -254,6 +274,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    if (SlangResult res = checkEntryPointIndexInRange(this, entryPointIndex, &sink);
+        SLANG_FAILED(res))
+    {
+        sink.getBlobIfNeeded(outDiagnostics);
+        return res;
+    }
 
     IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
@@ -313,6 +340,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
+    if (SlangResult res = checkEntryPointIndexInRange(this, entryPointIndex, &sink);
+        SLANG_FAILED(res))
+    {
+        sink.getBlobIfNeeded(outDiagnostics);
+        return res;
+    }
+
     IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
 
@@ -338,6 +372,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointMetadata(
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    if (SlangResult res = checkEntryPointIndexInRange(this, entryPointIndex, &sink);
+        SLANG_FAILED(res))
+    {
+        sink.getBlobIfNeeded(outDiagnostics);
+        return res;
+    }
 
     IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
@@ -419,7 +460,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
                 if (!parsedExpr)
                     return SLANG_FAIL;
 
-                SharedSemanticsContext sharedSemanticsContext(getLinkage(), nullptr, &sink);
+                SharedSemanticsContext sharedSemanticsContext(
+                    getLinkage(),
+                    getLinkage()->m_optionSet.getLanguageVersion(),
+                    &sink);
                 SemanticsVisitor visitor(&sharedSemanticsContext);
                 auto checkedExpr = visitor.CheckTerm(parsedExpr);
                 if (auto typeType = as<TypeType>(checkedExpr->type.type))
@@ -532,6 +576,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCompileResult
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    if (SlangResult res = checkEntryPointIndexInRange(this, entryPointIndex, &sink);
+        SLANG_FAILED(res))
+    {
+        sink.getBlobIfNeeded(outDiagnostics);
+        return res;
+    }
 
     IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
@@ -842,7 +893,10 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
 
     Expr* typeExpr = linkage->parseTermString(typeStr, scope);
-    SharedSemanticsContext sharedSemanticsContext(linkage, nullptr, sink);
+    SharedSemanticsContext sharedSemanticsContext(
+        linkage,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
     type = visitor.TranslateTypeNode(typeExpr);
     auto typeOut = visitor.tryCoerceToProperType(TypeExp(type));
@@ -859,7 +913,8 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
 Expr* ComponentType::tryResolveOverloadedExpr(Expr* exprIn)
 {
     auto linkage = getLinkage();
-    SemanticsContext context(linkage->getSemanticsForReflection());
+    auto sharedSemanticsContext = linkage->getSemanticsForReflection();
+    SemanticsContext context(sharedSemanticsContext);
     SemanticsVisitor visitor(context);
     return visitor.maybeResolveOverloadedExpr(exprIn, LookupMask::Function, nullptr);
 }
@@ -963,7 +1018,8 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
 
     Expr* expr = linkage->parseTermString(name, scope);
 
-    SemanticsContext context(linkage->getSemanticsForReflection());
+    auto sharedSemanticsContext = linkage->getSemanticsForReflection();
+    SemanticsContext context(sharedSemanticsContext);
     context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 
     SemanticsVisitor visitor(context);
@@ -1033,7 +1089,8 @@ Expr* ComponentType::findDeclFromStringInType(
     {
         expr = linkage->parseTermString(name, scope);
     }
-    SemanticsContext context(linkage->getSemanticsForReflection());
+    auto sharedSemanticsContext = linkage->getSemanticsForReflection();
+    SemanticsContext context(sharedSemanticsContext);
     context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 
     SemanticsVisitor visitor(context);
@@ -1111,7 +1168,8 @@ Expr* ComponentType::findDeclFromStringInType(
 
 bool ComponentType::isSubType(Type* subType, Type* superType)
 {
-    SemanticsContext context(getLinkage()->getSemanticsForReflection());
+    auto sharedSemanticsContext = getLinkage()->getSemanticsForReflection();
+    SemanticsContext context(sharedSemanticsContext);
     SemanticsVisitor visitor(context);
 
     return (visitor.isSubtype(subType, superType, IsSubTypeOptions::None) != nullptr);

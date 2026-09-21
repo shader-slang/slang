@@ -32,12 +32,16 @@ target gate, the input-attachment-index space exemption, the bindless
 descriptor-heap placement, and the diagnostics that abort binding.
 
 **Layout-IR-shape tests** use
-`-target <T> -dump-ir -o /dev/null -entry main -stage compute`. The layout
+`-target <T> -dump-ir -o - -entry main -stage compute`. The layout
 module is never dumped under a header of its own; its effects appear once
 link merges it into the post-link IR, so these tests pin `CHECK-NOT`
 patterns to the pre-link `### LOWER-TO-IR:` block and positive `CHECK`
-patterns to the first post-link block,
-`### AFTER validateAndRemoveAssumeAddress:`. Only the _structure_ of the
+patterns to the first post-link block. That block is matched as
+<code>### AFTER &#123;&#123;[A-Za-z0-9_]+&#125;&#125;:</code> rather than
+by pass name, because the claim is about the earliest post-link snapshot
+and not about any particular pass: which pass runs first there changes as
+passes are gated on `RequiredLoweringPassSet` flags and skipped when the
+module holds nothing for them to do. Only the _structure_ of the
 layout instructions is asserted (`varLayout(`, `offset(`,
 `structTypeLayout(`, `parameterGroupTypeLayout(`, `EntryPointLayout(`,
 `[layout(%N)]`); the numeric operands inside them are per-target by
@@ -199,7 +203,7 @@ classified in `## Untested claims` rather than tested.
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | A family that supplies ray-payload rules binds the miss payload instead of diagnosing it, so the same shader that fails on Metal compiles for SPIR-V and for CUDA.                   | functional | [#diagnosed-failures-during-binding](../../../../design/pipeline/04c-layout-ir.md#diagnosed-failures-during-binding)                                             | [`raytracing-miss-payload-accepted-where-rules-exist.slang`](raytracing-miss-payload-accepted-where-rules-exist.slang)                 |
 | A ray-tracing entry-point parameter on a target with no layout rules for it is diagnosed with error E39032 instead of crashing.                                                     | negative   | [#diagnosed-failures-during-binding](../../../../design/pipeline/04c-layout-ir.md#diagnosed-failures-during-binding)                                             | [`raytracing-entry-point-param-unsupported-target-diagnostic.slang`](raytracing-entry-point-param-unsupported-target-diagnostic.slang) |
-| CUDA lacks only the callable-payload layout rules, so a callable entry-point payload is rejected with E39032 naming the callable stage.                                              | negative   | [#diagnosed-failures-during-binding](../../../../design/pipeline/04c-layout-ir.md#diagnosed-failures-during-binding)                                             | [`raytracing-callable-payload-rejected-on-cuda.slang`](raytracing-callable-payload-rejected-on-cuda.slang)                             |
+| A target whose layout-rules family has no callable-payload rules rejects a callable entry-point payload with `E39032` naming the callable stage. | negative   | [#diagnosed-failures-during-binding](../../../../design/pipeline/04c-layout-ir.md#diagnosed-failures-during-binding) | [`raytracing-callable-payload-rejected-on-metal.slang`](raytracing-callable-payload-rejected-on-metal.slang) |
 | The CPU layout-rules family supplies no ray-payload rules either, so the same miss payload that compiles for SPIR-V is rejected with E39032 for -target cpp.                        | negative   | [#diagnosed-failures-during-binding](../../../../design/pipeline/04c-layout-ir.md#diagnosed-failures-during-binding)                                             | [`raytracing-miss-payload-rejected-on-cpp.slang`](raytracing-miss-payload-rejected-on-cpp.slang)                                       |
 | A vk::binding on a whole-space entry-point parameter such as a ParameterBlock positions the register space, so every member lands in the requested set.                             | boundary   | [#explicit-vkbinding-on-entry-point-parameters](../../../../design/pipeline/04c-layout-ir.md#explicit-vkbinding-on-entry-point-parameters)                       | [`vk-binding-entry-point-param-parameter-block-whole-space.slang`](vk-binding-entry-point-param-parameter-block-whole-space.slang)     |
 | A vk::binding on an entry-point parameter that the target cannot honor is reported with the unsupported-entry-point-parameter-modifier warning E38010.                              | negative   | [#explicit-vkbinding-on-entry-point-parameters](../../../../design/pipeline/04c-layout-ir.md#explicit-vkbinding-on-entry-point-parameters)                       | [`vk-binding-entry-point-param-ignored-warning.slang`](vk-binding-entry-point-param-ignored-warning.slang)                             |
@@ -269,6 +273,12 @@ classified in `## Untested claims` rather than tested.
 
 ## Doc gaps observed
 
+(none) — no gaps remain open against this bundle's source document.
+
+Every gap previously listed here was fixed on the documentation side and
+recorded in `docs/generated/design/_meta/doc-gap-state.json`; the answers
+are now in the source document itself.
+
 The eight gap rows this bundle previously recorded have all been filled by
 the current revision of the page (the E39012 / E39001 / E38010 codes, the
 `-bindless-space-index` and `-obfuscate` CLI spellings, the `miss`-payload
@@ -276,9 +286,3 @@ and `vk::binding` worked examples, the `-dump-ir` observability note, and
 the `[requireCapabilityAtom(...)]` dumper spelling are all present now), so
 they are retired here. The rows below are what re-reading the filled page
 against the compiler turned up.
-
-| Anchor                                                                                                                                                           | Kind                | Gap                                                                                                                                                                                                                                                                                                                                           | Suggested addition                                                                                                                                                                                                                                                                    |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [#diagnosed-failures-during-binding](../../../../design/pipeline/04c-layout-ir.md#diagnosed-failures-during-binding)                                             | drift-from-source   | The section says "the SPIR-V/GLSL, HLSL/DXIL, and WGSL families supply all three", but a reader cannot confirm the WGSL third of that sentence from the page's own worked example: compiling it with `-target wgsl -stage miss` never reaches parameter binding and instead reports `error[E99997] ... abort compilation: unsupported stage`. | Note that WGSL rejects ray-tracing *stages* before parameter binding runs, so the presence of its layout rules is not observable through this example, and point the reader at a stage WGSL does accept if one exists.                                                                 |
-| [#vkinput_attachment_index-and-descriptor-space-occupancy](../../../../design/pipeline/04c-layout-ir.md#vkinput_attachment_index-and-descriptor-space-occupancy) | ambiguous-claim     | "it lowers to `OpDecorateInputAttachmentIndex` only, never `OpDecorateDescriptorSet`" reads as a statement about the `SubpassInput` parameter, which is not what a reader observes: a fragment parameter declared `[[vk::input_attachment_index(5)]] SubpassInput<float4> a` emits `Binding 0`, `DescriptorSet 0` *and* `InputAttachmentIndex 5`. | Rewrite the sentence to scope it to the `LayoutResourceKind::InputAttachmentIndex` resource kind, and add one line saying the parameter still receives a descriptor slot (and therefore a set) from its separate `DescriptorTableSlot` reservation.                                     |
-| [#vkinput_attachment_index-and-descriptor-space-occupancy](../../../../design/pipeline/04c-layout-ir.md#vkinput_attachment_index-and-descriptor-space-occupancy) | missing-surface     | The list of sibling non-descriptor-space kinds (`PushConstantBuffer`, `RegisterSpace`, `VaryingInput`, `VaryingOutput`, `HitAttributes`, `RayPayload`) names no user-level annotation that puts an entry-point parameter into each kind, and `[[vk::push_constant]]` on an entry-point parameter is reported unsupported with warning `E38010`. | Add a column or parenthetical to that list giving the entry-point-parameter syntax (if any) that produces each kind, and say explicitly which of them cannot appear on an entry-point parameter at all.                                                                                |

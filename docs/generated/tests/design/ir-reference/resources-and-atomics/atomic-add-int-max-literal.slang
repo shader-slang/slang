@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomic-operations
-//META: doc_section_digest=e0b71e7cc30a0e069a5833b7fdc7038f02b6ab982bbba6656983e3a65dcba7ce
+//META: doc_section_digest=5818c272bb5b1e731fdf137e19f531519b21757eceadaae3e8b8a9739283af9c
 //META: purpose=`Atomic<int>::add(INT_MAX)` (largest signed value, `2147483647`) still lowers to the documented `atomicAdd` opcode shape.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -12,7 +12,7 @@
 // Boundary probe: largest representable 32-bit signed integer.
 // Runtime overflow behavior is not stated in the source doc.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<Atomic<int>> abuf;
 uniform RWStructuredBuffer<int> rwbuf;

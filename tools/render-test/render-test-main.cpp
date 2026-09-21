@@ -1609,10 +1609,9 @@ static SlangResult _setSessionPrelude(
         session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, buf.getBuffer());
 #endif
     }
-    else
-    {
-        session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, "");
-    }
+    // When no NVAPI slot is requested, leave the session's HLSL prelude untouched (matching
+    // slang-test) rather than blanking it, so render-test emission keeps whatever prelude the
+    // session already has — normally the compiler default an ordinary slangc user gets.
 
     return SLANG_OK;
 }

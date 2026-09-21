@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-switches
-//META: doc_section_digest=93e3e0077c420a8fd04038823472fc8368e454763e1fd6cc905f959fe8e07ee8
+//META: doc_section_digest=8cd18c4acb5c23465732d94445db3874f3f31fc0b0c4cc5c089482214037eeb6
 //META: purpose=Boundary: the smallest non-trivial switch — one explicit case plus default — still emits the switch terminator with the (value, break, default, caseVal, caseBlock) shape.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // end of the switch's variadic operand layout: scrutinee + breakLabel
 // + defaultLabel + one (caseVal, caseBlock) pair.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int sel;
 uniform RWStructuredBuffer<int> buf;

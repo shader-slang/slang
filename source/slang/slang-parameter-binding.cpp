@@ -2340,9 +2340,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
 // Diagnose that the current target provides no type-layout rules for a
 // ray-tracing entry-point parameter (payload or hit attributes) of `stage`.
 // Some targets do not support ray tracing at all (e.g. Metal, whose payload,
-// callable-payload, and hit-attribute rules are all null) or lack rules for a
-// specific parameter kind (e.g. CUDA callable payload); reporting this keeps
-// callers from dereferencing a null rules pointer during type layout.
+// callable-payload, and hit-attribute rules are all null) or may lack rules for
+// a specific parameter kind; reporting this keeps callers from dereferencing a
+// null rules pointer during type layout.
 static void diagnoseUnsupportedRayTracingParameter(
     ParameterBindingContext* context,
     Stage stage,

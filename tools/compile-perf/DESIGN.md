@@ -65,7 +65,7 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   sibling. The run label and `meta.json` date are derived from the checked-out
   commit's author date, so backfill points sort correctly in the tracking
   series.
-- **`compile-perf-release-sweep.yml`** (`workflow_dispatch`) — downloads prebuilt
+- **`perf-compile-release-sweep.yml`** (`workflow_dispatch`) — downloads prebuilt
   release `slangc` for the runner's platform, sweeps each into `releases/<tag>/`,
   writes `index.json`, stamps `runner.json`, rebuilds, and pushes. **Run with
   `force=true` to re-measure the whole history onto a new runner.** Inputs:
@@ -191,7 +191,7 @@ skipped. Distinguishing them in Slack needs a sixth state carried out of
 ### Runner-change procedure
 
 When the benchmark runner is replaced or updated, `track.py runner-id` changes and
-the stored `runner.json` no longer matches. Re-run **compile-perf-release-sweep**
+the stored `runner.json` no longer matches. Re-run **perf-compile-release-sweep**
 with `force=true` to re-measure every release on the new machine and re-stamp
 `runner.json`; until then daily-vs-history comparisons mix runners and are invalid.
 
@@ -245,27 +245,27 @@ secret already covers pushes to that repo.
 - Create the `shader-slang/slang-compile-perf` results repo + a
   `SLANG_COMPILE_PERF_PAT` secret with push access (mirrors the MDL
   `slang-material-modules-benchmark` + `SLANG_MDL_BENCHMARK_RESULTS_PAT` pattern).
-- Seed the history once via a manual **compile-perf-release-sweep** run, then —
+- Seed the history once via a manual **perf-compile-release-sweep** run, then —
   when ready — uncomment the nightly `schedule`.
 
 ## Design decisions
 
-| Decision                  | Choice                                                                          | Rationale                                                                                                                                                                                                     |
-| ------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Release binaries          | Prebuilt published per tag, platform-matched (Linux `.tar.gz` / Windows `.zip`) | Fast, reproducible, matches shipped artifacts; source builds only for commit-level bisect                                                                                                                     |
-| Measurement flag          | `-report-perf-benchmark`                                                        | Stable across the supported release window; the `detailed` variant only adds sub-timers on newer builds                                                                                                       |
-| Headline metric           | `compileInner`, **median** of N timed runs                                      | Excludes the fixed core-module-load floor, so it is stable across releases. Median over min: reflects the typical run and is steadier when run-to-run spread shifts                                           |
-| Per-compile floor         | the `minimal` workload's `compileInner`                                         | The N→0 limit — a direct measurement of fixed per-compile cost, not a fitted intercept (which can go negative on convex curves)                                                                               |
-| Timer scope / attribution | all nested phase timers; attribute via **leaf** timers                          | A jump in `compileInner` is traced down `generateOutput → linkAndOptimizeIR → specializeModule`; using leaves avoids double-counting nested timers                                                            |
-| Platform-bound workloads  | `WorkloadSpec.platforms` gates the DEFAULT set; `--only` overrides              | The default suite must pass on contributor machines (macOS/Linux) without dxc/nvrtc, but silently hiding a workload misreports coverage — bench prints a `[skip]` note; naming one explicitly runs it anyway  |
-| Downstream workloads      | `downstream_required`: missing-toolchain diagnostics are REAL errors            | slangc emits its internal timers before the downstream handoff, so without this a host missing dxc/nvrtc would record timers and report OK with no DXIL/PTX produced — the opposite of the workload's purpose |
-| Phase decomposition       | mutually-exclusive buckets (top-down)                                           | Named leaves + `(self)` residuals; if a child timer overshoots its parent it is scaled proportionally so the buckets always sum to `compileInner`                                                             |
-| Output                    | `results.json` only                                                             | JSON holds median/min/mean/stdev per timer; generated sources + compiled outputs go to an auto-removed `--gen-dir` tempdir so the results dir stays scratch-free                                              |
-| Robustness                | 1 warmup + N timed runs (default 5)                                             | The warmup absorbs cold-cache/first-run effects; multiple timed samples + median tame scheduling noise                                                                                                        |
-| Determinism               | generators are deterministic (same N → identical bytes)                         | A release sweep compares like with like, and base/head always compile identical inputs                                                                                                                        |
-| GPU / SDK dependency      | none                                                                            | Every workload is GPU-free and external-SDK-free, so it runs headless in CI                                                                                                                                   |
-| Target                    | `-target spirv -emit-spirv-directly` (text backends use `-target metal`/`wgsl`) | Measures Slang itself, not a downstream `spirv-opt`                                                                                                                                                           |
-| Comparability             | absolute times are **runner-specific**                                          | Every point in a comparison must come from the same machine (see the tracking model + runner fingerprint above)                                                                                               |
+| Decision                  | Choice                                                                             | Rationale                                                                                                                                                                                                                                                                                           |
+| ------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Release binaries          | Prebuilt published per tag, platform-matched (Linux `.tar.gz` / Windows `.zip`)    | Fast, reproducible, matches shipped artifacts; source builds only for commit-level bisect                                                                                                                                                                                                           |
+| Measurement flag          | `-report-detailed-perf-benchmark`, per-binary fallback to `-report-perf-benchmark` | Same timers as the base flag, same meaning, plus ~67 `SLANG_PASS` sub-timers covering the target-specific back end that otherwise collapses into `linkAndOptimizeIR (self)`. Overhead <= 1%. `bench.py` probes each binary once, so a release predating the flag still measures with the coarse set |
+| Headline metric           | `compileInner`, **median** of N timed runs                                         | Excludes the fixed core-module-load floor, so it is stable across releases. Median over min: reflects the typical run and is steadier when run-to-run spread shifts                                                                                                                                 |
+| Per-compile floor         | the `minimal` workload's `compileInner`                                            | The N→0 limit — a direct measurement of fixed per-compile cost, not a fitted intercept (which can go negative on convex curves)                                                                                                                                                                     |
+| Timer scope / attribution | all nested phase timers; attribute via **leaf** timers                             | A jump in `compileInner` is traced down `generateOutput → linkAndOptimizeIR → specializeModule`; using leaves avoids double-counting nested timers                                                                                                                                                  |
+| Platform-bound workloads  | `WorkloadSpec.platforms` gates the DEFAULT set; `--only` overrides                 | The default suite must pass on contributor machines (macOS/Linux) without dxc/nvrtc, but silently hiding a workload misreports coverage — bench prints a `[skip]` note; naming one explicitly runs it anyway                                                                                        |
+| Downstream workloads      | `downstream_required`: missing-toolchain diagnostics are REAL errors               | slangc emits its internal timers before the downstream handoff, so without this a host missing dxc/nvrtc would record timers and report OK with no DXIL/PTX produced — the opposite of the workload's purpose                                                                                       |
+| Phase decomposition       | mutually-exclusive buckets (top-down)                                              | Named leaves + `(self)` residuals; if a child timer overshoots its parent it is scaled proportionally so the buckets always sum to `compileInner`                                                                                                                                                   |
+| Output                    | `results.json` only                                                                | JSON holds median/min/mean/stdev per timer; generated sources + compiled outputs go to an auto-removed `--gen-dir` tempdir so the results dir stays scratch-free                                                                                                                                    |
+| Robustness                | 1 warmup + N timed runs (default 5)                                                | The warmup absorbs cold-cache/first-run effects; multiple timed samples + median tame scheduling noise                                                                                                                                                                                              |
+| Determinism               | generators are deterministic (same N → identical bytes)                            | A release sweep compares like with like, and base/head always compile identical inputs                                                                                                                                                                                                              |
+| GPU / SDK dependency      | none                                                                               | Every workload is GPU-free and external-SDK-free, so it runs headless in CI                                                                                                                                                                                                                         |
+| Target                    | `-target spirv -emit-spirv-directly` (text backends use `-target metal`/`wgsl`)    | Measures Slang itself, not a downstream `spirv-opt`                                                                                                                                                                                                                                                 |
+| Comparability             | absolute times are **runner-specific**                                             | Every point in a comparison must come from the same machine (see the tracking model + runner fingerprint above)                                                                                                                                                                                     |
 
 Benchmarking the whole suite is ~1.5–2.5 min per build; building `slangc` (minutes)
 dominates wall-clock, so the real constraints are timing noise and runner
@@ -335,7 +335,7 @@ from `--slangc`) and a build-once step for the driver; everything downstream
 workloads" section, stacked by driver phase with `apiTotal` as the top edge
 (they have no `compileInner`, so they are excluded from the compiler grid).
 The release history baseline backfills through the normal
-**compile-perf-release-sweep** dispatch: `sweep.py --api` counts the api
+**perf-compile-release-sweep** dispatch: `sweep.py --api` counts the api
 workloads as required, so releases measured before they existed are simply
 re-benched (full suite, same runner) on the next run — no `force` needed.
 

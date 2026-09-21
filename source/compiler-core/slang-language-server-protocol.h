@@ -318,12 +318,6 @@ struct InitializeParams
     static const StructRttiInfo g_rttiInfo;
 };
 
-struct NullResponse
-{
-    static const StructRttiInfo g_rttiInfo;
-    static NullResponse* get();
-};
-
 struct InitializeResult
 {
     ServerCapabilities capabilities;

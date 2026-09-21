@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=7ad88f18e708a0667a9afb539fc85293a139970c3197b087b618fd0216e6e53e
+//META: doc_section_digest=0aced03e78d798f55bca94c7adf21fd0cc8e537730edde2ff2ed3fd5c895fe5c
 //META: purpose=`lowerAppendConsumeStructuredBuffers` fires on Metal (the gate is `target != HLSL`), splitting an `AppendStructuredBuffer<T>` into element and counter pointers with an atomic counter bump.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

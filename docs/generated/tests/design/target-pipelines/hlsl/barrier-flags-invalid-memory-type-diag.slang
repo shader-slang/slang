@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#validatebarrierflagsforhlsl
-//META: doc_section_digest=eee10a133fed78bc4a828626e05d33cb9d0ac877ce7842e5c39404afb4fb107d
+//META: doc_section_digest=f9b6b5c0d3c7ecd9b84b0bcf6aa18c0f41f970892d2b27646c3e90a3637d3a2c
 //META: purpose=Negative: a barrier memory-type flag set with no HLSL named-constant spelling is reported as E31117 by the HLSL/D3D barrier-flag validation pass, so compilation stops before emit.
 //META: intent=negative
 //META: pipeline_stage=ir-pass
