@@ -145,6 +145,24 @@ def format_duration(seconds):
     return f"{h}h {m:02d}m"
 
 
+def latest_completed_job(run_jobs, name):
+    """Return the latest completed job with the exact name, if one exists.
+
+    A workflow run can retain jobs from more than one attempt in the monthly
+    archive. Selecting the latest completion keeps the aggregate gate metrics
+    aligned with the most recent result until the archive records attempts as
+    a first-class dimension.
+    """
+    matches = [
+        job
+        for job in run_jobs
+        if job.get("name") == name and parse_dt(job.get("completed_at"))
+    ]
+    if not matches:
+        return None
+    return max(matches, key=lambda job: parse_dt(job.get("completed_at")))
+
+
 # --- Shared HTML ---
 
 CHARTJS_CDN = "https://cdn.jsdelivr.net/npm/chart.js"
@@ -385,7 +403,11 @@ def process_jobs(jobs_data, config):
             runs[run_id].append(job)
 
     turnaround_by_date = defaultdict(list)  # date -> list of turnaround minutes
-    ci_turnaround_by_date = defaultdict(list)  # same but only "CI" workflow
+    ci_turnaround_by_date = defaultdict(list)  # trigger to required check-ci completion
+    ci_optional_tail_by_date = defaultdict(list)  # work completing after check-ci
+    ci_gate_runs_by_date = defaultdict(
+        lambda: {"success": 0, "failure": 0, "cancelled": 0, "total": 0}
+    )
     ci_sol_by_date = defaultdict(list)  # speed of light per CI run
     build_wait_by_date = defaultdict(list)  # build queue wait per CI run
     test_wait_by_date = defaultdict(list)  # test queue wait (after build) per CI run
@@ -422,7 +444,24 @@ def process_jobs(jobs_data, config):
         turnaround_by_date[date_str].append(turnaround_min)
         wf_name = run_jobs[0].get("workflow_name", "")
         if wf_name == "CI":
-            ci_turnaround_by_date[date_str].append(turnaround_min)
+            check_ci = latest_completed_job(run_jobs, "check-ci")
+            check_ci_completed = (
+                parse_dt(check_ci.get("completed_at")) if check_ci else None
+            )
+            if check_ci_completed and check_ci_completed > run_start:
+                required_turnaround_min = (
+                    check_ci_completed - run_start
+                ).total_seconds() / 60
+                ci_turnaround_by_date[date_str].append(required_turnaround_min)
+
+                optional_tail_min = (latest - check_ci_completed).total_seconds() / 60
+                if optional_tail_min > 0:
+                    ci_optional_tail_by_date[date_str].append(optional_tail_min)
+
+                gate_conclusion = check_ci.get("conclusion")
+                if gate_conclusion in ("success", "failure", "cancelled"):
+                    ci_gate_runs_by_date[date_str][gate_conclusion] += 1
+                    ci_gate_runs_by_date[date_str]["total"] += 1
 
             # Speed of light: max across platforms of (longest build + longest test).
             # This is the fastest possible turnaround with full parallelization,
@@ -521,27 +560,23 @@ def process_jobs(jobs_data, config):
         if run_jobs[0].get("workflow_name") != "CI":
             continue
 
-        # Determine run conclusion from jobs
-        conclusions = [j.get("conclusion") for j in run_jobs]
-        if "failure" in conclusions:
-            conclusion = "failure"
-        elif "cancelled" in conclusions and "success" not in conclusions:
-            conclusion = "cancelled"
-        elif all(c == "success" for c in conclusions if c):
-            conclusion = "success"
-        else:
-            conclusion = "cancelled"
+        # The required aggregate gate defines the merge queue result. Optional
+        # jobs such as test-falcor can finish later and must not turn a green
+        # merge-queue check into an analytics failure.
+        check_ci = latest_completed_job(run_jobs, "check-ci")
+        if not check_ci:
+            continue
+        conclusion = check_ci.get("conclusion")
+        if conclusion not in ("success", "failure", "cancelled"):
+            continue
 
-        # Date from earliest created_at
+        # Date from earliest created_at. End turnaround at the required gate,
+        # consistently with the main CI turnaround metric above.
         earliest = None
-        latest = None
         for j in run_jobs:
             c = parse_dt(j.get("created_at"))
-            d = parse_dt(j.get("completed_at"))
             if c and (earliest is None or c < earliest):
                 earliest = c
-            if d and (latest is None or d > latest):
-                latest = d
         if not earliest:
             continue
 
@@ -551,8 +586,9 @@ def process_jobs(jobs_data, config):
         mq_runs_by_date[date_str][conclusion] += 1
         mq_runs_by_date[date_str]["total"] += 1
 
-        if earliest and latest and latest > earliest:
-            tat = (latest - earliest).total_seconds() / 60
+        check_ci_completed = parse_dt(check_ci.get("completed_at"))
+        if check_ci_completed and check_ci_completed > earliest:
+            tat = (check_ci_completed - earliest).total_seconds() / 60
             mq_tat_by_date[date_str].append(tat)
 
         if conclusion == "failure":
@@ -587,6 +623,8 @@ def process_jobs(jobs_data, config):
         "jobs_by_month": dict(jobs_by_month),
         "turnaround_by_date": dict(turnaround_by_date),
         "ci_turnaround_by_date": dict(ci_turnaround_by_date),
+        "ci_optional_tail_by_date": dict(ci_optional_tail_by_date),
+        "ci_gate_runs_by_date": dict(ci_gate_runs_by_date),
         "ci_sol_by_date": dict(ci_sol_by_date),
         "build_wait_by_date": dict(build_wait_by_date),
         "test_wait_by_date": dict(test_wait_by_date),
@@ -676,15 +714,11 @@ def generate_index(data, output_dir):
         prs = len(pr_branches) / len(window_dates) if window_dates else 0
 
         s, f = 0, 0
+        gate_runs = data.get("ci_gate_runs_by_date", {})
         for d in window_dates:
-            for j in data["jobs_by_date"].get(d, []):
-                if not ci_filter(j):
-                    continue
-                c = j.get("conclusion")
-                if c == "success":
-                    s += 1
-                elif c == "failure":
-                    f += 1
+            day = gate_runs.get(d, {})
+            s += day.get("success", 0)
+            f += day.get("failure", 0)
         total_sf = s + f
         fr = (f / total_sf * 100) if total_sf > 0 else 0
         return tat, prs, fr
@@ -745,9 +779,9 @@ def generate_index(data, output_dir):
 <p style="color:#6c757d">Last updated: {data['generated_at']}. CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
 <h2>Last 3 Days</h2>
 <div>
-  <div class="stat-card"><div class="value">{ci_tat_3d:.0f}m{tat_delta}</div><div class="label">CI Turnaround (avg)</div></div>
+  <div class="stat-card"><div class="value">{ci_tat_3d:.0f}m{tat_delta}</div><div class="label">Required CI Turnaround (avg)</div></div>
   <div class="stat-card"><div class="value">{prs_3d:.1f}{prs_delta}</div><div class="label">Active PRs / day</div></div>
-  <div class="stat-card"><div class="value">{failure_rate_3d:.1f}%{fr_delta}</div><div class="label">Failure Rate</div></div>
+  <div class="stat-card"><div class="value">{failure_rate_3d:.1f}%{fr_delta}</div><div class="label">Required CI Failure Rate</div></div>
 {merged_card_html}
 </div>
 
@@ -790,6 +824,7 @@ def generate_statistics(data, config, output_dir):
     avg_duration_per_day = []
     avg_queue_per_day = []
     failure_rate_per_day = []
+    ci_gate_runs_by_date = data.get("ci_gate_runs_by_date", {})
 
     for date in dates:
         djobs = jobs_by_date[date]
@@ -819,8 +854,13 @@ def generate_statistics(data, config, output_dir):
         ]
         avg_queue_per_day.append(round(sum(queues) / len(queues) / 60, 1) if queues else 0)
 
-        total_day = s + f
-        failure_rate_per_day.append(round(f / total_day * 100, 1) if total_day > 0 else 0)
+        gate_day = ci_gate_runs_by_date.get(date, {})
+        gate_success = gate_day.get("success", 0)
+        gate_failure = gate_day.get("failure", 0)
+        gate_total = gate_success + gate_failure
+        failure_rate_per_day.append(
+            round(gate_failure / gate_total * 100, 1) if gate_total > 0 else 0
+        )
 
     # 7-day moving average for duration
     ma_duration = []
@@ -833,6 +873,10 @@ def generate_statistics(data, config, output_dir):
     ci_avg_tat = []
     ci_median_tat = []
     ci_p95_tat = []
+    ci_optional_tail_by_date = data.get("ci_optional_tail_by_date", {})
+    ci_optional_tail_avg = []
+    ci_optional_tail_median = []
+    ci_optional_tail_p95 = []
     for date in dates:
         tats = sorted(ci_turnaround_by_date.get(date, []))
         if tats:
@@ -843,6 +887,16 @@ def generate_statistics(data, config, output_dir):
             ci_avg_tat.append(0)
             ci_median_tat.append(0)
             ci_p95_tat.append(0)
+
+        tails = sorted(ci_optional_tail_by_date.get(date, []))
+        if tails:
+            ci_optional_tail_avg.append(round(sum(tails) / len(tails), 1))
+            ci_optional_tail_median.append(round(tails[len(tails) // 2], 1))
+            ci_optional_tail_p95.append(round(tails[int(len(tails) * 0.95)], 1))
+        else:
+            ci_optional_tail_avg.append(0)
+            ci_optional_tail_median.append(0)
+            ci_optional_tail_p95.append(0)
 
     # Speed of light per day (average across CI runs)
     ci_sol_by_date = data.get("ci_sol_by_date", {})
@@ -1091,8 +1145,11 @@ def generate_statistics(data, config, output_dir):
   </select>
 </div>
 
-{chart_section("turnaround", "CI Turnaround Time (minutes)",
-    "Time from workflow trigger to last job completed per run. Speed of light = max(build+test) across platforms, assuming full parallelization.")}
+{chart_section("turnaround", "Required CI Turnaround Time (minutes)",
+    "Time from workflow trigger to the required check-ci gate completing. Speed of light = max(build+test) across platforms, assuming full parallelization.")}
+
+{chart_section("optionalTail", "Optional Work After Required CI (minutes)",
+    "Time from check-ci completion to the final optional job completion. Zero-tail runs are omitted from these averages.")}
 
 {chart_section("prsPerDay", "Active PRs per Day",
     "Unique PR branches with CI activity per day.")}
@@ -1119,8 +1176,8 @@ def generate_statistics(data, config, output_dir):
 {chart_section("avgQueue", "Average Queue Wait Time (minutes)",
     "Mean time jobs spent waiting for a runner before starting.")}
 
-{chart_section("failureRate", "Failure Rate (%)",
-    "Percentage of jobs that failed (excludes skipped and cancelled).")}
+{chart_section("failureRate", "Required CI Failure Rate (%)",
+    "Percentage of completed check-ci gates that failed (excludes cancelled).")}
 
 {chart_section("byGroup", "Jobs by Runner Group",
     "Total jobs per runner group over the full date range.", canvas_style="max-width:800px")}
@@ -1148,6 +1205,9 @@ const allFailRate = {json.dumps(failure_rate_per_day)};
 const allTurnAvg = {json.dumps(ci_avg_tat)};
 const allTurnMedian = {json.dumps(ci_median_tat)};
 const allTurnP95 = {json.dumps(ci_p95_tat)};
+const allOptionalTailAvg = {json.dumps(ci_optional_tail_avg)};
+const allOptionalTailMedian = {json.dumps(ci_optional_tail_median)};
+const allOptionalTailP95 = {json.dumps(ci_optional_tail_p95)};
 const allSoL = {json.dumps(ci_sol_avg)};
 const allBuildWait = {json.dumps(avg_build_wait)};
 const allTestWait = {json.dumps(avg_test_wait)};
@@ -1200,6 +1260,19 @@ makeChart('turnaround_canvas', 'line', {{
       {{label:'Median', data:sliceData(allTurnMedian,30), _allData:allTurnMedian, borderColor:'#28a745', fill:false, tension:0.1}},
       {{label:'p95', data:sliceData(allTurnP95,30), _allData:allTurnP95, borderColor:'#dc3545', borderDash:[5,5], fill:false, tension:0.1}},
       {{label:'Speed of Light', data:sliceData(allSoL,30), _allData:allSoL, borderColor:'#6c757d', borderDash:[2,4], fill:false, tension:0.1, pointStyle:'triangle'}},
+    ]
+  }},
+  options: {{responsive:true, scales:{{y:{{title:{{display:true,text:'Minutes'}}}}}}}}
+}});
+
+// Optional work completing after the required aggregate gate.
+makeChart('optionalTail_canvas', 'line', {{
+  data: {{
+    labels: sliceData(allLabels, 30),
+    datasets: [
+      {{label:'Average', data:sliceData(allOptionalTailAvg,30), _allData:allOptionalTailAvg, borderColor:'#0d6efd', fill:false, tension:0.1}},
+      {{label:'Median', data:sliceData(allOptionalTailMedian,30), _allData:allOptionalTailMedian, borderColor:'#28a745', fill:false, tension:0.1}},
+      {{label:'p95', data:sliceData(allOptionalTailP95,30), _allData:allOptionalTailP95, borderColor:'#dc3545', borderDash:[5,5], fill:false, tension:0.1}},
     ]
   }},
   options: {{responsive:true, scales:{{y:{{title:{{display:true,text:'Minutes'}}}}}}}}
