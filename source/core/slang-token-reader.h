@@ -152,7 +152,7 @@ public:
 // recoverable TextFormatException (callers such as slang-ir-spirv-snippet.cpp catch it); when
 // they are disabled (SLANG_DISABLE_EXCEPTIONS) core cannot throw, so it is instead a fatal abort
 // through the signal path.
-[[noreturn]] inline void raiseTextFormatException(String message)
+[[noreturn]] inline void throwTextFormatException(String message)
 {
 #if SLANG_HAS_EXCEPTIONS
     throw TextFormatException(message);
@@ -186,7 +186,7 @@ public:
             else
                 return stringToInt(token.Content);
         }
-        raiseTextFormatException("Text parsing error: int expected.");
+        throwTextFormatException("Text parsing error: int expected.");
     }
     unsigned int ReadUInt()
     {
@@ -195,7 +195,7 @@ public:
         {
             return stringToUInt(token.Content);
         }
-        raiseTextFormatException("Text parsing error: int expected.");
+        throwTextFormatException("Text parsing error: int expected.");
     }
     double ReadDouble()
     {
@@ -213,7 +213,7 @@ public:
             else
                 return stringToDouble(token.Content);
         }
-        raiseTextFormatException("Text parsing error: floating point value expected.");
+        throwTextFormatException("Text parsing error: floating point value expected.");
     }
     float ReadFloat() { return (float)ReadDouble(); }
     String ReadWord()
@@ -223,7 +223,7 @@ public:
         {
             return token.Content;
         }
-        raiseTextFormatException("Text parsing error: identifier expected.");
+        throwTextFormatException("Text parsing error: identifier expected.");
     }
     String Read(const char* expectedStr)
     {
@@ -232,7 +232,7 @@ public:
         {
             return token.Content;
         }
-        raiseTextFormatException("Text parsing error: \'" + String(expectedStr) + "\' expected.");
+        throwTextFormatException("Text parsing error: \'" + String(expectedStr) + "\' expected.");
     }
     String Read(String expectedStr)
     {
@@ -241,7 +241,7 @@ public:
         {
             return token.Content;
         }
-        raiseTextFormatException("Text parsing error: \'" + expectedStr + "\' expected.");
+        throwTextFormatException("Text parsing error: \'" + expectedStr + "\' expected.");
     }
     bool Read(TokenType tokenType)
     {
@@ -250,7 +250,7 @@ public:
             ReadToken();
             return true;
         }
-        raiseTextFormatException("Text parsing error: unexpected '" + NextToken().Content + "'.");
+        throwTextFormatException("Text parsing error: unexpected '" + NextToken().Content + "'.");
     }
 
     String ReadStringLiteral()
@@ -260,7 +260,7 @@ public:
         {
             return token.Content;
         }
-        raiseTextFormatException("Text parsing error: string literal expected.");
+        throwTextFormatException("Text parsing error: string literal expected.");
     }
     void Back(int count) { tokenPtr -= count; }
     Token ReadMatchingToken(TokenType type)
@@ -268,7 +268,7 @@ public:
         auto token = ReadToken();
         if (token.Type != type)
         {
-            raiseTextFormatException("Text parsing error: unexpected token.");
+            throwTextFormatException("Text parsing error: unexpected token.");
         }
         return token;
     }
@@ -280,7 +280,7 @@ public:
             tokenPtr++;
             return rs;
         }
-        raiseTextFormatException("Unexpected ending.");
+        throwTextFormatException("Unexpected ending.");
     }
     Token NextToken(int offset = 0)
     {
