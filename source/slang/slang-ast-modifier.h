@@ -150,6 +150,17 @@ class ConstExprModifier : public Modifier
     FIDDLE(...)
 };
 
+// Marks a `[ForceInline]` attribute that the compiler synthesized (e.g. on the property accessor
+// generated for interface conformance in `slang-check-decl.cpp`) rather than one the user wrote.
+// Such an inline is required for correctness, so lowering must resolve it in Slang's own inliner;
+// only a genuine user `[ForceInline]` is recorded as `IRUserForceInlineDecoration` and eligible for
+// deferral to the downstream CUDA compiler on CUDA. See shader-slang/slang#12623.
+FIDDLE()
+class CompilerGeneratedForceInlineModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class ExternCppModifier : public Modifier
 {
@@ -1642,8 +1653,15 @@ class UnsafeForceInlineEarlyAttribute : public Attribute
     FIDDLE(...)
 };
 
-// A `[ForceInline]` attribute indicates that the callee should be inlined
-// by the Slang compiler.
+// A `[ForceInline]` attribute is a user request to inline the callee. Slang honors it by inlining
+// during its own IR passes on most targets; on CUDA it normally defers instead to the downstream
+// CUDA compiler (NVRTC for device code, nvcc for host code) by emitting the callee as a
+// `__forceinline__` function, because pre-inlining large bodies inflates the downstream front-end
+// compile time (shader-slang/slang#12623). It still inlines in-Slang where deferral would be unsafe
+// — e.g. a `static_assert` depends on the call folding, or the callee is an intrinsic or target
+// intrinsic (see `ForceInliningPass::shouldInline`). A user `[ForceInline]` lowers to
+// `IRUserForceInlineDecoration`, distinct from the `IRForceInlineDecoration` the compiler
+// synthesizes for correctness-mandated inlines, which are never deferred.
 //
 FIDDLE()
 class ForceInlineAttribute : public Attribute

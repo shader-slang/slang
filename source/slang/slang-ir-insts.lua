@@ -2199,6 +2199,18 @@ local insts = {
 				},
 			},
 			{
+				UserForceInline = {
+					-- Marks a callee whose `[ForceInline]` was written by the user purely as a
+					-- performance hint, as opposed to the many `ForceInlineDecoration`s that compiler
+					-- passes add because the inlining is required for correctness. A pure user hint
+					-- receives this decoration *instead of* the generic `ForceInlineDecoration`, so a
+					-- CUDA-only gate can defer it: the callee is kept as a separate
+					-- `__forceinline__` function and inlining is left to the downstream CUDA compiler
+					-- (NVRTC for device code, nvcc for host code). See #12623.
+					struct_name = "UserForceInlineDecoration",
+				},
+			},
+			{
 				AllowPreTranslationInlining = {
 					-- This decoration indicates the callee should be inlined after translation passes,
 					-- Typically, this is because the callee has non-trivial values associated with it that need to be preserved 

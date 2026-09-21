@@ -5,6 +5,7 @@
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
+#include "slang-target.h"
 
 // This file provides general facilities for inlining function calls.
 
@@ -179,6 +180,17 @@ struct InliningPassBase
     {
         SLANG_UNUSED(callSite);
         return false;
+    }
+
+    /// Hook invoked right after a call site's callee body has been cloned into the caller, so a
+    /// subclass can react to the freshly-cloned instructions. `env` still holds the mapping from
+    /// each original callee inst to its clone at this call site, letting a subclass carry a
+    /// per-call-site property (e.g. "must be inlined") over to the cloned sub-calls. The default
+    /// does nothing.
+    virtual void notifyCallSiteInlined(CallSiteInfo const& callSite, IRCloneEnv& env)
+    {
+        SLANG_UNUSED(callSite);
+        SLANG_UNUSED(env);
     }
 
     static bool hasGenericAsmInst(IRInst* func)
@@ -557,6 +569,11 @@ struct InliningPassBase
         }
 
         inlineFuncBody(callSite, &env, &builder);
+
+        // The callee body (including any calls it makes) has now been cloned in front of the
+        // original `call`. Let a subclass propagate per-call-site state to those clones while the
+        // original-to-clone mapping in `env` is still available.
+        notifyCallSiteInlined(callSite, env);
     }
 
     // When instructions are cloned, with cloneInst no sourceLoc information is copied over by
@@ -1144,32 +1161,230 @@ struct ForceInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
 
-    ForceInliningPass(IRModule* module)
-        : Super(module)
+    ForceInliningPass(IRModule* module, CodeGenTarget target)
+        : Super(module), m_target(target)
     {
+    }
+
+    CodeGenTarget m_target;
+
+    // Call instructions whose result a `static_assert` condition depends on, and which therefore
+    // must be inlined by this pass rather than deferred. Seeded (lazily, on first use) from the
+    // calls appearing directly in each condition, and extended during inlining by
+    // `notifyCallSiteInlined` as required calls are expanded. See `callIsRequiredByStaticAssert`
+    // for why this is keyed on the call site rather than the callee function.
+    HashSet<IRCall*> m_staticAssertReachableCalls;
+    bool m_computedStaticAssertReachable = false;
+
+    // Seed `m_staticAssertReachableCalls` with the call instructions that appear directly in a
+    // `static_assert` condition anywhere in the module.
+    //
+    // `checkStaticAssert` (slang-emit.cpp) is a pure checker that runs *after* this pass and the
+    // subsequent `simplifyIR` fold: it requires each `static_assert` condition to already be an
+    // `IRBoolLit`, and there is no compile-time call interpreter. So a `static_assert(f(K))`
+    // becomes constant only if the `f(K)` call is inlined here first. Deferring that call on CUDA
+    // (see `shouldInline`) would leave a `call` in the condition and produce a spurious "static
+    // assertion condition is not compile-time constant" error. We therefore never defer a call a
+    // `static_assert` condition depends on.
+    //
+    // We key on the *call site*, not the callee function: the same user `[ForceInline]` helper may
+    // be called both inside a `static_assert` and from ordinary runtime code, and only the
+    // static_assert call must be inlined — deferring the runtime calls is exactly what issue
+    // #12623 asks for. A transitive chain — `static_assert(outer(K))` where `outer` calls `inner`,
+    // both user `[ForceInline]` — is not seeded here (the `inner` call is inside `outer`'s body,
+    // not in the condition). It is handled when the `outer` call is inlined:
+    // `notifyCallSiteInlined` adds the freshly-cloned `inner` call to this set, and the
+    // per-function inlining fixpoint in `considerCallSiteInFunc` then revisits and inlines it.
+    // Marking clones as they are produced (rather than re-running this whole-module scan to a
+    // fixpoint) keeps the scan linear.
+    void computeStaticAssertReachableCalls()
+    {
+        struct Walker
+        {
+            HashSet<IRCall*>& reachedCalls;
+            // Operand nodes already visited by `seedFromValue`, shared across every
+            // `IRStaticAssert` seed so each node is walked at most once module-wide. Two assertion
+            // conditions can share a large operand sub-DAG (e.g. a common global constexpr); a
+            // per-seed set would re-walk it once per assertion, making the scan quadratic in a
+            // compact input. `reachedCalls` already dedups the collected calls, so sharing `seen`
+            // removes only redundant walking and leaves the result unchanged.
+            HashSet<IRInst*> seen;
+            void seedFromValue(IRInst* value)
+            {
+                // Walk the operand graph feeding `value`, collecting every call it depends on.
+                List<IRInst*> stack;
+                stack.add(value);
+                while (stack.getCount())
+                {
+                    auto cur = stack.getLast();
+                    stack.removeLast();
+                    if (!cur || !seen.add(cur))
+                        continue;
+                    if (auto call = as<IRCall>(cur))
+                        reachedCalls.add(call);
+                    // A `&&`/`||` in the condition lowers to short-circuit control flow, so the
+                    // value feeding the `static_assert` is a phi (a join-block parameter) rather
+                    // than a plain operand tree: e.g. `a(K) && b(K)` becomes
+                    // `ifElse(a(K), then, else, join)` with `then` branching `join(b(K))` and
+                    // `else` branching `join(false)`, and the condition is `join`'s parameter.
+                    // Operand edges alone never reach `a(K)` or `b(K)`, so for a block parameter we
+                    // also follow (1) the values each predecessor branch passes in — reaching
+                    // `b(K)` — and (2) the condition of any branch that selects among those
+                    // predecessors — reaching `a(K)`. Both must fold for the join to become a
+                    // compile-time constant, so both calls must be inlined rather than deferred.
+                    if (auto param = as<IRParam>(cur))
+                    {
+                        if (auto block = as<IRBlock>(param->getParent()))
+                        {
+                            int paramIndex = getParamIndexInBlock(param);
+                            if (paramIndex >= 0)
+                            {
+                                for (auto pred : block->getPredecessors())
+                                {
+                                    if (auto br = as<IRUnconditionalBranch>(pred->getTerminator()))
+                                    {
+                                        if ((UInt)paramIndex < br->getArgCount())
+                                            stack.add(br->getArg(paramIndex));
+                                    }
+                                }
+                            }
+                            for (auto use = block->firstUse; use; use = use->nextUse)
+                            {
+                                if (auto condBranch = as<IRConditionalBranch>(use->getUser()))
+                                    stack.add(condBranch->getCondition());
+                                else if (auto switchInst = as<IRSwitch>(use->getUser()))
+                                    stack.add(switchInst->getCondition());
+                            }
+                        }
+                    }
+                    for (UInt i = 0; i < cur->getOperandCount(); i++)
+                        stack.add(cur->getOperand(i));
+                }
+            }
+        } walker{m_staticAssertReachableCalls};
+
+        // An `IRStaticAssert` can be nested to any depth (e.g. inside an `IRFunc` that is itself
+        // under an `IRGeneric`), so scan the whole IR tree, the same traversal `checkStaticAssert`
+        // uses. A shallower scan would miss a generic that static-asserts on a user helper.
+        List<IRInst*> scan;
+        scan.add(m_module->getModuleInst());
+        while (scan.getCount())
+        {
+            auto inst = scan.getLast();
+            scan.removeLast();
+            if (auto staticAssert = as<IRStaticAssert>(inst))
+                walker.seedFromValue(staticAssert->getOperand(0));
+            for (auto child : inst->getChildren())
+                scan.add(child);
+        }
+    }
+
+    // Populate `m_staticAssertReachableCalls` on first use, before any inlining reacts to it.
+    void ensureStaticAssertReachableComputed()
+    {
+        if (!m_computedStaticAssertReachable)
+        {
+            computeStaticAssertReachableCalls();
+            m_computedStaticAssertReachable = true;
+        }
+    }
+
+    // Return true if this specific `call` must be inlined by this pass because a `static_assert`
+    // condition depends on its result being resolved to a compile-time constant (see above).
+    bool callIsRequiredByStaticAssert(IRCall* call)
+    {
+        ensureStaticAssertReachableComputed();
+        return m_staticAssertReachableCalls.contains(call);
+    }
+
+    // When a callee body is cloned at a call site, propagate the static_assert requirement onto the
+    // freshly-cloned sub-calls, so a required call keeps folding after it is spliced to a new site.
+    // Two independent reasons a clone must be marked, and both are needed:
+    //  * the call being inlined is itself required — a transitive chain `static_assert(outer(K))`
+    //    where `outer` calls `inner`: inlining `outer` brings `inner` to the condition site, so the
+    //    cloned `inner` call must fold too; and
+    //  * the original sub-call was already required — a `static_assert` lives inside this callee
+    //    body (e.g. a `constexpr`-parameter helper that the compiler always inlines): cloning the
+    //    body clones that assertion and its condition calls, which stay required at the new site.
+    // Runtime call sites of the same callees are distinct insts that are never marked, so they stay
+    // deferrable.
+    void notifyCallSiteInlined(CallSiteInfo const& callSite, IRCloneEnv& env) override
+    {
+        // The static_assert-required set is only consulted on CUDA (see `shouldInline`), so on
+        // other targets there is nothing to propagate and no reason to pay for the whole-module
+        // reachability scan.
+        if (!isCUDATarget(m_target))
+            return;
+        ensureStaticAssertReachableComputed();
+        bool enclosingRequired = m_staticAssertReachableCalls.contains(callSite.call);
+        for (auto block : callSite.callee->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (auto originalCall = as<IRCall>(inst))
+                {
+                    if (enclosingRequired || m_staticAssertReachableCalls.contains(originalCall))
+                    {
+                        if (auto clonedCall = as<IRCall>(lookUp(&env, originalCall)))
+                            m_staticAssertReachableCalls.add(clonedCall);
+                    }
+                }
+            }
+        }
     }
 
     bool shouldInline(CallSiteInfo const& info)
     {
-        if (info.callee->findDecoration<IRForceInlineDecoration>() ||
-            info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>() ||
-            info.callee->findDecoration<IRIntrinsicOpDecoration>())
-            return true;
-        return false;
+        auto callee = info.callee;
+        bool hasUserForceInline = callee->findDecoration<IRUserForceInlineDecoration>() != nullptr;
+        bool hasForceInline = callee->findDecoration<IRForceInlineDecoration>() != nullptr;
+        bool hasUnsafeEarly =
+            callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>() != nullptr;
+        bool hasIntrinsic = callee->findDecoration<IRIntrinsicOpDecoration>() != nullptr;
+        bool hasTargetIntrinsic = callee->findDecoration<IRTargetIntrinsicDecoration>() != nullptr;
+
+        // On CUDA, a user-written `[ForceInline]` is deferred to the downstream CUDA compiler: the
+        // callee is kept as a separate `__forceinline__` function (device or host) rather than
+        // having its body duplicated at every call site, which is what makes the downstream
+        // front-end time blow up (issue #12623).
+        //
+        // Deferring is a *performance* choice — emitting the callee in-Slang is always a correct
+        // lowering — so we only defer when provably safe, and inline (do not defer) whenever
+        // a consumer requires the callee resolved first. The vetoes: a generic
+        // `ForceInlineDecoration` means a compiler pass requires the inline for correctness
+        // (constexpr-parameter, setter, buffer-element pack/unpack, etc.);
+        // `Unsafe`/`__intrinsic_op` must inline regardless; a
+        // `[__target_intrinsic]` callee keeps its existing handling (emit uses the target-specific
+        // spelling, or inlines the fallback body it may carry) rather than being deferred as a
+        // separate `__forceinline__` function;
+        // and a call whose result a `static_assert` condition depends on must be inlined so the
+        // condition folds to a constant before `checkStaticAssert` runs. The static_assert veto is
+        // keyed on this call site, not on `callee`, so the same helper is still deferred at its
+        // ordinary runtime call sites.
+        if (isCUDATarget(m_target) && hasUserForceInline && !hasForceInline && !hasUnsafeEarly &&
+            !hasIntrinsic && !hasTargetIntrinsic && !callIsRequiredByStaticAssert(info.call))
+            return false;
+
+        return hasUserForceInline || hasForceInline || hasUnsafeEarly || hasIntrinsic;
     }
 };
 
 void performForceInlining(IRModule* module)
 {
+    performForceInlining(module, CodeGenTarget::Unknown);
+}
+
+void performForceInlining(IRModule* module, CodeGenTarget target)
+{
     SLANG_PROFILE;
 
-    ForceInliningPass pass(module);
+    ForceInliningPass pass(module, target);
     pass.considerAllCallSites();
 }
 
 bool performForceInlining(IRGlobalValueWithCode* func)
 {
-    ForceInliningPass pass(func->getModule());
+    ForceInliningPass pass(func->getModule(), CodeGenTarget::Unknown);
     return pass.considerAllCallSitesRec(func);
 }
 
@@ -1224,8 +1439,8 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
             case kIROp_IntrinsicOpDecoration:
                 return true;
             case kIROp_ForceInlineDecoration:
+            case kIROp_UserForceInlineDecoration:
                 hasForceInline = true;
-                break;
                 break;
             }
         }
