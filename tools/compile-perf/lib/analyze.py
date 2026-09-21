@@ -491,6 +491,45 @@ except ValueError as _e:
 del _rec, _mr, _mu, _bad
 
 
+# Import-time self-check for point_metrics, the sole producer of the
+# per-workload provenance markers consumed by trend.py. A missing workload
+# prefix or wrong encoding would make every affected counter look unknown and
+# silently remove it from judgement.
+def _point_metrics_selfcheck():
+    import shutil
+    import tempfile
+
+    d = tempfile.mkdtemp(prefix="point_metrics_selfcheck_")
+    try:
+        path = os.path.join(d, "results.json")
+        records = [
+            {"workload": "detailed", "size": 128, "timer_schema": "detailed",
+             "timers": {"compileInner": {"median": 1.0}}},
+            {"workload": "coarse", "size": None, "timer_schema": "coarse",
+             "timers": {"compileInner": {"median": 2.0}}},
+            {"workload": "legacy", "size": 32,
+             "timers": {"compileInner": {"median": 3.0}}},
+        ]
+        with open_output(path) as fh:
+            json.dump(records, fh)
+
+        got = point_metrics(path)
+        assert got[f"detailed|{SCHEMA_MARKER}"] == 1.0
+        assert got[f"detailed|{SIZE_MARKER}"] == 128.0
+        assert got[f"coarse|{SCHEMA_MARKER}"] == 0.0
+        assert f"coarse|{SIZE_MARKER}" not in got, \
+            "a missing size must remain unknown, not acquire a marker"
+        assert f"legacy|{SCHEMA_MARKER}" not in got, \
+            "a record predating timer_schema must remain unknown"
+        assert got[f"legacy|{SIZE_MARKER}"] == 32.0
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+_point_metrics_selfcheck()
+del _point_metrics_selfcheck
+
+
 # Import-time self-check for daily_labels, over a throwaway tmpdir (the same
 # idiom as fetch_releases.py's zip check). This function is the single place
 # that knows the daily storage layout, so a change here forks silently into

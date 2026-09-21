@@ -22,6 +22,36 @@ sys.path.insert(0, HERE)  # allow running from any directory
 from lib import analyze, manifest
 
 
+def workload_complete(measured_sizes, spec, sweep_requested):
+    """Whether a workload's successful measurements satisfy this sweep.
+
+    The current manifest default is always required. When scaling data was
+    requested, every current ladder size is required as well. `measured_sizes`
+    deliberately retains the JSON value types: a string such as "128" is not
+    evidence that the integer size 128 was measured.
+    """
+    if not measured_sizes:
+        return False
+    if spec and spec.default_size not in measured_sizes:
+        return False
+    if sweep_requested and spec and spec.sweep_sizes:
+        return set(spec.sweep_sizes) <= measured_sizes
+    return True
+
+
+# Pin the completeness predicate that decides whether a release is re-swept.
+_SPEC = manifest.BY_NAME["interface_depth"]
+assert workload_complete({_SPEC.default_size}, _SPEC, False)
+assert not workload_complete({64}, _SPEC, False), \
+    "a stale pre-resize default must trigger a re-sweep"
+assert not workload_complete({str(_SPEC.default_size)}, _SPEC, False), \
+    "size values with the wrong JSON type must not compare equal"
+assert workload_complete(set(_SPEC.sweep_sizes), _SPEC, True)
+assert not workload_complete(set(_SPEC.sweep_sizes[:-1]), _SPEC, True), \
+    "a missing ladder rung must trigger a scaling re-sweep"
+del _SPEC
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -87,40 +117,8 @@ def main():
                 if isinstance(r, dict) and "workload" in r and r.get("ok", True):
                     sizes.setdefault(r["workload"], set()).add(r.get("size"))
             need = want or all_wls
-
-            # `complete` closes over `sizes`, `args.sweep`, and `manifest` — all
-            # stable across loop iterations. It does NOT capture the loop variable.
-            def complete(wl):
-                szs = sizes.get(wl)
-                if not szs:
-                    return False
-                spec = manifest.BY_NAME.get(wl)
-                # The manifest's CURRENT default_size must be among the measured
-                # sizes. Without this the check only asks "was this workload ever
-                # measured at all", so resizing a workload (#13035 moved
-                # interface_depth 64->128, conformance and overload_resolution
-                # 600->2400, resource_aggregate 80->320) leaves every release
-                # looking complete at the stale size and no re-sweep is ever
-                # triggered. That contradicts the ladder rule just below, which
-                # deliberately re-sweeps when the manifest's sweep_sizes are
-                # retuned; default_size is the other half of the same intent.
-                if spec and spec.default_size not in szs:
-                    return False
-                if args.sweep and spec and spec.sweep_sizes:
-                    # Every configured ladder size must be present: an
-                    # interrupted prior sweep (e.g. a per-run timeout) leaves a
-                    # valid results.json with only the low sizes, and accepting
-                    # it here would leave a permanent gap in the scaling curve
-                    # that only --force could backfill. This also means a
-                    # retuned ladder in the manifest re-sweeps affected
-                    # releases on the next run, by design.
-                    return set(spec.sweep_sizes) <= szs
-                # True covers: no --sweep requested; a spec with no ladder
-                # (nothing to sweep); and a workload present in results.json
-                # but gone from the manifest (no ladder left to validate).
-                return True
-
-            if all(complete(wl) for wl in need):
+            if all(workload_complete(sizes.get(wl), manifest.BY_NAME.get(wl), args.sweep)
+                   for wl in need):
                 print(f"[{i}/{len(ready)}] {tag}: already has {sorted(need)}, skipping")
                 continue
         print(f"[{i}/{len(ready)}] {tag} ({rec.get('date','?')})")

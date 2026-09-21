@@ -284,12 +284,14 @@ def main():
 
     if args.baseline_kind == "daily":
         # The UNION of the series' daily points and every daily sweep on disk,
-        # deduped by label. On disk is normally the superset — that is the whole
-        # point — but the series remains the only source when daily/ is absent,
-        # which is the shape the self-checks below construct.
+        # deduped by label. The on-disk point wins a collision because it is
+        # reconstructed through point_metrics() and therefore carries the
+        # current provenance markers; tracking.json may have been written by an
+        # older tool and lack them. The series remains the fallback when daily/
+        # is absent.
         by_label = {p["label"]: p for p in earlier if p.get("kind") == "daily"}
         for p in analyze.daily_series_points(args.results):
-            by_label.setdefault(p["label"], p)
+            by_label[p["label"]] = p
         cur_order = _order(current)
         candidates = sorted((p for p in by_label.values() if _order(p) < cur_order),
                             key=_order)
@@ -504,6 +506,12 @@ _CURRENT = {"metrics": dict(_KNOWN_METRICS)}
 assert comparable_metric_values(
     _CURRENT, [{"metrics": dict(_KNOWN_METRICS)}],
     "minimal|compileInner", _PROV_KEYS) == [100.0]
+_MISMATCHED_METRICS = dict(_KNOWN_METRICS)
+_MISMATCHED_METRICS[_PROV_KEYS[1]] = 128.0
+assert comparable_metric_values(
+    _CURRENT, [{"metrics": _MISMATCHED_METRICS}],
+    "minimal|compileInner", _PROV_KEYS) == [], \
+    "complete but unequal provenance must not enter the baseline"
 for _missing in _PROV_KEYS:
     _legacy_current = {"metrics": dict(_KNOWN_METRICS)}
     del _legacy_current["metrics"][_missing]
@@ -514,7 +522,8 @@ for _missing in _PROV_KEYS:
     del _legacy_point["metrics"][_missing]
     assert comparable_metric_values(
         _CURRENT, [_legacy_point], "minimal|compileInner", _PROV_KEYS) == []
-del _PROV_KEYS, _KNOWN_METRICS, _CURRENT, _missing, _legacy_current, _legacy_point
+del _PROV_KEYS, _KNOWN_METRICS, _MISMATCHED_METRICS, _CURRENT
+del _missing, _legacy_current, _legacy_point
 
 # The two gates compose, and that composition is what the merge of the
 # two-tier gate and the unit-aware floor had to get right: a kb counter must
@@ -718,6 +727,39 @@ def _warnings_output_selfcheck():
                     (f"trend fixture: {metrics} expected the step summary to lead "
                      f"with {want_header}, got {md.splitlines()[0]!r} — a run with "
                      f"any regression must not be headed by the warning icon")
+
+        # A real provenance transition: minimal is present throughout the
+        # trailing window but changes size tonight, while newcomer has no
+        # history at all. Only minimal is a provenance skip, it must not be
+        # classified as a regression, and Actions must receive the warning.
+        current_metrics = {
+            "minimal|compileInner": BASE * 1.20,
+            "parse|compileInner": BASE,
+            "newcomer|compileInner": BASE * 1.20,
+        }
+        current = point("2026-01-09-zzzzzzzzz", "2026-01-09", current_metrics)
+        current["metrics"][f"minimal|{analyze.SIZE_MARKER}"] = 128.0
+        with analyze.open_output(tpath) as fh:
+            json.dump({"runner": "r1", "points": history + [current]}, fh)
+        for f in (gho, summary):
+            with analyze.open_output(f) as fh:
+                fh.write("")
+        os.environ["GITHUB_ACTIONS"] = "true"
+        sys.argv = ["trend.py", "--results", d, "--label", current["label"]]
+        stdout = io.StringIO()
+        code = 0
+        with contextlib.redirect_stdout(stdout):
+            try:
+                main()
+            except SystemExit as e:
+                code = e.code or 0
+        report = stdout.getvalue()
+        assert code == 0 and "OK — no compile-perf regression" in report, \
+            "a size transition must suppress comparison, not become a regression"
+        assert "Perf timer schema" in report and "(minimal)" in report, \
+            "a provenance skip must emit an Actions warning naming the workload"
+        assert "newcomer" not in report, \
+            "a new workload with too little history is not a provenance skip"
     finally:
         sys.argv = saved_argv
         for k, v in saved_env.items():
@@ -730,6 +772,95 @@ def _warnings_output_selfcheck():
 
 _warnings_output_selfcheck()
 del _warnings_output_selfcheck
+
+
+def _daily_baseline_selfcheck():
+    """Exercise the on-disk daily union, collision rule, and current cutoff.
+
+    The tracking series intentionally contains only one stale baseline point;
+    daily/ contributes the two pre-release nights the rendered series dropped
+    and replaces the stale shared label with a provenance-bearing point. Two
+    future points ensure the current-point cutoff is also load-bearing.
+    """
+    import contextlib
+    import io
+    import shutil
+    import tempfile
+
+    d = tempfile.mkdtemp(prefix="trend_daily_baseline_selfcheck_")
+    saved_argv = sys.argv
+    saved_env = {k: os.environ.get(k)
+                 for k in ("GITHUB_OUTPUT", "GITHUB_STEP_SUMMARY", "GITHUB_ACTIONS")}
+    try:
+        os.makedirs(os.path.join(d, "tracking"))
+        shared_label = "2026-01-03-ccccccccc"
+        current_label = "2026-01-04-ddddddddd"
+        stale_shared = {
+            "label": shared_label, "date": "2026-01-03", "kind": "daily",
+            "runner": "r1", "metrics": {"minimal|compileInner": 100.0},
+        }
+        current = {
+            "label": current_label, "date": "2026-01-04", "kind": "daily",
+            "runner": "r1", "metrics": {
+                "minimal|compileInner": 120.0,
+                f"minimal|{analyze.SCHEMA_MARKER}": 1.0,
+                f"minimal|{analyze.SIZE_MARKER}": 64.0,
+            },
+        }
+        with analyze.open_output(os.path.join(d, "tracking", "tracking.json")) as fh:
+            json.dump({"runner": "r1", "points": [stale_shared, current]}, fh)
+
+        def write_daily(label, date, value):
+            path = os.path.join(d, "daily", label)
+            os.makedirs(path)
+            with analyze.open_output(os.path.join(path, "results.json")) as fh:
+                json.dump([{
+                    "workload": "minimal", "size": 64,
+                    "timer_schema": "detailed",
+                    "timers": {"compileInner": {"median": value}},
+                }], fh)
+            with analyze.open_output(os.path.join(path, "meta.json")) as fh:
+                json.dump({"date": date, "commit": label[-9:],
+                           "commit_time": f"{date}T00:00:00Z", "runner": "r1"}, fh)
+
+        for label, date, value in (
+                ("2026-01-01-aaaaaaaaa", "2026-01-01", 100.0),
+                ("2026-01-02-bbbbbbbbb", "2026-01-02", 100.0),
+                (shared_label, "2026-01-03", 100.0),
+                ("2026-01-05-eeeeeeeee", "2026-01-05", 1000.0),
+                ("2026-01-06-fffffffff", "2026-01-06", 1000.0)):
+            write_daily(label, date, value)
+
+        for key in saved_env:
+            os.environ.pop(key, None)
+        sys.argv = ["trend.py", "--results", d, "--label", current_label,
+                    "--window", "3"]
+        stdout = io.StringIO()
+        code = 0
+        with contextlib.redirect_stdout(stdout):
+            try:
+                main()
+            except SystemExit as e:
+                code = e.code or 0
+        report = stdout.getvalue()
+        assert code == EXIT_REGRESSION and "1 regression(s)" in report, \
+            "three restored on-disk baselines must make the 1.20x rise judgeable"
+        assert "trailing 3 point(s)" in report, \
+            "the shared label must be deduplicated and both omitted nights restored"
+        assert "2026-01-01-aaaaaaaaa..2026-01-03-ccccccccc" in report, \
+            "future on-disk points must not cross the current-point cutoff"
+    finally:
+        sys.argv = saved_argv
+        for key, value in saved_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        shutil.rmtree(d, ignore_errors=True)
+
+
+_daily_baseline_selfcheck()
+del _daily_baseline_selfcheck
 
 
 def _abort_exit_code_selfcheck():
