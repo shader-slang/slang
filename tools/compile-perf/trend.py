@@ -143,6 +143,42 @@ def check_threshold_order(rel, warn_rel):
               f"every warning-level change to an error")
 
 
+def point_runner(point, history_runner):
+    """The runner fingerprint for `point`, or "" when it is unknown.
+
+    Release points deliberately omit a per-point runner because they all use
+    the release-sweep runner recorded at series level. Daily points do not
+    share that invariant: an absent runner means the legacy point's machine is
+    unknown, so inheriting `history_runner` would make unrelated measurements
+    look comparable.
+    """
+    if point.get("kind") == "release":
+        return history_runner
+    return point.get("runner", "")
+
+
+def comparable_metric_values(current, points, key, provenance_keys):
+    """Values for `key` whose complete provenance matches `current`.
+
+    Missing provenance is never evidence of equality. In particular, two
+    legacy points that both predate a marker must not match merely because
+    their dictionary lookups both return None.
+    """
+    current_provenance = tuple(current["metrics"].get(k) for k in provenance_keys)
+    if any(value is None for value in current_provenance):
+        return []
+
+    values = []
+    for point in points:
+        if key not in point.get("metrics", {}):
+            continue
+        point_provenance = tuple(point["metrics"].get(k) for k in provenance_keys)
+        if (all(value is not None for value in point_provenance)
+                and point_provenance == current_provenance):
+            values.append(point["metrics"][key])
+    return values
+
+
 def main():
     # The Windows runner's Python defaults to a cp1252 console encoding, which
     # cannot encode this report's non-ASCII table headers — and the flag table
@@ -214,11 +250,7 @@ def main():
         cur_idx = len(pts) - 1
     current = pts[cur_idx]
     earlier = pts[:cur_idx]
-    # Release points carry no per-point runner field by design: they are all built
-    # by the release-sweep job on the machine recorded in runner.json (hist_runner).
-    # The `or hist_runner` below is not defensive fallback — it is that data-model
-    # invariant: a missing runner field means "this is a release point, use hist_runner".
-    cur_runner = current.get("runner") or hist_runner
+    cur_runner = point_runner(current, hist_runner)
 
     print(f"trend: current={current['label']} ({current['date']}, {current['kind']})  "
           f"runner={cur_runner or 'unset'}")
@@ -264,8 +296,11 @@ def main():
     else:
         candidates = list(earlier)
 
-    # Restrict the baseline to points on the same runner.
-    prior = [p for p in candidates if (p.get("runner") or hist_runner) == cur_runner]
+    # Restrict the baseline to points on the same known runner. A legacy daily
+    # point with no runner is unknown provenance, not a release point that can
+    # inherit the series-level release-sweep runner.
+    prior = [p for p in candidates
+             if cur_runner and point_runner(p, hist_runner) == cur_runner]
 
     window = prior[-args.window:]
 
@@ -319,10 +354,8 @@ def main():
         # Admitting unknown provenance risks a false alert; excluding it costs a
         # few nights of reduced coverage while the window refills.
         prov_keys = (f"{wl}|{analyze.SCHEMA_MARKER}", f"{wl}|{analyze.SIZE_MARKER}")
-        cur_prov = tuple(current["metrics"].get(k) for k in prov_keys)
         present = [p for p in window if key in p.get("metrics", {})]
-        baseline = [p["metrics"][key] for p in present
-                    if tuple(p["metrics"].get(k) for k in prov_keys) == cur_prov]
+        baseline = comparable_metric_values(current, present, key, prov_keys)
         if len(baseline) < args.min_baseline:
             # Only counts as provenance-skipped when the counter WAS present in
             # enough trailing points and the provenance filter is what removed
@@ -453,6 +486,36 @@ assert not judged("minimal", "emitEntryPointsSourceFromIR"), \
 assert abs_floor_for("peakRssKb", 2.0) == 1024.0, "memory floor is 1 MiB"
 assert abs_floor_for("compileInner", 2.0) == 2.0, "time floor is --abs"
 
+# Runner provenance differs by point kind: only releases inherit the runner
+# recorded for the release history. A daily point with no runner is legacy data
+# from an unknown machine and must stay unknown.
+assert point_runner({"kind": "release"}, "r1") == "r1"
+assert point_runner({"kind": "daily"}, "r1") == ""
+assert point_runner({"kind": "daily", "runner": "r2"}, "r1") == "r2"
+
+# Complete, equal per-workload provenance admits a metric. Missing either
+# marker on either side admits nothing — most importantly, two missing values
+# do not become a false match through None == None.
+_PROV_KEYS = (f"minimal|{analyze.SCHEMA_MARKER}",
+              f"minimal|{analyze.SIZE_MARKER}")
+_KNOWN_METRICS = {"minimal|compileInner": 100.0,
+                  _PROV_KEYS[0]: 1.0, _PROV_KEYS[1]: 64.0}
+_CURRENT = {"metrics": dict(_KNOWN_METRICS)}
+assert comparable_metric_values(
+    _CURRENT, [{"metrics": dict(_KNOWN_METRICS)}],
+    "minimal|compileInner", _PROV_KEYS) == [100.0]
+for _missing in _PROV_KEYS:
+    _legacy_current = {"metrics": dict(_KNOWN_METRICS)}
+    del _legacy_current["metrics"][_missing]
+    assert comparable_metric_values(
+        _legacy_current, [{"metrics": dict(_KNOWN_METRICS)}],
+        "minimal|compileInner", _PROV_KEYS) == []
+    _legacy_point = {"metrics": dict(_KNOWN_METRICS)}
+    del _legacy_point["metrics"][_missing]
+    assert comparable_metric_values(
+        _CURRENT, [_legacy_point], "minimal|compileInner", _PROV_KEYS) == []
+del _PROV_KEYS, _KNOWN_METRICS, _CURRENT, _missing, _legacy_current, _legacy_point
+
 # The two gates compose, and that composition is what the merge of the
 # two-tier gate and the unit-aware floor had to get right: a kb counter must
 # clear 1 MiB before EITHER tier fires, so a few-KB wobble is neither an error
@@ -572,6 +635,11 @@ def _warnings_output_selfcheck():
     import tempfile
 
     def point(label, date, metrics):
+        metrics = dict(metrics)
+        workloads = {key.partition("|")[0] for key in metrics}
+        for workload in workloads:
+            metrics[f"{workload}|{analyze.SCHEMA_MARKER}"] = 1.0
+            metrics[f"{workload}|{analyze.SIZE_MARKER}"] = 64.0
         return {"label": label, "date": date, "kind": "daily",
                 "runner": "r1", "metrics": metrics}
 
