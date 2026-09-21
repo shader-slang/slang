@@ -2463,8 +2463,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Int8Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
-        // Pointer-sized ints are ordinary runtime scalars; `getIntTypeInfo` resolves their
-        // target-dependent width (`getPointerSize`) and signedness just like the fixed-width ops.
+        // In this `OpTypeInt` arm, pointer-sized ints are handled like the fixed-width integer ops:
+        // `getIntTypeInfo` resolves their `getPointerSize`-derived width and signedness.
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
             {

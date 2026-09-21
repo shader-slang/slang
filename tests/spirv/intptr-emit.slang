@@ -11,7 +11,9 @@
 //TEST:SIMPLE(filecheck=CHECK_S): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly
 //TEST:SIMPLE(filecheck=CHECK_U): -target spirv-asm -entry computeMainU -stage compute -emit-spirv-directly
 
-// A pointer-sized specialization constant exercises the OpSpecConstant literal path.
+// A pointer-sized specialization constant exercises the OpSpecConstant literal path. It is used
+// only by the signed entry point because that literal path is signedness-independent, so covering
+// it once is enough.
 [SpecializationConstant]
 const intptr_t iterCount = 4;
 
@@ -23,15 +25,17 @@ void computeMain(uint3 tid: SV_DispatchThreadID, uniform RWStructuredBuffer<floa
     intptr_t count = intptr_t(tid.y) + iterCount;
     for (intptr_t k = 0; k < count; k++)
     {
-        acc = acc + (float)(k * 1);
+        acc = acc + (float)k;
     }
     outp[0] = acc;
 }
 
 // CHECK_S-DAG: OpTypeInt 64 1
 // CHECK_S-DAG: OpSpecConstant %long 4
-// The unsigned->signed cast of `tid.y` routes through getUnsignedTypeFromSignedType,
-// yielding an unsigned 64-bit intermediate for the OpUConvert.
+// The runtime intptr_t loop literals emit 64-bit signed constants (not truncated to 32 bits).
+// CHECK_S-DAG: OpConstant %long
+// The uint->intptr_t widen goes through a 64-bit unsigned intermediate (%ulong) before it is
+// reinterpreted as signed, so the widening instruction is an unsigned OpUConvert.
 // CHECK_S-DAG: OpUConvert %ulong
 // The loop compares signed pointer-sized values, so it must use the signed OpSLessThan.
 // CHECK_S-DAG: OpSLessThan
@@ -44,7 +48,7 @@ void computeMainU(uint3 tid: SV_DispatchThreadID, uniform RWStructuredBuffer<flo
     uintptr_t count = uintptr_t(tid.y);
     for (uintptr_t k = 0; k < count; k++)
     {
-        acc = acc + (float)(k * 1);
+        acc = acc + (float)k;
     }
     outp[0] = acc;
 }
