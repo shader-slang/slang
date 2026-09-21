@@ -1160,6 +1160,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         case kIROp_PtrType:
         case kIROp_UIntPtrType:
+        case kIROp_IntPtrType:
             {
                 if (auto val = as<IRIntLit>(inst))
                 {
@@ -1201,6 +1202,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         case kIROp_PtrType:
         case kIROp_UIntPtrType:
+        case kIROp_IntPtrType:
             {
                 if (getPointerSize(m_targetRequest) == sizeof(uint64_t))
                     result = emitOpConstant(inst, type, SpvLiteralBits::from64(uint64_t(val)));
@@ -2461,6 +2463,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Int8Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
+        // Pointer-sized ints are ordinary runtime scalars; `getIntTypeInfo` resolves their
+        // target-dependent width (`getPointerSize`) and signedness just like the fixed-width ops.
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
             {
                 const IntInfo i = getIntTypeInfo(m_targetRequest, as<IRType>(inst));
                 if (i.width == 16)

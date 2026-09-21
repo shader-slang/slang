@@ -3177,6 +3177,7 @@ IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type)
     case kIROp_Int16Type:
     case kIROp_Int64Type:
     case kIROp_Int8Type:
+    case kIROp_IntPtrType:
         return builder->getType(getOppositeSignIntTypeOp(elementType->getOp()));
     default:
         return type;
@@ -3197,6 +3198,7 @@ bool isSignedType(IRType* type)
     case kIROp_Int16Type:
     case kIROp_Int64Type:
     case kIROp_Int8Type:
+    case kIROp_IntPtrType:
         return true;
     case kIROp_VectorType:
         return isSignedType(as<IRVectorType>(type)->getElementType());
