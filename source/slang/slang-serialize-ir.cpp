@@ -778,6 +778,15 @@ Result readSerializedModuleInfo(
     }
 
     Fossilized<IRModuleInfo>* fossilizedModuleInfo = cast<Fossilized<IRModuleInfo>>(rootValPtr);
+
+    // The serialization format version governs the layout of everything below it,
+    // so validate it before reading the `module` fields. This keeps the reader
+    // safe to call on any blob whose format we do not understand (rather than
+    // interpreting an unknown layout), and is what lets a caller invoke it on the
+    // failure path of `readSerializedModuleIR` to recover the semantic version.
+    if (fossilizedModuleInfo->serializationVersion != IRModuleInfo::kSupportedSerializationVersion)
+        return SLANG_FAIL;
+
     Fossilized<IRModule>* fossilizedModule = fossilizedModuleInfo->module;
     version = fossilizedModule->m_version;
     compilerVersion = fossilizedModuleInfo->fullVersion.get();

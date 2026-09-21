@@ -100,6 +100,16 @@ String supportedRangeFragment()
     return sb.produceString();
 }
 
+// The "version <v> is outside" fragment the diagnostic embeds, so an assertion
+// binds the printed value to its surrounding words rather than matching a bare
+// number that could appear elsewhere (e.g. in the error code).
+String actualVersionFragment(uint64_t version)
+{
+    StringBuilder sb;
+    sb << "version " << version << " is outside";
+    return sb.produceString();
+}
+
 bool serializeTrivialModule(UnitTestContext* unitTestContext, List<uint8_t>& outContainer)
 {
     ComPtr<slang::ISession> session;
@@ -171,7 +181,7 @@ SLANG_UNIT_TEST(moduleVersionAboveMaxIsRejected)
             unitTestContext->slangGlobalSession->createSession(sessionDesc, session.writeRef())));
     }
 
-    // Failing cleanly here (rather than crashing) is the property under test.
+    // A null return without crashing is the property under test.
     {
         ComPtr<slang::IBlob> diagnostics;
         slang::IModule* loaded = slang_loadModuleFromIRBlob(
@@ -186,11 +196,10 @@ SLANG_UNIT_TEST(moduleVersionAboveMaxIsRejected)
         UnownedStringSlice message(
             static_cast<const char*>(diagnostics->getBufferPointer()),
             diagnostics->getBufferSize());
-        // The message must name the offending version and the supported range.
         SLANG_CHECK(message.indexOf(UnownedStringSlice("unsupported")) != -1);
         SLANG_CHECK(
-            message.indexOf(String(IRModule::k_maxSupportedModuleVersion + 1).getUnownedSlice()) !=
-            -1);
+            message.indexOf(actualVersionFragment(IRModule::k_maxSupportedModuleVersion + 1)
+                                .getUnownedSlice()) != -1);
         SLANG_CHECK(message.indexOf(supportedRangeFragment().getUnownedSlice()) != -1);
     }
 
@@ -254,7 +263,7 @@ SLANG_UNIT_TEST(moduleVersionBelowMinIsRejected)
         static_cast<const char*>(diagnostics->getBufferPointer()),
         diagnostics->getBufferSize());
     SLANG_CHECK(message.indexOf(UnownedStringSlice("unsupported")) != -1);
-    SLANG_CHECK(message.indexOf(String(patchedVersion).getUnownedSlice()) != -1);
+    SLANG_CHECK(message.indexOf(actualVersionFragment(patchedVersion).getUnownedSlice()) != -1);
     SLANG_CHECK(message.indexOf(supportedRangeFragment().getUnownedSlice()) != -1);
 
     SlangInt moduleVersion = 0;

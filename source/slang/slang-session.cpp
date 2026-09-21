@@ -2237,13 +2237,12 @@ SlangResult Linkage::loadSerializedModuleContents(
     RefPtr<IRModule> irModule;
     if (SLANG_FAILED(readSerializedModuleIR(irChunk, session, sourceLocReader, irModule)))
     {
-        // The reader rejected the module (it validates the serialization format
-        // version and then the semantic version range before building any IR).
-        // If the cause was an out-of-range semantic version, turn the bare
-        // failure into a diagnostic that names the version and the supported
-        // range, since this is the load path that carries a sink. The version is
-        // read from the header only now, on the failure path, and only after the
-        // reader has already validated the serialization format.
+        // If the reader rejected the module because its semantic version is out of
+        // range, turn the bare failure into a diagnostic that names the version and
+        // supported range (this is the load path that carries a sink). The header
+        // read is on the failure path only, and `readSerializedModuleInfo` itself
+        // validates the serialization format before touching the version, so it is
+        // safe here regardless of why the full read failed.
         String moduleCompilerVersion;
         UInt moduleVersion = 0;
         String serializedModuleName;
