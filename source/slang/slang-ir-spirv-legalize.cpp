@@ -3358,6 +3358,82 @@ static void removeUnreachableCodeAfterDiscardForOpKill(
     }
 }
 
+// Widen the index/offset operand at `indexOperand` of an access-chain instruction to a 32-bit
+// integer of the same signedness when it is a narrower integer, leaving it unchanged otherwise.
+// SPIR-V treats every OpAccessChain / OpPtrAccessChain index as signed regardless of the index
+// type's declared Signedness (per the SPIR-V spec's access-chain indexing semantics), so a
+// sub-32-bit unsigned index such as a
+// uint16_t of 40000 would be read as the negative value -25536 and address out of bounds. The
+// inserted cast preserves signedness, so emitIntCast later lowers an unsigned index with OpUConvert
+// (zero-extend) and a signed one with OpSConvert (sign-extend); the value the access chain sees is
+// then the intended one. Indices already 32 bits or wider are left untouched, so the 64-bit
+// indexing path (spvShader64BitIndexingEXT, #11967), which deliberately preserves index width, is
+// unaffected. A 32-bit *unsigned* index with bit 31 set is likewise still signed-negative but is
+// not handled here: it is unreachable for logical-pointer arrays, and the reachable
+// PhysicalStorageBuffer OpPtrAccessChain case needs 64-bit widening under a wide-index capability,
+// tracked as a follow-up.
+static void widenNarrowAccessChainIndex(
+    IRInst* accessChainInst,
+    UInt indexOperand,
+    TargetRequest* targetReq)
+{
+    IRInst* index = accessChainInst->getOperand(indexOperand);
+    IRType* indexType = index->getDataType();
+    // These ops carry an integer index/offset by construction; the non-integral guard is defensive
+    // and simply leaves an unexpected operand unchanged rather than asserting during codegen.
+    if (!indexType || !isIntegralType(indexType))
+        return;
+    const IntInfo info = getIntTypeInfo(targetReq, indexType);
+    if (info.width >= 32)
+        return;
+    IRBuilder builder(accessChainInst);
+    builder.setInsertBefore(accessChainInst);
+    IRType* widenedType = info.isSigned ? static_cast<IRType*>(builder.getIntType())
+                                        : static_cast<IRType*>(builder.getUIntType());
+    auto widened = builder.emitCast(widenedType, index);
+    // propagateNonUniformDecorations runs before this sweep and marks a bindless index operand
+    // with IRSPIRVNonUniformResourceDecoration; it does not look through the cast we insert here,
+    // so we carry that marker onto the widened value to preserve the non-uniform invariant (the
+    // resulting descriptor pointer's NonUniform requirement, VUID-RuntimeSpirv-None-10148,
+    // depends on it).
+    if (index->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+        builder.addSPIRVNonUniformResourceDecoration(widened);
+    builder.replaceOperand(accessChainInst->getOperands() + indexOperand, widened);
+}
+
+// Enforce the invariant that no OpAccessChain / OpPtrAccessChain is emitted with a sub-32-bit index
+// (see widenNarrowAccessChainIndex). All four access-chain-forming ops carry the index/offset as
+// operand 1 ({base, index} / {base, offset}). This op list tracks the emitters that forward that
+// operand into an access chain -- emitGetElementPtr, emitStructuredBufferGetElementPtr,
+// emitMeshOutputRef, and emitGetOffsetPtr in slang-emit-spirv.cpp -- and must stay in sync with
+// them.
+static void widenNarrowAccessChainIndices(IRModule* module, TargetRequest* targetReq)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto code = as<IRGlobalValueWithCode>(globalInst);
+        if (!code)
+            continue;
+        for (auto block : code->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                switch (inst->getOp())
+                {
+                case kIROp_GetElementPtr:
+                case kIROp_RWStructuredBufferGetElementPtr:
+                case kIROp_MeshOutputRef:
+                case kIROp_GetOffsetPtr:
+                    widenNarrowAccessChainIndex(inst, 1, targetReq);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+}
+
 void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
@@ -3367,6 +3443,12 @@ void legalizeIRForSPIRV(
     SLANG_UNUSED(entryPoints);
     legalizeSPIRV(context, module, codeGenContext);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
+
+    // Widen any sub-32-bit access-chain index to 32 bits now that every producer -- including the
+    // simplifier's redundancy removal, which can rematerialize a GetElementPtr from a narrow index
+    // -- has run, so no OpAccessChain / OpPtrAccessChain is emitted with a signedness-ambiguous
+    // sub-32-bit index.
+    widenNarrowAccessChainIndices(module, context->m_targetProgram->getTargetReq());
 
     // Remove unreachable code after discard for SPIRV versions that emit OpKill.
     // This is necessary because OpKill is a terminator and cannot have instructions
