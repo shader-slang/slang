@@ -2092,6 +2092,95 @@ static SlangResult _testCompilerOptionHashIsInsertionOrderIndependent()
     return SLANG_OK;
 }
 
+// Return the entry-point hash for a program built from the same shader source and linked with one
+// `-Xnvrtc <downstreamArg>` option via linkWithOptions, which stores it in the linked component's
+// own option set. The two callers below differ only in downstreamArg. The PTX target makes the
+// nvrtc argument a real codegen input; no GPU is needed since no code is emitted.
+static SlangResult _getLinkTimeDownstreamArgEntryPointHash(
+    const char* downstreamArg,
+    ComPtr<ISlangBlob>& outHash)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_RETURN_ON_FAIL(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()));
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_PTX;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_RETURN_ON_FAIL(globalSession->createSession(sessionDesc, session.writeRef()));
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module;
+    module = session->loadModuleFromSourceString(
+        "linkTimeDownstreamArgHash",
+        "link-time-downstream-arg-hash.slang",
+        kCoverageCliShader,
+        diagnostics.writeRef());
+    if (!module)
+        return SLANG_FAIL;
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_RETURN_ON_FAIL(module->findAndCheckEntryPoint(
+        "main",
+        SLANG_STAGE_COMPUTE,
+        entryPoint.writeRef(),
+        diagnostics.writeRef()));
+
+    slang::IComponentType* components[] = {module.get(), entryPoint.get()};
+    ComPtr<slang::IComponentType> compositeProgram;
+    SLANG_RETURN_ON_FAIL(session->createCompositeComponentType(
+        components,
+        SLANG_COUNT_OF(components),
+        compositeProgram.writeRef(),
+        diagnostics.writeRef()));
+
+    slang::CompilerOptionEntry linkOptions[] = {
+        _makeString2CompilerOption(
+            slang::CompilerOptionName::DownstreamArgs,
+            "nvrtc",
+            downstreamArg),
+    };
+    ComPtr<slang::IComponentType> linkedProgram;
+    SLANG_RETURN_ON_FAIL(compositeProgram->linkWithOptions(
+        linkedProgram.writeRef(),
+        SLANG_COUNT_OF(linkOptions),
+        linkOptions,
+        diagnostics.writeRef()));
+
+    linkedProgram->getEntryPointHash(0, 0, outHash.writeRef());
+    return outHash ? SLANG_OK : SLANG_FAIL;
+}
+
+// Two different `--gpu-architecture` values change the emitted PTX, so they must produce different
+// entry-point hashes (the hash is a shader-cache key); the same value twice must match.
+static SlangResult _testLinkTimeDownstreamArgsAffectCompilerOptionHash()
+{
+    ComPtr<ISlangBlob> arch75Hash;
+    SLANG_RETURN_ON_FAIL(
+        _getLinkTimeDownstreamArgEntryPointHash("--gpu-architecture=compute_75", arch75Hash));
+
+    ComPtr<ISlangBlob> arch120Hash;
+    SLANG_RETURN_ON_FAIL(
+        _getLinkTimeDownstreamArgEntryPointHash("--gpu-architecture=compute_120", arch120Hash));
+
+    if (_blobContentEquals(arch75Hash, arch120Hash))
+        return SLANG_FAIL;
+
+    // Control: the same argument twice must match, so the difference above is due to the argument.
+    ComPtr<ISlangBlob> arch75HashRepeat;
+    SLANG_RETURN_ON_FAIL(
+        _getLinkTimeDownstreamArgEntryPointHash("--gpu-architecture=compute_75", arch75HashRepeat));
+
+    if (!_blobContentEquals(arch75Hash, arch75HashRepeat))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 SLANG_UNIT_TEST(SlangcReadFromStdin)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testSlangStdin(unitTestContext)));
@@ -2118,6 +2207,7 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testDuplicateIntOptionReplacesSecondOperand()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testMultiStringOptionHashIsDelimited()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCompilerOptionHashIsInsertionOrderIndependent()));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testLinkTimeDownstreamArgsAffectCompilerOptionHash()));
 }
 
 SLANG_UNIT_TEST(SlangcCoverageManifestOutputMetalLib)
