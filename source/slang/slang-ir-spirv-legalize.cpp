@@ -3358,6 +3358,155 @@ static void removeUnreachableCodeAfterDiscardForOpKill(
     }
 }
 
+// True if `operand` is available at `point`. A value that lives outside a block (a module-scope
+// constant or a struct key) is available everywhere; otherwise it must dominate `point`.
+static bool operandAvailableAt(IRDominatorTree* dominatorTree, IRInst* operand, IRInst* point)
+{
+    if (!as<IRBlock>(operand->getParent()))
+        return true;
+    return dominatorTree->dominates(operand, point);
+}
+
+// Emit and return the address that `value` denotes, if `value` is a load or a chain of
+// field/element projections rooted at a load; otherwise null. The returned address is a fresh
+// field/element address chain, emitted at the builder's current insert location, equivalent to
+// taking the address of `value`. A dynamic element index that is not available at `insertPoint`
+// yields null, since the chain is built at that point and must not reference an index before it is
+// defined. The availability and recursion checks precede each `emit`, so a null result leaves no
+// partial chain.
+static IRInst* tryEmitProjectedAddress(
+    IRBuilder& builder,
+    IRInst* value,
+    IRDominatorTree* dominatorTree,
+    IRInst* insertPoint)
+{
+    if (auto load = as<IRLoad>(value))
+        return load->getPtr();
+    if (auto fieldExtract = as<IRFieldExtract>(value))
+    {
+        if (auto baseAddr = tryEmitProjectedAddress(
+                builder,
+                fieldExtract->getBase(),
+                dominatorTree,
+                insertPoint))
+            return builder.emitFieldAddress(baseAddr, fieldExtract->getField());
+    }
+    else if (auto getElement = as<IRGetElement>(value))
+    {
+        auto index = getElement->getIndex();
+        if (!operandAvailableAt(dominatorTree, index, insertPoint))
+            return nullptr;
+        if (auto baseAddr =
+                tryEmitProjectedAddress(builder, getElement->getBase(), dominatorTree, insertPoint))
+            return builder.emitElementAddress(baseAddr, index);
+    }
+    return nullptr;
+}
+
+// Return the load at the root of a field/element projection chain, or null if `value` is not rooted
+// at a load.
+static IRLoad* findRootLoad(IRInst* value)
+{
+    for (;;)
+    {
+        if (auto load = as<IRLoad>(value))
+            return load;
+        else if (auto fieldExtract = as<IRFieldExtract>(value))
+            value = fieldExtract->getBase();
+        else if (auto getElement = as<IRGetElement>(value))
+            value = getElement->getBase();
+        else
+            return nullptr;
+    }
+}
+
+// Under SPIR-V logical addressing a pointer in a logical storage class may not be an operand of
+// `OpCompositeConstruct` nor the result of `OpCompositeExtract`. Reading a field/element of a
+// loaded aggregate that carries such a pointer by loading the whole aggregate and extracting
+// produces an `OpCompositeExtract`; and if the aggregate value stays live (for example because an
+// ordinary field of it is also read), the downstream optimizer may turn it into an
+// `OpCompositeConstruct` as well. Either way the logical pointer ends up in a composite
+// instruction.
+//
+// We instead read every field/element of such a load through its address:
+// `fieldExtract/getElement(load(p), key)` becomes `load(fieldAddress/elementAddress(p, key))`. We
+// do this for *every* field/element read of a logical-pointer-bearing aggregate load, not only the
+// pointer-typed ones, so that once its reads are all rewritten the whole-aggregate load has no uses
+// and the subsequent DCE removes it, leaving the aggregate value unmaterialized.
+//
+// The load is eliminated only when those field/element reads are its *only* uses. If the loaded
+// aggregate is also consumed whole -- a whole-aggregate copy, a call argument, or a return value --
+// the load keeps that use, survives DCE, and the pointer can still reach an `OpCompositeConstruct`
+// downstream. That whole-value case is the deliberately out-of-scope residual (the #9062 value-flow
+// class); this pass handles only the read side.
+//
+// The replacement load is placed at the root load's program point, not the projection's: loading
+// the whole aggregate then extracting reads the field as of the load, so the address-based read
+// must happen at that same point to remain value-preserving when a store, call, or barrier sits
+// between the load and the projection. Reads are rewritten outermost-first so every chain walked
+// and every root load is an original instruction present in the dominator tree. This runs after
+// address-space specialization has resolved pointer address spaces.
+static void legalizeLogicalPointerCompositesForSPIRV(IRModule* module)
+{
+    IRBuilder builder(module);
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto code = as<IRGlobalValueWithCode>(globalInst);
+        if (!code)
+            continue;
+
+        // A read whose base aggregate transitively carries a logical pointer; rewriting all such
+        // reads (not just pointer-typed ones) lets the whole-aggregate load be eliminated.
+        List<IRInst*> reads;
+        for (auto block : code->getBlocks())
+            for (auto inst : block->getChildren())
+            {
+                IRInst* base = nullptr;
+                if (auto fieldExtract = as<IRFieldExtract>(inst))
+                    base = fieldExtract->getBase();
+                else if (auto getElement = as<IRGetElement>(inst))
+                    base = getElement->getBase();
+                else
+                    continue;
+                if (typeContainsLogicalPointer(base->getDataType()))
+                    reads.add(inst);
+            }
+        if (reads.getCount() == 0)
+            continue;
+
+        auto dominatorTree = computeDominatorTree(code);
+
+        // Rewrite outermost reads first (reverse of definition order): the base chain of an outer
+        // read is still original when we process it, and its root load is one the dominator tree
+        // knows about.
+        for (Index i = reads.getCount() - 1; i >= 0; --i)
+        {
+            auto inst = reads[i];
+
+            // The read must be rooted at a load for there to be an address to redirect to;
+            // otherwise (e.g. a function parameter or call result) the emit-time check rejects it.
+            auto rootLoad = findRootLoad(inst);
+            if (!rootLoad)
+                continue;
+
+            // An alignment or memory-scope attribute describes the whole-aggregate access; the
+            // narrower field/element load reads at a different offset and would need a different
+            // (and not soundly derivable) alignment/scope, so rather than drop the attribute and
+            // risk a misaligned or mis-scoped access we leave such a load for the emit-time check.
+            if (rootLoad->findAttr<IRAlignedAttr>() || rootLoad->findAttr<IRMemoryScopeAttr>())
+                continue;
+
+            builder.setInsertBefore(rootLoad);
+            auto addr = tryEmitProjectedAddress(builder, inst, dominatorTree, rootLoad);
+            if (!addr)
+                continue;
+            auto loaded = builder.emitLoad(addr);
+            inst->replaceUsesWith(loaded);
+            inst->removeAndDeallocate();
+        }
+    }
+}
+
 void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
@@ -3366,6 +3515,10 @@ void legalizeIRForSPIRV(
 {
     SLANG_UNUSED(entryPoints);
     legalizeSPIRV(context, module, codeGenContext);
+    // Must run after `legalizeSPIRV`'s address-space specialization (so pointers have resolved
+    // address spaces to classify) and before `simplifyIRForSpirvLegalization`'s DCE (which removes
+    // the whole-aggregate load this pass leaves dead).
+    legalizeLogicalPointerCompositesForSPIRV(module);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
 
     // Remove unreachable code after discard for SPIRV versions that emit OpKill.
