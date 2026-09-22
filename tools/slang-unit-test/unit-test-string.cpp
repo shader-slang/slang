@@ -5,6 +5,9 @@
 
 // #include <math.h>
 
+#include <array>
+#include <cstring>
+#include <limits>
 #include <sstream>
 
 using namespace Slang;
@@ -265,6 +268,8 @@ SLANG_UNIT_TEST(string)
             SLANG_CHECK(_areApproximatelyEqual(value, parsedValue));
         }
     }
+
+    // number->ascii->number round trip tests
     {
         List<int64_t> values;
         values.add(0);
@@ -276,6 +281,8 @@ SLANG_UNIT_TEST(string)
             values.add(value);
             values.add(-value);
         }
+        values.add(std::numeric_limits<int64_t>::min());
+        values.add(std::numeric_limits<int64_t>::max());
 
         StringBuilder buf;
 
@@ -284,8 +291,7 @@ SLANG_UNIT_TEST(string)
             buf.clear();
             buf << value;
 
-
-            int64_t parsedValue;
+            int64_t parsedValue{-1};
 
             UnownedStringSlice slice = buf.getUnownedSlice();
             SlangResult res = StringUtil::parseInt64(slice, parsedValue);
@@ -294,6 +300,149 @@ SLANG_UNIT_TEST(string)
 
             // Check that they are equal
             SLANG_CHECK(value == parsedValue);
+        }
+    }
+
+    // integer->ascii expected value tests
+    {
+        // basic values
+        for (int radix = 2; radix <= 36; ++radix)
+        {
+            SLANG_CHECK(String(int32_t(0), radix) == "0");
+            SLANG_CHECK(String(uint32_t(0), radix) == "0");
+            SLANG_CHECK(String(int64_t(0), radix) == "0");
+            SLANG_CHECK(String(uint64_t(0), radix) == "0");
+
+            SLANG_CHECK(String(int32_t(1), radix) == "1");
+            SLANG_CHECK(String(uint32_t(1), radix) == "1");
+            SLANG_CHECK(String(int64_t(1), radix) == "1");
+            SLANG_CHECK(String(uint64_t(1), radix) == "1");
+
+            SLANG_CHECK(String(int32_t(-1), radix) == "-1");
+            SLANG_CHECK(String(int64_t(-1), radix) == "-1");
+        }
+
+        // extremes in the usual radixes
+        SLANG_CHECK(
+            String(std::numeric_limits<int32_t>::min(), 2) == "-10000000000000000000000000000000");
+        SLANG_CHECK(
+            String(std::numeric_limits<int32_t>::max(), 2) == "1111111111111111111111111111111");
+        SLANG_CHECK(
+            String(std::numeric_limits<int64_t>::min(), 2) ==
+            "-1000000000000000000000000000000000000000000000000000000000000000");
+        SLANG_CHECK(
+            String(std::numeric_limits<int64_t>::max(), 2) ==
+            "111111111111111111111111111111111111111111111111111111111111111");
+
+        SLANG_CHECK(
+            String(std::numeric_limits<uint32_t>::max(), 2) == "11111111111111111111111111111111");
+        SLANG_CHECK(
+            String(std::numeric_limits<uint64_t>::max(), 2) ==
+            "1111111111111111111111111111111111111111111111111111111111111111");
+
+        SLANG_CHECK(String(std::numeric_limits<int32_t>::min(), 8) == "-20000000000");
+        SLANG_CHECK(String(std::numeric_limits<int32_t>::max(), 8) == "17777777777");
+        SLANG_CHECK(String(std::numeric_limits<int64_t>::min(), 8) == "-1000000000000000000000");
+        SLANG_CHECK(String(std::numeric_limits<int64_t>::max(), 8) == "777777777777777777777");
+
+        SLANG_CHECK(String(std::numeric_limits<uint32_t>::max(), 8) == "37777777777");
+        SLANG_CHECK(String(std::numeric_limits<uint64_t>::max(), 8) == "1777777777777777777777");
+
+        SLANG_CHECK(String(std::numeric_limits<int32_t>::min(), 10) == "-2147483648");
+        SLANG_CHECK(String(std::numeric_limits<int32_t>::max(), 10) == "2147483647");
+        SLANG_CHECK(String(std::numeric_limits<int64_t>::min(), 10) == "-9223372036854775808");
+        SLANG_CHECK(String(std::numeric_limits<int64_t>::max(), 10) == "9223372036854775807");
+
+        SLANG_CHECK(String(std::numeric_limits<uint32_t>::max(), 10) == "4294967295");
+        SLANG_CHECK(String(std::numeric_limits<uint64_t>::max(), 10) == "18446744073709551615");
+
+        SLANG_CHECK(String(std::numeric_limits<int32_t>::min(), 16) == "-80000000");
+        SLANG_CHECK(String(std::numeric_limits<int32_t>::max(), 16) == "7FFFFFFF");
+        SLANG_CHECK(String(std::numeric_limits<int64_t>::min(), 16) == "-8000000000000000");
+        SLANG_CHECK(String(std::numeric_limits<int64_t>::max(), 16) == "7FFFFFFFFFFFFFFF");
+
+        SLANG_CHECK(String(std::numeric_limits<uint32_t>::max(), 16) == "FFFFFFFF");
+        SLANG_CHECK(String(std::numeric_limits<uint64_t>::max(), 16) == "FFFFFFFFFFFFFFFF");
+
+        // max radix cases
+        SLANG_CHECK(String(std::numeric_limits<int32_t>::min(), 36) == "-ZIK0ZK");
+        SLANG_CHECK(String(std::numeric_limits<int32_t>::max(), 36) == "ZIK0ZJ");
+        SLANG_CHECK(String(std::numeric_limits<int64_t>::min(), 36) == "-1Y2P0IJ32E8E8");
+        SLANG_CHECK(String(std::numeric_limits<int64_t>::max(), 36) == "1Y2P0IJ32E8E7");
+        SLANG_CHECK(String(std::numeric_limits<uint32_t>::max(), 36) == "1Z141Z3");
+        SLANG_CHECK(String(std::numeric_limits<uint64_t>::max(), 36) == "3W5E11264SGSF");
+
+        // intToAscii: basic pad-to + returned length test
+        struct PadToTestCaseInt64
+        {
+            int64_t number;
+            int radix;
+            int padTo;
+            const char* expected;
+        };
+
+        struct PadToTestCaseUint64
+        {
+            uint64_t number;
+            int radix;
+            int padTo;
+            const char* expected;
+        };
+
+        constexpr auto padToI64Cases = std::to_array<PadToTestCaseInt64>({
+            // pad-to smaller than length
+            {12345, 10, 0, "12345"},
+            {12345, 10, 4, "12345"},
+            {-12345, 10, 4, "-12345"},
+
+            // pad-to exact length
+            {12345, 10, 5, "12345"},
+            {-12345, 10, 5, "-12345"},
+
+            // pad-to larger than length
+            {12345, 10, 6, "012345"},
+            {-12345, 10, 6, "-012345"},
+            {12345, 10, 10, "0000012345"},
+            {-12345, 10, 10, "-0000012345"},
+        });
+
+        for (const auto& c : padToI64Cases)
+        {
+            char buf[66]{};
+
+            const int len = intToAscii(buf, c.number, c.radix, c.padTo);
+            SLANG_CHECK(strcmp(buf, c.expected) == 0);
+            SLANG_CHECK(len >= 0);
+            SLANG_CHECK(strlen(c.expected) == size_t(len));
+        }
+
+        constexpr auto padToU64Cases = std::to_array<PadToTestCaseUint64>({
+            // pad-to smaller than length
+            {12345, 10, 0, "12345"},
+            {12345, 10, 4, "12345"},
+
+            // pad-to exact length
+            {12345, 10, 5, "12345"},
+
+            // pad-to larger than length
+            {12345, 10, 6, "012345"},
+            {12345, 10, 10, "0000012345"},
+
+            // hash print cases
+            {uint64_t(0), 16, 16, "0000000000000000"},
+            {uint64_t(0x000123456789ABCD), 16, 16, "000123456789ABCD"},
+            {uint64_t(0x1234567890ABCDEF), 16, 16, "1234567890ABCDEF"},
+            {uint64_t(0xFFFFFFFFFFFFFFFF), 16, 16, "FFFFFFFFFFFFFFFF"},
+        });
+
+        for (const auto& c : padToU64Cases)
+        {
+            char buf[66]{};
+
+            const int len = intToAscii(buf, c.number, c.radix, c.padTo);
+            SLANG_CHECK(strcmp(buf, c.expected) == 0);
+            SLANG_CHECK(len >= 0);
+            SLANG_CHECK(strlen(c.expected) == size_t(len));
         }
     }
 }
