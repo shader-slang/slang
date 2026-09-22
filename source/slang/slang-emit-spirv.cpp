@@ -2421,6 +2421,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             return true;
 
+        case kIROp_DebugLexicalBlock:
+            if (shouldEmitExtendedDebugInfo)
+            {
+                *emittedSpvInst = emitDebugLexicalBlock(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    as<IRDebugLexicalBlock>(inst));
+            }
+            return true;
+
         case kIROp_DebugInlinedAt:
             if (shouldEmitExtendedDebugInfo)
             {
@@ -3030,6 +3039,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DebugBuildIdentifier:
         case kIROp_DebugCompilationUnit:
         case kIROp_DebugFunction:
+        case kIROp_DebugLexicalBlock:
         case kIROp_DebugInlinedAt:
             SLANG_UNEXPECTED(
                 "Debug instruction should have been handled by processDebugGlobalInst");
@@ -4692,9 +4702,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // The `actualHelperVar` is used to update the actual value of the variable
         // at each kIROp_DebugValue instruction.
         //
-        auto scope = findDebugScope(debugVar);
-        if (!scope)
-            return nullptr;
+        auto scope = ensureInst(debugVar->getScope());
+        SLANG_RELEASE_ASSERT(scope);
 
         bool hasBackingVar = m_mapIRInstToSpvInst.containsKey(debugVar);
 
@@ -4764,10 +4773,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugVarBackingLocalVarDeclaration(SpvInstParent* parent, IRDebugVar* debugVar)
     {
-        auto scope = findDebugScope(debugVar);
-        if (!scope)
-            return nullptr;
-
         IRBuilder builder(debugVar);
         builder.setInsertBefore(debugVar);
         auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
@@ -4940,6 +4945,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     nullptr,
                     as<IRDebugFunction>(inst));
             }
+            return true;
+
+        case kIROp_DebugLexicalBlock:
+            if (shouldEmitExtendedDebugInfo)
+                *emittedSpvInst = ensureInst(inst);
             return true;
 
         case kIROp_DebugInlinedAt:
@@ -5867,6 +5877,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DebugVar:
         case kIROp_DebugValue:
         case kIROp_DebugFunction:
+        case kIROp_DebugLexicalBlock:
         case kIROp_DebugInlinedAt:
         case kIROp_DebugScope:
         case kIROp_DebugNoScope:
@@ -10808,6 +10819,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
+    // Emit the explicit lexical parent chain recorded during lowering.
+    SpvInst* emitDebugLexicalBlock(SpvInstParent* parent, IRDebugLexicalBlock* debugLexicalBlock)
+    {
+        auto parentScope = debugLexicalBlock->getParentScope();
+        SLANG_RELEASE_ASSERT(
+            as<IRDebugFunction>(parentScope) || as<IRDebugLexicalBlock>(parentScope));
+        auto scope = ensureInst(parentScope);
+        SLANG_RELEASE_ASSERT(scope);
+        return emitOpDebugLexicalBlock(
+            parent,
+            debugLexicalBlock,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            debugLexicalBlock->getSource(),
+            debugLexicalBlock->getLine(),
+            debugLexicalBlock->getCol(),
+            scope);
+    }
+
     // Emit the DebugFunctionDefinition that binds the concrete OpFunction body `spvFunc` (whose
     // first block is `firstBlock`) to its DebugFunction record `debugFuncInfo`, at most once per
     // record. A DebugFunction binds to a single body — the NonSemantic invariant that a
@@ -10923,15 +10953,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         IRInst* lineInst = debugInlinedAt->getLine();
 
-        SpvInst* scope = nullptr;
-        if (as<IRDebugFunction>(debugInlinedAt->getDebugFunc()))
-        {
-            scope = ensureInst(debugInlinedAt->getDebugFunc());
-        }
-        if (scope == nullptr)
-        {
-            scope = findDebugScope(debugInlinedAt);
-        }
+        auto irScope = debugInlinedAt->getScope();
+        SLANG_RELEASE_ASSERT(as<IRDebugFunction>(irScope) || as<IRDebugLexicalBlock>(irScope));
+        SpvInst* scope = ensureInst(irScope);
+        SLANG_RELEASE_ASSERT(scope);
 
         // If it's not chained to another IRDebugInlinedAt, we don't use this.
         SpvInst* inlined = nullptr;

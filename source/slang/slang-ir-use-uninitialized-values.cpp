@@ -429,6 +429,7 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
     case kIROp_DebugVar:
     case kIROp_DebugLine:
     case kIROp_DebugScope:
+    case kIROp_DebugLexicalBlock:
     case kIROp_DebugInlinedAt:
         return None;
 
