@@ -2020,9 +2020,9 @@ Result linkAndOptimizeIR(
             // `CallShader(index, payload)` must keep its payload argument, but an empty
             // callable-data struct would be erased by the empty-struct legalization below. Pad it
             // with a dummy field first (must run before legalizeExistentialTypeLayout /
-            // legalizeResourceTypes remove the empty struct). `targetCaps` lets the pass recognize
-            // the `CallShader` intrinsic call via `findTargetIntrinsicDefinition`.
-            SLANG_PASS(legalizeEmptyCallableDataPayloadsForHLSL, targetRequest->getTargetCaps());
+            // legalizeResourceTypes remove the empty struct). The CUDA path runs the same pass from
+            // the CPU/CUDA branch below.
+            SLANG_PASS(legalizeEmptyCallableDataPayloadsForHLSLAndCUDA);
 
             // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
             // both a `read(...)` and a `write(...)` qualifier. The call-site fill above
@@ -2077,6 +2077,17 @@ Result linkAndOptimizeIR(
     }
     else
     {
+        // On CUDA, an empty `CallShader` payload (and an empty callable entry-point parameter) must
+        // be padded before the empty-struct legalization below erases it: `CallShader`'s CUDA arm
+        // is the fixed-arity `optixDirectCall<void>($0, $1)`, so a dropped `$1` aborts intrinsic
+        // expansion. This is the CUDA counterpart of the D3D call in the branch above; the shared
+        // pass recognizes `CallShader` by its target-agnostic `[KnownBuiltin(CallShader)]`
+        // identity.
+        if (isCUDATarget(targetRequest))
+        {
+            SLANG_PASS(legalizeEmptyCallableDataPayloadsForHLSLAndCUDA);
+        }
+
         // On CPU/CUDA targets, we simply elminate any empty types if
         // they are not part of public interface.
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);

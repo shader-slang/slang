@@ -19903,6 +19903,10 @@ int __callablePayloadLocation(__ref Payload payload);
 /// @category raytracing
 __generic<Payload>
 [require(cuda_glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
+// A target-agnostic identity so IR passes can recognize a `CallShader` call regardless of which
+// `__target_switch` arm was selected: the HLSL arm lowers to the codegen string `"CallShader"` but
+// the CUDA arm lowers to `optixDirectCall<...>`, so string-based recognition would miss CUDA.
+[KnownBuiltin($( (int)KnownBuiltinDeclName::CallShader))]
 void CallShader(uint shaderIndex, inout Payload payload)
 {
     __target_switch

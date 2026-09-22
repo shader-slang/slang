@@ -1,12 +1,16 @@
-// Regression test for https://github.com/shader-slang/slang/issues/12718:
-// an empty callable-data struct must not be erased on the HLSL/D3D path, or DXC rejects the
-// resulting zero-parameter callable. The Vulkan targets (SPIR-V and GLSL) keep a valid callable
-// entry point without materializing the unused empty payload — no padding needed there.
+// Regression test for https://github.com/shader-slang/slang/issues/12718 (and the CUDA counterpart
+// #13106): an empty callable-data struct must not be erased on the HLSL/D3D and CUDA paths, where
+// the callable data is a fixed-shape entry-point parameter. On D3D, erasure leaves a zero-parameter
+// callable that DXC rejects; on CUDA the parameter must survive so it matches the padded payload a
+// `CallShader` caller passes (each side pads independently, so they agree by construction). The
+// Vulkan targets (SPIR-V and GLSL) keep a valid callable entry point without materializing the
+// unused empty payload — no padding needed there.
 
 //TEST:SIMPLE(filecheck=HLSL): -stage callable -entry callableMain -target hlsl -profile sm_6_7
 //TEST:SIMPLE(filecheck=DXIL): -stage callable -entry callableMain -target dxil -profile sm_6_7
 //TEST:SIMPLE(filecheck=SPIRV): -stage callable -entry callableMain -target spirv
 //TEST:SIMPLE(filecheck=GLSL): -stage callable -entry callableMain -target glsl
+//TEST:SIMPLE(filecheck=CUDA): -stage callable -entry callableMain -target cuda
 
 struct EmptyData
 {
@@ -41,3 +45,9 @@ void callableMain(inout EmptyData data)
 // GLSL-NOT: callableDataInEXT
 // GLSL-NOT: _slang_dummy
 // GLSL: void main(
+
+// CUDA needs the padding like D3D: the callable entry point keeps its parameter as a padded
+// `EmptyData` pointer, so a `CallShader` caller (which pads its payload identically) agrees on the
+// callable-data ABI.
+// CUDA-DAG: int _slang_dummy
+// CUDA: void __direct_callable__callableMain(EmptyData{{.*}}*{{.*}})

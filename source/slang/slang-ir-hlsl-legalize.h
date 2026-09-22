@@ -17,17 +17,19 @@ void legalizeNonStructParameterToStructForHLSL(IRModule* module);
 void legalizeEmptyRayPayloadsForHLSL(IRModule* module);
 
 // Pad an empty callable-data struct with a dummy field so callable data survives type legalization
-// on the D3D/HLSL path. An empty struct is otherwise erased during type legalization, which breaks
-// two DXC requirements: a `[shader("callable")]` entry point loses its one required parameter, and
-// a `CallShader(index, payload)` loses its payload argument. This pass finds the empty struct at
-// both use sites — the callable entry point's `out`/`inout` parameter, and the second argument of
-// a `CallShader` target-intrinsic call (recognized via `findTargetIntrinsicDefinition`, hence the
-// `targetCaps`) — and pads it. The dummy field carries no payload access qualifiers (callable data
-// is a plain `inout`, not a `[raypayload]` struct). See
+// on the D3D and CUDA paths, where the payload is a fixed-shape call argument / parameter. An empty
+// struct is otherwise erased during type legalization, producing the wrong call/signature arity: on
+// D3D a `[shader("callable")]` entry point loses its one required parameter and a
+// `CallShader(index, payload)` loses its payload argument (both rejected by DXC, #12718); on CUDA
+// the dropped payload argument trips the fixed-arity `optixDirectCall<void>($0, $1)` intrinsic
+// expansion (#13106). This pass finds the empty struct at both use sites — the callable entry
+// point's `out`/`inout` parameter, and the second argument of a `CallShader` call (recognized via
+// its target-agnostic `[KnownBuiltin(CallShader)]` identity) — and pads it. The dummy field carries
+// no payload access qualifiers (callable data is a plain `inout`, not a `[raypayload]` struct). See
 // `legalizeEmptyCallableDataPayloadsForVulkan` for the SPIR-V/GLSL counterpart; a Vulkan callable
 // *entry-point parameter* needs no padding because it compiles to a valid `CallableKHR` entry point
 // with no materialized variable.
-void legalizeEmptyCallableDataPayloadsForHLSL(IRModule* module, CapabilitySet targetCaps);
+void legalizeEmptyCallableDataPayloadsForHLSLAndCUDA(IRModule* module);
 
 // Pad an empty `CallShader` payload struct on the Vulkan targets (SPIR-V and GLSL). `CallShader`'s
 // `spirv`/`glsl` arms back the payload with a module-scope `[__vulkanCallablePayload]` global whose

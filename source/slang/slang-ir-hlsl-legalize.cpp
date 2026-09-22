@@ -367,38 +367,37 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
     }
 }
 
-// Return true if `call` invokes the HLSL `CallShader` target intrinsic. Recognition uses the
-// canonical `findTargetIntrinsicDefinition` (which matches both the pre-link
-// `[targetIntrinsic("CallShader")]` decoration and the post-link `IRGenericAsm("CallShader")` body
-// the callee becomes), then compares the returned definition against the intrinsic's HLSL codegen
-// string `"CallShader"`. The coupling to that string is intentional: on the D3D path — the only
-// path that reaches this pass — the definition IS the HLSL `__intrinsic_asm` text. It deliberately
-// does NOT match the CUDA arm (whose definition is `optixDirectCall<...>`, a different string);
-// covering CUDA needs a target-agnostic identity (`KnownBuiltinDeclName`) and is tracked
-// separately.
-static bool isCallShaderCall(IRCall* call, CapabilitySet const& targetCaps)
+// Return true if `call` invokes the core-module `CallShader` intrinsic, on any target. Recognition
+// keys on the target-agnostic `[KnownBuiltin(CallShader)]` identity carried by the callee (via
+// `getBuiltinFuncEnum`), not on a target-specific codegen string: `CallShader`'s HLSL arm lowers to
+// `"CallShader"` while its CUDA arm lowers to `optixDirectCall<...>`, so a string match would
+// recognize the call on D3D but miss it on CUDA. The single identity matches every target's arm,
+// which is what lets this pass serve both the D3D and CUDA callers.
+static bool isCallShaderCall(IRCall* call)
 {
-    auto callee = getResolvedInstForDecorations(call->getCallee());
-    UnownedStringSlice definition;
-    IRInst* intrinsicInst = nullptr;
-    if (!findTargetIntrinsicDefinition(callee, targetCaps, definition, intrinsicInst))
-        return false;
-    return definition == UnownedStringSlice("CallShader");
+    return getBuiltinFuncEnum(call->getCallee()) == KnownBuiltinDeclName::CallShader;
 }
 
-void legalizeEmptyCallableDataPayloadsForHLSL(IRModule* module, CapabilitySet targetCaps)
+void legalizeEmptyCallableDataPayloadsForHLSLAndCUDA(IRModule* module)
 {
-    // DXC requires a callable entry point to declare exactly one argument parameter, and a
-    // `CallShader(index, payload)` to pass exactly two arguments. An empty callable-data struct
-    // legalizes to `LegalType::Flavor::none`, so `legalizeResourceTypes` removes both the callable
-    // parameter (leaving a zero-parameter callable) and the `CallShader` payload argument (leaving
-    // `CallShader(index)`) — DXC rejects both. Pad the empty struct so it survives, as
-    // `legalizeEmptyRayPayloadsForHLSL` does for ray payloads.
+    // On D3D and CUDA a `CallShader` payload (and a callable entry point's own data) is a
+    // fixed-shape call argument / parameter, so an empty callable-data struct legalizing to
+    // `LegalType::Flavor::none` — and being dropped by the empty-struct legalization that follows —
+    // produces a call/signature with the wrong arity:
+    //   - D3D: `legalizeResourceTypes` removes the callable parameter (leaving a zero-parameter
+    //     callable) and the `CallShader` payload argument (leaving `CallShader(index)`); DXC
+    //     rejects both (#12718).
+    //   - CUDA: `legalizeEmptyTypes` drops the payload argument, but `CallShader`'s CUDA arm is the
+    //     fixed-arity `optixDirectCall<void>($0, $1)`; the missing `$1` trips the
+    //     `SLANG_RELEASE_ASSERT` on the argument index in `slang-intrinsic-expand.cpp` (#13106).
+    // Pad the empty struct so it survives, as `legalizeEmptyRayPayloadsForHLSL` does for ray
+    // payloads. The Vulkan targets instead back the payload with a decorated global and are handled
+    // by `legalizeEmptyCallableDataPayloadsForVulkan`.
     IRBuilder builder(module);
 
-    // On the D3D path the callable-data struct carries no decoration to key on, so identify it
-    // structurally at its two use sites. Collect first, because padding inserts new global
-    // instructions (struct keys) that would invalidate a live `getGlobalInsts()` walk.
+    // On the D3D and CUDA paths the callable-data struct carries no decoration to key on, so
+    // identify it structurally at its two use sites. Collect first, because padding inserts new
+    // global instructions (struct keys) that would invalidate a live `getGlobalInsts()` walk.
     //
     // Limitation: `isEmptyStruct` keys on zero fields, but the erasure it guards against triggers
     // whenever the struct legalizes to `none` — which also happens for a struct whose fields *all*
@@ -412,10 +411,11 @@ void legalizeEmptyCallableDataPayloadsForHLSL(IRModule* module, CapabilitySet ta
         if (!func)
             continue;
 
-        // Use site 1: the callable entry point's own data, a varying parameter. On D3D — the only
-        // target this pass runs for — DXC requires callable data to be `inout`; it is lowered to an
-        // `IROutParamTypeBase` here, so scanning those parameters covers it. (`IROutParamTypeBase`
-        // spans both `out` and `inout`, the two mutable forms SPIR-V/CUDA additionally allow.)
+        // Use site 1: the callable entry point's own data, a varying parameter. Callable data is a
+        // mutable (`out`/`inout`) parameter lowered to an `IROutParamTypeBase` here, so scanning
+        // those parameters covers it. Padding the entry point's parameter to match the padded
+        // `CallShader` argument (use site 2) is what keeps the two in agreement on the
+        // callable-data ABI even though caller and callee are compiled separately.
         auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
         if (entryPointDecor && entryPointDecor->getProfile().getStage() == Stage::Callable)
         {
@@ -436,7 +436,7 @@ void legalizeEmptyCallableDataPayloadsForHLSL(IRModule* module, CapabilitySet ta
                 auto call = as<IRCall>(inst);
                 if (!call || call->getArgCount() < 2)
                     continue;
-                if (!isCallShaderCall(call, targetCaps))
+                if (!isCallShaderCall(call))
                     continue;
                 if (auto ptrType = as<IRPtrTypeBase>(call->getArg(1)->getDataType()))
                     addIfEmptyStruct(ptrType->getValueType(), emptyCallableDataStructs);
