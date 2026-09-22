@@ -445,4 +445,132 @@ SLANG_UNIT_TEST(string)
             SLANG_CHECK(strlen(c.expected) == size_t(len));
         }
     }
+
+    // ascii->integer expected value tests
+    {
+        struct ParseInt64Case
+        {
+            const char* input;
+            int64_t expected;
+        };
+        constexpr auto parseInt64Cases = std::to_array<ParseInt64Case>({
+            {"0", 0},
+            {"-0", 0},
+            {"+0", 0},
+            {"1", 1},
+            {"-1", -1},
+            {"+1", 1},
+            {"9223372036854775807", 9223372036854775807},
+            {"-9223372036854775808", std::numeric_limits<int64_t>::min()},
+            {"0x0123456789ABCDEF", 0x0123456789ABCDEF},
+            {"0x0123456789abcdef", 0x0123456789abcdef},
+            {"0X10", 16},
+            {"0x7FFFFFFFFFFFFFFF", 9223372036854775807},
+            {"-0x8000000000000000", std::numeric_limits<int64_t>::min()},
+        });
+
+        for (const auto& c : parseInt64Cases)
+        {
+            int64_t val{};
+            SLANG_CHECK(SLANG_SUCCEEDED(StringUtil::parseInt64(UnownedStringSlice(c.input), val)));
+            SLANG_CHECK(val == c.expected);
+        }
+
+        // failure tests
+        constexpr auto parseInt64FailCases = std::to_array<const char*>({
+            // no digits to parse
+            "",
+            "-",
+            "+",
+            "0x",
+            "abc",
+            "--1",
+            "+-1",
+
+            // characters that are not part of the number, before or after it
+            "12a",
+            "1.5",
+            " 12",
+            "12 ",
+
+            // just outside the representable range
+            "9223372036854775808",
+            "-9223372036854775809",
+            "0xFFFFFFFFFFFFFFFF",
+            "0x10000000000000000",
+
+            // These values escape a trivial overflow check that only tests
+            // whether the accumulated value decreases when a digit is consumed.
+            // Both wrap around to a value larger than the previous one that is
+            // also within the int64_t range.
+            "20496382304121724020",
+            "25000000000000000000",
+        });
+
+        for (const auto* input : parseInt64FailCases)
+        {
+            int64_t val{};
+            SLANG_CHECK(SLANG_FAILED(StringUtil::parseInt64(UnownedStringSlice(input), val)));
+        }
+    }
+
+    // parseIntAndAdvancePos() tests
+    //
+    // Unlike parseInt64(), this parser skips leading spaces, accepts neither a
+    // plus sign nor a hexadecimal prefix, stops at the first non-digit instead
+    // of failing, and signals failure by returning 0.
+    {
+        struct ParseAndAdvanceCase
+        {
+            const char* input;
+            Index startPos;
+            int expected;
+            Index expectedEndPos;
+        };
+        constexpr auto parseAndAdvanceCases = std::to_array<ParseAndAdvanceCase>({
+            // plain numbers, with and without leading spaces
+            {"123", 0, 123, 3},
+            {"-123", 0, -123, 4},
+            {" 123", 0, 123, 4},
+            {"   123", 0, 123, 6},
+            {"  -123", 0, -123, 6},
+            {"007", 0, 7, 3},
+
+            // parsing stops at the first non-digit, and pos is left on it
+            {" 12ab", 0, 12, 3},
+            {"12,34", 0, 12, 2},
+
+            // parsing may start in the middle of the buffer
+            {"12,34", 3, 34, 5},
+
+            // without digits the result is 0, but pos still advances over
+            // everything that was consumed
+            {" -x", 0, 0, 2},
+            {"-", 0, 0, 1},
+            {"abc", 0, 0, 0},
+            {"", 0, 0, 0},
+            {"   ", 0, 0, 3},
+
+            // neither the plus sign nor the hexadecimal prefix is accepted
+            // here, so "+5" parses nothing and "0x10" parses just the leading
+            // zero
+            {"+5", 0, 0, 0},
+            {"0x10", 0, 0, 1},
+
+            // int32_t extremes, and overflow, which yields 0 with all of the
+            // digits consumed
+            {"2147483647", 0, 2147483647, 10},
+            {"-2147483648", 0, std::numeric_limits<int32_t>::min(), 11},
+            {"2147483648", 0, 0, 10},
+            {"99999999999", 0, 0, 11},
+        });
+
+        for (const auto& c : parseAndAdvanceCases)
+        {
+            Index pos = c.startPos;
+            const int result = StringUtil::parseIntAndAdvancePos(UnownedStringSlice(c.input), pos);
+            SLANG_CHECK(result == c.expected);
+            SLANG_CHECK(pos == c.expectedEndPos);
+        }
+    }
 }
