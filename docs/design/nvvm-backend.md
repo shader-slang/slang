@@ -7761,13 +7761,18 @@ Immutable-load lowering now leaves constant-memory parameter-group fields as ord
 retaining read-only global loads through device-buffer pointers. The new regressions fail without
 the fix; the focused source suite passes 7/7 and CUDA 13.4 compile/assembly checks pass 12/12.
 
-Final acceptance is pending: after the initial collection, the GPU reported Xid 79 (fallen off the
-bus). Driver reset/reload and a function-level PCI reset did not restore it. The complete post-fix
-NVRTC refresh and affected direct-NVVM replays require hardware recovery. Initial evidence is
-preserved; historical 423/427 frozen and 72/72 discovery totals are not replaced with partial or
-reclassified results. See the [slice 200 report](../../issue-nvvm-backend/report.slice-200-gpu-correctness.md)
-for the evidence and exact resume procedure. This is an implementation checkpoint, not completed
-GPU acceptance.
+The separately approved reboot restored the GPU after its Xid 79 fault. Final validation refreshed
+all 452 frozen and 82 discovery NVRTC references, replayed 24 affected direct-NVVM rows, and retained
+unaffected direct execution evidence. Exact-identity comparisons preserve all 423 historically
+correct frozen MVP cases in both direct modes and all 72 healthy discovery cases in each mode.
+The historical frozen denominator remains 427; two FP8 reference rows are explicit skips on this
+SM86 GPU, whose runtime requires SM89 for Float8. No unexpected old-correct regressions remain.
+
+The [native-Linux validation manifest](../../issue-nvvm-backend/runtime-validation.slice-200.json)
+records counts, known gaps, hashes, and merge provenance separately from historical Windows
+snapshots. See the [slice 200 report](../../issue-nvvm-backend/report.slice-200-gpu-correctness.md)
+for the memory-space audit, recovery history, and exact validation commands. The GPU fault's cause
+is not established; physical SM70/SM90 validation remains separate.
 
 ## Authoritative References
 

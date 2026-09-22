@@ -2754,11 +2754,14 @@ CUDA 13.4.2 passed all 36 SM80/90 cells. Missing dependencies/outputs and CUDA 1
 without reducing the denominator. A pinned manual CI matrix is syntax-validated but undispatched.
 GPU runtime and historical corpus support are not inferred from these 90 compile/assembly passes.
 
-Slice 200 adds strict physical-GPU execution checks and native corpus runners. The RTX A6000 with
-NVIDIA driver 615.71.09 and CUDA 13.4 passed four differential fixtures and 474 focused tests, with
-one Windows-only skip. Initial discovery retained all 72 healthy cases in each mode. Full frozen
-collection exposed mirror directive leakage and a CUDA immutable-load storage error; both producers
-are corrected, with 7/7 source checks and 12/12 compile/assembly commands passing. The GPU then fell
-off the bus before final post-fix replays. Acceptance remains pending hardware recovery; historical
-423/427 frozen and 72/72 discovery totals remain unchanged. No new language capability or physical
-SM70/SM90 coverage is claimed. The slice 200 plan/report retain the remaining replay requirements.
+Slice 200 adds strict physical-GPU execution checks and native corpus runners. After recovery by
+an approved reboot, RTX A6000 with NVIDIA driver 615.71.09 and CUDA 13.4 passed all four differential
+fixtures. Final frozen comparison retains all 423 historically correct cases in both NVVM modes on
+the unchanged 427-case healthy subset; discovery retains all 72 healthy cases in all three modes.
+All 452 frozen and 82 discovery NVRTC references were refreshed after the CUDA immutable-load fix,
+with 24 affected direct rows replayed. Two FP8 reference skips remain explicit on SM86, never
+passes. No unexpected formerly-correct regressions remain. Mirror directive leakage and constant
+memory load selection are corrected; source checks pass 7/7 and compile/assembly checks 12/12.
+`issue-nvvm-backend/runtime-validation.slice-200.json` records native-Linux counts, known gaps,
+hashes, and retained/refreshed evidence separately from historical Windows manifests. No new
+language capability or physical SM70/SM90 coverage is claimed.

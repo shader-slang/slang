@@ -1,8 +1,8 @@
 # Slice 200: Require evidence of GPU execution
 
-**Checkpoint status:** Implementation and source/assembly checks are complete. Final GPU replays
-are blocked pending a reboot after the device fell off the PCI bus. This report does not claim
-completion of the fifth slice or restoration of the historical 423/427 frozen result.
+**Status:** Slice 200 is complete after the user-approved reboot restored the RTX A6000.
+The post-fix GPU gate and exact-identity corpus comparisons passed. Historical denominators and
+known gaps remain explicit; native-Linux evidence is recorded separately from Windows snapshots.
 
 ## Motivation
 
@@ -150,7 +150,7 @@ Artifact assertions retain `__ldg` and `ld.global.nc` for device buffer data whi
 constant-storage uniform load ordinary. The rebuilt parameter-block PTX loads the scalar with
 `ld.const.u32 ... [SLANG_globalParams]`, loads the block pointer with `ld.const.u64`, and retains
 `ld.global.nc.u32` for the pointed-to device value. Evidence is in
-`build/nvvm-slice200-cuda-load-after/results.json`. GPU corpus replay remains pending.
+`build/nvvm-slice200-cuda-load-after/results.json`. Post-reboot GPU corpus replay validates this correction separately.
 
 The alternative PTX NUL-termination hypothesis was checked and rejected for this failure. Both
 NVRTC and NVVM validate the vendor terminator, remove it from the logical List count, and move the
@@ -192,7 +192,8 @@ Local validation has passed:
   (`build/nvvm-slice200-discovery-runtime/comparison.slice195.json`). The frozen census and its
   producer-fix replays remain under review.
 
-Final acceptance remains pending. Initial discovery preserved all 72 healthy cases in all three modes; the rebuilt source producer still requires its NVRTC replay. The original CMake cache had
+At the pre-reboot checkpoint, final acceptance remained pending. Initial discovery preserved all
+72 healthy cases in all three modes; the rebuilt source producer required a fresh NVRTC replay. The original CMake cache had
 `SLANG_ENABLE_CUDA=FALSE` from configuration before toolkit installation. The existing build was
 reconfigured with CUDA enabled and its test/renderer tools rebuilt:
 
@@ -227,7 +228,7 @@ python3 issue-nvvm-backend/run-compute-discovery.py --bin-dir build/Debug/bin \
 
 Compare results per identity and mode with the historical snapshots. Keep all four known healthy
 frozen gaps and all unhealthy reference cases in their original denominators. A diagnostic exit code
-alone cannot replace that comparison. The slice remains incomplete until the required final execution evidence is reviewed.
+alone cannot replace that comparison. Final acceptance requires the reviewed execution evidence described below.
 
 The initial frozen run completed all **1,356 rows across 452 identities** before the device fault.
 Its all-identity raw counts were NVRTC O3: 435 correct, 16 infrastructure, one invalid-PTX failure;
@@ -237,15 +238,15 @@ not the historical healthy427 denominator. Within that fixed historical subset, 
 12 infrastructure, two preflight stops. Ten previously correct direct cases in each mode were
 rejected by the newly strict count rule because the mirror producer ran extra diagnostic tests.
 These raw results are retained as evidence, not presented as final backend regression totals.
-The invalid-PTX reference case and mirror producer have been fixed, but their GPU replays remain
-unexecuted. Initial results, hashes, comparison, completion timestamps, and logs are preserved under
+The invalid-PTX reference case and mirror producer were fixed before reboot; their GPU replays
+were still pending at that checkpoint. Initial results, hashes, comparison, completion timestamps, and logs are preserved under
 `build/nvvm-slice200-frozen-runtime`.
 
 After collection, the NVIDIA driver reported a GPU fallen off the PCI bus. The last collected test
 passed at 13:25:40 UTC, and none of the 1,356 test logs contain GPU-fault markers. No GPU clients
 remained during recovery. nvidia-smi reset could not find the device; module unload succeeded, but
 reload returned `No such device`. A supported function-level PCI reset also failed to restore it.
-The next recovery step is a separately approved host reboot; recovery is not yet confirmed. The earlier four-fixture GPU gate,
+The user subsequently approved a host reboot, which restored the device. The earlier four-fixture GPU gate,
 474/474 unit passes, and healthy discovery results remain recorded; none substitutes for execution
 of the rebuilt compiler fixes.
 
@@ -270,14 +271,59 @@ The merge validates exactly 452 identities and 1,356 `(id, mode)` rows, replaces
 plus 24 affected direct rows, and retains 880 initial direct rows. It preserves original hashes and
 logs. The plan names the exact 12 replay identities if generated build artifacts need recreation.
 Review the final comparison against the fixed historical 427 healthy and 423 direct-correct sets,
-including all known gaps. Final acceptance and the slice-complete commit remain pending this work.
+including all known gaps. These checks determine final acceptance.
 
 The rebuilt producer also needs an 82-row discovery NVRTC replay. Run the prepared, syntax-checked
 `python3 build/nvvm-slice200-resume-discovery.py` after device recovery. It retains the initial 164
 direct rows and writes an exact 82-identity/246-row final inventory and slice-195 comparison under
 `build/nvvm-slice200-discovery-runtime-final`. Require all historical 72 healthy cases to remain
-correct in each mode and no formerly-correct regressions. This replay has not been executed.
+correct in each mode and no formerly-correct regressions. The post-reboot replay retains these exact acceptance requirements.
 
-A final post-recovery probe again exited 2 with `cuInit` status 100; its blocked JSON is
+The final pre-reboot recovery probe again exited 2 with `cuInit` status 100; its blocked JSON is
 `build/nvvm-slice200-post-recovery-blocked/results.json`. Kernel and recovery logs are preserved
-under `build/nvvm-slice200-driver-diagnostics`. No reboot has been attempted.
+under `build/nvvm-slice200-driver-diagnostics`. The approved reboot restored the device with driver 615.71.09.
+
+## Final post-reboot validation
+
+The rebuilt compiler passed the focused four-fixture gate with zero ignored tests. All 452 frozen
+NVRTC references were refreshed, and the 12 affected frozen identities were replayed in both NVVM
+modes. The merge verified initial evidence hashes and exactly 452 identities/1,356 rows: 452 fresh
+NVRTC rows, 24 fresh direct rows, and 880 unchanged direct rows. The immutable-load fix is specific
+to CUDA source emission; retained direct-NVVM rows use the unaffected path. Discovery refreshed all
+82 NVRTC references and retained its 164 unaffected direct rows, producing exactly 82 identities
+and 246 results. Both comparisons passed their per-identity acceptance checks.
+
+| Scope                                               | NVRTC O3 | NVVM O0 | NVVM O3 |
+| --------------------------------------------------- | -------- | ------- | ------- |
+| All 452 frozen identities, correct                  | 447      | 437     | 437     |
+| Historical 427 healthy MVP identities, correct      | 425      | 423     | 423     |
+| Historical 72 healthy discovery identities, correct | 72       | 72      | 72      |
+
+Every correct row has one executed/passed test, no ignored tests, and no exceptional summary
+status. Every historically correct direct-NVVM identity remains correct. Discovery has no
+classification changes or formerly-correct regressions. The frozen NVRTC differences are exactly
+the two FP8 reference skips: `compute/dynamic-dispatch-substandard-float.slang#cuda-1` and
+`hlsl-intrinsic/substandard-fp-folding.slang#cuda-1`. Both require `-render-features fp8`;
+`cuda-device.cpp` enables Float8 only from SM89, while this device is SM86. They remain blocked
+rows in the original denominator, never passes. The four established healthy frozen backend gaps
+remain: those two FP8 cases, scalar BFloat16, and live RequirePrelude text.
+
+The corrected `cuda/param-block-alignment.slang#cuda-1` executes correctly in NVRTC and both direct
+modes. The mirror replays recover the previously correct direct cases while the unsupported
+wave-rotate identity retains its explicit preflight stop. Full-corpus diagnostic runners still
+return nonzero for retained infrastructure failures; acceptance comes from exact per-identity
+comparisons, not their process status.
+
+Durable results are in `issue-nvvm-backend/runtime-validation.slice-200.json`, including actual
+shared-compiler/provider hashes, evidence hashes, preserved denominators, and merge provenance.
+Successful GPU gate evidence is `build/nvvm-slice200-runtime-after-reboot/results.json`; frozen and
+discovery comparison files are under `build/nvvm-slice200-frozen-final` and
+`build/nvvm-slice200-discovery-runtime-final`. Historical slice-195 manifests remain unchanged.
+The reboot recovered the GPU, but this validation does not establish the cause of the earlier
+Xid 79 fault or claim physical SM70/SM90 coverage.
+
+The final post-reboot focused suite passed **474/474**, with only the existing Windows-only
+`nvvmSlangIntegerBitHelpersRequestTypedOperations` skipped. Command prefixes and configuration
+match the initial focused run; the final log is `build/nvvm-slice200-gpu-unit-after-reboot.log`.
+The device remained available after all validation, and the retained post-reboot kernel log
+contains no Xid or device-loss messages.

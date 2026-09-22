@@ -1,0 +1,292 @@
+{
+  "schema": 1,
+  "slice": 200,
+  "validation_date_utc": "2026-09-22",
+  "status": "accepted-with-recorded-capability-gaps",
+  "scope": "Native Linux CUDA 13.4 runtime validation; historical Windows slice-195 manifests remain unchanged.",
+  "source_commit": "1e814ea0561b9259ec253444f6f7c99b95eb47c7",
+  "platform": "Linux-6.8.0-60-generic-x86_64-with-glibc2.39",
+  "device": {
+    "name": "NVIDIA RTX A6000",
+    "ordinal": 0,
+    "visible_device_count": 1,
+    "compute_capability": 86,
+    "driver_api_version": 13040,
+    "cuda_visible_devices": null
+  },
+  "driver_version": "615.71.09",
+  "target_architecture": 80,
+  "toolkit": {
+    "path": "/usr/local/cuda-13.4",
+    "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Tue_Sep_01_08:45:21_PDT_2026\nCuda compilation tools, release 13.4, V13.4.92\nBuild cuda_13.4.r13.4/compiler.38855100_0"
+  },
+  "toolkit_libraries": {
+    "required_libnvvm": "/usr/local/cuda-13.4/nvvm/lib64/libnvvm.so.4.0.0",
+    "required_nvrtc": "/usr/local/cuda-13.4/targets/x86_64-linux/lib/libnvrtc.so.13.4.92",
+    "libnvvm_sha256": "eeef1ca79dc4ded9cc4ceb69a12f6d7148b5ccb5fc9f997a8ef40ff050be7092",
+    "nvrtc_sha256": "9b4fad8ab9a2aff7a1f5b2140ca28d1143fd4dd4025164781620b22b58f1f13e"
+  },
+  "post_fix_artifact_sha256": {
+    "build/Debug/bin/slangc": "65aa71514cde88aeebf1e1eec4543ba1084e2f5fe90610b3dfd164a3123f017a",
+    "build/Debug/bin/slang-test": "7b7bc82e82e6d340bf5cfc61b6f3160738fd4e21448f4dbb1016483c5753af27",
+    "build/Debug/bin/libslang-llvm-nvvm.so": "c4c813c9a554a8d678791af833ef67ca313391221333521ea1801831fc54db97",
+    "build/Debug/lib/libslang-compiler.so": "663e6eb966355da656740fa622e188189e857d37243491667fcd80a64a1e6edd",
+    "build/Debug/lib/librender-test-tool.so": "63b37158bddfb39f40a651e34f983d6545f20051daa257a78ffbc36896718dac"
+  },
+  "focused_gate": {
+    "fixtures_passed": 4,
+    "ignored": 0,
+    "optimization": "compiler-default (explicit O0/O3 coverage belongs to the compute census)",
+    "fixtures": [
+      "nvvmSlangCUDAExecutionRuntimeMatchesNVRTC",
+      "nvvmSlangSharedMemoryRuntimeMatchesNVRTC",
+      "nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC",
+      "nvvmSlangWaveReadLaneAtUIntRuntimeMatchesNVRTC"
+    ],
+    "evidence": {
+      "path": "build/nvvm-slice200-runtime-after-reboot/results.json",
+      "sha256": "9e8a1b450a44906f21eb7e7e7038d7b9b817d0435cc3b163a8c88df3ab2133b8"
+    }
+  },
+  "frozen_corpus": {
+    "identities": 452,
+    "mode_rows": 1356,
+    "historical_healthy_mvp_denominator": 427,
+    "historical_correct_direct_nvvm_subset": 423,
+    "historical_correct_direct_nvvm_subset_retained": true,
+    "counts": {
+      "nvrtc-o3": {
+        "correct": 447,
+        "infrastructure": 5
+      },
+      "nvvm-o0": {
+        "correct": 437,
+        "infrastructure": 3,
+        "preflight": 12
+      },
+      "nvvm-o3": {
+        "correct": 437,
+        "infrastructure": 3,
+        "preflight": 12
+      }
+    },
+    "historical_healthy_counts": {
+      "nvrtc-o3": {
+        "correct": 425,
+        "infrastructure": 2
+      },
+      "nvvm-o0": {
+        "correct": 423,
+        "infrastructure": 2,
+        "preflight": 2
+      },
+      "nvvm-o3": {
+        "correct": 423,
+        "infrastructure": 2,
+        "preflight": 2
+      }
+    },
+    "correct_in_both_nvvm_modes_on_historical_healthy_subset": 423,
+    "unexpected_old_correct_regressions": [],
+    "strict_correct_execution_counts": true,
+    "hardware_limited_reference_rows": [
+      {
+        "id": "compute/dynamic-dispatch-substandard-float.slang#cuda-1",
+        "mode": "nvrtc-o3",
+        "coverage_tier": "mvp",
+        "previous": "correct",
+        "current": "infrastructure",
+        "diagnostic": "expected exactly one passed/executed test without skips",
+        "log": "build/nvvm-slice200-frozen-nvrtc-final/logs/nvrtc-o3/c83f674610a415a4798c2919b246f2b364d60d07.log",
+        "hardware_limitation_evidence": {
+          "required_feature": "fp8",
+          "requirement_source": "tests/compute/dynamic-dispatch-substandard-float.slang",
+          "device": "NVIDIA RTX A6000 (SM86)",
+          "interpretation": "Capability-based inference: source requires fp8; cuda-device.cpp enables Float8 only at compute capability >= 8.9; actual gate device is 8.6. Runner reports available CUDA and an ignored-only summary, but omits the skip reason.",
+          "counted_as_pass": false
+        }
+      },
+      {
+        "id": "hlsl-intrinsic/substandard-fp-folding.slang#cuda-1",
+        "mode": "nvrtc-o3",
+        "coverage_tier": "mvp",
+        "previous": "correct",
+        "current": "infrastructure",
+        "diagnostic": "expected exactly one passed/executed test without skips",
+        "log": "build/nvvm-slice200-frozen-nvrtc-final/logs/nvrtc-o3/84297be6120018d69d3566951421c76001990fe6.log",
+        "hardware_limitation_evidence": {
+          "required_feature": "fp8",
+          "requirement_source": "tests/hlsl-intrinsic/substandard-fp-folding.slang",
+          "device": "NVIDIA RTX A6000 (SM86)",
+          "interpretation": "Capability-based inference: source requires fp8; cuda-device.cpp enables Float8 only at compute capability >= 8.9; actual gate device is 8.6. Runner reports available CUDA and an ignored-only summary, but omits the skip reason.",
+          "counted_as_pass": false
+        }
+      }
+    ],
+    "known_historical_direct_gaps": [
+      {
+        "id": "compute/dynamic-dispatch-substandard-float.slang#cuda-1",
+        "historical": {
+          "nvvm-o0": "preflight",
+          "nvvm-o3": "preflight"
+        },
+        "current": {
+          "nvvm-o0": "infrastructure",
+          "nvvm-o3": "infrastructure"
+        }
+      },
+      {
+        "id": "cuda/require-prelude.slang#cuda-1",
+        "historical": {
+          "nvvm-o0": "preflight",
+          "nvvm-o3": "preflight"
+        },
+        "current": {
+          "nvvm-o0": "preflight",
+          "nvvm-o3": "preflight"
+        }
+      },
+      {
+        "id": "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+        "historical": {
+          "nvvm-o0": "preflight",
+          "nvvm-o3": "preflight"
+        },
+        "current": {
+          "nvvm-o0": "preflight",
+          "nvvm-o3": "preflight"
+        }
+      },
+      {
+        "id": "hlsl-intrinsic/substandard-fp-folding.slang#cuda-1",
+        "historical": {
+          "nvvm-o0": "preflight",
+          "nvvm-o3": "preflight"
+        },
+        "current": {
+          "nvvm-o0": "infrastructure",
+          "nvvm-o3": "infrastructure"
+        }
+      }
+    ],
+    "merge": {
+      "initial_rows": 1356,
+      "native_replacement_rows": 452,
+      "direct_replacement_rows": 24,
+      "unchanged_direct_rows": 880,
+      "final_rows": 1356,
+      "final_ids": 452
+    },
+    "evidence": [
+      {
+        "path": "issue-nvvm-backend/census.slice-195.tsv",
+        "sha256": "77d335cdb66a54b83cefba9cca90c209ee29ec5d801294a169a244acc0398690"
+      },
+      {
+        "path": "build/nvvm-slice200-frozen-final/results.json",
+        "sha256": "a86fa454a1511ac4a629e9b8e3707d114c90f378d401aa7499607f7ceba94391"
+      },
+      {
+        "path": "build/nvvm-slice200-frozen-final/comparison-slice195.json",
+        "sha256": "b2019863826ace4f6f5735aa2e5a3876181b4d69622b207933cc1ae34b1bfe2f"
+      },
+      {
+        "path": "build/nvvm-slice200-frozen-final/merge-provenance.json",
+        "sha256": "71fcc68b58c33756318e51ab66492820122d78f76e2ed0fd9b8076542eae54bb"
+      },
+      {
+        "path": "build/nvvm-slice200-frozen-runtime/initial-result-hashes.json",
+        "sha256": "467a326a6388793adc07bec0c18a7fd1601fc00f3ce77929693f12763e2a9b9f"
+      },
+      {
+        "path": "build/nvvm-slice200-frozen-runtime/initial-binary-hashes.json",
+        "sha256": "f0adfe09b21c7047f9893628b8703a8643e9a954b14e410d7e89c5f76845b598"
+      }
+    ]
+  },
+  "discovery_corpus": {
+    "identities": 82,
+    "mode_rows": 246,
+    "historical_healthy_denominator": 72,
+    "counts": {
+      "nvrtc-o3": {
+        "correct": 72,
+        "infrastructure": 8,
+        "runtime-mismatch": 2
+      },
+      "nvvm-o0": {
+        "correct": 72,
+        "infrastructure": 7,
+        "runtime-mismatch": 1,
+        "preflight": 2
+      },
+      "nvvm-o3": {
+        "correct": 72,
+        "infrastructure": 7,
+        "runtime-mismatch": 1,
+        "preflight": 2
+      }
+    },
+    "historical_healthy_counts": {
+      "nvrtc-o3": {
+        "correct": 72
+      },
+      "nvvm-o0": {
+        "correct": 72
+      },
+      "nvvm-o3": {
+        "correct": 72
+      }
+    },
+    "all_prior_correct_regressions": [],
+    "newly_healthy_ids": [],
+    "lost_healthy_ids": [],
+    "refreshed_nvrtc_rows": 82,
+    "retained_direct_nvvm_rows": 164,
+    "evidence": [
+      {
+        "path": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+        "sha256": "91f2e0e6228ef0f59e399021248348512844018e7ad8e9300b941726b7a36883"
+      },
+      {
+        "path": "build/nvvm-slice200-discovery-runtime-final/results.json",
+        "sha256": "4bea6530248cd32b1902b2dfcbb371650f85316b688517ebc46a0c1344493e23"
+      },
+      {
+        "path": "build/nvvm-slice200-discovery-runtime-final/comparison.slice195.json",
+        "sha256": "69da0eccf2ce8c9281faddf6f286e298f952b00732a8edab27cf6c788dd62084"
+      },
+      {
+        "path": "build/nvvm-slice200-discovery-nvrtc-after/resume-invocation.json",
+        "sha256": "aeca14a4b5874b4d18de49314d4b8050d0d2a3531253b94a8cb75b329b44bf8d"
+      }
+    ]
+  },
+  "interpretation": [
+    "Every correct corpus row reports exactly one passed and executed test with no ignored or other summary status.",
+    "Two frozen NVRTC FP8 references are blocked on this SM86 GPU and are not passes; both remain in the historical denominator.",
+    "The local RHI enables Float8 only from compute capability 8.9 (external/slang-rhi/src/cuda/cuda-device.cpp); both named tests explicitly require fp8.",
+    "The source fix only affects CUDA-source immutable-load selection, so all NVRTC references were refreshed while unaffected direct NVVM rows retain original execution evidence.",
+    "Original evidence predates the device fault; post-fix replays occurred after the separately approved reboot recovered the GPU.",
+    "Raw binaries and logs are ignored local artifacts. This manifest preserves their hashes and paths, not a claim that they are distributed with the repository."
+  ],
+  "focused_units": {
+    "passed": 474,
+    "executed": 474,
+    "ignored": 1,
+    "ignored_fixture": "nvvmSlangIntegerBitHelpersRequestTypedOperations",
+    "ignored_reason": "Fixture is guarded by SLANG_WINDOWS_FAMILY; native Linux does not execute it.",
+    "evidence": {
+      "path": "build/nvvm-slice200-gpu-unit-after-reboot.log",
+      "sha256": "f62bfa0e0a65474e9e40a4b32e1fc94e708dd1dcb77457a625f4ef0bcf7edb42"
+    }
+  },
+  "post_validation_device_health": {
+    "post_reboot_kernel_gpu_fault_markers": 0,
+    "searched_markers": ["Xid", "fallen off", "GPU_IS_LOST"],
+    "evidence": {
+      "path": "build/nvvm-slice200-driver-diagnostics/post-reboot-kernel.log",
+      "sha256": "54e321c615c471e2ff8a139a356497d773d238c1d403f05385583f13bdd50e59"
+    }
+  }
+}

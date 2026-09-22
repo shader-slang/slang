@@ -10,10 +10,10 @@ ignored tests as correct.
 
 ## Current Status
 
-Implementation and local/source checks are complete. Final GPU acceptance is blocked pending a
-reboot after the device fell off the PCI bus. This is a checkpoint, not a completed fifth slice.
-Earlier real GPU evidence remains valid and retained; the rebuilt producer fixes still require
-physical execution and exact-key corpus comparison.
+Slice 200 is complete. The approved reboot restored the GPU; the rebuilt compiler passed all
+four focused fixtures, the frozen identity comparison, and the discovery refresh. All 423
+historically correct frozen MVP cases remain correct in both NVVM modes; discovery retains all
+72 healthy cases in all three modes. Two FP8 reference skips remain explicit on this SM86 device.
 
 ## Progress
 
@@ -35,8 +35,17 @@ physical execution and exact-key corpus comparison.
       O3 PTX generation, and ptxas assembly (12/12 commands), retaining device-buffer read-only loads.
 - [x] 2026-09-22: Preserved the initial 1,356-row frozen collection, source/binary/result hashes,
       and per-test logs. Collection finished before the later GPU fault.
-- [ ] Blocked: complete and review final frozen NVRTC O3/NVVM O0/O3 evidence, including
-      producer-fix replays, after recovering the device through a user-approved reboot.
+- [x] 2026-09-22: The approved reboot restored RTX A6000; the rebuilt compiler passed all four
+      focused GPU fixtures with no skips.
+- [x] 2026-09-22: Refreshed all 452 frozen NVRTC rows and replayed 24 affected direct rows.
+      The exact 452-identity/1,356-row merge retains all 423 historical healthy direct cases and
+      has no unexpected old-correct regressions; two FP8 reference skips remain explicit.
+- [x] 2026-09-22: Refreshed all 82 discovery NVRTC rows and retained 164 unaffected direct rows.
+      The exact 82-identity/246-row result retains all 72 healthy cases in every mode, with no
+      classification changes. Recorded durable status in runtime-validation.slice-200.json.
+
+- [x] 2026-09-22: Final rebuilt-binary focused run passed 474/474, with one Windows-only skip.
+      The GPU remained available and the post-reboot kernel log had no Xid/device-loss entries.
 
 ## Surprises and Discoveries
 
@@ -183,8 +192,8 @@ to retain the original denominator. No GPU access means this slice remains incom
 NVIDIA driver reported that the GPU had fallen off the bus. No GPU clients remained; nvidia-smi
 reset could not find the device. Module unload succeeded, but reload returned `No such device`.
 An available function-level PCI reset also failed to restore the device. Do not repeat GPU runs
-or report final acceptance until the device is recovered. Reboot approval is a separate system
-action owned by the parent.
+or report final acceptance until the device is recovered. The user separately approved a reboot, which restored the device. The post-reboot runs completed
+without another observed device fault; the original fault cause is not established.
 
 ## Artifacts and Hand-Off
 
@@ -205,18 +214,19 @@ fixtures on RTX A6000 (SM86, CUDA driver API 13040), targeting SM80 with CUDA 13
 is `build/nvvm-slice200-runtime/results.json`. Root CMake had cached SLANG_ENABLE_CUDA=FALSE before
 the toolkit was installed; enabling it and rebuilding the test/renderer tools prepares the full
 corpus lane. The GPU-enabled unit run passed 474/474 with one Windows-only ignored case; it is not
-an unavailable-device skip. Discovery retained its 72 healthy cases in all three modes. Do not mark
-the slice complete or refresh historical corpus correctness totals until
-the frozen/discovery results are reviewed.
+an unavailable-device skip. Final discovery retained its 72 healthy cases in all three modes. Final frozen comparison
+retained all 423 historically correct direct cases on the fixed 427-case subset. The two FP8
+reference rows are still skipped, consistent with the local RHI requiring SM89 for Float8.
 The exact corpus identities remain 452 total frozen and 82 total discovery; historical healthy
 subsets remain 427 and 72, with the four known frozen gaps retained. Generated evidence lives
 under `build/nvvm-slice200-*`.
 
-## Post-Reboot Acceptance Hand-Off
+## Completed Post-Reboot Acceptance
 
-Run the focused gate again, then `bash build/nvvm-slice200-frozen-final/resume-validation.sh`.
-The prepared script reruns all 452 NVRTC O3 identities and the 12 affected identities in both direct
-modes, then merges by `(id, mode)` and compares with slice 195. The final report must contain exactly
+The focused gate passed again. The runner commands in
+`build/nvvm-slice200-frozen-final/resume-validation.sh` were executed individually: all 452 NVRTC O3
+identities and the 12 affected identities in both direct modes, followed by the merge and slice-195
+comparison. The final report contains exactly
 452 distinct identities and 1,356 rows, replacing 452 + 24 rows and retaining the other 880 rows.
 Do not infer acceptance from diagnostic census exit codes. Confirm the historical healthy427 and
 correct423 sets per identity and optimization mode, and account separately for known gaps.
@@ -235,8 +245,11 @@ identities from `census.slice-195.tsv`: `cuda/param-block-alignment.slang#cuda-1
 `return-interface-from-dispatch.slang`, and `this-return-chained.slang`.
 
 After the compiler source fix, also rerun all 82 discovery NVRTC rows with
-`python3 build/nvvm-slice200-resume-discovery.py`. This prepared script has been syntax-checked but
-not executed. It writes `build/nvvm-slice200-discovery-nvrtc-after`, retains the initial 164 direct
+`python3 build/nvvm-slice200-resume-discovery.py`. This script completed successfully. It writes `build/nvvm-slice200-discovery-nvrtc-after`, retains the initial 164 direct
 rows, and writes a final comparison under `build/nvvm-slice200-discovery-runtime-final`. Require
 exactly 82 identities and 246 rows, all historical 72 healthy cases correct in every mode, and no
 formerly-correct discovery regressions. It refuses to overwrite existing final artifacts.
+
+The completion manifest records native-Linux results separately from historical Windows snapshots,
+including shared-compiler/provider hashes, evidence hashes, original denominators, known gaps, and
+the provenance of retained versus refreshed rows. Raw logs remain under ignored build directories.
