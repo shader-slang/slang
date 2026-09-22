@@ -2665,9 +2665,9 @@ local insts = {
 			},
 			{
 				DebugLocation = {
-					-- Decorates an inst with a debug source location (IRDebugSource, IRIntLit(line), IRIntLit(col)).
+					-- Source, line, column, and an optional declaration scope for variables/parameters.
 					struct_name = "DebugLocationDecoration",
-					operands = { { "source" }, { "line" }, { "col" } },
+					operands = { { "source" }, { "line" }, { "col" }, { "scope", optional = true } },
 				},
 			},
 			{
@@ -2999,7 +2999,11 @@ local insts = {
 			min_operands = 5,
 		},
 	},
-	{ DebugVar = { operands = { { "name" }, { "type" }, { "scope" }, { "location" } } } },
+	{
+		DebugVar = {
+			operands = { { "source" }, { "line" }, { "col" }, { "scope" }, { "argIndex", optional = true } },
+		},
+	},
 	{
 		DebugValue = {
 			min_operands = 2,
@@ -3009,6 +3013,11 @@ local insts = {
 	{
 		DebugFunction = {
 			min_operands = 5,
+		},
+	},
+	{
+		DebugLexicalBlock = {
+			operands = { { "source" }, { "line" }, { "col" }, { "parentScope" } },
 		},
 	},
 	{ DebugInlinedVariable = { min_operands = 2 } },
