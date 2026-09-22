@@ -2016,12 +2016,9 @@ Result linkAndOptimizeIR(
         {
             SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
 
-            // A callable entry point must keep exactly one argument parameter for DXC, and a
-            // `CallShader(index, payload)` must keep its payload argument, but an empty
-            // callable-data struct would be erased by the empty-struct legalization below. Pad it
-            // with a dummy field first (must run before legalizeExistentialTypeLayout /
-            // legalizeResourceTypes remove the empty struct). The CUDA path runs the same pass from
-            // the CPU/CUDA branch below.
+            // Pad an empty callable-data struct before legalizeExistentialTypeLayout /
+            // legalizeResourceTypes below erase it (see the pass's header doc for why). CUDA runs
+            // the same pass from the CPU/CUDA branch below.
             SLANG_PASS(legalizeEmptyCallableDataPayloadsForHLSLAndCUDA);
 
             // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
@@ -2077,12 +2074,9 @@ Result linkAndOptimizeIR(
     }
     else
     {
-        // On CUDA, an empty `CallShader` payload (and an empty callable entry-point parameter) must
-        // be padded before the empty-struct legalization below erases it: `CallShader`'s CUDA arm
-        // is the fixed-arity `optixDirectCall<void>($0, $1)`, so a dropped `$1` aborts intrinsic
-        // expansion. This is the CUDA counterpart of the D3D call in the branch above; the shared
-        // pass recognizes `CallShader` by its target-agnostic `[KnownBuiltin(CallShader)]`
-        // identity.
+        // CUDA counterpart of the D3D call above: pad an empty `CallShader` payload (and callable
+        // entry-point parameter) before `legalizeEmptyTypes` below erases it. See the pass's header
+        // doc for why.
         if (isCUDATarget(targetRequest))
         {
             SLANG_PASS(legalizeEmptyCallableDataPayloadsForHLSLAndCUDA);

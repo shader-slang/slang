@@ -49,9 +49,10 @@ void rgen()
 // GLSL-DAG: callableDataEXT
 // GLSL-DAG: executeCallableEXT
 
-// CUDA: the padded payload local survives and is passed as `optixDirectCall`'s second argument,
-// rather than the argument being dropped (which left `optixDirectCall<void>($0)` and aborted the
-// fixed-arity `$1` expansion). The `__raygen__rgen` entry point compiling is the positive control.
+// CUDA behaves the same way: the padded payload local survives and is passed as
+// `optixDirectCall`'s second argument, rather than being dropped (which left
+// `optixDirectCall<void>($0)` and aborted the fixed-arity `$1` expansion). The `__raygen__rgen`
+// entry point compiling is the positive control.
 // CUDA: int _slang_dummy
 // CUDA: __raygen__rgen()
 // CUDA: EmptyData{{[A-Za-z0-9_]*}} [[cudaPayload:[A-Za-z0-9_]+]];

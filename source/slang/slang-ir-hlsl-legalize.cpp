@@ -152,7 +152,8 @@ static bool isEmptyStruct(IRStructType* structType)
 // already-padded struct is non-empty and so is not re-collected on a re-run).
 static void addIfEmptyStruct(IRType* type, HashSet<IRStructType*>& set)
 {
-    if (auto structType = as<IRStructType>(type); structType && isEmptyStruct(structType))
+    auto structType = as<IRStructType>(type);
+    if (structType && isEmptyStruct(structType))
         set.add(structType);
 }
 
@@ -380,19 +381,10 @@ static bool isCallShaderCall(IRCall* call)
 
 void legalizeEmptyCallableDataPayloadsForHLSLAndCUDA(IRModule* module)
 {
-    // On D3D and CUDA a `CallShader` payload (and a callable entry point's own data) is a
-    // fixed-shape call argument / parameter, so an empty callable-data struct legalizing to
-    // `LegalType::Flavor::none` — and being dropped by the empty-struct legalization that follows —
-    // produces a call/signature with the wrong arity:
-    //   - D3D: `legalizeResourceTypes` removes the callable parameter (leaving a zero-parameter
-    //     callable) and the `CallShader` payload argument (leaving `CallShader(index)`); DXC
-    //     rejects both (#12718).
-    //   - CUDA: `legalizeEmptyTypes` drops the payload argument, but `CallShader`'s CUDA arm is the
-    //     fixed-arity `optixDirectCall<void>($0, $1)`; the missing `$1` trips the
-    //     `SLANG_RELEASE_ASSERT` on the argument index in `slang-intrinsic-expand.cpp` (#13106).
-    // Pad the empty struct so it survives, as `legalizeEmptyRayPayloadsForHLSL` does for ray
-    // payloads. The Vulkan targets instead back the payload with a decorated global and are handled
-    // by `legalizeEmptyCallableDataPayloadsForVulkan`.
+    // The header doc explains why an empty callable-data payload must survive erasure on D3D and
+    // CUDA (each has a fixed-shape call whose arity breaks when the payload is dropped). The Vulkan
+    // targets back it with a decorated global instead and are handled by
+    // `legalizeEmptyCallableDataPayloadsForVulkan`.
     IRBuilder builder(module);
 
     // On the D3D and CUDA paths the callable-data struct carries no decoration to key on, so
@@ -411,11 +403,13 @@ void legalizeEmptyCallableDataPayloadsForHLSLAndCUDA(IRModule* module)
         if (!func)
             continue;
 
-        // Use site 1: the callable entry point's own data, a varying parameter. Callable data is a
-        // mutable (`out`/`inout`) parameter lowered to an `IROutParamTypeBase` here, so scanning
-        // those parameters covers it. Padding the entry point's parameter to match the padded
-        // `CallShader` argument (use site 2) is what keeps the two in agreement on the
-        // callable-data ABI even though caller and callee are compiled separately.
+        // Use site 1: the callable entry point's own data. Callable data is the channel a callable
+        // returns through — it reads its input and writes results back through the same parameter —
+        // so it is a mutable (`out`/`inout`) parameter on every target, lowered to an
+        // `IROutParamTypeBase` here; scanning those parameters covers it. Padding this parameter
+        // identically to the `CallShader` argument (use site 2) — `padEmptyStructWithDummyField`
+        // deterministically adds the same single field — keeps a caller and its separately-compiled
+        // callee in agreement on the callable-data ABI.
         auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
         if (entryPointDecor && entryPointDecor->getProfile().getStage() == Stage::Callable)
         {

@@ -2339,8 +2339,6 @@ UnownedStringSlice getBuiltinFuncName(IRInst* callee)
         return UnownedStringSlice::fromLiteral("WaveIsFirstLane");
     case KnownBuiltinDeclName::WaveReadLaneFirst:
         return UnownedStringSlice::fromLiteral("WaveReadLaneFirst");
-    case KnownBuiltinDeclName::CallShader:
-        return UnownedStringSlice::fromLiteral("CallShader");
     default:
         return UnownedStringSlice();
     }

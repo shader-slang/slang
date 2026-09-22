@@ -46,8 +46,10 @@ void callableMain(inout EmptyData data)
 // GLSL-NOT: _slang_dummy
 // GLSL: void main(
 
-// CUDA needs the padding like D3D: the callable entry point keeps its parameter as a padded
-// `EmptyData` pointer, so a `CallShader` caller (which pads its payload identically) agrees on the
-// callable-data ABI.
+// This test covers only the callee (entry-point) side. On CUDA, as on D3D, the callable entry
+// point keeps its parameter as a padded `EmptyData` pointer. A separately-compiled `CallShader`
+// caller (see callshader-empty-payload.slang) pads its own copy of `EmptyData` with the identical
+// single `int _slang_dummy` field — `padEmptyStructWithDummyField` is deterministic — so the two
+// agree on the callable-data ABI by construction.
 // CUDA-DAG: int _slang_dummy
 // CUDA: void __direct_callable__callableMain(EmptyData{{.*}}*{{.*}})
