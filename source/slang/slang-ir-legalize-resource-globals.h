@@ -9,16 +9,18 @@ class DiagnosticSink;
 struct IRModule;
 class TargetProgram;
 
-/// Legalize per-invocation source-static resource state held in global IR storage into explicit
-/// entry-point state.
+/// Replaces file-scope `static` resource globals whose values belong to one shader invocation with
+/// explicit entry-point-local state.
 ///
-/// This operation moves resource-dependent initialization into each entry point, replaces the
-/// affected resource globals with entry-point locals, and threads their values through helper
-/// parameters. It diagnoses externally preserved storage and invocation boundaries that cannot
-/// carry per-invocation state without changing their contract.
+/// This operation first moves resource-dependent initialization into each entry point, then threads
+/// each localized value through helper parameters. It diagnoses externally observable storage,
+/// invocations without a rewritable direct call site, escaping addresses, and calls whose explicit
+/// arguments alias implicitly threaded state, because localization could not preserve those
+/// contracts or storage identities.
 ///
-/// Invoke it after linking, while source-static identities are intact, and before resource-type
-/// legalization and resource-usage specialization.
+/// This operation must run after linking, because linkage, direct calls, and function references
+/// expose the boundaries it validates. It must run before resource-type legalization, while each
+/// file-scope `static` and its initializer still form one identifiable global value.
 void legalizeResourceGlobalVars(
     IRModule* module,
     TargetProgram* targetProgram,

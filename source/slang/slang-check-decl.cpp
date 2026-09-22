@@ -3398,9 +3398,9 @@ static bool _initExprIsRuntimeValue(Expr* expr)
 
 static bool _isPerInvocationResourceOrResourceArray(VarDeclBase* varDecl)
 {
-    // Resource-global legalization can replace a resource value, including an array of such values,
-    // only when the declaration requests ordinary per-invocation storage. First classify the value
-    // type precisely, and then reject storage modifiers that an entry-point local cannot reproduce.
+    // We can replace only resource values whose type and storage semantics can be reproduced by an
+    // entry-point local. We first look through modifiers and array layers to classify the resource
+    // leaf, and then exclude storage classes that have a lifetime or memory contract of their own.
     auto type = varDecl->getType();
     for (;;)
     {
@@ -3430,30 +3430,34 @@ static bool _isPerInvocationResourceOrResourceArray(VarDeclBase* varDecl)
     return true;
 }
 
+static bool _isMutableFileStaticOpaqueVariable(VarDeclBase* varDecl, TypeTag typeTags)
+{
+    // We identify this source-level category by requiring an opaque type, file scope, `static`
+    // storage, and mutability. A top-level declaration without `static` is a shader parameter,
+    // while a `static const` declaration is a constant rather than a variable.
+    if ((int(typeTags) & int(TypeTag::Opaque)) == 0)
+        return false;
+    if (!isGlobalDecl(varDecl))
+        return false;
+    if (!varDecl->hasModifier<HLSLStaticModifier>())
+        return false;
+    if (varDecl->hasModifier<ConstModifier>())
+        return false;
+    return true;
+}
+
 static void maybeDiagnoseOpaqueTypeGlobalVar(
     DiagnosticSink* sink,
     VarDeclBase* varDecl,
     TypeTag typeTags)
 {
-    // Mutable file-scope `static` variables of opaque type have historically been rejected because
-    // most opaque values cannot use ordinary global storage. Resource-global legalization now
-    // supports one narrow exception. Work from the user-visible declaration categories toward that
-    // exception, with an early return for every case that does not denote an unsupported variable.
-    if ((int(typeTags) & int(TypeTag::Opaque)) == 0)
+    // We first identify mutable file-scope `static` variables of opaque type. We then exempt the
+    // resource-valued case that IR legalization can replace with per-entry-point state. Every
+    // remaining variable would require an opaque global-storage representation that Slang cannot
+    // support, so we diagnose it.
+    if (!_isMutableFileStaticOpaqueVariable(varDecl, typeTags))
         return;
 
-    if (!isGlobalDecl(varDecl))
-        return;
-
-    // Without `static`, a top-level declaration is a shader parameter rather than global storage.
-    if (!varDecl->hasModifier<HLSLStaticModifier>())
-        return;
-
-    // A `static const` declaration denotes a constant rather than a mutable variable.
-    if (varDecl->hasModifier<ConstModifier>())
-        return;
-
-    // This is the one opaque-variable case that later IR legalization knows how to replace.
     if (_isPerInvocationResourceOrResourceArray(varDecl))
         return;
 

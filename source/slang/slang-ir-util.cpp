@@ -11,9 +11,9 @@ namespace Slang
 
 bool doesInstOnlyDependOnOperandTypes(IRInst* inst)
 {
-    // A value-use analysis must not mistake a static type query for a read of the operand's runtime
-    // value. Keep the distinction explicit by enumerating instructions whose result depends only
-    // on an operand's type; every unlisted instruction remains a value use by default.
+    // Static type queries are represented as operations on runtime values, but they do not observe
+    // those values. We enumerate the known type-only operations so that value-use analyses can
+    // ignore them while conservatively treating every unlisted instruction as a value use.
     switch (inst->getOp())
     {
     case kIROp_IsBool:
@@ -35,9 +35,9 @@ bool doesInstOnlyDependOnOperandTypes(IRInst* inst)
 
 static bool _isResourceValueType(IRType* type)
 {
-    // Resource-global legalization needs a deliberately narrower classification than the general
-    // opaque-type machinery. Recognize exactly the direct resource values accepted by the front
-    // end and supported by downstream resource specialization.
+    // Resource-global legalization deliberately uses a narrower classification than the general
+    // opaque-type machinery. The cases below are exactly the direct resource values admitted by
+    // the front end and supported by downstream resource specialization.
     return as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
            as<IRUniformParameterGroupType>(type) || as<IRHLSLStructuredBufferTypeBase>(type) ||
            as<IRByteAddressBufferTypeBase>(type);
@@ -46,8 +46,8 @@ static bool _isResourceValueType(IRType* type)
 static bool _doesTypeContainResourceValues(IRType* type, HashSet<IRType*>& visitedTypes)
 {
     // Earlier target lowering may wrap an accepted resource category in a compiler-generated
-    // aggregate before resource-global legalization runs. Follow only value-bearing aggregate
-    // children and use `visitedTypes` to terminate recursive type graphs.
+    // aggregate before resource-global legalization runs. We follow only value-bearing aggregate
+    // children, and we use `visitedTypes` to terminate recursive type graphs.
     if (!visitedTypes.add(type))
         return false;
     if (_isResourceValueType(type))
@@ -81,10 +81,10 @@ static bool _doesTypeContainResourceValues(IRType* type, HashSet<IRType*>& visit
 
 bool isPerInvocationResourceStateGlobalVar(IRGlobalVar* globalVar)
 {
-    // Resource-global legalization applies only to linked file-scope state with ordinary
-    // per-invocation lifetime. The front-end gate admits a supported resource value or arrays
-    // thereof, but earlier target lowering can synthesize aggregate wrappers around that value.
-    // Inspect those wrappers recursively without broadening the accepted leaf taxonomy.
+    // A global belongs to this transformation only when it represents linked file-scope state with
+    // ordinary per-invocation lifetime. The front-end gate admits a supported resource value or an
+    // array of such values, while earlier target lowering may synthesize aggregate wrappers around
+    // them. We therefore inspect those wrappers recursively without broadening the accepted leaves.
     if (globalVar->getRate() || !globalVar->findDecoration<IRLinkageDecoration>())
         return false;
 
@@ -126,6 +126,56 @@ bool isAddressInst(IRInst* inst)
     default:
         return false;
     }
+}
+
+bool doesUseDeriveAddress(IRUse* use)
+{
+    // Address instructions and pointer-preserving casts derive their result from operand zero. We
+    // require that exact operand because another pointer operand may be a value being stored or
+    // otherwise consumed rather than the base of the result address.
+    auto user = use->getUser();
+    if (user->getOperandCount() == 0 || user->getOperandUse(0) != use)
+        return false;
+
+    if (isAddressInst(user))
+        return true;
+
+    switch (user->getOp())
+    {
+    case kIROp_BitCast:
+    case kIROp_Reinterpret:
+    case kIROp_PtrCast:
+    case kIROp_InOutImplicitCast:
+        return as<IRPtrTypeBase>(user->getDataType()) != nullptr;
+    default:
+        return false;
+    }
+}
+
+IRInst* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse)
+{
+    // We match the exact operand use rather than its value, because one value may be passed to
+    // multiple parameters with different direction contracts. Operand zero is the callee, and the
+    // remaining operands correspond positionally to the function-type parameters.
+    if (argumentUse == call->getCalleeUse())
+        return nullptr;
+
+    Index argIndex = -1;
+    for (UInt i = 0; i < call->getArgCount(); ++i)
+    {
+        if (call->getOperandUse(i + 1) == argumentUse)
+        {
+            argIndex = Index(i);
+            break;
+        }
+    }
+    if (argIndex < 0)
+        return nullptr;
+
+    auto funcType = as<IRFuncType>(call->getCallee()->getDataType());
+    if (!funcType || UInt(argIndex) >= funcType->getParamCount())
+        return nullptr;
+    return unwrapAttributedType(funcType->getParamType(UInt(argIndex)));
 }
 
 IRType* getVectorElementType(IRType* type)

@@ -239,24 +239,20 @@ static List<IRInst*> getAliasableInstructions(IRInst* inst)
     return getAliasableInstructions(inst, aliasSet);
 }
 
-// Does `inst` depend (transitively, through its operands) on any value in `aliasSet`?
-// Used to tell a genuinely-defined phi argument from one that is merely the tracked
-// uninitialized value carried/derived through computation. For example, with a
-// loop-carried accumulator the back-edge argument is `add(total1, a[i])`, which depends on
-// the loop-header phi `total1` (an alias) and so is *not* a real definition; whereas a
-// conditionally-stored value like `load(candidateProceduralAttrs)` depends on nothing in
-// the alias set and *is* a real definition. A `seen` set bounds the operand walk against
-// cycles (phis can be mutually recursive).
+// We determine whether `inst` transitively depends on a value in `aliasSet`. A phi argument that
+// depends on the tracked value merely carries that value around a loop; an independent argument is
+// a genuine definition reaching the phi. For example, `add(total1, a[i])` depends on the loop-
+// header alias `total1`, while `load(candidateProceduralAttrs)` does not. We use `seen` to
+// terminate the operand walk when phis form a cycle.
 static bool dependsOnAlias(IRInst* inst, const HashSet<IRInst*>& aliasSet, HashSet<IRInst*>& seen)
 {
     if (aliasSet.contains(inst))
         return true;
     if (!seen.add(inst))
         return false;
-    // Stop at block boundaries: a block parameter's "operands" are its phi arguments,
-    // which we reach via the predecessors, not via getOperand. Following an alias param is
-    // already handled by aliasSet membership above; any non-alias param is treated as an
-    // independent definition.
+    // We stop at block boundaries because a block parameter's phi arguments arrive through its
+    // predecessors rather than through `getOperand`. Membership in `aliasSet` above handles an
+    // alias parameter; every other parameter is an independent definition for this operand walk.
     if (as<IRParam>(inst))
         return false;
     for (UInt i = 0, n = inst->getOperandCount(); i < n; i++)
@@ -268,11 +264,9 @@ static bool dependsOnAlias(IRInst* inst, const HashSet<IRInst*>& aliasSet, HashS
     return false;
 }
 
-// Given the set of aliases of the tracked uninitialized value (the values that are the
-// uninitialized value or are it carried along a phi edge), find the phi merge points where
-// a *genuinely defined* value also flows in. Each such incoming argument is reported as a
-// "store": along its edge the variable holds a real, initialized value, so a read reached
-// after it is not a may-init (never-initialized) use.
+// We treat a defined value entering an alias phi as a write on that predecessor edge. Without that
+// write, a later read would appear to have no initialization even when a defined value reaches the
+// phi along one path.
 //
 // This is what keeps the analysis honest once phi following is enabled. Consider a value
 // that is assigned only on some paths and then read after a loop:
@@ -281,19 +275,16 @@ static bool dependsOnAlias(IRInst* inst, const HashSet<IRInst*>& aliasSet, HashS
 //     for (;;) { ...; if (cond) attrs = computed; ... }
 //     use(attrs);                          // reads the loop-header phi
 //
-// The loop-header phi merges the undefined pre-loop value with `computed`. Without this,
-// the post-loop read would be flagged may-init (no IR `store` exists for an SSA value),
-// even though a defined value reaches it on the assigning path — making it a conditional
-// (must-init) situation that the definite-assignment pass deliberately suppresses for
-// zero-trip loops. Registering `computed` as a store lets `cancelLoads` reclassify the read
-// out of may-init. A purely loop-carried accumulator (`total += a[i]`) has no such defined
-// incoming value -- its only non-undefined phi argument, `add(total1, a[i])`, depends on
-// the phi itself -- so `dependsOnAlias` rejects it and the accumulator correctly stays a
-// may-init violation.
-static void collectPhiMergeStores(
+// The loop-header phi merges the undefined pre-loop value with `computed`. No IR `store` exists
+// for that SSA value, so we record the predecessor edge as a possible write and as a write this
+// checker treats as definite. A purely loop-carried accumulator (`total += a[i]`) has no defined
+// incoming value: its only non-undefined phi argument, `add(total1, a[i])`, depends on the phi
+// itself. `dependsOnAlias` therefore rejects that argument, and we continue to diagnose the
+// accumulator read.
+static void collectPhiMergeWrites(
     const HashSet<IRInst*>& aliasSet,
     const List<IRInst*>& aliases,
-    List<IRInst*>& stores)
+    List<IRInst*>& writes)
 {
     for (auto alias : aliases)
     {
@@ -313,18 +304,16 @@ static void collectPhiMergeStores(
             if (!branch || UInt(paramIndex) >= branch->getArgCount())
                 continue;
             auto arg = branch->getArg(UInt(paramIndex));
-            // Only an argument that does not derive from the tracked uninitialized value is
-            // a genuine definition reaching this merge point.
+            // An argument defines the tracked value only when it does not derive from that value.
             HashSet<IRInst*> seen;
             if (dependsOnAlias(arg, aliasSet, seen))
                 continue;
-            // Record the store at the predecessor edge (its terminator), not at the
-            // argument's definition. The variable becomes initialized only on this incoming
-            // edge; the value `arg` may have been defined earlier (e.g. `float y = 1; if
-            // (cond) x = y;`), and using its definition point as the store would make the
-            // definite-assignment walk treat the unassigned edge as initialized too,
-            // suppressing the legitimate "may be uninitialized" diagnostic.
-            stores.add(branch);
+            // We record the write at the predecessor edge rather than at the argument's definition,
+            // because the tracked value becomes initialized only on this incoming edge. The value
+            // `arg` may have been defined earlier (for example, `float y = 1; if (cond) x = y;`).
+            // Treating that definition as the write would incorrectly initialize the unassigned
+            // edge and suppress the legitimate "may be uninitialized" diagnostic.
+            writes.add(branch);
         }
     }
 }
@@ -337,66 +326,41 @@ enum InstructionUsageType
     Load         // Instruction acts as a load from the source
 };
 
-// Classify how a call uses one argument when the callee's parameter direction is the only
-// information available. The existing analysis treats an `out`, `inout`, or `ref` parameter as a
-// write and every other parameter as a read. A caller with a more precise semantic summary can
-// override this baseline classification for the exact `IRUse` in `collectInstructionByUsage`.
-static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
+// We normally classify a call argument from the corresponding parameter direction: `out`, `inout`,
+// and `ref` arguments are writes, while every other resolved argument is a read. Calls through
+// `IRTranslateBase` are an IR-internal write that has no ordinary parameter signature, so we handle
+// them directly. When the signature cannot be resolved, we leave the use unclassified rather than
+// inventing an effect. `collectInstructionByUsage` can replace this baseline for an exact `IRUse`
+// when a transformation supplies a more precise effect.
+static InstructionUsageType getCallUsageType(IRCall* call, IRUse* argumentUse)
 {
-    IRInst* callee = call->getCallee();
-
-    // Resolve the actual function
-    IRFunc* ftn = nullptr;
-    IRFuncType* ftype = nullptr;
-    if (auto spec = as<IRSpecialize>(callee))
-        ftn = as<IRFunc>(getResolvedInstForDecorations(spec));
-    else if (as<IRTranslateBase>(callee))
+    if (as<IRTranslateBase>(call->getCallee()))
         return Store;
 
-    else if (auto wit = as<IRLookupWitnessMethod>(callee))
-        ftype = as<IRFuncType>(wit->getFullType());
-    else
-        ftn = as<IRFunc>(callee);
-
-    // Find the argument index so we can fetch the type
-    int index = 0;
-
-    auto args = call->getArgsList();
-    for (int i = 0; i < args.getCount(); i++)
-    {
-        if (args[i] == inst)
-        {
-            index = i;
-            break;
-        }
-    }
-
-    if (ftn)
-        ftype = as<IRFuncType>(ftn->getFullType());
-
-    if (!ftype)
+    auto paramType = findCallArgumentParameterType(call, argumentUse);
+    if (!paramType)
         return None;
 
-    // Consider it as a store if it is passed as an out/inout/ref parameter. Callers that have a
-    // more precise interprocedural summary can override this classification for an exact use.
-    auto type = unwrapAttributedType(ftype->getParamType(index));
-    return (as<IROutParamType>(type) || as<IRBorrowInOutParamType>(type) ||
-            as<IRRefParamType>(type))
+    return (as<IROutParamType>(paramType) || as<IRBorrowInOutParamType>(paramType) ||
+            as<IRRefParamType>(paramType))
                ? Store
                : Load;
 }
 
-// Infer whether `user` reads or writes the tracked value `inst` from the user's opcode and type.
-// First exclude instructions that merely propagate aliases or inspect types, then handle opcodes
-// with known operand roles. Unknown instructions fall back to the historical pointer-producing
-// heuristic so this classifier remains conservative for existing mandatory checking.
-static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
+// We infer the effect from the user's opcode and the tracked operand's role. We ignore type queries
+// and alias propagation, use precise rules for known opcodes, and preserve the module-wide
+// checker's fallback for unknown users: pointer-producing instructions count as writes and all
+// others as reads.
+static InstructionUsageType getInstructionUsageType(IRUse* use, IRInst* inst)
 {
+    auto user = use->getUser();
+
     // Type-only instructions do not observe the runtime value of their operands.
     if (doesInstOnlyDependOnOperandTypes(user))
         return None;
 
-    // Ignore instructions generating more aliases
+    // Alias-producing instructions are traversed separately and do not themselves read or write the
+    // tracked value.
     if (isAliasable(user))
         return None;
 
@@ -407,8 +371,7 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
         // TODO: Ignore branches for now
         return None;
 
-    // Debug info instructions should be ignored - they don't constitute
-    // actual loads or stores of data, they're just metadata.
+    // Debug instructions describe the value but do not observe or modify it at runtime.
     case kIROp_DebugValue:
     case kIROp_DebugVar:
     case kIROp_DebugLine:
@@ -417,11 +380,7 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
         return None;
 
     case kIROp_Call:
-        // Function calls can be either
-        // stores or loads depending on
-        // whether the callee takes it
-        // in as a out parameter or not
-        return getCallUsageType(as<IRCall>(user), inst);
+        return getCallUsageType(as<IRCall>(user), use);
 
     case kIROp_Store:
     case kIROp_AtomicStore:
@@ -443,7 +402,7 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
         // subject: here it tests the stored value's type
         // (`inst->getDataType()`), whereas the `default` case tests the using
         // instruction's type (`user->getDataType()`).
-        if (inst == user->getOperand(1) && !as<IRPtrTypeBase>(inst->getDataType()))
+        if (use == user->getOperandUse(1) && !as<IRPtrTypeBase>(inst->getDataType()))
             return Load;
         return Store;
 
@@ -462,38 +421,55 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
         // For specializing generic structs
         return Store;
 
-    // Miscellaneous cases
     case kIROp_ManagedPtrAttach:
+        // We retain the legacy approximation that either address operand represents a write. The
+        // generic classifier does not distinguish the destination from the attached native pointer;
+        // a caller that needs operand-specific semantics must provide a use-specific effect.
+        return Store;
+
     case kIROp_Unmodified:
+        // This intrinsic explicitly satisfies an output write contract without changing the value.
         return Store;
 
     default:
-        // Default case is that if the instruction is a pointer, it
-        // is considered a store, otherwise a load.
+        // For an unfamiliar instruction, we preserve the established conservative rule: a
+        // pointer-producing user counts as a write and every other user counts as a read.
         if (as<IRPtrTypeBase>(user->getDataType()))
             return Store;
         return Load;
     }
 }
 
-static void collectSpecialCaseInstructions(List<IRInst*>& stores, IRBlock* block)
+// Generic assembly does not expose operand effects, so output-parameter checking treats the whole
+// instruction as a possible write barrier.
+static void collectGenericAsmPossibleWrites(List<IRInst*>& possibleWrites, IRBlock* block)
 {
     for (auto inst = block->getFirstInst(); inst; inst = inst->next)
     {
         if (as<IRGenericAsm>(inst))
-            stores.add(inst);
+            possibleWrites.add(inst);
     }
 }
 
-// Add one use of the tracked value to the read/write sets consumed by the two CFG analyses.
-// An exact effect supplied by a transformation takes precedence over the generic IR classifier:
-// generated parameter directions can otherwise invent an incoming read or overstate a partial or
-// conditional write. Possible writes feed the reachability analysis, while only definite writes
-// feed the definite-assignment analysis.
+// We separate each tracked variable's uses into the facts needed by the two analyses. The generic
+// classifier predates use-specific effects and treats every inferred write as both possible and
+// definite. That is an established approximation, not proof that every instruction writes the
+// complete value on every path. Use-specific effects preserve the distinction for synthesized
+// operations whose writes can be partial or conditional.
+struct TrackedVariableUses
+{
+    List<IRInst*> reads;
+    List<IRInst*> possibleWrites;
+    List<IRInst*> writesTreatedAsDefinite;
+};
+
+// We record one use in the read/write sets shared by the reachability and definite-assignment
+// analyses. The generic classifier adds each inferred write to both write sets to preserve the
+// checker's historical behavior. When a transformation supplies a use-specific effect, we use it
+// instead: an `inout` ABI parameter need not semantically read its incoming value, and the effect
+// can distinguish a partial or conditional write from a definite whole-value write.
 static void collectInstructionByUsage(
-    List<IRInst*>& stores,
-    List<IRInst*>* definiteStores,
-    List<IRInst*>& loads,
+    TrackedVariableUses& result,
     IRUse* use,
     IRInst* inst,
     ConstArrayView<UninitializedVariableUseEffect> useEffects = {})
@@ -505,50 +481,44 @@ static void collectInstructionByUsage(
             continue;
 
         if (effect.readsValue)
-            loads.add(user);
+            result.reads.add(user);
         if (effect.mayWriteValue || effect.definitelyWritesValue)
-            stores.add(user);
-        if (effect.definitelyWritesValue && definiteStores)
-            definiteStores->add(user);
+            result.possibleWrites.add(user);
+        if (effect.definitelyWritesValue)
+            result.writesTreatedAsDefinite.add(user);
         return;
     }
 
-    InstructionUsageType usage = getInstructionUsageType(user, inst);
+    InstructionUsageType usage = getInstructionUsageType(use, inst);
     switch (usage)
     {
     case Load:
-        return loads.add(user);
+        return result.reads.add(user);
     case Store:
-        stores.add(user);
-        if (definiteStores)
-            definiteStores->add(user);
+        result.possibleWrites.add(user);
+        result.writesTreatedAsDefinite.add(user);
         return;
     case StoreParent:
-        stores.add(user->getParent());
-        if (definiteStores)
-            definiteStores->add(user->getParent());
+        result.possibleWrites.add(user->getParent());
+        result.writesTreatedAsDefinite.add(user->getParent());
         return;
     }
 }
 
-// Retain only reads for which no possible write can reach the read. This computes the first,
-// coarse class of violations: values that may still have no initialization at all. A single
-// instruction recorded as both a read and a write cannot use its outgoing write to satisfy its own
-// incoming read.
-static void cancelLoads(
+// We remove reads that an earlier possible write can reach. Any read left has no possible
+// initialization reaching it. When one instruction both reads and writes, its outgoing write cannot
+// initialize its incoming read.
+static void removeReadsReachedByPossibleWrite(
     ReachabilityContext& reachability,
-    const List<IRInst*>& stores,
-    List<IRInst*>& loads)
+    const List<IRInst*>& possibleWrites,
+    List<IRInst*>& reads)
 {
-    // Remove all loads which are reachable from stores
-    for (auto store : stores)
+    for (auto write : possibleWrites)
     {
-        for (Index i = 0; i < loads.getCount();)
+        for (Index i = 0; i < reads.getCount();)
         {
-            // A call that both reads and writes an argument cannot use its own write to
-            // initialize the incoming value that it reads.
-            if (store != loads[i] && reachability.isInstReachable(store, loads[i]))
-                loads.fastRemoveAt(i);
+            if (write != reads[i] && reachability.isInstReachable(write, reads[i]))
+                reads.fastRemoveAt(i);
             else
                 i++;
         }
@@ -606,31 +576,29 @@ static IRBlock* getInfeasibleBranchFromPredecessor(IRBlock* block, IRBlock* from
     return argVal->getValue() ? ifElse->getFalseBlock() : ifElse->getTrueBlock();
 }
 
-// A `if (WaveIsFirstLane()) { ... }` guard found in the function being analyzed, recorded
-// once per function rather than once per tracked variable (see `WaveElectionContext` below).
+// We record each `if (WaveIsFirstLane()) { ... }` guard once per function rather than once per
+// tracked variable (see `WaveElectionContext` below).
 //
 // `trueBlock` is the guard's true-branch entry block (the "elected lane" region); `mergeBlock`
 // is the `ifElse`'s reconvergence block (`IRIfElse::getAfterBlock()`). Together with
-// `isEveryPathFromBlockedByStore`, these license the must-init relaxation implemented in
-// `cancelLoadsByDefiniteAssignment` for the pattern reported in
-// https://github.com/shader-slang/slang/issues/12545: a store inside the guard, read back via
-// `WaveReadLaneFirst()`, is not actually reachable while uninitialized -- `WaveReadLaneFirst`
-// broadcasts from the first active lane, which is exactly the lane for which
-// `WaveIsFirstLane()` was true and which therefore took `trueBlock`.
+// `isEveryPathBlockedByDefiniteWrite`, these blocks let
+// `removeReadsWithDefiniteWriteOnEveryPath` recognize the pattern reported in
+// https://github.com/shader-slang/slang/issues/12545. A value written inside the guard and read via
+// `WaveReadLaneFirst()` cannot be observed before that write: the intrinsic broadcasts from the
+// first active lane, which is precisely the lane that entered `trueBlock`.
 struct WaveElectionGuard
 {
     IRBlock* trueBlock;
     IRBlock* mergeBlock;
 };
 
-// Find every `if (WaveIsFirstLane())` guard in `func`.
+// We collect every direct `if (WaveIsFirstLane())` guard in `func`.
 //
-// The condition must be *directly* a call to the `WaveIsFirstLane` known builtin -- no
-// unwrapping of `!`/boolean negation. This is deliberate: `!WaveIsFirstLane()` lowers to an
-// explicit `not(...)` operand feeding the `ifElse`, not a swapped true/false block, so requiring
-// a direct call correctly excludes `if (!WaveIsFirstLane()) { store }`, which must keep warning
-// (a non-elected lane never executes that store, so a later `WaveReadLaneFirst` read is a
-// genuine may-init/must-init bug).
+// We deliberately do not unwrap `!` or other boolean operations around the known builtin.
+// `!WaveIsFirstLane()` lowers to an explicit `not(...)` operand feeding the `ifElse`, rather than
+// to swapped true and false blocks. Requiring a direct call therefore excludes
+// `if (!WaveIsFirstLane()) { write }`, where the first active lane never executes the write and a
+// later `WaveReadLaneFirst()` can still observe an uninitialized value.
 static List<WaveElectionGuard> collectWaveElectionGuards(IRGlobalValueWithCode* func)
 {
     List<WaveElectionGuard> guards;
@@ -649,13 +617,11 @@ static List<WaveElectionGuard> collectWaveElectionGuards(IRGlobalValueWithCode* 
     return guards;
 }
 
-// Function-wide context for the `WaveIsFirstLane()`/`WaveReadLaneFirst()` must-init relaxation.
-// Computed once per function and threaded through by reference (mirroring how
-// `ReachabilityContext` is built once in `checkUninitializedValues`), because both `guards` and
-// `dominatorTree` are variable-independent -- rebuilding them per tracked variable would be
-// wasted work. `dominatorTree` is only built when `guards` is non-empty, since the
-// overwhelming majority of functions contain no `WaveIsFirstLane()` guard at all and shouldn't
-// pay for a dominator tree they'll never query.
+// We keep the `WaveIsFirstLane()`/`WaveReadLaneFirst()` relaxation in a function-wide context,
+// mirroring the lifetime of `ReachabilityContext` in `checkUninitializedValues`. Both `guards` and
+// `dominatorTree` are independent of the tracked variable, so rebuilding them per variable would
+// waste work. We build the dominator tree only when a guard exists, since most functions never
+// need this relaxation.
 struct WaveElectionContext
 {
     List<WaveElectionGuard> guards;
@@ -671,11 +637,10 @@ static WaveElectionContext collectWaveElectionContext(IRGlobalValueWithCode* fun
     return context;
 }
 
-// Is `to` reachable from `from` at all, ignoring `blocksWithStore` entirely? Used by
-// `isEveryPathFromBlockedByStore` to distinguish "every path to `to` passes a store" from "`to`
-// is never reached in the first place" -- the guard's true-branch diverging via an early
-// `return`/`break`/`discard` is the latter, not the former, and must not be treated as a
-// guarantee.
+// We first ask whether `to` is reachable from `from` without treating definite writes as barriers.
+// `isEveryPathBlockedByDefiniteWrite` uses this fact to distinguish a write on every path from a
+// region that never reaches `to`. An early `return`, `break`, or `discard` is the latter and
+// provides no initialization guarantee at `to`.
 static bool isBlockReachableFrom(IRBlock* from, IRBlock* to)
 {
     HashSet<IRBlock*> visited;
@@ -697,43 +662,33 @@ static bool isBlockReachableFrom(IRBlock* from, IRBlock* to)
     return false;
 }
 
-// Does every control-flow path from `from` to `to` pass through at least one block in
-// `blocksWithStore`? Used to decide whether a store inside a `WaveIsFirstLane()` guard's
-// true-branch (`from`) is guaranteed to execute before the elected lane reaches the guard's
-// merge block (`to`).
+// We determine whether every control-flow path from `from` to `to` passes through a block with a
+// write this checker treats as definite. This tells the wave relaxation whether the elected lane is
+// guaranteed to execute a write before reaching the guard's merge block.
 //
-// This must be a walk scoped to `from`'s own sub-CFG, not a whole-function dominance query
-// (`dominates(store, to)`): in the diamond CFG that `if`/`else` produces, the false-branch edge
-// always reaches `to` without passing through a store inside the true branch, so
-// `dominates(store, to)` in the *global* CFG is never satisfiable and would make this
-// relaxation never fire. Framing the question as "does every path within `from`'s own region
-// pass through a store before reaching `to`" is what correctly rejects a store nested inside a
-// further conditional within the guard, e.g.:
+// We walk the sub-CFG rooted at `from` instead of asking whether one write dominates `to` in the
+// whole function. The false branch of the surrounding `if` always reaches `to` without entering
+// this region, so whole-function dominance could never establish the property. The regional walk
+// also rejects a write nested inside another conditional:
 //
 //     if (WaveIsFirstLane())
 //     {
 //         if (rareCondition)
-//             nBaseIndex = ...;   // does NOT dominate `to` within this sub-CFG
+//             nBaseIndex = ...;   // This write is conditional within the elected lane.
 //     }
 //     uint nIndex = WaveReadLaneFirst(nBaseIndex) + ...;
 //
-// Here the elected lane can reach the merge block without ever executing the inner store (when
-// `rareCondition` is false), so this walk correctly finds a store-free path and the relaxation
-// below declines to fire -- the read stays flagged, as it must.
+// When `rareCondition` is false, the elected lane reaches the merge without the inner write, so we
+// retain the diagnostic.
 //
-// A store-free forward walk from `from` that never reaches `to` is not, by itself, evidence
-// that a store guards every path: it is equally what happens when `from`'s region diverges away
-// from `to` entirely (an early `return`/`break`/`discard` inside the guard) and never
-// reconverges at the merge block at all. In that case the elected lane gives no guarantee about
-// the state at `to`, and a store anywhere else in the function must not be allowed to satisfy
-// this check by the walk simply draining without objection. So this function first requires
-// that `to` is actually reachable from `from` when stores are *not* treated as barriers
-// (`isBlockReachableFrom`); only once that is established does "the store-free walk fails to
-// reach `to`" mean what it is meant to mean.
-static bool isEveryPathFromBlockedByStore(
+// A traversal that never reaches `to` is not sufficient by itself: the region may diverge through
+// an early `return`, `break`, or `discard` instead of encountering a write. We therefore establish
+// ordinary reachability first. Once `to` is known to be reachable, failure to reach it while writes
+// act as barriers proves that every path crosses such a write.
+static bool isEveryPathBlockedByDefiniteWrite(
     IRBlock* from,
     IRBlock* to,
-    const HashSet<IRBlock*>& blocksWithStore)
+    const HashSet<IRBlock*>& blocksWithDefiniteWrite)
 {
     if (!isBlockReachableFrom(from, to))
         return false;
@@ -747,9 +702,9 @@ static bool isEveryPathFromBlockedByStore(
         auto block = worklist.getLast();
         worklist.removeLast();
         if (block == to)
-            return false; // Reached `to` along a path with no preceding store.
-        if (blocksWithStore.contains(block))
-            continue; // A store in this block blocks propagation past it.
+            return false; // This path reached `to` without a preceding definite write.
+        if (blocksWithDefiniteWrite.contains(block))
+            continue; // The definite write prevents this path from remaining uninitialized.
         for (auto succ : block->getSuccessors())
         {
             if (visited.add(succ))
@@ -759,9 +714,9 @@ static bool isEveryPathFromBlockedByStore(
     return true;
 }
 
-// Is `readingInst` -- an instruction already classified as a read of the tracked value by
-// `getInstructionUsageType` -- a use that this file's must-init walk would otherwise flag, but
-// which is actually a `WaveReadLaneFirst` broadcast of it?
+// We determine whether `readingInst`, which `getInstructionUsageType` has already classified as a
+// read of the tracked value, is actually a `WaveReadLaneFirst()` broadcast eligible for the wave
+// relaxation.
 //
 // This has to account for two different IR shapes for the same source-level
 // `WaveReadLaneFirst(x)`, because `getInstructionUsageType`/`getCallUsageType` classify a call
@@ -774,14 +729,12 @@ static bool isEveryPathFromBlockedByStore(
 //  - `readingInst` may be a plain load (or other Load-classified instruction) whose result is
 //    consumed *only* (ignoring type-only instructions) as the argument to such a call.
 //
-// Either way, the tracked value's only real consumer must be the `WaveReadLaneFirst` call --
-// this is what ties the must-init relaxation to the specific broadcast read that makes it
-// sound. A plain read that also does something else with the value does not qualify and stays
-// flagged. It also does not see through a user-defined wrapper function around
-// `WaveReadLaneFirst` (e.g. `T MyBroadcast(T x) { return WaveReadLaneFirst(x); }`): the call
-// here must resolve directly to the known-builtin declaration. That is an accepted, narrow
-// scope limit -- unrecognized wrapper calls simply fail to qualify, which just leaves the
-// pre-existing (over-)warning in place rather than suppressing anything incorrectly.
+// In either shape, we require `WaveReadLaneFirst()` to be the tracked value's only runtime
+// consumer, because that broadcast is what makes the relaxation sound. A read with another
+// consumer remains diagnostic. We also require the call to resolve directly to the known builtin;
+// a user-defined wrapper such as `T MyBroadcast(T x) { return WaveReadLaneFirst(x); }` does not
+// qualify. This narrow scope can retain an existing over-warning, but cannot suppress a valid
+// diagnostic.
 static bool isWaveReadLaneFirstUse(IRInst* readingInst)
 {
     if (auto call = as<IRCall>(readingInst))
@@ -808,82 +761,77 @@ static bool isWaveReadLaneFirstUse(IRInst* readingInst)
     return getBuiltinFuncEnum(call->getCallee()) == KnownBuiltinDeclName::WaveReadLaneFirst;
 }
 
-// Remove all loads that are "definitely assigned": every control-flow path from
-// the function entry to the load passes through at least one store.
+// The caller supplies the instructions this checker treats as definite writes. We remove each read
+// for which every feasible control-flow path from the function entry passes through one of those
+// writes.
 //
-// A load is kept (a must-init violation) only when there exists a path from entry
-// to the load that does not pass through any store first — i.e. the variable can
-// be read while still uninitialized on at least one path.
+// A read remains when at least one path can reach it without a preceding definite write, because
+// that path can observe the variable while it is still uninitialized.
 //
-// This is the standard definite-assignment property. We compute it directly with a
-// forward CFG walk from entry that is blocked by store-containing blocks, rather
-// than using simple dominance. Dominance is too strict: "the load is dominated by
-// some single store" misses the common-and-safe case where different paths are
-// guarded by different stores, producing false positives on patterns like
-// short-circuit `&&` chains (`f(out x) && use(x)`), where the only way to reach the
-// use is through the store, but no individual store-block dominates the use-block
-// because the join block has a store-free predecessor whose path never reaches the
-// use.
-static void cancelLoadsByDefiniteAssignment(
+// We compute this definite-assignment property with a forward CFG walk that stops at blocks with a
+// definite write. Simple dominance would be too strict: different paths can initialize the value
+// with different writes. For example, in `f(out x) && use(x)`, every feasible path to `use(x)`
+// passes through the write in `f`, even though no individual write block dominates the use block.
+static void removeReadsWithDefiniteWriteOnEveryPath(
     IRGlobalValueWithCode* func,
-    const List<IRInst*>& stores,
-    List<IRInst*>& loads,
+    const List<IRInst*>& writesTreatedAsDefinite,
+    List<IRInst*>& readsWithoutDefiniteWrite,
     const WaveElectionContext& waveElection)
 {
-    if (loads.getCount() == 0)
+    if (readsWithoutDefiniteWrite.getCount() == 0)
         return;
 
-    // Map each store to the block that contains it.
+    // We map each definite write to the block that contains it.
     //
-    // `collectInstructionByUsage` records most stores as the storing instruction, but
-    // for the `StoreParent` case (e.g. inline SPIRV-asm operands) it records the
-    // *containing block* itself as the "store". Such a block is treated as initializing
-    // the variable somewhere within it, matching the block-reachability granularity the
-    // may-init analysis already uses. We track those separately as `wholeBlockStores`
-    // so that every load in them counts as definitely assigned.
-    HashSet<IRBlock*> blocksWithStore;
-    HashSet<IRBlock*> wholeBlockStores;
-    HashSet<IRInst*> storeSet;
-    for (auto store : stores)
+    // `collectInstructionByUsage` usually records the writing instruction. For `StoreParent`
+    // (for example, an inline SPIR-V assembly operand), it records the containing block instead.
+    // We preserve that block-level approximation in `wholeBlockDefiniteWrites`, so every read in
+    // such a block counts as following the write.
+    HashSet<IRBlock*> blocksWithDefiniteWrite;
+    HashSet<IRBlock*> wholeBlockDefiniteWrites;
+    HashSet<IRInst*> definiteWriteSet;
+    for (auto definiteWrite : writesTreatedAsDefinite)
     {
-        if (auto storeBlock = as<IRBlock>(store))
+        if (auto definiteWriteBlock = as<IRBlock>(definiteWrite))
         {
-            blocksWithStore.add(storeBlock);
-            wholeBlockStores.add(storeBlock);
+            blocksWithDefiniteWrite.add(definiteWriteBlock);
+            wholeBlockDefiniteWrites.add(definiteWriteBlock);
         }
-        else if (auto block = as<IRBlock>(store->getParent()))
+        else if (auto block = as<IRBlock>(definiteWrite->getParent()))
         {
-            blocksWithStore.add(block);
-            storeSet.add(store);
+            blocksWithDefiniteWrite.add(block);
+            definiteWriteSet.add(definiteWrite);
         }
     }
 
-    // Wave-broadcast relaxation for https://github.com/shader-slang/slang/issues/12545: a load
-    // that is read back only through `WaveReadLaneFirst()` is exempted from the must-init walk
-    // below when every store-free path out of some `WaveIsFirstLane()` guard's true-branch is
-    // blocked by a store before it can leave the guard, and the load itself is only reachable
-    // after that guard has reconverged. Such a load is not actually reachable while
-    // uninitialized: `WaveReadLaneFirst` broadcasts from the first active lane, which is
-    // exactly the lane that took the guard's true branch and therefore executed the store.
+    // We apply the wave-broadcast relaxation from
+    // https://github.com/shader-slang/slang/issues/12545 when every path out of a
+    // `WaveIsFirstLane()` true branch reaches a definite write before reconvergence, and the read
+    // occurs only after that reconvergence through `WaveReadLaneFirst()`. That read cannot observe
+    // the unwritten value: the intrinsic broadcasts from the first active lane, which is exactly
+    // the lane that took the guard and performed the write.
     //
     // Known, accepted scope limit: this is a single-thread CFG proof (see
-    // `isEveryPathFromBlockedByStore` and `isWaveReadLaneFirstUse` for the two halves of it).
+    // `isEveryPathBlockedByDefiniteWrite` and `isWaveReadLaneFirstUse` for the two halves of it).
     // It does not model whether the wave's active-lane mask could shift between the guard and
     // the read -- e.g. an intervening `discard`/`return` taken by only some lanes -- since
     // Slang has no dynamic-uniformity/wave-reconvergence analysis anywhere, and this relaxation
     // does not add one.
     for (auto& guard : waveElection.guards)
     {
-        if (!isEveryPathFromBlockedByStore(guard.trueBlock, guard.mergeBlock, blocksWithStore))
+        if (!isEveryPathBlockedByDefiniteWrite(
+                guard.trueBlock,
+                guard.mergeBlock,
+                blocksWithDefiniteWrite))
             continue;
-        for (Index i = 0; i < loads.getCount();)
+        for (Index i = 0; i < readsWithoutDefiniteWrite.getCount();)
         {
-            auto load = loads[i];
-            auto block = as<IRBlock>(load->getParent());
+            auto read = readsWithoutDefiniteWrite[i];
+            auto block = as<IRBlock>(read->getParent());
             if (block && waveElection.dominatorTree->dominates(guard.mergeBlock, block) &&
-                isWaveReadLaneFirstUse(load))
+                isWaveReadLaneFirstUse(read))
             {
-                loads.fastRemoveAt(i);
+                readsWithoutDefiniteWrite.fastRemoveAt(i);
             }
             else
             {
@@ -892,58 +840,49 @@ static void cancelLoadsByDefiniteAssignment(
         }
     }
 
-    if (loads.getCount() == 0)
+    if (readsWithoutDefiniteWrite.getCount() == 0)
         return;
 
-    // For blocks that contain both a store and a load, the relative order matters:
-    // a load that appears before any store in the same block is reachable while
-    // uninitialized (along the store-free entry path into the block), whereas a load
-    // after a store in the same block is definitely assigned by that store.
+    // When one block contains both a definite write and a read, their order matters. A read before
+    // every write can still observe the uninitialized value, while a preceding write initializes
+    // the value for the remainder of the block.
     //
-    // Precompute, for each load, whether a store precedes it within its own block.
-    HashSet<IRInst*> loadHasPriorStoreInBlock;
-    for (auto load : loads)
+    // We record which reads have a preceding definite write in their own block.
+    HashSet<IRInst*> readHasPriorDefiniteWriteInBlock;
+    for (auto read : readsWithoutDefiniteWrite)
     {
-        auto block = as<IRBlock>(load->getParent());
+        auto block = as<IRBlock>(read->getParent());
         if (!block)
             continue;
-        // A whole-block (StoreParent) store covers the entire block, so any load in it
-        // is considered definitely assigned.
-        if (wholeBlockStores.contains(block))
+        // A whole-block `StoreParent` write covers every read in that block.
+        if (wholeBlockDefiniteWrites.contains(block))
         {
-            loadHasPriorStoreInBlock.add(load);
+            readHasPriorDefiniteWriteInBlock.add(read);
             continue;
         }
-        if (!blocksWithStore.contains(block))
+        if (!blocksWithDefiniteWrite.contains(block))
             continue;
         for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
         {
-            if (inst == load)
+            if (inst == read)
                 break;
-            if (storeSet.contains(inst))
+            if (definiteWriteSet.contains(inst))
             {
-                loadHasPriorStoreInBlock.add(load);
+                readHasPriorDefiniteWriteInBlock.add(read);
                 break;
             }
         }
     }
 
-    // Loop relaxation: element-wise initialization inside a loop is extremely common
-    // (e.g. `[ForceUnroll] for (i) result[i] = ...;` filling an array/vector before
-    // use). Such a store does not strictly dominate the post-loop use — the loop could
-    // run zero times — but in practice these loops have constant trip counts >= 1, so
-    // treating the zero-trip path as leaving the variable uninitialized produces noisy
-    // false positives (this is what previously forced large parts of the core module
-    // and many tests to disable the warning).
+    // We relax the structural proof for element-wise initialization inside a loop, such as
+    // `[ForceUnroll] for (i) result[i] = ...;`. A write in the body does not dominate a post-loop
+    // read because the CFG admits a zero-trip path. In practice these loops commonly have constant,
+    // positive trip counts, and diagnosing that structural path produces pervasive false positives.
     //
-    // To suppress those while still catching genuine first-iteration reads (the #10658
-    // motivating bug, where the use appears *inside* the loop before any store), we
-    // treat a loop whose body contains a store as initializing the variable by the time
-    // control reaches the loop-exit (break) block: that break block is never marked
-    // clean-reachable. The break block is the loop's reconvergence point, so every path
-    // that reaches it first goes through the loop; excluding it does not hide store-free
-    // paths that bypass the loop entirely. Clean state still flows into the loop body, so
-    // uses that precede the store inside the body are still reported.
+    // We therefore treat a loop whose body contains a definite write as initialized at its break
+    // block. The break block is the loop's reconvergence point, so this does not hide a path that
+    // bypasses the loop. We still propagate the unwritten state into the body and diagnose a read
+    // that precedes the write there, including the pattern from issue #10658.
     HashSet<IRBlock*> suppressedBreakBlocks;
     for (auto block : func->getBlocks())
     {
@@ -952,36 +891,28 @@ static void cancelLoadsByDefiniteAssignment(
             continue;
         auto breakBlock = loop->getBreakBlock();
 
-        // Collect the loop body: blocks reachable from the loop target without passing
-        // through the break block. If any of them contains a store, treat the loop as
-        // initializing the variable by the time control reaches the break block.
+        // We collect the body blocks reachable from the loop target without crossing the break
+        // block. A definite write in that region initializes the value at reconvergence.
         //
-        // This is deliberately conservative toward *fewer* false positives. Loops that
-        // fill a variable element-by-element (e.g. `[ForceUnroll] for (i) result[i] =
-        // ...;`, including nested loops over compile-time-constant bounds) are extremely
-        // common and safe in practice, but the store is not guaranteed to dominate the
-        // post-loop use under a purely structural analysis (the loop "might" run zero
-        // times, or an inner loop might). Distinguishing those from a genuine
-        // conditionally-initialized-in-a-loop bug would require trip-count reasoning, so
-        // we accept the rare missed in-loop conditional-store case rather than warn on
-        // the pervasive element-wise pattern. Uses that occur *inside* the loop before
-        // the store are still reported, since clean state still flows into the body.
+        // This choice favors fewer false positives. Distinguishing fixed-trip element-wise writes
+        // from a genuinely conditional write would require trip-count reasoning, so we accept a
+        // rare missed conditional case instead of warning on the common array/vector pattern.
         HashSet<IRBlock*> bodyVisited;
         List<IRBlock*> bodyWork;
-        bodyVisited.add(breakBlock); // sentinel: never traverse past the break block
+        bodyVisited.add(breakBlock); // This sentinel keeps the traversal within the loop body.
         if (auto target = loop->getTargetBlock())
         {
             if (bodyVisited.add(target))
                 bodyWork.add(target);
         }
-        bool bodyHasStore = false;
+        bool bodyHasDefiniteWrite = false;
         while (bodyWork.getCount())
         {
             auto b = bodyWork.getLast();
             bodyWork.removeLast();
-            if (blocksWithStore.contains(b))
+            if (blocksWithDefiniteWrite.contains(b))
             {
-                bodyHasStore = true;
+                bodyHasDefiniteWrite = true;
                 break;
             }
             for (auto succ : b->getSuccessors())
@@ -990,42 +921,39 @@ static void cancelLoadsByDefiniteAssignment(
                     bodyWork.add(succ);
             }
         }
-        if (bodyHasStore)
+        if (bodyHasDefiniteWrite)
             suppressedBreakBlocks.add(breakBlock);
     }
 
-    // Forward CFG reachability from entry, treating any block that contains a store
-    // as a barrier: we can enter such a block "clean" (still uninitialized) but its
-    // successors are reached only after the store has executed, so they are not
-    // propagated as clean.
+    // We now traverse the CFG from entry while treating a block with a definite write as a barrier.
+    // An unwritten value can enter such a block, but the write executes before control reaches any
+    // successor, so the unwritten state does not propagate beyond it.
     //
-    // The set of "clean-reachable" blocks is exactly the set of blocks reachable
-    // from entry along a path with no preceding store (subject to the loop relaxation
-    // above, and pruning of short-circuit-infeasible edges below).
+    // `reachableWithoutDefiniteWrite` therefore contains exactly the blocks reached along a path
+    // with no preceding definite write, subject to the loop relaxation above and the
+    // infeasible-edge pruning below.
     //
-    // We propagate over CFG edges rather than blocks so that, when entering a block,
-    // we know which predecessor we came from and can prune outgoing edges that are
-    // statically infeasible due to short-circuit `&&`/`||` constant-phi conditions
-    // (see getInfeasibleBranchFromPredecessor). A block is clean-reachable if some
-    // clean, feasible edge enters it (the entry block is clean by definition).
+    // We propagate over CFG edges rather than blocks so that the predecessor remains available for
+    // pruning short-circuit `&&`/`||` edges with constant phi conditions (see
+    // `getInfeasibleBranchFromPredecessor`). A block belongs to the set when any feasible incoming
+    // edge carries the unwritten state; the entry block has that state by definition.
     //
-    // The worklist holds (predecessor, block) edges. `predecessor` is null for the
-    // synthetic entry edge.
-    HashSet<IRBlock*> cleanReachable;
+    // The worklist holds `(predecessor, block)` edges, with a null predecessor for the synthetic
+    // entry edge.
+    HashSet<IRBlock*> reachableWithoutDefiniteWrite;
     HashSet<KeyValuePair<IRBlock*, IRBlock*>> visitedEdges;
     List<KeyValuePair<IRBlock*, IRBlock*>> worklist;
 
     auto enqueueEdge = [&](IRBlock* pred, IRBlock* succ)
     {
-        // Don't mark a loop's break block clean when the loop body initializes the
-        // variable: by the time control reconverges at the break block, the loop has
-        // run at least once and performed the store.
+        // When the loop relaxation applies, the body has performed its definite write before
+        // control reconverges at the break block.
         if (suppressedBreakBlocks.contains(succ))
             return;
         KeyValuePair<IRBlock*, IRBlock*> edge(pred, succ);
         if (visitedEdges.add(edge))
         {
-            cleanReachable.add(succ);
+            reachableWithoutDefiniteWrite.add(succ);
             worklist.add(edge);
         }
     };
@@ -1040,12 +968,11 @@ static void cancelLoadsByDefiniteAssignment(
         IRBlock* pred = edge.key;
         IRBlock* block = edge.value;
 
-        // A store in this block blocks propagation to its successors.
-        if (blocksWithStore.contains(block))
+        // A definite write in this block prevents the unwritten state from reaching successors.
+        if (blocksWithDefiniteWrite.contains(block))
             continue;
 
-        // Prune the outgoing branch that is infeasible given the predecessor we
-        // arrived from (short-circuit constant-phi correlation).
+        // We prune the outgoing branch made infeasible by the predecessor's constant phi argument.
         IRBlock* infeasibleSucc = pred ? getInfeasibleBranchFromPredecessor(block, pred) : nullptr;
 
         for (auto succ : block->getSuccessors())
@@ -1056,130 +983,127 @@ static void cancelLoadsByDefiniteAssignment(
         }
     }
 
-    // A load is a violation iff its block is clean-reachable and no store precedes
-    // it within that block.
-    for (Index i = 0; i < loads.getCount();)
+    // A remaining read can observe an uninitialized value exactly when its block is reachable
+    // without a definite write and no such write precedes it within that block.
+    for (Index i = 0; i < readsWithoutDefiniteWrite.getCount();)
     {
-        auto block = as<IRBlock>(loads[i]->getParent());
-        bool definitelyAssigned = !block || !cleanReachable.contains(block) ||
-                                  loadHasPriorStoreInBlock.contains(loads[i]);
-        if (definitelyAssigned)
-            loads.fastRemoveAt(i);
+        auto read = readsWithoutDefiniteWrite[i];
+        auto block = as<IRBlock>(read->getParent());
+        bool hasDefiniteWriteOnEveryPath = !block ||
+                                           !reachableWithoutDefiniteWrite.contains(block) ||
+                                           readHasPriorDefiniteWriteInBlock.contains(read);
+        if (hasDefiniteWriteOnEveryPath)
+            readsWithoutDefiniteWrite.fastRemoveAt(i);
         else
             i++;
     }
 }
 
-// Collect every read and write of `inst`, including uses through derived addresses and SSA phis.
-// Each use is classified once, consulting exact effects before the generic IR rules. The `stores`
-// result contains possible as well as definite writes for the coarse reachability check;
-// `definiteStores`, when requested, contains only writes that initialize the complete tracked value
-// on every path through the instruction. Genuine initialized values entering an alias phi count as
-// writes in both sets.
-static void collectAliasableLoadStores(
+// We collect every read and write of `inst`, including uses through derived addresses and SSA phis.
+// Each use is classified once, with use-specific effects taking precedence over generic IR rules.
+// For generic uses, we preserve the legacy classifier's approximation that every inferred write is
+// definite. A supplied use-specific effect can instead describe a partial or conditional write. We
+// treat a defined value entering an alias phi as both a possible write and a write that is definite
+// on that incoming edge.
+static TrackedVariableUses collectTrackedVariableUses(
     IRInst* inst,
-    List<IRInst*>& stores,
-    List<IRInst*>& loads,
-    ConstArrayView<UninitializedVariableUseEffect> useEffects = {},
-    List<IRInst*>* definiteStores = nullptr)
+    ConstArrayView<UninitializedVariableUseEffect> useEffects = {})
 {
+    TrackedVariableUses result;
     HashSet<IRInst*> aliasSet;
     auto addresses = getAliasableInstructions(inst, aliasSet);
 
     for (auto alias : addresses)
     {
-        // TODO: Mark specific parts assigned to for partial initialization checks
+        // TODO: Partial-initialization checking requires tracking the specific parts assigned here.
         for (auto use = alias->firstUse; use; use = use->nextUse)
-            collectInstructionByUsage(stores, definiteStores, loads, use, alias, useEffects);
+            collectInstructionByUsage(result, use, alias, useEffects);
     }
 
-    // A defined value flowing into a phi alias is a store of an initialized value reaching
-    // that merge point; record it so reads after it are not mistaken for never-initialized
-    // (may-init) uses.
-    collectPhiMergeStores(aliasSet, addresses, stores);
-    if (definiteStores)
-        collectPhiMergeStores(aliasSet, addresses, *definiteStores);
+    // A defined value flowing into a phi alias initializes the value at that merge point. We record
+    // it in both write sets so later reads are not mistaken for uninitialized uses.
+    collectPhiMergeWrites(aliasSet, addresses, result.possibleWrites);
+    collectPhiMergeWrites(aliasSet, addresses, result.writesTreatedAsDefinite);
+    return result;
 }
 
-static List<IRInst*> getUnresolvedParamLoads(
+// We find each output-parameter read or return that no possible write can reach. Generic assembly
+// counts as a possible write because its operand effects are opaque to this analysis.
+static List<IRInst*> findParameterReadsWithoutReachingWrite(
     ReachabilityContext& reachability,
     IRFunc* func,
     IRInst* inst)
 {
-    // Partition instructions
-    List<IRInst*> stores;
-    List<IRInst*> loads;
+    auto uses = collectTrackedVariableUses(inst);
 
-    collectAliasableLoadStores(inst, stores, loads);
-
-    // Special cases for parameters
-    for (const auto& b : func->getBlocks())
+    for (const auto& block : func->getBlocks())
     {
-        collectSpecialCaseInstructions(stores, b);
+        collectGenericAsmPossibleWrites(uses.possibleWrites, block);
 
-        auto t = b->getTerminator();
-        if (as<IRReturn>(t))
-            loads.add(t);
+        auto terminator = block->getTerminator();
+        if (as<IRReturn>(terminator))
+            uses.reads.add(terminator);
     }
 
-    cancelLoads(reachability, stores, loads);
+    removeReadsReachedByPossibleWrite(reachability, uses.possibleWrites, uses.reads);
 
-    return loads;
+    return _Move(uses.reads);
 }
 
-// The checker reports two disjoint classes of reads for a tracked variable. Separating them lets
-// callers select the established diagnostics without running two independent use-collection walks.
-struct UninitializedUseLoads
+// We partition reads that can observe an uninitialized value so callers can select the established
+// diagnostics without running two independent use-collection walks.
+struct UninitializedReads
 {
-    // Reads to which no possible write can reach (the may-init violations, 41016/41033).
-    List<IRInst*> mayInit;
+    /// Reads to which no possible write can reach; these receive `UsingUninitialized...`.
+    List<IRInst*> readsWithNoReachingWrite;
 
-    // Reads reached by some write but also by a path without a definite whole-value write (the
-    // must-init / definite-assignment violations, 41035/41036).
-    List<IRInst*> mustInit;
+    /// Reads reached by some write but also by a path with no write treated as definite; these
+    /// receive `PossiblyUsingUninitialized...`.
+    List<IRInst*> readsWithoutDefiniteWrite;
 };
 
-// Find all reads of `inst` that can observe an uninitialized value. We first collect the reads,
-// possible writes, and definite writes shared by both analyses. Reachability from possible writes
-// identifies reads that can have no initialization at all. A forward definite-assignment CFG walk
-// then identifies the remaining reads that can be reached along a path without a definite write.
-// Finally we remove overlap so each source location receives only the more fundamental diagnostic.
-static UninitializedUseLoads getUninitializedUseLoads(
+// We find every read of `inst` that can observe an uninitialized value. Reads with no reaching
+// possible write receive `UsingUninitialized...`. Among the rest, reads reachable along a path with
+// no write this checker treats as definite receive `PossiblyUsingUninitialized...`. We remove the
+// first set from the second so each source location receives one diagnostic.
+static UninitializedReads findUninitializedReads(
     ReachabilityContext& reachability,
     IRGlobalValueWithCode* func,
     IRInst* inst,
     const WaveElectionContext& waveElection,
     ConstArrayView<UninitializedVariableUseEffect> useEffects = {})
 {
-    // Collect the aliasable loads/stores once and derive both violation sets from it.
-    List<IRInst*> stores;
-    List<IRInst*> definiteStores;
-    List<IRInst*> allLoads;
-    collectAliasableLoadStores(inst, stores, allLoads, useEffects, &definiteStores);
+    auto uses = collectTrackedVariableUses(inst, useEffects);
 
-    UninitializedUseLoads result;
+    UninitializedReads result;
 
-    // May-init violations: loads not reachable from any store.
-    result.mayInit = allLoads;
-    cancelLoads(reachability, stores, result.mayInit);
+    result.readsWithNoReachingWrite = uses.reads;
+    removeReadsReachedByPossibleWrite(
+        reachability,
+        uses.possibleWrites,
+        result.readsWithNoReachingWrite);
 
-    // Must-init only adds information when there is at least one store (otherwise every
-    // load is already a may-init violation) and at least one load.
-    if (stores.getCount() == 0 || allLoads.getCount() == 0)
+    // Definite assignment adds information only when some write and some read exist; otherwise all
+    // reads are already in the first diagnostic class.
+    if (uses.possibleWrites.getCount() == 0 || uses.reads.getCount() == 0)
         return result;
 
-    HashSet<IRInst*> mayInitSet;
-    for (auto load : result.mayInit)
-        mayInitSet.add(load);
+    HashSet<IRInst*> readsWithNoReachingWriteSet;
+    for (auto read : result.readsWithNoReachingWrite)
+        readsWithNoReachingWriteSet.add(read);
 
-    result.mustInit = allLoads;
-    cancelLoadsByDefiniteAssignment(func, definiteStores, result.mustInit, waveElection);
+    result.readsWithoutDefiniteWrite = uses.reads;
+    removeReadsWithDefiniteWriteOnEveryPath(
+        func,
+        uses.writesTreatedAsDefinite,
+        result.readsWithoutDefiniteWrite,
+        waveElection);
 
-    // Keep the two sets disjoint: drop loads already reported as may-init violations.
-    for (Index i = 0; i < result.mustInit.getCount();)
+    // We keep the sets disjoint so each read receives only one diagnostic.
+    for (Index i = 0; i < result.readsWithoutDefiniteWrite.getCount();)
     {
-        if (mayInitSet.contains(result.mustInit[i]))
-            result.mustInit.fastRemoveAt(i);
+        if (readsWithNoReachingWriteSet.contains(result.readsWithoutDefiniteWrite[i]))
+            result.readsWithoutDefiniteWrite.fastRemoveAt(i);
         else
             i++;
     }
@@ -1187,23 +1111,21 @@ static UninitializedUseLoads getUninitializedUseLoads(
     return result;
 }
 
-// Emit an uninitialized-use diagnostic at each load location. The named-variable form
-// (`TVarDiag`, carrying `varName`) is used when `inst` has a user-visible name; the
-// typed-value form (`TValDiag`, carrying `typeName`) is used otherwise (e.g. poison ops
-// and other compiler-synthesized intermediates). This is shared by the may-init
-// (41016/41033) and must-init (41035/41036) paths, which differ only in the diagnostic
-// pair they pass.
+// We use this emitter for both the `UsingUninitialized...` and
+// `PossiblyUsingUninitialized...` diagnostic families. Within either family, we choose the
+// named-variable form (`TVarDiag`) when `inst` has a user-visible name, and the typed-value form
+// (`TValDiag`) for poison values and other compiler-synthesized intermediates.
 template<typename TVarDiag, typename TValDiag>
 static void diagnoseUninitializedUses(
     DiagnosticSink* sink,
     IRInst* inst,
     IRType* type,
-    const List<IRInst*>& loads)
+    const List<IRInst*>& reads)
 {
     bool hasName = inst->findDecoration<IRNameHintDecoration>() != nullptr ||
                    inst->findDecoration<IRLinkageDecoration>() != nullptr;
 
-    for (auto load : loads)
+    for (auto read : reads)
     {
         if (hasName)
         {
@@ -1211,7 +1133,7 @@ static void diagnoseUninitializedUses(
             printDiagnosticArg(varNameSb, inst);
             sink->diagnose(TVarDiag{
                 .varName = varNameSb.produceString(),
-                .location = load->sourceLoc,
+                .location = read->sourceLoc,
             });
         }
         else
@@ -1220,26 +1142,30 @@ static void diagnoseUninitializedUses(
             printDiagnosticArg(typeNameSb, type);
             sink->diagnose(TValDiag{
                 .typeName = typeNameSb.produceString(),
-                .location = load->sourceLoc,
+                .location = read->sourceLoc,
             });
         }
     }
 }
 
-static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* reference, IRInst* inst)
+// We determine whether a possible write through `inst` or one of its aliases can reach `reference`.
+// Constructor checking uses this query to identify fields initialized before a returned value.
+static bool hasWriteReachingInstruction(
+    ReachabilityContext& reachability,
+    IRInst* reference,
+    IRInst* inst)
 {
-    List<IRInst*> stores;
-    List<IRInst*> loads;
+    TrackedVariableUses uses;
 
     for (auto alias : getAliasableInstructions(inst))
     {
         for (auto use = alias->firstUse; use; use = use->nextUse)
-            collectInstructionByUsage(stores, nullptr, loads, use, alias);
+            collectInstructionByUsage(uses, use, alias);
     }
 
-    for (auto store : stores)
+    for (auto write : uses.possibleWrites)
     {
-        if (reachability.isInstReachable(store, reference))
+        if (reachability.isInstReachable(write, reference))
             return true;
     }
 
@@ -1275,7 +1201,7 @@ static bool isDirectlyWrittenTo(IRInst* inst)
 {
     for (auto use = inst->firstUse; use; use = use->nextUse)
     {
-        InstructionUsageType usage = getInstructionUsageType(use->getUser(), inst);
+        InstructionUsageType usage = getInstructionUsageType(use, inst);
         if (usage == Store || usage == StoreParent)
             return true;
     }
@@ -1305,7 +1231,7 @@ static List<IRStructField*> checkFieldsFromExit(
         IRInst* user = use->getUser();
 
         auto fieldAddress = as<IRFieldAddress>(user);
-        if (!fieldAddress || !isInstStoredInto(reachability, ret, user))
+        if (!fieldAddress || !hasWriteReachingInstruction(reachability, ret, user))
             continue;
 
         IRInst* field = fieldAddress->getField();
@@ -1398,23 +1324,23 @@ static void checkParameterAsOut(
     IRParam* param,
     DiagnosticSink* sink)
 {
-    auto loads = getUnresolvedParamLoads(reachability, func, param);
-    for (auto load : loads)
+    auto reads = findParameterReadsWithoutReachingWrite(reachability, func, param);
+    for (auto read : reads)
     {
         StringBuilder paramNameSb;
         printDiagnosticArg(paramNameSb, param);
-        if (as<IRTerminatorInst>(load))
+        if (as<IRTerminatorInst>(read))
         {
             sink->diagnose(Diagnostics::ReturningWithUninitializedOut{
                 .paramName = paramNameSb.produceString(),
-                .location = load->sourceLoc,
+                .location = read->sourceLoc,
             });
         }
         else
         {
             sink->diagnose(Diagnostics::UsingUninitializedOut{
                 .paramName = paramNameSb.produceString(),
-                .location = load->sourceLoc,
+                .location = read->sourceLoc,
             });
         }
     }
@@ -1469,20 +1395,23 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
             if (canIgnoreType(type, nullptr))
                 continue;
 
-            // Collect both may-init and must-init violations from a single shared
-            // load/store collection pass.
-            auto useLoads = getUninitializedUseLoads(reachability, func, inst, waveElection);
-
-            // May-init: the variable is read on a path where no store reaches it at all.
+            auto uninitializedReads =
+                findUninitializedReads(reachability, func, inst, waveElection);
             diagnoseUninitializedUses<
                 Diagnostics::UsingUninitializedVariable,
-                Diagnostics::UsingUninitializedValue>(sink, inst, type, useLoads.mayInit);
+                Diagnostics::UsingUninitializedValue>(
+                sink,
+                inst,
+                type,
+                uninitializedReads.readsWithNoReachingWrite);
 
-            // Must-init: some store reaches the use, but a store-free path from entry can
-            // still reach it — the variable is only conditionally initialized.
             diagnoseUninitializedUses<
                 Diagnostics::PossiblyUsingUninitializedVariable,
-                Diagnostics::PossiblyUsingUninitializedValue>(sink, inst, type, useLoads.mustInit);
+                Diagnostics::PossiblyUsingUninitializedValue>(
+                sink,
+                inst,
+                type,
+                uninitializedReads.readsWithoutDefiniteWrite);
         }
     }
 
@@ -1535,35 +1464,35 @@ static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sin
 
     auto addresses = getAliasableInstructions(variable);
 
-    List<IRInst*> loads;
+    List<IRInst*> reads;
     for (auto alias : addresses)
     {
         for (auto use = alias->firstUse; use; use = use->nextUse)
         {
-            InstructionUsageType usage = getInstructionUsageType(use->getUser(), alias);
+            InstructionUsageType usage = getInstructionUsageType(use, alias);
             if (usage == Store || usage == StoreParent)
                 return;
 
             if (usage == Load)
-                loads.add(use->getUser());
+                reads.add(use->getUser());
         }
     }
 
-    for (auto load : loads)
+    for (auto read : reads)
     {
         StringBuilder varNameSb;
         printDiagnosticArg(varNameSb, variable);
         sink->diagnose(Diagnostics::UsingUninitializedGlobalVariable{
             .varName = varNameSb.produceString(),
-            .location = load->sourceLoc,
+            .location = read->sourceLoc,
         });
     }
 }
 
-// Check one local introduced after the mandatory module-wide check has already visited `code`.
-// Rebuild the same function-wide contexts, then run the shared intraprocedural solver for that
-// local. Exact effects preserve the operation's semantic reads and writes when a generated ABI
-// would otherwise imply different behavior.
+// Some transformations introduce a local after the module-wide uninitialized-value pass has run.
+// We rerun the same reachability and definite-assignment analyses for that local only, using
+// use-specific effects when a synthesized ABI's parameter directions do not express the semantic
+// reads and writes.
 void checkForUsingUninitializedVariable(
     IRGlobalValueWithCode* code,
     IRInst* variable,
@@ -1572,16 +1501,24 @@ void checkForUsingUninitializedVariable(
 {
     ReachabilityContext reachability(code);
     auto waveElection = collectWaveElectionContext(code);
-    auto useLoads =
-        getUninitializedUseLoads(reachability, code, variable, waveElection, useEffects);
+    auto uninitializedReads =
+        findUninitializedReads(reachability, code, variable, waveElection, useEffects);
     auto type = variable->getFullType();
 
     diagnoseUninitializedUses<
         Diagnostics::UsingUninitializedVariable,
-        Diagnostics::UsingUninitializedValue>(sink, variable, type, useLoads.mayInit);
+        Diagnostics::UsingUninitializedValue>(
+        sink,
+        variable,
+        type,
+        uninitializedReads.readsWithNoReachingWrite);
     diagnoseUninitializedUses<
         Diagnostics::PossiblyUsingUninitializedVariable,
-        Diagnostics::PossiblyUsingUninitializedValue>(sink, variable, type, useLoads.mustInit);
+        Diagnostics::PossiblyUsingUninitializedValue>(
+        sink,
+        variable,
+        type,
+        uninitializedReads.readsWithoutDefiniteWrite);
 }
 
 void checkForUsingUninitializedValues(IRModule* module, DiagnosticSink* sink)

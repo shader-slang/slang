@@ -38,17 +38,26 @@ struct UninitializedVariableUseEffect
     bool definitelyWritesValue = false;
 };
 
-/// Diagnose reads of one variable that can execute before it is initialized in `code`.
+/// Diagnoses reads of one variable that may execute before it is initialized in `code`.
 ///
-/// This entry point is for transformations that introduce a variable after the module-wide
-/// uninitialized-value check has run. It applies the same intraprocedural control-flow analysis to
-/// that variable alone. Entries in `useEffects` override the inferred effect of their exact uses;
-/// all other uses are classified from the IR as usual.
+/// Transformations use this entry point when they introduce a variable after the module-wide check
+/// has run. It applies the same reachability and definite-assignment analyses to that variable
+/// alone. Entries in `useEffects` override inferred effects for their exact operand uses; all other
+/// uses are classified from the IR as usual.
 void checkForUsingUninitializedVariable(
     IRGlobalValueWithCode* code,
     IRInst* variable,
     ConstArrayView<UninitializedVariableUseEffect> useEffects,
     DiagnosticSink* sink);
 
+/// Diagnoses uses of uninitialized values throughout `module`.
+///
+/// This module-wide entry point checks function bodies, functions returned from generics, and
+/// global variables. It reports both reads with no reaching write and reads that can execute along
+/// a path without a write the checker treats as definite.
+///
+/// This is the mandatory check for values present at its pipeline stage. A transformation that
+/// later synthesizes a local uses `checkForUsingUninitializedVariable` to check that local with the
+/// same analyses.
 void checkForUsingUninitializedValues(IRModule* module, DiagnosticSink* sink);
 } // namespace Slang

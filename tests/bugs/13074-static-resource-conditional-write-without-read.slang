@@ -15,8 +15,9 @@ void maybeInitialize()
 [numthreads(1, 1, 1)]
 void main()
 {
-    // Preserving an uninitialized resource on the path that skips the assignment is not itself a
-    // read. The state only becomes invalid if source code subsequently observes it.
+    // We intentionally leave `cachedTexture` uninitialized on one path. Propagating that value
+    // through hidden state is not a source-level read, so we diagnose only if later source code
+    // observes it.
     maybeInitialize();
     output[0] = 1;
 }

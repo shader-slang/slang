@@ -12,8 +12,9 @@ void maybeInitialize(inout Texture2D<float4> value)
     if (initializeTexture)
         value = textures[0];
 
-    // This named access gives the callee a hidden parameter, so the call that passes
-    // `cachedTexture` explicitly must also be rebuilt.
+    // We access `fallbackTexture` by name so legalization adds its hidden state parameter to
+    // `maybeInitialize`. The caller also passes `cachedTexture` explicitly, so rebuilding the call
+    // must preserve both argument roles.
     output[0] = fallbackTexture.Load(int3(0, 0, 0));
 }
 

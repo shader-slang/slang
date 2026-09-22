@@ -123,6 +123,18 @@ bool isUserPointerType(IRInst* type);
 // True if inst produces a derived address from another base address.
 bool isAddressInst(IRInst* inst);
 
+/// Returns true if `use` is the base-address operand of an instruction that derives another
+/// address.
+bool doesUseDeriveAddress(IRUse* use);
+
+/// Returns the formal parameter type corresponding to `argumentUse`, after removing outer
+/// attributed and rate-qualified wrappers. Parameter-direction wrappers such as `BorrowIn` and
+/// `Out` are preserved.
+///
+/// Returns null when the use is not an argument of `call`, or when the callee's function type does
+/// not provide a corresponding parameter.
+IRInst* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse);
+
 // Builds a dictionary that maps from requirement key to requirement value for `interfaceType`.
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType);
 
@@ -207,7 +219,8 @@ IRType* getMatrixElementType(IRType* type);
 /// A value-use analysis may ignore these instructions without treating their operands as read.
 bool doesInstOnlyDependOnOperandTypes(IRInst* inst);
 
-/// Returns true if `globalVar` represents file-scope resource state with per-invocation lifetime.
+/// Returns true when `globalVar` has source linkage, ordinary per-invocation storage, and a value
+/// type that contains a supported resource leaf.
 bool isPerInvocationResourceStateGlobalVar(IRGlobalVar* globalVar);
 
 // True if type is a resource backing memory

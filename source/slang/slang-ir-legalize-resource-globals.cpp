@@ -33,29 +33,32 @@
 //          return loadTexture(texture);
 //      }
 //
-// The pass implements that conceptual rewrite in five phases:
+// We implement that conceptual rewrite in five phases:
 //
-// 1. Build a stable, module-ordered inventory of functions, resource globals, and direct calls.
-// 2. Reject storage and call boundaries across which hidden per-invocation state cannot be
-//    threaded without changing a preserved ABI or storage identity.
-// 3. Analyze every derived address and direct call to determine which functions read or write each
-//    resource value, and whether a writer replaces the whole value on every return path.
-// 4. Materialize the analysis by introducing entry-point locals and helper parameters, replacing
-//    direct global uses, and appending the corresponding hidden arguments at calls.
-// 5. Check the now-explicit entry-point locals for reads before initialization, then remove the
+// 1. We build a stable, module-ordered inventory of functions, resource globals, and direct calls.
+// 2. We reject globals whose storage identity must remain externally observable and functions that
+//    can be invoked without a direct call site through which we can pass per-invocation state.
+// 3. We analyze every derived address and direct call to determine which functions read or write
+//    each resource value, and whether a writer replaces the whole value on every return path. We
+//    also reject address escapes and call-site aliases that localization could not preserve.
+// 4. We give entry points fresh locals and helpers hidden parameters with local mirrors, replace
+//    direct global uses, and append the corresponding hidden arguments at calls.
+// 5. We check the now-explicit entry-point locals for reads before initialization, then remove the
 //    unused global storage.
 //
-// The front end admits only the supported resource-value categories, optionally wrapped in arrays.
-// Earlier target lowering can place such a value in a compiler-generated aggregate (for example,
-// append-buffer lowering), so discovery follows aggregate wrappers without broadening the accepted
-// resource leaves. Resource-type legalization runs afterward and performs the final decomposition.
+// The front end admits textures and other resource types, samplers, parameter groups, structured
+// buffers, and byte-address buffers, optionally wrapped in arrays. Earlier target lowering can
+// place such a value in a compiler-generated struct or tuple (for example, during append-buffer
+// lowering), so `isPerInvocationResourceStateGlobalVar` follows aggregate wrappers and selects a
+// global when at least one leaf has one of those resource types. Resource-type legalization runs
+// afterward and splits the remaining aggregates into components that the target can represent.
 //
-// Parameter direction follows the source-level effect proved in phase 3. A read-only helper gets a
-// value parameter. A helper that replaces the whole value on every normal return gets an `out`
-// parameter only when it does not read the incoming value first. Every other writer gets `inout`,
-// because some path can preserve or observe the incoming value. Writer bodies use the canonical
-// local-mirror representation expected by the downstream resource-output specializer: copy in
-// when required, operate on a local, and copy out at each return.
+// Parameter direction follows the read/write and all-path replacement facts computed in phase 3.
+// A read-only helper gets a value parameter. A helper that replaces the whole value on every normal
+// return gets an `out` parameter only when it does not read the incoming value first. Every other
+// writer gets `inout`, because some path can preserve or observe the incoming value. The downstream
+// resource-output specializer expects writer bodies to copy in when required, operate on a local,
+// and copy out at each return.
 //
 // The initializer-moving pass supplies `resourceDependentState`, a conservative boundary-
 // validation set. It contains the resource globals, every initializer target that transitively
@@ -107,7 +110,7 @@ struct FunctionContext
     /// Whether this function creates fresh per-invocation state.
     bool isEntryPoint = false;
 
-    /// Whether at least one invocation has no direct call site at which to pass hidden state.
+    /// Whether this non-entry-point function can be invoked without a rewritable direct call site.
     bool isIndependentRoot = false;
 };
 
@@ -127,18 +130,20 @@ struct FunctionResourceStateInfo
     bool preservesIncomingValue = false;
 
     /// Whether phase 4 must redirect an original use in this body, including non-semantic metadata.
-    bool hasDirectUse = false;
+    bool hasRootUseInFunction = false;
 
-    /// The local address that replaces direct uses of the global in this function.
+    /// The generated local address, once phase 4 gives this function a representation of the value.
     IRInst* replacementAddress = nullptr;
 
-    /// The hidden helper parameter, or null when this function owns a local without a parameter.
+    /// The generated helper parameter, or null before phase 4, for entry points, and for locals
+    /// used only to redirect metadata.
     IRParam* parameter = nullptr;
 
-    /// Exact source-level effects retained for the generated local's definite-assignment check.
+    /// Per-use effect overrides retained for the generated local's definite-assignment check.
     List<UninitializedVariableUseEffect> uninitializedUseEffects;
 
-    /// Return whether the helper's local must start with the value supplied by its caller.
+    /// The helper's local starts with its caller's value when the body reads or preserves that
+    /// value.
     bool mustSeedLocalFromCaller() const
     {
         return semanticallyReadsIncomingValue || preservesIncomingValue;
@@ -149,6 +154,8 @@ struct FunctionResourceStateInfo
 struct DirectGlobalUse
 {
     IRUse* use = nullptr;
+
+    /// The containing function's module-order index, or -1 for a module-scope metadata use.
     Index functionIndex = -1;
 };
 
@@ -168,17 +175,21 @@ struct ResourceAddressUse
     bool replacesWholeValue = false;
 };
 
-/// Collects the analysis and rewrite state for one resource global.
+/// Collects the pre-mutation use graph, per-function effects, and replacements for one global.
+///
+/// Phases 1 through 3 populate the original uses and effect records. Phase 4 then records the local
+/// and parameter that replace the global in each function, without discarding the analysis that
+/// phase 5 needs for definite-assignment checking.
 struct ResourceGlobalToRewrite
 {
     /// The original storage whose uses phase 4 will replace and whose declaration phase 5 removes.
     IRGlobalVar* globalVar = nullptr;
 
-    /// The value type stored by `globalVar`, cached before rewriting changes its uses.
+    /// The value type used for every generated local and hidden parameter.
     IRType* valueType = nullptr;
 
     /// One analysis/rewrite record per function in the module inventory.
-    List<FunctionResourceStateInfo> functions;
+    List<FunctionResourceStateInfo> functionStates;
 
     /// Every direct use-list edge from the global, saved before phase 4 mutates the use list.
     List<DirectGlobalUse> rootUses;
@@ -201,12 +212,11 @@ struct DirectCallEdge
     Index calleeIndex = -1;
 };
 
-// The pass is presented before these low-level IR classifiers; their definitions follow it.
+// We present the pass before these low-level classifiers so that the file reads in algorithm order.
+// Their definitions follow the transformation that uses them.
 static ResourceStateAccess mergeAccess(ResourceStateAccess left, ResourceStateAccess right);
 static bool hasAccess(ResourceStateAccess value, ResourceStateAccess test);
 static bool doesInstSemanticallyUseOperandValue(IRInst* user);
-static bool doesUseDeriveAddress(IRUse* use);
-static IRInst* findCallArgumentParameterType(IRCall* call, IRUse* use);
 static ResourceStateAccess classifyCallArgumentAccess(IRCall* call, IRUse* use);
 static ResourceStateAccess classifyResourceAddressUse(IRUse* use);
 static bool doesUseEscapeAddress(IRUse* use);
@@ -231,18 +241,22 @@ struct LegalizeResourceGlobalVarsPass
     {
     }
 
+    /// We run the five ordered phases above, completing all rejecting validation before phase 4
+    /// mutates the IR.
     void processModule(List<IRGlobalVar*> const& resourceDependentState, DiagnosticSink* sink)
     {
-        // Phase 1: Inventory the module. Every later phase refers to functions, globals, and calls
-        // by stable module-order indices, so no analysis depends on hash-table or use-list order.
+        // Phase 1: We first inventory the module. Every later phase refers to functions, globals,
+        // and calls by stable module-order indices, so no analysis depends on hash-table or
+        // use-list order.
         collectFunctions();
         collectResourceGlobals();
         collectDirectCalls();
         assertResourceGlobalsAreResourceDependent(resourceDependentState);
 
-        // Phase 2: Prove that resource-dependent state can be localized and supplied at every
-        // invocation. Check storage identity and invocation roots separately so the reason each
-        // boundary is unsupported remains explicit in this top-level decomposition.
+        // Phase 2: We next reject storage and invocation boundaries that localization cannot
+        // preserve. We check externally observable storage and invocations without a rewritable
+        // direct call site separately, so this top-level decomposition preserves the reason each
+        // case is unsupported.
         //
         // TODO: Move these semantic boundary checks into a target-independent post-link validation
         // stage if the pipeline gains one. Mandatory per-module checking does not yet have the
@@ -257,32 +271,35 @@ struct LegalizeResourceGlobalVarsPass
         if (resourceGlobals.getCount() == 0)
             return;
 
-        // Phase 3: Determine the effect of each function on each resource value. The result tells
-        // phase 4 whether a helper needs a value, `out`, or `inout` parameter and tells phase 5
-        // which generated operations are possible versus definite initializations.
+        // Phase 3: We determine the effect of each function on each resource value. The result
+        // tells phase 4 whether a helper needs a value, `out`, or `inout` parameter and tells phase
+        // 5 which generated operations are possible versus definite initializations. We then
+        // reject escaping addresses, aliases that would split one identity across explicit and
+        // hidden arguments, and function uses whose signature we cannot rewrite.
         analyzeResourceStateFlow();
         recordMayWriteEffectsForDefiniteAssignment();
         if (diagnoseAddressEscapes(sink))
             return;
         if (diagnoseAliasingCallBoundaries(sink))
             return;
-        assertAllStatefulFunctionsHaveRewritableUses();
+        assertResourceStateUsersHaveRewritableUses();
 
-        // Phase 4: Give every function its own representation of the value, redirect the old
+        // Phase 4: We give every function its own representation of the value, redirect the old
         // global uses, and make the previously implicit data flow explicit at direct calls.
         introduceReplacements();
         replaceGlobalUses();
         rewriteCalls();
 
-        // Phase 5: Once entry-point state is explicit, apply the shared definite-assignment solver
-        // to it. Successful rewriting leaves the original globals unused and safe to delete.
+        // Phase 5: Once entry-point state is explicit, we apply the shared definite-assignment
+        // solver to it. Successful rewriting leaves the original globals unused and safe to delete.
         diagnoseUninitializedEntryPointReads(sink);
         removeReplacedResourceGlobals();
     }
 
-    // ## Phase 1: Build the stable module inventory
+    // ## Phase 1: Stable module inventory
 
-    /// Collect functions and the facts that determine where hidden state may enter the call graph.
+    /// We collect the functions and facts that determine where hidden state may enter the call
+    /// graph.
     ///
     /// Entry points create fresh state for one invocation. Every other independently invoked
     /// function is a boundary because at least one invocation has no rewritable call site through
@@ -309,7 +326,7 @@ struct LegalizeResourceGlobalVarsPass
         }
     }
 
-    /// Collect exactly the global variables whose resource values phase 4 must localize.
+    /// We collect exactly the global variables whose resource values phase 4 must localize.
     ///
     /// The initializer mover has already removed each selected initializer body. Keeping these
     /// records in module order makes the order of hidden parameters deterministic.
@@ -328,12 +345,12 @@ struct LegalizeResourceGlobalVarsPass
             resourceGlobal.globalVar = globalVar;
             resourceGlobal.valueType = ptrType->getValueType();
             for (Index i = 0; i < functions.getCount(); ++i)
-                resourceGlobal.functions.add(FunctionResourceStateInfo());
+                resourceGlobal.functionStates.add(FunctionResourceStateInfo());
             resourceGlobals.add(_Move(resourceGlobal));
         }
     }
 
-    /// Collect direct calls whose caller and callee both belong to the module inventory.
+    /// We collect direct calls whose caller and callee both belong to the module inventory.
     ///
     /// These edges are the only invocation boundaries phase 4 can rewrite. They also provide the
     /// graph over which phases 2 and 3 propagate state requirements back toward entry points.
@@ -364,7 +381,7 @@ struct LegalizeResourceGlobalVarsPass
         }
     }
 
-    /// Assert the contract between initializer movement and resource-state legalization.
+    /// We assert the contract between initializer movement and resource-state legalization.
     ///
     /// Every resource global rewritten here must be present in the mover's wider state set. If it
     /// is absent, phase 2 could miss a preserved boundary that observes the localized value.
@@ -377,13 +394,13 @@ struct LegalizeResourceGlobalVarsPass
             SLANG_RELEASE_ASSERT(resourceDependentStateSet.contains(resourceGlobal.globalVar));
     }
 
-    // ## Phase 2: Validate storage and invocation boundaries
+    // ## Phase 2: Storage and invocation boundaries
 
-    /// Diagnose resource-dependent state whose storage must remain externally observable.
+    /// We diagnose resource-dependent state whose storage must remain externally observable.
     ///
     /// Localizing such a variable independently in each entry point would change its identity and
-    /// lifetime. Diagnose the storage declaration itself; other boundary checks skip this state
-    /// because there is no valid localization to thread through the call graph.
+    /// lifetime. We report the storage declaration itself and exclude this state from the other
+    /// boundary checks, because there is no valid localization to thread through the call graph.
     bool diagnosePreservedResourceDependentStorage(
         List<IRGlobalVar*> const& resourceDependentState,
         DiagnosticSink* sink)
@@ -401,11 +418,12 @@ struct LegalizeResourceGlobalVarsPass
         return diagnosed;
     }
 
-    /// Find every function that directly or transitively observes localizable dependent state.
+    /// We compute a module-order bitmap of functions that access resource-dependent state whose
+    /// storage can be localized.
     ///
     /// Direct global uses seed the set. Repeatedly adding callers computes the reverse-call-graph
     /// closure, including recursion, so phase 2 also checks roots that reach state through helpers.
-    List<bool> findFunctionsAccessingResourceDependentState(
+    List<bool> computeResourceDependentStateAccessByFunction(
         List<IRGlobalVar*> const& resourceDependentState)
     {
         List<bool> accessesState;
@@ -442,7 +460,7 @@ struct LegalizeResourceGlobalVarsPass
         return accessesState;
     }
 
-    /// Diagnose call roots that cannot receive per-invocation state from an in-module caller.
+    /// We diagnose call roots that cannot receive per-invocation state from an in-module caller.
     ///
     /// A callable entry point would need both a fresh-state entry wrapper and an ordinary helper
     /// that accepts its caller's state. Other independent roots would need an analogous wrapper to
@@ -452,7 +470,7 @@ struct LegalizeResourceGlobalVarsPass
         DiagnosticSink* sink)
     {
         bool diagnosed = false;
-        auto accessesState = findFunctionsAccessingResourceDependentState(resourceDependentState);
+        auto accessesState = computeResourceDependentStateAccessByFunction(resourceDependentState);
 
         List<bool> hasOrdinaryCallSite;
         for (Index i = 0; i < functions.getCount(); ++i)
@@ -484,13 +502,14 @@ struct LegalizeResourceGlobalVarsPass
         return diagnosed;
     }
 
-    // ## Phase 3: Analyze resource-state flow and validate its representation
+    // ## Phase 3: Resource-state flow and address-identity validation
 
-    /// Analyze how every function reads, writes, and replaces every resource global.
+    /// We analyze how every function reads, writes, and replaces every resource global.
     ///
-    /// For each global, first classify direct and derived-address uses, then propagate possible
-    /// effects through callers. Finally prove which writers replace the whole value on all returns
-    /// and which reads or partial writers therefore need the caller's incoming value.
+    /// For each global, we first classify direct and derived-address uses and then propagate
+    /// possible effects through callers. Finally, we prove which writers replace the whole value
+    /// on all returns and which reads or partial writers therefore need the caller's incoming
+    /// value.
     void analyzeResourceStateFlow()
     {
         for (auto& resourceGlobal : resourceGlobals)
@@ -505,12 +524,12 @@ struct LegalizeResourceGlobalVarsPass
                 true);
 
             propagateAccessToCallers(resourceGlobal);
-            findWholeValueReplacementsOnEveryReturn(resourceGlobal);
-            findIncomingValueRequirements(resourceGlobal);
+            determineWholeValueReplacementsOnEveryReturn(resourceGlobal);
+            determineIncomingValueRequirements(resourceGlobal);
         }
     }
 
-    /// Save every direct use of the global before phase 4 mutates any use lists.
+    /// We save every direct use of the global before phase 4 mutates any use lists.
     ///
     /// Function-local uses establish where replacement storage is required. Module-scope metadata
     /// is retained only so `replaceGlobalUses` can remove it safely with the obsolete global.
@@ -526,7 +545,7 @@ struct LegalizeResourceGlobalVarsPass
                 if (auto index = functionIndices.tryGetValue(parentFunc))
                 {
                     rootUse.functionIndex = *index;
-                    global.functions[*index].hasDirectUse = true;
+                    global.functionStates[*index].hasRootUseInFunction = true;
                 }
             }
 
@@ -534,11 +553,48 @@ struct LegalizeResourceGlobalVarsPass
         }
     }
 
-    /// Walk the address graph rooted at one resource global and classify its terminal uses.
+    /// We record one terminal use reached at the end of a resource global's address graph.
     ///
-    /// Address derivations recurse while carrying whether the address still denotes the whole
-    /// value. Terminal loads, stores, and calls contribute effects to their containing function;
-    /// escaping and explicitly passed addresses are saved for validation later in phase 3.
+    /// A terminal use contributes read/write effects to its containing function. We also retain
+    /// calls and escaping addresses for the identity checks later in this phase, and distinguish a
+    /// complete root assignment from a write through an address to only part of the value.
+    void analyzeTerminalAddressUse(
+        ResourceGlobalToRewrite& global,
+        IRUse* use,
+        bool representsWholeValue)
+    {
+        auto user = use->getUser();
+        if (as<IRCall>(user))
+            global.addressPassingUses.add(use);
+        if (doesUseEscapeAddress(use))
+            global.addressEscapes.add(use);
+
+        auto parentFunc = getParentFunc(user);
+        SLANG_RELEASE_ASSERT(parentFunc);
+        auto functionIndex = functionIndices.tryGetValue(parentFunc);
+        SLANG_RELEASE_ASSERT(functionIndex);
+
+        auto terminalAccess = classifyResourceAddressUse(use);
+        auto& access = global.functionStates[*functionIndex].access;
+        access = mergeAccess(access, terminalAccess);
+
+        bool replacesWholeValue = false;
+        if (representsWholeValue)
+        {
+            if (auto store = as<IRStore>(user))
+                replacesWholeValue = store->ptr.get() == use->get();
+            else if (as<IRCall>(user))
+                replacesWholeValue = terminalAccess == ResourceStateAccess::Write;
+        }
+        global.terminalUses.add(
+            ResourceAddressUse{use, *functionIndex, terminalAccess, replacesWholeValue});
+    }
+
+    /// We walk the address graph rooted at one resource global and classify its terminal uses.
+    ///
+    /// For each use, we either recurse through another derived address or hand the terminal use to
+    /// `analyzeTerminalAddressUse`. We carry whether the current address still denotes the whole
+    /// root value so terminal writes can distinguish replacement from partial mutation.
     void analyzeDerivedAddressUses(
         ResourceGlobalToRewrite& global,
         IRInst* address,
@@ -559,35 +615,11 @@ struct LegalizeResourceGlobalVarsPass
                 analyzeDerivedAddressUses(global, user, visitedAddresses, false);
                 continue;
             }
-
-            if (as<IRCall>(user))
-                global.addressPassingUses.add(use);
-            if (doesUseEscapeAddress(use))
-                global.addressEscapes.add(use);
-
-            auto parentFunc = getParentFunc(user);
-            SLANG_RELEASE_ASSERT(parentFunc);
-            auto functionIndex = functionIndices.tryGetValue(parentFunc);
-            SLANG_RELEASE_ASSERT(functionIndex);
-
-            auto terminalAccess = classifyResourceAddressUse(use);
-            auto& access = global.functions[*functionIndex].access;
-            access = mergeAccess(access, terminalAccess);
-
-            bool replacesWholeValue = false;
-            if (representsWholeValue)
-            {
-                if (auto store = as<IRStore>(user))
-                    replacesWholeValue = store->ptr.get() == address;
-                else if (as<IRCall>(user))
-                    replacesWholeValue = terminalAccess == ResourceStateAccess::Write;
-            }
-            global.terminalUses.add(
-                ResourceAddressUse{use, *functionIndex, terminalAccess, replacesWholeValue});
+            analyzeTerminalAddressUse(global, use, representsWholeValue);
         }
     }
 
-    /// Propagate possible read/write effects from callees to callers.
+    /// We propagate possible read/write effects from callees to callers.
     ///
     /// Iterating direct calls to a fixed point handles ordinary chains and recursive strongly
     /// connected components without relying on a particular function order.
@@ -599,8 +631,8 @@ struct LegalizeResourceGlobalVarsPass
             changed = false;
             for (auto const& edge : directCallEdges)
             {
-                auto calleeAccess = global.functions[edge.calleeIndex].access;
-                auto& callerAccess = global.functions[edge.callerIndex].access;
+                auto calleeAccess = global.functionStates[edge.calleeIndex].access;
+                auto& callerAccess = global.functionStates[edge.callerIndex].access;
                 auto merged = mergeAccess(callerAccess, calleeAccess);
                 if (merged != callerAccess)
                 {
@@ -611,12 +643,12 @@ struct LegalizeResourceGlobalVarsPass
         } while (changed);
     }
 
-    /// Compute which writers satisfy an `out`-parameter contract.
+    /// We determine which writers satisfy an `out`-parameter contract.
     ///
-    /// Callee proofs create barriers in callers, so repeat the per-function proof to a fixed point.
-    /// Starting from false keeps a recursive cycle conservative unless some member has its own
-    /// writes that cover every reachable return path.
-    void findWholeValueReplacementsOnEveryReturn(ResourceGlobalToRewrite& global)
+    /// Callee proofs create barriers in callers, so we repeat the per-function proof to a fixed
+    /// point. Starting from false keeps a recursive cycle conservative unless some member has its
+    /// own writes that cover every reachable return path.
+    void determineWholeValueReplacementsOnEveryReturn(ResourceGlobalToRewrite& global)
     {
         bool changed = false;
         do
@@ -624,21 +656,21 @@ struct LegalizeResourceGlobalVarsPass
             changed = false;
             for (Index functionIndex = 0; functionIndex < functions.getCount(); ++functionIndex)
             {
-                auto& function = global.functions[functionIndex];
-                if (!hasAccess(function.access, ResourceStateAccess::Write) ||
-                    function.replacesWholeValueOnEveryReturn)
+                auto& stateInfo = global.functionStates[functionIndex];
+                if (!hasAccess(stateInfo.access, ResourceStateAccess::Write) ||
+                    stateInfo.replacesWholeValueOnEveryReturn)
                     continue;
 
                 if (doesFunctionReplaceWholeValueOnEveryReturn(global, functionIndex))
                 {
-                    function.replacesWholeValueOnEveryReturn = true;
+                    stateInfo.replacesWholeValueOnEveryReturn = true;
                     changed = true;
                 }
             }
         } while (changed);
     }
 
-    /// Prove that every reachable normal return follows a complete replacement of the value.
+    /// We prove that every reachable normal return follows a complete replacement of the value.
     ///
     /// A function with no replacement, or no reachable normal return, does not establish an `out`
     /// contract. Otherwise a return disproves the contract if it is reachable before a barrier.
@@ -673,7 +705,7 @@ struct LegalizeResourceGlobalVarsPass
         return foundReachableReturn;
     }
 
-    /// Collect instructions after which the current function has a complete replacement value.
+    /// We collect instructions after which the current function has a complete replacement value.
     ///
     /// Direct whole-value stores are barriers immediately. Calls become barriers only after the
     /// fixed-point analysis proves that their callee replaces the value on every normal return.
@@ -691,17 +723,17 @@ struct LegalizeResourceGlobalVarsPass
         for (auto const& edge : directCallEdges)
         {
             if (edge.callerIndex == functionIndex &&
-                global.functions[edge.calleeIndex].replacesWholeValueOnEveryReturn)
+                global.functionStates[edge.calleeIndex].replacesWholeValueOnEveryReturn)
             {
                 replacements.add(edge.call);
             }
         }
     }
 
-    /// Return the dominator tree used to exclude unreachable returns from all-path proofs.
+    /// We return the dominator tree used to exclude unreachable returns from all-path proofs.
     ///
-    /// Each resource value runs the same CFG queries. Compute the tree lazily on the first query
-    /// and retain it in the function record so later resources reuse the same analysis.
+    /// We ask the same CFG questions for every resource value. We compute the tree lazily on the
+    /// first query and retain it in the function record so later resources reuse the same analysis.
     IRDominatorTree* getDominatorTree(Index functionIndex)
     {
         auto& function = functions[functionIndex];
@@ -710,7 +742,7 @@ struct LegalizeResourceGlobalVarsPass
         return function.dominatorTree;
     }
 
-    /// Return whether control can reach `target` before any complete replacement barrier.
+    /// We determine whether control can reach `target` before any complete replacement barrier.
     ///
     /// The worklist carries exactly one state: the resource still has its incoming value. A
     /// replacement ends that path, while reaching the target first proves the incoming value is
@@ -736,7 +768,7 @@ struct LegalizeResourceGlobalVarsPass
             bool pathWasReplaced = false;
             for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
             {
-                // A call can both read the incoming value and replace it before returning. Test
+                // A call can both read the incoming value and replace it before returning. We test
                 // the target first so its own replacement does not hide that read.
                 if (inst == target)
                     return true;
@@ -759,20 +791,20 @@ struct LegalizeResourceGlobalVarsPass
         return false;
     }
 
-    /// Compute why each function needs the caller's incoming resource value.
+    /// We determine why each function needs the caller's incoming resource value.
     ///
-    /// First mark partial or conditional writers that must preserve an incoming value even if they
-    /// never read it semantically. Next classify direct reads by whether a replacement dominates
-    /// them. Finally propagate callee read requirements to callers, stopping when an earlier
-    /// replacement supplies the value instead.
-    void findIncomingValueRequirements(ResourceGlobalToRewrite& global)
+    /// We first mark partial or conditional writers that must preserve an incoming value even if
+    /// they never read it semantically. We next classify direct reads by whether every path to them
+    /// crosses a replacement. Finally, we propagate callee read requirements to callers, stopping
+    /// when an earlier replacement supplies the value instead.
+    void determineIncomingValueRequirements(ResourceGlobalToRewrite& global)
     {
-        for (auto& function : global.functions)
+        for (auto& stateInfo : global.functionStates)
         {
-            if (hasAccess(function.access, ResourceStateAccess::Write) &&
-                !function.replacesWholeValueOnEveryReturn)
+            if (hasAccess(stateInfo.access, ResourceStateAccess::Write) &&
+                !stateInfo.replacesWholeValueOnEveryReturn)
             {
-                function.preservesIncomingValue = true;
+                stateInfo.preservesIncomingValue = true;
             }
         }
 
@@ -785,7 +817,8 @@ struct LegalizeResourceGlobalVarsPass
                     terminalUse.functionIndex,
                     terminalUse.use->getUser()))
             {
-                global.functions[terminalUse.functionIndex].semanticallyReadsIncomingValue = true;
+                global.functionStates[terminalUse.functionIndex].semanticallyReadsIncomingValue =
+                    true;
             }
         }
 
@@ -795,9 +828,9 @@ struct LegalizeResourceGlobalVarsPass
             changed = false;
             for (auto const& edge : directCallEdges)
             {
-                if (!global.functions[edge.calleeIndex].semanticallyReadsIncomingValue)
+                if (!global.functionStates[edge.calleeIndex].semanticallyReadsIncomingValue)
                     continue;
-                auto& caller = global.functions[edge.callerIndex];
+                auto& caller = global.functionStates[edge.callerIndex];
                 if (caller.semanticallyReadsIncomingValue ||
                     hasPriorWholeValueReplacement(global, edge.callerIndex, edge.call))
                 {
@@ -809,9 +842,9 @@ struct LegalizeResourceGlobalVarsPass
         } while (changed);
     }
 
-    /// Return whether every path to `read` has already replaced the incoming value.
+    /// We determine whether every path to `read` has already replaced the incoming value.
     ///
-    /// Collect the current direct and callee-proven barriers, then negate the complementary
+    /// We collect the current direct and callee-proven barriers, then negate the complementary
     /// reachability question: whether any path can reach the read before crossing one of them.
     bool hasPriorWholeValueReplacement(
         ResourceGlobalToRewrite& global,
@@ -824,10 +857,10 @@ struct LegalizeResourceGlobalVarsPass
                !canReachInstructionBeforeWholeValueReplacement(functionIndex, read, replacements);
     }
 
-    /// Record writes whose generated `out`/`inout` type would overstate definite assignment.
+    /// We record writes whose generated `out`/`inout` type would overstate definite assignment.
     ///
     /// A subobject store or an `inout` call may write the value but does not initialize the whole
-    /// value on every path. Preserve that semantic distinction for the phase-5 CFG solver.
+    /// value on every path. We preserve that semantic distinction for the phase-5 CFG solver.
     void recordMayWriteEffectsForDefiniteAssignment()
     {
         for (auto& global : resourceGlobals)
@@ -840,7 +873,7 @@ struct LegalizeResourceGlobalVarsPass
                     continue;
                 }
 
-                auto& stateInfo = global.functions[terminalUse.functionIndex];
+                auto& stateInfo = global.functionStates[terminalUse.functionIndex];
                 stateInfo.uninitializedUseEffects.add(UninitializedVariableUseEffect{
                     .use = terminalUse.use,
                     .readsValue = hasAccess(terminalUse.access, ResourceStateAccess::Read),
@@ -851,7 +884,7 @@ struct LegalizeResourceGlobalVarsPass
         }
     }
 
-    /// Diagnose uses that let a resource global's address escape the analyzable address graph.
+    /// We diagnose uses that let a resource global's address escape the analyzable address graph.
     ///
     /// Phase 4 creates separate locals and parameters. An escaped address could retain or compare
     /// the old global identity, so rewriting it without an explicit storage model would be unsound.
@@ -871,11 +904,11 @@ struct LegalizeResourceGlobalVarsPass
         return diagnosed;
     }
 
-    /// Diagnose an explicit argument that aliases state also threaded implicitly to the callee.
+    /// We diagnose an explicit argument that aliases state also threaded implicitly to the callee.
     ///
     /// After localization, the explicit argument and hidden argument could name different local
-    /// copies of what was one global. Reject that call until the transform can preserve one shared
-    /// storage identity.
+    /// copies of what was one global. We reject that call until the transform can preserve one
+    /// shared storage identity.
     bool diagnoseAliasingCallBoundaries(DiagnosticSink* sink)
     {
         bool diagnosed = false;
@@ -890,7 +923,7 @@ struct LegalizeResourceGlobalVarsPass
                 if (!calleeIndex)
                     continue;
 
-                auto implicitAccess = resourceGlobal.functions[*calleeIndex].access;
+                auto implicitAccess = resourceGlobal.functionStates[*calleeIndex].access;
                 if (implicitAccess == ResourceStateAccess::None || !diagnosedCalls.add(call))
                     continue;
 
@@ -904,12 +937,12 @@ struct LegalizeResourceGlobalVarsPass
         return diagnosed;
     }
 
-    /// Assert that every function receiving hidden state has only rewritable invocation uses.
+    /// We assert that every function receiving hidden state has only rewritable invocation uses.
     ///
     /// Phase 2 diagnoses preserved roots. This assertion protects the remaining pipeline contract:
     /// no witness table, specialization, or function-pointer use may be silently left with the old
     /// signature after phase 4 adds parameters.
-    void assertAllStatefulFunctionsHaveRewritableUses()
+    void assertResourceStateUsersHaveRewritableUses()
     {
         for (Index functionIndex = 0; functionIndex < functions.getCount(); ++functionIndex)
         {
@@ -921,7 +954,7 @@ struct LegalizeResourceGlobalVarsPass
             for (auto const& global : resourceGlobals)
             {
                 needsParameter |=
-                    global.functions[functionIndex].access != ResourceStateAccess::None;
+                    global.functionStates[functionIndex].access != ResourceStateAccess::None;
             }
             if (!needsParameter)
                 continue;
@@ -939,13 +972,13 @@ struct LegalizeResourceGlobalVarsPass
         }
     }
 
-    // ## Phase 4: Materialize locals, parameters, uses, and calls
+    // ## Phase 4: Explicit per-function resource state and call data flow
 
-    /// Materialize the per-function representations selected by phase-3 analysis.
+    /// We give entry points fresh locals and helpers hidden parameters with local mirrors.
     ///
-    /// Entry points and metadata-only users receive locals. Helpers with semantic access receive a
-    /// hidden parameter plus a local mirror. After all parameters are present, rebuild affected
-    /// function and debug signatures once per function.
+    /// A function with only a metadata use also receives a local solely so that use can be
+    /// redirected. After all helper parameters are present, we rebuild affected function and debug
+    /// signatures once per function.
     void introduceReplacements()
     {
         IRBuilder builder(module);
@@ -955,8 +988,9 @@ struct LegalizeResourceGlobalVarsPass
             for (Index functionIndex = 0; functionIndex < functions.getCount(); ++functionIndex)
             {
                 auto const& function = functions[functionIndex];
-                auto& stateInfo = global.functions[functionIndex];
-                if (stateInfo.access == ResourceStateAccess::None && !stateInfo.hasDirectUse)
+                auto& stateInfo = global.functionStates[functionIndex];
+                if (stateInfo.access == ResourceStateAccess::None &&
+                    !stateInfo.hasRootUseInFunction)
                     continue;
 
                 if (function.isEntryPoint || stateInfo.access == ResourceStateAccess::None)
@@ -970,7 +1004,7 @@ struct LegalizeResourceGlobalVarsPass
         {
             bool changed = false;
             for (auto const& global : resourceGlobals)
-                changed |= global.functions[functionIndex].parameter != nullptr;
+                changed |= global.functionStates[functionIndex].parameter != nullptr;
             if (changed)
             {
                 fixUpFuncType(functions[functionIndex].func);
@@ -979,7 +1013,7 @@ struct LegalizeResourceGlobalVarsPass
         }
     }
 
-    /// Choose the hidden parameter type that preserves the analyzed source-level effect.
+    /// We choose the hidden parameter type that preserves the effects computed in phase 3.
     ///
     /// Read-only state travels by value. A writer proven to replace the whole value on every
     /// return can use `out`, unless it reads the incoming value first. Every remaining writer uses
@@ -1000,7 +1034,7 @@ struct LegalizeResourceGlobalVarsPass
         return global.valueType;
     }
 
-    /// Insert replacement storage at the start of a function's original body.
+    /// We insert replacement storage at the start of a function's original body.
     ///
     /// Entry points own fresh state for each invocation. A non-semantic direct use, such as debug
     /// metadata, also needs a local address but does not justify adding a parameter.
@@ -1016,11 +1050,56 @@ struct LegalizeResourceGlobalVarsPass
         copyNameHint(builder, global.globalVar, stateInfo.replacementAddress);
     }
 
-    /// Add a hidden parameter and canonical local mirror for one helper's resource state.
+    /// We initialize a helper's local mirror from its hidden parameter when its input is
+    /// meaningful.
     ///
-    /// Downstream resource-output specialization expects bodies to operate on locals and normal
-    /// returns to copy writer locals back to `out`/`inout` parameters. Seed the local only when the
-    /// helper reads or preserves the incoming value; a true `out` helper starts uninitialized.
+    /// A read-only value parameter always supplies the local's initial value. A writer needs a
+    /// copy-in only when phase 3 found that the body reads or preserves the caller's value; a true
+    /// `out` helper starts with an uninitialized local.
+    void initializeLocalMirrorFromParameter(
+        IRBuilder& builder,
+        ResourceGlobalToRewrite const& global,
+        FunctionResourceStateInfo& stateInfo)
+    {
+        bool writesValue = hasAccess(stateInfo.access, ResourceStateAccess::Write);
+        if (writesValue && !stateInfo.mustSeedLocalFromCaller())
+            return;
+
+        auto inputValue = !writesValue ? static_cast<IRInst*>(stateInfo.parameter)
+                                       : builder.emitLoad(global.valueType, stateInfo.parameter);
+        builder.emitStore(stateInfo.replacementAddress, inputValue);
+    }
+
+    /// We copy a writer's local mirror back to its hidden parameter at every normal return.
+    ///
+    /// Downstream resource-output specialization expects helper bodies to operate on a local and
+    /// materializes the caller-visible `out`/`inout` effect from these return-path stores.
+    void copyLocalMirrorToParameterAtReturns(
+        IRBuilder& builder,
+        FunctionContext const& function,
+        ResourceGlobalToRewrite const& global,
+        FunctionResourceStateInfo& stateInfo)
+    {
+        if (!hasAccess(stateInfo.access, ResourceStateAccess::Write))
+            return;
+
+        for (auto block : function.func->getBlocks())
+        {
+            auto returnInst = as<IRReturn>(block->getTerminator());
+            if (!returnInst)
+                continue;
+
+            builder.setInsertBefore(returnInst);
+            auto result = builder.emitLoad(global.valueType, stateInfo.replacementAddress);
+            builder.emitStore(stateInfo.parameter, result);
+        }
+    }
+
+    /// We add a hidden parameter and canonical local mirror for one helper's resource state.
+    ///
+    /// We first create the parameter selected by phase 3 and then create the local on which the
+    /// body operates. We copy the input into that mirror only when it is meaningful, and copy a
+    /// writer's final mirror value back to the parameter at every normal return.
     void createThreadedHelperReplacement(
         IRBuilder& builder,
         Index functionIndex,
@@ -1038,31 +1117,11 @@ struct LegalizeResourceGlobalVarsPass
         copyNameHint(builder, global.globalVar, stateInfo.parameter);
 
         createLocalReplacement(builder, functionIndex, global, stateInfo);
-
-        bool writesValue = hasAccess(stateInfo.access, ResourceStateAccess::Write);
-        if (!writesValue || stateInfo.mustSeedLocalFromCaller())
-        {
-            auto inputValue = !writesValue
-                                  ? static_cast<IRInst*>(stateInfo.parameter)
-                                  : builder.emitLoad(global.valueType, stateInfo.parameter);
-            builder.emitStore(stateInfo.replacementAddress, inputValue);
-        }
-
-        if (!writesValue)
-            return;
-        for (auto block : function.func->getBlocks())
-        {
-            auto returnInst = as<IRReturn>(block->getTerminator());
-            if (!returnInst)
-                continue;
-
-            builder.setInsertBefore(returnInst);
-            auto result = builder.emitLoad(global.valueType, stateInfo.replacementAddress);
-            builder.emitStore(stateInfo.parameter, result);
-        }
+        initializeLocalMirrorFromParameter(builder, global, stateInfo);
+        copyLocalMirrorToParameterAtReturns(builder, function, global, stateInfo);
     }
 
-    /// Position generated entry code before the first instruction captured during phase 1.
+    /// We position generated entry code before the first instruction captured during phase 1.
     ///
     /// Phase 4 inserts several locals and copy-ins into the same block. Reusing the pre-mutation
     /// anchor keeps all generated entry code ahead of the original body as those insertions build
@@ -1076,14 +1135,15 @@ struct LegalizeResourceGlobalVarsPass
             builder.setInsertInto(function.func->getFirstBlock());
     }
 
-    /// Preserve a source variable's user-facing name on its generated local or parameter.
+    /// We preserve a source variable's user-facing name on its generated local or parameter.
     void copyNameHint(IRBuilder& builder, IRInst* source, IRInst* target)
     {
         if (auto nameHint = source->findDecoration<IRNameHintDecoration>())
             builder.addNameHintDecoration(target, nameHint->getName());
     }
 
-    /// Redirect saved function-local uses to their replacement address and remove stale metadata.
+    /// We redirect saved function-local uses to their replacement address and remove stale
+    /// metadata.
     ///
     /// Metadata deletion is deferred because one instruction may mention multiple globals; deleting
     /// it while another global still holds an `IRUse*` into it would invalidate that saved use.
@@ -1108,7 +1168,7 @@ struct LegalizeResourceGlobalVarsPass
                     continue;
                 }
 
-                auto replacement = global.functions[rootUse.functionIndex].replacementAddress;
+                auto replacement = global.functionStates[rootUse.functionIndex].replacementAddress;
                 SLANG_RELEASE_ASSERT(replacement);
                 rootUse.use->set(replacement);
             }
@@ -1118,10 +1178,11 @@ struct LegalizeResourceGlobalVarsPass
             user->removeAndDeallocate();
     }
 
-    /// Replace direct calls whose callees gained hidden resource-state parameters.
+    /// We replace direct calls whose callees gained hidden resource-state parameters.
     ///
-    /// Copy explicit arguments first, append hidden arguments in deterministic order, and preserve
-    /// source locations, decorations, and saved semantic effects before deleting the old call.
+    /// We copy explicit arguments first, append hidden arguments in deterministic order, and
+    /// preserve source locations, decorations, and saved semantic effects before deleting the old
+    /// call. Keeping the original arguments first preserves their parameter indices.
     void rewriteCalls()
     {
         IRBuilder builder(module);
@@ -1151,21 +1212,21 @@ struct LegalizeResourceGlobalVarsPass
         }
     }
 
-    /// Return whether rewriting one call must append at least one hidden state argument.
+    /// We determine whether rewriting one call must append at least one hidden state argument.
     ///
-    /// A non-null generated parameter is the phase-4 source of truth. Scan the callee's per-global
-    /// records and stop as soon as one such parameter requires this call to be rebuilt.
+    /// A non-null generated parameter is the phase-4 source of truth. We scan the callee's
+    /// per-global records and stop as soon as one such parameter requires this call to be rebuilt.
     bool callNeedsHiddenStateArguments(DirectCallEdge const& edge)
     {
         for (auto const& global : resourceGlobals)
         {
-            if (global.functions[edge.calleeIndex].parameter)
+            if (global.functionStates[edge.calleeIndex].parameter)
                 return true;
         }
         return false;
     }
 
-    /// Append hidden arguments in the same global order used to create callee parameters.
+    /// We append hidden arguments in the same global order used to create callee parameters.
     ///
     /// Read-only state is loaded and passed by value. Writers receive the caller's local address,
     /// which matches the callee's generated `out` or `inout` parameter.
@@ -1176,11 +1237,11 @@ struct LegalizeResourceGlobalVarsPass
     {
         for (auto const& global : resourceGlobals)
         {
-            auto const& calleeState = global.functions[edge.calleeIndex];
+            auto const& calleeState = global.functionStates[edge.calleeIndex];
             if (!calleeState.parameter)
                 continue;
 
-            auto const& callerState = global.functions[edge.callerIndex];
+            auto const& callerState = global.functionStates[edge.callerIndex];
             SLANG_RELEASE_ASSERT(callerState.replacementAddress);
             if (calleeState.access == ResourceStateAccess::Read)
                 args.add(builder.emitLoad(global.valueType, callerState.replacementAddress));
@@ -1189,15 +1250,15 @@ struct LegalizeResourceGlobalVarsPass
         }
     }
 
-    /// Retarget saved explicit-argument effects when phase 4 replaces a call instruction.
+    /// We retarget saved explicit-argument effects when phase 4 replaces a call instruction.
     ///
     /// The semantic override belongs to an `IRUse`, and replacing the call creates new operand
-    /// uses. Match arguments by index so phase 5 still sees the source-level `ref`/`inout` effect.
+    /// uses. We match arguments by index so phase 5 retains the use-specific read/write effect.
     void remapExplicitArgumentUseEffects(IRCall* oldCall, IRCall* newCall, Index callerIndex)
     {
         for (auto& global : resourceGlobals)
         {
-            auto& effects = global.functions[callerIndex].uninitializedUseEffects;
+            auto& effects = global.functionStates[callerIndex].uninitializedUseEffects;
             for (auto& effect : effects)
             {
                 for (UInt argIndex = 0; argIndex < oldCall->getArgCount(); ++argIndex)
@@ -1212,11 +1273,11 @@ struct LegalizeResourceGlobalVarsPass
         }
     }
 
-    /// Record the exact definite-assignment effect of each newly appended hidden argument.
+    /// We record the use-specific definite-assignment effect of each hidden argument.
     ///
-    /// Canonical `out`/`inout` types cannot express a conditional write that preserves an incoming
-    /// value without semantically reading it. Associate phase-3 facts with the new operand use so
-    /// phase 5 does not infer a stronger effect from the generated ABI type.
+    /// Canonical `out`/`inout` types cannot express separately whether an operation reads the
+    /// incoming value, may write it, or definitely replaces it. We associate those phase-3 facts
+    /// with the new operand use so phase 5 does not infer a stronger effect from the generated ABI.
     void recordHiddenArgumentUseEffects(
         IRCall* oldCall,
         IRCall* newCall,
@@ -1225,11 +1286,11 @@ struct LegalizeResourceGlobalVarsPass
         UInt hiddenArgIndex = oldCall->getArgCount();
         for (auto& global : resourceGlobals)
         {
-            auto const& calleeState = global.functions[edge.calleeIndex];
+            auto const& calleeState = global.functionStates[edge.calleeIndex];
             if (!calleeState.parameter)
                 continue;
 
-            auto& callerState = global.functions[edge.callerIndex];
+            auto& callerState = global.functionStates[edge.callerIndex];
             if (hasAccess(calleeState.access, ResourceStateAccess::Write))
             {
                 callerState.uninitializedUseEffects.add(UninitializedVariableUseEffect{
@@ -1243,12 +1304,14 @@ struct LegalizeResourceGlobalVarsPass
         }
     }
 
-    // ## Phase 5: Diagnose generated locals and remove obsolete storage
+    // ## Phase 5: Generated-local diagnostics and obsolete-storage removal
 
-    /// Diagnose entry-point paths that read generated local state before any complete assignment.
+    /// We diagnose entry-point paths that read generated local state before any complete
+    /// assignment.
     ///
-    /// These locals do not exist during mandatory front-end checking. Reuse its intraprocedural
-    /// solver here with the exact possible/definite effects retained through phase 3 and rewriting.
+    /// These locals do not exist during mandatory front-end checking. We reuse its intraprocedural
+    /// solver here with the per-use read, possible-write, and definite-write effects retained
+    /// through phase 3 and rewriting.
     void diagnoseUninitializedEntryPointReads(DiagnosticSink* sink)
     {
         for (auto const& global : resourceGlobals)
@@ -1257,33 +1320,33 @@ struct LegalizeResourceGlobalVarsPass
             {
                 if (!functions[functionIndex].isEntryPoint)
                     continue;
-                auto replacement = global.functions[functionIndex].replacementAddress;
+                auto replacement = global.functionStates[functionIndex].replacementAddress;
                 if (!replacement)
                     continue;
                 checkForUsingUninitializedVariable(
                     functions[functionIndex].func,
                     replacement,
-                    global.functions[functionIndex].uninitializedUseEffects.getArrayView(),
+                    global.functionStates[functionIndex].uninitializedUseEffects.getArrayView(),
                     sink);
             }
         }
     }
 
-    /// Remove the obsolete globals after all function and metadata uses have been redirected.
+    /// We remove the obsolete globals after all function and metadata uses have been redirected.
     ///
-    /// Phase 4 must leave no uses of the old storage. Assert that invariant at the destruction
+    /// Phase 4 must leave no uses of the old storage. We assert that invariant at the destruction
     /// boundary so a future unhandled use fails here instead of becoming a dangling reference.
     void removeReplacedResourceGlobals()
     {
         for (auto& global : resourceGlobals)
         {
-            SLANG_ASSERT(!global.globalVar->hasUses());
+            SLANG_RELEASE_ASSERT(!global.globalVar->hasUses());
             global.globalVar->removeAndDeallocate();
         }
     }
 };
 
-// ## Low-level IR classification helpers
+// ## IR-use classification rules
 
 static ResourceStateAccess mergeAccess(ResourceStateAccess left, ResourceStateAccess right)
 {
@@ -1295,7 +1358,7 @@ static bool hasAccess(ResourceStateAccess value, ResourceStateAccess test)
     return (UInt(value) & UInt(test)) != 0;
 }
 
-/// Return whether an instruction semantically observes or changes an operand's runtime value.
+/// We classify whether an instruction semantically observes or changes an operand's runtime value.
 ///
 /// Address-use analysis must ignore decorations, debug records, types, and queries whose result
 /// depends only on an operand's type. Every other use is conservatively treated as a value use so
@@ -1329,60 +1392,7 @@ static bool doesInstSemanticallyUseOperandValue(IRInst* user)
     }
 }
 
-/// Return whether `use` derives another address whose uses must be analyzed recursively.
-///
-/// Slang address instructions and pointer-preserving casts take their base address as operand zero.
-/// Uses in any other operand position are terminal uses of the address value, not derivations.
-static bool doesUseDeriveAddress(IRUse* use)
-{
-    auto user = use->getUser();
-    if (user->getOperandCount() == 0 || user->getOperandUse(0) != use)
-        return false;
-
-    if (isAddressInst(user))
-        return true;
-
-    switch (user->getOp())
-    {
-    case kIROp_BitCast:
-    case kIROp_Reinterpret:
-    case kIROp_PtrCast:
-    case kIROp_InOutImplicitCast:
-        return as<IRPtrTypeBase>(user->getDataType()) != nullptr;
-    default:
-        return false;
-    }
-}
-
-/// Return the formal parameter type corresponding to one call argument use.
-///
-/// Operand zero is the callee, followed by the arguments. Match the exact `IRUse`, then consult the
-/// callee's function type and remove attributes so effect and lifetime classifiers see the
-/// directional parameter wrapper itself. Return null when any part of that contract is unavailable.
-static IRInst* findCallArgumentParameterType(IRCall* call, IRUse* use)
-{
-    if (use == call->getCalleeUse())
-        return nullptr;
-
-    Index argIndex = -1;
-    for (UInt i = 0; i < call->getArgCount(); ++i)
-    {
-        if (call->getOperandUse(i + 1) == use)
-        {
-            argIndex = Index(i);
-            break;
-        }
-    }
-    if (argIndex < 0)
-        return nullptr;
-
-    auto funcType = as<IRFuncType>(call->getCallee()->getDataType());
-    if (!funcType || UInt(argIndex) >= funcType->getParamCount())
-        return nullptr;
-    return unwrapAttributedType(funcType->getParamType(UInt(argIndex)));
-}
-
-/// Classify how a call may access the resource address passed by `use`.
+/// We classify how a call may access the resource address passed by `use`.
 ///
 /// Directional parameter types provide the precise read/write contract. If the use cannot be
 /// matched to such a parameter, both effects are retained: under-classifying an unknown call would
@@ -1402,13 +1412,13 @@ static ResourceStateAccess classifyCallArgumentAccess(IRCall* call, IRUse* use)
     if (as<IRPtrTypeBase>(paramType))
     {
         // A raw pointer parameter carries no directional contract. Its callee may observe or
-        // replace the pointee, so preserve both directions rather than assuming an input use.
+        // replace the pointee, so we preserve both directions rather than assuming an input use.
         return mergeAccess(ResourceStateAccess::Read, ResourceStateAccess::Write);
     }
     return ResourceStateAccess::Read;
 }
 
-/// Classify a non-deriving use reached while walking a resource global's address graph.
+/// We classify a non-deriving use reached while walking a resource global's address graph.
 ///
 /// Loads are reads, stores through the address operand are writes, and calls inherit the formal
 /// parameter's direction. Uses with no precise contract conservatively preserve every effect they
@@ -1439,7 +1449,7 @@ static ResourceStateAccess classifyResourceAddressUse(IRUse* use)
 
     // A pointer-producing instruction that is not a recognized address derivation may let the
     // address escape. The same is true when the address is routed through control flow or returned.
-    // We cannot safely infer how those users access the variable, so preserve both directions.
+    // We cannot safely infer how those users access the variable, so we preserve both directions.
     if (as<IRPtrTypeBase>(user->getDataType()))
         return mergeAccess(ResourceStateAccess::Read, ResourceStateAccess::Write);
 
@@ -1457,7 +1467,7 @@ static ResourceStateAccess classifyResourceAddressUse(IRUse* use)
     }
 }
 
-/// Return whether replacing the global with independent per-function locals would lose identity.
+/// We determine whether independent per-function locals would lose the global's storage identity.
 ///
 /// Storing or returning the address, routing it through control flow, or applying an address-
 /// identity operation lets code observe or retain the original storage. Only known pointee
@@ -1488,7 +1498,7 @@ static bool doesUseEscapeAddress(IRUse* use)
     return true;
 }
 
-/// Return whether `func` has a use that can invoke it without a rewritable direct call site.
+/// We determine whether `func` has an invocation without a rewritable direct call site.
 ///
 /// A direct `IRCall` can receive hidden state arguments. Decorations used by a runtime (for
 /// example, a patch-constant function reference) and other first-class function uses cannot.
@@ -1505,8 +1515,8 @@ static bool hasInvocationWithoutRewritableCallSite(IRFunc* func)
 
         // A decoration that names a function can represent a runtime-managed invocation, such as
         // a hull shader's patch-constant function. Other non-call value uses likewise provide no
-        // call site where this pass can append a hidden argument. Treat both as independent roots;
-        // type and debug metadata do not establish a call boundary.
+        // call site where this pass can append a hidden argument. We treat both as independent
+        // roots; type and debug metadata do not establish a call boundary.
         if (as<IRDecoration>(user))
             return true;
         if (!doesInstSemanticallyUseOperandValue(user))
@@ -1516,7 +1526,7 @@ static bool hasInvocationWithoutRewritableCallSite(IRFunc* func)
     return false;
 }
 
-/// Return whether `func` can be invoked without an ordinary call in this module.
+/// We determine whether `func` can be invoked without an ordinary call in this module.
 ///
 /// Phase 4 can add state parameters only when every invocation has a direct `IRCall` to rewrite.
 /// Export and keep-alive decorations promise another caller, while a non-call function reference
@@ -1535,7 +1545,7 @@ static bool isIndependentlyInvokedFunction(IRFunc* func)
            hasInvocationWithoutRewritableCallSite(func);
 }
 
-/// Return whether `globalVar` must retain one externally meaningful storage location.
+/// We determine whether `globalVar` must retain one externally meaningful storage location.
 ///
 /// Such storage cannot be replaced by a distinct local in every entry point. A rate or an explicit
 /// ABI/storage decoration establishes this requirement; ordinary linkage alone does not.
@@ -1581,14 +1591,14 @@ void legalizeResourceGlobalVars(
     TargetProgram* targetProgram,
     DiagnosticSink* sink)
 {
-    // The task is to make resource-bearing file-scope `static` state explicit per entry-point
-    // invocation. Perform it in two ordered steps while keeping their private hand-off scoped here:
+    // We make resource-bearing file-scope `static` state explicit per entry-point invocation in two
+    // ordered steps, while keeping their private hand-off scoped here:
     //
-    // 1. Move only the initializer dependency closure that requires resource state into entry
+    // 1. We move only the initializer dependency closure that requires resource state into entry
     //    points, and collect the wider state whose initialization semantics now depend on those
     //    entry points.
-    // 2. Validate storage and invocation boundaries, then localize each resource global and thread
-    //    its value through the direct call graph.
+    // 2. We validate storage and invocation boundaries, then localize each resource global and
+    //    thread its value through the direct call graph.
     //
     // The ordinary target-policy initializer pass remains later in the pipeline. Moving it here
     // wholesale would broaden this transformation for programs that contain no resource globals.
@@ -1598,8 +1608,8 @@ void legalizeResourceGlobalVars(
         targetProgram,
         resourceDependentState);
 
-    // Consume the complete boundary set produced by step 1; clients cannot accidentally invoke
-    // the localization pass with a partial view of resource-dependent state.
+    // We pass the complete boundary set produced by step 1 directly into step 2, so the private
+    // localization pass cannot receive a partial view of resource-dependent state.
     LegalizeResourceGlobalVarsPass pass(module);
     pass.processModule(resourceDependentState, sink);
 }

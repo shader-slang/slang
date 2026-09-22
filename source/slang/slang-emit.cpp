@@ -2023,17 +2023,18 @@ Result linkAndOptimizeIR(
         if (!validateStructuredBufferResourceTypes(irModule, sink, targetRequest))
             return SLANG_FAIL;
 
-        // Make per-invocation resource state explicit while linked identities, initializer bodies,
-        // function decorations/references, and direct calls still expose the relevant boundaries.
-        // This must currently run before resource-type legalization: non-simple resource globals
-        // such as ParameterBlock and append-buffer values can carry initializer bodies that the
-        // type legalizer cannot split while preserving their source-static identity.
+        // We localize file-scope resource state here, while linkage identifies each source
+        // `static`, calls between defined functions are direct, and decorations or function
+        // references expose invocation boundaries that cannot accept hidden state. We run before
+        // resource-type legalization because it splits aggregate resources such as `ParameterBlock`
+        // and append-buffer representations into leaf globals. Those leaves no longer identify the
+        // source `static` storage and initializer body that this pass must treat together.
         //
-        // TODO: Investigate whether global-initializer extraction can move here as a general step,
-        // with resource-global localization deferred until after resource-type legalization. That
-        // could eliminate the resource-specific initializer selection mode, but requires the type
-        // legalizer to preserve linkage, initialization dependencies, and boundary-analysis state
-        // across split leaf globals. Correctness and generated-code impact also need validation.
+        // TODO: To remove the resource-dependency initializer-selection mode, resource-type
+        // legalization would need to preserve that source-global and initializer provenance on each
+        // split leaf. We could then extract all initializers here and localize the resource leaves
+        // afterward, while calls and function decorations still provide the independent invocation-
+        // boundary information.
         SLANG_PASS(legalizeResourceGlobalVars, targetProgram, sink);
         if (sink->getErrorCount() != 0)
             return SLANG_FAIL;

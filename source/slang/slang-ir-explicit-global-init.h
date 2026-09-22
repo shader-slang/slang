@@ -9,24 +9,25 @@ struct IRGlobalVar;
 struct IRModule;
 class TargetProgram;
 
-/// Make target-selected global initialization explicit at the start of every entry point.
+/// Moves each eligible global initializer selected by the target policy to the start of every
+/// defined entry point.
 ///
-/// Selected globals retain their storage but no longer contain initializer bodies.
+/// Selected globals retain their storage but no longer contain initializer bodies. Storage with an
+/// independently managed global lifetime is not eligible for per-entry-point initialization.
 void moveGlobalVarInitializationToEntryPoints(IRModule* module, TargetProgram* targetProgram);
 
-/// Move resource-dependent global initializers to the start of each entry point.
+/// Moves the eligible initializers of linked, per-invocation globals that transitively depend on
+/// resource state to the start of every defined entry point.
 ///
-/// This operation moves only linked, per-invocation initializer targets whose values transitively
-/// depend on resource state. The ordinary target-policy operation still runs later for any other
-/// initializer that the target cannot represent at global scope.
+/// On return, `outResourceDependentState` contains the conservative boundary-validation set: the
+/// resource-state globals, all resource-dependent initializer targets (including immovable
+/// targets), and every global that a moved initializer may mutate. `legalizeResourceGlobalVars`
+/// uses this set to reject preserved storage and functions that can reach the state through an
+/// invocation without a rewritable direct call.
 ///
-/// `outResourceDependentState` receives the complete state whose initialization semantics depend
-/// on an entry point: resource-bearing per-invocation globals, every resource-dependent initializer
-/// target (including targets this operation cannot move), and globals that the moved initializer
-/// call graph may mutate. A subsequent pass can use this wider set to validate other call roots.
-///
-/// Invoke this operation after linking, when source globals have linkage decorations and calls
-/// between defined functions are direct.
+/// This operation must run after linking, when source globals have linkage decorations and calls
+/// between defined functions are direct. The ordinary target-policy operation still runs later for
+/// any other initializer that the target cannot represent at global scope.
 void moveResourceDependentGlobalVarInitializationToEntryPoints(
     IRModule* module,
     TargetProgram* targetProgram,
