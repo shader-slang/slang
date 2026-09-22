@@ -11,15 +11,19 @@
 
 // Marks a code path the Slang compiler has proved dead, such as the default arm of a closed
 // dynamic-dispatch switch. C++ output may be built by any host compiler, so the spelling is
-// per-compiler; an unknown compiler gets a harmless no-op. This header is shared by the cpp, host,
-// and torch preludes, so defining it here covers every C++ target.
+// per-compiler. The producer emits this for a provably-dead block that has no trailing return, so
+// the fallback for an unrecognized compiler is `abort()` (a genuine no-return), not a no-op: a
+// no-op would let a value-returning dispatcher fall off the end of a non-void function (undefined
+// behavior), whereas `abort()` keeps the code well-formed even though this path is never actually
+// reached. This header is shared by the cpp, host, and torch preludes (each of which includes
+// <stdlib.h>, providing `abort`), so defining it here covers every C++ target.
 #ifndef SLANG_PRELUDE_UNREACHABLE
 #if defined(__clang__) || defined(__GNUC__)
 #define SLANG_PRELUDE_UNREACHABLE() __builtin_unreachable()
 #elif defined(_MSC_VER)
 #define SLANG_PRELUDE_UNREACHABLE() __assume(0)
 #else
-#define SLANG_PRELUDE_UNREACHABLE() ((void)0)
+#define SLANG_PRELUDE_UNREACHABLE() abort()
 #endif
 #endif
 

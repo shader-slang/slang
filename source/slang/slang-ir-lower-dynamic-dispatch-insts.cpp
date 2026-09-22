@@ -276,6 +276,11 @@ IRFunc* createDispatchFunc(
     Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping,
     TargetRequest* targetReq)
 {
+    // Both target-dependent choices below dereference `targetReq` (force-inline via
+    // `isCPUTargetViaLLVM`, the default-arm terminator via `targetSupportsUnreachableTerminator`),
+    // so a null request is a contract violation, not a "skip".
+    SLANG_ASSERT(targetReq);
+
     // Create a dispatch function with switch-case for each function
     IRBuilder builder(dispatchFuncType->getModule());
 
@@ -319,12 +324,19 @@ IRFunc* createDispatchFunc(
     builder.setInsertInto(defaultBlock);
     if (targetSupportsUnreachableTerminator(targetReq))
     {
-        // The switch selector and every `case` tag are synthesized from the same closed
-        // witness-table set (see the force-inline comment above), and external sequential IDs are
-        // clamped to an in-set tag before reaching here, so no tag selects the default arm. On
-        // targets that can express it we terminate that dead arm with `unreachable`, so the backend
-        // drops the range check and matches handwritten dispatch; targets without the spelling keep
-        // the defined default below and stay valid.
+        // This arm is dead: no tag value ever selects it. Every tag feeding this switch comes from
+        // one closed witness-table set -- produced directly by `GetTagOfElementInSet`, by the
+        // set->set remap, or, for an externally-supplied sequential ID, by
+        // `GetTagFromSequentialID`, whose integer map clamps any unregistered ID to an in-set tag
+        // (that map's default is `mapping[defaultSeqID]`, an in-set value built by
+        // `createIntegerMappingFunc` at the `GetTagFromSequentialID` call site). That in-set clamp
+        // is load-bearing for this arm's deadness, which is why the structurally near-identical
+        // `createIntegerMappingFunc` default is deliberately left a defined value and must NOT be
+        // turned into `unreachable`. (The reverse `GetSequentialIDFromTag` path produces sequential
+        // IDs, not set tags, and does not feed this switch.) On targets that can express it we
+        // therefore terminate this dead arm with `unreachable`, so the backend drops the range
+        // check and matches handwritten dispatch; targets without the spelling keep the defined
+        // default below.
         builder.emitUnreachable();
     }
     else if (resultType->getOp() == kIROp_VoidType)
