@@ -2188,11 +2188,11 @@ static SlangResult _getLinkTimeDownstreamArgHash(
 
 // getEntryPointHash is a shader-cache key that includes the linked component's own option set, so a
 // link-time option that affects code generation must change it. Three independent slices of that
-// contract are checked, each using an option that genuinely affects codegen for its target and that
-// Slang passes through to the downstream compiler unchanged (so a differing hash reflects a real
-// codegen difference, not a spurious miss): a CUDA downstream argument, a DXC/DXIL downstream
-// argument (a second backend), and a non-DownstreamArgs option (VulkanBindGlobals on SPIR-V,
-// reached via linkWithOptions).
+// contract are checked, each using an option that genuinely affects codegen for its target (so a
+// differing hash reflects a real codegen difference, not a spurious miss): a CUDA downstream
+// argument and a DXC/DXIL downstream argument (a second backend) -- both passed through to the
+// downstream compiler unchanged -- and a non-DownstreamArgs option (VulkanBindGlobals on SPIR-V,
+// reached via linkWithOptions), which Slang's own SPIR-V layout consumes rather than forwarding.
 static SlangResult _testLinkTimeOptionsAffectCompilerOptionHash()
 {
     // 1) CUDA/PTX downstream args: --fmad toggles fused multiply-add contraction, a PTX codegen
