@@ -99,6 +99,7 @@
 #include "slang-ir-missing-return.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
+#include "slang-ir-ray-tracing-legalize.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-resolve-texture-format.h"
 #include "slang-ir-resolve-varying-input-ref.h"
@@ -1948,6 +1949,11 @@ Result linkAndOptimizeIR(
         SLANG_PASS(inlineGlobalConstantsForLegalization);
     }
 
+    // Apply target-specific ray-tracing payload policy before general type legalization: resolve
+    // D3D payload markers, materialize required physical carriers, and normalize D3D payload
+    // access qualifiers. CUDA/OptiX intentionally takes the no-materialization policy here.
+    SLANG_PASS(legalizeRayTracingPayloads, targetProgram);
+
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
@@ -1994,49 +2000,6 @@ Result linkAndOptimizeIR(
         //  we need to replace it with just an `X`, after which we
         //  will have (more) legal shader code.
         //
-        // For DXIL/HLSL with NVAPI and SPIRV: add dummy fields to empty ray payloads
-        if (isD3DTarget(targetRequest) || isSPIRV(targetRequest->getTarget()))
-        {
-            SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
-        }
-
-        // Vulkan (SPIR-V + GLSL): an empty `CallShader` payload is backed by a
-        // `[__vulkanCallablePayload]` global; if it legalizes to `none`, type legalization aborts
-        // with "non-simple operand(s)!" — via `OpExecuteCallableKHR` on SPIR-V, or
-        // `__callablePayloadLocation` on GLSL. Pad it so a real Callable Data variable survives.
-        // Must run before legalizeResourceTypes erases the empty payload struct.
-        if (isKhronosTarget(targetRequest))
-        {
-            SLANG_PASS(legalizeEmptyCallableDataPayloadsForVulkan);
-        }
-
-        // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions
-        // (must run before legalizeExistentialTypeLayout removes empty struct parameters)
-        if (isD3DTarget(targetRequest))
-        {
-            SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
-
-            // Pad an empty callable-data struct before legalizeExistentialTypeLayout /
-            // legalizeResourceTypes below erase it (see the pass's header doc for why). CUDA runs
-            // the same pass from the CPU/CUDA branch below.
-            SLANG_PASS(legalizeEmptyCallableDataPayloadsForHLSLAndCUDA);
-
-            // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
-            // both a `read(...)` and a `write(...)` qualifier. The call-site fill above
-            // only covers payload structs reached through a `TraceRay`-style call, so a
-            // user-authored struct with one-sided PAQ that only reaches a hit shader
-            // (e.g. a per-stage-compiled shader library) would slip through. Fill any
-            // missing per-side PAQs structurally on every `[raypayload]` struct.
-            auto profile = getEffectiveTargetProfile(
-                targetProgram->getTargetReq(),
-                targetProgram->getOptionSet());
-            if (profile.getFamily() == ProfileFamily::DX &&
-                profile.getVersion() >= ProfileVersion::DX_6_7)
-            {
-                SLANG_PASS(legalizeRayPayloadAccessQualifiersForHLSL);
-            }
-        }
-
         if (requiredLoweringPassSet.existentialTypeLayout)
         {
             SLANG_PASS(legalizeExistentialTypeLayout, targetProgram, sink);
@@ -2074,15 +2037,6 @@ Result linkAndOptimizeIR(
     }
     else
     {
-        // CUDA counterpart of the D3D call above: pad an empty `CallShader` payload (and callable
-        // entry-point parameter) before `legalizeEmptyTypes` below erases it. See the pass's header
-        // doc for why. The CPU target also reaches this `else` branch, but it has no ray-tracing
-        // `CallShader` or callable entry points for the pass to act on, so we restrict it to CUDA.
-        if (isCUDATarget(targetRequest))
-        {
-            SLANG_PASS(legalizeEmptyCallableDataPayloadsForHLSLAndCUDA);
-        }
-
         // On CPU/CUDA targets, we simply elminate any empty types if
         // they are not part of public interface.
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);

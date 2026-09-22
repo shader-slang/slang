@@ -1,10 +1,7 @@
-// Regression test for https://github.com/shader-slang/slang/issues/12718 (and the CUDA counterpart
-// #13106): an empty callable-data struct must not be erased on the HLSL/D3D and CUDA paths, where
-// the callable data is a fixed-shape entry-point parameter. On D3D, erasure leaves a zero-parameter
-// callable that DXC rejects; on CUDA the parameter must survive so it matches the padded payload a
-// `CallShader` caller passes (each side pads independently, so they agree by construction). The
-// Vulkan targets (SPIR-V and GLSL) keep a valid callable entry point without materializing the
-// unused empty payload — no padding needed there.
+// Regression test for https://github.com/shader-slang/slang/issues/12718 and its CUDA counterpart,
+// #13106. D3D requires an empty callable-data struct to remain as a fixed-shape entry-point
+// parameter; CUDA/OptiX, SPIR-V, and GLSL all permit the logically empty payload to contribute no
+// physical entry-point parameter.
 
 //TEST:SIMPLE(filecheck=HLSL): -stage callable -entry callableMain -target hlsl -profile sm_6_7
 //TEST:SIMPLE(filecheck=DXIL): -stage callable -entry callableMain -target dxil -profile sm_6_7
@@ -46,10 +43,7 @@ void callableMain(inout EmptyData data)
 // GLSL-NOT: _slang_dummy
 // GLSL: void main(
 
-// This test covers only the callee (entry-point) side. On CUDA, as on D3D, the callable entry
-// point keeps its parameter as a padded `EmptyData` pointer. A separately-compiled `CallShader`
-// caller (see callshader-empty-payload.slang) pads its own copy of `EmptyData` with the identical
-// single `int _slang_dummy` field — `padEmptyStructWithDummyField` is deterministic — so the two
-// agree on the callable-data ABI by construction.
-// CUDA-DAG: int _slang_dummy
-// CUDA: void __direct_callable__callableMain(EmptyData{{.*}}*{{.*}})
+// The OptiX callable ABI is variadic, so the empty logical parameter is erased and no artificial
+// dummy storage is emitted. A non-empty control is covered by callable-nonempty-data.slang.
+// CUDA-NOT: _slang_dummy
+// CUDA: void __direct_callable__callableMain()

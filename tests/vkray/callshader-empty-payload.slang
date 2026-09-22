@@ -1,14 +1,13 @@
-// Regression test for the `CallShader` caller side of the empty-callable-payload erasure, across
-// every capability-allowed Vulkan/D3D/CUDA target. An empty callable-data payload passed to `CallShader`
-// must survive type legalization instead of being dropped/erased:
+// Regression test for the `CallShader` caller side of empty-callable-payload legalization across
+// every capability-allowed Vulkan/D3D/CUDA target. D3D and Vulkan require a physical callable-data
+// object, while CUDA/OptiX permits the empty payload to have no physical argument:
 //   - D3D/HLSL (#12718): the emitted HLSL must still pass the payload as `CallShader`'s 2nd arg
 //     (the bug emitted a one-argument `CallShader(0U)` that DXC rejects).
 //   - SPIR-V (#12731): the `[__vulkanCallablePayload]` global must keep a real Callable Data
 //     variable for `OpExecuteCallableKHR` (the bug aborted with "non-simple operand(s)!").
 //   - GLSL (same path): the same global feeds `executeCallableEXT`; the bug aborted the same way.
-//   - CUDA (#13106): `CallShader`'s CUDA arm is the fixed-arity `optixDirectCall<void>($0, $1)`, so
-//     the dropped payload argument used to abort intrinsic expansion (`slang-intrinsic-expand.cpp`);
-//     the padded payload must be passed as the real second argument.
+//   - CUDA (#13106): the empty payload is erased, and the variadic OptiX intrinsic expansion emits
+//     only the shader index instead of trying to reference a missing fixed `$1` operand.
 
 //TEST:SIMPLE(filecheck=HLSL): -stage raygeneration -entry rgen -target hlsl -profile sm_6_7
 //TEST:SIMPLE(filecheck=DXIL): -stage raygeneration -entry rgen -target dxil -profile sm_6_7
@@ -49,11 +48,8 @@ void rgen()
 // GLSL-DAG: callableDataEXT
 // GLSL-DAG: executeCallableEXT
 
-// CUDA behaves the same way: the padded payload local survives and is passed as
-// `optixDirectCall`'s second argument, rather than being dropped (which left
-// `optixDirectCall<void>($0)` and aborted the fixed-arity `$1` expansion). The `__raygen__rgen`
-// entry point compiling is the positive control.
-// CUDA: int _slang_dummy
-// CUDA: __raygen__rgen()
-// CUDA: EmptyData{{[A-Za-z0-9_]*}} [[cudaPayload:[A-Za-z0-9_]+]];
-// CUDA: optixDirectCall<void>((0U), (&[[cudaPayload]]));
+// OptiX direct calls are variadic, so CUDA keeps no artificial payload storage or argument. The
+// old fixed `$1` intrinsic expansion aborted after type legalization erased the empty payload.
+// CUDA-NOT: _slang_dummy
+// CUDA-LABEL: void __raygen__rgen()
+// CUDA: optixDirectCall<void>(0U);
