@@ -2394,15 +2394,6 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
     DiagnosticSink* sink,
     SourceLoc loc)
 {
-    List<ConstantIntVal*> constArgs;
-    for (auto arg : newArgs)
-    {
-        auto c = as<ConstantIntVal>(arg);
-        if (!c)
-            return nullptr; // still symbolic
-        constArgs.add(c);
-    }
-
     // Reject a malformed node whose argument count does not match the operation's arity, so a
     // unary op never reads a missing second operand and a binary op never folds with a
     // defaulted one.
@@ -2410,12 +2401,37 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         (op == BuiltinOperationKind::Neg || op == BuiltinOperationKind::BitNot ||
          op == BuiltinOperationKind::Not);
     const Index expectedArgs = (op == BuiltinOperationKind::Conditional) ? 3 : (isUnary ? 1 : 2);
-    if (constArgs.getCount() != expectedArgs)
+    if (newArgs.getCount() != expectedArgs)
         return nullptr;
 
-    const IntegerLiteralValue a0 = constArgs[0]->getValue();
-    const IntegerLiteralValue a1 = (constArgs.getCount() > 1) ? constArgs[1]->getValue() : 0;
-    const IntegerLiteralValue a2 = (constArgs.getCount() > 2) ? constArgs[2]->getValue() : 0;
+    // Unpack arguments and check that they're constants
+    IntegerLiteralValue literalValues[3]{};
+    bool isArgBitwiseValues[3]{};
+    size_t numArgs{};
+
+    for (auto arg : newArgs)
+    {
+        // just for extra sanity in case something went horribly wrong above
+        SLANG_RELEASE_ASSERT(numArgs < 3U);
+
+        if (auto c = as<ConstantBitwiseIntVal>(arg))
+        {
+            isArgBitwiseValues[numArgs] = true;
+            literalValues[numArgs] = c->getValue();
+        }
+        else if (auto c = as<ConstantIntVal>(arg))
+            literalValues[numArgs] = c->getValue();
+        else
+            return nullptr; // still symbolic
+
+        ++numArgs;
+    }
+
+    const IntegerLiteralValue a0 = literalValues[0];
+    const IntegerLiteralValue a1 = literalValues[1];
+    const bool a1IsBitwise = isArgBitwiseValues[1];
+    const IntegerLiteralValue a2 = literalValues[2];
+    const bool a2IsBitwise = isArgBitwiseValues[2];
     // Do the wrapping arithmetic (negate/add/sub/mul) through the unsigned type: signed
     // overflow is UB (and `-INT64_MIN` / `INT64_MIN / -1` even trap on real hardware), while
     // unsigned wraps two's-complement, matching what the target IR ops compute at runtime.
@@ -2423,6 +2439,7 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
     const UInt u0 = (UInt)a0;
     const UInt u1 = (UInt)a1;
     IntegerLiteralValue r = 0;
+    bool bitwiseValue = false;
     switch (op)
     {
     case BuiltinOperationKind::Neg:
@@ -2430,6 +2447,7 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         break;
     case BuiltinOperationKind::BitNot:
         r = ~a0;
+        bitwiseValue = true;
         break;
     case BuiltinOperationKind::Not:
         r = (a0 == 0);
@@ -2454,12 +2472,15 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         break;
     case BuiltinOperationKind::BitAnd:
         r = a0 & a1;
+        bitwiseValue = true;
         break;
     case BuiltinOperationKind::BitOr:
         r = a0 | a1;
+        bitwiseValue = true;
         break;
     case BuiltinOperationKind::BitXor:
         r = a0 ^ a1;
+        bitwiseValue = true;
         break;
     case BuiltinOperationKind::Add:
         r = (IntegerLiteralValue)(u0 + u1);
@@ -2486,6 +2507,8 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
             r = (op == BuiltinOperationKind::Div) ? (a0 / a1) : (a0 % a1);
         break;
     case BuiltinOperationKind::Lsh:
+        bitwiseValue = true;
+        // fall-through
     case BuiltinOperationKind::Rsh:
         if (!_tryFoldConstantShift(a0, a1, /*isLeftShift*/ op == BuiltinOperationKind::Lsh, r))
             return nullptr;
@@ -2498,11 +2521,21 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         break;
     case BuiltinOperationKind::Conditional:
         r = (a0 != 0) ? a1 : a2;
+        bitwiseValue = (a1IsBitwise && a2IsBitwise);
         break;
     default:
         return nullptr;
     }
-    return astBuilder->getIntVal(resultType, r);
+
+    fprintf(stderr, "%s:%d: %lu OP %lu = %lu\n",
+            __FILE__,
+            __LINE__,
+            a0, a1, r);
+
+    if (bitwiseValue)
+        return astBuilder->getBitwiseIntVal(resultType, r);
+    else
+        return astBuilder->getIntVal(resultType, r);
 }
 
 Val* BuiltinOperationIntVal::_resolveImplOverride()

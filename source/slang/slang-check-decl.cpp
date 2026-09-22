@@ -44,6 +44,7 @@ TypedIntegerLiteralValue::TypedIntegerLiteralValue(ConstantIntVal& val)
 
     m_rawValue = val.getValue();
     m_signedType = (baseTypeInfo.flags & BaseTypeInfo::Flag::Signed) != 0U;
+    m_bitwiseValue = (as<ConstantBitwiseIntVal>(&val) != nullptr);
 }
 
 TypedIntegerLiteralValue::TypedIntegerLiteralValue(IntegerLiteralExpr& val)

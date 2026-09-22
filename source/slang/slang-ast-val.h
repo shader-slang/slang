@@ -168,6 +168,13 @@ class ConstantIntVal : public IntVal
     bool _isLinkTimeValOverride() { return false; }
 };
 
+// Trivial case of a value that is just a constant bitwise integer
+FIDDLE()
+class ConstantBitwiseIntVal : public ConstantIntVal
+{
+    FIDDLE(...)
+};
+
 // The logical "value" of a reference to a generic value parameter
 FIDDLE()
 class DeclRefIntVal : public IntVal
