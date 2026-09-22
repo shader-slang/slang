@@ -1,4 +1,4 @@
-// Codegen test for shader-slang/slang#13220 — interface dispatch on a C-family target.
+// Codegen test for shader-slang/slang#13220: interface dispatch on a C-family target.
 //
 // Lowering an interface (existential) value builds a witness-tag dispatch `switch` with one `case`
 // per concrete conformer plus a `default:` arm for tags outside that closed, statically-enumerable

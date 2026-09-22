@@ -104,8 +104,8 @@ bool isWGPUTarget(CodeGenTarget target);
 
 /// Can the target's emitted code express a no-return "unreachable" terminator (so the downstream
 /// compiler may prune a provably-dead path, e.g. the default arm of a closed dynamic-dispatch
-/// switch)? True for CUDA and the CPU backends; false for HLSL/GLSL/WGSL/Metal, which keep a
-/// defined terminator on such a path instead.
+/// switch)? True for CUDA and the CPU backends except the bytecode VM (whose emitter drops
+/// unreachable blocks); false for HLSL/GLSL/WGSL/Metal, which keep a defined terminator instead.
 bool targetSupportsUnreachableTerminator(TargetRequest* targetReq);
 bool targetSupportsUnreachableTerminator(CodeGenTarget target);
 

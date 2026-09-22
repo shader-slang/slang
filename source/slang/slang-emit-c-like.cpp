@@ -3711,9 +3711,9 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion, Region* breakRegionToOmit)
                     // An `unreachable` terminator marks a block the compiler has proved dead, such
                     // as the default arm of a closed dynamic-dispatch switch. On targets that can
                     // spell it we emit `SLANG_PRELUDE_UNREACHABLE()` so the downstream compiler can
-                    // drop the dead path. Other C-like targets have no such spelling, and their
-                    // producers never route a reachable `unreachable` block here, so emitting
-                    // nothing keeps their output valid.
+                    // drop the dead path. On other C-like targets we emit nothing, which is valid
+                    // because the terminator itself guarantees control cannot continue past this
+                    // block.
                     if (targetSupportsUnreachableTerminator(getTarget()))
                         m_writer->emit("SLANG_PRELUDE_UNREACHABLE();\n");
                     break;
