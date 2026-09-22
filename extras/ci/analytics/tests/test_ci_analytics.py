@@ -906,12 +906,24 @@ class TestHealthApiBounds(unittest.TestCase):
 
 
 class TestRequiredGateMetrics(unittest.TestCase):
-    def _job(self, run_id, name, conclusion, start, completed, event="pull_request"):
-        return {
+    def _job(
+        self,
+        run_id,
+        name,
+        conclusion,
+        start,
+        completed,
+        event="pull_request",
+        run_attempt=None,
+        run_created_at=None,
+    ):
+        job = {
             "name": name,
             "workflow_name": "CI",
             "run_id": run_id,
-            "run_created_at": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "run_created_at": (run_created_at or start).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            ),
             "created_at": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "started_at": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "completed_at": completed.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -924,6 +936,9 @@ class TestRequiredGateMetrics(unittest.TestCase):
             "queued_seconds": 0,
             "html_url": "",
         }
+        if run_attempt is not None:
+            job["run_attempt"] = run_attempt
+        return job
 
     def test_required_turnaround_ends_at_check_ci_and_tracks_optional_tail(self):
         start = (
@@ -1031,6 +1046,90 @@ class TestRequiredGateMetrics(unittest.TestCase):
         self.assertEqual(data["mq_runs_by_date"][date]["success"], 1)
         self.assertEqual(data["mq_runs_by_date"][date]["failure"], 0)
         self.assertEqual(data["mq_tat_by_date"][date], [20.0])
+
+    def test_metrics_use_latest_check_ci_attempt_only(self):
+        first_start = (
+            datetime.now(timezone.utc).replace(
+                hour=12, minute=0, second=0, microsecond=0
+            )
+            - timedelta(days=3)
+        )
+        retry_start = first_start + timedelta(days=1)
+        jobs = [
+            self._job(
+                1,
+                "check-ci",
+                "success",
+                first_start,
+                first_start + timedelta(minutes=20),
+                event="merge_group",
+                run_attempt=1,
+                run_created_at=first_start,
+            ),
+            self._job(
+                1,
+                "old-attempt-failure",
+                "failure",
+                first_start,
+                first_start + timedelta(minutes=120),
+                event="merge_group",
+                run_attempt=1,
+                run_created_at=first_start,
+            ),
+            self._job(
+                1,
+                "build-linux / build",
+                "success",
+                retry_start,
+                retry_start + timedelta(minutes=10),
+                event="merge_group",
+                run_attempt=2,
+                run_created_at=first_start,
+            ),
+            self._job(
+                1,
+                "check-ci",
+                "failure",
+                retry_start,
+                retry_start + timedelta(minutes=30),
+                event="merge_group",
+                run_attempt=2,
+                run_created_at=first_start,
+            ),
+            self._job(
+                1,
+                "test-falcor / Test (Falcor)",
+                "success",
+                retry_start,
+                retry_start + timedelta(minutes=45),
+                event="merge_group",
+                run_attempt=2,
+                run_created_at=first_start,
+            ),
+        ]
+        config = {
+            "label_groups": [],
+            "runner_name_prefixes": [],
+            "non_production_periods": {"runners": {}},
+        }
+
+        data = ci_visualization.process_jobs(jobs, config)
+        first_date = first_start.strftime("%Y-%m-%d")
+        retry_date = retry_start.strftime("%Y-%m-%d")
+
+        self.assertNotIn(first_date, data["ci_turnaround_by_date"])
+        self.assertEqual(data["turnaround_by_date"][retry_date], [45.0])
+        self.assertEqual(data["ci_turnaround_by_date"][retry_date], [30.0])
+        self.assertEqual(data["ci_optional_tail_by_date"][retry_date], [15.0])
+        self.assertEqual(
+            data["ci_gate_runs_by_date"][retry_date],
+            {"success": 0, "failure": 1, "cancelled": 0, "total": 1},
+        )
+        self.assertEqual(data["mq_runs_by_date"][retry_date]["failure"], 1)
+        self.assertEqual(data["mq_tat_by_date"][retry_date], [30.0])
+        self.assertNotIn(
+            "old-attempt-failure", data["mq_recent_failures"][0]["failing_jobs"]
+        )
 
 
 class TestStatisticsRunnerNamePrefixes(unittest.TestCase):
@@ -1572,6 +1671,20 @@ class TestMonthlySplit(unittest.TestCase):
         self.assertEqual(ci_job_collector.job_month({"created_at": "2026-03-15T10:00:00Z"}), "2026-03")
         self.assertEqual(ci_job_collector.job_month({"created_at": None}), "unknown")
         self.assertEqual(ci_job_collector.job_month({}), "unknown")
+
+    def test_extract_job_data_preserves_run_attempt(self):
+        job = {
+            "id": 7,
+            "run_attempt": 3,
+            "created_at": "2026-03-15T10:00:00Z",
+            "started_at": "2026-03-15T10:00:05Z",
+            "completed_at": "2026-03-15T10:01:00Z",
+        }
+        run = {"id": 1, "run_attempt": 2}
+
+        extracted = ci_job_collector.extract_job_data(job, run)
+
+        self.assertEqual(extracted["run_attempt"], 3)
 
     def test_monthly_main_handles_cross_month_jobs(self):
         existing_feb_job = self._make_job(1, "2026-02-15T10:00:00Z")

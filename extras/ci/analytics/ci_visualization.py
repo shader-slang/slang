@@ -146,13 +146,7 @@ def format_duration(seconds):
 
 
 def latest_completed_job(run_jobs, name):
-    """Return the latest completed job with the exact name, if one exists.
-
-    A workflow run can retain jobs from more than one attempt in the monthly
-    archive. Selecting the latest completion keeps the aggregate gate metrics
-    aligned with the most recent result until the archive records attempts as
-    a first-class dimension.
-    """
+    """Return the latest completed job with the exact name, if one exists."""
     matches = [
         job
         for job in run_jobs
@@ -161,6 +155,19 @@ def latest_completed_job(run_jobs, name):
     if not matches:
         return None
     return max(matches, key=lambda job: parse_dt(job.get("completed_at")))
+
+
+def jobs_for_selected_attempt(run_jobs, selected_job):
+    """Return jobs from the selected job's workflow attempt.
+
+    Older archived records do not contain ``run_attempt``. In that case the
+    full run is retained to preserve the historical behavior rather than
+    silently dropping all of its jobs.
+    """
+    run_attempt = selected_job.get("run_attempt")
+    if run_attempt is None:
+        return run_jobs
+    return [job for job in run_jobs if job.get("run_attempt") == run_attempt]
 
 
 # --- Shared HTML ---
@@ -412,10 +419,18 @@ def process_jobs(jobs_data, config):
     build_wait_by_date = defaultdict(list)  # build queue wait per CI run
     test_wait_by_date = defaultdict(list)  # test queue wait (after build) per CI run
     for run_id, run_jobs in runs.items():
+        wf_name = run_jobs[0].get("workflow_name", "")
+        check_ci = (
+            latest_completed_job(run_jobs, "check-ci") if wf_name == "CI" else None
+        )
+        metric_jobs = (
+            jobs_for_selected_attempt(run_jobs, check_ci) if check_ci else run_jobs
+        )
+
         # Find earliest job created_at and latest completed_at
         earliest_job = None
         latest = None
-        for j in run_jobs:
+        for j in metric_jobs:
             c = parse_dt(j.get("created_at"))
             d = parse_dt(j.get("completed_at"))
             if c and (earliest_job is None or c < earliest_job):
@@ -433,7 +448,7 @@ def process_jobs(jobs_data, config):
         # than 10 minutes before the first job, it's a re-run and we use
         # the job timestamp instead.
         run_start = earliest_job
-        rc = run_jobs[0].get("run_created_at")
+        rc = metric_jobs[0].get("run_created_at")
         if rc:
             run_trigger = parse_dt(rc)
             if run_trigger and (earliest_job - run_trigger).total_seconds() < 600:
@@ -442,9 +457,7 @@ def process_jobs(jobs_data, config):
         turnaround_min = (latest - run_start).total_seconds() / 60
         date_str = run_start.strftime("%Y-%m-%d")
         turnaround_by_date[date_str].append(turnaround_min)
-        wf_name = run_jobs[0].get("workflow_name", "")
         if wf_name == "CI":
-            check_ci = latest_completed_job(run_jobs, "check-ci")
             check_ci_completed = (
                 parse_dt(check_ci.get("completed_at")) if check_ci else None
             )
@@ -467,7 +480,7 @@ def process_jobs(jobs_data, config):
             # This is the fastest possible turnaround with full parallelization,
             # limited only by the critical path of build->test per platform.
             platform_times = defaultdict(lambda: {"build": 0, "test": 0})
-            for j in run_jobs:
+            for j in metric_jobs:
                 dur = j.get("duration_seconds") or 0
                 if dur <= 0:
                     continue
@@ -499,7 +512,7 @@ def process_jobs(jobs_data, config):
             build_starts = []
             build_ends_by_os = defaultdict(list)
             test_starts_by_os = defaultdict(list)
-            for j in run_jobs:
+            for j in metric_jobs:
                 jname = j.get("name", "")
                 started = parse_dt(j.get("started_at"))
                 completed = parse_dt(j.get("completed_at"))
@@ -555,10 +568,6 @@ def process_jobs(jobs_data, config):
     for run_id, run_jobs in runs.items():
         if not run_jobs:
             continue
-        if run_jobs[0].get("event") != "merge_group":
-            continue
-        if run_jobs[0].get("workflow_name") != "CI":
-            continue
 
         # The required aggregate gate defines the merge queue result. Optional
         # jobs such as test-falcor can finish later and must not turn a green
@@ -566,6 +575,11 @@ def process_jobs(jobs_data, config):
         check_ci = latest_completed_job(run_jobs, "check-ci")
         if not check_ci:
             continue
+        if check_ci.get("event") != "merge_group":
+            continue
+        if check_ci.get("workflow_name") != "CI":
+            continue
+        attempt_jobs = jobs_for_selected_attempt(run_jobs, check_ci)
         conclusion = check_ci.get("conclusion")
         if conclusion not in ("success", "failure", "cancelled"):
             continue
@@ -573,7 +587,7 @@ def process_jobs(jobs_data, config):
         # Date from earliest created_at. End turnaround at the required gate,
         # consistently with the main CI turnaround metric above.
         earliest = None
-        for j in run_jobs:
+        for j in attempt_jobs:
             c = parse_dt(j.get("created_at"))
             if c and (earliest is None or c < earliest):
                 earliest = c
@@ -592,12 +606,12 @@ def process_jobs(jobs_data, config):
             mq_tat_by_date[date_str].append(tat)
 
         if conclusion == "failure":
-            branch = run_jobs[0].get("head_branch", "")
+            branch = check_ci.get("head_branch", "")
             pr_num = parse_merge_queue_pr_number(branch)
 
             # Find failing job names
             failing_jobs = [
-                j.get("name", "") for j in run_jobs
+                j.get("name", "") for j in attempt_jobs
                 if j.get("conclusion") == "failure"
             ]
             mq_recent_failures.append({
@@ -606,7 +620,7 @@ def process_jobs(jobs_data, config):
                 "run_id": run_id,
                 "branch": branch,
                 "pr_number": pr_num,
-                "url": run_jobs[0].get("html_url", ""),
+                "url": check_ci.get("html_url", ""),
                 "failing_jobs": failing_jobs[:5],
             })
 
