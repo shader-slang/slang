@@ -3358,20 +3358,13 @@ static void removeUnreachableCodeAfterDiscardForOpKill(
     }
 }
 
-// Widen the index/offset operand at `indexOperand` of an access-chain instruction to a 32-bit
-// integer of the same signedness when it is a narrower integer, leaving it unchanged otherwise.
-// SPIR-V treats every OpAccessChain / OpPtrAccessChain index as signed regardless of the index
-// type's declared Signedness (per the SPIR-V spec's access-chain indexing semantics), so a
-// sub-32-bit unsigned index such as a
-// uint16_t of 40000 would be read as the negative value -25536 and address out of bounds. The
-// inserted cast preserves signedness, so emitIntCast later lowers an unsigned index with OpUConvert
-// (zero-extend) and a signed one with OpSConvert (sign-extend); the value the access chain sees is
-// then the intended one. Indices already 32 bits or wider are left untouched, so the 64-bit
-// indexing path (spvShader64BitIndexingEXT, #11967), which deliberately preserves index width, is
-// unaffected. A 32-bit *unsigned* index with bit 31 set is likewise still signed-negative but is
-// not handled here: it is unreachable for logical-pointer arrays, and the reachable
-// PhysicalStorageBuffer OpPtrAccessChain case needs 64-bit widening under a wide-index capability,
-// tracked as a follow-up.
+// Widen a sub-32-bit access-chain index/offset to a 32-bit integer of the same signedness.
+// An OpAccessChain / OpPtrAccessChain index is interpreted as signed, so a narrow *unsigned* index
+// (e.g. a uint16_t of 40000) reads as negative and addresses out of bounds. Widening to 32 bits
+// preserves the value -- emitIntCast then picks OpUConvert (unsigned) or OpSConvert (signed) --
+// while indices already 32 bits or wider are left alone, so the 64-bit indexing path (#11967) is
+// unaffected. Open: a 32-bit unsigned index with bit 31 set has the same hazard and needs 64-bit
+// widening (a wide-index-capability follow-up); it is unreachable for logical-pointer arrays.
 static void widenNarrowAccessChainIndex(
     IRInst* accessChainInst,
     UInt indexOperand,
