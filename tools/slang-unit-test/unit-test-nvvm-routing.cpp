@@ -132,9 +132,18 @@ SLANG_UNIT_TEST(cudaEmissionMethodLinkOptionsAffectRoutingAndHash)
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
     ComPtr<slang::ISession> nvrtcSession;
     ComPtr<slang::ISession> nvvmSession;
-    static const char kUnsupportedSource[] =
-        "[shader(\"compute\")] [numthreads(1, 1, 1)] void computeMain() { "
-        "GroupMemoryBarrierWithGroupSync(); }";
+    // Pointer equality is rejected before provider discovery, so this routing check does not
+    // depend on an installed CUDA toolkit or NVVM builder.
+    static const char kUnsupportedSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform Ptr<int, Access::Read, AddressSpace::Device> left,
+    uniform Ptr<int, Access::Read, AddressSpace::Device> right)
+{
+    *destination = left == right ? 1 : 0;
+}
+)";
     ComPtr<slang::IComponentType> nvrtcInput =
         createMinimalPTXProgram(globalSession, nvrtcSession, nullptr, kUnsupportedSource);
     ComPtr<slang::IComponentType> nvvmInput =
@@ -172,7 +181,7 @@ SLANG_UNIT_TEST(cudaEmissionMethodLinkOptionsAffectRoutingAndHash)
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(code == nullptr);
     SLANG_CHECK(getBlobSlice(diagnostics).indexOf(toSlice("E52017")) != -1);
-    SLANG_CHECK(getBlobSlice(diagnostics).indexOf(toSlice("'CUDA kernel decoration'")) != -1);
+    SLANG_CHECK(getBlobSlice(diagnostics).indexOf(toSlice("'cmpEQ'")) != -1);
 }
 
 SLANG_UNIT_TEST(invalidCUDAEmissionMethodIsDiagnosed)
