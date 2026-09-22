@@ -2730,7 +2730,31 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     String fullPath;
     Path::getCanonical(input.filePath, fullPath);
     wsFolder.uri = URI::fromLocalFilePath(Path::getParentDirectory(fullPath).getUnownedSlice()).uri;
-    if (input.testOptions->commandOptions.containsKey("root-uri-only"))
+    if (input.testOptions->commandOptions.containsKey("workspace-search-path-order"))
+    {
+        // Keep the fixture roots outside the opened document's directory. Opening a document adds
+        // that directory as a search path, and putting the roots below it verifies their explicit
+        // workspaceFolders order without relying on recursive directory enumeration order.
+        auto fixtureDir = Path::getParentDirectory(fullPath);
+        wsFolder.name = "first";
+        wsFolder.uri =
+            URI::fromLocalFilePath(Path::combine(fixtureDir, "first-root").getUnownedSlice()).uri;
+        initParams.workspaceFolders.add(wsFolder);
+        wsFolder.name = "second";
+        wsFolder.uri =
+            URI::fromLocalFilePath(Path::combine(fixtureDir, "second-root").getUnownedSlice()).uri;
+        initParams.workspaceFolders.add(wsFolder);
+    }
+    else if (input.testOptions->commandOptions.containsKey("additional-search-path-order"))
+    {
+        auto fixtureDir = Path::getParentDirectory(fullPath);
+        wsFolder.name = "workspace";
+        wsFolder.uri =
+            URI::fromLocalFilePath(Path::combine(fixtureDir, "workspace-root").getUnownedSlice())
+                .uri;
+        initParams.workspaceFolders.add(wsFolder);
+    }
+    else if (input.testOptions->commandOptions.containsKey("root-uri-only"))
         initParams.rootUri = wsFolder.uri;
     else
     {
@@ -2765,6 +2789,42 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     if (SLANG_FAILED(connection->getMessage(&initResult)))
     {
         return TestResult::Fail;
+    }
+
+    if (input.testOptions->commandOptions.containsKey("additional-search-path-order"))
+    {
+        // Configured search paths intentionally precede auto-discovered workspace paths. Exercise
+        // that contract through the same notification a real editor sends.
+        auto container = connection->getContainer();
+        auto fixtureDir = Path::getParentDirectory(fullPath);
+        auto additionalPath = Path::combine(fixtureDir, "additional-root");
+        JSONValue pathValue = container->createString(additionalPath.getUnownedSlice());
+        JSONValue pathsValue = container->createArray(&pathValue, 1);
+        JSONValue settingsValue = container->createObject(nullptr, 0);
+        container->setKeyValue(
+            settingsValue,
+            container->getKey(UnownedStringSlice("slang.additionalSearchPaths")),
+            pathsValue);
+
+        LanguageServerProtocol::DidChangeConfigurationParams configParams;
+        configParams.settings = settingsValue;
+        if (SLANG_FAILED(connection->sendCall(
+                LanguageServerProtocol::DidChangeConfigurationParams::methodName,
+                &configParams)))
+        {
+            return TestResult::Fail;
+        }
+
+        // Applying search paths asks the client to refresh semantic tokens and inlay hints. Drain
+        // those server-to-client calls before sending requests whose responses the test inspects.
+        for (Index i = 0; i < 2; ++i)
+        {
+            if (SLANG_FAILED(connection->waitForResult(-1)))
+                return TestResult::Fail;
+            JSONRPCCall refreshCall;
+            if (SLANG_FAILED(connection->getRPC(&refreshCall)))
+                return TestResult::Fail;
+        }
     }
 
     // Send open document call.
