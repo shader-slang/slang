@@ -15916,7 +15916,11 @@ uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($1))";
-    case cuda: __intrinsic_asm "__popc(__ballot_sync($0, $1)  & _getLaneLtMask())";
+    case cuda:
+        // CUDA lane indices are 0..31, so this mask excludes the current lane without
+        // shifting by the word width. Keep the caller's mask on the synchronized ballot.
+        uint lowerLanes = (uint(1) << WaveGetLaneIndex()) - uint(1);
+        return countbits(WaveMaskBallot(mask, value) & lowerLanes);
     case hlsl: __intrinsic_asm "WavePrefixCountBits($1)";
     case spirv:
         return spirv_asm

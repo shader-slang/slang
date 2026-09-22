@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "slice": 201,
+  "status": "blocked-on-gpu-recovery",
+  "scope": "Partial native Linux CUDA13.4 SM80 wave-subset regression attempt. No full frozen/discovery acceptance update.",
+  "metadata": {
+    "utc": "2026-09-22T14:42:45.307406+00:00",
+    "command": [
+      "/usr/bin/python3",
+      "issue-nvvm-backend/run-compute-census.py",
+      "--bin-dir",
+      "build/Debug/bin",
+      "--provider",
+      "build/Debug/bin",
+      "--architecture",
+      "80",
+      "--workload-ids-from",
+      "/opt/src/slang/build/nvvm-feature-loop/slice-201/wave-identities.tsv",
+      "--output",
+      "/opt/src/slang/build/nvvm-feature-loop/slice-201/wave",
+      "--jobs",
+      "4"
+    ],
+    "baseline": "build/nvvm-slice200-frozen-final/results.json",
+    "baseline_sha256": "a86fa454a1511ac4a629e9b8e3707d114c90f378d401aa7499607f7ceba94391",
+    "binary_sha256": {
+      "build/Debug/bin/slangc": "65aa71514cde88aeebf1e1eec4543ba1084e2f5fe90610b3dfd164a3123f017a",
+      "build/Debug/bin/libslang-llvm-nvvm.so": "c4c813c9a554a8d678791af833ef67ca313391221333521ea1801831fc54db97",
+      "build/Debug/lib/libslang.so": "5710edec7cb37e94f3a5a0a9ced75ea8ba35d58092704735cf0a1b66c132b9fc",
+      "build/Debug/bin/slang-test": "7b7bc82e82e6d340bf5cfc61b6f3160738fd4e21448f4dbb1016483c5753af27",
+      "build/Debug/lib/libslang-compiler.so": "5710edec7cb37e94f3a5a0a9ced75ea8ba35d58092704735cf0a1b66c132b9fc",
+      "build/Debug/lib/slang-core-module.bin": "fa493bbed75180151e2129593ce0574337f6d2d76a2a30f4f4861ef5c1aa6932",
+      "build/Debug/lib/librender-test-tool.so": "63b37158bddfb39f40a651e34f983d6545f20051daa257a78ffbc36896718dac"
+    }
+  },
+  "attempt": {
+    "selected_frozen_identities": 61,
+    "intended_mode_rows": 183,
+    "started_modes": ["nvrtc-o3"],
+    "completed_log_counts": {
+      "infrastructure": 46,
+      "correct": 14
+    },
+    "interrupted_workloads": [
+      "hlsl-intrinsic/wave-mask/wave-broadcast-lane-at.slang#cuda-1"
+    ],
+    "unstarted_modes": ["nvvm-o0", "nvvm-o3"],
+    "result_inventory_created": false,
+    "inherited_baseline_frozen_identities": 452,
+    "inherited_baseline_discovery_identities": 82,
+    "baseline_promotion": "none; preserve slice200 acceptance unchanged"
+  },
+  "device_failure": {
+    "utc": "2026-09-22T14:43:07Z",
+    "xid": 79,
+    "description": "GPU has fallen off the bus",
+    "reported_process": {
+      "pid": 29855,
+      "name": "slang-test"
+    },
+    "recovery_xid": 154,
+    "driver_requested_recovery": "OS Reboot",
+    "kernel_log": "build/nvvm-feature-loop/slice-201/driver-diagnostics/kernel.log",
+    "kernel_log_sha256": "1287c18bdcd002fd157baac5f57eb5ff13c3d93bce1205b9f5857649a5c7a5e9"
+  },
+  "notes": [
+    "Fourteen individual NVRTC logs have exact 1/1 passing summaries. Forty-six later completed logs report infrastructure failures after GPU loss. One active process was terminated after the device became unavailable.",
+    "The operation-level GPU fixtures and compiler/PTX checks are recorded separately by the parent slice report.",
+    "No driver or hardware cause has been established. The Xid process does not identify a compiler regression. No retries are hidden in this evidence.",
+    "The interrupted broadcast-lane process PID29907 differs from the driver-reported PID29855. No test is identified as causing the hardware/driver fault."
+  ],
+  "completed_focused_checks": {
+    "new_prefix_gpu_fixture": {
+      "passed": 3,
+      "executed": 3,
+      "ignored": 0,
+      "modes": ["nvrtc-o3", "nvvm-o0", "nvvm-o3"],
+      "evidence": {
+        "path": "build/nvvm-slice201/focused.log",
+        "sha256": "4b921d49a8943af33131ed5888ee477b695a32645e8dcbaf186557d5ba27d046"
+      }
+    },
+    "focused_regression_units": {
+      "passed": 474,
+      "executed": 474,
+      "ignored": 1,
+      "ignored_reason": "Existing Windows-only typed integer bit helper test",
+      "evidence": {
+        "path": "build/nvvm-slice201/unit.log",
+        "sha256": "a7a3366891016ed3046f3b11baa02fd7062383da37b3f89a9c3a529818aecded"
+      }
+    },
+    "ptx_and_assembly": {
+      "passed_commands": 8,
+      "shader_count": 2,
+      "optimizations": ["O0", "O3"],
+      "ptx_compilations": 4,
+      "assemblies": 4,
+      "evidence": {
+        "path": "build/nvvm-slice201/assembly/results.json",
+        "sha256": "96c22f5a1bb168cbc5313f581f7d4e046564e54eb31334339590cbbe16d54eef"
+      }
+    },
+    "before_fix": {
+      "path": "build/nvvm-slice201/before.log",
+      "sha256": "d3538c654d81d6cd628ebf79e296a7c614e1e4b63ed66024629c290a1ff361e1"
+    },
+    "build": {
+      "path": "build/nvvm-slice201/build.log",
+      "sha256": "cb426bac2b17b1318687dc91de59c349ae3b456a3ba537e2ac69010be10a4376"
+    }
+  },
+  "partial_log_evidence": {
+    "path": "build/nvvm-feature-loop/slice-201/partial-log-evidence.json",
+    "sha256": "9b743b0a38f470c7dfe5b107112d7d883419c3e732d74e59eafe479f2384ce84",
+    "records": 60,
+    "counts": {
+      "infrastructure": 46,
+      "correct": 14
+    }
+  },
+  "selected_frozen_manifest": {
+    "path": "build/nvvm-feature-loop/slice-201/wave-identities.tsv",
+    "sha256": "409eb106a0cc7a7e4b1616388f9ee1d2aa334cc2f146caf65979908663354360",
+    "identities": 61
+  }
+}
