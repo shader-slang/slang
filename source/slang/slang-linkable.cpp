@@ -310,15 +310,15 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
 
     // A component's own option set feeds target code generation (TargetProgram merges it in), so it
     // belongs in the entry-point cache key -- in particular the link-time downstream arguments that
-    // linkWithOptions records here (e.g. -Xnvrtc --gpu-architecture=), which nothing above hashes.
+    // linkWithOptions records here (e.g. an -Xnvrtc --fmad= flag), which nothing above hashes.
     //
     // This runs for every component kind. For a plain composite from link() the own set is empty,
-    // so it appends nothing. For a Module the own set is the linkage's session option set, so those
-    // options end up folded into the digest three times: through getLinkage()->buildHash above,
-    // through buildHash() above (Module::buildHash -> computeDigest also hashes the module's option
-    // set), and through this call. For a specialized component the own set is the base's, copied
-    // via overrideWith. The extra hashing is deterministic and safe -- appending more bytes can
-    // only turn a cache hit into a miss, never a miss into a false hit.
+    // so it appends nothing. For a Module the own set is the linkage's session option set, which is
+    // therefore reached by three distinct hashing paths: getLinkage()->buildHash above (which also
+    // hashes the target option set), buildHash() above (Module::buildHash -> computeDigest also
+    // hashes the module's option set), and this call. For a specialized component the own set is
+    // the base's, copied via overrideWith. The extra hashing is deterministic and safe -- appending
+    // more bytes can only turn a cache hit into a miss, never a miss into a false hit.
     getOptionSet().buildHash(builder);
 
     // Add the name and name override for the specified entry point to the hash.
