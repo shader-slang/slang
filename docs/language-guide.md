@@ -126,6 +126,326 @@ struct PointLight : ILight
 }
 ```
 
+### `some` and `dyn`
+
+Interface-typed variables can be qualified with either `some` or `dyn` when used as variable, parameter, or return type to make explicit distinction between compile-time polymorphism (`some`) and runtime polymorphism (`dyn`). When not explicitly qualified, interface typed variables default to `some` in language version 2026+ and `dyn` in language version 2025.
+
+#### `dyn` Interface Declarations
+
+Interface types that can be used for dynamic dispatch must be qualified with the `dyn` keyword:
+
+```C#
+#lang 2026
+
+// Define an interface that can be used for dynamic dispatch
+dyn interface IRenderer
+{
+    float4 render(float3 position);
+}
+
+void renderScene()
+{
+	// Define variable that can participate in dynamic dispatch
+    dyn IRenderer renderer = getRenderer();
+
+    float4 color = renderer.render(position);
+}
+```
+
+If language version is 2025 or older, all `interface` declarations are implicitly `dyn`.
+
+```C#
+#lang 2025
+
+/*dyn*/ interface DynInterface
+{
+}
+```
+
+If `interface` declaration has the modifier `[anyValueSize(...)]`, the `interface` is implicitly `dyn`.
+
+```C#
+#lang 2025
+
+[anyValueSize(16)]
+/*dyn*/ interface DynInterface
+{
+}
+```
+
+`dyn` interface-declarations have the following restrictions if language version is 2026+ and does not have the flag `-enable-experimental-dynamic-dispatch`:
+- Cannot be generic
+- Cannot define associated types
+- Cannot define generic methods
+- Cannot define mutating methods
+- Cannot contain methods with `some` types in parameters or return values
+- Cannot inherit from non-`dyn` interface-types
+- Cannot contain any function requirements that are marked as `[Differentiable]`.
+
+Conforming to a `dyn` interface:
+- Types conforming to `dyn` interfaces must be ordinary data types. This means the subtype conforming to the `dyn` interface cannot contain opaque (like `Texture2D`), non-copyable, and unsized elements.
+
+Additional restrictions for types conforming to a `dyn` interface if language version is 2026+ and does not have the flag `-enable-experimental-dynamic-dispatch`:
+- The type conforming to a `dyn` interface itself cannot be generic.
+- Extensions that make types conform to `dyn` interface-type are not allowed.
+
+#### `dyn` and `some` Interface Typed Variables
+
+Variables, parameters, and return values of interface type can be declared with either `some` or `dyn` qualifiers to control whether compile-time or runtime polymorphism is used. 
+
+#### `some` Interface Typed Variables
+
+A `some` interface variable represents a concrete type that implements the interface, with the type determined at compile time. Each `some` variable declaration creates a unique type, even if they reference the same interface.
+
+```C#
+#lang 2026
+
+interface ILight
+{
+    float3 getColor();
+    [mutating] void setIntensity(float intensity);
+}
+
+struct PointLight : ILight { /* ... */ }
+struct DirectionalLight : ILight { /* ... */ }
+
+// Function parameter - concrete type determined at call site
+void processLight(some ILight light)
+{
+    float3 color = light.getColor(); // No dynamic dispatch
+}
+
+// Usage
+void example()
+{
+    PointLight point;
+    DirectionalLight directional;
+    
+    processLight(point); // Concrete type: PointLight
+    processLight(directional); // Concrete type: DirectionalLight
+}
+```
+
+**Where `some` variables can be used:**
+- Function parameters (`in`, `out`, `inout`)
+- Function return values
+- Local variables
+- **Cannot** be used in struct fields or global variables
+- **Cannot** appear in complex type expressions like `some ILight[]`, `some ILight*`, `Tuple<some T>`
+
+```C#
+void localVariableExample()
+{
+    some ILight light;
+    some ILight lights[10]; // ERROR: cannot use some in complex types
+}
+// ERROR: cannot use some in struct fields
+struct Container { some ILight light; }
+
+// ERROR: cannot use some in global variables
+static some ILight globalLight;
+```
+
+**General assignment rules for `some`:**
+- Cannot assign two different `some` declarations since they are considered **different types**.
+- `some` typed return's must return the same type via all `return` statements.
+- `some` variables must only be assigned/initialized once throughout their lifetime.
+    - Unassigned `some` type will be called `unbound_some` type for clarity. All `unbound_some` types must be assigned by the same type in a given compile
+	    - `out` types are considered `unbound_some` types
+		- New variables are an `unbound_some` type.
+	- Assigned `some` type which cannot be assigned again will be called `bound_some` type for clarity.
+		- `in`/`inout` types are considered `bound_some` types
+
+```C#
+// Bound some types - concrete type already determined
+void processBoundSome(in some ILight light, // Bound by caller
+                      inout some ILight light2) // Bound by caller
+{
+    float3 color = light.getColor(); // OK - calling methods on bound type
+    light2.setIntensity(0.8f); // OK - mutating bound type
+    
+    // light2 = DirectionalLight(); // ERROR - cannot reassign bound type
+}
+
+// Unbound some types - concrete type to be determined
+void createUnboundSome(out some ILight light1, // Unbound - function determines type
+                       out some ILight light2) // Unbound - function determines type
+{
+    light1 = PointLight(); // OK - binding to concrete type
+    light2 = DirectionalLight(); // OK - binding to different concrete type
+}
+
+// Local variables can be bound or unbound
+void localVariableExample()
+{
+    some ILight boundLight = PointLight();  // Bound immediately
+    some ILight unboundLight; // Unbound initially
+    
+    unboundLight = DirectionalLight(); // OK - binding unbound variable
+    // unboundLight = PointLight(); // ERROR - cannot rebind
+    
+    // boundLight = DirectionalLight(); // ERROR - cannot reassign bound type
+}
+
+// Return type consistency - all returns must be same concrete type
+some ILight getLight(int choice)
+{
+    if (choice == 0)
+        return PointLight(); // OK
+    else if (choice == 1)
+        return PointLight(); // OK - same concrete type
+    else
+		return DirectionalLight(); // ERROR - different concrete type
+}
+
+void lightMultiAssignmentExample(int choice)
+{
+    some ILight unboundLight1;
+    if (choice < 1)
+        unboundLight1 = PointLight(); // OK
+	if (choice < 2)
+        unboundLight1 = PointLight(); // Error - potential reassignment of type
+    
+    some ILight unboundLight2;
+    if (choice < 1)
+        unboundLight1 = PointLight(); // OK
+	else if (choice < 2)
+	{
+        unboundLight1 = PointLight(); // OK
+        unboundLight1 = PointLight(); // Error - may assign twice
+	}
+
+	some ILight unboundLight3;
+	for(int i = 0; i < choice; i++)
+		unboundLight3 = PointLight(); // Error - may assign more than once
+
+	some ILight unboundLight4;
+    if (choice < 1)
+        unboundLight4 = PointLight(); // OK
+	else if (choice < 2)
+        unboundLight4 = PointLight(); // OK
+}
+```
+
+#### `dyn` Interface Typed Variables
+
+A `dyn` interface variable can store any type implementing a `dyn` interface and may use dynamic dispatch. Only interfaces marked with `dyn` can be used with `dyn` variables.
+
+```C#
+#lang 2026
+
+dyn interface IRenderer
+{
+    float4 render(float3 position);
+}
+
+struct RasterRenderer : IRenderer { /* ... */ }
+struct RayTracer : IRenderer { /* ... */ }
+
+void renderScene()
+{
+    dyn IRenderer renderer = getRenderer(); // May involve dynamic dispatch
+    float4 color = renderer.render(position); // Potentially dynamic call
+}
+```
+
+**Where `dyn` variables can be used:**
+- Everywhere a normal variable can be used
+	- Function parameters (`in`, `out`, `inout`) 
+	- Function return values
+	- Local variables
+	- Struct fields
+	- Global variables
+	- Complex type expressions like `dyn IRenderer[]`
+	- ...
+
+**General assignment rules for `dyn`:**
+- Allowed to assign `dyn` variables to each other
+- May be assigned & reassigned as needed
+
+```C#
+#lang 2026
+
+// Valid uses of `dyn` in various contexts
+struct LightingSystem
+{
+    dyn IRenderer primaryRenderer;  // OK - struct field
+    dyn IRenderer renderers[10];    // OK - array
+}
+
+dyn IRenderer globalRenderer; // OK - global variable
+
+void dynFunctions(dyn IRenderer renderer)
+{
+    dyn IRenderer local = renderer; // OK - local assignment
+}
+```
+
+#### Interactions between `some` and `dyn` variables
+
+- Variables are allowed to assign `some` interface to `dyn` interface (implicit conversion).
+    - Cannot assign `some` to `out dyn` or `inout dyn`
+- Variables are not allowed to assign `dyn` interface to `some` interface.
+
+```C#
+#lang 2026
+
+void outDyn(out dyn ILight Var)
+{
+
+}
+void conversionRules(some ILight someLight, dyn ILight dynLight1, dyn ILight dynLight2)
+{
+    // OK: some can be implicitly converted to `dyn`
+    dyn ILight dynFromSome = someLight;
+    
+    // OK: `dyn` variables can be assigned to each other
+	// OK: `dyn` variables can be assigned & reassigned
+    dynLight1 = dynLight2;
+	
+    // ERROR: `dyn` cannot be converted to some
+    some ILight someFromDyn = dynLight;
+
+    // ERROR: cannot assign `some` to `out dyn`, `inout dyn`, or other L-value senarios
+    outDyn(someLight);
+}
+
+// Implicit conversions work with some but not `dyn` due to type uniqueness
+struct Processor
+{
+    __implicit_conversion(1)
+    __init(dyn ILight light) { /* ... */ }
+}
+
+void implicitConversionExample()
+{
+    dyn ILight dynLight = PointLight();
+    some ILight someLight = PointLight();
+    
+    Processor p1 = dynLight;   // OK - implicit conversion
+}
+```
+
+#### How Language version affects `some` and `dyn`
+
+When a variable with an interface as a type is not specified as `some` or `dyn`, variables default to `some` in language version 2026+, else as `dyn`
+
+```C#
+// Language version 2025 (default to dyn)
+#lang 2025
+struct Container2025
+{
+    ILight light; // Implicitly dyn ILight - OK
+}
+
+// Language version 2026 (default to some)  
+#lang 2026
+struct Container2026
+{
+    ILight light; // Implicitly some ILight - ERROR
+}
+```
+
 ### Generics
 
 Slang supports *generic* declarations, using the common angle-bracket (`<>`) syntax from languages like C#, Java, etc.
