@@ -2092,19 +2092,22 @@ static SlangResult _testCompilerOptionHashIsInsertionOrderIndependent()
     return SLANG_OK;
 }
 
-// Return the entry-point hash for a program built from the same shader source and linked with one
-// `-Xnvrtc <downstreamArg>` option via linkWithOptions, which stores it in the linked component's
-// own option set. The two callers below differ only in downstreamArg. The PTX target makes the
-// nvrtc argument a real codegen input; no GPU is needed since no code is emitted.
-static SlangResult _getLinkTimeDownstreamArgEntryPointHash(
-    const char* downstreamArg,
+// Return the entry-point hash for a program built from the same shader source and linked via
+// linkWithOptions with the given link-time options, which are stored in the linked component's own
+// option set. `target` selects which options are codegen-relevant. getEntryPointHash only builds
+// the digest, so no GPU or target-code compilation runs (building the digest may load the target's
+// downstream compiler to query its version, but that is constant across calls here).
+static SlangResult _getLinkTimeOptionEntryPointHash(
+    SlangCompileTarget target,
+    const slang::CompilerOptionEntry* linkOptions,
+    SlangInt linkOptionCount,
     ComPtr<ISlangBlob>& outHash)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_RETURN_ON_FAIL(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()));
 
     slang::TargetDesc targetDesc = {};
-    targetDesc.format = SLANG_PTX;
+    targetDesc.format = target;
 
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
@@ -2116,8 +2119,8 @@ static SlangResult _getLinkTimeDownstreamArgEntryPointHash(
     ComPtr<slang::IBlob> diagnostics;
     ComPtr<slang::IModule> module;
     module = session->loadModuleFromSourceString(
-        "linkTimeDownstreamArgHash",
-        "link-time-downstream-arg-hash.slang",
+        "linkTimeOptionHash",
+        "link-time-option-hash.slang",
         kCoverageCliShader,
         diagnostics.writeRef());
     if (!module)
@@ -2138,16 +2141,10 @@ static SlangResult _getLinkTimeDownstreamArgEntryPointHash(
         compositeProgram.writeRef(),
         diagnostics.writeRef()));
 
-    slang::CompilerOptionEntry linkOptions[] = {
-        _makeString2CompilerOption(
-            slang::CompilerOptionName::DownstreamArgs,
-            "nvrtc",
-            downstreamArg),
-    };
     ComPtr<slang::IComponentType> linkedProgram;
     SLANG_RETURN_ON_FAIL(compositeProgram->linkWithOptions(
         linkedProgram.writeRef(),
-        SLANG_COUNT_OF(linkOptions),
+        (uint32_t)linkOptionCount,
         linkOptions,
         diagnostics.writeRef()));
 
@@ -2155,27 +2152,91 @@ static SlangResult _getLinkTimeDownstreamArgEntryPointHash(
     return outHash ? SLANG_OK : SLANG_FAIL;
 }
 
-// Two different `--gpu-architecture` values change the emitted PTX, so they must produce different
-// entry-point hashes (the hash is a shader-cache key); the same value twice must match.
-static SlangResult _testLinkTimeDownstreamArgsAffectCompilerOptionHash()
+// Link with a single `-X<tool> <arg>` downstream-compiler argument and return the entry-point hash.
+static SlangResult _getLinkTimeDownstreamArgHash(
+    SlangCompileTarget target,
+    const char* tool,
+    const char* arg,
+    ComPtr<ISlangBlob>& outHash)
 {
+    slang::CompilerOptionEntry options[] = {
+        _makeString2CompilerOption(slang::CompilerOptionName::DownstreamArgs, tool, arg),
+    };
+    return _getLinkTimeOptionEntryPointHash(target, options, SLANG_COUNT_OF(options), outHash);
+}
+
+// The fix hashes the linked component's entire option set, so any link-time option that reaches
+// code generation must change the entry-point hash (the hash is a shader-cache key). We check three
+// independent slices of that contract, each using an option that is codegen-relevant for its target
+// so a differing hash is a real cache distinction and not a spurious miss: a CUDA downstream
+// argument (the reported NVRTC case), a DXC/DXIL downstream argument (a second downstream backend),
+// and a non-DownstreamArgs option (VulkanBindGlobals on SPIR-V, exercised via linkWithOptions).
+static SlangResult _testLinkTimeOptionsAffectCompilerOptionHash()
+{
+    // 1) CUDA/PTX downstream args: two `--gpu-architecture` values emit different PTX, so they must
+    // hash differently; the same argument twice must match (isolating the argument as the cause).
     ComPtr<ISlangBlob> arch75Hash;
-    SLANG_RETURN_ON_FAIL(
-        _getLinkTimeDownstreamArgEntryPointHash("--gpu-architecture=compute_75", arch75Hash));
+    SLANG_RETURN_ON_FAIL(_getLinkTimeDownstreamArgHash(
+        SLANG_PTX,
+        "nvrtc",
+        "--gpu-architecture=compute_75",
+        arch75Hash));
 
     ComPtr<ISlangBlob> arch120Hash;
-    SLANG_RETURN_ON_FAIL(
-        _getLinkTimeDownstreamArgEntryPointHash("--gpu-architecture=compute_120", arch120Hash));
+    SLANG_RETURN_ON_FAIL(_getLinkTimeDownstreamArgHash(
+        SLANG_PTX,
+        "nvrtc",
+        "--gpu-architecture=compute_120",
+        arch120Hash));
 
     if (_blobContentEquals(arch75Hash, arch120Hash))
         return SLANG_FAIL;
 
-    // Control: the same argument twice must match, so the difference above is due to the argument.
     ComPtr<ISlangBlob> arch75HashRepeat;
-    SLANG_RETURN_ON_FAIL(
-        _getLinkTimeDownstreamArgEntryPointHash("--gpu-architecture=compute_75", arch75HashRepeat));
+    SLANG_RETURN_ON_FAIL(_getLinkTimeDownstreamArgHash(
+        SLANG_PTX,
+        "nvrtc",
+        "--gpu-architecture=compute_75",
+        arch75HashRepeat));
 
     if (!_blobContentEquals(arch75Hash, arch75HashRepeat))
+        return SLANG_FAIL;
+
+    // 2) A second downstream backend (DXC/DXIL): two different dxc arguments must hash differently,
+    // confirming the fix is not NVRTC-specific.
+    ComPtr<ISlangBlob> dxcOdHash;
+    SLANG_RETURN_ON_FAIL(_getLinkTimeDownstreamArgHash(SLANG_DXIL, "dxc", "-Od", dxcOdHash));
+
+    ComPtr<ISlangBlob> dxcO3Hash;
+    SLANG_RETURN_ON_FAIL(_getLinkTimeDownstreamArgHash(SLANG_DXIL, "dxc", "-O3", dxcO3Hash));
+
+    if (_blobContentEquals(dxcOdHash, dxcO3Hash))
+        return SLANG_FAIL;
+
+    // 3) A non-DownstreamArgs link-time option (VulkanBindGlobals on SPIR-V): the fix hashes the
+    // whole option set, not just downstream arguments, so two different binding sets must differ.
+    slang::CompilerOptionEntry bindSet0[] = {
+        _makeInt2CompilerOption(slang::CompilerOptionName::VulkanBindGlobals, 0, 0),
+    };
+    slang::CompilerOptionEntry bindSet1[] = {
+        _makeInt2CompilerOption(slang::CompilerOptionName::VulkanBindGlobals, 0, 1),
+    };
+
+    ComPtr<ISlangBlob> bindSet0Hash;
+    SLANG_RETURN_ON_FAIL(_getLinkTimeOptionEntryPointHash(
+        SLANG_SPIRV,
+        bindSet0,
+        SLANG_COUNT_OF(bindSet0),
+        bindSet0Hash));
+
+    ComPtr<ISlangBlob> bindSet1Hash;
+    SLANG_RETURN_ON_FAIL(_getLinkTimeOptionEntryPointHash(
+        SLANG_SPIRV,
+        bindSet1,
+        SLANG_COUNT_OF(bindSet1),
+        bindSet1Hash));
+
+    if (_blobContentEquals(bindSet0Hash, bindSet1Hash))
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -2207,7 +2268,7 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testDuplicateIntOptionReplacesSecondOperand()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testMultiStringOptionHashIsDelimited()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCompilerOptionHashIsInsertionOrderIndependent()));
-    SLANG_CHECK(SLANG_SUCCEEDED(_testLinkTimeDownstreamArgsAffectCompilerOptionHash()));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testLinkTimeOptionsAffectCompilerOptionHash()));
 }
 
 SLANG_UNIT_TEST(SlangcCoverageManifestOutputMetalLib)
