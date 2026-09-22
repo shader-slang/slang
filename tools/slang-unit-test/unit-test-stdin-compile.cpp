@@ -2197,15 +2197,16 @@ static SlangResult _testLinkTimeOptionsAffectCompilerOptionHash()
 
     // 2) A second downstream backend (DXC/DXIL): -Gfa and -Gfp select opposing flow-control codegen
     // strategies that dxc honors and that Slang does not override, so they must hash differently --
-    // the contract is not specific to NVRTC. (-all_resources_bound is required for the SM 5.1+ DXIL
-    // profile to compile at all; the argline deserializes into both dxc arguments.)
+    // the contract is not specific to NVRTC. -all_resources_bound is required for the SM 5.1+ DXIL
+    // profile to compile; the argline is newline-delimited because a DownstreamArgs argline
+    // deserializes one dxc argument per line (CommandLineArgs::deserialize splits on '\n').
     ComPtr<ISlangBlob> gfaHash;
     SLANG_RETURN_ON_FAIL(
-        _getLinkTimeDownstreamArgHash(SLANG_DXIL, "dxc", "-Gfa -all_resources_bound", gfaHash));
+        _getLinkTimeDownstreamArgHash(SLANG_DXIL, "dxc", "-Gfa\n-all_resources_bound", gfaHash));
 
     ComPtr<ISlangBlob> gfpHash;
     SLANG_RETURN_ON_FAIL(
-        _getLinkTimeDownstreamArgHash(SLANG_DXIL, "dxc", "-Gfp -all_resources_bound", gfpHash));
+        _getLinkTimeDownstreamArgHash(SLANG_DXIL, "dxc", "-Gfp\n-all_resources_bound", gfpHash));
 
     if (_blobContentEquals(gfaHash, gfpHash))
         return SLANG_FAIL;
