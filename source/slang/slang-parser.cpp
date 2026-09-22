@@ -4780,6 +4780,19 @@ static NodeBase* parseRequireCapabilityDecl(Parser* parser, void*)
     return decl;
 }
 
+static NodeBase* parseStaticAssertDecl(Parser* parser, void*)
+{
+    auto decl = parser->astBuilder->create<StaticAssertDecl>();
+    parser->FillPosition(decl);
+    parser->ReadToken(TokenType::LParent);
+    decl->condition = parser->ParseArgExpr();
+    if (AdvanceIf(parser, TokenType::Comma))
+        decl->message = parser->ParseArgExpr();
+    parser->ReadToken(TokenType::RParent);
+    parser->ReadToken(TokenType::Semicolon);
+    return decl;
+}
+
 static NodeBase* parseConstructorDecl(Parser* parser, void* /*userData*/)
 {
     ConstructorDecl* decl = parser->astBuilder->create<ConstructorDecl>();
@@ -7106,6 +7119,21 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowC
     else if (LookAheadToken("__requireCapability"))
     {
         statement = ParseRequireCapabilityStatement();
+    }
+    else if (LookAheadToken("static_assert"))
+    {
+        // `static_assert` is registered as a syntax decl, but statement parsing does not consult
+        // the syntax-decl table for a leading identifier (see the TODO in the identifier branch
+        // below), so we dispatch to its parse callback explicitly and wrap the resulting decl in a
+        // `DeclStmt`. Adding it to the current container keeps its scope chain intact so the
+        // condition can reference names in the enclosing body.
+        ReadToken("static_assert");
+        auto decl = as<Decl>(parseStaticAssertDecl(this, nullptr));
+        AddMember(currentScope->containerDecl, decl);
+        auto declStmt = astBuilder->create<DeclStmt>();
+        declStmt->loc = decl->loc;
+        declStmt->decl = decl;
+        statement = declStmt;
     }
     else if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
     {
@@ -10865,6 +10893,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("__transparent_block", parseTransparentBlockDecl),
     _makeParseDecl("__file_decl", parseFileDecl),
     _makeParseDecl("__require_capability", parseRequireCapabilityDecl),
+    _makeParseDecl("static_assert", parseStaticAssertDecl),
 
     // !!!!!!!!!!!!!!!!!!!!!! Modifer !!!!!!!!!!!!!!!!!!!!!!
 

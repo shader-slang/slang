@@ -95,6 +95,7 @@ bool isSimpleDecoration(IROp op)
     case kIROp_Shader64BitIndexingDecoration:
     case kIROp_SynthesizedParameterGroupDecoration:
     case kIROp_KeepAliveDecoration:
+    case kIROp_StaticAssertContainerDecoration:
     case kIROp_LineAdjInputPrimitiveTypeDecoration:
     case kIROp_LineInputPrimitiveTypeDecoration:
     case kIROp_NoInlineDecoration:

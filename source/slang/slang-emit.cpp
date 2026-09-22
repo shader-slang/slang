@@ -698,8 +698,10 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
             {
                 if (!condiLit->getValue())
                 {
-                    IRInst* msg = inst->getOperand(1);
-                    if (auto msgLit = as<IRStringLit>(msg))
+                    IRStringLit* msgLit = nullptr;
+                    if (inst->getOperandCount() > 1)
+                        msgLit = as<IRStringLit>(inst->getOperand(1));
+                    if (msgLit)
                     {
                         sink->diagnose(Diagnostics::StaticAssertionFailure{
                             .message = String(msgLit->getStringSlice()),
@@ -738,6 +740,29 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
     }
 
     return false;
+}
+
+// Evaluate every `static_assert` in the module (via `checkStaticAssert`) and then delete the
+// synthesized carrier functions that hosted the out-of-function-body ones. This runs on the codegen
+// path of *every* target — including the interpreter's early-out in `linkAndOptimizeIR` — because
+// `checkStaticAssert` is the only place a `static_assert` is diagnosed (the front end defers
+// evaluation), and a surviving carrier or `kIROp_StaticAssert` would otherwise reach a backend that
+// has no lowering for it (e.g. the VM emitter aborts on the unhandled op).
+static void checkAndRemoveStaticAsserts(IRModule* irModule, DiagnosticSink* sink)
+{
+    checkStaticAssert(irModule->getModuleInst(), sink);
+
+    // `checkStaticAssert` has removed each assertion, so a carrier now only computes its (unused)
+    // condition and returns; delete the carriers so they are never emitted.
+    List<IRInst*> staticAssertCarriers;
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (inst->getOp() == kIROp_Func &&
+            inst->findDecoration<IRStaticAssertContainerDecoration>())
+            staticAssertCarriers.add(inst);
+    }
+    for (auto carrier : staticAssertCarriers)
+        carrier->removeAndDeallocate();
 }
 
 static void unexportNonEmbeddableIR(IRModule* irModule, CodeGenTarget target)
@@ -1807,6 +1832,17 @@ Result linkAndOptimizeIR(
         // as the later target pipelines do.
         SLANG_PASS(cleanUpVoidType);
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
+
+        // The interpreter path returns here, before the shared `static_assert` check below, so run
+        // it now: `simplifyIR` has folded the conditions, and the VM emitter has no
+        // `kIROp_StaticAssert` lowering, so an unchecked/undeleted assertion would abort byte-code
+        // generation. `checkAndRemoveStaticAsserts` diagnoses a failed assertion into `sink` and
+        // then removes the inst, so this early return must translate a populated sink into
+        // `SLANG_FAIL`; otherwise a caller that surfaces diagnostics only on a failed result — e.g.
+        // `slangi` via `getTargetCode` — would run a program whose assertion failed.
+        checkAndRemoveStaticAsserts(irModule, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
         return SLANG_OK;
     }
 
@@ -2152,9 +2188,9 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    // Process `static_assert` after the specialization is done.
-    // Some information for `static_assert` is available only after the specialization.
-    checkStaticAssert(irModule->getModuleInst(), sink);
+    // Process `static_assert` after the specialization is done, since a condition can depend on
+    // information (`sizeof`, layout, target/stage specialization) that is only available now.
+    checkAndRemoveStaticAsserts(irModule, sink);
 
     switch (target)
     {

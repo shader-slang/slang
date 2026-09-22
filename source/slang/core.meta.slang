@@ -486,13 +486,6 @@ void __requirePrelude(constexpr String preludeText);
 __intrinsic_op($(kIROp_RequireTargetExtension))
 void __requireTargetExtension(constexpr String preludeText);
 
-/// @experimetal
-/// Perform a compile-time condition check and emit a compile-time error if the condition is false.
-/// @param condition The compile-time condition to check.
-/// @param errorMessage The error message to emit if the condition is false.
-__intrinsic_op($(kIROp_StaticAssert))
-void static_assert(constexpr bool condition, NativeString errorMessage);
-
 /// Represents a 'value' type that is differentiable for the purposes of automatic differentiation.
 ///
 /// See the auto-diff user guide section for an introduction to
