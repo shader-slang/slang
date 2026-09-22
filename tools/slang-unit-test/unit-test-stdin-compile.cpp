@@ -2152,7 +2152,6 @@ static SlangResult _getLinkTimeOptionEntryPointHash(
     return outHash ? SLANG_OK : SLANG_FAIL;
 }
 
-// Link with a single `-X<tool> <arg>` downstream-compiler argument and return the entry-point hash.
 static SlangResult _getLinkTimeDownstreamArgHash(
     SlangCompileTarget target,
     const char* tool,
@@ -2165,12 +2164,12 @@ static SlangResult _getLinkTimeDownstreamArgHash(
     return _getLinkTimeOptionEntryPointHash(target, options, SLANG_COUNT_OF(options), outHash);
 }
 
-// The fix hashes the linked component's entire option set, so any link-time option that reaches
-// code generation must change the entry-point hash (the hash is a shader-cache key). We check three
-// independent slices of that contract, each using an option that is codegen-relevant for its target
-// so a differing hash is a real cache distinction and not a spurious miss: a CUDA downstream
-// argument (the reported NVRTC case), a DXC/DXIL downstream argument (a second downstream backend),
-// and a non-DownstreamArgs option (VulkanBindGlobals on SPIR-V, exercised via linkWithOptions).
+// The entry-point hash is a shader-cache key that includes the linked component's own option set,
+// so any link-time option that reaches code generation must change it. Three independent slices of
+// that contract are checked, each using an option that is codegen-relevant for its target so a
+// differing hash is a real cache distinction rather than a spurious miss: a CUDA downstream
+// argument, a DXC/DXIL downstream argument (a second backend), and a non-DownstreamArgs option
+// (VulkanBindGlobals on SPIR-V, reached via linkWithOptions).
 static SlangResult _testLinkTimeOptionsAffectCompilerOptionHash()
 {
     // 1) CUDA/PTX downstream args: two `--gpu-architecture` values emit different PTX, so they must
@@ -2202,8 +2201,8 @@ static SlangResult _testLinkTimeOptionsAffectCompilerOptionHash()
     if (!_blobContentEquals(arch75Hash, arch75HashRepeat))
         return SLANG_FAIL;
 
-    // 2) A second downstream backend (DXC/DXIL): two different dxc arguments must hash differently,
-    // confirming the fix is not NVRTC-specific.
+    // 2) A second downstream backend (DXC/DXIL): two different dxc arguments emit different DXIL,
+    // so they must hash differently -- the contract is not specific to NVRTC.
     ComPtr<ISlangBlob> dxcOdHash;
     SLANG_RETURN_ON_FAIL(_getLinkTimeDownstreamArgHash(SLANG_DXIL, "dxc", "-Od", dxcOdHash));
 
@@ -2213,8 +2212,9 @@ static SlangResult _testLinkTimeOptionsAffectCompilerOptionHash()
     if (_blobContentEquals(dxcOdHash, dxcO3Hash))
         return SLANG_FAIL;
 
-    // 3) A non-DownstreamArgs link-time option (VulkanBindGlobals on SPIR-V): the fix hashes the
-    // whole option set, not just downstream arguments, so two different binding sets must differ.
+    // 3) A non-DownstreamArgs link-time option (VulkanBindGlobals on SPIR-V): the whole option set
+    // is part of the hash, not just downstream arguments, so two different binding sets must
+    // differ.
     slang::CompilerOptionEntry bindSet0[] = {
         _makeInt2CompilerOption(slang::CompilerOptionName::VulkanBindGlobals, 0, 0),
     };
