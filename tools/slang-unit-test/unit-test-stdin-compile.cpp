@@ -2092,7 +2092,29 @@ static SlangResult _testCompilerOptionHashIsInsertionOrderIndependent()
     return SLANG_OK;
 }
 
-// Return the entry-point hash for a program built from the same shader source and linked via
+// Fixture for the link-time-option hashing test. It has a float multiply-add so nvrtc `--fmad`
+// (fused-multiply-add contraction) actually changes the emitted PTX, and a data-dependent branch so
+// dxc `-Gfa`/`-Gfp` (flow-control strategy) actually changes the emitted DXIL; the global
+// `RWStructuredBuffer` is a resource parameter whose binding `VulkanBindGlobals` affects on SPIR-V.
+// So each option the test toggles is a genuine code-generation input for its target, not merely a
+// string that differs in the hash.
+static const char* kLinkTimeOptionShader = R"(
+RWStructuredBuffer<float> outputBuffer;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    float a = outputBuffer[0];
+    float b = outputBuffer[1];
+    float r = a * b + outputBuffer[2];
+    if (tid.x > 0u)
+        r = r * b + a;
+    outputBuffer[tid.x] = r;
+}
+)";
+
+// Return the entry-point hash for a program built from kLinkTimeOptionShader and linked via
 // linkWithOptions with the given link-time options, which are stored in the linked component's own
 // option set. `target` selects which options are codegen-relevant. getEntryPointHash only builds
 // the digest, so no GPU or target-code compilation runs (building the digest may load the target's
@@ -2121,7 +2143,7 @@ static SlangResult _getLinkTimeOptionEntryPointHash(
     module = session->loadModuleFromSourceString(
         "linkTimeOptionHash",
         "link-time-option-hash.slang",
-        kCoverageCliShader,
+        kLinkTimeOptionShader,
         diagnostics.writeRef());
     if (!module)
         return SLANG_FAIL;
@@ -2197,9 +2219,10 @@ static SlangResult _testLinkTimeOptionsAffectCompilerOptionHash()
 
     // 2) A second downstream backend (DXC/DXIL): -Gfa and -Gfp select opposing flow-control codegen
     // strategies that dxc honors and that Slang does not override, so they must hash differently --
-    // the contract is not specific to NVRTC. -all_resources_bound is required for the SM 5.1+ DXIL
-    // profile to compile; the argline is newline-delimited because a DownstreamArgs argline
-    // deserializes one dxc argument per line (CommandLineArgs::deserialize splits on '\n').
+    // the contract is not specific to NVRTC. -all_resources_bound is kept common to both to satisfy
+    // dxc's requirement for -Gfa on SM 5.1+; the argline is newline-delimited because a
+    // DownstreamArgs argline deserializes one dxc argument per line (CommandLineArgs::deserialize
+    // splits on '\n').
     ComPtr<ISlangBlob> gfaHash;
     SLANG_RETURN_ON_FAIL(
         _getLinkTimeDownstreamArgHash(SLANG_DXIL, "dxc", "-Gfa\n-all_resources_bound", gfaHash));

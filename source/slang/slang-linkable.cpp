@@ -310,7 +310,8 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
 
     // A component's own option set feeds target code generation (TargetProgram merges it in), so it
     // belongs in the entry-point cache key -- in particular the link-time downstream arguments that
-    // linkWithOptions records here (e.g. an -Xnvrtc --fmad= flag), which nothing above hashes.
+    // linkWithOptions records here (e.g. an -Xnvrtc --fmad= flag). For the linked composite that
+    // linkWithOptions produces, nothing above hashes that option set.
     //
     // This runs for every component kind. For a plain composite from link() the own set is empty,
     // so it appends nothing. For a Module the own set is the linkage's session option set, which is
