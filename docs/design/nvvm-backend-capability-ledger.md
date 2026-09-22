@@ -2734,3 +2734,5 @@ provider and the no-override adjacent layout both pass real LLVM serialization, 
 compilation, and PTX assembly. The selected unit prefix passes 439/439 and the permanent category
 passes 102/102. Frozen v1 remains 423/423/423 over 427; discovery remains 72/72/72 over 72; both
 have zero classification change. Provider ABI revision 35 is unchanged.
+
+Slice 196 establishes a separate native Linux CUDA 13.4.2 compilation/assembly baseline at explicit SM80: 419/419 selected tests passed, with 54 correctly reported skips and no failures. This denominator includes harness regressions and does not replace historical Windows measurements. Both reporter paths retain explicit skips, invalid target settings fail, and compute_70 remains unsupported by CUDA 13. NVRTC artifact production now excludes the vendor terminator. GPU runtime evidence remains pending here. Frozen v1 stays 423/427 and discovery stays 72/72 without reclassification.

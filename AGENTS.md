@@ -55,6 +55,10 @@ outcomes current. Distill durable architecture into `docs/design/`, durable test
 relevant test manifest, and the implementation narrative into the required five-part PR
 description.
 
+For the NVVM backend slice loop, the maintainer explicitly requires completed plans and reports
+to be committed with each slice. This is an exception to the working-log rule above; generated
+binaries and raw validation logs remain under ignored `build/`.
+
 ## WSL and Windows Tooling
 
 When working in this repository from WSL on Windows, use Windows-native developer tools by

@@ -161,6 +161,7 @@ public:
     StringBuilder m_buf;
     Index m_failCount = 0;
     Index m_testCount = 0;
+    bool m_ignored = false;
 };
 
 class TestServer
@@ -591,9 +592,10 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
         result.result = SLANG_FAIL;
         result.stdError = testReporter.m_buf.getUnownedSlice();
     }
-    else if (testReporter.m_testCount == 0)
+    else if (testReporter.m_ignored || testReporter.m_testCount == 0)
     {
         result.result = SLANG_E_NOT_AVAILABLE;
+        result.stdError = testReporter.m_buf.getUnownedSlice();
     }
 
     result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
@@ -853,6 +855,12 @@ void TestReporter::addResultWithLocation(
     {
         addResultWithLocation(false, testText, file, line);
     }
+    else if (result == TestResult::Ignored)
+    {
+        addResult(result);
+        m_buf << "[Ignored]: " << testText << "\n";
+        m_buf << file << ":" << line << "\n";
+    }
     else
     {
         m_testCount++;
@@ -883,6 +891,12 @@ void TestReporter::addResult(TestResult result)
     if (result == TestResult::Fail)
     {
         m_failCount++;
+    }
+    else if (result == TestResult::Ignored)
+    {
+        // A test can pass setup assertions before discovering an unavailable dependency.
+        // Preserve its explicit skip; _executeUnitTest still gives failures precedence.
+        m_ignored = true;
     }
 }
 

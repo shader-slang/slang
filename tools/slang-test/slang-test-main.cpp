@@ -6023,6 +6023,13 @@ static SlangResult runUnitTestModule(
                     reporter->message(TestMessageType::TestFailure, output.getBuffer());
                 }
 
+                if (testResult == TestResult::Ignored)
+                {
+                    String output = getOutput(exeRes);
+                    if (output.getLength())
+                        reporter->message(TestMessageType::Info, output.getBuffer());
+                }
+
                 // If the test failed and it is not an expected failure, add it to the list of
                 // failed unit tests so that we can retry.
                 // The expected-failure list is keyed by the reporter key, not the bare test

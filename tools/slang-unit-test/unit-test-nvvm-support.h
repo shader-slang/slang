@@ -7188,6 +7188,48 @@ static ComPtr<IArtifact> _createCUDASourceArtifact(const UnownedStringSlice& sou
     return artifact;
 }
 
+// Parses the explicit architecture lane. Keep these values independent of the installed toolkit:
+// a requested unsupported lane must fail compilation instead of silently testing another target.
+static bool _parseRealNVVMTestArchitecture(const UnownedStringSlice& text, int& outArchitecture)
+{
+    if (text == toSlice("70"))
+        outArchitecture = 70;
+    else if (text == toSlice("80"))
+        outArchitecture = 80;
+    else if (text == toSlice("90"))
+        outArchitecture = 90;
+    else
+        return false;
+    return true;
+}
+
+// Preserves the historical compute_70 lane unless the validation invocation selects another one.
+// For example, SLANG_NVVM_TEST_ARCH=80 makes real Slang, NVVM, and NVRTC compilation agree on
+// compute_80, makes ptxas assemble for sm_80, and requires an sm_80-or-newer runtime device.
+static int _getRealNVVMTestArchitecture()
+{
+    StringBuilder value;
+    if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(toSlice("SLANG_NVVM_TEST_ARCH"), value)))
+        return 70;
+    int architecture = 0;
+    const bool valid = _parseRealNVVMTestArchitecture(value.getUnownedSlice(), architecture);
+    if (!valid)
+    {
+        getTestReporter()->message(
+            TestMessageType::TestFailure,
+            "SLANG_NVVM_TEST_ARCH must be exactly 70, 80, or 90.");
+    }
+    SLANG_CHECK_ABORT(valid);
+    return architecture;
+}
+
+// Low-level IR fixtures historically require sm_75. Preserve that floor in the default lane;
+// explicit sm_80 and sm_90 lanes use the same target as their Slang source fixtures.
+static int _getRealNVVMLowLevelTestArchitecture()
+{
+    return Math::Max(75, _getRealNVVMTestArchitecture());
+}
+
 struct CompileSettings
 {
     DownstreamCompileOptions::OptimizationLevel optimizationLevel =
@@ -7205,6 +7247,7 @@ struct CompileSettings
     bool requiresCUDADeviceLibrary = false;
     bool addFakeCompilerArgument = false;
     const char* compilerSpecificArgument = nullptr;
+    int architecture = 75;
 };
 
 static SlangResult _compileNVVM(
@@ -7216,7 +7259,7 @@ static SlangResult _compileNVVM(
     IArtifact* sourceArtifacts[] = {sourceArtifact};
     DownstreamCompileOptions::CapabilityVersion capability;
     capability.kind = DownstreamCompileOptions::CapabilityVersion::Kind::CUDASM;
-    capability.version.set(7, 5);
+    capability.version.set(settings.architecture / 10, settings.architecture % 10);
 
     DownstreamCompileOptions options;
     options.sourceLanguage = SLANG_SOURCE_LANGUAGE_LLVM;
@@ -7241,12 +7284,13 @@ static SlangResult _compileNVVM(
 static SlangResult _compileNVRTC(
     IDownstreamCompiler* compiler,
     IArtifact* sourceArtifact,
-    IArtifact** outArtifact)
+    IArtifact** outArtifact,
+    int architecture = 75)
 {
     IArtifact* sourceArtifacts[] = {sourceArtifact};
     DownstreamCompileOptions::CapabilityVersion capability;
     capability.kind = DownstreamCompileOptions::CapabilityVersion::Kind::CUDASM;
-    capability.version.set(7, 5);
+    capability.version.set(architecture / 10, architecture % 10);
 
     DownstreamCompileOptions options;
     options.sourceLanguage = SLANG_SOURCE_LANGUAGE_CUDA;
@@ -7607,6 +7651,7 @@ static SlangResult _compileRealNVVMBitcode(
 
     ComPtr<IArtifact> sourceArtifact = _createNVVMBitcodeArtifact(bitcode, bitcodeSize);
     CompileSettings settings;
+    settings.architecture = _getRealNVVMLowLevelTestArchitecture();
     const SlangResult compileResult =
         _compileNVVM(compiler, sourceArtifact, settings, outArtifact.writeRef());
     IArtifactDiagnostics* diagnostics = _findDiagnostics(outArtifact);
@@ -7633,6 +7678,7 @@ static SlangResult _compileRealNVVMIRWithLibdevice(
 
     ComPtr<IArtifact> sourceArtifact = _createNVVMIRArtifact(kLibdeviceSineNVVMIR);
     CompileSettings settings;
+    settings.architecture = _getRealNVVMLowLevelTestArchitecture();
     settings.requiresCUDADeviceLibrary = true;
     const SlangResult compileResult =
         _compileNVVM(compiler, sourceArtifact, settings, outArtifact.writeRef());
@@ -7659,8 +7705,11 @@ static SlangResult _compileRealNVRTCSource(
         return SLANG_FAIL;
 
     ComPtr<IArtifact> sourceArtifact = _createCUDASourceArtifact(source);
-    const SlangResult compileResult =
-        _compileNVRTC(compiler, sourceArtifact, outArtifact.writeRef());
+    const SlangResult compileResult = _compileNVRTC(
+        compiler,
+        sourceArtifact,
+        outArtifact.writeRef(),
+        _getRealNVVMLowLevelTestArchitecture());
     IArtifactDiagnostics* diagnostics = _findDiagnostics(outArtifact);
     if (SLANG_FAILED(compileResult) || !diagnostics || SLANG_FAILED(diagnostics->getResult()))
     {
@@ -14373,7 +14422,8 @@ static SlangResult _compileSlangWithDirectNVVM(
     return linkedProgram->getEntryPointCode(0, 0, outCode.writeRef(), outDiagnostics.writeRef());
 }
 
-static SlangResult _compileSlangWithPTXMethod(
+// Compiles both sides of real differential tests with the explicitly selected architecture lane.
+static SlangResult _compileSlangWithRealPTXMethod(
     slang::IGlobalSession* globalSession,
     const char* source,
     SlangEmitCUDAMethod emissionMethod,
@@ -14381,17 +14431,35 @@ static SlangResult _compileSlangWithPTXMethod(
     ComPtr<slang::IBlob>& outDiagnostics)
 {
     outCode.setNull();
+    const int architecture = _getRealNVVMTestArchitecture();
+    StringBuilder capabilityName;
+    capabilityName << "cuda_sm_" << architecture / 10 << "_" << architecture % 10;
     ComPtr<slang::ISession> session;
     ComPtr<slang::IComponentType> linkedProgram;
     SLANG_RETURN_ON_FAIL(_createSlangPTXLinkedProgram(
         globalSession,
         source,
         emissionMethod,
-        "cuda_sm_7_0",
+        capabilityName.getBuffer(),
         session,
         linkedProgram,
         outDiagnostics));
     return linkedProgram->getEntryPointCode(0, 0, outCode.writeRef(), outDiagnostics.writeRef());
+}
+
+// Uses the real validation lane while leaving fake compiler routing fixtures at their fixed target.
+static SlangResult _compileSlangWithRealNVVM(
+    slang::IGlobalSession* globalSession,
+    const char* source,
+    ComPtr<slang::IBlob>& outCode,
+    ComPtr<slang::IBlob>& outDiagnostics)
+{
+    return _compileSlangWithRealPTXMethod(
+        globalSession,
+        source,
+        SLANG_EMIT_CUDA_VIA_NVVM,
+        outCode,
+        outDiagnostics);
 }
 
 static SlangResult _runScalarKernel(
@@ -15880,7 +15948,9 @@ static SlangResult _assemblePTX(IArtifact* ptxArtifact, const String& ptxasPath)
     CommandLine commandLine;
     commandLine.setExecutableLocation(
         ExecutableLocation(ExecutableLocation::Type::Path, ptxasPath));
-    commandLine.addArg("-arch=sm_75");
+    StringBuilder architectureOption;
+    architectureOption << "-arch=sm_" << _getRealNVVMLowLevelTestArchitecture();
+    commandLine.addArg(architectureOption);
     commandLine.addArg("-v");
     commandLine.addArg(ptxFile->getPath());
     commandLine.addArg("-o");

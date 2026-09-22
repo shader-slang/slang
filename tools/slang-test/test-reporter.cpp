@@ -167,6 +167,20 @@ void TestReporter::endTest()
     m_inTest = false;
 }
 
+// Preserve an explicit skip when combining assertions from one test. For example, a test can
+// pass its session-creation assertion before discovering that CUDA is unavailable. The setup
+// assertion does not make the skipped test pass, and an earlier failure must still remain a
+// failure.
+static TestResult _combineResultsWithinTest(TestResult previous, TestResult incoming)
+{
+    if ((previous == TestResult::Pass && incoming == TestResult::Ignored) ||
+        (previous == TestResult::Ignored && incoming == TestResult::Pass))
+    {
+        return TestResult::Ignored;
+    }
+    return TestReporter::combine(previous, incoming);
+}
+
 void TestReporter::addResult(TestResult result)
 {
     SLANG_ASSERT(m_inTest);
@@ -174,7 +188,7 @@ void TestReporter::addResult(TestResult result)
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (result == TestResult::Fail && isExpectedFailure(m_currentInfo.name))
         result = TestResult::ExpectedFail;
-    m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
+    m_currentInfo.testResult = _combineResultsWithinTest(m_currentInfo.testResult, result);
     m_numCurrentResults++;
 }
 
@@ -203,7 +217,7 @@ void TestReporter::addResultWithLocation(
 
     m_numCurrentResults++;
 
-    m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
+    m_currentInfo.testResult = _combineResultsWithinTest(m_currentInfo.testResult, result);
     if (result != TestResult::Fail)
     {
         // We don't need to output the result if it

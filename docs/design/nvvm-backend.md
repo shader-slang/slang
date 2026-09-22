@@ -7694,6 +7694,14 @@ classification changes. The selected unit prefix passes 439/439 and the permanen
 102/102. The three representative gates retain their PTX sizes and assemble through direct O3 for
 SM70, SM80, and SM90.
 
+## Slice 196: native Linux CUDA 13 baseline
+
+Real NVVM tests accept `SLANG_NVVM_TEST_ARCH=70`, `80`, or `90`. Without it, source fixtures retain SM70 and low-level fixtures retain their SM75 minimum. Use `CUDA_PATH=/usr/local/cuda-13.4 SLANG_NVVM_TEST_ARCH=80` for CUDA 13. This setting belongs to tests; compiler requests are never silently retargeted.
+
+On 2026-09-22 the Debug NVVM/routing/reporter prefixes passed 419/419 with 54 explicit skips and zero failures. Invalid settings fail, and compute_70 remains unsupported by CUDA 13. Both reporter paths preserve skips after successful assertions and failures over skips. NVRTC PTX artifacts exclude the vendor terminator, allowing their serialized text to assemble.
+
+This host has no CUDA device; GPU correctness remains pending. Historical Windows corpus counts are unchanged. See [the slice report](../../issue-nvvm-backend/report.slice-196-cuda13-validation.md) for commands and self-review.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

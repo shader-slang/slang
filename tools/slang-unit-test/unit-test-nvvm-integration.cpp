@@ -2,6 +2,49 @@
 
 #include "unit-test-nvvm-support.h"
 
+SLANG_UNIT_TEST(nvvmTestArchitectureSelection)
+{
+    const char* validValues[] = {"70", "80", "90"};
+    const int expectedArchitectures[] = {70, 80, 90};
+    for (Index i = 0; i < SLANG_COUNT_OF(validValues); ++i)
+    {
+        int architecture = 0;
+        SLANG_CHECK(
+            _parseRealNVVMTestArchitecture(UnownedStringSlice(validValues[i]), architecture));
+        SLANG_CHECK(architecture == expectedArchitectures[i]);
+    }
+    const char* invalidValues[] = {"", "75", "8", "080", "80junk", "sm_80", " 80", "80 "};
+    for (const char* value : invalidValues)
+    {
+        int architecture = 0;
+        SLANG_CHECK(!_parseRealNVVMTestArchitecture(UnownedStringSlice(value), architecture));
+    }
+}
+
+// A PTX artifact contains text, so NVRTC's C-string terminator must not be serialized into it.
+SLANG_UNIT_TEST(nvvmNVRTCReferencePTXExcludesTerminator)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
+    {
+        getTestReporter()->message(TestMessageType::Info, "NVRTC is unavailable.");
+        SLANG_IGNORE_TEST;
+    }
+    ComPtr<slang::IBlob> code;
+    ComPtr<slang::IBlob> diagnostics;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithRealPTXMethod(
+        globalSession,
+        kDirectNVVMEmptyComputeSource,
+        SLANG_EMIT_CUDA_VIA_NVRTC,
+        code,
+        diagnostics)));
+    SLANG_CHECK_ABORT(code != nullptr && code->getBufferSize() > 0);
+    const auto bytes = static_cast<const char*>(code->getBufferPointer());
+    SLANG_CHECK(::memchr(bytes, 0, code->getBufferSize()) == nullptr);
+}
+
 SLANG_UNIT_TEST(nvvmSlangRealEmptyCompute)
 {
     NVVMIRBuilder preflightBuilder;
@@ -20,11 +63,8 @@ SLANG_UNIT_TEST(nvvmSlangRealEmptyCompute)
 
     ComPtr<slang::IBlob> code;
     ComPtr<slang::IBlob> diagnostics;
-    const SlangResult compileResult = _compileSlangWithDirectNVVM(
-        globalSession,
-        kDirectNVVMEmptyComputeSource,
-        code,
-        diagnostics);
+    const SlangResult compileResult =
+        _compileSlangWithRealNVVM(globalSession, kDirectNVVMEmptyComputeSource, code, diagnostics);
     if (SLANG_FAILED(compileResult))
     {
         const String diagnosticText = _getBlobText(diagnostics);
@@ -64,7 +104,7 @@ SLANG_UNIT_TEST(nvvmSlangRealEmptyComputePtxasAccepts)
 
     ComPtr<slang::IBlob> code;
     ComPtr<slang::IBlob> diagnostics;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithRealNVVM(
         globalSession,
         kDirectNVVMEmptyComputeSource,
         code,
@@ -147,7 +187,7 @@ SLANG_UNIT_TEST(nvvmSlangRealScalarDifferentialPTX)
     {
         ComPtr<slang::IBlob> nvvmCode;
         ComPtr<slang::IBlob> nvvmDiagnostics;
-        const SlangResult nvvmResult = _compileSlangWithPTXMethod(
+        const SlangResult nvvmResult = _compileSlangWithRealPTXMethod(
             globalSession,
             scalarCase.source,
             SLANG_EMIT_CUDA_VIA_NVVM,
@@ -164,7 +204,7 @@ SLANG_UNIT_TEST(nvvmSlangRealScalarDifferentialPTX)
 
         ComPtr<slang::IBlob> nvrtcCode;
         ComPtr<slang::IBlob> nvrtcDiagnostics;
-        const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
+        const SlangResult nvrtcResult = _compileSlangWithRealPTXMethod(
             globalSession,
             scalarCase.source,
             SLANG_EMIT_CUDA_VIA_NVRTC,
@@ -267,7 +307,7 @@ static void _runNVVMSlangRealFloat32ArithmeticDifferentialPTX(
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
             globalSession,
             testCase.source,
             kMethods[i],
@@ -347,7 +387,7 @@ static void _runNVVMSlangRealFloat32ComparisonDifferentialPTX(
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
             globalSession,
             testCase.source,
             kMethods[i],
@@ -437,7 +477,7 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32ConstantDifferentialPTX)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMFloat32ConstantSource,
             kMethods[i],
@@ -498,7 +538,7 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32PhiDifferentialPTX)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMFloat32PhiSource,
             kMethods[i],
@@ -559,7 +599,7 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32FunctionDifferentialPTX)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMFloat32FunctionSource,
             kMethods[i],
@@ -623,7 +663,7 @@ static void _runNVVMSlangDifferentialPTX(
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
         const SlangResult compileResult =
-            _compileSlangWithPTXMethod(globalSession, source, kMethods[i], code, diagnostics);
+            _compileSlangWithRealPTXMethod(globalSession, source, kMethods[i], code, diagnostics);
         if (SLANG_FAILED(compileResult))
         {
             const String text = _getBlobText(diagnostics);
@@ -1027,7 +1067,7 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyDifferentialPTX)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMFloat32CopySource,
             kMethods[i],
@@ -1076,7 +1116,7 @@ SLANG_UNIT_TEST(nvvmSlangRealPointerOffsetDifferentialPTX)
 
     ComPtr<slang::IBlob> nvvmCode;
     ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
+    const SlangResult nvvmResult = _compileSlangWithRealPTXMethod(
         globalSession,
         kDirectNVVMPointerOffsetSource,
         SLANG_EMIT_CUDA_VIA_NVVM,
@@ -1093,7 +1133,7 @@ SLANG_UNIT_TEST(nvvmSlangRealPointerOffsetDifferentialPTX)
 
     ComPtr<slang::IBlob> nvrtcCode;
     ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
+    const SlangResult nvrtcResult = _compileSlangWithRealPTXMethod(
         globalSession,
         kDirectNVVMPointerOffsetSource,
         SLANG_EMIT_CUDA_VIA_NVRTC,
@@ -1149,7 +1189,7 @@ SLANG_UNIT_TEST(nvvmSlangRealFixedDeviceArrayDifferentialPTX)
 
     ComPtr<slang::IBlob> nvvmCode;
     ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
+    const SlangResult nvvmResult = _compileSlangWithRealPTXMethod(
         globalSession,
         kDirectNVVMFixedDeviceArraySource,
         SLANG_EMIT_CUDA_VIA_NVVM,
@@ -1166,7 +1206,7 @@ SLANG_UNIT_TEST(nvvmSlangRealFixedDeviceArrayDifferentialPTX)
 
     ComPtr<slang::IBlob> nvrtcCode;
     ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
+    const SlangResult nvrtcResult = _compileSlangWithRealPTXMethod(
         globalSession,
         kDirectNVVMFixedDeviceArraySource,
         SLANG_EMIT_CUDA_VIA_NVRTC,
@@ -1223,7 +1263,7 @@ SLANG_UNIT_TEST(nvvmSlangRealRawRWStructuredBufferI32DifferentialPTX)
 
     ComPtr<slang::IBlob> nvvmCode;
     ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
+    const SlangResult nvvmResult = _compileSlangWithRealPTXMethod(
         globalSession,
         kDirectNVVMRawRWStructuredBufferI32StoreSource,
         SLANG_EMIT_CUDA_VIA_NVVM,
@@ -1240,7 +1280,7 @@ SLANG_UNIT_TEST(nvvmSlangRealRawRWStructuredBufferI32DifferentialPTX)
 
     ComPtr<slang::IBlob> nvrtcCode;
     ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
+    const SlangResult nvrtcResult = _compileSlangWithRealPTXMethod(
         globalSession,
         kDirectNVVMRawRWStructuredBufferI32StoreSource,
         SLANG_EMIT_CUDA_VIA_NVRTC,
@@ -1588,7 +1628,7 @@ static void _runNVVMScalarDifferentialPTX(
     for (Index i = 0; i < SLANG_COUNT_OF(methods); ++i)
     {
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult result = _compileSlangWithPTXMethod(
+        const SlangResult result = _compileSlangWithRealPTXMethod(
             globalSession,
             testCase.source,
             methods[i],
@@ -1670,7 +1710,7 @@ SLANG_UNIT_TEST(nvvmSlangRealRelaxedGlobalI32AtomicAddDifferentialPTX)
 
     ComPtr<slang::IBlob> nvvmCode;
     ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
+    const SlangResult nvvmResult = _compileSlangWithRealPTXMethod(
         globalSession,
         kDirectNVVMRelaxedGlobalI32AtomicAddSource,
         SLANG_EMIT_CUDA_VIA_NVVM,
@@ -1687,7 +1727,7 @@ SLANG_UNIT_TEST(nvvmSlangRealRelaxedGlobalI32AtomicAddDifferentialPTX)
 
     ComPtr<slang::IBlob> nvrtcCode;
     ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
+    const SlangResult nvrtcResult = _compileSlangWithRealPTXMethod(
         globalSession,
         kDirectNVVMRelaxedGlobalI32AtomicAddSource,
         SLANG_EMIT_CUDA_VIA_NVRTC,
@@ -1754,7 +1794,7 @@ SLANG_UNIT_TEST(nvvmSlangRealAtomicReductionDifferentialPTX)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMAtomicReductionSource,
             method,
@@ -1842,7 +1882,7 @@ SLANG_UNIT_TEST(nvvmSlangRealScalarPtxasAccepts)
             ComPtr<slang::IBlob> code;
             ComPtr<slang::IBlob> diagnostics;
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-                _compileSlangWithPTXMethod(globalSession, source, method, code, diagnostics)));
+                _compileSlangWithRealPTXMethod(globalSession, source, method, code, diagnostics)));
             ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
             SLANG_CHECK_ABORT(ptxArtifact != nullptr);
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
@@ -1889,7 +1929,7 @@ static void _runNVVMSlangRealSourcePtxasAccepts(
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-            _compileSlangWithPTXMethod(globalSession, source, method, code, diagnostics)));
+            _compileSlangWithRealPTXMethod(globalSession, source, method, code, diagnostics)));
         ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
         SLANG_CHECK_ABORT(ptxArtifact != nullptr);
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
@@ -2142,7 +2182,7 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyPtxasAccepts)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMFloat32CopySource,
             method,
@@ -2189,7 +2229,7 @@ SLANG_UNIT_TEST(nvvmSlangRealPointerOffsetPtxasAccepts)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMPointerOffsetSource,
             method,
@@ -2236,7 +2276,7 @@ SLANG_UNIT_TEST(nvvmSlangRealFixedDeviceArrayPtxasAccepts)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMFixedDeviceArraySource,
             method,
@@ -2285,7 +2325,7 @@ SLANG_UNIT_TEST(nvvmSlangRealRawRWStructuredBufferI32PtxasAccepts)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMRawRWStructuredBufferI32StoreSource,
             method,
@@ -2336,8 +2376,12 @@ static void _runNVVMScalarPtxas(UnitTestContext* unitTestContext, NVVMScalarTest
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-            _compileSlangWithPTXMethod(globalSession, testCase.source, method, code, diagnostics)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithRealPTXMethod(
+            globalSession,
+            testCase.source,
+            method,
+            code,
+            diagnostics)));
         ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
         SLANG_CHECK_ABORT(ptxArtifact != nullptr);
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
@@ -2400,7 +2444,7 @@ SLANG_UNIT_TEST(nvvmSlangRealRelaxedGlobalI32AtomicAddPtxasAccepts)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMRelaxedGlobalI32AtomicAddSource,
             method,
@@ -2449,11 +2493,12 @@ SLANG_UNIT_TEST(nvvmSlangScalarRuntimeMatchesNVRTC)
             &computeMinor,
             kCudaDeviceAttributeComputeCapabilityMinor,
             device) == 0);
-    if (computeMajor < 7)
+    if (computeMajor < _getRealNVVMTestArchitecture() / 10)
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring scalar runtime differential because the device is older than sm_70.");
+            "Ignoring scalar runtime differential because the device is older than the selected "
+            "NVVM test target.");
         SLANG_IGNORE_TEST;
     }
 
@@ -2511,7 +2556,7 @@ SLANG_UNIT_TEST(nvvmSlangScalarRuntimeMatchesNVRTC)
         {
             ComPtr<slang::IBlob> code;
             ComPtr<slang::IBlob> diagnostics;
-            const SlangResult compileResult = _compileSlangWithPTXMethod(
+            const SlangResult compileResult = _compileSlangWithRealPTXMethod(
                 globalSession,
                 runtimeCase.source,
                 method,
@@ -2570,11 +2615,12 @@ static void _runNVVMSlangSourceRuntimeMatchesNVRTC(
             &computeMajor,
             kCudaDeviceAttributeComputeCapabilityMajor,
             device) == 0);
-    if (computeMajor < 7)
+    if (computeMajor < _getRealNVVMTestArchitecture() / 10)
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring direct-source runtime test because the device is older than sm_70.");
+            "Ignoring direct-source runtime test because the device is older than the selected "
+            "NVVM test target.");
         SLANG_IGNORE_TEST;
     }
 
@@ -2604,7 +2650,7 @@ static void _runNVVMSlangSourceRuntimeMatchesNVRTC(
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
         const SlangResult compileResult =
-            _compileSlangWithPTXMethod(globalSession, source, method, code, diagnostics);
+            _compileSlangWithRealPTXMethod(globalSession, source, method, code, diagnostics);
         if (SLANG_FAILED(compileResult))
         {
             const String text = _getBlobText(diagnostics);
@@ -2651,11 +2697,12 @@ static void _runNVVMSlangFloat32ArithmeticRuntimeMatchesNVRTC(
             &computeMajor,
             kCudaDeviceAttributeComputeCapabilityMajor,
             device) == 0);
-    if (computeMajor < 7)
+    if (computeMajor < _getRealNVVMTestArchitecture() / 10)
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32-arithmetic runtime because the device is older than sm_70.");
+            "Ignoring float32-arithmetic runtime because the device is older than the selected "
+            "NVVM test target.");
         SLANG_IGNORE_TEST;
     }
 
@@ -2684,8 +2731,12 @@ static void _runNVVMSlangFloat32ArithmeticRuntimeMatchesNVRTC(
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult =
-            _compileSlangWithPTXMethod(globalSession, testCase.source, method, code, diagnostics);
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
+            globalSession,
+            testCase.source,
+            method,
+            code,
+            diagnostics);
         if (SLANG_FAILED(compileResult))
         {
             const String text = _getBlobText(diagnostics);
@@ -2758,11 +2809,12 @@ static void _runNVVMSlangFloat32ComparisonRuntimeMatchesNVRTC(
             &computeMajor,
             kCudaDeviceAttributeComputeCapabilityMajor,
             device) == 0);
-    if (computeMajor < 7)
+    if (computeMajor < _getRealNVVMTestArchitecture() / 10)
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32-comparison runtime because the device is older than sm_70.");
+            "Ignoring float32-comparison runtime because the device is older than the selected "
+            "NVVM test target.");
         SLANG_IGNORE_TEST;
     }
 
@@ -2791,8 +2843,12 @@ static void _runNVVMSlangFloat32ComparisonRuntimeMatchesNVRTC(
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult =
-            _compileSlangWithPTXMethod(globalSession, testCase.source, method, code, diagnostics);
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
+            globalSession,
+            testCase.source,
+            method,
+            code,
+            diagnostics);
         if (SLANG_FAILED(compileResult))
         {
             const String text = _getBlobText(diagnostics);
@@ -2867,12 +2923,12 @@ SLANG_UNIT_TEST(nvvmSlangFloat32ConstantRuntimeMatchesNVRTC)
             &computeMajor,
             kCudaDeviceAttributeComputeCapabilityMajor,
             device) == 0);
-    if (computeMajor < 7)
+    if (computeMajor < _getRealNVVMTestArchitecture() / 10)
     {
         getTestReporter()->message(
             TestMessageType::Info,
             "Ignoring float32-constant runtime differential because the device is older than "
-            "sm_70.");
+            "the selected NVVM test target.");
         SLANG_IGNORE_TEST;
     }
 
@@ -2902,7 +2958,7 @@ SLANG_UNIT_TEST(nvvmSlangFloat32ConstantRuntimeMatchesNVRTC)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMFloat32ConstantSource,
             method,
@@ -3187,11 +3243,12 @@ SLANG_UNIT_TEST(nvvmSlangFloat32CopyRuntimeMatchesNVRTC)
             &computeMajor,
             kCudaDeviceAttributeComputeCapabilityMajor,
             device) == 0);
-    if (computeMajor < 7)
+    if (computeMajor < _getRealNVVMTestArchitecture() / 10)
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32-copy runtime differential because the device is older than sm_70.");
+            "Ignoring float32-copy runtime differential because the device is older than the "
+            "selected NVVM test target.");
         SLANG_IGNORE_TEST;
     }
 
@@ -3221,7 +3278,7 @@ SLANG_UNIT_TEST(nvvmSlangFloat32CopyRuntimeMatchesNVRTC)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMFloat32CopySource,
             method,
@@ -3272,11 +3329,12 @@ SLANG_UNIT_TEST(nvvmSlangPointerOffsetRuntimeMatchesNVRTC)
             &computeMajor,
             kCudaDeviceAttributeComputeCapabilityMajor,
             device) == 0);
-    if (computeMajor < 7)
+    if (computeMajor < _getRealNVVMTestArchitecture() / 10)
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring pointer-offset runtime differential because the device is older than sm_70.");
+            "Ignoring pointer-offset runtime differential because the device is older than the "
+            "selected NVVM test target.");
         SLANG_IGNORE_TEST;
     }
 
@@ -3305,7 +3363,7 @@ SLANG_UNIT_TEST(nvvmSlangPointerOffsetRuntimeMatchesNVRTC)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMPointerOffsetSource,
             method,
@@ -3354,11 +3412,12 @@ SLANG_UNIT_TEST(nvvmSlangFixedDeviceArrayRuntimeMatchesNVRTC)
             &computeMajor,
             kCudaDeviceAttributeComputeCapabilityMajor,
             device) == 0);
-    if (computeMajor < 7)
+    if (computeMajor < _getRealNVVMTestArchitecture() / 10)
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring fixed-array runtime differential because the device is older than sm_70.");
+            "Ignoring fixed-array runtime differential because the device is older than the "
+            "selected NVVM test target.");
         SLANG_IGNORE_TEST;
     }
 
@@ -3388,7 +3447,7 @@ SLANG_UNIT_TEST(nvvmSlangFixedDeviceArrayRuntimeMatchesNVRTC)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMFixedDeviceArraySource,
             method,
@@ -3441,12 +3500,12 @@ SLANG_UNIT_TEST(nvvmSlangRawRWStructuredBufferI32RuntimeMatchesNVRTC)
             &computeMajor,
             kCudaDeviceAttributeComputeCapabilityMajor,
             device) == 0);
-    if (computeMajor < 7)
+    if (computeMajor < _getRealNVVMTestArchitecture() / 10)
     {
         getTestReporter()->message(
             TestMessageType::Info,
             "Ignoring raw RWStructuredBuffer<int> runtime differential because the device is "
-            "older than sm_70.");
+            "older than the selected NVVM test target.");
         SLANG_IGNORE_TEST;
     }
 
@@ -3476,7 +3535,7 @@ SLANG_UNIT_TEST(nvvmSlangRawRWStructuredBufferI32RuntimeMatchesNVRTC)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMRawRWStructuredBufferI32StoreSource,
             method,
@@ -3649,11 +3708,12 @@ static void _runNVVMScalarRuntime(
             &computeMajor,
             kCudaDeviceAttributeComputeCapabilityMajor,
             device) == 0);
-    if (computeMajor < 7)
+    if (computeMajor < _getRealNVVMTestArchitecture() / 10)
     {
         StringBuilder message;
         message << "Ignoring " << testCase.diagnosticName
-                << " runtime differential because the device is older than sm_70.";
+                << " runtime differential because the device is older than the selected NVVM test "
+                   "target.";
         getTestReporter()->message(TestMessageType::Info, message.getBuffer());
         SLANG_IGNORE_TEST;
     }
@@ -3687,8 +3747,12 @@ static void _runNVVMScalarRuntime(
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult =
-            _compileSlangWithPTXMethod(globalSession, testCase.source, method, code, diagnostics);
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
+            globalSession,
+            testCase.source,
+            method,
+            code,
+            diagnostics);
         if (SLANG_FAILED(compileResult))
         {
             const String text = _getBlobText(diagnostics);
@@ -3762,12 +3826,12 @@ SLANG_UNIT_TEST(nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC)
             &computeMajor,
             kCudaDeviceAttributeComputeCapabilityMajor,
             device) == 0);
-    if (computeMajor < 7)
+    if (computeMajor < _getRealNVVMTestArchitecture() / 10)
     {
         getTestReporter()->message(
             TestMessageType::Info,
             "Ignoring relaxed global signed-i32 atomic-add runtime differential because the "
-            "device is older than sm_70.");
+            "device is older than the selected NVVM test target.");
         SLANG_IGNORE_TEST;
     }
 
@@ -3797,7 +3861,7 @@ SLANG_UNIT_TEST(nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
+        const SlangResult compileResult = _compileSlangWithRealPTXMethod(
             globalSession,
             kDirectNVVMRelaxedGlobalI32AtomicAddSource,
             method,

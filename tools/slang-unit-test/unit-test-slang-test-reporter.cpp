@@ -570,3 +570,70 @@ SLANG_UNIT_TEST(slangTestReporterReconcileKeepsDispatchTallyAndClearsKeys)
     SLANG_CHECK(reporter.m_failedTestCount == 0);
     SLANG_CHECK(reporter.m_dispatchFailureCount == 1);
 }
+
+// Successful setup assertions do not turn an explicit dependency skip into a passing test.
+SLANG_UNIT_TEST(slangTestReporterExplicitIgnoreOverridesSuccessfulAssertions)
+{
+    TestReporter reporter;
+    reporter.m_suppressConsoleOutput = true;
+    TestReporter::SuiteScope suite(&reporter, "explicit-ignore");
+    {
+        TestReporter::TestScope test(&reporter, "skipped-after-setup");
+        reporter.addResultWithLocation(true, "setup succeeded", __FILE__, __LINE__);
+        reporter.addResult(TestResult::Ignored);
+        reporter.addResultWithLocation(true, "cleanup succeeded", __FILE__, __LINE__);
+        SLANG_CHECK(reporter.getResult() == TestResult::Ignored);
+    }
+    SLANG_CHECK(reporter.m_ignoredTestCount == 1);
+    SLANG_CHECK(reporter.m_passedTestCount == 0);
+
+    // Starting another test resets the skip along with the rest of its assertion state.
+    {
+        TestReporter::TestScope test(&reporter, "next-test-passes");
+        reporter.addResult(TestResult::Pass);
+    }
+    SLANG_CHECK(reporter.m_passedTestCount == 1);
+}
+
+SLANG_UNIT_TEST(slangTestReporterLocatedIgnoreOverridesSuccessfulAssertions)
+{
+    TestReporter reporter;
+    reporter.m_suppressConsoleOutput = true;
+    TestReporter::SuiteScope suite(&reporter, "located-ignore");
+    {
+        TestReporter::TestScope test(&reporter, "skipped-with-location");
+        reporter.addResult(TestResult::Pass);
+        reporter.addResultWithLocation(
+            TestResult::Ignored,
+            "dependency unavailable",
+            __FILE__,
+            __LINE__);
+        SLANG_CHECK(reporter.getResult() == TestResult::Ignored);
+    }
+    SLANG_CHECK(reporter.m_ignoredTestCount == 1);
+    SLANG_CHECK(reporter.m_passedTestCount == 0);
+}
+
+// A skip cannot erase a failed assertion, including one on the expected-failure list.
+SLANG_UNIT_TEST(slangTestReporterExplicitIgnorePreservesEarlierFailure)
+{
+    TestReporter reporter;
+    reporter.m_suppressConsoleOutput = true;
+    reporter.m_expectedFailureList.add(String("expected-failure-before-skip"));
+    TestReporter::SuiteScope suite(&reporter, "failure-before-ignore");
+    {
+        TestReporter::TestScope test(&reporter, "failure-before-skip");
+        reporter.addResult(TestResult::Fail);
+        reporter.addResult(TestResult::Ignored);
+        SLANG_CHECK(reporter.getResult() == TestResult::Fail);
+    }
+    {
+        TestReporter::TestScope test(&reporter, "expected-failure-before-skip");
+        reporter.addResult(TestResult::Fail);
+        reporter.addResult(TestResult::Ignored);
+        SLANG_CHECK(reporter.getResult() == TestResult::ExpectedFail);
+    }
+    SLANG_CHECK(reporter.m_failedTestCount == 1);
+    SLANG_CHECK(reporter.m_expectedFailedTestCount == 1);
+    SLANG_CHECK(reporter.m_ignoredTestCount == 0);
+}

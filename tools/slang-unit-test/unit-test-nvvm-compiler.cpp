@@ -249,11 +249,10 @@ SLANG_UNIT_TEST(nvvmCompilerAcceptsLLVMBitcodeArtifact)
     // This deliberately contains several embedded NULs. The artifact descriptor identifies the
     // bytes as bitcode; Slang must forward the complete buffer without treating it as a string.
     static const uint8_t bitcode[] = {0x42, 0x43, 0xc0, 0xde, 0x00, 0x11, 0x00, 0x22};
-    ComPtr<IArtifact> sourceArtifact = ArtifactUtil::createArtifact(
-        ArtifactDesc::make(
-            ArtifactKind::ObjectCode,
-            ArtifactPayload::LLVMIR,
-            ArtifactStyle::Kernel));
+    ComPtr<IArtifact> sourceArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
+        ArtifactKind::ObjectCode,
+        ArtifactPayload::LLVMIR,
+        ArtifactStyle::Kernel));
     sourceArtifact->addRepresentationUnknown(RawBlob::create(bitcode, SLANG_COUNT_OF(bitcode)));
 
     ComPtr<IArtifact> outputArtifact;
@@ -1039,11 +1038,12 @@ SLANG_UNIT_TEST(nvvmCompilerLibdeviceSineRuns)
             &computeMinor,
             kCudaDeviceAttributeComputeCapabilityMinor,
             device) == 0);
-    if (computeMajor < 7 || (computeMajor == 7 && computeMinor < 5))
+    if (computeMajor * 10 + computeMinor < _getRealNVVMLowLevelTestArchitecture())
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring libdevice runtime test because the device is older than sm_75.");
+            "Ignoring libdevice runtime test because the device is older than the selected "
+            "target.");
         SLANG_IGNORE_TEST;
     }
 
@@ -1077,6 +1077,7 @@ SLANG_UNIT_TEST(nvvmCompilerCompilesEmptyKernel)
     ComPtr<IArtifact> sourceArtifact = _createNVVMIRArtifact();
     ComPtr<IArtifact> outputArtifact;
     CompileSettings settings;
+    settings.architecture = _getRealNVVMLowLevelTestArchitecture();
     SlangResult compileResult =
         _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef());
     IArtifactDiagnostics* diagnostics = _findDiagnostics(outputArtifact);
@@ -1121,6 +1122,7 @@ SLANG_UNIT_TEST(nvvmCompilerCompilesEmptyKernelBitcode)
     ComPtr<IArtifact> sourceArtifact = _createNVVMBitcodeArtifact();
     ComPtr<IArtifact> outputArtifact;
     CompileSettings settings;
+    settings.architecture = _getRealNVVMLowLevelTestArchitecture();
     SlangResult compileResult =
         _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef());
     IArtifactDiagnostics* diagnostics = _findDiagnostics(outputArtifact);

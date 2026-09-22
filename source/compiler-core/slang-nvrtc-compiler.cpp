@@ -1491,6 +1491,10 @@ SlangResult NVRTCDownstreamCompiler::compile(
 
         SLANG_NVRTC_RETURN_ON_FAIL(m_nvrtcGetPTX(program, (char*)ptx.getBuffer()));
 
+        // NVRTC includes its string terminator in ptxSize. The artifact contains PTX text bytes;
+        // serializing the terminator into a .ptx file makes ptxas reject it with unexpected EOF.
+        SLANG_RELEASE_ASSERT(ptx.getCount() && ptx.getLast() == 0);
+        ptx.removeLast();
         artifact->addRepresentationUnknown(ListBlob::moveCreate(ptx));
     }
 
