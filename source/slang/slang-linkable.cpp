@@ -298,7 +298,7 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
 {
     DigestBuilder<SHA1> builder;
 
-    // A note on enums that may be hashed in as part of the following two function calls:
+    // A note on enums that may be hashed in as part of the digest-building calls below:
     //
     // While enums are not guaranteed to be encoded the same way across all versions of
     // the compiler, part of hashing the linkage is hashing in the compiler version.
@@ -307,6 +307,20 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     getLinkage()->buildHash(builder, targetIndex);
 
     buildHash(builder);
+
+    // A component's own option set feeds target code generation (TargetProgram merges it in), so it
+    // belongs in the entry-point cache key -- in particular the link-time downstream arguments that
+    // linkWithOptions records here (e.g. an -Xnvrtc --fmad= flag). For the linked composite that
+    // linkWithOptions produces, nothing above hashes that option set.
+    //
+    // This runs for every component kind. For a plain composite from link() the own set is empty,
+    // so it appends nothing. For a Module the own set is the linkage's session option set, which is
+    // therefore reached by three distinct hashing paths: getLinkage()->buildHash above (which also
+    // hashes the target option set), buildHash() above (Module::buildHash -> computeDigest also
+    // hashes the module's option set), and this call. For a specialized component the own set is
+    // the base's, copied via overrideWith. The extra hashing is deterministic and safe -- appending
+    // more bytes can only turn a cache hit into a miss, never a miss into a false hit.
+    getOptionSet().buildHash(builder);
 
     // Add the name and name override for the specified entry point to the hash.
     auto entryPoint = getEntryPoint(entryPointIndex);
