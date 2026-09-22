@@ -30,8 +30,10 @@ ACTIVE_CUDA_RE = re.compile(
     r"(?P<command>COMPARE_COMPUTE(?:_EX)?(?:\([^)]*\))?):(?P<arguments>.*-cuda.*)$",
     re.IGNORECASE,
 )
+# Match executable directives accepted by slang-test, including ///TEST and // TEST. Keep
+# TEST_INPUT/CATEGORY/IGNORE_FILE metadata: only the selected executable directive is replaced.
 EXECUTION_DIRECTIVE_RE = re.compile(
-    r"^\s*//(?:TEST(?:\([^)]*\))?|DISABLED?_TEST(?:\([^)]*\))?):",
+    r"^\s*//+\s*(?:(?:DISABLE|DISABLED)_)?(?:TEST|DIAGNOSTIC_TEST)\s*(?:\([^)]*\))?\s*:",
     re.IGNORECASE,
 )
 ACTIVE_EXECUTION_DIRECTIVE_RE = re.compile(
@@ -94,6 +96,7 @@ RESULT_FIELDS = [
     "reference_derived_from_direct",
     "classification",
     "return_code",
+    "execution_counts",
     "elapsed_ms",
     "diagnostic",
     "canonical_shape",
@@ -144,7 +147,7 @@ def _coverage_tier(relative_path: str) -> tuple[str, str]:
     return "mvp", ""
 
 
-def discover_workloads(tests_dir: Path) -> tuple[list[dict[str, object]], list[dict[str, str]]]:
+def discover_workloads(tests_dir: Path, architecture: int = 80) -> tuple[list[dict[str, object]], list[dict[str, str]]]:
     workloads: list[dict[str, object]] = []
     excluded: list[dict[str, str]] = []
     for source_path in sorted(tests_dir.rglob("*.slang")):
@@ -202,7 +205,7 @@ def discover_workloads(tests_dir: Path) -> tuple[list[dict[str, object]], list[d
                     "scope_reason": scope_reason,
                     "capability": capability_match.group("capability")
                     if capability_match
-                    else "cuda_sm_7_0",
+                    else f"cuda_sm_{architecture // 10}_{architecture % 10}",
                 }
             )
     return workloads, excluded
@@ -243,8 +246,11 @@ def _directive_for_mode(workload: dict[str, object], mode: str) -> str:
     use_nvvm, optimization = MODES[mode]
     arguments = OPTIMIZATION_RE.sub("", str(workload["arguments"])).strip()
     arguments = DIRECT_NVVM_RE.sub("", arguments).strip()
-    if not CAPABILITY_RE.search(arguments):
-        arguments += " -capability cuda_sm_7_0"
+    capability = str(workload["capability"])
+    if CAPABILITY_RE.search(arguments):
+        arguments = CAPABILITY_RE.sub(" -capability " + capability, arguments).strip()
+    else:
+        arguments += " -capability " + capability
     if use_nvvm:
         arguments += " -Xslang -emit-cuda-via-nvvm"
     arguments += f" -Xslang -O{optimization}"
@@ -291,6 +297,23 @@ def prepare_mode(
             shutil.copy2(expected_source, Path(str(generated_path) + ".expected.txt"))
 
 
+def execution_counts(output: str) -> dict[str, int] | None:
+    """Read one authoritative slang-test summary, rejecting absent or ambiguous summaries."""
+    summaries = re.findall(
+        r"^\d+% of tests passed \((\d+)/(\d+)\)([^\r\n]*)$", output, re.MULTILINE
+    )
+    if len(summaries) != 1:
+        return None
+    passed, executed, suffix = summaries[0]
+    ignored = re.search(r"(\d+) tests ignored", suffix)
+    return {
+        "passed": int(passed),
+        "executed": int(executed),
+        "ignored": int(ignored.group(1)) if ignored else 0,
+        "other_summary_status": int(bool(suffix.strip())),
+    }
+
+
 def _classify_result(return_code: int, output: str, mode: str) -> tuple[str, str, str]:
     diagnostic_match = DIAGNOSTIC_RE.search(output)
     diagnostic_code = diagnostic_match.group(1).upper() if diagnostic_match else ""
@@ -310,12 +333,24 @@ def _classify_result(return_code: int, output: str, mode: str) -> tuple[str, str
     if shape.startswith("GenericAsm assembly="):
         shape = "GenericAsm"
 
+    # The executed-test summary owns success. Capability inventory banners describe optional
+    # gfx backends; direct-driver unit fixtures can execute CUDA independently of that inventory.
+    if return_code == 0:
+        counts = execution_counts(output)
+        if counts != {"passed": 1, "executed": 1, "ignored": 0, "other_summary_status": 0}:
+            return "infrastructure", "expected exactly one passed/executed test without skips", shape
+        return "correct", diagnostic, shape
+
     if "no tests run" in output.lower():
         return "infrastructure", "generated census test was not discovered", shape
     if diagnostic_code == "E52017":
         return "preflight", diagnostic, shape
     if diagnostic_code == "E52018" or "NVVM IR verification" in output or "libNVVM" in output:
         return "provider", diagnostic, shape
+    # render-test wraps compiler aborts in EXPECTED/ACTUAL output too. That wrapper does not
+    # imply a kernel executed: preserve the upstream compilation failure classification.
+    if diagnostic_code == "E99997":
+        return "infrastructure", diagnostic, shape
     infrastructure_markers = (
         "E52016",
         "unable to load a compatible LLVM",
@@ -327,8 +362,6 @@ def _classify_result(return_code: int, output: str, mode: str) -> tuple[str, str
     )
     if any(marker.lower() in output.lower() for marker in infrastructure_markers):
         return "infrastructure", diagnostic, shape
-    if return_code == 0:
-        return "correct", diagnostic, shape
     if "profile implicitly upgraded" in output:
         return "infrastructure", diagnostic or "profile implicitly upgraded", shape
     if mode.startswith("nvrtc-") and re.search(
@@ -351,10 +384,11 @@ def _run_one(
     workload: dict[str, object],
     mode: str,
     provider_path: Path,
+    test_runner: Path,
 ) -> dict[str, object]:
     generated_relative = _generated_relative_path(workload)
     command = [
-        str(repo_root / "build/Release/bin/slang-test.exe"),
+        str(test_runner),
         "-test-dir",
         str(mode_root),
         "-disable-retries",
@@ -394,6 +428,7 @@ def _run_one(
         "reference_derived_from_direct": workload["reference_derived_from_direct"],
         "classification": classification,
         "return_code": completed.returncode,
+        "execution_counts": execution_counts(completed.stdout),
         "elapsed_ms": elapsed_ms,
         "diagnostic": diagnostic,
         "canonical_shape": shape,
@@ -408,6 +443,7 @@ def run_mode(
     workloads: list[dict[str, object]],
     mode: str,
     provider_path: Path,
+    test_runner: Path,
     jobs: int,
 ) -> list[dict[str, object]]:
     results: list[dict[str, object]] = []
@@ -424,6 +460,7 @@ def run_mode(
                 workload,
                 mode,
                 provider_path,
+                test_runner,
             ): workload
             for workload in workloads
         }
@@ -452,7 +489,10 @@ def _write_result_files(
     output_root: Path,
     results: list[dict[str, object]],
 ) -> dict[str, dict[str, int]]:
-    _write_tsv(output_root / "results.tsv", results, RESULT_FIELDS)
+    # Keep counts structured in JSON and encode that object explicitly in the TSV cell.
+    tsv_results = [dict(result, execution_counts=json.dumps(result.get("execution_counts")))
+                   for result in results]
+    _write_tsv(output_root / "results.tsv", tsv_results, RESULT_FIELDS)
     _write_text(output_root / "results.json", json.dumps(results, indent=2) + "\n")
     counts: dict[str, dict[str, int]] = {}
     for result in results:
@@ -461,6 +501,63 @@ def _write_result_files(
         mode_counts[classification] = mode_counts.get(classification, 0) + 1
     _write_text(output_root / "summary.json", json.dumps(counts, indent=2) + "\n")
     return counts
+
+
+def add_execution_arguments(parser: argparse.ArgumentParser) -> None:
+    """Share native executable, provider, and architecture settings between both corpora."""
+    parser.add_argument("--jobs", type=int, default=8)
+    parser.add_argument("--config", choices=["Debug", "Release", "RelWithDebInfo"], default="Release")
+    parser.add_argument("--bin-dir", type=Path, help="compiler/test binary directory")
+    parser.add_argument("--test-runner", type=Path, help="exact native slang-test executable")
+    parser.add_argument("--provider", type=Path, help="provider directory or module (default: bin dir)")
+    parser.add_argument("--architecture", type=int, choices=[70, 80, 90], default=80,
+                        help="minimum CUDA target lane; preserves higher workload requirements")
+    parser.add_argument("--require-all-correct", action="store_true",
+                        help="fail unless every selected workload passed; use for supported subsets")
+
+
+def execution_paths(repo_root: Path, args: argparse.Namespace) -> tuple[Path, Path]:
+    """Resolve native paths, allowing discovery/reclassification without build dependencies."""
+    if args.jobs < 1:
+        raise SystemExit("--jobs must be positive")
+    bin_dir = (repo_root / (args.bin_dir or Path("build") / args.config / "bin")).resolve()
+    provider_path = (repo_root / (args.provider or bin_dir)).resolve()
+    suffix = ".exe" if os.name == "nt" else ""
+    test_runner = (repo_root / (args.test_runner or bin_dir / ("slang-test" + suffix))).resolve()
+    if not args.discover_only and not args.classify_only:
+        if not test_runner.is_file():
+            raise SystemExit(f"missing test runner: {test_runner}")
+        if not provider_path.exists():
+            raise SystemExit(f"missing NVVM provider: {provider_path}")
+    return provider_path, test_runner
+
+
+def select_architecture(workloads: list[dict[str, object]], architecture: int) -> None:
+    """Raise baseline targets while preserving workloads with stronger explicit requirements."""
+    for workload in workloads:
+        match = re.fullmatch(r"cuda_sm_(\d+)_(\d+)", str(workload["capability"]))
+        if match and int(match.group(1)) * 10 + int(match.group(2)) < architecture:
+            workload["capability"] = f"cuda_sm_{architecture // 10}_{architecture % 10}"
+
+
+def inventory_matches(results, workloads, modes) -> bool:
+    """Require each requested workload/mode exactly once when replay is used as a strict gate."""
+    expected = {(str(workload["id"]), mode) for workload in workloads for mode in modes}
+    actual = [(str(result["id"]), str(result["mode"])) for result in results]
+    if len(actual) != len(set(actual)) or set(actual) != expected:
+        print("strict replay requires the complete selected workload/mode inventory", file=sys.stderr)
+        return False
+    return True
+
+
+def result_exit_code(results: list[dict[str, object]], require_all_correct: bool) -> int:
+    """Keep diagnostic census completion distinct from acceptance of supported workloads."""
+    if not results:
+        return 2
+    if require_all_correct:
+        return 0 if all(item["classification"] == "correct" for item in results) else 2
+    failures = {"infrastructure", "unclassified", "runtime-mismatch"}
+    return 2 if any(item["classification"] in failures for item in results) else 0
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -472,7 +569,7 @@ def parse_arguments() -> argparse.Namespace:
         type=Path,
         help="optional TSV whose exact id/source rows freeze the executed workload identity set",
     )
-    parser.add_argument("--jobs", type=int, default=8)
+    add_execution_arguments(parser)
     parser.add_argument("--discover-only", action="store_true")
     parser.add_argument(
         "--classify-only",
@@ -507,14 +604,9 @@ def main() -> int:
         (repo_root / args.output).resolve() if not args.output.is_absolute() else args.output
     )
     tests_dir = repo_root / "tests"
-    provider_path = repo_root / "build/nvvm-builder-deps/slang-llvm-nvvm-build/Release"
-    test_runner = repo_root / "build/Release/bin/slang-test.exe"
-    if not test_runner.is_file():
-        raise SystemExit(f"missing Release test runner: {test_runner}")
-    if not provider_path.is_dir():
-        raise SystemExit(f"missing NVVM provider directory: {provider_path}")
-
-    workloads, excluded = discover_workloads(tests_dir)
+    provider_path, test_runner = execution_paths(repo_root, args)
+    workloads, excluded = discover_workloads(tests_dir, args.architecture)
+    select_architecture(workloads, args.architecture)
     discovered_workload_count = len(workloads)
     discovered_eligible_source_count = len({str(workload["source"]) for workload in workloads})
     discovered_candidate_sources = {str(workload["source"]) for workload in workloads}
@@ -536,6 +628,9 @@ def main() -> int:
     candidate_sources.update(item["source"] for item in excluded)
     manifest = {
         "schema": 1,
+        "test_runner": str(test_runner),
+        "provider": str(provider_path),
+        "minimum_architecture": args.architecture,
         "candidate_source_count": len(candidate_sources),
         "eligible_source_count": len({str(workload["source"]) for workload in workloads}),
         "eligible_workload_count": len(workloads),
@@ -584,25 +679,6 @@ def main() -> int:
     )
     if args.discover_only:
         return 0
-    if args.classify_only:
-        results_path = output_root / "results.json"
-        if not results_path.is_file():
-            raise SystemExit(f"missing prior census results: {results_path}")
-        results = json.loads(_read_text(results_path))
-        for result in results:
-            log_path = repo_root / Path(str(result["log"]))
-            classification, diagnostic, shape = _classify_result(
-                int(result["return_code"]),
-                _read_text(log_path),
-                str(result["mode"]),
-            )
-            result["classification"] = classification
-            result["diagnostic"] = diagnostic
-            result["canonical_shape"] = shape
-        counts = _write_result_files(output_root, results)
-        print(json.dumps(counts, indent=2), flush=True)
-        return 0 if all("unclassified" not in item for item in counts.values()) else 2
-
     run_workloads = workloads
     if args.match and args.match_regex:
         raise SystemExit("--match and --match-regex are mutually exclusive")
@@ -629,6 +705,28 @@ def main() -> int:
             flush=True,
         )
 
+    if args.classify_only:
+        results_path = output_root / "results.json"
+        if not results_path.is_file():
+            raise SystemExit(f"missing prior census results: {results_path}")
+        results = json.loads(_read_text(results_path))
+        for result in results:
+            log_path = repo_root / Path(str(result["log"]))
+            classification, diagnostic, shape = _classify_result(
+                int(result["return_code"]),
+                _read_text(log_path),
+                str(result["mode"]),
+            )
+            result["execution_counts"] = execution_counts(_read_text(log_path))
+            result["classification"] = classification
+            result["diagnostic"] = diagnostic
+            result["canonical_shape"] = shape
+        counts = _write_result_files(output_root, results)
+        print(json.dumps(counts, indent=2), flush=True)
+        if args.require_all_correct and not inventory_matches(results, run_workloads, args.modes):
+            return 2
+        return result_exit_code(results, args.require_all_correct)
+
     all_results: list[dict[str, object]] = []
     for mode in args.modes:
         mode_root = output_root / "mirrors" / mode
@@ -642,6 +740,7 @@ def main() -> int:
                 run_workloads,
                 mode,
                 provider_path,
+                test_runner,
                 args.jobs,
             )
         )
@@ -650,7 +749,7 @@ def main() -> int:
 
     counts = _write_result_files(output_root, all_results)
     print(json.dumps(counts, indent=2), flush=True)
-    return 0 if all("unclassified" not in mode_counts for mode_counts in counts.values()) else 2
+    return result_exit_code(all_results, args.require_all_correct)
 
 
 if __name__ == "__main__":

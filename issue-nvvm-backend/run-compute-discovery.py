@@ -377,7 +377,7 @@ def parse_arguments(census: ModuleType) -> argparse.Namespace:
         default=Path("issue-nvvm-backend/census.slice-146.tsv"),
     )
     parser.add_argument("--output", type=Path, default=Path("build/nvvm-discovery"))
-    parser.add_argument("--jobs", type=int, default=8)
+    census.add_execution_arguments(parser)
     parser.add_argument("--discover-only", action="store_true")
     parser.add_argument(
         "--classify-only",
@@ -415,6 +415,8 @@ def main() -> int:
         frozen_sources,
         census,
     )
+    census.select_architecture(workloads, args.architecture)
+    provider_path, test_runner = census.execution_paths(repo_root, args)
     output_root.mkdir(parents=True, exist_ok=True)
     _write_selection_files(
         output_root,
@@ -431,12 +433,13 @@ def main() -> int:
     if args.discover_only:
         return 0
 
-    provider_path = repo_root / "build/nvvm-builder-deps/slang-llvm-nvvm-build/Release"
-    test_runner = repo_root / "build/Release/bin/slang-test.exe"
-    if not test_runner.is_file():
-        raise SystemExit(f"missing Release test runner: {test_runner}")
-    if not provider_path.is_dir():
-        raise SystemExit(f"missing NVVM provider directory: {provider_path}")
+    run_workloads = workloads
+    if args.match:
+        needle = args.match.lower()
+        run_workloads = [row for row in workloads if needle in str(row["id"]).lower()]
+        if not run_workloads:
+            raise SystemExit(f"no discovery workload ID contains: {args.match}")
+        print(f"selected {len(run_workloads)} workloads matching {args.match!r}", flush=True)
 
     if args.classify_only:
         results_path = output_root / "results.json"
@@ -450,20 +453,15 @@ def main() -> int:
                 census._read_text(log_path),
                 str(result["mode"]),
             )
+            result["execution_counts"] = census.execution_counts(census._read_text(log_path))
             result["classification"] = classification
             result["diagnostic"] = diagnostic
             result["canonical_shape"] = shape
         counts = census._write_result_files(output_root, results)
         print(json.dumps(counts, indent=2), flush=True)
-        return 0 if all("unclassified" not in item for item in counts.values()) else 2
-
-    run_workloads = workloads
-    if args.match:
-        needle = args.match.lower()
-        run_workloads = [row for row in workloads if needle in str(row["id"]).lower()]
-        if not run_workloads:
-            raise SystemExit(f"no discovery workload ID contains: {args.match}")
-        print(f"selected {len(run_workloads)} workloads matching {args.match!r}", flush=True)
+        if args.require_all_correct and not census.inventory_matches(results, run_workloads, args.modes):
+            return 2
+        return census.result_exit_code(results, args.require_all_correct)
 
     print("preparing one hard-linked discovery mirror", flush=True)
     mirror_root = _prepare_mirror_tree(tests_dir, output_root)
@@ -479,6 +477,7 @@ def main() -> int:
                 run_workloads,
                 mode,
                 provider_path,
+                test_runner,
                 args.jobs,
             )
         )
@@ -488,7 +487,7 @@ def main() -> int:
 
     counts = census._write_result_files(output_root, all_results)
     print(json.dumps(counts, indent=2), flush=True)
-    return 0 if all("unclassified" not in item for item in counts.values()) else 2
+    return census.result_exit_code(all_results, args.require_all_correct)
 
 
 if __name__ == "__main__":

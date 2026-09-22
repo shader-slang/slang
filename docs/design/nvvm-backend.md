@@ -7700,7 +7700,8 @@ Real NVVM tests accept `SLANG_NVVM_TEST_ARCH=70`, `80`, or `90`. Without it, sou
 
 On 2026-09-22 the Debug NVVM/routing/reporter prefixes passed 419/419 with 54 explicit skips and zero failures. Invalid settings fail, and compute_70 remains unsupported by CUDA 13. Both reporter paths preserve skips after successful assertions and failures over skips. NVRTC PTX artifacts exclude the vendor terminator, allowing their serialized text to assemble.
 
-This host has no CUDA device; GPU correctness remains pending. Historical Windows corpus counts are unchanged. See [the slice report](../../issue-nvvm-backend/report.slice-196-cuda13-validation.md) for commands and self-review.
+At this stage no CUDA driver/device was visible to the tests; GPU correctness remained pending.
+Slice 200 later found the physical RTX A6000 and installed its missing driver. Historical Windows corpus counts are unchanged. See [the slice report](../../issue-nvvm-backend/report.slice-196-cuda13-validation.md) for commands and self-review.
 
 ## Slice 197: reproducible isolated provider build
 
@@ -7743,6 +7744,30 @@ GitHub Actions workflow pins CUDA 12.9.1 and 13.4.1 containers and builds the co
 source. It passed actionlint but has not been dispatched; those exact container environments remain
 unvalidated. See [slice 199](../../issue-nvvm-backend/report.slice-199-toolkit-matrix.md) for commands.
 These results establish compilation and assembly, not GPU execution.
+
+## Slice 200: GPU execution gate and CUDA memory-space correction
+
+`extras/validate-nvvm-runtime.py` requires four existing differential fixtures to execute and pass,
+with exact test counts and no skips. It records the selected toolkit, provider, compiler, and device.
+The frozen and discovery runners now use native paths and explicit architecture selection, retain
+workload identities, and reject ignored-only success. Mirror generation removes all executable
+source directives except the selected test; extra directives cannot inflate an individual result.
+
+After installing driver 615.71.09, the RTX A6000 (SM86) passed all four GPU fixtures at SM80 and
+474 focused tests, with one Windows-only skip. Initial discovery preserved all 72 historically
+healthy cases in NVRTC O3 and both NVVM optimization modes. The full frozen collection completed
+452 identities in all three modes, exposing mirror defects and a CUDA-source address-space bug.
+Immutable-load lowering now leaves constant-memory parameter-group fields as ordinary loads while
+retaining read-only global loads through device-buffer pointers. The new regressions fail without
+the fix; the focused source suite passes 7/7 and CUDA 13.4 compile/assembly checks pass 12/12.
+
+Final acceptance is pending: after the initial collection, the GPU reported Xid 79 (fallen off the
+bus). Driver reset/reload and a function-level PCI reset did not restore it. The complete post-fix
+NVRTC refresh and affected direct-NVVM replays require hardware recovery. Initial evidence is
+preserved; historical 423/427 frozen and 72/72 discovery totals are not replaced with partial or
+reclassified results. See the [slice 200 report](../../issue-nvvm-backend/report.slice-200-gpu-correctness.md)
+for the evidence and exact resume procedure. This is an implementation checkpoint, not completed
+GPU acceptance.
 
 ## Authoritative References
 

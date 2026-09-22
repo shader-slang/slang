@@ -289,10 +289,30 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
         return loadFunc.apply(builder, valueType, ptr);
     }
 
+    // Returns whether an immutable load can use CUDA's global-memory read-only cache.
+    // Consider this example:
+    //
+    //     uniform uint frame;
+    //     struct Params { uint value; };
+    //     ConstantBuffer<Params> params;
+    //
+    // collectGlobalUniformParameters puts both values in one global parameter group.
+    // CUDASourceEmitter::emitParameterGroupImpl emits that group in __constant__ memory,
+    // so loading frame or the params pointer itself must not use __ldg. Loading params.value
+    // starts from the loaded buffer pointer instead, and still uses the global-memory cache.
+    bool canUseReadOnlyGlobalLoad(IRInst* ptr)
+    {
+        auto root = getRootAddr(ptr);
+        if (!isPointerToImmutableLocation(root))
+            return false;
+        if (as<IRGlobalParam>(root) && as<IRUniformParameterGroupType>(root->getDataType()))
+            return false;
+        return true;
+    }
+
     void processInst(IRInst* inst)
     {
-        // For every load instruction we see in the module, if the it is loading from
-        // an immutable location, try to lower it into a series of __ldg calls.
+        // For each load from immutable global memory, try to lower it into __ldg calls.
         // We need to handle both ordinary loads and structured buffer loads.
         //
         switch (inst->getOp())
@@ -300,7 +320,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
         case kIROp_Load:
             {
                 auto load = as<IRLoad>(inst);
-                if (isPointerToImmutableLocation(getRootAddr(load->getPtr())))
+                if (canUseReadOnlyGlobalLoad(load->getPtr()))
                 {
                     IRBuilder builder(load);
                     builder.setInsertBefore(load);
