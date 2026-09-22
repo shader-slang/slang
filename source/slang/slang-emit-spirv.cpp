@@ -8752,8 +8752,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             makeArray(fieldId));
     }
 
+    // A pointer in a logical storage class may not be the result of an `OpCompositeExtract` under
+    // SPIR-V logical addressing. `legalizeLogicalPointerCompositesForSPIRV` rewrites into
+    // address-based loads the reads it can; an extract that still returns a logical pointer here is
+    // one it could not so rewrite, so we reject it rather than emit invalid SPIR-V.
+    void diagnoseIfLogicalPointerExtract(IRInst* inst)
+    {
+        if (isLogicalPointerType(inst->getDataType()))
+            m_sink->diagnose(Diagnostics::LogicalPointerInComposite{.location = inst->sourceLoc});
+    }
+
     SpvInst* emitFieldExtract(SpvInstParent* parent, IRFieldExtract* inst)
     {
+        diagnoseIfLogicalPointerExtract(inst);
+
         IRBuilder builder(m_irModule);
         builder.setInsertBefore(inst);
 
@@ -8845,6 +8857,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitGetElement(SpvInstParent* parent, IRGetElement* inst)
     {
+        diagnoseIfLogicalPointerExtract(inst);
+
         requireVariableBufferCapabilityIfNeeded(inst->getDataType());
 
         // Note: SPIRV only supports the case where `index` is constant.

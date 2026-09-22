@@ -260,6 +260,61 @@ bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType)
     return isOpaqueTypeImpl(type, visited, outLeafOpaqueHandleType);
 }
 
+bool isLogicalAddressSpace(AddressSpace addrSpace)
+{
+    // Only the PhysicalStorageBuffer storage class (`AddressSpace::UserPointer`) is physical; every
+    // other SPIR-V storage class is logical. A logical pointer may not be an operand of
+    // OpCompositeConstruct nor the result of OpCompositeExtract.
+    return addrSpace != AddressSpace::UserPointer;
+}
+
+bool isLogicalPointerType(IRType* type)
+{
+    if (auto ptrType = as<IRPtrTypeBase>(unwrapAttributedType(type)))
+    {
+        // A pointer that has not been resolved to a concrete address space has not been proven
+        // physical, so we conservatively treat it as logical.
+        if (!ptrType->hasAddressSpace())
+            return true;
+        return isLogicalAddressSpace(ptrType->getAddressSpace());
+    }
+    return false;
+}
+
+static bool typeContainsLogicalPointerImpl(IRType* type, HashSet<IRType*>& visited)
+{
+    // A by-value cycle is impossible and a pointer leaf short-circuits before we recurse through
+    // it, so it is safe to treat a revisit purely as a recursion guard.
+    if (!visited.add(type))
+        return false;
+
+    if (isLogicalPointerType(type))
+        return true;
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+            if (typeContainsLogicalPointerImpl(field->getFieldType(), visited))
+                return true;
+    }
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+        return typeContainsLogicalPointerImpl(arrayType->getElementType(), visited);
+    if (auto tupleType = as<IRTupleTypeBase>(type))
+    {
+        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+            if (auto elementType = as<IRType>(tupleType->getOperand(i)))
+                if (typeContainsLogicalPointerImpl(elementType, visited))
+                    return true;
+    }
+    return false;
+}
+
+bool typeContainsLogicalPointer(IRType* type)
+{
+    HashSet<IRType*> visited;
+    return typeContainsLogicalPointerImpl(type, visited);
+}
+
 SourceLoc findBestSourceLocFromUses(IRInst* inst)
 {
     for (auto use = inst->firstUse; use; use = use->nextUse)

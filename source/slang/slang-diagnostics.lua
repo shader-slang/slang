@@ -6047,7 +6047,7 @@ err(
     span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
 )
 
--- SPIRV (57001-57007)
+-- SPIRV (57001-57008)
 
 warning(
     "spirv-opt-failed",
@@ -6093,6 +6093,13 @@ err(
     "debug-info-include-source-requires-debug-info",
     57007,
     "'-debug-info-include-source' cannot be used with '-g0' or when no debug information is enabled; enable at least '-g1'."
+)
+
+err(
+    "logical-pointer-in-composite",
+    57008,
+    "logical pointer read out of a composite for SPIR-V",
+    span { loc = "location", message = "a pointer in a logical storage class cannot be read out of a composite value when targeting SPIR-V; access the pointer field through its address (keep the aggregate in memory), or use a physical ('PhysicalStorageBuffer') pointer." }
 )
 
 -- GLSL Compatibility (58001-58003)
