@@ -7702,6 +7702,18 @@ On 2026-09-22 the Debug NVVM/routing/reporter prefixes passed 419/419 with 54 ex
 
 This host has no CUDA device; GPU correctness remains pending. Historical Windows corpus counts are unchanged. See [the slice report](../../issue-nvvm-backend/report.slice-196-cuda13-validation.md) for commands and self-review.
 
+## Slice 197: reproducible isolated provider build
+
+`python3 extras/build-nvvm-provider.py --jobs 4` fetches the immutable LLVM 14.0.6 commit,
+builds the required static PIC components, and builds this checkout's provider in independent
+CMake caches. Explicit `--llvm-source` and `--llvm-dir` inputs support offline use. WSL selects
+Windows host tools by default. See the [provider README](../../source/slang-llvm-nvvm/README.md).
+
+Native Linux validation passed managed fetch/rerun, fresh LLVM and provider builds, cached-package
+builds and package changes, single-symbol exports, and O3 PTX compilation plus SM80 assembly.
+The fresh provider has no shared LLVM, zlib, or terminfo dependency. Windows/macOS/WSL execution
+remains unvalidated. [Slice 197 report](../../issue-nvvm-backend/report.slice-197-reproducible-provider-build.md).
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

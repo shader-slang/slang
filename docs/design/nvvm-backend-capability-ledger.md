@@ -2736,3 +2736,9 @@ passes 102/102. Frozen v1 remains 423/423/423 over 427; discovery remains 72/72/
 have zero classification change. Provider ABI revision 35 is unchanged.
 
 Slice 196 establishes a separate native Linux CUDA 13.4.2 compilation/assembly baseline at explicit SM80: 419/419 selected tests passed, with 54 correctly reported skips and no failures. This denominator includes harness regressions and does not replace historical Windows measurements. Both reporter paths retain explicit skips, invalid target settings fail, and compute_70 remains unsupported by CUDA 13. NVRTC artifact production now excludes the vendor terminator. GPU runtime evidence remains pending here. Frozen v1 stays 423/427 and discovery stays 72/72 without reclassification.
+
+Slice 197 makes the isolated provider reproducible: the pinned LLVM 14.0.6 source path and cached
+package path both build compiler-matched providers on native Linux and pass O3 PTX/SM80 assembly.
+The fresh source build exports only the C ABI and needs no shared LLVM, zlib, or terminfo. This is
+build/deployment evidence, not a language-support or GPU-runtime expansion. Historical corpus
+classifications and provider ABI revision 35 remain unchanged.
