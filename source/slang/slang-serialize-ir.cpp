@@ -547,6 +547,15 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     IRInst** const insts = &instsList[1];
     insts[-1] = nullptr;
 
+    // Each instruction consumes one entry of `operandIndices` for its result type, followed by
+    // one entry per operand (see the traversal below), so the size of that table is an exact
+    // bound on the total operand count. We check that bound here, before allocating anything,
+    // because `operandCount` comes from untrusted input: an inflated value would otherwise size
+    // a tail-allocated operand array that the file has no data to fill, and on a 32-bit target
+    // (including WebAssembly) `operandCount * sizeof(IRUse)` can wrap `size_t` and produce an
+    // undersized allocation.
+    Int64 usedOperandIndices = 0;
+
     for (Int64 instIndex = 0; instIndex < numInsts; ++instIndex)
     {
         const auto& a = flat.instAllocInfo[instIndex];
@@ -587,6 +596,9 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
                 break;
             }
         }
+        usedOperandIndices += Int64(a.operandCount) + 1;
+        SLANG_RELEASE_ASSERT(usedOperandIndices <= operandIndicesCount);
+
         insts[instIndex] = module->_allocateInst(op, a.operandCount, minSizeInBytes);
     }
 
