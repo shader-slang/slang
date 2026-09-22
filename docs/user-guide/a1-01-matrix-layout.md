@@ -155,4 +155,27 @@ Alternatively the default layout can be set by
 * Including a `CompilerOptionName::MatrixLayoutColumn` or `CompilerOptionName::MatrixLayoutRow` entry in `SessionDesc::compilerOptionEntries`.
 * Setting `-matrix-layout-row-major` or `-matrix-layout-column-major` command line options to `slangc`.
 
+HLSL and Slang source can change the default for subsequent matrix type occurrences with
+`#pragma pack_matrix`:
+
+```hlsl
+#pragma pack_matrix(row_major)
+float3x4 rowMajorMatrix;
+
+#pragma pack_matrix(column_major)
+float3x4 columnMajorMatrix;
+```
+
+An explicit `row_major` or `column_major` modifier on a matrix type overrides the active pragma.
+Before the first directive, the compiler's configured matrix-layout default applies. A normal
+`#include` inherits the active default, and changes inside the included file persist afterwards.
+The directive changes the source default, not just the current brace-delimited scope. Ordinary
+typedefs retain the layout selected at their definition.
+
+A semantic `__include` is preprocessed independently. It does not inherit the including source's
+active matrix-layout default, and directives inside it do not change the including source's default.
+
+Native GLSL input does not support this directive; it uses GLSL layout qualifiers instead.
+This input-language restriction does not prevent compiling HLSL or Slang containing the directive
+to a GLSL target.
 

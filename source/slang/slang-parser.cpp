@@ -135,8 +135,16 @@ public:
     ModuleDecl* currentModule = nullptr;
 
     bool hasSeenCompletionToken = false;
+    /// Whether the expression parser is inside a generic argument with an unresolved type/value
+    /// role.
+    bool isParsingGenericArgument = false;
 
     TokenReader tokenReader;
+    const Token* sourceTokenBegin = nullptr;
+    // Borrowed from the segment or UnparsedStmt that owns the tokens. A deferred body beginning at
+    // token `N` looks up local token `i` at `N + i`, so the immutable timeline needs no rebasing.
+    MatrixLayoutPragmaInfo* matrixLayoutPragmaInfo = nullptr;
+    Index matrixLayoutTokenOffsetBase = 0;
     DiagnosticSink* sink;
     SourceLoc lastErrorLoc;
     ParserOptions options;
@@ -189,8 +197,13 @@ public:
         TokenSpan const& _tokens,
         DiagnosticSink* sink,
         Scope* outerScope,
-        ParserOptions inOptions)
+        ParserOptions inOptions,
+        MatrixLayoutPragmaInfo* inMatrixLayoutPragmaInfo = nullptr,
+        Index inMatrixLayoutTokenOffsetBase = 0)
         : tokenReader(_tokens)
+        , sourceTokenBegin(_tokens.begin())
+        , matrixLayoutPragmaInfo(inMatrixLayoutPragmaInfo)
+        , matrixLayoutTokenOffsetBase(inMatrixLayoutTokenOffsetBase)
         , astBuilder(inAstBuilder)
         , sink(sink)
         , outerScope(outerScope)
@@ -198,6 +211,51 @@ public:
     {
     }
     Parser(const Parser& other) = default;
+
+    /// Returns the current token's offset in the original preprocessed segment.
+    Index getCurrentTokenOffset() const
+    {
+        return matrixLayoutTokenOffsetBase + (tokenReader.m_cursor - sourceTokenBegin);
+    }
+
+    /// Returns the first matrix-layout event whose offset is greater than `tokenOffset`.
+    Index getMatrixLayoutEventUpperBound(Index tokenOffset) const
+    {
+        if (!matrixLayoutPragmaInfo)
+            return 0;
+
+        Index begin = 0;
+        Index end = matrixLayoutPragmaInfo->events.getCount();
+        while (begin < end)
+        {
+            const Index middle = begin + (end - begin) / 2;
+            if (matrixLayoutPragmaInfo->events[middle].tokenOffset <= tokenOffset)
+                begin = middle + 1;
+            else
+                end = middle;
+        }
+        return begin;
+    }
+
+    /// Returns the layout active at `tokenOffset`, or the segment's inherited initial mode.
+    SlangMatrixLayoutMode getMatrixLayoutModeAtTokenOffset(Index tokenOffset) const
+    {
+        const Index eventIndex = getMatrixLayoutEventUpperBound(tokenOffset);
+        if (eventIndex)
+            return matrixLayoutPragmaInfo->events[eventIndex - 1].mode;
+        if (matrixLayoutPragmaInfo)
+            return matrixLayoutPragmaInfo->initialMode;
+        return SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
+    }
+
+    /// Returns the matrix-layout mode active at the parser's current token.
+    /// Deriving it from the cursor keeps speculative parsing and cursor restoration consistent.
+    SlangMatrixLayoutMode getMatrixLayoutModeAtCurrentToken() const
+    {
+        if (!matrixLayoutPragmaInfo)
+            return SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
+        return getMatrixLayoutModeAtTokenOffset(getCurrentTokenOffset());
+    }
 
     // Session* getSession() { return m_session; }
 
@@ -2289,6 +2347,9 @@ static Stmt* parseOptBody(Parser* parser)
     unparsedStmt->currentScope = parser->currentScope;
     unparsedStmt->outerScope = parser->outerScope;
     unparsedStmt->sourceLanguage = parser->getSourceLanguage();
+    unparsedStmt->matrixLayoutPragmaInfo =
+        RefPtr<MatrixLayoutPragmaInfo>(parser->matrixLayoutPragmaInfo);
+    unparsedStmt->matrixLayoutTokenOffsetBase = parser->getCurrentTokenOffset();
     parser->FillPosition(unparsedStmt);
     List<Token>& tokens = unparsedStmt->tokens;
     int braceDepth = 0;
@@ -3330,6 +3391,38 @@ static Expr* _applyModifiersToTypeExpr(Parser* parser, Expr* typeExpr, Modifiers
     }
 }
 
+/// Records the active matrix-layout default on syntax that may resolve to a matrix type.
+///
+/// Names and generic applications may represent either types or values. For unchecked syntax,
+/// preserve the default until `CheckTerm` resolves it. If generic-application disambiguation has
+/// already checked the expression, apply the default immediately.
+static Expr* _maybeApplyMatrixLayoutDefault(
+    Parser* parser,
+    Expr* expr,
+    SlangMatrixLayoutMode matrixLayoutMode)
+{
+    if (matrixLayoutMode == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+        return expr;
+
+    if (!as<DeclRefExpr>(expr) && !as<GenericAppExpr>(expr))
+        return expr;
+
+    // Generic-argument and postfix handling may visit the same expression before wrapping it.
+    if (expr->getPendingMatrixLayoutMode() != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+        return expr;
+
+    // Deferred parsing may already have checked a name to disambiguate `<`. Apply its default
+    // directly rather than leaving pending state behind CheckTerm's checked-expression fast path.
+    if (expr->checked)
+    {
+        SLANG_RELEASE_ASSERT(parser->semanticsVisitor);
+        return parser->semanticsVisitor->applyMatrixLayoutDefault(expr, matrixLayoutMode);
+    }
+
+    expr->setPendingMatrixLayoutMode(matrixLayoutMode);
+    return expr;
+}
+
 /// Move any type modifier in `ioBaseModifiers` to the given `typeExpr`.
 ///
 /// If any type modifiers were present, `ioBaseModifiers` will be updated
@@ -3525,6 +3618,7 @@ static Expr* parseHLSLTraditionalIntegerTypeSpecifier(Parser* parser)
 /// Parse a type specifier, without dealing with modifiers.
 static TypeSpec _parseSimpleTypeSpec(Parser* parser)
 {
+    auto matrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
     TypeSpec typeSpec;
     Expr* typeExpr = nullptr;
 
@@ -3606,6 +3700,7 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
             inGlobalScope = true;
         }
 
+        matrixLayoutMode = parser->getMatrixLayoutModeAtCurrentToken();
         Token typeName = parser->ReadToken(TokenType::Identifier);
 
         auto basicType = parser->astBuilder->create<VarExpr>();
@@ -3644,7 +3739,7 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         }
     }
 
-    typeSpec.expr = typeExpr;
+    typeSpec.expr = _maybeApplyMatrixLayoutDefault(parser, typeExpr, matrixLayoutMode);
     return typeSpec;
 }
 
@@ -8937,11 +9032,14 @@ static Expr* parseAtomicExpr(Parser* parser)
             }
 
             Token openParen = parser->ReadToken(TokenType::LParent);
+            const auto parenthesizedMatrixLayoutMode =
+                parser->getMatrixLayoutModeAtCurrentToken();
 
             // Only handles cases of `(type)`, where type is a single identifier,
             // and at this point the type is known
             if (peekTypeName(parser) && parser->LookAheadToken(TokenType::RParent, 1))
             {
+                const auto matrixLayoutMode = parser->getMatrixLayoutModeAtCurrentToken();
                 // Get the identifier for the type
                 const Token typeToken = advanceToken(parser);
                 // Consume the closing `)`
@@ -8955,7 +9053,8 @@ static Expr* parseAtomicExpr(Parser* parser)
                 TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
                 tcexpr->loc = openParen.loc;
 
-                tcexpr->functionExpr = varExpr;
+                tcexpr->functionExpr =
+                    _maybeApplyMatrixLayoutDefault(parser, varExpr, matrixLayoutMode);
                 tcexpr->arguments.add(parsePrefixExpr(parser));
 
                 return tcexpr;
@@ -9052,7 +9151,10 @@ static Expr* parseAtomicExpr(Parser* parser)
                         TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
                         tcexpr->loc = openParen.loc;
 
-                        tcexpr->functionExpr = base;
+                        tcexpr->functionExpr = _maybeApplyMatrixLayoutDefault(
+                            parser,
+                            base,
+                            parenthesizedMatrixLayoutMode);
                         tcexpr->arguments.add(parsePrefixExpr(parser));
 
                         return tcexpr;
@@ -9061,7 +9163,12 @@ static Expr* parseAtomicExpr(Parser* parser)
                     {
                         ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
                         parenExpr->loc = openParen.loc;
-                        parenExpr->base = base;
+                        // In `(matrix<float, 2, 3>)(0)`, parentheses hide the type from the outer
+                        // call parser. Preserve the default captured at the inner type occurrence.
+                        parenExpr->base = _maybeApplyMatrixLayoutDefault(
+                            parser,
+                            base,
+                            parenthesizedMatrixLayoutMode);
                         return parenExpr;
                     }
                 }
@@ -9225,10 +9332,21 @@ static Expr* parseAtomicExpr(Parser* parser)
 
 static Expr* parsePostfixExpr(Parser* parser)
 {
+    const auto matrixLayoutMode = parser->getMatrixLayoutModeAtCurrentToken();
     auto expr = parseAtomicExpr(parser);
     for (;;)
     {
         auto nextTokenType = peekTokenType(parser);
+
+        // A generic argument is parsed with the expression grammar because it may be either a
+        // type or a value. Preserve the matrix-layout default once a possibly-qualified name is
+        // complete, before a postfix such as `[2]` can wrap a matrix element type.
+        if (parser->isParsingGenericArgument && nextTokenType != TokenType::Scope &&
+            nextTokenType != TokenType::Dot)
+        {
+            expr = _maybeApplyMatrixLayoutDefault(parser, expr, matrixLayoutMode);
+        }
+
         switch (nextTokenType)
         {
         default:
@@ -9278,7 +9396,8 @@ static Expr* parsePostfixExpr(Parser* parser)
         case TokenType::LParent:
             {
                 InvokeExpr* invokeExpr = parser->astBuilder->create<InvokeExpr>();
-                invokeExpr->functionExpr = expr;
+                invokeExpr->functionExpr =
+                    _maybeApplyMatrixLayoutDefault(parser, expr, matrixLayoutMode);
                 parser->FillPosition(invokeExpr);
                 auto lParen = parser->ReadToken(TokenType::LParent);
                 invokeExpr->argumentDelimeterLocs.add(lParen.loc);
@@ -10059,6 +10178,9 @@ static Expr* _parseGenericArg(Parser* parser)
         return typeExpr;
     }
 
+    const bool wasParsingGenericArgument = parser->isParsingGenericArgument;
+    parser->isParsingGenericArgument = true;
+    SLANG_DEFER(parser->isParsingGenericArgument = wasParsingGenericArgument);
     return parser->ParseArgExpr();
 }
 
@@ -10085,6 +10207,8 @@ Stmt* parseUnparsedStmt(
     TranslationUnitRequest* translationUnit,
     SourceLanguage sourceLanguage,
     TokenSpan const& tokens,
+    MatrixLayoutPragmaInfo* matrixLayoutPragmaInfo,
+    Index matrixLayoutTokenOffsetBase,
     DiagnosticSink* sink,
     Scope* currentScope,
     Scope* outerScope)
@@ -10099,7 +10223,14 @@ Stmt* parseUnparsedStmt(
     options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
     options.optionSet = translationUnit->compileRequest->optionSet;
 
-    Parser parser(astBuilder, tokens, sink, outerScope, options);
+    Parser parser(
+        astBuilder,
+        tokens,
+        sink,
+        outerScope,
+        options,
+        matrixLayoutPragmaInfo,
+        matrixLayoutTokenOffsetBase);
     parser.currentScope = outerScope;
     parser.namePool = translationUnit->getNamePool();
     parser.semanticsVisitor = semanticsVisitor;
@@ -10114,6 +10245,8 @@ void parseSourceFile(
     TranslationUnitRequest* translationUnit,
     SourceLanguage sourceLanguage,
     TokenSpan const& tokens,
+    MatrixLayoutPragmaInfo* matrixLayoutPragmaInfo,
+    Index matrixLayoutTokenOffsetBase,
     DiagnosticSink* sink,
     Scope* outerScope,
     ContainerDecl* parentDecl)
@@ -10128,7 +10261,14 @@ void parseSourceFile(
     options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
     options.optionSet = translationUnit->compileRequest->optionSet;
 
-    Parser parser(astBuilder, tokens, sink, outerScope, options);
+    Parser parser(
+        astBuilder,
+        tokens,
+        sink,
+        outerScope,
+        options,
+        matrixLayoutPragmaInfo,
+        matrixLayoutTokenOffsetBase);
     parser.namePool = translationUnit->getNamePool();
     return parser.parseSourceFile(parentDecl);
 }
@@ -10881,6 +11021,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("__constref", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("const", getSyntaxClass<ConstModifier>()),
     _makeParseModifier("__builtin", getSyntaxClass<BuiltinModifier>()),
+    _makeParseModifier("__hlsl_matrix_type_alias", getSyntaxClass<HLSLMatrixTypeAliasModifier>()),
     _makeParseModifier("highp", getSyntaxClass<GLSLPrecisionModifier>()),
     _makeParseModifier("lowp", getSyntaxClass<GLSLPrecisionModifier>()),
     _makeParseModifier("mediump", getSyntaxClass<GLSLPrecisionModifier>()),

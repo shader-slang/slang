@@ -2,6 +2,7 @@
 #pragma once
 
 #include "slang-ast-base.h"
+#include "slang-preprocessor.h"
 
 //
 #include "slang-ast-stmt.h.fiddle"
@@ -58,6 +59,10 @@ class UnparsedStmt : public Stmt
     Scope* currentScope = nullptr;
     Scope* outerScope = nullptr;
     SourceLanguage sourceLanguage;
+    // Keep the original timeline alive for deferred parsing. Local token `i` maps to
+    // `matrixLayoutTokenOffsetBase + i`; event offsets remain in the original token stream.
+    RefPtr<MatrixLayoutPragmaInfo> matrixLayoutPragmaInfo;
+    Index matrixLayoutTokenOffsetBase = 0;
 };
 
 FIDDLE()

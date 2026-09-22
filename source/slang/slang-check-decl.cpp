@@ -15102,6 +15102,8 @@ Stmt* SemanticsVisitor::maybeParseStmt(Stmt* stmt, const SemanticsContext& conte
             getShared()->getTranslationUnitRequest(),
             unparsedStmt->sourceLanguage,
             tokenList,
+            unparsedStmt->matrixLayoutPragmaInfo,
+            unparsedStmt->matrixLayoutTokenOffsetBase,
             getShared()->getSink(),
             unparsedStmt->currentScope,
             unparsedStmt->outerScope);

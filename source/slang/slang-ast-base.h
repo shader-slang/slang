@@ -819,6 +819,26 @@ class Expr : public SyntaxNode
     FIDDLE() QualType type;
 
     bool checked = false;
+
+    /// Returns the matrix-layout default captured while this expression's role was unresolved.
+    SlangMatrixLayoutMode getPendingMatrixLayoutMode() const
+    {
+        return SlangMatrixLayoutMode(m_pendingMatrixLayoutMode);
+    }
+
+    /// Records or clears a pending matrix-layout default; checked expressions may only clear it.
+    void setPendingMatrixLayoutMode(SlangMatrixLayoutMode mode)
+    {
+        SLANG_RELEASE_ASSERT(
+            mode == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN || mode == SLANG_MATRIX_LAYOUT_ROW_MAJOR ||
+            mode == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
+        SLANG_RELEASE_ASSERT(!checked || mode == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN);
+        m_pendingMatrixLayoutMode = uint8_t(mode);
+    }
+
+private:
+    // Parser-only state; semantic checking consumes it, and AST serialization omits it.
+    uint8_t m_pendingMatrixLayoutMode = uint8_t(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN);
 };
 
 FIDDLE(abstract)

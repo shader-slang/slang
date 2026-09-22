@@ -339,6 +339,34 @@ static void _applySourceLanguageDirective(
     }
 }
 
+/// Reports `#pragma pack_matrix` as unknown in GLSL and discards its recorded state.
+/// This runs after preprocessing because the effective language is resolved across primary sources.
+static void _rejectMatrixLayoutPragmasInGLSL(
+    List<List<PreprocessedSegment>>& preprocessedSources,
+    SourceLanguage sourceLanguage,
+    DiagnosticSink* sink)
+{
+    if (sourceLanguage != SourceLanguage::GLSL)
+        return;
+
+    for (auto& preprocessed : preprocessedSources)
+    {
+        for (auto& segment : preprocessed)
+        {
+            if (!segment.matrixLayoutPragmaInfo)
+                continue;
+
+            for (auto location : segment.matrixLayoutPragmaInfo->directiveLocations)
+            {
+                sink->diagnose(Diagnostics::UnknownPragmaDirectiveIgnored{
+                    .directive = "pack_matrix",
+                    .location = location});
+            }
+            segment.matrixLayoutPragmaInfo = nullptr;
+        }
+    }
+}
+
 /// Resolve the extension-implied language of the primary source files and diagnose conflicts.
 ///
 /// An explicit language intentionally overrides every file-name extension without a diagnostic.
@@ -540,6 +568,11 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
         preprocessedSources.add(_Move(preprocessed));
     }
 
+    _rejectMatrixLayoutPragmasInGLSL(
+        preprocessedSources,
+        translationUnit->sourceLanguage,
+        getSink());
+
     // Parser and semantic checks both consult `ModuleDecl::languageVersion`, so a translation unit
     // must resolve one version before any primary file is parsed. A `#language` directive in any
     // primary file overrides the request-level default for the complete module; conflicting
@@ -657,10 +690,12 @@ List<PreprocessedSegment> preprocessSourceSegments(
     PreprocessorHandler* preprocessorHandler)
 {
     List<PreprocessedSegment> result;
+    SlangMatrixLayoutMode matrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 
     for (auto segmentFile : segments)
     {
         PreprocessedSegment seg;
+        MatrixLayoutPragmaInfo matrixLayoutPragmaInfo;
 
         seg.tokens = preprocessSource(
             segmentFile,
@@ -670,7 +705,24 @@ List<PreprocessedSegment> preprocessSourceSegments(
             linkage,
             seg.sourceLanguageDirective,
             ioLanguageVersion,
-            preprocessorHandler);
+            preprocessorHandler,
+            matrixLayoutMode,
+            &matrixLayoutPragmaInfo);
+
+        matrixLayoutMode = matrixLayoutPragmaInfo.finalMode;
+        // Files without a source matrix-layout default need no shared timeline or deferred-body
+        // reference counting. An EOF-only directive still supplies the next segment's default.
+        if (matrixLayoutPragmaInfo.initialMode != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN ||
+            matrixLayoutPragmaInfo.events.getCount() != 0 ||
+            matrixLayoutPragmaInfo.directiveLocations.getCount() != 0)
+        {
+            seg.matrixLayoutPragmaInfo = new MatrixLayoutPragmaInfo();
+            seg.matrixLayoutPragmaInfo->initialMode = matrixLayoutPragmaInfo.initialMode;
+            seg.matrixLayoutPragmaInfo->events = _Move(matrixLayoutPragmaInfo.events);
+            seg.matrixLayoutPragmaInfo->finalMode = matrixLayoutPragmaInfo.finalMode;
+            seg.matrixLayoutPragmaInfo->directiveLocations =
+                _Move(matrixLayoutPragmaInfo.directiveLocations);
+        }
 
         result.add(_Move(seg));
     }
@@ -693,6 +745,8 @@ void parsePreprocessedSegments(
             translationUnit,
             translationUnit->sourceLanguage,
             seg.tokens,
+            seg.matrixLayoutPragmaInfo,
+            0,
             sink,
             outerScope,
             parentDecl);

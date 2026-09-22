@@ -2160,6 +2160,11 @@ public:
 
     Expr* _CheckTerm(Expr* term);
 
+    /// Applies `mode` when `expr` denotes an eligible matrix with an unresolved layout.
+    /// Values, other types, user aliases, and explicit layouts are returned unchanged. Semantic
+    /// checking must have assigned `expr->type`, but need not have set `expr->checked` yet.
+    Expr* applyMatrixLayoutDefault(Expr* expr, SlangMatrixLayoutMode mode);
+
     /// If inside a lambda body, check whether `exprIn` (or its base sub-expression chain)
     /// references an outer-scope variable that needs to be captured into the lambda struct.
     /// This handles the case where an expression was already checked by the parser's

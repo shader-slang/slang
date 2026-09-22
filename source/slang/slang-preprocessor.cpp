@@ -1328,6 +1328,18 @@ struct Preprocessor
     /// Stores macro definition and invocation info for language server.
     PreprocessorContentAssistInfo* contentAssistInfo = nullptr;
 
+    /// Records `#pragma pack_matrix` state changes for the current preprocessing pass.
+    List<MatrixLayoutPragmaEvent> matrixLayoutEvents;
+
+    /// Records valid directives so their language-specific availability can be checked later.
+    List<SourceLoc> matrixLayoutDirectiveLocations;
+
+    /// Tracks the source matrix layout currently active for emitted tokens.
+    SlangMatrixLayoutMode currentMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
+
+    /// Whether a matrix-layout change should be recorded at the next output token.
+    bool hasPendingMatrixLayoutEvent = false;
+
     NamePool* getNamePool() { return namePool; }
     SourceManager* getSourceManager() { return sourceManager; }
 
@@ -4431,6 +4443,52 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
     AdvanceToken(context);
 }
 
+SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaPackMatrixDirective)
+{
+    if (!Expect(context, TokenType::LParent, PreprocessorExpectDiag::TokenInDirective))
+        return;
+
+    Token layoutToken;
+    if (!Expect(
+            context,
+            TokenType::Identifier,
+            PreprocessorExpectDiag::TokenInDirective,
+            &layoutToken))
+        return;
+
+    SlangMatrixLayoutMode layoutMode;
+    if (layoutToken.getContent() == "row_major")
+    {
+        layoutMode = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
+    }
+    else if (layoutToken.getContent() == "column_major")
+    {
+        layoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+    }
+    else
+    {
+        GetSink(context)->diagnose(
+            Diagnostics::Expected2TokensInPreprocessorDirective{
+                .token1 = "row_major",
+                .token2 = "column_major",
+                .directive = GetDirectiveName(context),
+                .location = layoutToken.loc});
+        context->m_parseError = true;
+        return;
+    }
+
+    if (!Expect(context, TokenType::RParent, PreprocessorExpectDiag::TokenInDirective))
+        return;
+
+    // The outer directive handler diagnoses and consumes unexpected trailing tokens.
+    if (!IsEndOfLine(context))
+        return;
+
+    context->m_preprocessor->currentMatrixLayoutMode = layoutMode;
+    context->m_preprocessor->hasPendingMatrixLayoutEvent = true;
+    context->m_preprocessor->matrixLayoutDirectiveLocations.add(subDirectiveToken.loc);
+}
+
 // Information about a specific `#pragma` directive
 struct PragmaDirective
 {
@@ -4446,6 +4504,8 @@ static const PragmaDirective kPragmaDirectives[] = {
     {"once", &handlePragmaOnceDirective},
 
     {"warning", &handlePragmaWarningDirective},
+
+    {"pack_matrix", &handlePragmaPackMatrixDirective},
 
     {NULL, NULL},
 };
@@ -4983,6 +5043,23 @@ static void DefineMacro(Preprocessor* preprocessor, String const& key, String co
     reportMacroDefinitionForContentAssist(preprocessor, macro);
 }
 
+/// Records the pending matrix-layout change at the position of the next output token.
+/// Pragma callbacks run inside `ReadToken` and cannot observe the output token offset directly.
+static void _recordPendingMatrixLayoutPragmaEvent(Preprocessor* preprocessor, Index tokenOffset)
+{
+    if (!preprocessor->hasPendingMatrixLayoutEvent)
+        return;
+
+    SLANG_ASSERT(preprocessor->currentMatrixLayoutMode != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN);
+
+    MatrixLayoutPragmaEvent event;
+    event.tokenOffset = tokenOffset;
+    event.mode = preprocessor->currentMatrixLayoutMode;
+    preprocessor->matrixLayoutEvents.add(event);
+
+    preprocessor->hasPendingMatrixLayoutEvent = false;
+}
+
 // read the entire input into tokens
 static TokenList ReadAllTokens(Preprocessor* preprocessor)
 {
@@ -4994,6 +5071,7 @@ static TokenList ReadAllTokens(Preprocessor* preprocessor)
         switch (token.type)
         {
         default:
+            _recordPendingMatrixLayoutPragmaEvent(preprocessor, tokens.m_tokens.getCount());
             tokens.add(token);
             break;
 
@@ -5080,13 +5158,17 @@ TokenList preprocessSource(
     Linkage* linkage,
     SourceLanguageDirective& outSourceLanguageDirective,
     SlangLanguageVersion& outLanguageVersion,
-    PreprocessorHandler* handler)
+    PreprocessorHandler* handler,
+    SlangMatrixLayoutMode initialMatrixLayoutMode,
+    MatrixLayoutPragmaInfo* matrixLayoutPragmaInfo)
 {
     PreprocessorDesc desc;
 
     desc.sink = sink;
     desc.includeSystem = includeSystem;
     desc.handler = handler;
+    desc.initialMatrixLayoutMode = initialMatrixLayoutMode;
+    desc.matrixLayoutPragmaInfo = matrixLayoutPragmaInfo;
 
     desc.defines = &defines;
 
@@ -5129,6 +5211,7 @@ TokenList preprocessSource(
     preprocessor.endOfFileToken.type = TokenType::EndOfFile;
     preprocessor.endOfFileToken.flags = TokenFlag::AtStartOfLine;
     preprocessor.contentAssistInfo = desc.contentAssistInfo;
+    preprocessor.currentMatrixLayoutMode = desc.initialMatrixLayoutMode;
 
     preprocessor.warningStateTracker =
         dynamicCast<preprocessor::WarningStateTracker>(desc.sink->getSourceWarningStateTracker());
@@ -5253,6 +5336,14 @@ TokenList preprocessSource(
     outSourceLanguageDirective = preprocessor.sourceLanguageDirective;
     if (preprocessor.languageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN)
         outLanguageVersion = preprocessor.languageVersion;
+    if (desc.matrixLayoutPragmaInfo)
+    {
+        desc.matrixLayoutPragmaInfo->initialMode = desc.initialMatrixLayoutMode;
+        desc.matrixLayoutPragmaInfo->events = _Move(preprocessor.matrixLayoutEvents);
+        desc.matrixLayoutPragmaInfo->finalMode = preprocessor.currentMatrixLayoutMode;
+        desc.matrixLayoutPragmaInfo->directiveLocations =
+            _Move(preprocessor.matrixLayoutDirectiveLocations);
+    }
     return tokens;
 }
 
