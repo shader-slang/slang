@@ -8,7 +8,7 @@
 // cannot keep a defined default.
 //
 // The SIMPLE variants check the emitted code (GPU-free). The COMPARE_COMPUTE variant additionally
-// compiles the emitted C++ *through the host compiler* (exercising the new SLANG_PRELUDE_UNREACHABLE
+// compiles the emitted C++ *through the host compiler* (exercising the SLANG_PRELUDE_UNREACHABLE
 // macro) and executes closed-set dispatch on the CPU, confirming the never-taken default arm leaves
 // runtime behavior unchanged; it also drives a CUDA (nvrtc) syntax compile of the marker. The
 // dispatched type is read from a buffer so the dispatcher is not resolved away at compile time.
