@@ -1,9 +1,10 @@
 // Regression test that the empty-callable-data padding does NOT touch a non-empty callable-data
-// struct: the padding passes are guarded by `isEmptyStruct`, so a struct that already has fields
-// must be left alone. A spurious `_slang_dummy` here would mean the emptiness guard regressed and
-// the passes started padding structs that do not need it.
+// struct on either padding path (HLSL/D3D and CUDA): both passes are guarded by `isEmptyStruct`,
+// so a struct that already has fields must be left alone. A spurious `_slang_dummy` here would mean
+// the emptiness guard regressed and the passes started padding structs that do not need it.
 
 //TEST:SIMPLE(filecheck=HLSL): -stage callable -entry callableMain -target hlsl -profile sm_6_7
+//TEST:SIMPLE(filecheck=CUDA): -stage callable -entry callableMain -target cuda
 
 struct NonEmptyData
 {
@@ -20,3 +21,9 @@ void callableMain(inout NonEmptyData data)
 // check precedes the signature match so it covers the struct declaration, which is emitted first.
 // HLSL-NOT: _slang_dummy
 // HLSL: void callableMain(inout NonEmptyData{{.*}} {{[A-Za-z0-9_]+}})
+
+// The CUDA padding pass shares the same `isEmptyStruct` guard, so the non-empty struct keeps its
+// original field and gains no dummy: the negative check runs ahead of the signature match, covering
+// the struct declaration too. The callable entry point survives as a padded pointer parameter.
+// CUDA-NOT: _slang_dummy
+// CUDA: void __direct_callable__callableMain(NonEmptyData{{.*}}*{{.*}})

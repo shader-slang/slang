@@ -2076,7 +2076,8 @@ Result linkAndOptimizeIR(
     {
         // CUDA counterpart of the D3D call above: pad an empty `CallShader` payload (and callable
         // entry-point parameter) before `legalizeEmptyTypes` below erases it. See the pass's header
-        // doc for why.
+        // doc for why. The CPU target also reaches this `else` branch, but it has no ray-tracing
+        // `CallShader` or callable entry points for the pass to act on, so we restrict it to CUDA.
         if (isCUDATarget(targetRequest))
         {
             SLANG_PASS(legalizeEmptyCallableDataPayloadsForHLSLAndCUDA);
