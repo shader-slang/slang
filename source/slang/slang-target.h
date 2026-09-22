@@ -102,6 +102,13 @@ bool isCPUTarget(CodeGenTarget target);
 bool isWGPUTarget(TargetRequest* targetReq);
 bool isWGPUTarget(CodeGenTarget target);
 
+/// Can the target's emitted code express a no-return "unreachable" terminator (so the downstream
+/// compiler may prune a provably-dead path, e.g. the default arm of a closed dynamic-dispatch
+/// switch)? True for CUDA and the CPU backends; false for HLSL/GLSL/WGSL/Metal, which keep a
+/// defined terminator on such a path instead.
+bool targetSupportsUnreachableTerminator(TargetRequest* targetReq);
+bool targetSupportsUnreachableTerminator(CodeGenTarget target);
+
 /// Does the target honor `[[vk::binding]]` on entry-point resource parameters?
 bool doesTargetSupportVkBindingOnEntryPointParameters(TargetRequest* targetReq);
 bool doesTargetSupportVkBindingOnEntryPointParameters(CodeGenTarget target);

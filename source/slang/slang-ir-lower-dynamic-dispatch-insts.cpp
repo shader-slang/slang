@@ -317,7 +317,17 @@ IRFunc* createDispatchFunc(
     // Create default block
     auto defaultBlock = builder.emitBlock();
     builder.setInsertInto(defaultBlock);
-    if (resultType->getOp() == kIROp_VoidType)
+    if (targetSupportsUnreachableTerminator(targetReq))
+    {
+        // The switch selector and every `case` tag are synthesized from the same closed
+        // witness-table set (see the force-inline comment above), and external sequential IDs are
+        // clamped to an in-set tag before reaching here, so no tag selects the default arm. On
+        // targets that can express it we terminate that dead arm with `unreachable`, so the backend
+        // drops the range check and matches handwritten dispatch; targets without the spelling keep
+        // the defined default below and stay valid.
+        builder.emitUnreachable();
+    }
+    else if (resultType->getOp() == kIROp_VoidType)
     {
         builder.emitReturn();
     }

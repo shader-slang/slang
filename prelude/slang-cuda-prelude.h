@@ -18,6 +18,13 @@
 
 #endif
 
+// Marks a code path the Slang compiler has proved dead (for example the default arm of a closed
+// dynamic-dispatch switch). Both NVRTC and nvcc accept `__builtin_unreachable()`, which lets the
+// driver JIT drop the dead path instead of emitting a range check for a tag that can never occur.
+#ifndef SLANG_PRELUDE_UNREACHABLE
+#define SLANG_PRELUDE_UNREACHABLE() __builtin_unreachable()
+#endif
+
 // Define SLANG_CUDA_ENABLE_HALF to use the cuda_fp16 include to add half support.
 // For this to work NVRTC needs to have the path to the CUDA SDK.
 //

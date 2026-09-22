@@ -3364,6 +3364,21 @@ bool isCUDATarget(CodeGenTarget codeGenTarget)
     }
 }
 
+bool targetSupportsUnreachableTerminator(CodeGenTarget target)
+{
+    // CUDA (NVRTC/nvcc) and the CPU targets (C++ source, compiled by clang/gcc/MSVC, and LLVM)
+    // all emit to a backend that can express a no-return "unreachable" terminator, so the
+    // downstream compiler can drop a provably-dead path such as the default arm of a closed
+    // dynamic-dispatch switch. HLSL/GLSL/WGSL/Metal have no such spelling wired up here, so on
+    // those targets a dead arm keeps a defined terminator and the emitted code stays valid.
+    return isCUDATarget(target) || isCPUTarget(target);
+}
+
+bool targetSupportsUnreachableTerminator(TargetRequest* targetReq)
+{
+    return targetSupportsUnreachableTerminator(targetReq->getTarget());
+}
+
 bool isWGPUTarget(CodeGenTarget target)
 {
     switch (target)

@@ -9,6 +9,20 @@
 #endif
 #endif
 
+// Marks a code path the Slang compiler has proved dead, such as the default arm of a closed
+// dynamic-dispatch switch. C++ output may be built by any host compiler, so the spelling is
+// per-compiler; an unknown compiler gets a harmless no-op. This header is shared by the cpp, host,
+// and torch preludes, so defining it here covers every C++ target.
+#ifndef SLANG_PRELUDE_UNREACHABLE
+#if defined(__clang__) || defined(__GNUC__)
+#define SLANG_PRELUDE_UNREACHABLE() __builtin_unreachable()
+#elif defined(_MSC_VER)
+#define SLANG_PRELUDE_UNREACHABLE() __assume(0)
+#else
+#define SLANG_PRELUDE_UNREACHABLE() ((void)0)
+#endif
+#endif
+
 // Since we are using unsigned arithmatic care is need in this comparison.
 // It is *assumed* that sizeInBytes >= elemSize. Which means (sizeInBytes >= elemSize) >= 0
 // Which means only a single test is needed
