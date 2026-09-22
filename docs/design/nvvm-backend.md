@@ -7730,6 +7730,20 @@ outside the build tree compiled and assembled six O0/O3 cases covering adjacent,
 exact-file provider loading. The [slice report](../../issue-nvvm-backend/report.slice-198-provider-packaging.md)
 records the normal-package, incremental-build, and negative checks. GPU execution is separate.
 
+## Slice 199: required toolkit and architecture matrix
+
+`extras/validate-nvvm-toolkit.py` requires explicit compiler, provider, CUDA root, and architecture
+inputs. Nine established shaders run at O0/O3. Every requested cell must emit the requested PTX
+target and entry, then produce a fresh assembled cubin. Missing inputs, stale outputs, unsupported
+targets, or missing cells cannot become successful skips. JSON records retain commands and hashes.
+
+Local native Linux validation passed 54/54 cells with CUDA 12.9.2 at SM70/80/90 and 36/36 with CUDA
+13.4.2 at SM80/90. CUDA 13 SM70 requests and missing-input/output cases failed explicitly. The manual
+GitHub Actions workflow pins CUDA 12.9.1 and 13.4.1 containers and builds the compiler/provider from
+source. It passed actionlint but has not been dispatched; those exact container environments remain
+unvalidated. See [slice 199](../../issue-nvvm-backend/report.slice-199-toolkit-matrix.md) for commands.
+These results establish compilation and assembly, not GPU execution.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

@@ -1,0 +1,82 @@
+name: NVVM Toolkit Validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-and-assemble:
+    name: CUDA ${{ matrix.toolkit }} compilation and assembly
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - toolkit: "12.9"
+            image: nvidia/cuda:12.9.1-devel-ubuntu24.04@sha256:020bc241a628776338f4d4053fed4c38f6f7f3d7eb5919fecb8de313bb8ba47c
+            architectures: "70 80 90"
+          - toolkit: "13.4"
+            image: nvidia/cuda:13.4.1-devel-ubuntu24.04@sha256:a3f014424ccc86cf66c84d700d2896491424205dd9457e3116ed4f0e96381311
+            architectures: "80 90"
+    container:
+      image: ${{ matrix.image }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      CUDA_PATH: /usr/local/cuda
+      CUDA_HOME: /usr/local/cuda
+
+    steps:
+      - name: Install build tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential ca-certificates cmake git ninja-build python3-dev libx11-dev
+
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Build the Slang compiler
+        run: |
+          cmake --preset default \
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DSLANG_ENABLE_DXIL=OFF \
+            -DSLANG_ENABLE_TESTS=OFF \
+            -DSLANG_ENABLE_EXAMPLES=OFF \
+            -DSLANG_ENABLE_GFX=OFF \
+            -DSLANG_ENABLE_SLANG_RHI=OFF \
+            -DSLANG_ENABLE_OPTIX=OFF
+          cmake --build build --config Release --target slangc --parallel 2
+
+      - name: Build the isolated LLVM 14 provider
+        run: |
+          python3 extras/build-nvvm-provider.py \
+            --build-dir build/nvvm-provider --config Release --jobs 2
+
+      - name: Compile and assemble every required cell
+        env:
+          REQUIRED_ARCHITECTURES: ${{ matrix.architectures }}
+          EXPECTED_TOOLKIT: ${{ matrix.toolkit }}
+        run: |
+          read -r -a architectures <<< "$REQUIRED_ARCHITECTURES"
+          python3 extras/validate-nvvm-toolkit.py \
+            --slangc build/Release/bin/slangc \
+            --provider build/nvvm-provider/artifacts/Release/libslang-llvm-nvvm.so \
+            --cuda-root "$CUDA_PATH" \
+            --expected-toolkit "$EXPECTED_TOOLKIT" \
+            --architectures "${architectures[@]}" \
+            --output build/nvvm-toolkit-validation
+
+      - name: Upload compilation and assembly evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: nvvm-toolkit-${{ matrix.toolkit }}
+          path: build/nvvm-toolkit-validation
+          if-no-files-found: error

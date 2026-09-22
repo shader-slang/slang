@@ -2748,3 +2748,8 @@ Linux Debug validation passes 421 focused tests with 54 skips; six relocated-pac
 cases assemble using adjacent, directory, and exact-file provider discovery. Exact-file overrides
 now preserve platform filenames, and nonembedded compiler/cache artifacts use the normal runtime
 install component. This establishes packaging correctness, not new language or GPU support.
+
+Slice 199 adds a strict nine-shader O0/O3 toolkit gate. CUDA 12.9.2 passed all 54 SM70/80/90 cells;
+CUDA 13.4.2 passed all 36 SM80/90 cells. Missing dependencies/outputs and CUDA 13 SM70 requests fail
+without reducing the denominator. A pinned manual CI matrix is syntax-validated but undispatched.
+GPU runtime and historical corpus support are not inferred from these 90 compile/assembly passes.
