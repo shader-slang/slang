@@ -122,6 +122,14 @@ Help formatting style
 Add a path to be used in resolving '#include' and 'import' operations. 
 
 
+<a id="search-path-list"></a>
+### -search-path-list
+
+**-search-path-list &lt;path&gt;**
+
+Add every search path listed in a text file. 
+
+
 <a id="lang"></a>
 ### -lang
 
