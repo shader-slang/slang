@@ -35,7 +35,18 @@ SlangResult DefaultSharedLibraryLoader::loadSharedLibrary(
     ISlangSharedLibrary** outSharedLibrary)
 {
     *outSharedLibrary = nullptr;
-    // Try loading
+    // Downstream compiler paths may name an existing platform file, such as
+    // /opt/slang/bin/libslang-llvm-nvvm.so. Honor that file instead of decorating its name again.
+    // A broken explicit file must fail here rather than falling back to a different library.
+    SlangPathType pathType;
+    if (SLANG_SUCCEEDED(Path::getPathType(path, &pathType)) && pathType == SLANG_PATH_TYPE_FILE)
+    {
+        // A bare filename is still an explicit file in the current directory. On POSIX, dlopen
+        // otherwise interprets it as a search-path lookup, even after our filesystem check.
+        const String platformPath =
+            Path::getParentDirectory(path).getLength() ? String(path) : Path::combine(".", path);
+        return loadPlatformSharedLibrary(platformPath.getBuffer(), outSharedLibrary);
+    }
     SharedLibrary::Handle handle;
     SLANG_RETURN_ON_FAIL(SharedLibrary::load(path, handle));
     *outSharedLibrary = ComPtr<ISlangSharedLibrary>(new DefaultSharedLibrary(handle)).detach();

@@ -655,6 +655,9 @@ add_subdirectory(source/slang-dispatcher)
 add_subdirectory(source/standard-modules)
 add_subdirectory(examples)
 
+# Optional compiler-matched provider; configure after executable targets for adjacent staging.
+include(NVVM)
+
 #
 # Packaging
 #

@@ -8900,3 +8900,43 @@ SLANG_UNIT_TEST(nvvmIRBuilderCoexistsWithLLVM21)
         SLANG_CHECK(reportedOnePassingTest);
     }
 }
+
+// Exercise the platform loader with real provider bytes: fake loaders do not decorate paths and
+// therefore cannot catch a second .so suffix or fallback away from an explicitly selected file.
+SLANG_UNIT_TEST(nvvmIRBuilderLoadsExactProviderFile)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    const String providerPath = SharedLibraryUtils::getSharedLibraryFileName(
+        reinterpret_cast<void*>(preflightBuilder.getAPI().queryInterface));
+    SLANG_CHECK_ABORT(File::exists(providerPath));
+    NVVMIRBuilder exactBuilder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::load(
+        providerPath,
+        DefaultSharedLibraryLoader::getSingleton(),
+        exactBuilder)));
+    SLANG_CHECK(exactBuilder.isInitialized());
+
+    TempDirectory temporary;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createTempDirectory(temporary)));
+    const String explicitFile = Path::combine(temporary.path, "nvvm-provider-shadow.invalid");
+    const String decoratedFile = SharedLibrary::calcPlatformPath(explicitFile.getUnownedSlice());
+    List<unsigned char> providerBytes;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllBytes(providerPath, providerBytes)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::writeAllBytes(decoratedFile, providerBytes.getBuffer(), providerBytes.getCount())));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(explicitFile, "invalid provider")));
+
+    // A valid decorated sibling proves that loading the undecorated explicit file would succeed
+    // incorrectly if the loader ignored the existing file and normalized its name instead.
+    ComPtr<ISlangSharedLibrary> sibling;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(DefaultSharedLibraryLoader::getSingleton()->loadPlatformSharedLibrary(
+            decoratedFile.getBuffer(),
+            sibling.writeRef())));
+    ComPtr<ISlangSharedLibrary> invalidLibrary;
+    SLANG_CHECK(SLANG_FAILED(DefaultSharedLibraryLoader::getSingleton()->loadSharedLibrary(
+        explicitFile.getBuffer(),
+        invalidLibrary.writeRef())));
+    SLANG_CHECK(invalidLibrary == nullptr);
+}

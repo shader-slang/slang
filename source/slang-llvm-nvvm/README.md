@@ -67,6 +67,33 @@ The install component contains one platform module under `<slang-install-prefix>
 into the same prefix as the Slang executables. It intentionally has no process-visible LLVM shared
 library dependency.
 
+## Build with the main compiler and package
+
+To include the provider in ordinary native Slang builds, first produce its isolated LLVM package,
+then enable the optional root integration. For example, on Linux/macOS:
+
+```sh
+python3 extras/build-nvvm-provider.py --config Debug --jobs 4
+cmake --preset default -DSLANG_EMBED_CORE_MODULE=OFF \
+  -DSLANG_ENABLE_NVVM_PROVIDER=ON \
+  -DSLANG_NVVM_LLVM_DIR="$PWD/build/nvvm-provider/llvm-build/lib/cmake/llvm"
+cmake --build --preset debug --target slangc slang-test
+cmake --install build --config Debug --prefix /path/to/slang-install \
+  --component slang-llvm-nvvm
+```
+
+Use the matching Windows preset and Windows paths for a Windows-hosted build. Existing root build
+options remain applicable. The provider uses the root compiler/toolchain and selected build
+configuration but has a separate CMake cache from the main compiler, so LLVM14 and LLVM21 imported
+targets cannot collide. Cross-compilation is currently rejected. The option defaults to OFF and
+never downloads dependencies: `SLANG_NVVM_LLVM_DIR` must already contain the isolated LLVM package.
+
+Targeted `slangc`, `slang-test`, and `test-server` builds also build and stage the provider beside
+those executables, including custom runtime output directories. Incremental builds track the
+shared provider ABI headers. The normal binary package presets include the `slang-llvm-nvvm`
+component when enabled; build all enabled installable targets before packaging. The component-only
+install command above installs the provider into `bin` of an existing Slang installation.
+
 ## Discovery and updates
 
 With no override, a global Slang session resolves the provider from the running executable's

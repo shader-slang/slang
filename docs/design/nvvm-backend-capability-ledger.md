@@ -2742,3 +2742,9 @@ package path both build compiler-matched providers on native Linux and pass O3 P
 The fresh source build exports only the C ABI and needs no shared LLVM, zlib, or terminfo. This is
 build/deployment evidence, not a language-support or GPU-runtime expansion. Historical corpus
 classifications and provider ABI revision 35 remain unchanged.
+
+Slice 198 integrates the optional provider with root builds and normal binary packaging. Native
+Linux Debug validation passes 421 focused tests with 54 skips; six relocated-package O0/O3 PTX
+cases assemble using adjacent, directory, and exact-file provider discovery. Exact-file overrides
+now preserve platform filenames, and nonembedded compiler/cache artifacts use the normal runtime
+install component. This establishes packaging correctness, not new language or GPU support.

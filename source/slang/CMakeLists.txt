@@ -312,8 +312,9 @@ if(NOT SLANG_EMBED_CORE_MODULE)
         ${slang_link_args}
         ${slang_interface_args}
         ${slang_public_lib_args}
-        INSTALL_COMPONENT generators
     )
+    # This is also the runtime compiler, so keep its normal install component even though
+    # slang-bootstrap uses the same target to generate the separate core-module cache.
     add_library(slang-without-embedded-core-module ALIAS slang)
 else()
     # However if we're embedding core module, we need to make two different
@@ -413,8 +414,6 @@ if(NOT SLANG_EMBED_CORE_MODULE AND SLANG_LIB_TYPE STREQUAL "SHARED")
     install(
         FILES "${core_module_cache}"
         DESTINATION ${core_module_cache_install_dir}
-        COMPONENT generators
-        EXCLUDE_FROM_ALL
     )
 endif()
 

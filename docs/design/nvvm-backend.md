@@ -7714,6 +7714,22 @@ builds and package changes, single-symbol exports, and O3 PTX compilation plus S
 The fresh provider has no shared LLVM, zlib, or terminfo dependency. Windows/macOS/WSL execution
 remains unvalidated. [Slice 197 report](../../issue-nvvm-backend/report.slice-197-reproducible-provider-build.md).
 
+## Slice 198: integrated provider builds and normal packaging
+
+Opt in with `SLANG_ENABLE_NVVM_PROVIDER=ON` and an existing `SLANG_NVVM_LLVM_DIR` package.
+The main build invokes the standalone provider in a separate CMake process, stages it beside
+compiler/test executables, and includes its install component in binary package presets. Separate
+configuration caches preserve LLVM14/LLVM21 isolation. The default remains OFF; no download occurs.
+
+Deployment checks also fixed two producer boundaries: existing exact library paths bypass platform
+name decoration, and the nonembedded runtime compiler/core cache belong to the normal install
+component. Invalid explicit provider files fail without falling back to an adjacent provider.
+
+Native Linux validation passed 421 focused tests with 54 skips. An ordinary Debug package relocated
+outside the build tree compiled and assembled six O0/O3 cases covering adjacent, directory, and
+exact-file provider loading. The [slice report](../../issue-nvvm-backend/report.slice-198-provider-packaging.md)
+records the normal-package, incremental-build, and negative checks. GPU execution is separate.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)
