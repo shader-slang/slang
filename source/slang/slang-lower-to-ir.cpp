@@ -11920,6 +11920,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addVarDecorations(subContext, irGlobal, decl);
         maybeAddDebugLocationDecoration(subContext, irGlobal);
 
+        // A `static` variable declared at file or namespace scope and a static data member both
+        // lower to module-scope `IRGlobalVar` instructions with IR linkage decorations. We decorate
+        // file- and namespace-scope variables explicitly so that `legalizeResourceGlobalVars` does
+        // not also replace static data members. The earlier `static const` branch has already
+        // returned, so every decorated instruction represents mutable storage.
+        if (isGlobalDecl(decl) && decl->hasModifier<HLSLStaticModifier>())
+            subBuilder->addDecoration(irGlobal, kIROp_FileOrNamespaceScopeStaticVarDecoration);
+
         if (decl)
         {
             subBuilder->addHighLevelDeclDecoration(irGlobal, decl);

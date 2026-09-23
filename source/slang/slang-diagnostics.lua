@@ -5979,6 +5979,83 @@ warning(
     span { loc = "location" }
 )
 
+err(
+    "resource-static-used-by-function-without-rewritable-call",
+    56006,
+    "resource declared static at file or namespace scope is unavailable to a function whose invocations cannot all be rewritten",
+    span { loc = "location", message = "function '~function:IRInst' may be invoked without a direct call that Slang can rewrite, so Slang cannot automatically pass the resource that it accesses; pass the resource explicitly instead" }
+)
+
+err(
+    "resource-static-has-conflicting-call-aliases",
+    56007,
+    "resource declared static at file or namespace scope cannot be passed by reference and accessed by name when either path may modify it",
+    span { loc = "location", message = "resource '~variable:IRInst' is declared static at file or namespace scope and is passed by reference to function '~function:IRInst', which also accesses the resource by name, and at least one of those paths may modify it; pass the resource through only one path" }
+)
+
+err(
+    "resource-static-requires-module-scope-storage",
+    56008,
+    "resource declared static at file or namespace scope must remain in module-scope storage",
+    span { loc = "location", message = "resource '~variable:IRInst' is declared static at file or namespace scope and must remain in module-scope storage because it is externally accessible or explicitly retained; Slang cannot replace it with function-local storage" }
+)
+
+err(
+    "resource-static-address-has-unsupported-use",
+    56009,
+    "address use may observe the identity of storage for a resource declared static at file or namespace scope",
+    span { loc = "location", message = "the program may retain the address of resource '~variable:IRInst', which is declared static at file or namespace scope, or observe its storage identity; replacing the variable with function-local storage might change that behavior" }
+)
+
+err(
+    "resource-static-used-by-callable-entry-point",
+    56010,
+    "resource declared static at file or namespace scope is not supported in a callable entry point",
+    span { loc = "location", message = "entry point '~function:IRInst' may also be invoked as a callable function, and it accesses a resource declared static at file or namespace scope; Slang cannot use one function both as an entry point that creates the replacement local and as a callee that receives the replacement value; move the shared implementation to a separate function without an entry-point attribute" }
+)
+
+err(
+    "resource-static-used-outside-function",
+    56011,
+    "resource declared static at file or namespace scope is used by executable code outside a function",
+    span { loc = "location", message = "resource '~variable:IRInst' is declared static at file or namespace scope and is referenced by an operation outside a function body; perform that operation inside an entry point or another function" }
+)
+
+err(
+    "resource-static-array-complete-initialization-not-proven",
+    56012,
+    "cannot prove complete initialization of a resource array declared static at file or namespace scope",
+    span { loc = "location", message = "resource array '~variable:IRInst' is declared static at file or namespace scope, may be written one element at a time, and may be read before a whole-array assignment; assign the whole array before reading it" }
+)
+
+err(
+    "resource-static-initializer-cannot-be-moved-safely",
+    56013,
+    "initializer for a resource declared static at file or namespace scope cannot be moved safely",
+    span { loc = "location", message = "Slang cannot prove that moving the initializer for resource '~variable:IRInst', which is declared static at file or namespace scope, to each entry point preserves observable behavior. The initializer may have externally observable side effects or may read preexisting mutable storage, resource contents, or non-resource data from a source-declared parameter group; initialize the resource explicitly in an entry point instead" }
+)
+
+err(
+    "resource-static-used-by-generic-assembly-function",
+    56014,
+    "resource declared static at file or namespace scope is unavailable to a generic-assembly function",
+    span { loc = "location", message = "function '~function:IRInst' uses generic assembly as its emitted implementation, so Slang cannot preserve the function body's access to resources declared static at file or namespace scope; pass the resource explicitly as an assembly operand instead" }
+)
+
+err(
+    "resource-static-used-by-target-intrinsic-function",
+    56015,
+    "resource declared static at file or namespace scope is unavailable to a target-intrinsic function",
+    span { loc = "location", message = "function '~function:IRInst' has a target-intrinsic implementation for this compilation target, so Slang emits that implementation instead of the function body and cannot preserve the body's access to a resource declared static at file or namespace scope; pass the resource as an explicit function argument and reference it from the target intrinsic instead" }
+)
+
+err(
+    "resource-static-has-reference-outside-function-body",
+    56016,
+    "resource declared static at file or namespace scope has an unsupported reference outside a function body",
+    span { loc = "location", message = "resource '~variable:IRInst' is declared static at file or namespace scope and is referenced by an instruction that is not inside a function body; Slang cannot preserve that reference after replacing the variable with function-local storage" }
+)
+
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 

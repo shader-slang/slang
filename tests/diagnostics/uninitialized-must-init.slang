@@ -49,6 +49,27 @@ int out_param_conditional_only(bool b)
 //CHK: variable 'y' may be uninitialized on some paths
 }
 
+void write_conditionally(bool condition, inout int value)
+{
+    if (condition)
+        value = 1;
+}
+
+// An `inout` argument reads its incoming value and is not required to replace it. The call therefore
+// reads `value` while it is uninitialized, and `value` can remain uninitialized after the call.
+int inout_parameter_may_not_write(bool condition)
+{
+    int value;
+    write_conditionally(condition, value);
+//CHK:                 ^ use of uninitialized variable
+//CHK:                 ^ use of uninitialized variable 'value'
+    return value;
+/*CHK:
+    ^^^^^^ possible use of uninitialized variable
+    ^^^^^^ variable 'value' may be uninitialized on some paths; it is only conditionally assigned
+*/
+}
+
 // Loop-initialized variable: should NOT warn
 // (store is unconditional within the loop body)
 void loop_init_no_warn()
@@ -80,7 +101,7 @@ float switch_fallthrough(int val)
         // falls through to case 1
     case 1:
         return d.value;
-//CHK: E41035
+//CHK:  ^^^^^^ possible use of uninitialized variable
 //CHK: variable 'd' may be uninitialized on some paths
     default:
         break;
@@ -186,7 +207,7 @@ uint wave_elect_negated_guard_warn(bool bIsAlive)
         gWaveCounterBuffer.InterlockedAdd(0, WaveActiveCountBits(bIsAlive), nBaseIndex);
     }
     return WaveReadLaneFirst(nBaseIndex) + WavePrefixCountBits(bIsAlive);
-//CHK: E41035
+//CHK:                      ^ possible use of uninitialized variable
 //CHK: variable 'nBaseIndex' may be uninitialized on some paths
 }
 
@@ -201,7 +222,7 @@ uint wave_elect_plain_read_warn(bool bIsAlive)
         gWaveCounterBuffer.InterlockedAdd(0, WaveActiveCountBits(bIsAlive), nBaseIndex);
     }
     return nBaseIndex + WavePrefixCountBits(bIsAlive);
-//CHK: E41035
+//CHK:                ^ possible use of uninitialized variable
 //CHK: variable 'nBaseIndex' may be uninitialized on some paths
 }
 
@@ -221,7 +242,7 @@ uint wave_elect_nested_conditional_store_warn(bool bIsAlive)
         }
     }
     return WaveReadLaneFirst(nBaseIndex) + WavePrefixCountBits(bIsAlive);
-//CHK: E41035
+//CHK:                      ^ possible use of uninitialized variable
 //CHK: variable 'nBaseIndex' may be uninitialized on some paths
 }
 
