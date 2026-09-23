@@ -2754,6 +2754,7 @@ struct ForwardDiffTranslationContext
         case kIROp_DebugScope:
         case kIROp_DebugNoScope:
         case kIROp_DebugInlinedVariable:
+        case kIROp_DebugLexicalBlock:
         case kIROp_DebugFunction:
         case kIROp_GetArrayLength:
         case kIROp_SizeOf:

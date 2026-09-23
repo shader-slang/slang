@@ -134,6 +134,9 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
     auto funcDebugLoc = func->findDecoration<IRDebugLocationDecoration>();
     if (!funcDebugLoc)
         return;
+    auto funcDebugDecor = func->findDecoration<IRDebugFuncDecoration>();
+    SLANG_RELEASE_ASSERT(funcDebugDecor && "function has DebugLocation but no DebugFunc");
+    auto debugFunc = funcDebugDecor->getDebugFunc();
     List<IRInst*> params;
     for (auto param : firstBlock->getParams())
     {
@@ -162,6 +165,7 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             funcDebugLoc->getSource(),
             funcDebugLoc->getLine(),
             funcDebugLoc->getCol(),
+            debugFunc,
             builder.getIntValue(builder.getUIntType(), paramIndex));
         copyNameHintAndDebugDecorations(debugVar, param);
 
@@ -216,7 +220,8 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
                         varType,
                         debugLoc->getSource(),
                         debugLoc->getLine(),
-                        debugLoc->getCol());
+                        debugLoc->getCol(),
+                        debugLoc->getScope());
                     copyNameHintAndDebugDecorations(debugVar, varInst);
                     mapVarToDebugVar[varInst] = debugVar;
                 }

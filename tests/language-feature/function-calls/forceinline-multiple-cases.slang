@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -g3 -O0
-//TEST:SIMPLE(filecheck=NOSCOPE): -stage compute -entry computeMain -target spirv -g3 -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -g3 -O0
+//TEST:SIMPLE(filecheck=NOSCOPE): -target spirv -g3 -O0
 RWStructuredBuffer<int> outputBuffer;
 
 // Function with a single basic block
@@ -100,7 +100,7 @@ int testMixedCallsWithCondition()
     }
     return result;
 }
-
+[shader("compute")]
 [numthreads(8, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -148,6 +148,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CHECK-DAG: %[[MIXED:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction %[[MIXED_NAME]]
 // CHECK-DAG: %[[COND_NAME:[0-9]+]] = OpString "testMixedCallsWithCondition"
 // CHECK-DAG: %[[COND:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction %[[COND_NAME]]
+// CHECK-DAG: %[[COND_BRANCH:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugLexicalBlock %{{[0-9]+}} %uint_95 %uint_9 %[[COND]]
+// CHECK-DAG: %[[COND_CALL:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugInlinedAt %uint_95 %[[COND_BRANCH]]{{$}}
 
 // CHECK-LABEL: %testMultipleBasicBlockCalls = OpFunction
 // CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
@@ -199,6 +201,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
 // CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[COND]]{{$}}
 // CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[COND_RESULT:result[0-9_]*]] %{{[a-zA-Z0-9_]+}}
-// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// The conditional call returns to the branch, where the addition still executes.
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %[[COND_CALL]]{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[COND_BRANCH]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[COND_RESULT]] %int_62
 // CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[COND]]{{$}}
-// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[COND_RESULT]] %{{[a-zA-Z0-9_]+}}
+// CHECK-NOT: DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpReturnValue %int_62

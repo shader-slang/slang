@@ -2421,6 +2421,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             return true;
 
+        case kIROp_DebugLexicalBlock:
+            if (shouldEmitExtendedDebugInfo)
+            {
+                *emittedSpvInst = emitDebugLexicalBlock(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    as<IRDebugLexicalBlock>(inst));
+            }
+            return true;
+
         case kIROp_DebugInlinedAt:
             if (shouldEmitExtendedDebugInfo)
             {
@@ -3030,6 +3039,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DebugBuildIdentifier:
         case kIROp_DebugCompilationUnit:
         case kIROp_DebugFunction:
+        case kIROp_DebugLexicalBlock:
         case kIROp_DebugInlinedAt:
             SLANG_UNEXPECTED(
                 "Debug instruction should have been handled by processDebugGlobalInst");
@@ -4692,9 +4702,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // The `actualHelperVar` is used to update the actual value of the variable
         // at each kIROp_DebugValue instruction.
         //
-        auto scope = findDebugScope(debugVar);
-        if (!scope)
-            return nullptr;
+        auto scope = ensureInst(debugVar->getScope());
+        SLANG_RELEASE_ASSERT(scope);
 
         bool hasBackingVar = m_mapIRInstToSpvInst.containsKey(debugVar);
 
@@ -4764,10 +4773,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugVarBackingLocalVarDeclaration(SpvInstParent* parent, IRDebugVar* debugVar)
     {
-        auto scope = findDebugScope(debugVar);
-        if (!scope)
-            return nullptr;
-
         IRBuilder builder(debugVar);
         builder.setInsertBefore(debugVar);
         auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
@@ -4940,6 +4945,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     nullptr,
                     as<IRDebugFunction>(inst));
             }
+            return true;
+
+        case kIROp_DebugLexicalBlock:
+            if (shouldEmitExtendedDebugInfo)
+                *emittedSpvInst = ensureInst(inst);
             return true;
 
         case kIROp_DebugInlinedAt:
@@ -5867,6 +5877,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DebugVar:
         case kIROp_DebugValue:
         case kIROp_DebugFunction:
+        case kIROp_DebugLexicalBlock:
         case kIROp_DebugInlinedAt:
         case kIROp_DebugScope:
         case kIROp_DebugNoScope:
@@ -10808,18 +10819,29 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
-    // Emit the DebugFunctionDefinition that binds the concrete OpFunction body `spvFunc` (whose
-    // first block is `firstBlock`) to its DebugFunction record `debugFuncInfo`, at most once per
-    // record. A DebugFunction binds to a single body — the NonSemantic invariant that a
-    // DebugFunction has one DebugFunctionDefinition — so we dedup on the record, not the body. This
-    // is separate from the record cache (m_mapIRInstToSpvInst) because the record may already have
-    // been emitted early and bare via the global debug-inst path — for example when a
-    // caller-scope-restore DebugScope inserted by inlining precedes a DebugVar and resolves this
-    // function as that var's scope — whereas the definition must still be emitted for the concrete
-    // body. Deduping on the record is load-bearing, not merely defensive: reverse-mode autodiff can
-    // make several generated OpFunctions share one IRDebugFunction (copyDebugInfo clones the
-    // decoration and the module-global record is not remapped), and without this dedup a definition
-    // would be emitted for each shared body, breaking the one-definition-per-record invariant.
+    // Emit the explicit lexical parent chain recorded during lowering.
+    SpvInst* emitDebugLexicalBlock(SpvInstParent* parent, IRDebugLexicalBlock* debugLexicalBlock)
+    {
+        auto parentScope = debugLexicalBlock->getParentScope();
+        SLANG_RELEASE_ASSERT(
+            as<IRDebugFunction>(parentScope) || as<IRDebugLexicalBlock>(parentScope));
+        auto scope = ensureInst(parentScope);
+        SLANG_RELEASE_ASSERT(scope);
+        return emitOpDebugLexicalBlock(
+            parent,
+            debugLexicalBlock,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            debugLexicalBlock->getSource(),
+            debugLexicalBlock->getLine(),
+            debugLexicalBlock->getCol(),
+            scope);
+    }
+
+    // Bind a DebugFunction record to at most one concrete OpFunction body. Lexical scopes and
+    // debug variables can emit the record before its body, so definition tracking is separate
+    // from the metadata cache. Reverse-mode autodiff's copyDebugInfo can also make generated
+    // bodies share one record; deduplicating by record preserves its single-definition invariant.
     void maybeEmitDebugFunctionDefinition(
         SpvInst* firstBlock,
         SpvInst* spvFunc,
@@ -10853,57 +10875,44 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRFunc* irFunc = nullptr)
     {
         SpvInst* debugFuncInfo = nullptr;
-        if (debugFunc && m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
+        // Lexical blocks can request this metadata before the function body is emitted.
+        // Reuse the metadata, then register the function scope and bind its definition below.
+        if (!debugFunc || !m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
         {
-            // The record was already emitted, possibly bare via the global debug-inst path (which
-            // passes a null irFunc, so this function was never registered as its own debug scope).
-            // The record cache covers neither the per-body definition nor that scope registration,
-            // so we do both here for a concrete body. Without the registration, findDebugScope's
-            // IRFunc fallback misses and a pre-inline DebugVar (a parameter, or a local before the
-            // first inlined call) resolves its OpDebugLocalVariable scope to the module compilation
-            // unit instead of the function.
-            if (irFunc && !m_mapIRInstToSpvDebugInst.containsKey(irFunc))
-                registerDebugInst(irFunc, debugFuncInfo);
-            maybeEmitDebugFunctionDefinition(firstBlock, spvFunc, debugFuncInfo);
-            return debugFuncInfo;
+            // Use the parent scope bound at IR-gen so an imported function resolves to its own
+            // module's compilation unit. Fall back to the module-global scope for an included or
+            // line-remapped source without a compilation unit, or an IR blob predating this
+            // operand. findDebugScope also handles a null debugFunc (no IRDebugFuncDecoration).
+            SpvInst* scope = nullptr;
+            if (debugFunc)
+            {
+                if (auto irParentScope = debugFunc->getParentScope())
+                    scope = ensureInst(irParentScope);
+            }
+            if (!scope)
+                scope = findDebugScope(debugFunc);
+            if (!scope)
+                return nullptr;
+
+            SpvInst* neededDebugType = emitDebugType(as<IRFuncType>(debugFunc->getDebugType()));
+            SLANG_ASSERT(neededDebugType);
+
+            IRBuilder builder(debugFunc);
+            debugFuncInfo = emitOpDebugFunction(
+                parent,
+                debugFunc,
+                m_voidType,
+                getNonSemanticDebugInfoExtInst(),
+                debugFunc->getName(),
+                neededDebugType,
+                debugFunc->getFile(),
+                debugFunc->getLine(),
+                debugFunc->getCol(),
+                scope,
+                debugFunc->getName(),
+                builder.getIntValue(builder.getUIntType(), 0),
+                debugFunc->getLine());
         }
-
-        // Use the parent scope bound to the function at IR-gen, which is the compilation unit of
-        // the module the function belongs to, so an imported function resolves to its own module's
-        // compilation unit rather than the entry point's. The parent scope is absent for a function
-        // whose source has no compilation unit of its own (an #include'd/#line-remapped source) and
-        // for a function from an IR blob that predates the operand; in those cases fall back to the
-        // module-global scope. findDebugScope also handles a null debugFunc (a function with no
-        // IRDebugFuncDecoration), so the getParentScope() read is guarded by that null check.
-        SpvInst* scope = nullptr;
-        if (debugFunc)
-        {
-            if (auto irParentScope = debugFunc->getParentScope())
-                scope = ensureInst(irParentScope);
-        }
-        if (!scope)
-            scope = findDebugScope(debugFunc);
-        if (!scope)
-            return nullptr;
-
-        SpvInst* neededDebugType = emitDebugType(as<IRFuncType>(debugFunc->getDebugType()));
-        SLANG_ASSERT(neededDebugType);
-
-        IRBuilder builder(debugFunc);
-        debugFuncInfo = emitOpDebugFunction(
-            parent,
-            debugFunc,
-            m_voidType,
-            getNonSemanticDebugInfoExtInst(),
-            debugFunc->getName(),
-            neededDebugType,
-            debugFunc->getFile(),
-            debugFunc->getLine(),
-            debugFunc->getCol(),
-            scope,
-            debugFunc->getName(),
-            builder.getIntValue(builder.getUIntType(), 0),
-            debugFunc->getLine());
 
         if (irFunc)
         {
@@ -10923,15 +10932,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         IRInst* lineInst = debugInlinedAt->getLine();
 
-        SpvInst* scope = nullptr;
-        if (as<IRDebugFunction>(debugInlinedAt->getDebugFunc()))
-        {
-            scope = ensureInst(debugInlinedAt->getDebugFunc());
-        }
-        if (scope == nullptr)
-        {
-            scope = findDebugScope(debugInlinedAt);
-        }
+        auto irScope = debugInlinedAt->getScope();
+        SLANG_RELEASE_ASSERT(as<IRDebugFunction>(irScope) || as<IRDebugLexicalBlock>(irScope));
+        SpvInst* scope = ensureInst(irScope);
+        SLANG_RELEASE_ASSERT(scope);
 
         // If it's not chained to another IRDebugInlinedAt, we don't use this.
         SpvInst* inlined = nullptr;
@@ -12406,11 +12410,13 @@ SlangResult emitSPIRVFromIR(
     auto generateWholeProgram = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::GenerateWholeProgram);
 
-    // Note: Debug info emission is controlled by the IR generation phase based on the debug level:
+    // IR generation preserves debug information according to the source module's debug level.
+    // The emission level may differ when compiling a serialized module:
     // - None (g0): No debug instructions in IR
-    // - Minimal (g1): IRDebugSource (content only when `-debug-info-include-source` is set) and
-    //                 IRDebugLine for line numbers only. Emits standard SPIR-V debug instructions
-    //                 (OpString, OpLine, OpSource)
+    // - Minimal (g1): Source/line records and function/compilation-unit scope metadata.
+    //                 Source text is retained only with `-debug-info-include-source`.
+    //                 Emitting at g1 uses only standard SPIR-V debug instructions
+    //                 (OpString, OpLine, OpSource).
     // - Standard (g2): Full NonSemantic debug info including IRDebugVar for local variables
     // - Maximal (g3): Same as Standard
     //
