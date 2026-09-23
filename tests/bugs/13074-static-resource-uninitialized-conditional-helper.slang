@@ -17,5 +17,5 @@ float4 main() : SV_Target
     maybeInitialize();
     return cachedTexture.Load(int3(0, 0, 0));
 //CHECK:                     ^ possible use of uninitialized variable
-//CHECK:                     ^ variable 'cachedTexture' is not definitely initialized before this use
+//CHECK:                     ^ variable 'cachedTexture' may be uninitialized on some paths; it is only conditionally assigned
 }

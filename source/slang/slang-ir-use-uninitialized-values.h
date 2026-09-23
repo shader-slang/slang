@@ -11,18 +11,19 @@ struct IRInst;
 struct IRModule;
 struct IRUse;
 
-/// Overrides the inferred read/write effect of one use for uninitialized-value checking.
+/// An `UninitializedVariableUseEffect` overrides the inferred read/write effect of one use during
+/// uninitialized-value checking.
 ///
 /// The use must pass the tracked variable, or an address derived from it, to an instruction.
 /// Normally the checker infers whether that instruction reads or writes the variable from its IR
-/// opcode and operand type. A client that has more precise information can override that inference
-/// for an exact `IRUse`. This is useful when a transformation synthesizes an ABI whose parameter
-/// direction does not exactly represent the operation being modeled.
+/// opcode and operand type. A client with more precise information can override that inference for
+/// an exact `IRUse`. This override is intended for a transformation that introduces a call
+/// argument whose IR parameter direction is less precise than the source operation being modeled.
 ///
-/// A read observes the incoming value. A possible write is enough to establish that some
-/// initialization can reach later uses; a definite write additionally establishes initialization
-/// on every path through the instruction. `definitelyWritesValue` implies a possible write even
-/// when `mayWriteValue` is false.
+/// A read observes the incoming value. A possible write means that at least one execution of the
+/// instruction can update the tracked value. A definite write means that every normally completing
+/// execution initializes the complete value before control reaches a successor.
+/// `definitelyWritesValue` implies a possible write even when `mayWriteValue` is false.
 struct UninitializedVariableUseEffect
 {
     /// The exact operand use whose inferred effect should be replaced.
@@ -31,33 +32,26 @@ struct UninitializedVariableUseEffect
     /// The instruction observes the value that arrives through `use`.
     bool readsValue = false;
 
-    /// The instruction can write some or all of the value on at least one path.
+    /// At least one execution that reaches the instruction can update the tracked value.
     bool mayWriteValue = false;
 
-    /// The instruction writes the complete value on every path through the instruction.
+    /// Every normally completing execution initializes the complete value before any successor.
     bool definitelyWritesValue = false;
 };
 
-/// Diagnoses reads of one variable that may execute before it is initialized in `code`.
+/// Diagnose reads of one variable that can execute before it is initialized in `code`.
 ///
-/// Transformations use this entry point when they introduce a variable after the module-wide check
-/// has run. It applies the same reachability and definite-assignment analyses to that variable
-/// alone. Entries in `useEffects` override inferred effects for their exact operand uses; all other
-/// uses are classified from the IR as usual.
+/// Call this function for a variable introduced after the module-wide uninitialized-value check has
+/// run. `variable` must belong to `code`. The function applies the same intraprocedural control-flow
+/// analysis to that variable alone. Entries in `useEffects` override the inferred effect of their
+/// exact uses; all other uses are classified from the IR as usual. Each entry must name a distinct
+/// use in the alias and use graph rooted at `variable`.
 void checkForUsingUninitializedVariable(
     IRGlobalValueWithCode* code,
     IRInst* variable,
     ConstArrayView<UninitializedVariableUseEffect> useEffects,
     DiagnosticSink* sink);
 
-/// Diagnoses uses of uninitialized values throughout `module`.
-///
-/// This module-wide entry point checks function bodies, functions returned from generics, and
-/// global variables. It reports both reads with no reaching write and reads that can execute along
-/// a path without a write the checker treats as definite.
-///
-/// This is the mandatory check for values present at its pipeline stage. A transformation that
-/// later synthesizes a local uses `checkForUsingUninitializedVariable` to check that local with the
-/// same analyses.
+/// Diagnose uses of uninitialized values throughout `module`.
 void checkForUsingUninitializedValues(IRModule* module, DiagnosticSink* sink);
 } // namespace Slang

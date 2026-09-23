@@ -1,35 +1,26 @@
 // slang-ir-explicit-global-init.h
 #pragma once
 
-#include "core/slang-list.h"
-
 namespace Slang
 {
-struct IRGlobalVar;
+class DiagnosticSink;
 struct IRModule;
 class TargetProgram;
 
-/// Moves each eligible global initializer selected by the target policy to the start of every
+/// Move each eligible global initializer selected by the target policy to the start of every
 /// defined entry point.
 ///
-/// Selected globals retain their storage but no longer contain initializer bodies. Storage with an
-/// independently managed global lifetime is not eligible for per-entry-point initialization.
+/// Selected globals retain their storage but no longer contain initializer bodies. A variable
+/// whose lifetime extends beyond one entry-point invocation is not eligible for this operation.
 void moveGlobalVarInitializationToEntryPoints(IRModule* module, TargetProgram* targetProgram);
 
-/// Moves the eligible initializers of linked, per-invocation globals that transitively depend on
-/// resource state to the start of every defined entry point.
+/// Move eligible file-scope `static` resource initializers to every defined entry point.
 ///
-/// On return, `outResourceDependentState` contains the conservative boundary-validation set: the
-/// resource-state globals, all resource-dependent initializer targets (including immovable
-/// targets), and every global that a moved initializer may mutate. `legalizeResourceGlobalVars`
-/// uses this set to reject preserved storage and functions that can reach the state through an
-/// invocation without a rewritable direct call.
-///
-/// This operation must run after linking, when source globals have linkage decorations and calls
-/// between defined functions are direct. The ordinary target-policy operation still runs later for
-/// any other initializer that the target cannot represent at global scope.
-void moveResourceDependentGlobalVarInitializationToEntryPoints(
+/// Require each moved initializer to have no side effects and not to read mutable state.
+/// This restriction makes the initializer independent of its position among the initializers that
+/// remain at global scope. Diagnose an initializer that does not meet this requirement. Call this
+/// operation immediately before replacing the selected global storage declarations.
+void moveGlobalVarInitializationToEntryPointsForResourceGlobalLegalization(
     IRModule* module,
-    TargetProgram* targetProgram,
-    List<IRGlobalVar*>& outResourceDependentState);
+    DiagnosticSink* sink);
 } // namespace Slang

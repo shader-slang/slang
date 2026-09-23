@@ -12,9 +12,9 @@ void maybeInitialize(inout Texture2D<float4> value)
     if (initializeTexture)
         value = textures[0];
 
-    // We access `fallbackTexture` by name so legalization adds its hidden state parameter to
-    // `maybeInitialize`. The caller also passes `cachedTexture` explicitly, so rebuilding the call
-    // must preserve both argument roles.
+    // Because this function reads `fallbackTexture` by name, legalization adds a parameter for
+    // that resource. The source call also passes `cachedTexture` as its explicit argument. When we
+    // rebuild the call, we must preserve the explicit argument and append the generated one.
     output[0] = fallbackTexture.Load(int3(0, 0, 0));
 }
 
@@ -26,5 +26,5 @@ void main()
 //CHECK:           ^ use of uninitialized variable 'cachedTexture'
     output[1] = cachedTexture.Load(int3(0, 0, 0));
 //CHECK:                          ^ possible use of uninitialized variable
-//CHECK:                          ^ variable 'cachedTexture' is not definitely initialized before this use
+//CHECK:                          ^ variable 'cachedTexture' may be uninitialized on some paths; it is only conditionally assigned
 }

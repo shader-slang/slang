@@ -15,9 +15,8 @@ void maybeInitialize()
 [numthreads(1, 1, 1)]
 void main()
 {
-    // We intentionally leave `cachedTexture` uninitialized on one path. Propagating that value
-    // through hidden state is not a source-level read, so we diagnose only if later source code
-    // observes it.
+    // `maybeInitialize` leaves `cachedTexture` uninitialized on one path, but this entry point
+    // never reads it. The call alone must not produce an uninitialized-value diagnostic.
     maybeInitialize();
     output[0] = 1;
 }

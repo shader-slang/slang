@@ -3396,12 +3396,12 @@ static bool _initExprIsRuntimeValue(Expr* expr)
     return false;
 }
 
-static bool _isPerInvocationResourceOrResourceArray(VarDeclBase* varDecl)
+/// Return the innermost array element type after removing type modifiers at every level.
+static Type* _getUnmodifiedInnermostArrayElementType(Type* type)
 {
-    // We can replace only resource values whose type and storage semantics can be reproduced by an
-    // entry-point local. We first look through modifiers and array layers to classify the resource
-    // leaf, and then exclude storage classes that have a lifetime or memory contract of their own.
-    auto type = varDecl->getType();
+    // A modifier may wrap either an array or its element type. We therefore remove one wrapper at a
+    // time until neither form remains, rather than assuming that every modifier is outside every
+    // array dimension.
     for (;;)
     {
         if (auto modifiedType = as<ModifiedType>(type))
@@ -3409,17 +3409,39 @@ static bool _isPerInvocationResourceOrResourceArray(VarDeclBase* varDecl)
         else if (auto arrayType = as<ArrayExpressionType>(type))
             type = arrayType->getElementType();
         else
-            break;
+            return type;
     }
+}
 
-    bool isResource =
-        as<ResourceType>(type) || as<SamplerStateType>(type) ||
-        as<UniformParameterGroupType>(type) || as<HLSLStructuredBufferTypeBase>(type) ||
-        as<HLSLByteAddressBufferType>(type) || as<HLSLRWByteAddressBufferType>(type) ||
-        as<HLSLRasterizerOrderedByteAddressBufferType>(type);
-    if (!isResource)
+/// Return whether `type` remains one resource value that resource-global legalization can replace.
+static bool _isResourceTypeSupportedForFileStaticReplacement(Type* type)
+{
+    // Type modifiers do not change the underlying resource category. An array remains one IR value
+    // through resource-type legalization when its element type does, so we classify its unmodified
+    // innermost element. `legalizeResourceGlobalVars` recognizes whole-array initialization and
+    // emits a specific diagnostic when a proof would need to combine separate element writes.
+    type = _getUnmodifiedInnermostArrayElementType(type);
+
+    // `legalizeResourceGlobalVars` replaces one global address with one local in each affected
+    // function. Parameter groups and append or consume buffers are instead lowered to several IR
+    // values. The pass cannot yet relate those values back to one source variable and replace them
+    // as a unit. We reject append and consume buffers on every target so that this language rule
+    // does not depend on the selected code-generation target.
+    return as<ResourceType>(type) || as<SamplerStateType>(type) ||
+           as<HLSLStructuredBufferType>(type) || as<HLSLRWStructuredBufferType>(type) ||
+           as<HLSLRasterizerOrderedStructuredBufferType>(type) ||
+           as<HLSLByteAddressBufferType>(type) || as<HLSLRWByteAddressBufferType>(type) ||
+           as<HLSLRasterizerOrderedByteAddressBufferType>(type);
+}
+
+/// Return whether `varDecl` has a type and storage class that entry-point locals can reproduce.
+static bool _hasTypeAndStorageSupportedForFileStaticResourceReplacement(VarDeclBase* varDecl)
+{
+    // The caller has already established that `varDecl` is a mutable file-scope `static` variable. We
+    // now require a resource type that remains one IR value, and reject storage modifiers whose
+    // lifetime or memory behavior cannot be reproduced by an ordinary entry-point local.
+    if (!_isResourceTypeSupportedForFileStaticReplacement(varDecl->getType()))
         return false;
-
     if (varDecl->hasModifier<HLSLGroupSharedModifier>())
         return false;
     if (varDecl->hasModifier<ActualGlobalModifier>())
@@ -3430,12 +3452,17 @@ static bool _isPerInvocationResourceOrResourceArray(VarDeclBase* varDecl)
     return true;
 }
 
+/// Return whether `varDecl` is a mutable file-scope `static` variable that needs opaque storage.
 static bool _isMutableFileStaticOpaqueVariable(VarDeclBase* varDecl, TypeTag typeTags)
 {
-    // We identify this source-level category by requiring an opaque type, file scope, `static`
-    // storage, and mutability. A top-level declaration without `static` is a shader parameter,
-    // while a `static const` declaration is a constant rather than a variable.
-    if ((int(typeTags) & int(TypeTag::Opaque)) == 0)
+    // We first determine whether the value needs opaque storage. The general type-tag logic already
+    // marks most parameter groups as `Opaque`, but omits `ParameterBlock`. The explicit parameter-
+    // group check ensures that a file-scope `static ParameterBlock` reaches this diagnostic. We then
+    // require file scope, `static` variable storage, and a mutable rather than `const` declaration.
+    bool needsOpaqueStorage = (int(typeTags) & int(TypeTag::Opaque)) != 0;
+    auto type = _getUnmodifiedInnermostArrayElementType(varDecl->getType());
+    needsOpaqueStorage |= as<UniformParameterGroupType>(type) != nullptr;
+    if (!needsOpaqueStorage)
         return false;
     if (!isGlobalDecl(varDecl))
         return false;
@@ -3446,19 +3473,19 @@ static bool _isMutableFileStaticOpaqueVariable(VarDeclBase* varDecl, TypeTag typ
     return true;
 }
 
+/// Diagnose an unsupported mutable file-scope `static` variable of opaque type.
 static void maybeDiagnoseOpaqueTypeGlobalVar(
     DiagnosticSink* sink,
     VarDeclBase* varDecl,
     TypeTag typeTags)
 {
-    // We first identify mutable file-scope `static` variables of opaque type. We then exempt the
-    // resource-valued case that IR legalization can replace with per-entry-point state. Every
-    // remaining variable would require an opaque global-storage representation that Slang cannot
-    // support, so we diagnose it.
+    // We diagnose only mutable file-scope `static` variables of opaque type. The IR pass can
+    // replace a supported subset with entry-point locals, so we allow that subset to proceed. Every
+    // remaining declaration would require opaque global storage that Slang cannot emit.
     if (!_isMutableFileStaticOpaqueVariable(varDecl, typeTags))
         return;
 
-    if (_isPerInvocationResourceOrResourceArray(varDecl))
+    if (_hasTypeAndStorageSupportedForFileStaticResourceReplacement(varDecl))
         return;
 
     sink->diagnose(Diagnostics::GlobalVarCannotHaveOpaqueType{.decl = varDecl});

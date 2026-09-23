@@ -1939,6 +1939,21 @@ Result linkAndOptimizeIR(
         SLANG_PASS(inlineGlobalConstantsForLegalization);
     }
 
+    // `legalizeResourceGlobalVars` replaces each selected global storage declaration, so its
+    // initializer body must move first. The initializer pass rejects any initializer that could
+    // observe the resulting change in execution time or order.
+    SLANG_PASS(moveGlobalVarInitializationToEntryPointsForResourceGlobalLegalization, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    // Resource-global legalization creates resource-typed locals and parameters. We run it before
+    // resource-type legalization so that the existing legalization and simplification passes can
+    // process those new values. This ordering is required for resource arrays on Khronos targets,
+    // where a resource-typed local cannot reach the emitter.
+    SLANG_PASS(legalizeResourceGlobalVars, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
@@ -2021,22 +2036,6 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
 
         if (!validateStructuredBufferResourceTypes(irModule, sink, targetRequest))
-            return SLANG_FAIL;
-
-        // We localize file-scope resource state here, while linkage identifies each source
-        // `static`, calls between defined functions are direct, and decorations or function
-        // references expose invocation boundaries that cannot accept hidden state. We run before
-        // resource-type legalization because it splits aggregate resources such as `ParameterBlock`
-        // and append-buffer representations into leaf globals. Those leaves no longer identify the
-        // source `static` storage and initializer body that this pass must treat together.
-        //
-        // TODO: To remove the resource-dependency initializer-selection mode, resource-type
-        // legalization would need to preserve that source-global and initializer provenance on each
-        // split leaf. We could then extract all initializers here and localize the resource leaves
-        // afterward, while calls and function decorations still provide the independent invocation-
-        // boundary information.
-        SLANG_PASS(legalizeResourceGlobalVars, targetProgram, sink);
-        if (sink->getErrorCount() != 0)
             return SLANG_FAIL;
 
         // Many of our target languages and/or downstream compilers

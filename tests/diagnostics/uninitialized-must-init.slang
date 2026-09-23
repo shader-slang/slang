@@ -22,7 +22,7 @@ float struct_conditional(bool b)
         d.value = 1.0;
     return d.value;
 //CHK: E41035
-//CHK: variable 'd' is not definitely initialized before this use
+//CHK: variable 'd' may be uninitialized on some paths
 }
 
 // Out parameter in conditional path
@@ -35,7 +35,7 @@ int out_param_conditional(bool b)
         set_val(x);
     return x;
 //CHK: E41035
-//CHK: variable 'x' is not definitely initialized before this use
+//CHK: variable 'x' may be uninitialized on some paths
 }
 
 // Conditional via out param, only one variable
@@ -46,7 +46,28 @@ int out_param_conditional_only(bool b)
         set_val(y);
     return y;
 //CHK: E41035
-//CHK: variable 'y' is not definitely initialized before this use
+//CHK: variable 'y' may be uninitialized on some paths
+}
+
+void write_conditionally(bool condition, inout int value)
+{
+    if (condition)
+        value = 1;
+}
+
+// An `inout` argument reads its incoming value and is not required to replace it. The call therefore
+// reads `value` while it is uninitialized, and `value` can remain uninitialized after the call.
+int inout_parameter_may_not_write(bool condition)
+{
+    int value;
+    write_conditionally(condition, value);
+//CHK:                 ^ use of uninitialized variable
+//CHK:                 ^ use of uninitialized variable 'value'
+    return value;
+/*CHK:
+    ^^^^^^ possible use of uninitialized variable
+    ^^^^^^ variable 'value' may be uninitialized on some paths; it is only conditionally assigned
+*/
 }
 
 // Loop-initialized variable: should NOT warn
@@ -81,7 +102,7 @@ float switch_fallthrough(int val)
     case 1:
         return d.value;
 //CHK: E41035
-//CHK: variable 'd' is not definitely initialized before this use
+//CHK: variable 'd' may be uninitialized on some paths
     default:
         break;
     }
@@ -187,7 +208,7 @@ uint wave_elect_negated_guard_warn(bool bIsAlive)
     }
     return WaveReadLaneFirst(nBaseIndex) + WavePrefixCountBits(bIsAlive);
 //CHK: E41035
-//CHK: variable 'nBaseIndex' is not definitely initialized before this use
+//CHK: variable 'nBaseIndex' may be uninitialized on some paths
 }
 
 // Same guarded store as the no-warn case above, but read back directly instead of through
@@ -201,8 +222,8 @@ uint wave_elect_plain_read_warn(bool bIsAlive)
         gWaveCounterBuffer.InterlockedAdd(0, WaveActiveCountBits(bIsAlive), nBaseIndex);
     }
     return nBaseIndex + WavePrefixCountBits(bIsAlive);
-//CHK: E41035
-//CHK: variable 'nBaseIndex' is not definitely initialized before this use
+//CHK:                ^ possible use of uninitialized variable
+//CHK: variable 'nBaseIndex' may be uninitialized on some paths
 }
 
 // The store is nested inside a further conditional *within* the `WaveIsFirstLane()` guard, so
@@ -221,8 +242,8 @@ uint wave_elect_nested_conditional_store_warn(bool bIsAlive)
         }
     }
     return WaveReadLaneFirst(nBaseIndex) + WavePrefixCountBits(bIsAlive);
-//CHK: E41035
-//CHK: variable 'nBaseIndex' is not definitely initialized before this use
+//CHK:                      ^ possible use of uninitialized variable
+//CHK: variable 'nBaseIndex' may be uninitialized on some paths
 }
 
 [Shader("compute")]

@@ -1,465 +1,412 @@
 // slang-ir-explicit-global-init.cpp
 #include "slang-ir-explicit-global-init.h"
 
+#include "slang-diagnostics.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 
 namespace Slang
 {
 
-// This pass takes code in a form like:
+// A global variable may contain both its storage declaration and the IR body that computes its
+// initial value. `MoveGlobalVarInitializationToEntryPointsPass` separates those two roles. For
+// example, it changes:
 //
-//      static int gCounter = 1;
-//
-//      void computeMain()
-//      {
-//          ...
-//          int tmp = gCounter++;
-//      }
-//
-// and makes the initialization explicit at the start of each entry point:
-//
-//      static int gCounter;
+//      static int counter = 1;
 //
 //      void computeMain()
 //      {
-//          gCounter = 1;
-//          ...
-//          int tmp = gCounter++;
+//          int oldValue = counter++;
 //      }
 //
-// We use the same three-step transformation for both selection policies. We first select the
-// affected globals whose storage is eligible for per-entry-point initialization. We then split each
-// selected global into storage and a zero-argument function that computes its initial value.
-// Finally, we call those functions and store their results at the start of every entry point.
+// into the equivalent form:
 //
-// Under the target policy, we move every initializer the target cannot represent at global scope.
-// Under the resource-dependency policy, we start from linked per-invocation resource-state globals
-// and move only resource-dependent initializer globals: initializer targets whose values
-// transitively depend on those seeds. We also collect ordinary globals that the moved initializers
-// may mutate. The union is resource-dependent state, which later validation uses to reject
-// functions that can execute without first passing through an entry point and could therefore
-// observe state initialized only there.
+//      static int counter;
 //
-// We leave unrelated initializers for the later target-policy pass. This preserves the established
-// behavior without imposing an eager-versus-lazy initialization order that Slang does not specify.
+//      void computeMain()
+//      {
+//          counter = 1;
+//          int oldValue = counter++;
+//      }
+//
+// We perform that transformation in three steps. We first choose the globals whose initializer
+// bodies must move. We then move each selected body into a zero-argument function. Finally, we
+// insert equivalent initialization at the start of every defined entry point. A non-trivial body is
+// evaluated by calling its new function; a body that only returns a module-scope value needs just a
+// store.
+//
+// Two callers use these extraction and injection steps. The established target-specific policy
+// chooses ordinary initializers. Resource-global legalization moves only the file-scope `static`
+// resource initializers that it will replace with entry-point locals. We accept a resource
+// initializer only when it has no side effects and does not read mutable state. Its evaluation is
+// then independent of every initializer that remains at global scope, so moving it cannot change
+// their observable order.
 
-/// Selects the policy that decides which globals use the shared extraction and injection mechanism.
-enum class GlobalInitSelectionMode
+/// A `GlobalInitializerSelection` chooses the policy used to select initializer bodies.
+enum class GlobalInitializerSelection
 {
-    TargetPolicy,
-    ResourceDependencies,
+    RequiredByTarget,
+    FileScopeStaticResources,
 };
 
-// We present the pass before these low-level classifiers so that the file reads in algorithm order.
-// Their definitions follow the transformation that uses them.
-static bool isLinkedPerInvocationGlobal(IRGlobalVar* globalVar);
-static bool canCallWriteThroughArgument(IRCall* call, IRUse* use);
-static bool mayWriteThroughAddressUse(IRUse* use, HashSet<IRInst*>& visitedAddresses);
-
+/// A `MoveGlobalVarInitializationToEntryPointsPass` extracts the selected initializer bodies and
+/// inserts equivalent initialization into every defined entry point.
 struct MoveGlobalVarInitializationToEntryPointsPass
 {
-    /// Records the dependencies and possible mutations of one function or global initializer body.
-    struct CodeBodySummary
-    {
-        /// The body described by this summary.
-        IRGlobalValueWithCode* code = nullptr;
-
-        /// The callees and initialized globals through which resource dependence can propagate.
-        List<Index> dependencies;
-
-        /// The dependency edges that execute another body and therefore propagate its mutations.
-        ///
-        /// Merely reading an initialized global does not execute its initializer here, so we keep
-        /// call edges as a separate subset.
-        List<Index> callees;
-
-        /// The globals this body may mutate directly or by allowing their addresses to escape.
-        List<IRGlobalVar*> mutatedGlobals;
-
-        /// Whether this body directly or transitively depends on a resource-state global.
-        bool dependsOnResourceState = false;
-    };
-
-    IRModule* m_module;
-    TargetProgram* m_targetProgram;
-    GlobalInitSelectionMode m_selectionMode;
-
-    // The resource-dependency policy maintains related sets with distinct roles:
-    //
-    // * `m_resourceStateGlobals` contains the linked per-invocation globals whose values contain
-    //   resources. They seed the dependency analysis.
-    // * `m_resourceDependentInitializerGlobals` contains every initializer target that depends on
-    //   those seeds, while `m_selectedResourceDependentInitializerGlobals` is the movable subset
-    //   that establishes where explicit initialization must begin.
-    // * `m_globalsMutatedByResourceDependentInitializers` contains additional state affected by
-    //   the selected resource-dependent initializer bodies and their callees.
-    //
-    // The output is deliberately wider than the transformation set. Later validation must reject
-    // any function that can execute without first passing through an entry point and can observe
-    // state whose initialization happens only there.
-    HashSet<IRGlobalVar*> m_resourceStateGlobals;
-    HashSet<IRGlobalVar*> m_resourceDependentInitializerGlobals;
-    HashSet<IRGlobalVar*> m_selectedResourceDependentInitializerGlobals;
-    HashSet<IRGlobalVar*> m_globalsMutatedByResourceDependentInitializers;
-    List<IRGlobalVar*>* m_outResourceDependentState;
-    List<CodeBodySummary> m_codeBodySummaries;
-    Dictionary<IRGlobalValueWithCode*, Index> m_codeBodyIndices;
-
-    // An `IRGlobalVar` represents a pointer to storage and may also own the code that computes its
-    // initial value. This works because `IRGlobalVar` and `IRFunc` both derive from
-    // `IRGlobalValueWithCode`.
-    //
-    // Extraction separates those roles into a global with no initializer body and an ordinary
-    // function that computes the initial value. We retain each pair so the injection phase can emit
-    // the corresponding call and store.
+    /// An `ExtractedInitializer` pairs global storage with the function that computes its value.
     struct ExtractedInitializer
     {
+        /// The storage that will receive the extracted initializer's result.
         IRGlobalVar* globalVar = nullptr;
-        IRFunc* initFunc = nullptr;
+
+        /// The new function that contains the initializer's original body.
+        IRFunc* function = nullptr;
     };
+
+    /// The module being transformed.
+    IRModule* m_module = nullptr;
+
+    /// The target policy for `RequiredByTarget`, or null for the resource-only selection.
+    TargetProgram* m_targetProgram = nullptr;
+
+    /// The sink used to diagnose unsupported resource initializers.
+    DiagnosticSink* m_sink = nullptr;
+
+    /// The policy that decides which initializer bodies to extract.
+    GlobalInitializerSelection m_selection = GlobalInitializerSelection::RequiredByTarget;
+
+    /// The extracted initializers in their original module order.
     List<ExtractedInitializer> m_extractedInitializers;
 
+    /// Move the selected initializer bodies and initialize their variables in every entry point.
     void processModule(
         IRModule* module,
         TargetProgram* targetProgram,
-        GlobalInitSelectionMode selectionMode,
-        List<IRGlobalVar*>* outResourceDependentState = nullptr)
+        GlobalInitializerSelection selection,
+        DiagnosticSink* sink = nullptr)
     {
-        // In resource-dependency mode, we first summarize the module and select the dependency
-        // closure. In either mode, we then traverse globals in module order, extracting each
-        // initializer selected by the active policy. Finally, we reproduce those initializers at
-        // every defined entry point. We share the latter two steps so resource legalization adds
-        // only a selection policy, not a second initialization mechanism.
+        // We first validate the selected resource initializers, because reporting an error must not
+        // leave the module partly transformed. We then separate extraction from injection because
+        // every entry point must execute the same selected initializers in the same order.
         m_module = module;
         m_targetProgram = targetProgram;
-        m_selectionMode = selectionMode;
-        m_outResourceDependentState = outResourceDependentState;
+        m_selection = selection;
+        m_sink = sink;
 
-        if (m_selectionMode == GlobalInitSelectionMode::ResourceDependencies)
+        if (m_selection == GlobalInitializerSelection::FileScopeStaticResources &&
+            diagnoseOrderDependentResourceInitializers())
         {
-            buildCodeBodySummaries();
-            selectResourceDependentInitializers();
-            collectStateMutatedByResourceDependentInitializers();
-            writeResourceDependentStateOutput();
+            return;
         }
 
         extractSelectedInitializers();
         injectInitializersIntoEntryPoints();
     }
 
-    // ## Resource-dependency preselection and state summary
-
-    bool isInitializerRequiredByTargetPolicy(IRGlobalVar* globalVar)
+    /// Return whether the target requires this initializer to execute inside an entry point.
+    bool isInitializerRequiredByTarget(IRGlobalVar* globalVar)
     {
-        // We preserve the established target policy. Non-D3D targets move every initializer. D3D
-        // targets keep initializers that HLSL can represent at global scope, but move cooperative-
-        // vector construction because DXC cannot perform it there.
+        // HLSL can represent ordinary global initializers, so we leave them at global scope.
+        // Cooperative-vector construction is the exception because DXC cannot construct a
+        // cooperative vector in a global initializer. For other targets, this policy selects every
+        // eligible global initializer body.
+        SLANG_RELEASE_ASSERT(m_targetProgram);
         if (isD3DTarget(m_targetProgram->getTargetReq()))
         {
             auto valueType = globalVar->getDataType()->getValueType();
-            if (as<IRCoopVectorType>(valueType))
-                return true;
-            return false;
+            return as<IRCoopVectorType>(valueType) != nullptr;
         }
         return true;
     }
 
+    /// Return whether `globalVar` is eligible and selected for extraction.
     bool shouldExtractInitializer(IRGlobalVar* globalVar)
     {
-        // We can reproduce an initializer independently in every entry point only when the global
-        // does not have `ActualGlobal` storage. Among the eligible globals, the two policies answer
-        // separate selection questions: resource-dependency processing moves only its selected
-        // closure, while the ordinary target policy runs later for everything else.
+        // `ActualGlobal` storage has one lifetime outside individual shader invocations. Repeating
+        // its initialization in each entry point would change that lifetime, so neither selection
+        // policy may move `globalVar`.
         if (as<IRActualGlobalRate>(globalVar->getRate()))
             return false;
-        if (m_selectionMode == GlobalInitSelectionMode::ResourceDependencies)
-            return m_selectedResourceDependentInitializerGlobals.contains(globalVar);
-        return isInitializerRequiredByTargetPolicy(globalVar);
+
+        if (m_selection == GlobalInitializerSelection::FileScopeStaticResources)
+            return isFileScopeStaticResourceGlobalToReplace(globalVar);
+
+        return isInitializerRequiredByTarget(globalVar);
     }
 
-    void buildCodeBodySummaries()
+    /// Return whether `value` can address mutable state not created inside its enclosing
+    /// computation.
+    bool canAddressReferToPreexistingMutableState(IRInst* value, HashSet<IRInst*>& visited)
     {
-        // Resource-dependency selection must answer two related questions: which initializer values
-        // transitively depend on resource-state globals, and which additional globals the selected
-        // initializer code may mutate. We summarize every code-bearing global value once so both
-        // answers use the same view of calls, global-value dependencies, and address effects.
-        //
-        // We build the summary in three passes. We first collect the resource-state seeds and then
-        // assign an index to every code body; indexing must finish before we can represent forward
-        // edges. Finally, we inspect each body to record dependencies and mutations.
-        collectResourceStateGlobals();
-        indexCodeBodies();
-        for (auto& summary : m_codeBodySummaries)
+        // Address casts, selects, and other forwarding instructions retain their operands in the
+        // IR, so we can find the original storage by walking their operands. Block parameters need
+        // one extra step: we follow each argument supplied by a predecessor. The visited set bounds
+        // the walk when a loop passes an address through a block parameter.
+        if (!visited.add(value))
+            return false;
+        if (as<IRGlobalVar>(value))
+            return true;
+
+        // A pointer into a writable resource denotes state supplied from outside the shader. That
+        // state can change between the original initialization point and an entry-point call.
+        if (as<IRRWStructuredBufferGetElementPtr>(value))
+            return true;
+        if (as<IRImageSubscript>(value) && !isPointerToImmutableLocation(value))
+            return true;
+
+        if (auto globalConstant = as<IRGlobalConstant>(value))
         {
-            for (auto block : summary.code->getBlocks())
-            {
-                for (auto inst : block->getChildren())
-                    summarizeInstruction(summary, inst);
-            }
+            // A constant pointer may still name mutable storage. We follow a known value and treat
+            // an imported constant pointer conservatively because its target is unavailable. A
+            // non-pointer constant used as an address index does not itself name storage.
+            auto type = globalConstant->getDataType();
+            if (!type || !as<IRPtrTypeBase>(unwrapAttributedType(type)))
+                return false;
+            auto constantValue = globalConstant->getValue();
+            return constantValue
+                       ? canAddressReferToPreexistingMutableState(constantValue, visited)
+                       : true;
         }
-    }
 
-    void collectResourceStateGlobals()
-    {
-        // Resource dependence starts at linked, per-invocation globals whose values contain a
-        // resource. We collect those seeds separately from initializer targets: a resource global
-        // may have no initializer body, while a non-resource global may depend on one transitively.
-        for (auto inst : m_module->getGlobalInsts())
+        if (auto parameter = as<IRParam>(value))
         {
-            auto globalVar = as<IRGlobalVar>(inst);
-            if (!globalVar)
-                continue;
-            if (isPerInvocationResourceStateGlobalVar(globalVar))
-                m_resourceStateGlobals.add(globalVar);
-        }
-    }
+            auto block = as<IRBlock>(parameter->getParent());
+            if (!block)
+                return false;
 
-    void indexCodeBodies()
-    {
-        // We assign an index to every function or global initializer with a body. Indices let the
-        // summary represent graph edges compactly. We mark a resource global's own initializer
-        // body as dependent immediately; other direct resource uses are found when bodies are
-        // scanned.
-        for (auto inst : m_module->getGlobalInsts())
-        {
-            auto code = as<IRGlobalValueWithCode>(inst);
-            if (!code || !code->getFirstBlock())
-                continue;
-
-            Index index = m_codeBodySummaries.getCount();
-            m_codeBodySummaries.add(CodeBodySummary{code});
-            m_codeBodyIndices.add(code, index);
-
-            if (auto globalVar = as<IRGlobalVar>(code))
+            auto parameterIndex = getParamIndexInBlock(parameter);
+            if (parameterIndex < 0)
+                return false;
+            for (auto predecessor : block->getPredecessors())
             {
-                if (m_resourceStateGlobals.contains(globalVar))
-                    m_codeBodySummaries[index].dependsOnResourceState = true;
-            }
-        }
-    }
-
-    void summarizeInstruction(CodeBodySummary& summary, IRInst* inst)
-    {
-        // Each instruction can contribute call edges, global-value dependencies, and mutation
-        // effects to its enclosing body. A direct call is both a value dependency and a call edge.
-        // Keeping call edges distinct lets side-effect collection later follow only code that
-        // actually executes as part of a selected initializer.
-        if (auto call = as<IRCall>(inst))
-        {
-            if (auto callee = as<IRGlobalValueWithCode>(call->getCallee()))
-            {
-                if (auto dependencyIndex = m_codeBodyIndices.tryGetValue(callee))
+                auto branch = as<IRUnconditionalBranch>(predecessor->getTerminator());
+                if (!branch || UInt(parameterIndex) >= branch->getArgCount())
+                    return true;
+                if (canAddressReferToPreexistingMutableState(
+                        branch->getArg(UInt(parameterIndex)),
+                        visited))
                 {
-                    summary.dependencies.add(*dependencyIndex);
-                    summary.callees.add(*dependencyIndex);
+                    return true;
                 }
             }
+            return false;
         }
 
-        // When an operand is a global with an initializer body, we add that body as a value
-        // dependency. We separately inspect this exact operand use for writes; the recursive
-        // analysis follows every address derived from it.
-        for (UInt operandIndex = 0; operandIndex < inst->getOperandCount(); ++operandIndex)
+        for (UInt operandIndex = 0; operandIndex < value->getOperandCount(); ++operandIndex)
         {
-            auto globalVar = as<IRGlobalVar>(inst->getOperand(operandIndex));
-            if (!globalVar)
-                continue;
-
-            if (m_resourceStateGlobals.contains(globalVar))
-                summary.dependsOnResourceState = true;
-            if (auto dependencyIndex = m_codeBodyIndices.tryGetValue(globalVar))
-                summary.dependencies.add(*dependencyIndex);
-
-            HashSet<IRInst*> visitedAddresses;
-            if (mayWriteThroughAddressUse(inst->getOperandUse(operandIndex), visitedAddresses))
-                summary.mutatedGlobals.add(globalVar);
+            auto operand = value->getOperand(operandIndex);
+            if (operand && canAddressReferToPreexistingMutableState(operand, visited))
+                return true;
         }
+
+        // An otherwise unknown module-scope pointer may refer to imported mutable storage. A value
+        // with no pointer type cannot be the address consumed by the load that started this walk.
+        if (value->getParent() == m_module->getModuleInst())
+        {
+            auto type = value->getDataType();
+            return type && as<IRPtrTypeBase>(unwrapAttributedType(type)) != nullptr;
+        }
+        return false;
     }
 
-    void selectResourceDependentInitializers()
+    /// Return whether an argument to `call` contains a resource value.
+    bool doesCallPassResourceValue(IRCall* call)
     {
-        // We begin with bodies marked by direct resource uses. We then repeatedly mark a body when
-        // any of its dependencies is marked. Iterating to a fixed point handles arbitrary call and
-        // initializer-reference depth without relying on module order.
-        bool changed = false;
-        do
+        // `ReadNone` excludes ordinary global-memory reads. For an opaque callee, the remaining
+        // mutable state it could read is resource content reached through an argument. Target
+        // intrinsics use `ReadNone` even for operations such as `Texture.Load`, so we reject an
+        // opaque call that receives a resource value.
+        for (auto argument : call->getArgsList())
         {
-            changed = false;
-            for (auto& summary : m_codeBodySummaries)
+            auto type = as<IRType>(unwrapAttributedType(argument->getDataType()));
+            if (type && isOpaqueType(type, nullptr))
+                return true;
+        }
+        return false;
+    }
+
+    /// Return whether `function` contains target code whose effects are not represented in IR.
+    bool doesFunctionContainOpaqueTargetCode(IRFunc* function)
+    {
+        // `IRGenericAsm` is a terminator, so it does not appear among a block's ordinary
+        // instructions. We inspect every terminator explicitly before deciding that the function's
+        // body can summarize a call.
+        for (auto block : function->getBlocks())
+        {
+            if (as<IRGenericAsm>(block->getTerminator()))
+                return true;
+        }
+        return false;
+    }
+
+    /// Return whether executing `code` at a different time can change program behavior.
+    bool isComputationOrderDependent(
+        IRGlobalValueWithCode* code,
+        HashSet<IRFunc*>& visitedFunctions)
+    {
+        // Moving a computation changes when its side effects and reads occur. We reject any side
+        // effect or read of mutable state. For a call to a defined function, we inspect its body so
+        // that resource-content reads are not hidden behind a `ReadNone` summary. For an opaque
+        // callee, passing a resource value is conservatively treated as a possible content read.
+        for (auto block : code->getBlocks())
+        {
+            auto terminator = block->getTerminator();
+            for (auto inst = block->getFirstOrdinaryInst(); inst && inst != terminator;
+                 inst = inst->getNextInst())
             {
-                if (summary.dependsOnResourceState)
+                IRInst* loadedAddress = nullptr;
+                if (auto load = as<IRLoad>(inst))
+                    loadedAddress = load->getPtr();
+                else if (auto atomicLoad = as<IRAtomicLoad>(inst))
+                    loadedAddress = atomicLoad->getPtr();
+
+                if (loadedAddress)
+                {
+                    HashSet<IRInst*> visited;
+                    if (canAddressReferToPreexistingMutableState(loadedAddress, visited))
+                        return true;
+                }
+
+                if (isDebugInfoInst(inst))
                     continue;
 
-                for (auto dependencyIndex : summary.dependencies)
+                if (isResourceLoadNotReportedAsSideEffecting(inst->getOp()))
+                    return true;
+
+                if (auto call = as<IRCall>(inst))
                 {
-                    if (!m_codeBodySummaries[dependencyIndex].dependsOnResourceState)
+                    // `NoSideEffect` allows a callee to read global state. Only `ReadNone`
+                    // guarantees that ordinary memory reads cannot depend on initialization order.
+                    if (!isPureFunctionalCall(call))
+                        return true;
+
+                    auto callee = as<IRFunc>(getResolvedInstForDecorations(call->getCallee()));
+                    bool hasInspectableBody = callee && callee->getFirstBlock() &&
+                                              !callee->findDecoration<IRTargetIntrinsicDecoration>() &&
+                                              !doesFunctionContainOpaqueTargetCode(callee);
+                    if (!hasInspectableBody)
+                    {
+                        if (doesCallPassResourceValue(call))
+                            return true;
                         continue;
+                    }
 
-                    summary.dependsOnResourceState = true;
-                    changed = true;
-                    break;
+                    if (visitedFunctions.add(callee) &&
+                        isComputationOrderDependent(callee, visitedFunctions))
+                    {
+                        return true;
+                    }
+                    continue;
                 }
-            }
-        } while (changed);
-
-        // The fixed point includes functions and global initializer targets. Every dependent
-        // initializer target belongs to the wider boundary-check state, but only linked
-        // per-invocation targets are safe for this pass to move into each entry point.
-        for (auto const& summary : m_codeBodySummaries)
-        {
-            if (!summary.dependsOnResourceState)
-                continue;
-            if (auto globalVar = as<IRGlobalVar>(summary.code))
-            {
-                m_resourceDependentInitializerGlobals.add(globalVar);
-                if (isLinkedPerInvocationGlobal(globalVar))
-                    m_selectedResourceDependentInitializerGlobals.add(globalVar);
+                if (inst->mightHaveSideEffects())
+                    return true;
             }
         }
+        return false;
     }
 
-    void collectStateMutatedByResourceDependentInitializers()
+    /// Return whether `globalVar`'s initializer can observe when it executes.
+    bool isResourceInitializerOrderDependent(IRGlobalVar* globalVar)
     {
-        // Moving a resource-dependent initializer also moves its side effects. An initializer can
-        // mutate ordinary state directly or through a helper even when that state is not part of
-        // its value dependencies. We walk the call graph rooted at the selected resource-dependent
-        // initializers and collect all summarized mutations. The caller treats that state as
-        // resource-dependent so a function that can execute without first passing through an entry
-        // point cannot observe effects that occur only during entry-point initialization.
-        List<Index> workList;
-        HashSet<Index> reachableCode;
-        for (auto globalVar : m_selectedResourceDependentInitializerGlobals)
-        {
-            if (auto codeIndex = m_codeBodyIndices.tryGetValue(globalVar))
-            {
-                if (reachableCode.add(*codeIndex))
-                    workList.add(*codeIndex);
-            }
-        }
-        while (workList.getCount())
-        {
-            auto codeIndex = workList.getLast();
-            workList.removeLast();
-            auto const& summary = m_codeBodySummaries[codeIndex];
-            for (auto globalVar : summary.mutatedGlobals)
-                m_globalsMutatedByResourceDependentInitializers.add(globalVar);
-            for (auto calleeIndex : summary.callees)
-            {
-                if (reachableCode.add(calleeIndex))
-                    workList.add(calleeIndex);
-            }
-        }
+        // We inspect every reachable defined callee at most once. Revisiting a function through a
+        // recursive cycle cannot reveal an instruction that its first visit did not inspect.
+        HashSet<IRFunc*> visitedFunctions;
+        return isComputationOrderDependent(globalVar, visitedFunctions);
     }
 
-    void writeResourceDependentStateOutput()
+    /// Diagnose resource initializers whose evaluation order can affect program behavior.
+    bool diagnoseOrderDependentResourceInitializers()
     {
-        // We report the conservative state whose semantics will depend on entry-point
-        // initialization once we move the selected initializers. This is the union of
-        // resource-state globals, every resource-dependent initializer global, and ordinary state
-        // that the selected initializer call graph may mutate. We emit the union in module order to
-        // make downstream behavior and diagnostics deterministic.
-        if (!m_outResourceDependentState)
-            return;
-
-        m_outResourceDependentState->clear();
+        // The resource-only policy moves an initializer without moving adjacent ordinary
+        // initializers. We can preserve semantics only when that move cannot be observed. We check
+        // every selected initializer before changing the module and report all violations together.
+        SLANG_RELEASE_ASSERT(m_sink);
+        bool diagnosed = false;
         for (auto inst : m_module->getGlobalInsts())
         {
             auto globalVar = as<IRGlobalVar>(inst);
-            if (!globalVar)
+            if (!globalVar || !globalVar->getFirstBlock() || !shouldExtractInitializer(globalVar))
                 continue;
-            if (m_resourceStateGlobals.contains(globalVar) ||
-                m_resourceDependentInitializerGlobals.contains(globalVar) ||
-                m_globalsMutatedByResourceDependentInitializers.contains(globalVar))
-            {
-                m_outResourceDependentState->add(globalVar);
-            }
+            if (!isResourceInitializerOrderDependent(globalVar))
+                continue;
+
+            m_sink->diagnose(Diagnostics::ResourceStaticInitializerHasObservableEffect{
+                .variable = globalVar,
+                .location = globalVar->sourceLoc});
+            diagnosed = true;
         }
+        return diagnosed;
     }
 
-    // ## Extracted storage and initializer functions
-
+    /// Extract every selected initializer body, preserving module order.
     void extractSelectedInitializers()
     {
-        // We consider initializer-bearing globals in module order, which also determines the order
-        // in which entry-point injection emits their calls and stores. We exclude shared
-        // `ActualGlobal` storage because reproducing its initialization independently in every
-        // entry point would change its lifetime. Resource-dependent analysis still reports such a
-        // target so that the caller can diagnose that unsupported boundary.
+        // We visit globals in module order because the injection step uses that same order at every
+        // entry point. This choice retains the order already present in the IR and makes the
+        // generated code deterministic.
         for (auto inst : m_module->getGlobalInsts())
         {
             auto globalVar = as<IRGlobalVar>(inst);
-            if (!globalVar)
+            if (!globalVar || !globalVar->getFirstBlock())
+                continue;
+            if (!shouldExtractInitializer(globalVar))
                 continue;
 
-            auto firstBlock = globalVar->getFirstBlock();
-            if (!firstBlock || !shouldExtractInitializer(globalVar))
-                continue;
-
-            extractInitializer(globalVar, firstBlock);
+            extractInitializer(globalVar);
         }
     }
 
-    void extractInitializer(IRGlobalVar* globalVar, IRBlock* firstBlock)
+    /// Move `globalVar`'s initializer body into a new zero-argument function.
+    void extractInitializer(IRGlobalVar* globalVar)
     {
-        // A selected global combines storage with a body that computes its initial value, while
-        // explicit entry-point initialization needs those pieces separately. We create a
-        // zero-argument function, move the existing initializer blocks into it, and remember the
-        // storage/function pair for entry-point injection.
-
+        // An `IRGlobalVar` has pointer type, but its initializer body returns the value stored
+        // through that pointer. We therefore use the pointer's value type as the new function's
+        // result type.
         IRBuilder builder(m_module);
         builder.setInsertBefore(globalVar);
 
-        // An `IRGlobalVar` has pointer type, so we use its pointee as the initializer function's
-        // result type.
         auto valueType = globalVar->getDataType()->getValueType();
+        auto function = builder.createFunc();
+        function->setFullType(builder.getFuncType(0, nullptr, valueType));
 
-        // Global initializer bodies have no parameters, so the extracted function has none.
-        auto initFunc = builder.createFunc();
-        initFunc->setFullType(builder.getFuncType(0, nullptr, valueType));
-
-        // We move the existing body rather than cloning it. The global is left with storage only,
-        // and the new function preserves the exact initializer control flow.
+        // We move the blocks instead of cloning them. The global retains only its storage, while
+        // the new function retains the initializer's original instructions and control flow.
         IRBlock* nextBlock = nullptr;
-        for (IRBlock* block = firstBlock; block; block = nextBlock)
+        for (IRBlock* block = globalVar->getFirstBlock(); block; block = nextBlock)
         {
             nextBlock = block->getNextBlock();
-
             block->removeFromParent();
-            block->insertAtEnd(initFunc);
+            block->insertAtEnd(function);
         }
 
-        ExtractedInitializer info;
-        info.globalVar = globalVar;
-        info.initFunc = initFunc;
-        m_extractedInitializers.add(info);
+        m_extractedInitializers.add({globalVar, function});
     }
 
-    // ## Selected initialization at each entry point
-
+    /// Insert the extracted initializers into every defined entry point.
     void injectInitializersIntoEntryPoints()
     {
-        // We reproduce the selected initialization at the start of every defined entry point.
-        // Declarations have no body in which to insert it, so they remain unchanged.
+        // Entry-point declarations have no block in which to insert initialization, so only
+        // definitions can be changed.
         for (auto inst : m_module->getGlobalInsts())
         {
-            auto func = as<IRFunc>(inst);
-            if (!func || !func->findDecoration<IREntryPointDecoration>())
+            auto function = as<IRFunc>(inst);
+            if (!function || !function->findDecoration<IREntryPointDecoration>())
+                continue;
+            if (!function->getFirstBlock())
                 continue;
 
-            injectInitializersAtEntryPoint(func);
+            injectInitializersAtEntryPoint(function);
         }
     }
 
-    IRInst* findDirectModuleScopeInitializerValue(IRFunc* initFunc)
+    /// Return a module-scope result when the initializer body contains only its return.
+    IRInst* findResultOfReturnOnlyInitializer(IRFunc* function)
     {
-        // We can replace an initializer call with its returned module-scope value only when the
-        // function has no other observable effect. We therefore require one block whose only
-        // ordinary instruction is the return, and we require the returned value to live at module
-        // scope so that it is available at every entry point. Merely inspecting the return operand
-        // is insufficient: `static Texture2D t = (++count, inputTexture);` also returns a
-        // module-scope value, but the increment preceding that return must still execute.
-        auto block = initFunc->getFirstBlock();
+        // We may omit a call only when the function contains a single return and that return uses a
+        // module-scope value. Checking the entire body matters: an initializer such as
+        // `(++counter, inputTexture)` returns a module-scope value, but the increment must still
+        // execute.
+        auto block = function->getFirstBlock();
         if (!block || block->getNextBlock())
             return nullptr;
 
@@ -474,131 +421,52 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         return value;
     }
 
-    void injectInitializersAtEntryPoint(IRFunc* entryPointFunc)
+    /// Insert one call and store, or one direct store, for each extracted initializer.
+    void injectInitializersAtEntryPoint(IRFunc* entryPoint)
     {
-        // Each defined entry point must reproduce the selected global initialization in the same
-        // module order used during extraction. We insert one store for each storage/function pair
-        // at the start of the entry block. When the initializer merely returns a module-scope
-        // value, we store that value directly; all other initializer bodies remain explicit calls.
-        auto firstBlock = entryPointFunc->getFirstBlock();
-        if (!firstBlock)
-            return;
+        // We insert before the first ordinary instruction so that every selected initializer
+        // completes before the entry point can read or write the corresponding global.
+        auto firstBlock = entryPoint->getFirstBlock();
+        SLANG_ASSERT(firstBlock);
 
-        // Initialization must precede the entry point's first ordinary instruction.
         IRBuilder builder(m_module);
         builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
 
         for (auto initializer : m_extractedInitializers)
         {
-            auto globalVar = initializer.globalVar;
-            auto initFunc = initializer.initFunc;
-
-            // The extracted function returns the pointee value stored in the global.
-            auto valType = globalVar->getDataType()->getValueType();
-
-            // We avoid a call when the initializer is already a module-scope value that can be
-            // stored directly.
-            IRInst* initVal = findDirectModuleScopeInitializerValue(initFunc);
-            if (!initVal)
+            auto initialValue = findResultOfReturnOnlyInitializer(initializer.function);
+            if (!initialValue)
             {
-                // Otherwise, we execute the initializer through its extracted zero-argument
-                // function.
-                initVal = builder.emitCallInst(valType, initFunc, 0, nullptr);
+                auto valueType = initializer.globalVar->getDataType()->getValueType();
+                initialValue = builder.emitCallInst(valueType, initializer.function, 0, nullptr);
             }
-            builder.emitStore(globalVar, initVal);
+            builder.emitStore(initializer.globalVar, initialValue);
         }
     }
 };
 
-// ## Classifying movable globals and initializer writes
-
-static bool isLinkedPerInvocationGlobal(IRGlobalVar* globalVar)
-{
-    // We select linked globals because linkage identifies the source declarations whose
-    // per-invocation semantics this policy handles. We leave unlinked storage to its producer's
-    // lifetime policy, while a rate explicitly denotes a different lifetime; neither category can
-    // be assumed safe to initialize independently at every entry point.
-    return !globalVar->getRate() && globalVar->findDecoration<IRLinkageDecoration>();
-}
-
-static bool canCallWriteThroughArgument(IRCall* call, IRUse* use)
-{
-    // We match this argument use to its formal parameter. An ordinary value exposes no address, and
-    // `BorrowIn` is pointer-shaped in IR but promises read-only access; we therefore reject that
-    // case before the generic pointer test. `out`, `inout`, `ref`, and raw-pointer parameters can
-    // mutate the pointee. If the signature is unavailable, we conservatively report a possible
-    // write so boundary validation cannot omit affected state.
-    auto paramType = findCallArgumentParameterType(call, use);
-    if (!paramType)
-        return true;
-    if (as<IRBorrowInParamType>(paramType))
-        return false;
-    return as<IROutParamType>(paramType) || as<IRBorrowInOutParamType>(paramType) ||
-           as<IRRefParamType>(paramType) || as<IRPtrTypeBase>(paramType);
-}
-
-static bool mayWriteThroughAddressUse(IRUse* use, HashSet<IRInst*>& visitedAddresses)
-{
-    // We follow address derivations within one function or initializer body to determine whether
-    // code can write through a global address. We classify known readers and writers directly,
-    // classify calls from their parameter contracts, and recursively inspect instructions that
-    // derive another address. Unknown consumers may let the address escape, so we conservatively
-    // report a possible write. The visited set makes the recursive walk terminate if address-
-    // producing IR contains a cycle.
-    auto user = use->getUser();
-    if (as<IRLoad>(user) || as<IRAtomicLoad>(user) || doesInstOnlyDependOnOperandTypes(user))
-        return false;
-
-    if (as<IRStore>(user))
-    {
-        // A store can either write through this address or store the address itself. In either
-        // case, the surrounding body may mutate this global, so we include it in the mutation
-        // summary.
-        return true;
-    }
-    if (as<IRAtomicOperation>(user) || as<IRSwizzledStore>(user) || as<IRMatrixSwizzleStore>(user))
-    {
-        return true;
-    }
-    if (auto call = as<IRCall>(user))
-        return canCallWriteThroughArgument(call, use);
-
-    if (doesUseDeriveAddress(use))
-    {
-        if (!visitedAddresses.add(user))
-            return false;
-        for (auto derivedUse = user->firstUse; derivedUse; derivedUse = derivedUse->nextUse)
-        {
-            if (mayWriteThroughAddressUse(derivedUse, visitedAddresses))
-                return true;
-        }
-        return false;
-    }
-
-    // Any remaining use may let the address escape beyond code we can inspect. We conservatively
-    // report a possible mutation so boundary validation cannot omit affected state.
-    return true;
-}
-
 void moveGlobalVarInitializationToEntryPoints(IRModule* module, TargetProgram* targetProgram)
 {
-    MoveGlobalVarInitializationToEntryPointsPass pass;
-    pass.processModule(module, targetProgram, GlobalInitSelectionMode::TargetPolicy);
-}
-
-void moveResourceDependentGlobalVarInitializationToEntryPoints(
-    IRModule* module,
-    TargetProgram* targetProgram,
-    List<IRGlobalVar*>& outResourceDependentState)
-{
-    // We use resource-dependency selection here and return its wider state set so resource-global
-    // legalization can validate storage and invocation boundaries before localizing that state.
+    // We retain the established target policy for the ordinary global-initializer pass.
     MoveGlobalVarInitializationToEntryPointsPass pass;
     pass.processModule(
         module,
         targetProgram,
-        GlobalInitSelectionMode::ResourceDependencies,
-        &outResourceDependentState);
+        GlobalInitializerSelection::RequiredByTarget);
+}
+
+void moveGlobalVarInitializationToEntryPointsForResourceGlobalLegalization(
+    IRModule* module,
+    DiagnosticSink* sink)
+{
+    // We extract only the resource initializers that `legalizeResourceGlobalVars` will replace. We
+    // first reject any selected initializer whose evaluation order could be observed.
+    MoveGlobalVarInitializationToEntryPointsPass pass;
+    pass.processModule(
+        module,
+        nullptr,
+        GlobalInitializerSelection::FileScopeStaticResources,
+        sink);
 }
 
 } // namespace Slang

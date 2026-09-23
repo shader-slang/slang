@@ -1,5 +1,6 @@
-// A direct resource global is legal, while an ordinary struct containing a resource remains
-// unsupported.
+// A file-scope `static` `RWStructuredBuffer` remains one resource value during legalization, so it
+// is supported. Group-shared and coherent storage cannot be replaced with ordinary entry-point
+// locals, and an ordinary struct containing resources must be split, so those cases remain errors.
 //
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 RWStructuredBuffer<uint> outputBuffer;

@@ -6,8 +6,8 @@ static Texture2D<float4> cachedTexture = textures[0];
 [shader("fragment")]
 float4 callee() : SV_Target
 /*CHECK:
-       ^^^^^^ resource-dependent static state is not supported in a callable entry point
-       ^^^^^^ entry point 'callee' is also called as an ordinary function and transitively accesses per-invocation resource-dependent static state; move the shared implementation to an unannotated helper
+       ^^^^^^ file-scope static resource is not supported in a callable entry point
+       ^^^^^^ entry point 'callee' can also be invoked as an ordinary function and accesses a file-scope static resource; move the shared implementation to a separate function without an entry-point attribute
 */
 {
     return cachedTexture.Load(int3(0, 0, 0));

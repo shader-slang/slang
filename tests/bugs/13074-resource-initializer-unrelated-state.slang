@@ -1,8 +1,18 @@
-//TEST:SIMPLE: -target hlsl -entry main -stage compute -o 13074-resource-initializer-unrelated-state.hlsl
+// Moving a resource initializer must not move an unrelated ordinary initializer. In particular,
+// `getUnrelatedValue` may be called without first invoking this module's shader entry point.
+//
+//TEST:SIMPLE: -target hlsl -entry main -stage compute -g -validate-ir -verify-debug-serial-ir -o 13074-resource-initializer-unrelated-state.hlsl
 
 Texture2D<float4> texture;
 RWStructuredBuffer<float> output;
-static Texture2D<float4> cachedTexture = texture;
+
+[noinline]
+Texture2D<float4> returnTexture(Texture2D<float4> value)
+{
+    return value;
+}
+
+static Texture2D<float4> cachedTexture = returnTexture(texture);
 static uint unrelatedValue = 17;
 
 export uint getUnrelatedValue()

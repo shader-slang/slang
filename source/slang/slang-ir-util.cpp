@@ -11,9 +11,9 @@ namespace Slang
 
 bool doesInstOnlyDependOnOperandTypes(IRInst* inst)
 {
-    // Static type queries are represented as operations on runtime values, but they do not observe
-    // those values. We enumerate the known type-only operations so that value-use analyses can
-    // ignore them while conservatively treating every unlisted instruction as a value use.
+    // Some static type queries take a runtime value and inspect only its static type. Others compare
+    // types directly or query their layout. We enumerate both forms so that value-use analyses can
+    // ignore their operands while conservatively treating every unlisted instruction as a value use.
     switch (inst->getOp())
     {
     case kIROp_IsBool:
@@ -35,65 +35,31 @@ bool doesInstOnlyDependOnOperandTypes(IRInst* inst)
 
 static bool _isResourceValueType(IRType* type)
 {
-    // Resource-global legalization deliberately uses a narrower classification than the general
-    // opaque-type machinery. The cases below are exactly the direct resource values admitted by
-    // the front end and supported by downstream resource specialization.
+    // The front-end allow-list admits only resource types that remain one IR value through the part
+    // of the pipeline that calls this predicate. We therefore recognize the corresponding broad IR
+    // categories here and leave the source-language policy in semantic checking.
+    type = cast<IRType>(unwrapAttributedType(type));
+    while (auto arrayType = as<IRArrayTypeBase>(type))
+        type = cast<IRType>(unwrapAttributedType(arrayType->getElementType()));
+
     return as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
-           as<IRUniformParameterGroupType>(type) || as<IRHLSLStructuredBufferTypeBase>(type) ||
-           as<IRByteAddressBufferTypeBase>(type);
+           as<IRHLSLStructuredBufferTypeBase>(type) || as<IRByteAddressBufferTypeBase>(type);
 }
 
-static bool _doesTypeContainResourceValues(IRType* type, HashSet<IRType*>& visitedTypes)
+bool isFileScopeStaticResourceGlobalToReplace(IRGlobalVar* globalVar)
 {
-    // Earlier target lowering may wrap an accepted resource category in a compiler-generated
-    // aggregate before resource-global legalization runs. We follow only value-bearing aggregate
-    // children, and we use `visitedTypes` to terminate recursive type graphs.
-    if (!visitedTypes.add(type))
-        return false;
-    if (_isResourceValueType(type))
-        return true;
-
-    if (auto structType = as<IRStructType>(type))
-    {
-        for (auto field : structType->getFields())
-        {
-            if (_doesTypeContainResourceValues(field->getFieldType(), visitedTypes))
-                return true;
-        }
-    }
-    else if (auto arrayType = as<IRArrayTypeBase>(type))
-    {
-        return _doesTypeContainResourceValues(arrayType->getElementType(), visitedTypes);
-    }
-    else if (auto tupleType = as<IRTupleTypeBase>(type))
-    {
-        for (UInt i = 0; i < tupleType->getOperandCount(); ++i)
-        {
-            if (auto elementType = as<IRType>(tupleType->getOperand(i)))
-            {
-                if (_doesTypeContainResourceValues(elementType, visitedTypes))
-                    return true;
-            }
-        }
-    }
-    return false;
-}
-
-bool isPerInvocationResourceStateGlobalVar(IRGlobalVar* globalVar)
-{
-    // A global belongs to this transformation only when it represents linked file-scope state with
-    // ordinary per-invocation lifetime. The front-end gate admits a supported resource value or an
-    // array of such values, while earlier target lowering may synthesize aggregate wrappers around
-    // them. We therefore inspect those wrappers recursively without broadening the accepted leaves.
-    if (globalVar->getRate() || !globalVar->findDecoration<IRLinkageDecoration>())
+    // AST-to-IR lowering adds `IRFileScopeStaticVarDecoration` only to a variable declared
+    // `static` at file or namespace scope. We test that marker instead of IR linkage decorations
+    // because static data members receive those decorations too. An explicit rate gives the storage
+    // a lifetime that cannot be reproduced by a fresh entry-point local.
+    if (globalVar->getRate() || !globalVar->findDecoration<IRFileScopeStaticVarDecoration>())
         return false;
 
     auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
     if (!ptrType)
         return false;
 
-    HashSet<IRType*> visitedTypes;
-    return _doesTypeContainResourceValues(ptrType->getValueType(), visitedTypes);
+    return _isResourceValueType(ptrType->getValueType());
 }
 
 bool isPointerOfType(IRInst* type, IROp opCode)
@@ -128,9 +94,9 @@ bool isAddressInst(IRInst* inst)
     }
 }
 
-bool doesUseDeriveAddress(IRUse* use)
+bool isUseBaseOfDerivedAddress(IRUse* use)
 {
-    // Address instructions and pointer-preserving casts derive their result from operand zero. We
+    // Address instructions and pointer-to-pointer casts derive their result from operand zero. We
     // require that exact operand because another pointer operand may be a value being stored or
     // otherwise consumed rather than the base of the result address.
     auto user = use->getUser();
@@ -146,7 +112,8 @@ bool doesUseDeriveAddress(IRUse* use)
     case kIROp_Reinterpret:
     case kIROp_PtrCast:
     case kIROp_InOutImplicitCast:
-        return as<IRPtrTypeBase>(user->getDataType()) != nullptr;
+        return as<IRPtrTypeBase>(use->get()->getDataType()) != nullptr &&
+               as<IRPtrTypeBase>(user->getDataType()) != nullptr;
     default:
         return false;
     }
@@ -160,22 +127,22 @@ IRInst* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse)
     if (argumentUse == call->getCalleeUse())
         return nullptr;
 
-    Index argIndex = -1;
+    Index argumentIndex = -1;
     for (UInt i = 0; i < call->getArgCount(); ++i)
     {
         if (call->getOperandUse(i + 1) == argumentUse)
         {
-            argIndex = Index(i);
+            argumentIndex = Index(i);
             break;
         }
     }
-    if (argIndex < 0)
+    if (argumentIndex < 0)
         return nullptr;
 
     auto funcType = as<IRFuncType>(call->getCallee()->getDataType());
-    if (!funcType || UInt(argIndex) >= funcType->getParamCount())
+    if (!funcType || UInt(argumentIndex) >= funcType->getParamCount())
         return nullptr;
-    return unwrapAttributedType(funcType->getParamType(UInt(argIndex)));
+    return unwrapAttributedType(funcType->getParamType(UInt(argumentIndex)));
 }
 
 IRType* getVectorElementType(IRType* type)
@@ -3237,6 +3204,51 @@ IRInst* peelAddressForwardingOps(IRInst* addr)
         default:
             return addr;
         }
+    }
+}
+
+bool isDebugInfoInst(IRInst* inst)
+{
+    // Debug instructions describe source locations, variables, and scopes. They do not execute and
+    // therefore must not be mistaken for value uses or side effects by semantic analyses.
+    switch (inst->getOp())
+    {
+    case kIROp_DebugValue:
+    case kIROp_DebugVar:
+    case kIROp_DebugLine:
+    case kIROp_DebugLocationDecoration:
+    case kIROp_DebugFuncDecoration:
+    case kIROp_DebugSource:
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugInlinedVariable:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugFunction:
+    case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugCompilationUnit:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool isResourceLoadNotReportedAsSideEffecting(IROp op)
+{
+    // These loads have no write side effect, so `mightHaveSideEffects()` returns false for them.
+    // Their results still depend on resource contents. Analyses that require a computation to be
+    // independent of external state must therefore reject them explicitly.
+    switch (op)
+    {
+    case kIROp_ImageLoad:
+    case kIROp_StructuredBufferLoad:
+    case kIROp_ByteAddressBufferLoad:
+    case kIROp_StructuredBufferLoadStatus:
+    case kIROp_RWStructuredBufferLoad:
+    case kIROp_RWStructuredBufferLoadStatus:
+    case kIROp_SubpassLoad:
+        return true;
+    default:
+        return false;
     }
 }
 

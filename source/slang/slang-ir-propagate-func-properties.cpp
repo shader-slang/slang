@@ -15,23 +15,6 @@ public:
     virtual bool propagate(IRBuilder& builder, IRFunc* func) = 0;
 };
 
-static bool isResourceLoad(IROp op)
-{
-    switch (op)
-    {
-    case kIROp_ImageLoad:
-    case kIROp_StructuredBufferLoad:
-    case kIROp_ByteAddressBufferLoad:
-    case kIROp_StructuredBufferLoadStatus:
-    case kIROp_RWStructuredBufferLoad:
-    case kIROp_RWStructuredBufferLoadStatus:
-    case kIROp_SubpassLoad:
-        return true;
-    default:
-        return false;
-    }
-}
-
 static bool isKnownOpCodeWithSideEffect(IROp op)
 {
     switch (op)
@@ -83,20 +66,6 @@ public:
         return true;
     }
 
-    bool isDebugInst(IRInst* inst)
-    {
-        switch (inst->getOp())
-        {
-        case kIROp_DebugLine:
-        case kIROp_DebugScope:
-        case kIROp_DebugVar:
-        case kIROp_DebugValue:
-            return true;
-        default:
-            return false;
-        }
-    }
-
     virtual bool propagate(IRBuilder& builder, IRFunc* f) override
     {
         bool hasNonReadNoneOp = false;
@@ -104,10 +73,16 @@ public:
         {
             for (auto inst : block->getChildren())
             {
+                // Debug instructions describe the surrounding program but do not read its runtime
+                // state. They therefore cannot affect whether the function is `ReadNone`.
+                if (isDebugInfoInst(inst))
+                    continue;
+
                 // Is this inst known to not have global side effect/analyzable?
                 if (!isKnownOpCodeWithSideEffect(inst->getOp()))
                 {
-                    if (inst->mightHaveSideEffects() || isResourceLoad(inst->getOp()))
+                    if (inst->mightHaveSideEffects() ||
+                        isResourceLoadNotReportedAsSideEffecting(inst->getOp()))
                     {
                         // We have a inst that has side effect that is not understood by this
                         // method, e.g. bufferStore, discard, etc. or we are seeing a resource load.
@@ -295,6 +270,11 @@ public:
         {
             for (auto inst : block->getChildren())
             {
+                // Debug instructions do not change program state, so they cannot invalidate a
+                // `NoSideEffect` result.
+                if (isDebugInfoInst(inst))
+                    continue;
+
                 if (!isKnownOpCodeWithSideEffect(inst->getOp()))
                 {
                     // Is this inst known to not have global side effect/analyzable?

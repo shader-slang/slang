@@ -28,8 +28,8 @@ HullOutput hullMain()
 }
 
 PatchOutput constants()
-//CHECK:    ^^^^^^^^^ resource-dependent static state is not supported in an independently invoked function
-//CHECK:    ^^^^^^^^^ function 'constants' may be invoked without an entry-point caller and transitively accesses per-invocation resource-dependent static state; pass the required state explicitly instead
+//CHECK:    ^^^^^^^^^ file-scope static resource requires rewritable direct calls
+//CHECK:    ^^^^^^^^^ function 'constants' accesses a file-scope static resource but may be invoked without an in-module direct call that can receive the resource as an added argument; pass the resource explicitly instead
 {
     PatchOutput result;
     result.edgeFactors[0] = 1;

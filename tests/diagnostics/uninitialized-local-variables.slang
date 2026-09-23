@@ -25,9 +25,9 @@ float3 unconditional(int mode)
 
     return k0 + k1;
 //CHK:        ^ possible use of uninitialized variable
-//CHK:        ^ variable 'k0' is not definitely initialized before this use
+//CHK:        ^ variable 'k0' may be uninitialized on some paths; it is only conditionally assigned
 //CHK:        ^ possible use of uninitialized variable
-//CHK:        ^ variable 'k1' is not definitely initialized before this use
+//CHK:        ^ variable 'k1' may be uninitialized on some paths; it is only conditionally assigned
 }
 
 // Warn here for branches using the variables
@@ -74,6 +74,16 @@ float filled_array(int mode)
     float array[2];
     array[0] = 1.0f;
     return array[0];
+}
+
+// A value-to-pointer bit cast reads its source value; it does not derive an address from that
+// value. The uninitialized-value check must therefore diagnose this use of `bits`.
+int* pointer_from_uninitialized_bits()
+{
+    uint2 bits;
+    return bit_cast<int*>(bits);
+//CHK:                   ^ use of uninitialized variable
+//CHK:                   ^ use of uninitialized variable 'bits'
 }
 
 // Structs and nested structs

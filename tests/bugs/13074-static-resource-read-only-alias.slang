@@ -1,4 +1,14 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry main -stage fragment
+//TEST:SIMPLE: -target hlsl -entry main -stage fragment -validate-ir -o 13074-static-resource-read-only-alias.hlsl
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -stage fragment -validate-ir
+
+// A read-only explicit argument may refer to the same resource that the callee also reads by name.
+// The source parameter and generated parameter preserve the two reads without introducing
+// competing writes.
+
+//CHECK-LABEL: float4 readExplicitlyAndByName_
+//CHECK: .Load({{.*}}) + {{.*}}.Load({{.*}});
+//CHECK-LABEL: float4 main()
+//CHECK: readExplicitlyAndByName_
 
 Texture2D<float4> textures[1];
 static Texture2D<float4> selectedTexture;
@@ -14,6 +24,4 @@ float4 main() : SV_Target
 {
     selectedTexture = textures[0];
     return readExplicitlyAndByName(selectedTexture);
-//CHECK:                          ^ file-scope static resource cannot be accessed both by name and explicit reference
-//CHECK:                          ^ file-scope static resource 'selectedTexture' is passed by reference to function 'readExplicitlyAndByName', which also accesses it by name; pass the resource through only one of those paths
 }

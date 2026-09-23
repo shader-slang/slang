@@ -11,5 +11,5 @@ float4 main() : SV_Target
         selectedTexture = textures[0];
     return selectedTexture.Load(int3(0, 0, 0));
 //CHECK:                       ^ possible use of uninitialized variable
-//CHECK:                       ^ variable 'selectedTexture' is not definitely initialized before this use
+//CHECK:                       ^ variable 'selectedTexture' may be uninitialized on some paths; it is only conditionally assigned
 }

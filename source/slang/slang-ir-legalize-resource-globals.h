@@ -7,24 +7,21 @@ namespace Slang
 
 class DiagnosticSink;
 struct IRModule;
-class TargetProgram;
 
-/// Replaces file-scope `static` resource globals whose values belong to one shader invocation with
-/// explicit entry-point-local state.
+/// Replace each global selected by `isFileScopeStaticResourceGlobalToReplace` with local storage in
+/// every entry point that may access it.
 ///
-/// This operation first moves resource-dependent initialization into each entry point, then threads
-/// each localized value through helper parameters. It diagnoses externally observable storage,
-/// invocations without a rewritable direct call site, escaping addresses, and calls whose explicit
-/// arguments alias implicitly threaded state, because localization could not preserve those
-/// contracts or storage identities.
+/// Require selected initializer bodies to have been moved by
+/// `moveGlobalVarInitializationToEntryPointsForResourceGlobalLegalization`. Add a generated parameter
+/// to each affected non-entry-point function, and add the corresponding argument to every in-module
+/// direct call. Diagnose uses that require one persistent address or that invoke an affected
+/// function without a direct `IRCall` that can receive the generated argument.
 ///
-/// This operation must run after linking, because linkage, direct calls, and function references
-/// expose the boundaries it validates. It must run before resource-type legalization, while each
-/// file-scope `static` and its initializer still form one identifiable global value.
-void legalizeResourceGlobalVars(
-    IRModule* module,
-    TargetProgram* targetProgram,
-    DiagnosticSink* sink);
+/// Run this operation after linking but before resource-type legalization and
+/// `specializeResourceUsage`. At that point all relevant in-module functions and direct calls are
+/// available. The later legalization and resource-specialization passes can then consume the
+/// generated locals, parameters, and call arguments.
+void legalizeResourceGlobalVars(IRModule* module, DiagnosticSink* sink);
 
 } // namespace Slang
 

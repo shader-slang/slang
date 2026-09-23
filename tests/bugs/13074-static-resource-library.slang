@@ -4,8 +4,8 @@ Texture2D<float4> texture;
 static Texture2D<float4> cachedTexture = texture;
 
 export float4 loadCachedTexture()
-//CHECK:      ^^^^^^^^^^^^^^^^^ resource-dependent static state is not supported in an independently invoked function
-//CHECK:      ^^^^^^^^^^^^^^^^^ function 'loadCachedTexture' may be invoked without an entry-point caller and transitively accesses per-invocation resource-dependent static state; pass the required state explicitly instead
+//CHECK:      ^^^^^^^^^^^^^^^^^ file-scope static resource requires rewritable direct calls
+//CHECK:      ^^^^^^^^^^^^^^^^^ function 'loadCachedTexture' accesses a file-scope static resource but may be invoked without an in-module direct call that can receive the resource as an added argument; pass the resource explicitly instead
 {
     return cachedTexture.Load(int3(0, 0, 0));
 }

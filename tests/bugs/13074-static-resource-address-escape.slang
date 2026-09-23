@@ -9,8 +9,8 @@ Ptr<Texture2D<float4>> getCachedTexture()
 {
     return &cachedTexture;
 /*CHECK:
-    ^^^^^^ address of file-scope static resource cannot escape
-    ^^^^^^ the address of file-scope static resource 'cachedTexture' escapes the function; pass the resource value or a caller-owned reference explicitly instead
+    ^^^^^^ unsupported use of the address of a file-scope static resource
+    ^^^^^^ the address of file-scope static resource 'cachedTexture' is retained or observed in a way that cannot be preserved when each function has separate storage
 */
 }
 
@@ -26,8 +26,8 @@ void retainCachedTexture(
 uintptr_t getCachedTextureAddress()
 {
     return uintptr_t(&cachedTexture);
-//CHECK:            ^ address of file-scope static resource cannot escape
-//CHECK:            ^ the address of file-scope static resource 'cachedTexture' escapes the function; pass the resource value or a caller-owned reference explicitly instead
+//CHECK:            ^ unsupported use of the address of a file-scope static resource
+//CHECK:            ^ the address of file-scope static resource 'cachedTexture' is retained or observed in a way that cannot be preserved when each function has separate storage
 }
 
 [numthreads(1, 1, 1)]
@@ -35,8 +35,8 @@ void main()
 {
     Ptr<Texture2D<float4>> cached = getCachedTexture();
     retainCachedTexture(&cachedTexture, cached);
-//CHECK:               ^ address of file-scope static resource cannot escape
-//CHECK:               ^ the address of file-scope static resource 'cachedTexture' escapes the function; pass the resource value or a caller-owned reference explicitly instead
+//CHECK:               ^ unsupported use of the address of a file-scope static resource
+//CHECK:               ^ the address of file-scope static resource 'cachedTexture' is retained or observed in a way that cannot be preserved when each function has separate storage
     uint address = uint(getCachedTextureAddress());
     output[0] = (*cached).Load(int3(0, 0, 0));
     output[1] = float4(float(address), 0.0, 0.0, 0.0);

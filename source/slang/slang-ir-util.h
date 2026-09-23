@@ -123,15 +123,15 @@ bool isUserPointerType(IRInst* type);
 // True if inst produces a derived address from another base address.
 bool isAddressInst(IRInst* inst);
 
-/// Returns true if `use` is the base-address operand of an instruction that derives another
+/// Return whether `use` is the base-address operand of an instruction that derives another
 /// address.
-bool doesUseDeriveAddress(IRUse* use);
+bool isUseBaseOfDerivedAddress(IRUse* use);
 
-/// Returns the formal parameter type corresponding to `argumentUse`, after removing outer
+/// Return the formal parameter type corresponding to `argumentUse`, after removing outer
 /// attributed and rate-qualified wrappers. Parameter-direction wrappers such as `BorrowIn` and
 /// `Out` are preserved.
 ///
-/// Returns null when the use is not an argument of `call`, or when the callee's function type does
+/// Return null when the use is not an argument of `call`, or when the callee's function type does
 /// not provide a corresponding parameter.
 IRInst* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse);
 
@@ -214,14 +214,18 @@ IRType* getVectorOrCoopMatrixElementType(IRType* type);
 // If `type` is a matrix, returns its element type. Otherwise, return `type`.
 IRType* getMatrixElementType(IRType* type);
 
-/// Returns true if `inst` may inspect operand types but cannot observe operand runtime values.
+/// Return whether `inst` may inspect operand types but cannot observe operand runtime values.
 ///
 /// A value-use analysis may ignore these instructions without treating their operands as read.
 bool doesInstOnlyDependOnOperandTypes(IRInst* inst);
 
-/// Returns true when `globalVar` has source linkage, ordinary per-invocation storage, and a value
-/// type that contains a supported resource leaf.
-bool isPerInvocationResourceStateGlobalVar(IRGlobalVar* globalVar);
+/// Return whether `globalVar` is marked as a file-scope `static` variable, has no explicit rate, and
+/// stores one resource value or an array of resource values.
+///
+/// This predicate recognizes the IR shape selected for replacement with entry-point locals. It
+/// assumes that source semantic checking has already restricted the resource type and storage
+/// modifiers to the subset supported by that transformation.
+bool isFileScopeStaticResourceGlobalToReplace(IRGlobalVar* globalVar);
 
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
@@ -619,6 +623,12 @@ IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
 // into the OptiX SBT" or "is this address into CUDA's `__constant__` global parameter
 // group") should peel with this function first, then test the terminal instruction.
 IRInst* peelAddressForwardingOps(IRInst* addr);
+
+/// Return whether `inst` records source-level debug information without affecting execution.
+bool isDebugInfoInst(IRInst* inst);
+
+/// Return whether `op` reads resource contents but does not report a memory side effect.
+bool isResourceLoadNotReportedAsSideEffecting(IROp op);
 
 // Returns true if the memory location pointed to by `ptrInst` is immutable.
 // An immutable location is the memory region that can't be modified by the user code.

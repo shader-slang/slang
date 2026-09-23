@@ -1880,6 +1880,9 @@ local insts = {
 			-- to it.
 			{ vulkanHitObjectAttributes = { struct_name = "VulkanHitObjectAttributesDecoration" } },
 			{ GlobalVariableShadowingGlobalParameterDecoration = { min_operands = 2 } },
+			-- Marks an IR global variable lowered from a source variable declared `static`
+			-- at file or namespace scope.
+			{ fileScopeStaticVar = { struct_name = "FileScopeStaticVarDecoration" } },
 			{
 				requireSPIRVVersion = {
 					struct_name = "RequireSPIRVVersionDecoration",

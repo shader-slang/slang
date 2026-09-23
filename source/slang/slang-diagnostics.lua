@@ -5022,14 +5022,14 @@ warning(
     "possibly-using-uninitialized-variable",
     41035,
     "possible use of uninitialized variable",
-    span { loc = "location", message = "variable '~varName' is not definitely initialized before this use" }
+    span { loc = "location", message = "variable '~varName' may be uninitialized on some paths; it is only conditionally assigned" }
 )
 
 warning(
     "possibly-using-uninitialized-value",
     41036,
     "possible use of uninitialized value",
-    span { loc = "location", message = "value of type '~typeName' is not definitely initialized before this use" }
+    span { loc = "location", message = "value of type '~typeName' may be uninitialized on some paths; it is only conditionally assigned" }
 )
 
 warning(
@@ -5773,38 +5773,59 @@ warning(
 )
 
 err(
-    "resource-dependent-static-used-by-preserved-function",
+    "resource-static-used-by-function-without-rewritable-call",
     56006,
-    "resource-dependent static state is not supported in an independently invoked function",
-    span { loc = "location", message = "function '~function:IRInst' may be invoked without an entry-point caller and transitively accesses per-invocation resource-dependent static state; pass the required state explicitly instead" }
+    "file-scope static resource requires rewritable direct calls",
+    span { loc = "location", message = "function '~function:IRInst' accesses a file-scope static resource but may be invoked without an in-module direct call that can receive the resource as an added argument; pass the resource explicitly instead" }
 )
 
 err(
-    "resource-static-aliases-threaded-state",
+    "resource-static-has-conflicting-call-aliases",
     56007,
-    "file-scope static resource cannot be accessed both by name and explicit reference",
-    span { loc = "location", message = "file-scope static resource '~variable:IRInst' is passed by reference to function '~function:IRInst', which also accesses it by name; pass the resource through only one of those paths" }
+    "file-scope static resource cannot be both passed by reference and accessed by name",
+    span { loc = "location", message = "file-scope static resource '~variable:IRInst' is passed by reference to function '~function:IRInst', which also accesses the same variable by name; pass the resource through only one of those paths" }
 )
 
 err(
-    "resource-dependent-state-has-preserved-storage",
+    "resource-static-requires-externally-visible-storage",
     56008,
-    "resource-dependent state cannot have externally preserved storage",
-    span { loc = "location", message = "variable '~variable:IRInst' has storage that must remain externally addressable, but its initialization or resource value must be localized to each entry point" }
+    "file-scope static resource must keep one externally visible address",
+    span { loc = "location", message = "file-scope static resource '~variable:IRInst' must retain one externally visible address, so it cannot be replaced by a separate local in each entry point" }
 )
 
 err(
-    "resource-static-address-escapes",
+    "resource-static-address-has-unsupported-use",
     56009,
-    "address of file-scope static resource cannot escape",
-    span { loc = "location", message = "the address of file-scope static resource '~variable:IRInst' escapes the function; pass the resource value or a caller-owned reference explicitly instead" }
+    "unsupported use of the address of a file-scope static resource",
+    span { loc = "location", message = "the address of file-scope static resource '~variable:IRInst' is retained or observed in a way that cannot be preserved when each function has separate storage" }
 )
 
 err(
-    "resource-dependent-static-used-by-callable-entry-point",
+    "resource-static-used-by-callable-entry-point",
     56010,
-    "resource-dependent static state is not supported in a callable entry point",
-    span { loc = "location", message = "entry point '~function:IRInst' is also called as an ordinary function and transitively accesses per-invocation resource-dependent static state; move the shared implementation to an unannotated helper" }
+    "file-scope static resource is not supported in a callable entry point",
+    span { loc = "location", message = "entry point '~function:IRInst' can also be invoked as an ordinary function and accesses a file-scope static resource; move the shared implementation to a separate function without an entry-point attribute" }
+)
+
+err(
+    "resource-static-used-outside-function",
+    56011,
+    "file-scope static resource is used by another global initializer",
+    span { loc = "location", message = "file-scope static resource '~variable:IRInst' is used while initializing another global variable; move that initialization into a function" }
+)
+
+err(
+    "resource-static-array-element-initialization-not-proven",
+    56012,
+    "cannot prove element-wise initialization of file-scope static resource array",
+    span { loc = "location", message = "file-scope static resource array '~variable:IRInst' has individual element writes and may be read before a whole-array assignment; assign the whole array before reading it" }
+)
+
+err(
+    "resource-static-initializer-has-observable-effect",
+    56013,
+    "unsupported file-scope static resource initializer",
+    span { loc = "location", message = "initializer for file-scope static resource '~variable:IRInst' has a side effect or reads mutable state; initialize the resource explicitly in an entry point instead" }
 )
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics

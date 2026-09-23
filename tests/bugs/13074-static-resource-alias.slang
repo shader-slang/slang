@@ -14,6 +14,6 @@ float4 replaceAndRead(inout Texture2D<float4> alias)
 float4 main() : SV_Target
 {
     return replaceAndRead(selectedTexture);
-//CHECK:                 ^ file-scope static resource cannot be accessed both by name and explicit reference
-//CHECK:                 ^ file-scope static resource 'selectedTexture' is passed by reference to function 'replaceAndRead', which also accesses it by name; pass the resource through only one of those paths
+//CHECK:                 ^ file-scope static resource cannot be both passed by reference and accessed by name
+//CHECK:                 ^ file-scope static resource 'selectedTexture' is passed by reference to function 'replaceAndRead', which also accesses the same variable by name; pass the resource through only one of those paths
 }
