@@ -59,11 +59,11 @@ static void addRayPayloadDecorationIfNeeded(IRBuilder& builder, IRType* type)
         builder.addRayPayloadDecoration(type);
 }
 
-// A zero-field struct legalizes to `LegalType::Flavor::none`. A struct whose fields all legalize
-// to `none` has the same eventual representation, but is deliberately not classified here:
-// reproducing general type legalization with a recursive structural predicate would be incomplete
-// (for example, arrays of empty structs also legalize to `none`) and can make padding dependent on
-// which related carrier is processed first.
+// Check whether the struct has no fields before type legalization. This misses transitively empty
+// carriers: for `struct Outer { Empty inner; }`, where Empty has no fields, legalization removes
+// inner and then Outer. Such a payload still loses its required argument or parameter on D3D,
+// or its required global on Khronos. Fixing that requires preserving the carrier when its fields
+// legalize to `none`; this immediate-field check does not establish that it will survive.
 static bool isZeroFieldStruct(IRStructType* structType)
 {
     return !structType->getFields().getFirst();
@@ -225,10 +225,12 @@ static void legalizeD3DForcedStructArguments(IRModule* module)
     }
 }
 
-// Collect the empty ray-payload struct reachable from a single global inst, if any. A semantic ray
-// payload is a struct carrying `IRRayPayloadDecoration`/`IRVulkanRayPayloadDecoration`, or — for
-// built-ins such as `__spirvTraceRayHitObjectEXT` that put the Vulkan decoration on a global
-// variable rather than on the struct type — the pointee of such a decorated global.
+// Collect the empty ray-payload struct reachable from a single global inst, if any. Identify ray
+// payloads by their IR decorations: either the struct type is decorated, or it is the pointee type
+// of a decorated global variable. For example, the standard-library wrapper that calls
+// __spirvTraceRayHitObjectEXT declares `[__vulkanRayPayload] static T p;` and passes `p` to the
+// intrinsic. Lowering attaches IRVulkanRayPayloadDecoration to that global, so the global-variable
+// check below finds its payload type without checking the intrinsic's name or looking for a call.
 static void collectIfEmptyRayPayload(
     IRInst* globalInst,
     HashSet<IRStructType*>& emptyRayPayloadStructs)
@@ -268,6 +270,9 @@ static void collectIfEmptyD3DCallableData(
     if (!func)
         return;
 
+    // Find the callable entry point's mutable data parameter, for example `data` in
+    // `[shader("callable")] void callableMain(inout Data data)`. This parameter receives the
+    // second argument of CallShader; the shader index is not a parameter of the entry point.
     auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
     if (entryPointDecor && entryPointDecor->getProfile().getStage() == Stage::Callable)
     {
@@ -278,6 +283,8 @@ static void collectIfEmptyD3DCallableData(
         }
     }
 
+    // Find the caller's payload type in `CallShader(shaderIndex, data)`. Its second argument is
+    // the pointer to `data`, whose pointee struct must survive type legalization.
     for (auto block : func->getBlocks())
     {
         for (auto inst : block->getChildren())
