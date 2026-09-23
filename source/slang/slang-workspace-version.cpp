@@ -500,6 +500,8 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
     targetDesc.profile = slangGlobalSession->findProfile("sm_6_6");
     desc.targets = &targetDesc;
     List<const char*> searchPathsRaw;
+    // SessionDesc borrows these buffers until createSession returns.
+    List<String> openedDocumentSearchPaths;
     for (auto& path : additionalSearchPaths)
         searchPathsRaw.add(path.getBuffer());
     if (searchInWorkspace)
@@ -514,8 +516,10 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
         {
             auto dir = Path::getParentDirectory(docPath.getBuffer());
             if (set.add(dir))
-                searchPathsRaw.add(dir.getBuffer());
+                openedDocumentSearchPaths.add(dir);
         }
+        for (auto& path : openedDocumentSearchPaths)
+            searchPathsRaw.add(path.getBuffer());
     }
     desc.searchPaths = searchPathsRaw.getBuffer();
     desc.searchPathCount = searchPathsRaw.getCount();
