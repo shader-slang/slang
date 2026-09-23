@@ -4467,12 +4467,11 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaPackMatrixDirective)
     }
     else
     {
-        GetSink(context)->diagnose(
-            Diagnostics::Expected2TokensInPreprocessorDirective{
-                .token1 = "row_major",
-                .token2 = "column_major",
-                .directive = GetDirectiveName(context),
-                .location = layoutToken.loc});
+        GetSink(context)->diagnose(Diagnostics::Expected2TokensInPreprocessorDirective{
+            .token1 = "row_major",
+            .token2 = "column_major",
+            .directive = GetDirectiveName(context),
+            .location = layoutToken.loc});
         context->m_parseError = true;
         return;
     }
