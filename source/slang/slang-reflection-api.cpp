@@ -1642,6 +1642,25 @@ SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getContainerVarL
     return nullptr;
 }
 
+SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetContentVarLayout(
+    SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if (!typeLayout)
+        return nullptr;
+
+    if (auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
+    {
+        return convert(parameterGroupTypeLayout->elementVarLayout.Ptr());
+    }
+    else if (auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
+    {
+        return convert(structuredBufferTypeLayout->contentVarLayout.Ptr());
+    }
+
+    return nullptr;
+}
+
 SLANG_API SlangParameterCategory
 spReflectionTypeLayout_GetParameterCategory(SlangReflectionTypeLayout* inTypeLayout)
 {

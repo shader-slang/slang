@@ -128,7 +128,7 @@ of `tests/`), not the incomplete profile handed to the sweep.
   reached emit on a target that does not override them, which no CLI input produces.
 - **`CLikeSourceEmitter::emitLivenessImpl` (`:690`) is not reachable via
   `-track-liveness`.** On the Khronos targets `applyGLSLLiveness`
-  (`slang-emit.cpp:2603`) rewrites the markers into intrinsic calls before emit —
+  (`slang-emit.cpp:2751`) rewrites the markers into intrinsic calls before emit —
   that is what `glsl-track-liveness-spirv-intrinsics.slang` pins — and on `cpp`,
   `cuda` and `hlsl` the same flag (with and without `-O1`) emits no `SLANG_LIVE_START`
   / `SLANG_LIVE_END` at all.
@@ -172,7 +172,7 @@ of `tests/`), not the incomplete profile handed to the sweep.
 - **`-track-liveness` produces an invalid module on direct SPIR-V.** Any shader with a
   tracked local emits an `OpLifetimeStart` of 5 words where the SPIR-V grammar allows
   3, and `spirv-opt` rejects it (slangc exits 255, no output). `applyGLSLLiveness`
-  (`slang-emit.cpp:2603`) is gated on `isKhronosTarget`, which is true for SPIR-V as
+  (`slang-emit.cpp:2751`) is gated on `isKhronosTarget`, which is true for SPIR-V as
   well as GLSL, but the pass rewrites markers into the `spirv_instruction` function
   calls that only the GLSL text path consumes. No shipped test passes the flag on any
   target, which is consistent with the breakage surviving. This is why the claim above
@@ -231,3 +231,25 @@ this list records only the ones whose reason needs more than a table cell.
 ## Doc gaps observed
 
 NA
+
+## Drift review
+
+Reviewed at `d592afa9b9` against `ef1068b548`, the commit this bundle was
+generated from. 37 commits touched its watched paths in between; all
+13 existing tests still pass.
+
+Three diagnostics new since the base commit are raised from this bundle's
+`coverage_targets`: E55210 (`abort` format string must be a literal), E57005
+(SPIR-V resource heap stride too small for an acceleration-structure entry) and
+E57006 (`-spirv-resource-heap-stride` conflicting with
+`-spirv-unified-descriptor-heap-stride`). All three already have hand-written
+regression tests that shipped with the PRs that introduced them
+(`tests/spirv/descriptor-heap-acceleration-structure.slang`,
+`tests/spirv/descriptor-heap-unified-stride.slang`,
+`tests/diagnostics/abort-format-not-literal.slang`), pinning the same
+observable behaviour this bundle would pin. No test was added.
+
+One citation had drifted and was corrected: `applyGLSLLiveness` is called from
+`slang-emit.cpp:2751`, not `:2603`. The `CLikeSourceEmitter` line citations
+(`:371`, `:584`, `:591`, `:690`, `:800`) were re-checked against
+`slang-emit-c-like.cpp` and are all still exact.

@@ -1094,10 +1094,12 @@ bundles:
     watched_paths:
       - source/slang/slang-ir-specialize.cpp
       - source/slang/slang-ir-typeflow-specialize.cpp
+      - source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp
     depends_on: []
     coverage_targets:
       - source/slang/slang-ir-specialize.cpp
       - source/slang/slang-ir-typeflow-specialize.cpp
+      - source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp
     size_cap_files: 30
 
   coverage/torch:
