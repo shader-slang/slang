@@ -10,7 +10,9 @@
 //
 // The defect is not specific to entry points, so this covers both computeMain (an entry point) and
 // helperCaller (a non-entry caller); plainLeaf has no inlined callee and is the unaffected control.
-// -O0 is pinned so helperCaller and plainLeaf are not inlined away.
+// -O0 is pinned so helperCaller and plainLeaf are not inlined away, and -fvk-use-entrypoint-name
+// keeps the entry point's OpFunction named %computeMain so the computeMain CHECK below matches by
+// name instead of silently failing on the default %main.
 
 RWStructuredBuffer<int> outputBuffer;
 
@@ -53,6 +55,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK-DAG: [[HC_STR:%[0-9]+]] = OpString "helperCaller"
 // CHECK-DAG: [[HC_FUNC:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction [[HC_STR]]
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugFunctionDefinition [[HC_FUNC]] %helperCaller
+
+// A pre-inline DebugVar (here helperCaller's parameter x) in a bare-cached function must scope to
+// that function's DebugFunction, not the module DebugCompilationUnit; this guards the
+// cache-hit-path registerDebugInst so the OpDebugLocalVariable Parent resolves to helperCaller.
+// CHECK-DAG: [[X_STR:%[0-9]+]] = OpString "x"
+// CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugLocalVariable [[X_STR]] {{.*}} [[HC_FUNC]] %uint_0
 
 // CHECK-DAG: [[PL_STR:%[0-9]+]] = OpString "plainLeaf"
 // CHECK-DAG: [[PL_FUNC:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction [[PL_STR]]

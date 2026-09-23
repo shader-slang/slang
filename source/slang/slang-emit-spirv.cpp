@@ -10683,7 +10683,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // debug-inst path — for example when a caller-scope-restore DebugScope inserted by inlining
     // precedes a DebugVar and resolves this function as that var's scope — whereas the definition
     // must still be emitted for each concrete OpFunction body regardless of whether the record was
-    // already cached.
+    // already cached. The only caller passing a non-null spvFunc is emitFuncDefinition, once per
+    // body, so the per-spvFunc set is defensive against a future path binding a body twice rather
+    // than load-bearing today.
     void maybeEmitDebugFunctionDefinition(
         SpvInst* firstBlock,
         SpvInst* spvFunc,
@@ -10719,9 +10721,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvInst* debugFuncInfo = nullptr;
         if (debugFunc && m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
         {
-            // The record was already emitted (possibly bare, via the global debug-inst path). The
-            // record cache does not cover the per-body definition, so still bind this concrete
-            // OpFunction body to the record.
+            // The record was already emitted, possibly bare via the global debug-inst path (which
+            // passes a null irFunc, so this function was never registered as its own debug scope).
+            // The record cache covers neither the per-body definition nor that scope registration,
+            // so we do both here for a concrete body. Without the registration, findDebugScope's
+            // IRFunc fallback misses and a pre-inline DebugVar (a parameter, or a local before the
+            // first inlined call) resolves its OpDebugLocalVariable scope to the module compilation
+            // unit instead of the function.
+            if (irFunc && !m_mapIRInstToSpvDebugInst.containsKey(irFunc))
+                registerDebugInst(irFunc, debugFuncInfo);
             maybeEmitDebugFunctionDefinition(firstBlock, spvFunc, debugFuncInfo);
             return debugFuncInfo;
         }
