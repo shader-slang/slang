@@ -2,20 +2,16 @@
 //
 // Regression test for shader-slang/slang#13235.
 //
-// A function that has a [ForceInline] callee inlined into it must still emit a
-// DebugFunctionDefinition binding its OpFunction body to its DebugFunction record; otherwise a
-// GPU debugger cannot map the function to its debug info and step into it. Inlining a callee makes
-// the emitter insert a caller-scope-restore DebugScope inst (shader-slang/slang#13175); when a
-// DebugVar (a local declared after the inlined call) follows that DebugScope, resolving its scope
-// emitted the caller's DebugFunction record early and bare through the global debug-inst path,
-// after which the per-body DebugFunctionDefinition was dropped on the record-cache hit in
-// emitDebugFunction.
+// A function that inlines a [ForceInline] callee and declares a local AFTER the inlined call
+// must still emit a DebugFunctionDefinition binding its OpFunction body to its DebugFunction
+// record, so a debugger can associate the OpFunction with its debug info. Inlining makes the
+// inliner add a caller-scope-restore DebugScope referencing the caller's own DebugFunction; the
+// local's DebugVar then follows that DebugScope, and handling that ordering is the emitter's job.
+// A local assigned directly at the call, with nothing after it, does not exercise this.
 //
-// The defect is not specific to entry points: it affects any function that inlines a callee and has
-// a local following the restored scope. This is why the test covers both computeMain (an entry
-// point) and helperCaller (an ordinary non-entry caller); plainLeaf has no inlined callee and
-// always kept its definition, so it is the control. -O0 is pinned because at higher optimization
-// levels helperCaller and plainLeaf would be inlined away and the scenario would no longer arise.
+// The defect is not specific to entry points, so this covers both computeMain (an entry point) and
+// helperCaller (a non-entry caller); plainLeaf has no inlined callee and is the unaffected control.
+// -O0 is pinned so helperCaller and plainLeaf are not inlined away.
 
 RWStructuredBuffer<int> outputBuffer;
 

@@ -10689,17 +10689,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvInst* spvFunc,
         SpvInst* debugFuncInfo)
     {
-        if (!firstBlock || !spvFunc || !debugFuncInfo)
+        // firstBlock and spvFunc are supplied as a pair: both null when only the DebugFunction
+        // record is being emitted (the global debug-inst path, which has no body to bind), and both
+        // non-null for a concrete OpFunction body. There is nothing to bind in the record-only
+        // case.
+        SLANG_ASSERT((firstBlock != nullptr) == (spvFunc != nullptr));
+        if (!firstBlock || !spvFunc)
             return;
-        if (!m_debugFunctionDefinitionsEmitted.add(spvFunc))
-            return;
-        emitOpDebugFunctionDefinition(
-            firstBlock,
-            nullptr,
-            m_voidType,
-            getNonSemanticDebugInfoExtInst(),
-            debugFuncInfo,
-            spvFunc);
+        SLANG_ASSERT(debugFuncInfo);
+        if (m_debugFunctionDefinitionsEmitted.add(spvFunc))
+        {
+            emitOpDebugFunctionDefinition(
+                firstBlock,
+                nullptr,
+                m_voidType,
+                getNonSemanticDebugInfoExtInst(),
+                debugFuncInfo,
+                spvFunc);
+        }
     }
 
     SpvInst* emitDebugFunction(
