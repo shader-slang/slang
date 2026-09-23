@@ -225,10 +225,11 @@ IRInst* cloneInst(
     IRInst* originalInst,
     IROriginalValuesForClone const& originalValues);
 
-// Return true if `inst` already carries an `IRAnnotation` of `kind` targeting it. A
-// symbol's auto-diff trait associations are a property of the linked type, not of any
-// one declaration, so when annotations are unioned from several same-name declarations
-// (see `cloneGlobalValueImpl`) we keep a single copy per kind and skip the rest.
+// Return true if `inst` already carries an `IRAnnotation` of `kind` targeting it. An
+// auto-diff trait association is single-valued per (target, kind) -- the lookup in
+// `tryLookupAnnotation` assumes this -- so when annotations are unioned from several
+// same-name declarations of a symbol (see `cloneGlobalValueImpl`) we keep one copy per kind
+// and skip the rest.
 static bool hasAnnotationOfKind(IRInst* inst, IRIntegerValue kind)
 {
     for (auto use = inst->firstUse; use; use = use->nextUse)
@@ -240,21 +241,7 @@ static bool hasAnnotationOfKind(IRInst* inst, IRIntegerValue kind)
     return false;
 }
 
-// Differentiable-*type* associations (`DifferentialPairType` and later) are a property of
-// the type and its `IDifferentiable` witness, so they are the same on every declaration of
-// a symbol and are safe to recover from any of them. The earlier kinds associate a
-// *callable* with derivative functions, which can be definition- or target-specific; those
-// must come only from the selected definition, never from a non-selected declaration.
-static bool isDifferentiableTypeAnnotation(IRIntegerValue kind)
-{
-    return kind >= IRIntegerValue(AnnotationKind::DifferentialPairType);
-}
-
-static void cloneAnnotations(
-    IRSpecContextBase* context,
-    IRInst* clonedInst,
-    IRInst* originalInst,
-    bool onlyDifferentiableTypeAnnotations = false)
+static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRInst* originalInst)
 {
     // `IRAnnotation`s exclusively carry auto-diff trait associations: a target's
     // derivative functions and differential type/zero/add/pair witnesses. Every
@@ -289,10 +276,7 @@ static void cloneAnnotations(
         originalInst->getModule()->_getLinkingInfo()->getAnnotationsForTarget(originalInst);
     for (auto annotation : annotations)
     {
-        auto kind = annotation->getConformanceID();
-        if (onlyDifferentiableTypeAnnotations && !isDifferentiableTypeAnnotation(kind))
-            continue;
-        if (hasAnnotationOfKind(clonedInst, kind))
+        if (hasAnnotationOfKind(clonedInst, annotation->getConformanceID()))
             continue;
         cloneInst(context, context->builder, annotation, annotation);
     }
@@ -1580,27 +1564,26 @@ IRInst* cloneGlobalValueImpl(
 
     // A linked symbol can have several declarations across modules (an importing module's
     // `[import]` and the defining module's `[export]`), which link collapses into this one
-    // inst via `originalInst`. A differentiable-*type* association -- e.g.
-    // `DifferentialPairType` -- is emitted by whichever module differentiates the type,
-    // which need not be the selected definition: an importer differentiating an imported
-    // type records it on its own `[import]` declaration. Cloning annotations from only the
-    // selected declaration then loses it, and forward mode mistypes the parameter as the
-    // primal type with a zero tangent (#13233). We therefore also recover the type
-    // associations from the other declarations. The selected definition is cloned first
-    // (with all of its annotations, including the callable ones) so it wins for any kind
-    // recorded twice (`cloneAnnotations` dedups per kind); the siblings then supply only the
-    // differentiable-type kinds they add. A declaration in the module we are linking into is
-    // skipped, since its annotations are neither linked away nor (during prelink) backed by
-    // prebuilt linking info.
+    // inst via `originalInst`. Their module-scope annotations -- the auto-diff trait
+    // associations -- are emitted by whichever module differentiates the symbol, which need
+    // not be the selected definition: a module differentiating an imported type or function
+    // records them on its own `[import]` declaration. Cloning annotations from only the
+    // selected declaration then loses them, and forward mode mistypes the parameter as the
+    // primal type with a zero tangent (a type association, #13233) or emits a zero
+    // derivative for an imported `[Differentiable]` function (its callable associations, as
+    // in `cross-module-differentiable.slang`). A symbol's associations are interdependent --
+    // a `DifferentialPairType` and the derivative-context annotations reference one another
+    // -- so we recover them as the whole set from each declaration, not a subset. The
+    // selected definition is cloned first so its associations win for any kind recorded on
+    // more than one declaration (`cloneAnnotations` dedups per kind, so a sibling only fills
+    // a kind the selected definition genuinely lacks). A declaration in the module we are
+    // linking into is skipped, since its annotations are neither linked away nor (during
+    // prelink) backed by prebuilt linking info.
     cloneAnnotations(context, clonedValue, originalInst);
     for (auto s = originalValues.sym; s; s = s->nextWithSameName)
     {
         if (s->irGlobalValue->getModule() != context->getModule())
-            cloneAnnotations(
-                context,
-                clonedValue,
-                s->irGlobalValue,
-                /* onlyDifferentiableTypeAnnotations: */ true);
+            cloneAnnotations(context, clonedValue, s->irGlobalValue);
     }
     return clonedValue;
 }
