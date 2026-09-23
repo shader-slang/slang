@@ -4,9 +4,8 @@
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=SPV):-target spirv -stage compute -entry computeMain
 
-// TODO: requires changes in parser
-//static_assert(true, "PASS_global");
-//static_assert(false, "FAIL_global");
+static_assert(true, "PASS_global");
+static_assert(1 + 1 == 2);
 
 __generic<T:IArithmetic>
 void TEST_specialize()
@@ -36,10 +35,6 @@ void TEST_target_switch()
 __generic<T:IArithmetic>
 struct MyType
 {
-    // TODO: requires changes in parser
-    //static_assert(true, "PASS_struct");
-    //static_assert(false, "FAIL_struct");
-
     __init()
     {
         static_assert(true, "MyType init true");
@@ -83,6 +78,14 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     //CHK_NEG-NOT: MyType init true
     //CHK-DAG: MyType init false
     MyType<float> obj;
+
+    // This file's failing assertions abort compilation, so these buffers hold the diagnostic
+    // output. The passing global-scope assertion must produce no diagnostic on any target — its
+    // message must not appear. (Carrier removal from *emitted* code is covered by
+    // static-assert-carrier-no-leak.slang, which compiles successfully.)
+    //CHK_NEG-NOT: PASS_global
+    //GLSL-NOT: PASS_global
+    //SPV-NOT: PASS_global
 
     //CHK-DAG: error[E41402]
     //CHK-DAG: static_assert.slang:[[#@LINE+1]]

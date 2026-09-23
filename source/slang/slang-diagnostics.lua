@@ -5567,6 +5567,13 @@ err(
 )
 
 err(
+    "static-assertion-inside-generic-type",
+    41405,
+    "static assertion enclosed by a generic is not supported",
+    span { loc = "location", message = "'static_assert' outside a function body is not yet supported when it is enclosed by a generic; move it into a function body, or to a global, namespace, or aggregate scope that has no enclosing generic." }
+)
+
+err(
     "multi-sampled-texture-does-not-allow-writes",
     41404,
     "cannot write to multisampled texture",

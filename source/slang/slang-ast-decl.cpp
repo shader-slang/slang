@@ -82,6 +82,11 @@ bool isInterfaceRequirement(Decl* decl)
     if (isGenericConstraintParameterDecl(decl))
         return false;
 
+    // A `static_assert` in an interface body is a compile-time check, not a member that conforming
+    // types must satisfy, so it contributes no witness-table requirement.
+    if (as<StaticAssertDecl>(decl))
+        return false;
+
     auto ancestor = decl->parentDecl;
     for (; ancestor; ancestor = ancestor->parentDecl)
     {

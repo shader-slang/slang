@@ -10775,6 +10775,88 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
 #undef IGNORED_CASE
 
+    LoweredValInfo visitStaticAssertDecl(StaticAssertDecl* decl)
+    {
+        // A `static_assert` lowers to an `IRStaticAssert`, whose condition is folded by the
+        // post-specialization IR passes and then checked by `checkStaticAssert` (slang-emit.cpp).
+        // `kIROp_StaticAssert` is not side-effect-free (see `IRInst::mightHaveSideEffects`), so
+        // once reachable it survives dead-code elimination up to that check.
+        auto builder = getBuilder();
+
+        if (builder->getBlock())
+        {
+            // Function-body scope: lower directly into the current block. The condition may itself
+            // introduce control flow (e.g. the short-circuiting `||`/`&&` in `T is float || T is
+            // half`), which moves the builder to the resulting merge block; we must leave the
+            // insertion point there so following statements continue from the correct block.
+            // Restoring an earlier insertion point would orphan the merge block and leave it
+            // unterminated.
+            emitStaticAssertInst(builder, decl);
+            return LoweredValInfo();
+        }
+
+        // Global, namespace, or (non-generic) aggregate scope: there is no active block. If any
+        // enclosing declaration is generic, the assertion may depend on unbound generic parameters
+        // and would need to be checked once per instantiation, for which there is no hook yet, so
+        // we walk the whole parent chain and diagnose rather than mis-lower it (lowering the
+        // condition against an unbound generic parameter would abort). Walking the chain, not just
+        // the direct parent, also rejects a `static_assert` in a non-generic aggregate nested
+        // inside a generic one. A `static_assert` in a generic *function* body takes the block path
+        // above and is unaffected.
+        for (auto parent = decl->parentDecl; parent; parent = parent->parentDecl)
+        {
+            if (as<GenericDecl>(parent))
+            {
+                context->getSink()->diagnose(
+                    Diagnostics::StaticAssertionInsideGenericType{.location = decl->loc});
+                return LoweredValInfo();
+            }
+        }
+
+        // There is no enclosing block to host the condition, which may lower to instructions that
+        // require one (a call needing inlining, or the control flow of a short-circuiting
+        // operator); emitting them directly under the module inst produces malformed IR that later
+        // aborts. We therefore synthesize a `void()` carrier function and lower the assertion into
+        // its body, reusing the same well-formed lowering as the function-body case. The carrier is
+        // never called: `[hlslExport]` makes `linkIR` retain it as a root so the
+        // post-specialization, per-target `checkStaticAssert` reaches it, and `[keepAlive]` blocks
+        // DCE until then — mirroring how other synthesized-yet-unreferenced functions are carried
+        // through the linker. `[staticAssertContainer]` marks it so `slang-emit.cpp` can delete the
+        // carrier once the assertion has been checked, keeping it out of the emitted output.
+        IRBuilderInsertLocScope insertScope(builder);
+        builder->setInsertInto(builder->getModule());
+        auto carrier = builder->createFunc();
+        carrier->setFullType(builder->getFuncType(0, nullptr, builder->getVoidType()));
+        builder->addHLSLExportDecoration(carrier);
+        builder->addKeepAliveDecoration(carrier);
+        builder->addStaticAssertContainerDecoration(carrier);
+
+        builder->setInsertInto(carrier);
+        builder->emitBlock();
+        emitStaticAssertInst(builder, decl);
+        builder->emitReturn();
+        return LoweredValInfo();
+    }
+
+    // The caller must have already established the current block (a function body's or a
+    // synthesized carrier's); the condition is emitted there but not evaluated, since the
+    // post-specialization passes fold it and `checkStaticAssert` (slang-emit.cpp) diagnoses a
+    // failure.
+    void emitStaticAssertInst(IRBuilder* builder, StaticAssertDecl* decl)
+    {
+        List<IRInst*> args;
+        args.add(getSimpleVal(context, lowerRValueExpr(context, decl->condition)));
+        if (decl->message)
+            args.add(getSimpleVal(context, lowerRValueExpr(context, decl->message)));
+
+        auto assertInst = builder->emitIntrinsicInst(
+            builder->getVoidType(),
+            kIROp_StaticAssert,
+            (UInt)args.getCount(),
+            args.getBuffer());
+        assertInst->sourceLoc = decl->loc;
+    }
+
     void getAllEntryPointsNoOverride(List<IRInst*>& entryPoints)
     {
         if (entryPoints.getCount() != 0)
@@ -15797,10 +15879,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     context->traceBranchCoverage =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
 
-    // Import validation in this compiler uses the checked AST attribute. Keep emitting the derived
-    // IR marker because this refactor leaves `IRModule::k_maxSupportedModuleVersion` unchanged:
-    // compatible pre-refactor binaries still read newly serialized modules, and their
-    // packaged-standard-module path relies on this marker to emit E00104.
+    // Import validation in this compiler uses the checked AST attribute. We still emit the derived
+    // IR marker because the packaged-standard-module path relies on it to emit E00104.
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {
         builder->addDecoration(module->getModuleInst(), kIROp_ExperimentalModuleDecoration);

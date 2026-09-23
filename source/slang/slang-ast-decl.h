@@ -1175,6 +1175,22 @@ class AttributeDecl : public ContainerDecl
     FIDDLE() SyntaxClass<NodeBase> syntaxClass;
 };
 
+// A `static_assert(condition [, message])` declaration.
+//
+// We model `static_assert` as a declaration rather than an intrinsic function so that it can appear
+// in a declaration scope (global, namespace, or aggregate body with no enclosing generic) as well
+// as inside a function body, where the parser wraps it in a `DeclStmt`. The condition is folded by
+// the post-specialization IR passes and then checked by `checkStaticAssert` in `slang-emit.cpp`, so
+// a `sizeof`- or layout-dependent condition works; semantic checking here only type-checks the
+// operands. See issue #6136.
+FIDDLE()
+class StaticAssertDecl : public Decl
+{
+    FIDDLE(...)
+    FIDDLE() Expr* condition = nullptr;
+    FIDDLE() Expr* message = nullptr;
+};
+
 bool isInterfaceRequirement(Decl* decl);
 InterfaceDecl* findParentInterfaceDecl(Decl* decl);
 

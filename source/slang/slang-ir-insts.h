@@ -5239,6 +5239,11 @@ $(type_info.return_type) $(type_info.method_name)(
 
     void addKeepAliveDecoration(IRInst* value) { addDecoration(value, kIROp_KeepAliveDecoration); }
 
+    void addStaticAssertContainerDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_StaticAssertContainerDecoration);
+    }
+
     void addPublicDecoration(IRInst* value) { addDecoration(value, kIROp_PublicDecoration); }
     void addHLSLExportDecoration(IRInst* value)
     {

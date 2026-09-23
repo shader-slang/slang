@@ -963,6 +963,26 @@ struct SemanticsDeclBodyVisitor : public SemanticsDeclVisitorBase,
 
     void visitAggTypeDecl(AggTypeDecl* aggTypeDecl);
 
+    void visitStaticAssertDecl(StaticAssertDecl* decl)
+    {
+        // We type-check the condition (coercing it to `bool`) and the optional message, but we do
+        // not evaluate the condition here. Whether it folds to a compile-time constant is only
+        // decidable after specialization (a `sizeof` or generic-dependent condition is not known at
+        // this point), so the later specialization/simplification passes fold the condition and
+        // `checkStaticAssert` (slang-emit.cpp) consumes the result and diagnoses a failure.
+        if (decl->condition)
+            decl->condition = checkPredicateExpr(decl->condition);
+        if (decl->message)
+        {
+            decl->message = CheckTerm(decl->message);
+            decl->message = coerce(
+                CoercionSite::General,
+                m_astBuilder->getStringType(),
+                decl->message,
+                getSink());
+        }
+    }
+
     SemanticsContext registerDifferentiableTypesForFunc(FunctionDeclBase* funcDecl);
 
 private:
@@ -11602,6 +11622,10 @@ bool SemanticsVisitor::checkInterfaceConformance(
         if (as<InheritanceDecl>(requiredMemberDecl.getDecl()))
             continue;
         if (as<InterfaceDefaultImplDecl>(requiredMemberDecl.getDecl()))
+            continue;
+        // A `static_assert` in an interface body is a compile-time check, not a member a conforming
+        // type must satisfy, so it contributes no witness-table requirement.
+        if (as<StaticAssertDecl>(requiredMemberDecl.getDecl()))
             continue;
         ensureDecl(requiredMemberDecl, DeclCheckState::ReadyForReference);
         auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(

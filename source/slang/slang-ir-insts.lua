@@ -1543,7 +1543,7 @@ local insts = {
 	},
 	{ RequireTargetExtension = { operands = { { "extension" } } } },
 	{ RequireComputeDerivative = {} },
-	{ StaticAssert = { operands = { { "condition" }, { "message" } } } },
+	{ StaticAssert = { operands = { { "condition" } }, min_operands = 1 } },
 	{ Printf = { operands = { { "format" } } } },
 	{ Abort = { operands = { { "format" } } } },
 	-- Quad control execution modes.
@@ -2172,6 +2172,16 @@ local insts = {
 				},
 			},
 			{
+				staticAssertContainer = {
+					-- Marks a function synthesized solely to host a module/namespace/aggregate-scope
+					-- `static_assert` (see `visitStaticAssertDecl`). The carrier gives the assertion's
+					-- condition a valid block and is carried through linking to the per-target
+					-- `checkStaticAssert`; `slang-emit.cpp` then deletes the carrier after checking so
+					-- it is never emitted.
+					struct_name = "StaticAssertContainerDecoration",
+				},
+			},
+			{
 				noSideEffect = {
 					-- A `[NoSideEffect]` decoration marks a callee to be side-effect free.
 					struct_name = "NoSideEffectDecoration",
@@ -2706,9 +2716,8 @@ local insts = {
 				experimentalModule = {
 					-- Marks a module as experimental in serialized IR.
 					--
-					-- Retained as derived metadata because the AST-gate refactor left
-					-- `IRModule::k_maxSupportedModuleVersion` unchanged, so compatible
-					-- pre-refactor readers still inspect this marker to emit E00104.
+					-- Retained as derived metadata because the packaged-standard-module
+					-- path inspects this marker to emit E00104.
 					struct_name = "ExperimentalModuleDecoration"
 				},
 			},
