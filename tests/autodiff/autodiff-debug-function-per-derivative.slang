@@ -6,9 +6,9 @@
 // record. A shared record reports the derivative body under the original's name and, because a
 // DebugFunctionDefinition binds one record to one body, lets only one sharing body be described.
 // The bug is invisible to spirv-val (NonSemantic debug info is not validated), so this FileCheck
-// guard is the only regression coverage. The checks are ID-anchored (bind the record id, then
-// require the name / definition / decoration that uses it) so they cannot self-match embedded
-// source.
+// guard is the only regression coverage. Each check is ID-anchored -- it binds an id (a name's
+// OpString in the SPIR-V pass, a record in the IR pass) and then requires the record / definition /
+// decoration that references it -- so it cannot self-match any embedded-source OpString.
 
 [Differentiable]
 float diffSquare(float x)
