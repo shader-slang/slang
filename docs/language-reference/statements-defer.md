@@ -143,6 +143,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         output[index].result =
             try checkedDivide(
                 input[index].dividend, input[index].divisor);
+        output[index].error = false;
 
         // if no error was thrown, the deferred statement is
         // executed here
