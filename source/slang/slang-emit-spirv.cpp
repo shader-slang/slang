@@ -590,6 +590,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Map a Slang IR instruction to the corresponding SPIR-V debug instruction.
     Dictionary<IRInst*, SpvInst*> m_mapIRInstToSpvDebugInst;
 
+    // DebugFunction records for which a DebugFunctionDefinition has already been emitted. A record
+    // binds to at most one definition (the NonSemantic invariant), so we dedup by record; see
+    // maybeEmitDebugFunctionDefinition.
+    HashSet<SpvInst*> m_debugFunctionsWithDefinition;
+
     /// Register that `irInst` maps to `spvInst`
     void registerInst(IRInst* irInst, SpvInst* spvInst)
     {
@@ -10803,6 +10808,43 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
+    // Emit the DebugFunctionDefinition that binds the concrete OpFunction body `spvFunc` (whose
+    // first block is `firstBlock`) to its DebugFunction record `debugFuncInfo`, at most once per
+    // record. A DebugFunction binds to a single body — the NonSemantic invariant that a
+    // DebugFunction has one DebugFunctionDefinition — so we dedup on the record, not the body. This
+    // is separate from the record cache (m_mapIRInstToSpvInst) because the record may already have
+    // been emitted early and bare via the global debug-inst path — for example when a
+    // caller-scope-restore DebugScope inserted by inlining precedes a DebugVar and resolves this
+    // function as that var's scope — whereas the definition must still be emitted for the concrete
+    // body. Deduping on the record is load-bearing, not merely defensive: reverse-mode autodiff can
+    // make several generated OpFunctions share one IRDebugFunction (copyDebugInfo clones the
+    // decoration and the module-global record is not remapped), and without this dedup a definition
+    // would be emitted for each shared body, breaking the one-definition-per-record invariant.
+    void maybeEmitDebugFunctionDefinition(
+        SpvInst* firstBlock,
+        SpvInst* spvFunc,
+        SpvInst* debugFuncInfo)
+    {
+        // firstBlock and spvFunc are supplied as a pair: both null when only the DebugFunction
+        // record is being emitted (the global debug-inst path, which has no body to bind), and both
+        // non-null for a concrete OpFunction body. There is nothing to bind in the record-only
+        // case.
+        SLANG_RELEASE_ASSERT((firstBlock != nullptr) == (spvFunc != nullptr));
+        if (!firstBlock || !spvFunc)
+            return;
+        SLANG_RELEASE_ASSERT(debugFuncInfo);
+        if (m_debugFunctionsWithDefinition.add(debugFuncInfo))
+        {
+            emitOpDebugFunctionDefinition(
+                firstBlock,
+                nullptr,
+                m_voidType,
+                getNonSemanticDebugInfoExtInst(),
+                debugFuncInfo,
+                spvFunc);
+        }
+    }
+
     SpvInst* emitDebugFunction(
         SpvInstParent* parent,
         SpvInst* firstBlock,
@@ -10813,6 +10855,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvInst* debugFuncInfo = nullptr;
         if (debugFunc && m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
         {
+            // The record was already emitted, possibly bare via the global debug-inst path (which
+            // passes a null irFunc, so this function was never registered as its own debug scope).
+            // The record cache covers neither the per-body definition nor that scope registration,
+            // so we do both here for a concrete body. Without the registration, findDebugScope's
+            // IRFunc fallback misses and a pre-inline DebugVar (a parameter, or a local before the
+            // first inlined call) resolves its OpDebugLocalVariable scope to the module compilation
+            // unit instead of the function.
+            if (irFunc && !m_mapIRInstToSpvDebugInst.containsKey(irFunc))
+                registerDebugInst(irFunc, debugFuncInfo);
+            maybeEmitDebugFunctionDefinition(firstBlock, spvFunc, debugFuncInfo);
             return debugFuncInfo;
         }
 
@@ -10858,16 +10910,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             registerDebugInst(irFunc, debugFuncInfo);
         }
 
-        if (firstBlock && spvFunc)
-        {
-            emitOpDebugFunctionDefinition(
-                firstBlock,
-                nullptr,
-                m_voidType,
-                getNonSemanticDebugInfoExtInst(),
-                debugFuncInfo,
-                spvFunc);
-        }
+        maybeEmitDebugFunctionDefinition(firstBlock, spvFunc, debugFuncInfo);
         return debugFuncInfo;
     }
 
