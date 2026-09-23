@@ -502,9 +502,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     HashSet<SpvId> m_decoratedSpvInsts;
 
     // The floating-point arithmetic instructions that must carry `NoContraction` because
-    // they contribute to a `precise`-qualified value; lazily filled by `computePreciseInsts()`.
+    // they contribute to a `precise`-qualified value; filled once by `computePreciseInsts()`
+    // before emission begins.
     HashSet<IRInst*> m_preciseInsts;
-    bool m_preciseInstsComputed = false;
 
     SpvAddressingModel m_addressingMode = SpvAddressingModelLogical;
 
@@ -10308,10 +10308,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // stores into it, not an operand).
     void computePreciseInsts()
     {
-        if (m_preciseInstsComputed)
-            return;
-        m_preciseInstsComputed = true;
-
         HashSet<IRInst*> visited;
         List<IRInst*> workList;
         auto enqueue = [&](IRInst* inst)
@@ -10437,7 +10433,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
     {
-        computePreciseInsts();
         const bool isPrecise = isFloatingPointModePrecise(inst) || m_preciseInsts.contains(inst);
         if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
         {
@@ -12105,6 +12100,11 @@ SlangResult emitSPIRVFromIR(
 
     SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
+
+    // Now that legalization has put the IR in its final, emit-ready shape, precompute the
+    // set of arithmetic instructions that transitively feed a `precise` value, so that
+    // `emitArithmetic` only has to do a per-instruction lookup.
+    context.computePreciseInsts();
 
 #if 0
     {
