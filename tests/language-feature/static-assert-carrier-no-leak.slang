@@ -36,3 +36,6 @@ void computeMain()
     //SPV-NOT: OpFunctionEnd
     outputBuffer[0] = 1;
 }
+// A leaked carrier could emit on either side of the entry point, so `export` is rejected both
+// before (above) and after (here) the `HLSL: void computeMain` match to cover the whole output.
+//HLSL-NOT: export
