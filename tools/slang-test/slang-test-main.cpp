@@ -2745,7 +2745,9 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             URI::fromLocalFilePath(Path::combine(fixtureDir, "second-root").getUnownedSlice()).uri;
         initParams.workspaceFolders.add(wsFolder);
     }
-    else if (input.testOptions->commandOptions.containsKey("additional-search-path-order"))
+    else if (
+        input.testOptions->commandOptions.containsKey("additional-search-path-order") ||
+        input.testOptions->commandOptions.containsKey("workspace-search-toggle"))
     {
         auto fixtureDir = Path::getParentDirectory(fullPath);
         wsFolder.name = "workspace";
@@ -2756,6 +2758,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     }
     else if (input.testOptions->commandOptions.containsKey("root-uri-only"))
         initParams.rootUri = wsFolder.uri;
+    else if (input.testOptions->commandOptions.containsKey("root-path-only"))
+        initParams.rootPath = Path::getParentDirectory(fullPath);
     else
     {
         initParams.workspaceFolders.add(wsFolder);
@@ -2791,6 +2795,29 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         return TestResult::Fail;
     }
 
+    // Configuration changes ask the client to refresh semantic tokens and inlay hints. Drain
+    // those requests before reading the response to a subsequent completion request.
+    auto sendConfig = [&](const char* key, JSONValue value) -> SlangResult
+    {
+        auto container = connection->getContainer();
+        JSONValue settingsValue = container->createObject(nullptr, 0);
+        container->setKeyValue(settingsValue, container->getKey(UnownedStringSlice(key)), value);
+
+        LanguageServerProtocol::DidChangeConfigurationParams configParams;
+        configParams.settings = settingsValue;
+        SLANG_RETURN_ON_FAIL(connection->sendCall(
+            LanguageServerProtocol::DidChangeConfigurationParams::methodName,
+            &configParams));
+
+        for (Index i = 0; i < 2; ++i)
+        {
+            SLANG_RETURN_ON_FAIL(connection->waitForResult(-1));
+            JSONRPCCall refreshCall;
+            SLANG_RETURN_ON_FAIL(connection->getRPC(&refreshCall));
+        }
+        return SLANG_OK;
+    };
+
     if (input.testOptions->commandOptions.containsKey("additional-search-path-order"))
     {
         // Configured search paths intentionally precede auto-discovered workspace paths. Exercise
@@ -2800,31 +2827,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         auto additionalPath = Path::combine(fixtureDir, "additional-root");
         JSONValue pathValue = container->createString(additionalPath.getUnownedSlice());
         JSONValue pathsValue = container->createArray(&pathValue, 1);
-        JSONValue settingsValue = container->createObject(nullptr, 0);
-        container->setKeyValue(
-            settingsValue,
-            container->getKey(UnownedStringSlice("slang.additionalSearchPaths")),
-            pathsValue);
-
-        LanguageServerProtocol::DidChangeConfigurationParams configParams;
-        configParams.settings = settingsValue;
-        if (SLANG_FAILED(connection->sendCall(
-                LanguageServerProtocol::DidChangeConfigurationParams::methodName,
-                &configParams)))
-        {
+        if (SLANG_FAILED(sendConfig("slang.additionalSearchPaths", pathsValue)))
             return TestResult::Fail;
-        }
-
-        // Applying search paths asks the client to refresh semantic tokens and inlay hints. Drain
-        // those server-to-client calls before sending requests whose responses the test inspects.
-        for (Index i = 0; i < 2; ++i)
-        {
-            if (SLANG_FAILED(connection->waitForResult(-1)))
-                return TestResult::Fail;
-            JSONRPCCall refreshCall;
-            if (SLANG_FAILED(connection->getRPC(&refreshCall)))
-                return TestResult::Fail;
-        }
     }
 
     // Send open document call.
@@ -2927,6 +2931,14 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                     actualOutputSB << "\n";
                 }
             }
+        }
+        else if (line.startsWith("DISABLE_WORKSPACE_SEARCH"))
+        {
+            if (SLANG_FAILED(sendConfig(
+                    "slang.searchInAllWorkspaceDirectories",
+                    JSONValue::makeBool(false))))
+                return TestResult::Fail;
+            actualOutputSB << "--------\nsearchInAllWorkspaceDirectories: false\n";
         }
         else if (line.startsWith("SIGNATURE:"))
         {

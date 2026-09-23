@@ -1073,8 +1073,8 @@ void CompletionContext::createSwizzleCandidates(
                 item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
                 item.label = memberNames[i];
                 // LSP clients use the label when ordinary members do not provide sortText. The
-                // "0:" prefix ranks swizzles before those labels while retaining label order
-                // among the swizzles themselves.
+                // "0:" prefix ranks swizzles before those labels and sorts the swizzles
+                // alphabetically by label.
                 item.sortText = "0:" + item.label;
                 result.add(item);
             }

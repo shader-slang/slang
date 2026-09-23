@@ -200,6 +200,7 @@ void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
                 },
                 &context);
         }
+        // Append every root's paths. OrderedHashSet removes duplicates and keeps first-root order.
         for (auto& searchPath : context.paths)
             workspaceSearchPaths.add(searchPath);
     }
