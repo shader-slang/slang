@@ -11216,11 +11216,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto subBuilder = subContext->irBuilder;
 
         // Front-end conformance checking must have filled the witness table before
-        // lowering reaches it; the loop below dereferences it unconditionally. Assert
-        // that invariant loudly. Use SLANG_RELEASE_ASSERT, not SLANG_ASSERT: in release
-        // builds SLANG_ASSERT expands to SLANG_ASSUME, which performs no runtime check
-        // and instead lets the optimizer assume the condition holds (undefined behavior
-        // if it does not).
+        // lowering reaches it, the loop below dereferences it. Assert that invariant.
         SLANG_RELEASE_ASSERT(astWitnessTable);
 
         SubstitutionSet witnessTableSubstitution(witnessTableBaseDeclRef);
