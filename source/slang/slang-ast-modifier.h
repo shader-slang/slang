@@ -1504,6 +1504,18 @@ class RefAttribute : public Attribute
     FIDDLE(...)
 };
 
+/// Records the type and parameter-passing mode of a declaration's effective `this` parameter.
+///
+/// Signature checking attaches this attribute if and only if the declaration has an effective
+/// `this` parameter. Later compiler stages consume this checked semantic information instead of
+/// deriving it again from syntax or compilation options.
+FIDDLE()
+class ThisParamInfoAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() ParamInfo info;
+};
+
 // A `[__readNone]` attribute, which indicates that a function
 // computes its results strictly based on argument values, without
 // reading or writing through any pointer arguments, or any other

@@ -3713,244 +3713,10 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 }
 
 
-ParamPassingMode adjustParamPassingModeBasedOnParamType(
-    ParamPassingMode originalMode,
-    Type* paramType)
-{
-    // A mesh-shader output's direction is intrinsic to its `MeshOutputType` (carried by
-    // IRMeshOutputDecoration), so the `out` on the `out vertices T[N]` spelling must not
-    // also wrap it in `IROutParamType`: that would diverge from the generic
-    // `OutputVertices<T,N>` spelling and make the HLSL emitter print a doubled `out`.
-    if (as<MeshOutputType>(paramType))
-        originalMode = ParamPassingMode::In;
-
-    // If the type is copyable, then the original mode is appropriate to use.
-    //
-    if (isCopyableType(paramType))
-        return originalMode;
-
-    // If we have a non-copyable parameter type, we will inspect
-    // the original mode and see whether it needs adjustting.
-    //
-    switch (originalMode)
-    {
-    default:
-        return originalMode;
-
-    case ParamPassingMode::In:
-        // We will adjust the `in` parameter-passing mode over
-        // to `borrow in`, since there is no way to do the by-value
-        // copy-in that is implied by `in` when we are dealing
-        // with a non-copyable type.
-        //
-        return ParamPassingMode::BorrowIn;
-    }
-}
-
 ParamPassingMode getParamPassingMode(ParamDecl* paramDecl)
 {
     auto declaredMode = getExplicitlyDeclaredParamPassingMode(paramDecl);
     auto actualMode = adjustParamPassingModeBasedOnParamType(declaredMode, paramDecl->getType());
-    return actualMode;
-}
-
-/// The default parameter-passing mode to use for a `this` parameter,
-/// if no explicit modifiers/attributes or other contextual information
-/// implies a specific other mode.
-///
-static const ParamPassingMode kDefaultModeForImplicitThisParam = ParamPassingMode::In;
-
-/// Compute the "declared" direction for an implicit `this` parameter,
-///
-/// This function doesn't take the type of the `this` parameter into
-/// account; the chosen mode is based only on the declarations
-/// involved and their modifiers/attributes.
-///
-/// The `declWithImplicitThisParam` should be the declaration of the
-/// function/property/etc. that has an implicit `this` parameter.
-///
-/// The `defaultModeFromContext` can be a mode that is implied by
-/// more deeply nested context, that should be used as a default if
-/// the `declWithImplicitParam` and the outer declarations it is
-/// nested under don't indicate a more specific mode.
-///
-/// Note that in some cases the declaration that has an implicit
-/// `this` parameter may be nested multiple levels under the
-/// corresponding type declaration that `this` will use for its
-/// type. For example, we can have an accessor in a generic subscript:
-///
-///     struct MyContainer<T>
-///     {
-///         subscript<K : IKeyType>(K key) -> T
-///         {
-///             get { /* ... */ }
-///         }
-///     }
-///
-/// In this case, the nesting is something like (from inner-most
-/// to outer-most):
-///
-/// * the `get` accessor (a `GetterDecl`)
-/// * the `subscript` (a `SubscriptDecl`)
-/// * the generic `<K ...>` wrapping the subscript (a `GenericDecl`)
-/// * the `struct` type (a `StructDecl`)
-/// * the generic `<T>` wrapping the `struct` (a `GenericDecl`)
-///
-/// In order to compute the correct mode for the implicit `this`
-/// parameter of the `get` accessor, each of those levels will
-/// end up being queried (from inner to outer), until a type
-/// declaration (the `struct`) is reached. A modifier or other
-/// piece of context on, e.g., the `subscript` declaration might
-/// have an influence on what mode will be used for the `get`.
-///
-/// Currently, the lowering logic in this file will walk up the
-/// hierarchy calling `getDeclaredParamPassingModeForImplicitThisParam()`,
-/// and pass the result of an inner invocation to the next outer one,
-/// to accumulate a mode based on all the contextual information available.
-///
-ParamPassingMode getDeclaredParamPassingModeForImplicitThisParam(
-    Decl* declWithImplicitThisParam,
-    ParamPassingMode defaultModeFromContext = kDefaultModeForImplicitThisParam)
-{
-    // If this declaration of the function/property/whatever is nested
-    // under a type declaration such as a `struct`, then that declaration
-    // may dictate the mode that should be used.
-    //
-    if (auto outerAggTypeDecl = getParentAggTypeDecl(declWithImplicitThisParam))
-    {
-        // An implicit `this` parameter of a `class` is always `in`,
-        // because classes are reference types and mutability of the
-        // parameter would thus apply to the reference/pointer and not
-        // to the contents of the instance being pointed to.
-        //
-        if (as<ClassDecl>(outerAggTypeDecl))
-        {
-            return ParamPassingMode::In;
-        }
-    }
-
-    if (auto outerExtensionDecl = getParentExtensionDecl(declWithImplicitThisParam))
-    {
-        if (as<CallableDecl>(declWithImplicitThisParam) &&
-            isDeclRefTypeOf<CallableDecl>(outerExtensionDecl->targetType))
-        {
-            return getDeclaredParamPassingModeForImplicitThisParam(
-                as<DeclRefType>(outerExtensionDecl->targetType)->getDeclRef().getDecl(),
-                defaultModeFromContext);
-        }
-    }
-
-    // Slang currently provides a set of attributes that a declaration
-    // can use to explicitly specify a parameter-passing mode for
-    // the implicit `this` parameter. We will check for those here,
-    // since the explicit request from the programmer should in general
-    // take precedence over other considerations.
-    //
-    // If there are ever cases where it would be semantically incorrect
-    // to follow what these modifiers indicate, then we should be detecting
-    // and diagnosing such situations during semantic checking, rather than
-    // hacking in workarounds here.
-    //
-    if (declWithImplicitThisParam->hasModifier<MutatingAttribute>())
-    {
-        return ParamPassingMode::BorrowInOut;
-    }
-    if (declWithImplicitThisParam->hasModifier<ConstRefAttribute>())
-    {
-        return ParamPassingMode::BorrowIn;
-    }
-    if (declWithImplicitThisParam->hasModifier<RefAttribute>())
-    {
-        return ParamPassingMode::Ref;
-    }
-    //
-    // The `[nonmutating]` attribute is really just another case of
-    // these attributes that specify a mode, except that it should
-    // in principle only be allowed on declarations where the
-    // implicit `this` parameter would otherwise be `inout`.
-    //
-    // TODO: ensure that semantic checking is diagnosing errors when
-    // these attributes are applied inappropriately.
-    //
-    if (declWithImplicitThisParam->hasModifier<NonmutatingAttribute>())
-    {
-        return ParamPassingMode::In;
-    }
-
-    // Once we'e considered the attributes on the declaration,
-    // and given them an opportunity to dictate a parameter-passing
-    // mode, we turn our attention to the kind of declaration
-    // under consideration.
-    //
-    // For example, a `set` accessor (e.g., on a `property` or
-    // `subscript` declaration) defaults to having a mutable
-    // `this` parameter, unless the programmer explicitly
-    // opts out using `[nomutating]` (which was already checked
-    // for above).
-    //
-    if (as<SetterDecl>(declWithImplicitThisParam))
-    {
-        return ParamPassingMode::BorrowInOut;
-    }
-
-    // Declarations that represent abstract storage (e.g., a `property`
-    // or `subscript`) do not want to dictate anything about the mode
-    // of an implicit `this` parameter; the decision hinges on the
-    // inner accessor (e.g., a `get` or `set`) that will actually
-    // be invoked, and the outer type declaration that will determine
-    // the type of `this`.
-    //
-    // The same is true of generic declarations, which are currently
-    // encoded in the Slang AST as wrappers around the thing that
-    // is generic (e.g., a generic function is a `FuncDecl` wrapped
-    // in a `GenericDecl`).
-    //
-    // In all of these cases, we will just pass along the default
-    // parameter-passing mode (which will have been computed from
-    // the inner declaration).
-    //
-    if (as<PropertyDecl>(declWithImplicitThisParam))
-    {
-        return defaultModeFromContext;
-    }
-    if (as<SubscriptDecl>(declWithImplicitThisParam))
-    {
-        return defaultModeFromContext;
-    }
-    if (as<GenericDecl>(declWithImplicitThisParam))
-    {
-        return defaultModeFromContext;
-    }
-
-    // If we reach the end of this function, then that means
-    // that the declaration itself didn't dictate a mode
-    // (either via modifiers or its AST node class), and
-    // it wasn't identified as one of the cases that should
-    // just pass through the information from an inner
-    // declaration.
-    //
-    // At this point we can finally fall back on the
-    // default parameter-passing mode for an implicit `this`.
-    //
-    return kDefaultModeForImplicitThisParam;
-}
-
-ParamPassingMode getActualParamPassingModeForImplicitThisParam(
-    Decl* declWithImplicitThisParam,
-    Type* thisParamType)
-{
-    //
-    // TODO(tfoley): This logic largely mirrors what was in place when I factored out this
-    // subroutine, but it doesn't seem to be correct when we consider the way that `collectParams()`
-    // in this same file computes the actual parameter-passing mode for an implicit `this` by
-    // traversing the declaration hierarchy.
-    //
-    // We should refactor the queries so that they are mutually consistent between the case where
-    // we are emitting a declaration and where we are invoking it.
-    //
-
-    auto declaredMode = getDeclaredParamPassingModeForImplicitThisParam(declWithImplicitThisParam);
-    auto actualMode = adjustParamPassingModeBasedOnParamType(declaredMode, thisParamType);
     return actualMode;
 }
 
@@ -3973,110 +3739,6 @@ DeclRef<D> createDefaultSpecializedDeclRef(
 {
     DeclRef<Decl> declRef = createDefaultSpecializedDeclRefImpl(context, semantics, decl);
     return declRef.as<D>();
-}
-
-Type* getThisParamTypeForCallable(IRGenContext* context, DeclRef<Decl> callableDeclRef);
-
-static Type* _findReplacementThisParamType(IRGenContext* context, DeclRef<Decl> parentDeclRef)
-{
-    if (auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>())
-    {
-        auto targetType = getTargetType(context->astBuilder, extensionDeclRef);
-        if (auto targetDeclRefType = as<DeclRefType>(targetType))
-        {
-            // If our extension applies to a function, then the this-type is that function's
-            // this-type.
-            //
-            if (isDeclRefTypeOf<CallableDecl>(targetDeclRefType))
-            {
-                return getThisParamTypeForCallable(context, targetDeclRefType->getDeclRef());
-            }
-
-            if (auto replacementType =
-                    _findReplacementThisParamType(context, targetDeclRefType->getDeclRef()))
-                return replacementType;
-        }
-        return targetType;
-    }
-
-    if (auto interfaceDeclRef = parentDeclRef.as<InterfaceDecl>())
-    {
-        auto thisType = DeclRefType::create(
-            context->astBuilder,
-            context->astBuilder->getMemberDeclRef(
-                interfaceDeclRef,
-                interfaceDeclRef.getDecl()->getThisTypeDecl()));
-        return thisType;
-    }
-
-    if (auto defaultImplDeclRef = parentDeclRef.as<InterfaceDefaultImplDecl>())
-    {
-        auto thisType = DeclRefType::create(
-            context->astBuilder,
-            DeclRef<Decl>(defaultImplDeclRef.getDecl()->thisTypeDecl));
-        return thisType;
-    }
-
-    return nullptr;
-}
-
-/// Get the type of the `this` parameter introduced by `parentDeclRef`, or null.
-///
-/// E.g., if `parentDeclRef` is a `struct` declaration, then this will
-/// return the type of that `struct`.
-///
-/// If this function is called on a declaration that does not itself directly
-/// introduce a notion of `this`, then null will be returned. Note that this
-/// includes things like function declarations themselves, which inherit the
-/// definition of `this` from their parent/outer declaration.
-///
-Type* getThisParamTypeForContainer(IRGenContext* context, DeclRef<Decl> parentDeclRef)
-{
-    if (auto replacementType = _findReplacementThisParamType(context, parentDeclRef))
-        return replacementType;
-
-    if (auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>())
-    {
-        return DeclRefType::create(context->astBuilder, aggTypeDeclRef);
-    }
-
-    return nullptr;
-}
-
-Type* getThisParamTypeForCallable(IRGenContext* context, DeclRef<Decl> callableDeclRef)
-{
-    if (auto lookup = as<LookupDeclRef>((callableDeclRef.declRefBase)))
-    {
-        auto lookupSource = lookup->getLookupSource();
-        // Hack for AD 2.0..
-        if (isDeclRefTypeOf<CallableDecl>(lookupSource))
-        {
-            return getThisParamTypeForCallable(
-                context,
-                as<DeclRefType>(lookupSource)->getDeclRef());
-        }
-        else
-        {
-            return lookupSource;
-        }
-    }
-
-    auto parentDeclRef = callableDeclRef.getParent();
-
-    if (parentDeclRef.as<SubscriptDecl>() || parentDeclRef.as<PropertyDecl>())
-        parentDeclRef = parentDeclRef.getParent();
-
-    if (auto genericDeclRef = parentDeclRef.as<GenericDecl>())
-        parentDeclRef = genericDeclRef.getParent();
-
-    // The parent's this type could end up without the full substitutions applied, so we need to
-    // apply those substitutions here.
-    //
-    auto thisType = getThisParamTypeForContainer(context, parentDeclRef);
-    if (thisType)
-        return substituteType(SubstitutionSet(callableDeclRef), context->astBuilder, thisType);
-    else
-        return nullptr;
 }
 
 struct StmtLoweringVisitor;
@@ -4215,26 +3877,14 @@ ParameterListCollectMode getModeForCollectingParentParameters(Decl* decl, Contai
     return kParameterListCollectMode_Default;
 }
 
-/// Add a suitable `this` parameter to a parameter list being constructed.
-///
-/// The `impliedParamPassingMode` is the parameter-passing mode that has
-/// been determined based on the declaration that needs a `this` parameter,
-/// as well as its lexical context, but does *not* take into account the
-/// type of the `this` parameter.
-///
-void addThisParameter(
-    ParamPassingMode impliedParamPassingMode,
-    Type* type,
-    ParameterLists* ioParameterLists)
+/// Add the checked effective `this` parameter to a parameter list.
+void addThisParameter(const ParamInfo& paramInfo, ParameterLists* ioParameterLists)
 {
-    auto adjustedParamPassingMode =
-        adjustParamPassingModeBasedOnParamType(impliedParamPassingMode, type);
-
     IRLoweringParameterInfo info;
-    info.type = type;
+    info.type = paramInfo.type;
     info.decl = nullptr;
-    info.intendedParamPassingMode = adjustedParamPassingMode;
-    info.actualParamPassingModeToUse = adjustedParamPassingMode;
+    info.intendedParamPassingMode = paramInfo.mode;
+    info.actualParamPassingModeToUse = paramInfo.mode;
     info.isThisParam = true;
 
     ioParameterLists->params.add(info);
@@ -4258,235 +3908,32 @@ void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resu
     }
 }
 
-//
-// And here is our function that will do the recursive walk:
+/// Collect the explicitly declared value parameters contributed by `declRef` and its parents.
+///
+/// An accessor of a subscript, for example, receives both the subscript indices and the accessor's
+/// own parameters. The front end separately records the accessor's effective `this` parameter, and
+/// the caller prepends that checked information before invoking this function.
 void collectParameterLists(
     IRGenContext* context,
     DeclRef<Decl> const& declRef,
     ParameterLists* ioParameterLists,
-    ParameterListCollectMode mode,
-    ParamPassingMode defaultParamPassingModeForImplicitThisParam)
+    ParameterListCollectMode mode)
 {
-    // The basic idea here is that we are walking up the parent chain
-    // of declarations, starting at some declaration for which we want
-    // to emit an IR function, and we want to accumulate all relevant
-    // parameters along the way.
-    //
-    // As a concrete example, consider this code:
-    //
-    //      struct MyArray<T>
-    //      {
-    //          subscript(int index)
-    //          {
-    //              set(newValue) { /* ... */ }
-    //          }
-    //      }
-    //
-    // The eventual signature that we want to see on the IR function
-    // for the `set` accessor there is something like:
-    //
-    //      void MyArray_subscript_set<T>(
-    //          inout MyArray<T> this,
-    //          int index,
-    //          T newValue)
-    //      { /* ... */ }
-    //
-    // Note how in this example there are multiple declarations
-    // that contribute to the complete parameter list:
-    //
-    //      * The `GenericDecl` that wraps the `StructDecl`
-    //        contributes the `<T>`.
-    //
-    //      * The `StructDecl` for `MyArray` contributes
-    //        the `this` parameter.
-    //
-    //      * The `SubscriptDecl` contributes the `index` parameter.
-    //
-    //      * The `SetterDecl` contributes the `newValue` parameter and,
-    //        additionally determines that the `this` parameter should
-    //        use `inout`.
-    //
-    // (Note that this function is currently only responsible for value
-    // parameters, so the generic `<T>` in the example above is discovered
-    // via a different subroutine)
-    //
-    // The basic idea here is that we are recursively traversing up
-    // through the declaration hierarchy (via `declRef`), potentially
-    // collecting parameters (into `ioParameterLists`) along the way.
-    // Along the way we thread two pieces of state that allow inner
-    // declarations to control what parts of an outer declaration
-    // (if any) contribute to the result:
-    //
-    // * The `ParameterListCollectMode` `mode` determines if we are in an
-    //   (implicitly or explicitly) `static` context, so that no
-    //   implicit `this` parameter should be added.
-    //
-    // * The `defaultParamPassingModeForImplicitThisParam` parameter
-    //   encodes the parameter-passing mode (e.g., `in` vs `inout`)
-    //   that should be used for an implicit `this` parameter, if
-    //   one ends up being introduced.
-    //
-
-    // We terminate the traversal when we encounter certain kinds of
-    // declarations. The most clear-cut case here is that if we
-    // run into an aggregate type declaration (like a `struct` or
-    // `class`) then we stop searching, even if that type might
-    // itself be nested in yet another type declaration. We thus
-    // will not accumulate multiple `this` parameters when there
-    // are nested types, because all aggregate type declarations
-    // in Slang are implicitly `static`.
-    //
-    // TODO(tfoley): Because such declarations are implicitly static,
-    // we should in theory be able to handle this case below,
-    // because `getModeForCollectingParentParameters()` would already
-    // indicate the static-ness.
-    //
-    // This early-out check also applies to default implementations
-    // of interface methods because we are currently desugaring
-    // such declarations to be explicitly generic and take an explicit
-    // `this` parameter, rather than handling that translation as
-    // part of lowering from the AST to the IR. As such, a default
-    // implementation of an interface method will appear as a non-`static`
-    // member of the corresponding `InterfaceDecl`, even though it
-    // is conceptually static.
-    //
-    // TODO(tfoley): Change how default implementations of interface
-    // requirements are being handled so that they can be semantically
-    // checked without that transformation, and then have the AST-to-IR
-    // lowering logic take responsibility for generating the generic.
-    //
     if (as<InterfaceDefaultImplDecl>(declRef) || as<AggTypeDeclBase>(declRef))
         return;
 
-    // Any outer declaration(s) of the `declRef` under consideration
-    // will be added to the parameter list ahead of those for the
-    // declaration itself.
-    //
     if (auto outerDeclRef = declRef.getParent())
     {
-        // We will compute a `ParameterListCollectMode` to be
-        // used when collecting parameters of the outer declaration,
-        // based on a combination of the modifiers on the current
-        // `declRef` (e.g., is it declared with `static`?) as well
-        // as the AST node class of both the inner `declRef` and
-        // the `outerDeclRef`.
-        //
-        // Basically we are computing whether this `declRef` is
-        // effectively `static` in this context.
-        //
         ParameterListCollectMode outerMode =
             getModeForCollectingParentParameters(declRef.getDecl(), outerDeclRef.getDecl());
-
-        // If we have already decided that we are in "`static` mode"
-        // based on some inner context, then we do not let the current
-        // `declRef` and `outerDeclRef` override that choice.
-        //
         if (outerMode < mode)
             outerMode = mode;
-
-        // As we traverse up the hierarchy, we are collecting information
-        // that helps us determine the correct parameter-passing mode to
-        // use for any implicit `this` that might be inserted.
-        //
-        // We need to update this information as we traverse, because we
-        // might start out thinking one thing (e.g., a `set` accessor
-        // defaults to using `inout` for `this`), and then discover new
-        // information (if that accessor was nested under a property of
-        // a `class` declaration, then it should use `in` instead).
-        //
-        ParamPassingMode impliedParamPassingModeForImplicitThisParam =
-            getDeclaredParamPassingModeForImplicitThisParam(
-                declRef.getDecl(),
-                defaultParamPassingModeForImplicitThisParam);
-
-        // Once we've computed the mode(s) to use, we can recurse on
-        // the outer declaration and work our way further up the chain.
-        //
-        // TODO(tfoley): The original intention of this subroutine was that
-        // it could be used to collect both value and generic parameters in
-        // the same traversal. Right now it is only being used to collect
-        // value parameters and, as a result, it is a little silly to
-        // continue the traversal after we have decided to be in "`static` mode."
-        //
-        // If we don't intend to ever include generic parameter collection
-        // into this same routine, we should be able to move the recursive
-        // `collectParameterLists` call below to be under the `if` statement
-        // on the mode, and save ourselves some trouble.
-        //
-        collectParameterLists(
-            context,
-            outerDeclRef,
-            ioParameterLists,
-            outerMode,
-            impliedParamPassingModeForImplicitThisParam);
-
-        // Now we will check to see if the `outerDeclRef` is one that would
-        // indicate that an implicit `this` parameter is needed and, if so,
-        // add such a parameter. The obvious case is when `outerDeclRef`
-        // is a type declaration like a `struct`, but we also need to
-        // consider the case of an `extension` declaration.
-        //
-        // TODO(tfoley): It seems like this logic could more cleanly be handled
-        // in the context of the recursive call on `outerDeclRef` (at which point
-        // it is just the `declRef`). At that point the logic below that adds
-        // the parameters of a `CallableDecl` would just need to have an alternative
-        // path for the case of a surrounding type (or `extension`) declaration.
-        //
-        if (outerMode != kParameterListCollectMode_Static)
-        {
-            auto thisType = getThisParamTypeForContainer(context, outerDeclRef);
-            if (thisType)
-            {
-                thisType = as<Type>(
-                    thisType->substitute(getCurrentASTBuilder(), SubstitutionSet(declRef)));
-                if (isDeclRefTypeOf<CallableDecl>(thisType))
-                {
-                    // If the `this` type is a callable, then we need to
-                    // get the `this` parameter type of the callable.
-                    //
-                    thisType = getThisParamTypeForCallable(
-                        context,
-                        as<DeclRefType>(thisType)->getDeclRef());
-                }
-
-                // At this point we've concluded that an implicit `this`
-                // parameter is called for, and computed what its type
-                // should be under normal circumstances.
-                //
-                // However, the autodiff features add a few wrinkles here
-                // that can modify the type of `this` and, in one case,
-                // change the parameter-passing mode that should be used.
-                //
-                if (declRef.getDecl()->findModifier<NoDiffThisAttribute>())
-                {
-                    auto noDiffAttr = context->astBuilder->getNoDiffModifierVal();
-                    thisType = context->astBuilder->getModifiedType(thisType, 1, &noDiffAttr);
-                }
-
-                addThisParameter(
-                    impliedParamPassingModeForImplicitThisParam,
-                    thisType,
-                    ioParameterLists);
-            }
-        }
+        collectParameterLists(context, outerDeclRef, ioParameterLists, outerMode);
     }
 
-    // Once we've added any parameters based on enclosing declarations,
-    // we can see if this declaration itself introduces parameters.
-    //
-    // If we are in the a `static` context - meaning that this `declRef`
-    // is something like the enclosing type around a `static` method,
-    // then the parameters of this declaration should not contribute
-    // to the list. That status was passed down to us as the `mode`
-    // parameter, when the inner declaration requested the outer
-    // declaration to add parameters.
-    //
     if (mode != kParameterListCollectMode_Default)
         return;
 
-    // Only callable declarations have parameters, so if this declaration
-    // isn't callable, there's nothing to do.
-    //
     auto callableDeclRef = declRef.as<CallableDecl>();
     if (!callableDeclRef)
         return;
@@ -4516,10 +3963,6 @@ void collectParameterLists(
     }
     else
     {
-        // If we've determined that the paramters of this declaration might
-        // be relevant, then we will iterate over them and add appropriate
-        // entries to the `ioParameterLists`.
-        //
         for (auto paramDeclRef : getParameters(context->astBuilder, callableDeclRef))
         {
             auto paramInfo = getParameterInfo(context, paramDeclRef);
@@ -4527,13 +3970,6 @@ void collectParameterLists(
         }
     }
 
-    // Finally, in some cases the result value of a function will
-    // be lowered to an `out` parameter (e.g. for a non-copyable type
-    // this avoids the copying implied by the ordinary function return).
-    //
-    // We detect such cases here and add a suitable `out` parameter to
-    // the end of the parameter list.
-    //
     maybeAddReturnDestinationParam(
         ioParameterLists,
         getResultType(context->astBuilder, callableDeclRef));
@@ -4590,116 +4026,40 @@ void _lowerInfoFromFuncType(
     DeclRef<FunctionDeclBase> declRef,
     FuncDeclBaseTypeInfo& outInfo)
 {
-    auto resolvedFuncType =
-        declRef.getDecl()
-            ->funcType.type->substitute(context->astBuilder, SubstitutionSet(declRef))
-            ->resolve();
+    auto specializedFuncType = as<Type>(declRef.getDecl()->funcType.type->substitute(
+        context->astBuilder,
+        SubstitutionSet(declRef)));
+    SLANG_RELEASE_ASSERT(specializedFuncType);
 
-    FuncType* effectiveFuncType = as<FuncType>(resolvedFuncType);
-    SLANG_ASSERT(effectiveFuncType);
-
-    //
-    // TODO: Unify this logic with the this-param lowering
-    // logic in 'collectParameterLists', so its not a special case..
-    //
-
-    ParameterListCollectMode innerMode =
-        getModeForCollectingParentParameters(declRef.getDecl(), declRef.getParent().getDecl());
-
-    if (innerMode != kParameterListCollectMode_Static)
+    auto effectiveFuncType = as<FuncType>(specializedFuncType->resolve());
+    if (!effectiveFuncType)
     {
-        auto thisType = getThisParamTypeForContainer(context, declRef.getParent());
+        // An abstract function-dependent type, such as the type of an `__associatedfunc`, cannot
+        // become an AST `FuncType` until its callable and witness operands are specialized. Keep
+        // its symbolic IR form. That form operates on `FuncTypeOf` the lowered callable, whose IR
+        // signature already contains the callable's effective `this` parameter; prepending the
+        // checked parameter here would duplicate it when the symbolic type is resolved in IR.
+        SLANG_RELEASE_ASSERT(!declRef.getDecl()->body);
+        outInfo.type = lowerType(context, specializedFuncType);
+        outInfo.resultType = nullptr;
+        return;
+    }
 
-        ParamPassingMode innerThisParamDirection =
-            getActualParamPassingModeForImplicitThisParam(declRef.getDecl(), thisType);
+    if (auto thisParamInfo =
+            findEffectiveThisParamInfo(context->astBuilder, DeclRef<Decl>(declRef)))
+    {
+        List<Type*> paramTypes;
+        paramTypes.add(getParamTypeWithModeWrapper(
+            context->astBuilder,
+            thisParamInfo->type,
+            thisParamInfo->mode));
+        for (auto paramType : effectiveFuncType->getParamTypes())
+            paramTypes.add(paramType);
 
-        // Hack for how this-types work for looked up function for AD 2.0..
-        if (auto lookup = as<LookupDeclRef>((declRef.declRefBase)))
-        {
-            auto lookupSource = lookup->getLookupSource();
-            if (isDeclRefTypeOf<CallableDecl>(lookupSource))
-            {
-                innerThisParamDirection = getActualParamPassingModeForImplicitThisParam(
-                    as<DeclRefType>(lookupSource)->getDeclRef().getDecl(),
-                    thisType);
-            }
-        }
-
-        if (thisType)
-        {
-            thisType =
-                as<Type>(thisType->substitute(getCurrentASTBuilder(), SubstitutionSet(declRef)));
-        }
-
-        // If we're looking something up on a callable, the this-type determination will
-        // continue up the chain until we find a non-callable.
-        // For now, we assume only one level of indirection is needed.
-        //
-        if (isDeclRefTypeOf<CallableDecl>(thisType))
-        {
-            auto baseCallableDeclRef = as<DeclRefType>(thisType)->getDeclRef();
-            ParameterListCollectMode innerCallableCollectMode =
-                getModeForCollectingParentParameters(
-                    baseCallableDeclRef.getDecl(),
-                    baseCallableDeclRef.getParent().getDecl());
-
-            if (innerCallableCollectMode != kParameterListCollectMode_Static)
-            {
-                thisType = getThisParamTypeForCallable(context, baseCallableDeclRef);
-            }
-            else
-            {
-                thisType = nullptr;
-            }
-        }
-
-        if (thisType)
-        {
-            // Need to check for no-diff-this attribute on the target decl-ref for
-            // functions that are members of other functions.
-            //
-            if (declRef.getDecl()->findModifier<NoDiffThisAttribute>())
-            {
-                auto noDiffAttr = context->astBuilder->getNoDiffModifierVal();
-                thisType = context->astBuilder->getModifiedType(thisType, 1, &noDiffAttr);
-            }
-
-            switch (innerThisParamDirection)
-            {
-            case ParamPassingMode::In:
-                // The `this` parameter is passed by value, so we
-                // don't need to do anything special here.
-                break;
-            case ParamPassingMode::Ref:
-                // The `this` parameter is passed by reference, so we
-                thisType = context->astBuilder->getRefParamType(thisType);
-                break;
-            case ParamPassingMode::BorrowIn:
-                // The `this` parameter is passed by const reference, so we
-                thisType = context->astBuilder->getConstRefParamType(thisType);
-                break;
-            case ParamPassingMode::BorrowInOut:
-                // The `this` parameter is passed by in-out reference, so we
-                thisType = context->astBuilder->getBorrowInOutParamType(thisType);
-                break;
-            default:
-                SLANG_UNEXPECTED("unknown this parameter direction");
-                break;
-            }
-
-            // Construct new effectiveFuncType to include the `this` parameter
-            //
-            List<Type*> paramTypes;
-            paramTypes.add(thisType);
-            for (auto paramType : effectiveFuncType->getParamTypes())
-            {
-                paramTypes.add(paramType);
-            }
-            effectiveFuncType = context->astBuilder->getFuncType(
-                paramTypes.getArrayView(),
-                effectiveFuncType->getResultType(),
-                effectiveFuncType->getErrorType());
-        }
+        effectiveFuncType = context->astBuilder->getFuncType(
+            paramTypes.getArrayView(),
+            effectiveFuncType->getResultType(),
+            effectiveFuncType->getErrorType());
     }
 
     // Lower type.
@@ -4719,12 +4079,12 @@ void _lowerInfoFromFuncParameters(
 
     // Collect the parameter lists we will use for our new function.
     auto& parameterLists = outInfo.parameterLists;
-    collectParameterLists(
-        context,
-        declRef,
-        &parameterLists,
-        kParameterListCollectMode_Default,
-        ParamPassingMode::In);
+    if (auto thisParamInfo =
+            findEffectiveThisParamInfo(context->astBuilder, DeclRef<Decl>(declRef)))
+    {
+        addThisParameter(*thisParamInfo, &parameterLists);
+    }
+    collectParameterLists(context, declRef, &parameterLists, kParameterListCollectMode_Default);
 
     auto& paramTypes = outInfo.paramTypes;
 
@@ -5620,43 +4980,43 @@ struct ExprLoweringContext
                 return result;
             }
 
+            auto thisParamInfo = findEffectiveThisParamInfo(context->astBuilder, funcDeclRef);
+
             // First comes the `this` argument if we are calling
             // a member function:
-            if (baseExpr)
+            if (baseExpr && thisParamInfo)
             {
-                if (auto thisType = getThisParamTypeForCallable(context, funcDeclRef))
+                // For when the invoke expr is a member of a _function_,
+                // we want to use the base expression for that function,
+                // instead of function itself.
+                //
+                if (auto memberExpr = as<MemberExpr>(baseExpr))
                 {
-                    // For when the invoke expr is a member of a _function_,
-                    // we want to use the base expression for that function,
-                    // instead of function itself.
+                    if (memberExpr->declRef.template as<CallableDecl>())
+                    {
+                        baseExpr = memberExpr->baseExpression;
+                    }
+                }
+                else if (auto staticMemberExpr = as<StaticMemberExpr>(baseExpr))
+                {
+                    // TODO: We really shouldn't hit this case.. for some reason
+                    // it's possible to see a regular member expr of static member expr of
+                    // something
                     //
-                    if (auto memberExpr = as<MemberExpr>(baseExpr))
+                    if (staticMemberExpr->declRef.template as<CallableDecl>())
                     {
-                        if (memberExpr->declRef.template as<CallableDecl>())
-                        {
-                            baseExpr = memberExpr->baseExpression;
-                        }
+                        baseExpr = nullptr;
                     }
-                    else if (auto staticMemberExpr = as<StaticMemberExpr>(baseExpr))
-                    {
-                        // TODO: We really shouldn't hit this case.. for some reason
-                        // it's possible to see a regular member expr of static member expr of
-                        // something
-                        //
-                        if (staticMemberExpr->declRef.template as<CallableDecl>())
-                        {
-                            baseExpr = nullptr;
-                        }
-                    }
+                }
 
-                    if (baseExpr)
-                    {
-                        auto thisParamMode = getActualParamPassingModeForImplicitThisParam(
-                            funcDeclRef.getDecl(),
-                            thisType);
-
-                        addCallArgsForParam(context, thisParamMode, baseExpr, &irArgs, &argFixups);
-                    }
+                if (baseExpr)
+                {
+                    addCallArgsForParam(
+                        context,
+                        thisParamInfo->mode,
+                        baseExpr,
+                        &irArgs,
+                        &argFixups);
                 }
             }
 
@@ -5675,22 +5035,23 @@ struct ExprLoweringContext
                 funcTypeInfo.type = lowerType(context, resolvedFuncType);
                 // Insert a this type to the front of the param types
 
-                if (baseExpr)
+                if (baseExpr && thisParamInfo)
                 {
-                    if (auto thisType = getThisParamTypeForCallable(context, funcDeclRef))
-                    {
-                        auto irThisType = lowerType(context, thisType);
+                    auto thisParamType = getParamTypeWithModeWrapper(
+                        context->astBuilder,
+                        thisParamInfo->type,
+                        thisParamInfo->mode);
+                    auto irThisParamType = lowerType(context, thisParamType);
 
-                        List<IRType*> paramTypes;
-                        paramTypes.add(irThisType);
-                        for (auto paramType : cast<IRFuncType>(funcTypeInfo.type)->getParamTypes())
-                            paramTypes.add(paramType);
+                    List<IRType*> paramTypes;
+                    paramTypes.add(irThisParamType);
+                    for (auto paramType : cast<IRFuncType>(funcTypeInfo.type)->getParamTypes())
+                        paramTypes.add(paramType);
 
-                        funcTypeInfo.type = context->irBuilder->getFuncType(
-                            paramTypes.getCount(),
-                            paramTypes.getBuffer(),
-                            cast<IRFuncType>(funcTypeInfo.type)->getResultType());
-                    }
+                    funcTypeInfo.type = context->irBuilder->getFuncType(
+                        paramTypes.getCount(),
+                        paramTypes.getBuffer(),
+                        cast<IRFuncType>(funcTypeInfo.type)->getResultType());
                 }
 
                 addDirectCallArgs(expr, resolvedFuncType, &irArgs, &argFixups);
@@ -13827,43 +13188,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (!decl)
             return false;
 
-        // Constructors aren't really member functions, insofar
-        // as they aren't called with a `this` parameter.
-        if (as<ConstructorDecl>(decl))
-            return false;
-
-        // Exclude `static` functions for same reason.
-        if (decl->findModifier<HLSLStaticModifier>())
-        {
-            return false;
-        }
-
-        auto dd = decl->parentDecl;
-        for (;;)
-        {
-            if (auto genericDecl = as<GenericDecl>(dd))
-            {
-                dd = genericDecl->parentDecl;
-                continue;
-            }
-
-            if (auto subscriptDecl = as<SubscriptDecl>(dd))
-            {
-                dd = subscriptDecl->parentDecl;
-            }
-
-            break;
-        }
-
-        // Note: the use of `AggTypeDeclBase` here instead of just
-        // `AggTypeDecl` means that we consider a declaration that
-        // is under a `struct` *or* an `extension` to be a member
-        // function for our purposes.
-        //
-        if (as<AggTypeDeclBase>(dd))
-            return true;
-
-        return false;
+        // A leading `.` in a core intrinsic name means that the target receives an object
+        // argument. Use the checked callable ABI as the source of truth, including for static
+        // declarations, constructors, and extensions on another callable.
+        return findEffectiveThisParamInfo(context->astBuilder, makeDeclRef(decl)).has_value();
     }
 
     /// Add a "catch-all" decoration for a core module function if it would be needed
@@ -14177,20 +13505,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         irFunc->sourceLoc = decl->loc;
 
         FuncDeclBaseTypeInfo info;
-        if (decl->funcType.type && !decl->returnType.type)
-        {
-            // We should be in a case with no definition (body)
-            SLANG_ASSERT(!decl->body);
-            info.type = lowerType(subContext, decl->funcType.type);
-            info.resultType = nullptr;
-        }
-        else
-        {
-            _lowerFuncDeclBaseTypeInfo(
-                subContext,
-                createDefaultSpecializedDeclRef(context, nullptr, decl),
-                info);
-        }
+        _lowerFuncDeclBaseTypeInfo(
+            subContext,
+            createDefaultSpecializedDeclRef(context, nullptr, decl),
+            info);
 
         if (auto synFuncDecl = as<SynthesizedFuncDecl>(decl))
         {
@@ -15793,10 +15111,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     context->traceBranchCoverage =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
 
-    // Import validation in this compiler uses the checked AST attribute. Keep emitting the derived
-    // IR marker because this refactor leaves `IRModule::k_maxSupportedModuleVersion` unchanged:
-    // compatible pre-refactor binaries still read newly serialized modules, and their
-    // packaged-standard-module path relies on this marker to emit E00104.
+    // Import validation in this compiler uses the checked AST attribute. We also emit the derived
+    // IR marker because the packaged-standard-module path relies on it to emit E00104.
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {
         builder->addDecoration(module->getModuleInst(), kIROp_ExperimentalModuleDecoration);

@@ -592,8 +592,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                 expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr) &&
                                          (expr->type.hasReadOnlyOnTarget == false);
 
-                // Another exception is if we are accessing a property
-                // that provides a [nonmutating] setter.
+                // Another exception is if we are accessing a property through an accessor that
+                // does not require writable receiver storage.
                 if (!expr->type.isLeftValue)
                 {
                     if (auto propertyDecl = as<PropertyDecl>(declRef.getDecl()))
@@ -603,7 +603,11 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                         {
                             if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
                             {
-                                if (member->findModifier<NonmutatingAttribute>())
+                                auto accessorDeclRef =
+                                    m_astBuilder->getMemberDeclRef(declRef, member);
+                                auto thisParamInfo = findEffectiveThisParamInfo(accessorDeclRef);
+                                if (thisParamInfo && !doesParamPassingModeIndicateWritableStorage(
+                                                         thisParamInfo->mode))
                                 {
                                     isLValue = true;
                                 }
@@ -985,19 +989,16 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                 //
                 auto thisType = calcThisType(breadcrumb->declRef);
 
-                // Next we construct an appropriate expression to
-                // stand in for the implicit `this` or `This` reference.
+                // Next we construct an appropriate expression to stand in for the `this` value or
+                // `This` type used as the lookup base.
                 //
-                // The lookup process will have computed the appropriate
-                // "mode" to use for the implicit `this` or `This`.
+                // The lookup process will have computed the appropriate mode for that base.
                 //
                 auto thisParameterMode = breadcrumb->thisParameterMode;
                 if (thisParameterMode == LookupResultItem::Breadcrumb::ThisParameterMode::Type)
                 {
-                    // If we are in a static context, then we do not
-                    // have implicit `this` expression, and the expression
-                    // we construct will need to start with the `This`
-                    // type.
+                    // If we are in a static context, then we do not have a `this` expression, and
+                    // the expression we construct will need to start with the `This` type.
                     //
                     // Because we are constrained to yield an expression
                     // here, we must construct an expression that
@@ -1032,10 +1033,8 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                                 as<DeclRefExpr>(invokeExpr->originalFunctionExpr))
                             expr->scope = calleeDeclRefExpr->scope;
                     }
-                    // Whether or not the implicit `this` is mutable depends
-                    // on the context in which it is used, and the lookup
-                    // logic will have computed an appropriate "mode" based
-                    // on the context during lookup.
+                    // Whether the `this` value is mutable depends on the context in which it is
+                    // used, and lookup has recorded that result in the breadcrumb.
                     //
                     expr->type.isLeftValue =
                         thisParameterMode ==
@@ -4114,8 +4113,8 @@ static Expr* _peelCastsAndParens(Expr* expr)
 }
 
 // Check whether two expressions refer to the same storage location by
-// comparing their structure in lockstep. Handles the implicit object
-// (`this` == `this`), bare variable / static-member references, member
+// comparing their structure in lockstep. Handles the receiver object (`this` == `this`), bare
+// variable / static-member references, member
 // accesses (s.x == s.x, but not s.x == s.y), and subscripts with matching
 // constant indices (arr[0] == arr[0], but not arr[0] == arr[1]). Returns
 // false for anything it can't prove equal.
@@ -4126,7 +4125,7 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
     if (!a || !b)
         return false;
 
-    // Same implicit object: `this` vs `this`. There is exactly one `this` in a
+    // Same receiver object: `this` vs `this`. There is exactly one `this` in a
     // given method body, so any two `ThisExpr` nodes necessarily refer to the
     // same object; that is why this returns true without comparing them further
     // (there is no per-`this` identity to compare, unlike a named variable).
@@ -5764,23 +5763,14 @@ Type* SemanticsVisitor::tryGetDifferentialPairType(Type* primalType)
     return nullptr;
 }
 
-Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType thisQualType)
+Type* SemanticsVisitor::getForwardDiffFuncType(
+    FuncType* originalType,
+    std::optional<ParamInfo> thisParamInfo)
 {
     // Resolve diff type here.
     // Note that this type checking needs to be in sync with
     // the auto-generation logic in slang-ir-diff-diff.cpp
     List<Type*> paramTypes;
-
-    Type* thisType = nullptr;
-
-    if (thisQualType.type)
-    {
-        if (thisQualType.isLeftValue)
-            thisType = getCurrentASTBuilder()->getBorrowInOutParamType(thisQualType.type);
-        else
-            thisType = thisQualType.type;
-    }
-
 
     auto resultType = originalType->getResultType();
     if (auto resultPairType = tryGetDifferentialPairType(resultType))
@@ -5790,12 +5780,18 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType 
     SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
     auto errorType = originalType->getErrorType();
 
-    if (thisType)
+    if (thisParamInfo)
     {
-        // The first parameter is the primal function itself.
-        if (auto diffThisType = _toDifferentialParamType(thisType))
+        auto differentiatedThisMode = getDifferentiatedThisParamMode(thisParamInfo->mode);
+        auto thisParamType =
+            getParamTypeWithModeWrapper(m_astBuilder, thisParamInfo->type, differentiatedThisMode);
+        if (auto diffThisType = _toDifferentialParamType(thisParamType))
         {
-            paramTypes.add(diffThisType);
+            auto [diffThisValueType, diffThisMode] =
+                splitParameterTypeAndDirection(m_astBuilder, diffThisType);
+            diffThisMode = adjustParamPassingModeBasedOnParamType(diffThisMode, diffThisValueType);
+            paramTypes.add(
+                getParamTypeWithModeWrapper(m_astBuilder, diffThisValueType, diffThisMode));
         }
     }
 
@@ -5812,7 +5808,9 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType 
     return diffType;
 }
 
-Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType thisQualType)
+Type* SemanticsVisitor::getBackwardDiffFuncType(
+    FuncType* originalType,
+    std::optional<ParamInfo> thisParamInfo)
 {
     // Resolve backward diff type here.
     // Note that this type checking needs to be in sync with
@@ -5827,24 +5825,37 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
     SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
     auto errorType = originalType->getErrorType();
 
-    // Handle implicit `this` parameter for non-static member methods.
-    if (thisQualType.type)
+    // Handle the effective `this` parameter of a member method.
+    if (thisParamInfo)
     {
-        if (auto diffPairType = tryGetDifferentialPairType(thisQualType.type))
+        Type* differentiatedThisType = nullptr;
+        auto differentiatedThisMode = getDifferentiatedThisParamMode(thisParamInfo->mode);
+        if (auto diffPairType = tryGetDifferentialPairType(thisParamInfo->type))
         {
-            paramTypes.add(
-                thisQualType.isLeftValue ? m_astBuilder->getBorrowInOutParamType(diffPairType)
-                                         : diffPairType);
+            differentiatedThisType = diffPairType;
+            // A value pair must be passed as writable storage so that reverse-mode AD can
+            // accumulate its differential. Pointer pairs already carry the required indirection,
+            // and the remaining differentiated modes retain their parameter-passing behavior.
+            if (as<DifferentialPairType>(diffPairType) &&
+                differentiatedThisMode == ParamPassingMode::In)
+            {
+                differentiatedThisMode = ParamPassingMode::BorrowInOut;
+            }
         }
         else
         {
-            auto noDiffThisType = m_astBuilder->getModifiedType(
-                thisQualType.type,
-                {m_astBuilder->getNoDiffModifierVal()});
-            paramTypes.add(
-                thisQualType.isLeftValue ? m_astBuilder->getBorrowInOutParamType(noDiffThisType)
-                                         : noDiffThisType);
+            differentiatedThisType = doesTypeHaveNoDiffModifier(thisParamInfo->type)
+                                         ? thisParamInfo->type
+                                         : m_astBuilder->getModifiedType(
+                                               thisParamInfo->type,
+                                               {m_astBuilder->getNoDiffModifierVal()});
         }
+        differentiatedThisMode =
+            adjustParamPassingModeBasedOnParamType(differentiatedThisMode, differentiatedThisType);
+        paramTypes.add(getParamTypeWithModeWrapper(
+            m_astBuilder,
+            differentiatedThisType,
+            differentiatedThisMode));
     }
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
@@ -5962,19 +5973,21 @@ struct HigherOrderInvokeExprCheckingActions
         return nullptr;
     }
 
-    // Extract the implicit `this` type for a statically-referenced non-static
-    // member method (e.g. `Type::method`).  Returns a null QualType for free
-    // functions, static methods, constructors, and member methods referenced
-    // by name within their own type (e.g. `[BackwardDerivativeOf(f)]`).
-    QualType getThisTypeForBaseFunc(SemanticsVisitor* semantics, Expr* funcExpr)
+    // Extract the effective `this` parameter information for a statically referenced member method
+    // (e.g. `Type::method`). Returns an empty result for declarations without that parameter and
+    // for member methods referenced by name within their own type (e.g.
+    // `[BackwardDerivativeOf(f)]`).
+    std::optional<ParamInfo> getThisParamInfoForBaseFunc(
+        SemanticsVisitor* semantics,
+        Expr* funcExpr)
     {
         auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
-        // Only produce a this-type when the method is accessed via Type::method
-        // (StaticMemberExpr). When referenced by name within the same struct
-        // (plain DeclRefExpr), the derivative is itself a member method and
-        // the this parameter is handled implicitly.
+        // Only produce a `this` type when the method is accessed via `Type::method`
+        // (`StaticMemberExpr`). When referenced by name within the same struct (a plain
+        // `DeclRefExpr`), the derivative is itself a member method with its own effective `this`
+        // parameter.
         if (!as<StaticMemberExpr>(innerExpr))
-            return QualType();
+            return std::nullopt;
         if (auto declRefExpr = as<DeclRefExpr>(innerExpr))
         {
             auto declRef = declRefExpr->declRef;
@@ -5986,16 +5999,9 @@ struct HigherOrderInvokeExprCheckingActions
                     genDecl->inner);
             }
             if (auto callableDeclRef = declRef.as<FunctionDeclBase>())
-            {
-                auto callableDecl = callableDeclRef.getDecl();
-                if (!callableDecl->hasModifier<HLSLStaticModifier>() &&
-                    !as<ConstructorDecl>(callableDecl))
-                {
-                    return getTypeForThisExpr(semantics, callableDeclRef);
-                }
-            }
+                return semantics->findEffectiveThisParamInfo(callableDeclRef);
         }
-        return QualType();
+        return std::nullopt;
     }
 };
 
@@ -6018,8 +6024,8 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
-        resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, thisType);
+        auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
+        resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, thisParamInfo);
         if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
         {
             auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
@@ -6029,7 +6035,7 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             }
             if (funcDecl)
             {
-                if (thisType.type)
+                if (thisParamInfo)
                     resultDiffExpr->newParameterNames.add(semantics->getName("this"));
                 for (auto param : funcDecl->getParameters())
                 {
@@ -6059,8 +6065,8 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
-        resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType, thisType);
+        auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
+        resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType, thisParamInfo);
         if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
         {
             auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
@@ -6070,7 +6076,7 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             }
             if (funcDecl)
             {
-                if (thisType.type)
+                if (thisParamInfo)
                     resultDiffExpr->newParameterNames.add(semantics->getName("this"));
                 for (auto param : funcDecl->getParameters())
                 {
@@ -6220,14 +6226,14 @@ struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
         }
         // __apply(fn) takes the same params as fn (not wrapped in DifferentialPair).
         // Give it the base function type so overload resolution works with original args.
-        auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
-        if (thisType.type)
+        auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
+        if (thisParamInfo)
         {
             List<Type*> paramTypes;
-            paramTypes.add(
-                thisType.isLeftValue
-                    ? semantics->getASTBuilder()->getBorrowInOutParamType(thisType.type)
-                    : thisType.type);
+            paramTypes.add(getParamTypeWithModeWrapper(
+                semantics->getASTBuilder(),
+                thisParamInfo->type,
+                thisParamInfo->mode));
             for (Index i = 0; i < baseFuncType->getParamCount(); i++)
                 paramTypes.add(baseFuncType->getParamTypeWithModeWrapper(i));
 
@@ -6248,7 +6254,7 @@ struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
                 funcDecl = as<CallableDecl>(genDecl->inner);
             if (funcDecl)
             {
-                if (thisType.type)
+                if (thisParamInfo)
                     resultExpr->newParameterNames.add(semantics->getName("this"));
                 for (auto param : funcDecl->getParameters())
                     resultExpr->newParameterNames.add(param->getName());
@@ -8178,6 +8184,11 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
         funcDecl->addMember(param);
     }
 
+    // The lambda operator is assembled while checking the enclosing function body, so the
+    // module-wide declaration walk will not necessarily advance it through the ordinary signature
+    // transition before lowering consumes its checked callable information.
+    ensureDecl(funcDecl, DeclCheckState::SignatureChecked);
+
     // LambdaDecl should inherit from `IFunc<>`.
     if (funcDecl->returnType.type)
     {
@@ -9224,8 +9235,7 @@ Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)
     return expr;
 }
 
-// Perform semantic checking of an object-oriented `this`
-// expression.
+// Perform semantic checking of an object-oriented `this` expression.
 Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
 {
     // A `this` expression will default to immutable.
@@ -9243,60 +9253,18 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
         {
             expr->type.isLeftValue = true;
         }
-        else if (const auto setterDecl = as<SetterDecl>(containerDecl); setterDecl)
-        {
-            expr->type.isLeftValue = true;
-        }
         else if (auto funcDeclBase = as<FunctionDeclBase>(containerDecl))
         {
-            if (funcDeclBase->hasModifier<MutatingAttribute>())
+            if (auto thisParamInfo = findEffectiveThisParamInfo(getDefaultDeclRef(funcDeclBase)))
             {
-                expr->type.isLeftValue = true;
-            }
-            else if (funcDeclBase->hasModifier<RefAttribute>())
-            {
-                expr->type.isLeftValue = true;
-            }
-
-            // When a function has been reparented into an AggTypeDeclBase
-            // (e.g., a __func_extension's inner function moved into a
-            // synthesized ExtensionDecl), its parentDecl is the extension
-            // even though the parsing scope chain doesn't include it.
-            // Resolve `this` from the parent extension in this case.
-            if (auto parentExtDecl = as<ExtensionDecl>(funcDeclBase->parentDecl))
-            {
-                if (!funcDeclBase->hasModifier<HLSLStaticModifier>())
+                expr->type.type = thisParamInfo->type;
+                expr->type.isLeftValue =
+                    doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode);
+                if (m_parentLambdaExpr)
                 {
-                    // For func_extension apply on a member method, the extension's
-                    // target is a function-as-type. We want `this` to be the parent
-                    // struct type of that member function, not the function type itself.
-                    // Use the target function's DeclRef to get the correctly
-                    // substituted parent type (e.g., MyVec<float> not MyVec<T>).
-                    if (auto targetDeclRefType = as<DeclRefType>(parentExtDecl->targetType.type))
-                    {
-                        auto targetDeclRef = targetDeclRefType->getDeclRef();
-                        if (auto targetFuncDecl = as<FunctionDeclBase>(targetDeclRef.getDecl()))
-                        {
-                            if (auto parentTypeDecl =
-                                    as<AggTypeDeclBase>(targetFuncDecl->parentDecl))
-                            {
-                                auto thisType = calcThisType(makeDeclRef(parentTypeDecl));
-                                // Apply the target function's substitutions to get
-                                // the specialized parent type.
-                                if (thisType)
-                                {
-                                    expr->type.type = as<Type>(thisType->substitute(
-                                        m_astBuilder,
-                                        SubstitutionSet(targetDeclRef)));
-                                }
-                                return expr;
-                            }
-                        }
-                    }
-                    // Fallback: use the extension's this type directly.
-                    expr->type.type = calcThisType(makeDeclRef(parentExtDecl));
-                    return expr;
+                    return maybeRegisterLambdaCapture(expr);
                 }
+                return expr;
             }
         }
         else if (auto typeOrExtensionDecl = as<AggTypeDeclBase>(containerDecl))

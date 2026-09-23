@@ -189,26 +189,19 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
             ? nullptr
             : getDiffWitness(funcType->getResultType());
 
-    auto thisValueType = getTypeForThisExpr(this, callableDeclRef);
     Type* thisParamType = nullptr;
+    SubtypeWitness* thisWitness = nullptr;
 
-    if (callableDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() ||
-        as<ConstructorDecl>(callableDeclRef.getDecl()))
+    if (auto thisParamInfo = findEffectiveThisParamInfo(callableDeclRef))
     {
-        thisParamType = nullptr;
+        // Keep the witness faithful to the checked primal receiver ABI. Each derivative-function
+        // consumer applies its own direction and value-type transformations before reapplying the
+        // ordinary type-based parameter-mode adjustment.
+        thisParamType =
+            getParamTypeWithModeWrapper(astBuilder, thisParamInfo->type, thisParamInfo->mode);
+        if (!doesTypeHaveNoDiffModifier(thisParamInfo->type))
+            thisWitness = getDiffWitness(thisParamInfo->type);
     }
-    else if (thisValueType.type)
-    {
-        if (thisValueType.isLeftValue)
-            thisParamType = astBuilder->getBorrowInOutParamType(thisValueType.type);
-        else
-            thisParamType = thisValueType.type;
-    }
-
-    SubtypeWitness* thisWitness = thisParamType ? getDiffWitness(thisValueType) : nullptr;
-
-    if (callableDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>())
-        thisWitness = nullptr;
 
     return astBuilder->getOrCreate<DiffTypeInfoWitness>(
         thisParamType,

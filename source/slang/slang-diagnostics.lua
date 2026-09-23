@@ -1555,6 +1555,20 @@ err(
 )
 
 err(
+    "this-param-mode-attribute-without-effective-this-param",
+    30428,
+    "attribute requires an effective `this` parameter",
+    span { loc = "attribute:Modifier", message = "attribute '~attribute' is only allowed on a declaration with an effective `this` parameter." }
+)
+
+err(
+    "this-param-mode-attribute-on-class-member",
+    30429,
+    "attribute cannot change a class member's effective `this` parameter",
+    span { loc = "attribute:Modifier", message = "attribute '~attribute' is not allowed on a class member; the effective `this` parameter of a class member is always passed by value." }
+)
+
+err(
     "expected-a-type",
     30060,
     "expected a type",
