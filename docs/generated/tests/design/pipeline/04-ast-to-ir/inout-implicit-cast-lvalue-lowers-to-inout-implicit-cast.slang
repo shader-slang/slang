@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#loweredvalinfo-and-the-lowering-environment
-//META: doc_section_digest=9127ecfc310ffdc4aecbad1b96d176cf66095ac4dcbdc84a1ac4106e6bf98dd2
+//META: doc_section_digest=b811ef439a253bd37ab607f1ac1de7706df1cebe7013e2fd2ae6c1702a518c0c
 //META: purpose=An implicit conversion on an `inout` argument stays symbolic as the `ImplicitCastedLValue` flavor and materializes at the call site as a single `inOutImplicitCast` on the base pointer, not as a read-cast / write-cast pair around a temporary.
 //META: intent=functional
 //META: pipeline_stage=lower

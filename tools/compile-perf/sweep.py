@@ -22,6 +22,43 @@ sys.path.insert(0, HERE)  # allow running from any directory
 from lib import analyze, manifest
 
 
+def workload_complete(measured_sizes, spec, sweep_requested):
+    """Whether a workload's successful measurements satisfy this sweep.
+
+    The current manifest default is always required. When scaling data was
+    requested, every current ladder size is required as well. `measured_sizes`
+    deliberately retains the JSON value types: a string such as "128" is not
+    evidence that the integer size 128 was measured.
+    """
+    if not measured_sizes:
+        return False
+    typed_sizes = {(type(size), size) for size in measured_sizes}
+    if spec and (type(spec.default_size), spec.default_size) not in typed_sizes:
+        return False
+    if sweep_requested and spec and spec.sweep_sizes:
+        expected = {(type(size), size) for size in spec.sweep_sizes}
+        return expected <= typed_sizes
+    return True
+
+
+# Pin the completeness predicate that decides whether a release is re-swept.
+_SPEC = manifest.BY_NAME["interface_depth"]
+assert workload_complete({_SPEC.default_size}, _SPEC, False)
+assert not workload_complete({64}, _SPEC, False), \
+    "a stale pre-resize default must trigger a re-sweep"
+assert not workload_complete({str(_SPEC.default_size)}, _SPEC, False), \
+    "size values with the wrong JSON type must not compare equal"
+assert not workload_complete({float(_SPEC.default_size)}, _SPEC, False), \
+    "an integral float must not satisfy an integer manifest size"
+assert workload_complete(set(_SPEC.sweep_sizes), _SPEC, True)
+assert not workload_complete(set(_SPEC.sweep_sizes[:-1]), _SPEC, True), \
+    "a missing ladder rung must trigger a scaling re-sweep"
+_BOOL_SPEC = argparse.Namespace(default_size=1, sweep_sizes=[1, 2])
+assert not workload_complete({True, 2}, _BOOL_SPEC, True), \
+    "bool is a distinct JSON type and must not satisfy integer size 1"
+del _SPEC, _BOOL_SPEC
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -87,29 +124,8 @@ def main():
                 if isinstance(r, dict) and "workload" in r and r.get("ok", True):
                     sizes.setdefault(r["workload"], set()).add(r.get("size"))
             need = want or all_wls
-
-            # `complete` closes over `sizes`, `args.sweep`, and `manifest` — all
-            # stable across loop iterations. It does NOT capture the loop variable.
-            def complete(wl):
-                szs = sizes.get(wl)
-                if not szs:
-                    return False
-                spec = manifest.BY_NAME.get(wl)
-                if args.sweep and spec and spec.sweep_sizes:
-                    # Every configured ladder size must be present: an
-                    # interrupted prior sweep (e.g. a per-run timeout) leaves a
-                    # valid results.json with only the low sizes, and accepting
-                    # it here would leave a permanent gap in the scaling curve
-                    # that only --force could backfill. This also means a
-                    # retuned ladder in the manifest re-sweeps affected
-                    # releases on the next run, by design.
-                    return set(spec.sweep_sizes) <= szs
-                # True covers: no --sweep requested; a spec with no ladder
-                # (nothing to sweep); and a workload present in results.json
-                # but gone from the manifest (no ladder left to validate).
-                return True
-
-            if all(complete(wl) for wl in need):
+            if all(workload_complete(sizes.get(wl), manifest.BY_NAME.get(wl), args.sweep)
+                   for wl in need):
                 print(f"[{i}/{len(ready)}] {tag}: already has {sorted(need)}, skipping")
                 continue
         print(f"[{i}/{len(ready)}] {tag} ({rec.get('date','?')})")

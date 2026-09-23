@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#work-graph-record-types
-//META: doc_section_digest=7ce9495f8f8cf2b1b4adf2f417316b6d259dafe3e374c502b180caf6e4a76ab2
+//META: doc_section_digest=301cf5fbdc053cefff914c60b0a6b2763a73ba2f02169943b38c045d43b6e5fb
 //META: purpose=A DispatchNodeInputRecord<T> node parameter is typed DispatchNodeInputRecord(<T>) in the IR dump, with the record struct as its single operand.
 //META: intent=functional
 //META: pipeline_stage=lower
