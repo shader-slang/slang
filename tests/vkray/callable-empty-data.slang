@@ -1,6 +1,6 @@
 // Regression test for https://github.com/shader-slang/slang/issues/12718 and its CUDA counterpart,
-// #13106. D3D requires an empty callable-data struct to remain as a fixed-shape entry-point
-// parameter; CUDA/OptiX, SPIR-V, and GLSL all permit the logically empty payload to contribute no
+// #13106. D3D requires a physical carrier for an empty callable-data entry-point parameter;
+// CUDA/OptiX, SPIR-V, and GLSL all permit the logically empty payload to contribute no
 // physical entry-point parameter.
 
 //TEST:SIMPLE(filecheck=HLSL): -stage callable -entry callableMain -target hlsl -profile sm_6_7
@@ -26,11 +26,11 @@ void callableMain(inout EmptyData data)
 // so a successful compile confirms the parameter survived. This only checks a function is emitted.
 // DXIL: define void @
 
-// SPIR-V does not need the D3D dummy padding: an empty callable payload on a callable entry point
+// SPIR-V does not need the D3D carrier here: an empty callable payload on a callable entry point
 // compiles to a valid CallableKHR entry point without materializing the payload at all. The
 // negative checks pin that — no incoming callable-data variable and no dummy field are emitted —
-// so the Vulkan padding pass (which does match the incoming decoration) leaves this entry point
-// untouched, because no such global exists for it to find.
+// so the Khronos boundary collector (which matches incoming decorations too) leaves this entry
+// point untouched, because no such global exists for it to find.
 // SPIRV: OpEntryPoint CallableKHR
 // SPIRV-NOT: IncomingCallableData
 // SPIRV-NOT: _slang_dummy

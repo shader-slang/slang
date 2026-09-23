@@ -1,7 +1,13 @@
 // slang-ir-ray-tracing-legalize.cpp
+// Preserve required ray-tracing storage without changing the program's logical data types.
+// First identify payload parameters and globals, then give empty ones a physical carrier. Its
+// logical data field is left to ordinary type legalization; only a dummy int survives. This makes
+// caller and receiver layouts independent of which other types happen to be payloads in a module.
 #include "slang-ir-ray-tracing-legalize.h"
 
 #include "slang-compiler.h"
+#include "slang-ir-dce.h"
+#include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-util.h"
@@ -59,54 +65,186 @@ static void addRayPayloadDecorationIfNeeded(IRBuilder& builder, IRType* type)
         builder.addRayPayloadDecoration(type);
 }
 
-static void addIfEmptyStruct(IRType* type, HashSet<IRStructType*>& set)
+// A boundary-only representation of an empty logical payload. The data field lets existing IR
+// keep using the original type until general type legalization erases that field and its accesses.
+struct EmptyPayloadCarrier
 {
-    auto structType = as<IRStructType>(type);
-    if (structType && isEmptyType(structType))
-        set.add(structType);
-}
+    IRStructType* type;
+    IRStructKey* dataKey;
+};
 
-// Add storage to the payload struct itself and update its constructors. Consider this example:
+// Own the per-module carrier cache and the boundary objects that need storage. Selection is by
+// use, not by type: padding Empty itself would also change Data in this valid program:
 //
-//     struct EmptyInner {}
-//     struct EmptyOuter { EmptyInner inner; }
+//     struct Empty {}
+//     struct Data { Empty unused; uint value; }
+//     Empty empty;
+//     Data data;
+//     CallShader(0, empty);
+//     CallShader(1, data);
 //
-// EmptyOuter is a valid payload, but all its fields will disappear during type legalization. Add
-// an int to EmptyOuter and leave EmptyInner unchanged, so legalization can still erase inner while
-// retaining the outer carrier. The same applies when inner is an array of empty elements.
-// Collection checks emptiness before any types are changed. Do not repeat that check here: another
-// selected payload may itself be a field type of this one and may already have been padded.
-static void padEmptyStructWithDummyField(IRBuilder& builder, IRStructType* structType)
+// A separately compiled Data receiver must have the same layout even without the first call.
+struct EmptyPayloadLegalizationContext
 {
-    // Insert the key before the struct type so it is defined before being referenced.
-    builder.setInsertBefore(structType);
-    auto dummyKey = builder.createStructKey();
-    builder.addNameHintDecoration(dummyKey, UnownedStringSlice("_slang_dummy"));
-    builder.createStructField(structType, dummyKey, builder.getIntType());
+    IRModule* module;
+    Dictionary<IRType*, EmptyPayloadCarrier> carriers;
+    HashSet<IRParam*> d3dParams;
+    HashSet<IRParam*> d3dRayParams;
+    HashSet<IRGlobalVar*> khronosGlobals;
 
-    // Collect first because replacing and removing a constructor invalidates the use walk.
-    List<IRInst*> makeStructsToUpdate;
-    for (auto use = structType->firstUse; use; use = use->nextUse)
+    // Return a shared wrapper for this logical type without modifying it or its constructors.
+    // Arrays are valid logical payloads too; the wrapper supplies the outer struct required by D3D.
+    EmptyPayloadCarrier getCarrier(IRType* logicalType)
     {
-        auto user = use->getUser();
-        if (user->getOp() == kIROp_MakeStruct && user->getDataType() == structType)
-            makeStructsToUpdate.add(user);
+        EmptyPayloadCarrier carrier;
+        if (carriers.tryGetValue(logicalType, carrier))
+            return carrier;
+
+        IRBuilder builder(module);
+        builder.setInsertAfter(logicalType);
+        carrier.dataKey = builder.createStructKey();
+        builder.addNameHintDecoration(carrier.dataKey, UnownedStringSlice("_slang_data"));
+        auto dummyKey = builder.createStructKey();
+        builder.addNameHintDecoration(dummyKey, UnownedStringSlice("_slang_dummy"));
+        carrier.type = builder.createStructType();
+        auto nameHint = logicalType->findDecoration<IRNameHintDecoration>();
+        builder.addNameHintDecoration(
+            carrier.type,
+            nameHint ? nameHint->getName() : UnownedStringSlice("EmptyPayload"));
+        builder.createStructField(carrier.type, carrier.dataKey, logicalType);
+        builder.createStructField(carrier.type, dummyKey, builder.getIntType());
+        carriers.add(logicalType, carrier);
+        return carrier;
     }
 
-    for (auto makeStructInst : makeStructsToUpdate)
+    // Select only mutable empty payload parameters, retaining whether D3D ray qualifiers apply.
+    void collectParam(IRParam* param, bool isRayPayload)
     {
-        builder.setInsertBefore(makeStructInst);
-        // Keep the operands for the original fields until type legalization removes them. A
-        // nested-empty struct still has constructor operands even though they carry no data.
-        List<IRInst*> args;
-        for (UInt i = 0; i < makeStructInst->getOperandCount(); ++i)
-            args.add(makeStructInst->getOperand(i));
-        args.add(builder.getIntValue(builder.getIntType(), 0));
-        auto newMakeStruct = builder.emitMakeStruct(structType, args.getCount(), args.getBuffer());
-        makeStructInst->replaceUsesWith(newMakeStruct);
-        makeStructInst->removeAndDeallocate();
+        auto ptrType = as<IROutParamTypeBase>(param->getDataType());
+        if (!ptrType || !isEmptyType(ptrType->getValueType()))
+            return;
+        d3dParams.add(param);
+        if (isRayPayload)
+            d3dRayParams.add(param);
     }
-}
+
+    // Select a decorated Khronos carrier by its logical contents, including root arrays.
+    void collectGlobal(IRGlobalVar* global)
+    {
+        auto ptrType = cast<IRPtrTypeBase>(global->getDataType());
+        if (isEmptyType(ptrType->getValueType()))
+            khronosGlobals.add(global);
+    }
+
+    // Expose dispatch operands in small SPIR-V helpers that receive this payload global, such as
+    // HitObject's trace wrapper. Reuse the normal intrinsic inliner's eligibility test, but leave
+    // unrelated intrinsics at their normal pipeline stage. Return whether a helper was inlined.
+    bool inlinePayloadIntrinsicCalls(IRGlobalVar* global)
+    {
+        HashSet<IRCall*> calls;
+        for (auto use = global->firstUse; use; use = use->nextUse)
+        {
+            if (auto call = as<IRCall>(use->getUser()))
+                calls.add(call);
+        }
+        bool changed = false;
+        for (auto call : calls)
+            changed |= inlineIntrinsicFunctionCall(call);
+        return changed;
+    }
+
+    // Retype a D3D boundary parameter and adapt all calls to the same intrinsic signature. The
+    // standard-library intrinsic has a GenericAsm body that implicitly consumes its parameters;
+    // entry points instead access the logical data field in their ordinary shader code.
+    void materializeParam(IRParam* param)
+    {
+        auto func = getParentFunc(param);
+        auto paramIndex = getParamIndexInBlock(param);
+        auto oldPtrType = cast<IRPtrTypeBase>(param->getDataType());
+        auto logicalType = oldPtrType->getValueType();
+        auto carrier = getCarrier(logicalType);
+        IRBuilder builder(module);
+        if (d3dRayParams.contains(param))
+            addRayPayloadDecorationIfNeeded(builder, carrier.type);
+
+        List<IRUse*> oldUses;
+        for (auto use = param->firstUse; use; use = use->nextUse)
+            oldUses.add(use);
+        param->setFullType(builder.getPtrType(carrier.type, oldPtrType));
+        if (oldUses.getCount())
+        {
+            builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+            auto dataAddress = builder.emitFieldAddress(oldPtrType, param, carrier.dataKey);
+            for (auto use : oldUses)
+                use->set(dataAddress);
+        }
+
+        // The instantiated intrinsic may be called from several shaders. Updating only the call
+        // that identified it would leave the other calls with a mismatched parameter type.
+        List<IRCall*> calls;
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            auto call = as<IRCall>(use->getUser());
+            if (call && call->getCallee() == func)
+                calls.add(call);
+        }
+        for (auto call : calls)
+        {
+            auto arg = call->getArg(paramIndex);
+            builder.setInsertBefore(call);
+            auto carrierVar = builder.emitVar(carrier.type);
+            IRInst* fields[] = {
+                builder.emitLoad(arg),
+                builder.getIntValue(builder.getIntType(), 0)};
+            builder.emitStore(carrierVar, builder.emitMakeStruct(carrier.type, 2, fields));
+            call->setArg(paramIndex, carrierVar);
+            builder.setInsertAfter(call);
+            auto data = builder.emitFieldAddress(
+                builder.getPtrType(logicalType),
+                carrierVar,
+                carrier.dataKey);
+            builder.emitStore(arg, builder.emitLoad(data));
+        }
+        fixUpFuncType(func);
+    }
+
+    // Give a Khronos payload global physical storage. Dispatch operands and location queries
+    // must still name that global, while source-level loads/stores use its empty logical field.
+    // Payload-helper inlining exposes SPIR-V dispatch operands before this rewrite.
+    void materializeGlobal(IRGlobalVar* global)
+    {
+        auto oldPtrType = cast<IRPtrTypeBase>(global->getDataType());
+        auto carrier = getCarrier(oldPtrType->getValueType());
+        List<IRUse*> logicalUses;
+        List<IRInst*> asmOperands;
+        for (auto use = global->firstUse; use; use = use->nextUse)
+        {
+            switch (use->getUser()->getOp())
+            {
+            case kIROp_SPIRVAsmOperandInst:
+                asmOperands.add(use->getUser());
+                break;
+            case kIROp_GetVulkanRayTracingPayloadLocation:
+            case kIROp_DependsOnDecoration:
+                break;
+            default:
+                logicalUses.add(use);
+                break;
+            }
+        }
+        IRBuilder builder(module);
+        global->setFullType(builder.getPtrType(carrier.type, oldPtrType));
+        // An asm operand is a typed reference to its value. Keep both sides consistent or the
+        // operand's stale empty pointer type would itself legalize to none inside the asm block.
+        for (auto operand : asmOperands)
+            operand->setFullType(global->getFullType());
+        for (auto use : logicalUses)
+        {
+            builder.setInsertBefore(use->getUser());
+            use->set(builder.emitFieldAddress(oldPtrType, global, carrier.dataKey));
+        }
+    }
+};
 
 // Resolve the temporary markers in `inst`'s calls, recursing through nested blocks. Consider this
 // example:
@@ -116,21 +254,25 @@ static void padEmptyStructWithDummyField(IRBuilder& builder, IRStructType* struc
 //
 // The public TraceRay API accepts any `payload_t`, but the HLSL intrinsic requires its payload to
 // be a user struct. The specialized wrapper therefore passes `payload` through
-// ForceVarIntoRayPayloadStructTemporarily. If `payload_t` is already a struct, this pass forwards
+// ForceVarIntoRayPayloadStructTemporarily. If `payload_t` is a nonempty struct, this pass forwards
 // the original variable and marks its type with `IRRayPayloadDecoration` so later payload passes
 // can find it. Otherwise, as in the example, it creates a local `struct { int data; }`, copies the
 // value in, passes the wrapper, and copies the field back after the call when the intrinsic
 // parameter is mutable. ForceVarIntoStructTemporarily performs the same two rewrites for other
 // struct-only parameters without adding ray-payload semantics. Specialization must expose the
 // concrete argument type before this choice, and no marker may remain when HLSL emission begins.
-static void legalizeForcedStructArgumentsInChildren(IRInst* inst)
+// Empty structs and arrays instead select the intrinsic parameter for boundary-only
+// materialization.
+static void legalizeForcedStructArgumentsInChildren(
+    IRInst* inst,
+    EmptyPayloadLegalizationContext& context)
 {
     for (auto child : inst->getChildren())
     {
         switch (child->getOp())
         {
         case kIROp_Block:
-            legalizeForcedStructArgumentsInChildren(child);
+            legalizeForcedStructArgumentsInChildren(child, context);
             break;
 
         case kIROp_Call:
@@ -150,6 +292,24 @@ static void legalizeForcedStructArgumentsInChildren(IRInst* inst)
                     SLANG_RELEASE_ASSERT(forceStructPtrType);
                     auto forceStructBaseType = forceStructPtrType->getValueType();
                     IRBuilder builder(call);
+                    if (isEmptyType(forceStructBaseType))
+                    {
+                        // Empty data needs a boundary-only carrier, even when it is an array.
+                        // Select the formal parameter so every call to this instantiated
+                        // intrinsic is adapted together when its signature changes.
+                        call->setArg(i, forceStructArg);
+                        auto callee = cast<IRFunc>(call->getCallee());
+                        UInt paramIndex = 0;
+                        for (auto param : callee->getParams())
+                        {
+                            if (paramIndex++ == i)
+                            {
+                                context.collectParam(param, isForcedRayPayloadStruct);
+                                break;
+                            }
+                        }
+                        continue;
+                    }
                     if (forceStructBaseType->getOp() == kIROp_StructType)
                     {
                         call->setArg(i, forceStructArg);
@@ -217,7 +377,7 @@ static void legalizeForcedStructArgumentsInChildren(IRInst* inst)
 // marker could identify EmptyOuter as a payload. Parameter binding treats mutable parameters of
 // hit and miss shaders as ray payloads; record that same role here so collection and SM 6.7 access
 // qualifiers also cover these entry points without requiring an explicit [raypayload] attribute.
-static void markD3DEntryPointRayPayloadTypes(IRFunc* func)
+static void markD3DEntryPointRayPayloadTypes(IRFunc* func, EmptyPayloadLegalizationContext& context)
 {
     auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
     if (!entryPointDecor)
@@ -238,13 +398,14 @@ static void markD3DEntryPointRayPayloadTypes(IRFunc* func)
         auto outType = as<IROutParamTypeBase>(param->getFullType());
         if (!outType)
             continue;
+        context.collectParam(param, true);
         auto structType = as<IRStructType>(outType->getValueType());
         if (structType)
             addRayPayloadDecorationIfNeeded(builder, structType);
     }
 }
 
-static void prepareD3DRayTracingPayloads(IRModule* module)
+static void prepareD3DRayTracingPayloads(IRModule* module, EmptyPayloadLegalizationContext& context)
 {
     // Establish payload roles from both caller arguments and receiving entry-point parameters
     // before collection or access-qualifier normalization inspects the types.
@@ -256,51 +417,34 @@ static void prepareD3DRayTracingPayloads(IRModule* module)
         auto func = as<IRFunc>(globalInst);
         if (!func)
             continue;
-        legalizeForcedStructArgumentsInChildren(func);
-        markD3DEntryPointRayPayloadTypes(func);
+        legalizeForcedStructArgumentsInChildren(func, context);
+        markD3DEntryPointRayPayloadTypes(func, context);
     }
 }
 
-// Collect the empty ray-payload struct reachable from a single global inst, if any. Identify ray
-// payloads by their IR decorations: either the struct type is decorated, or it is the pointee type
-// of a decorated global variable. For example, the standard-library wrapper that calls
-// __spirvTraceRayHitObjectEXT declares `[__vulkanRayPayload] static T p;` and passes `p` to the
-// intrinsic. Lowering attaches IRVulkanRayPayloadDecoration to that global, so the global-variable
-// check below finds its payload type without checking the intrinsic's name or looking for a call.
-static void collectIfEmptyRayPayload(
+// Collect an empty Khronos ray-payload global by its semantic decoration. For example, the wrapper
+// that calls __spirvTraceRayHitObjectEXT declares `[__vulkanRayPayload] static T p;` and passes p
+// to the intrinsic. Lowering attaches IRVulkanRayPayloadDecoration to that global, so the
+// global-variable check below finds its payload type without checking the intrinsic's name or
+// looking for a call.
+static void collectIfEmptyKhronosRayPayload(
     IRInst* globalInst,
-    HashSet<IRStructType*>& emptyRayPayloadStructs)
+    EmptyPayloadLegalizationContext& context)
 {
-    if (auto structType = as<IRStructType>(globalInst))
-    {
-        if (structType->findDecoration<IRRayPayloadDecoration>() ||
-            structType->findDecoration<IRVulkanRayPayloadDecoration>())
-        {
-            addIfEmptyStruct(structType, emptyRayPayloadStructs);
-        }
-        return;
-    }
-
     auto globalVar = as<IRGlobalVar>(globalInst);
-    if (!globalVar || !globalVar->findDecoration<IRVulkanRayPayloadDecoration>())
+    if (!globalVar || (!globalVar->findDecoration<IRVulkanRayPayloadDecoration>() &&
+                       !globalVar->findDecoration<IRVulkanRayPayloadInDecoration>()))
         return;
-    auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
-    SLANG_RELEASE_ASSERT(ptrType);
-    addIfEmptyStruct(ptrType->getValueType(), emptyRayPayloadStructs);
+    context.collectGlobal(globalVar);
 }
 
-static bool isCallShaderCall(IRCall* call)
-{
-    return getBuiltinFuncEnum(call->getCallee()) == KnownBuiltinDeclName::CallShader;
-}
-
-// Collect the empty D3D callable-data structs reachable from a single global inst. A D3D callable
+// Collect the empty D3D callable-data parameters of a single function. A D3D callable
 // entry point has a fixed-shape mutable callable-data parameter, and a `CallShader` payload is the
 // second, pointer-typed argument of the call; `KnownBuiltin` gives this target-neutral IR pass a
 // stable identity for `CallShader` independent of the eventual intrinsic spelling.
 static void collectIfEmptyD3DCallableData(
     IRInst* globalInst,
-    HashSet<IRStructType*>& emptyCallableDataStructs)
+    EmptyPayloadLegalizationContext& context)
 {
     auto func = as<IRFunc>(globalInst);
     if (!func)
@@ -313,35 +457,29 @@ static void collectIfEmptyD3DCallableData(
     if (entryPointDecor && entryPointDecor->getProfile().getStage() == Stage::Callable)
     {
         for (auto param : func->getParams())
-        {
-            if (auto outType = as<IROutParamTypeBase>(param->getFullType()))
-                addIfEmptyStruct(outType->getValueType(), emptyCallableDataStructs);
-        }
+            context.collectParam(param, false);
     }
 
-    // Find the caller's payload type in `CallShader(shaderIndex, data)`. Its second argument is
-    // the pointer to `data`, whose pointee struct must survive type legalization.
-    for (auto block : func->getBlocks())
+    // Specialization leaves the HLSL CallShader intrinsic as a concrete function. Select its
+    // payload parameter, then adapt all calls to that signature during materialization.
+    if (getBuiltinFuncEnum(func) == KnownBuiltinDeclName::CallShader)
     {
-        for (auto inst : block->getChildren())
+        UInt paramIndex = 0;
+        for (auto param : func->getParams())
         {
-            auto call = as<IRCall>(inst);
-            if (!call || !isCallShaderCall(call))
-                continue;
-            SLANG_RELEASE_ASSERT(call->getArgCount() == 2);
-            auto ptrType = as<IRPtrTypeBase>(call->getArg(1)->getDataType());
-            SLANG_RELEASE_ASSERT(ptrType);
-            addIfEmptyStruct(ptrType->getValueType(), emptyCallableDataStructs);
+            if (paramIndex++ == 1)
+                context.collectParam(param, false);
         }
+        SLANG_RELEASE_ASSERT(paramIndex == 2);
     }
 }
 
-// Collect the empty Khronos callable-data struct reachable from a single global inst. Vulkan-style
+// Collect an empty Khronos callable-data global. Vulkan-style
 // `CallShader` lowering stores callable data in a decorated module-scope global; the intrinsic call
 // may already have been inlined by this point, so the global is the canonical surviving carrier.
 static void collectIfEmptyKhronosCallableData(
     IRInst* globalInst,
-    HashSet<IRStructType*>& emptyCallableDataStructs)
+    EmptyPayloadLegalizationContext& context)
 {
     auto globalVar = as<IRGlobalVar>(globalInst);
     if (!globalVar)
@@ -351,16 +489,7 @@ static void collectIfEmptyKhronosCallableData(
     {
         return;
     }
-    auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
-    SLANG_RELEASE_ASSERT(ptrType);
-    addIfEmptyStruct(ptrType->getValueType(), emptyCallableDataStructs);
-}
-
-static void padEmptyStructs(IRModule* module, HashSet<IRStructType*> const& emptyStructs)
-{
-    IRBuilder builder(module);
-    for (auto structType : emptyStructs)
-        padEmptyStructWithDummyField(builder, structType);
+    context.collectGlobal(globalVar);
 }
 
 static void legalizeRayPayloadAccessQualifiersForD3D(IRModule* module)
@@ -381,12 +510,14 @@ static void legalizeRayPayloadAccessQualifiersForD3D(IRModule* module)
         addDefaultPayloadAccessQualifiersToStruct(builder, structType);
 }
 
+// Select the physical boundary forms required by a target and its shader model.
 struct RayTracingPayloadLegalizationPolicy
 {
     bool prepareD3DRayTracingPayloads = false;
-    bool materializeEmptyRayPayloads = false;
+    bool materializeEmptyKhronosRayPayloads = false;
     bool materializeEmptyD3DCallableData = false;
     bool materializeEmptyKhronosCallableData = false;
+    bool inlineSPIRVPayloadIntrinsics = false;
     bool normalizeD3DPayloadAccessQualifiers = false;
 };
 
@@ -399,7 +530,6 @@ static RayTracingPayloadLegalizationPolicy getRayTracingPayloadLegalizationPolic
     if (isD3DTarget(targetRequest))
     {
         policy.prepareD3DRayTracingPayloads = true;
-        policy.materializeEmptyRayPayloads = true;
         policy.materializeEmptyD3DCallableData = true;
 
         auto profile = getEffectiveTargetProfile(targetRequest, targetProgram->getOptionSet());
@@ -410,8 +540,9 @@ static RayTracingPayloadLegalizationPolicy getRayTracingPayloadLegalizationPolic
     {
         // Both SPIR-V and GLSL lower ray payloads and CallShader callable data through decorated
         // module-scope objects that must keep a physical representation.
-        policy.materializeEmptyRayPayloads = true;
+        policy.materializeEmptyKhronosRayPayloads = true;
         policy.materializeEmptyKhronosCallableData = true;
+        policy.inlineSPIRVPayloadIntrinsics = isSPIRV(targetRequest->getTarget());
     }
 
     // CUDA/OptiX is intentionally absent. Its callable ABI is variadic, so ordinary empty-type
@@ -419,44 +550,55 @@ static RayTracingPayloadLegalizationPolicy getRayTracingPayloadLegalizationPolic
     return policy;
 }
 
-// Collect every empty payload struct the policy asks for in a single walk of the module's global
-// insts. The payload kinds inspect different global-inst shapes, so we dispatch each inst to the
-// per-kind collectors the policy enables instead of walking the global list once per kind. All
-// three collectors feed one shared set: a struct reused as both a ray payload and callable data
-// must be padded exactly once. Finish collection before padding so emptiness is evaluated on the
-// original types, independently of the order in which the selected structs will be modified.
-static void collectEmptyPayloadStructs(
+// Collect boundary objects in a single global walk. Separate ray and callable collectors share
+// one context so repeated uses of a logical type receive the same boundary representation.
+static void collectEmptyPayloads(
     IRModule* module,
     RayTracingPayloadLegalizationPolicy const& policy,
-    HashSet<IRStructType*>& emptyPayloadStructs)
+    EmptyPayloadLegalizationContext& context)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (policy.materializeEmptyRayPayloads)
-            collectIfEmptyRayPayload(globalInst, emptyPayloadStructs);
+        if (policy.materializeEmptyKhronosRayPayloads)
+            collectIfEmptyKhronosRayPayload(globalInst, context);
         if (policy.materializeEmptyD3DCallableData)
-            collectIfEmptyD3DCallableData(globalInst, emptyPayloadStructs);
+            collectIfEmptyD3DCallableData(globalInst, context);
         if (policy.materializeEmptyKhronosCallableData)
-            collectIfEmptyKhronosCallableData(globalInst, emptyPayloadStructs);
+            collectIfEmptyKhronosCallableData(globalInst, context);
     }
 }
 
 void legalizeRayTracingPayloads(IRModule* module, TargetProgram* targetProgram)
 {
     const auto policy = getRayTracingPayloadLegalizationPolicy(targetProgram);
+    EmptyPayloadLegalizationContext context;
+    context.module = module;
 
-    // Identify ray-payload types from both call-site markers and entry-point parameters before
-    // collecting empty payloads. Without their IRRayPayloadDecoration, an unannotated payload
-    // struct would be missed and type legalization could erase it.
+    // Identify D3D ray-payload boundaries from both call-site markers and entry-point parameters,
+    // including unannotated payload types and independently compiled receiving shaders.
     if (policy.prepareD3DRayTracingPayloads)
-        prepareD3DRayTracingPayloads(module);
+        prepareD3DRayTracingPayloads(module, context);
 
-    if (policy.materializeEmptyRayPayloads || policy.materializeEmptyD3DCallableData ||
+    if (policy.materializeEmptyKhronosRayPayloads || policy.materializeEmptyD3DCallableData ||
         policy.materializeEmptyKhronosCallableData)
     {
-        HashSet<IRStructType*> emptyPayloadStructs;
-        collectEmptyPayloadStructs(module, policy, emptyPayloadStructs);
-        padEmptyStructs(module, emptyPayloadStructs);
+        collectEmptyPayloads(module, policy, context);
+        for (auto param : context.d3dParams)
+            context.materializeParam(param);
+        bool inlinedPayloadIntrinsic = false;
+        for (auto global : context.khronosGlobals)
+        {
+            if (policy.inlineSPIRVPayloadIntrinsics)
+                inlinedPayloadIntrinsic |= context.inlinePayloadIntrinsicCalls(global);
+            context.materializeGlobal(global);
+        }
+        if (inlinedPayloadIntrinsic)
+        {
+            // Remove obsolete helper definitions: their old empty formal parameters would
+            // still be visited by type legalization. Do this after all selected globals have
+            // been rewritten, since DCE can also remove globals that no longer have uses.
+            eliminateDeadCode(module);
+        }
     }
 
     if (policy.normalizeD3DPayloadAccessQualifiers)

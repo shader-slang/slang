@@ -1,7 +1,7 @@
 // Arrays whose elements have no physical representation disappear during type legalization too.
 // A zero cast lowers directly to MakeStruct with a MakeArrayFromElement operand before payload
-// legalization. Adding the outer dummy field must preserve that original constructor operand
-// until type legalization removes the empty array; replacing it prematurely invalidates the IR.
+// legalization. Creating an ABI carrier must leave this logical constructor and type unchanged
+// until type legalization removes the empty array.
 // Brace initialization in the callee also covers the ordinary aggregate constructor path.
 
 //TEST:SIMPLE(filecheck=HLSL_CALLER): -stage raygeneration -entry rgen -target hlsl -profile sm_6_7 -validate-ir
@@ -36,7 +36,8 @@ void rgen()
     CallShader(0, payload);
 }
 
-// The array and its empty element type must disappear. Only the outer payload gets one int.
+// The logical array and its empty element type disappear. Only the separate ABI carrier gets
+// an int.
 // HLSL_CALLER: struct EmptyArrayPayload
 // HLSL_CALLER: {
 // HLSL_CALLER-NEXT: int _slang_dummy{{.*}};
@@ -49,12 +50,12 @@ void rgen()
 // HLSL_CALLEE: void callableMain(inout EmptyArrayPayload{{.*}} {{[A-Za-z0-9_]+}})
 // DXIL: define void @
 
-// The intermediate constructor must still have an operand for every field, including the empty
-// array, until type legalization removes that field. Successful final emission alone can hide a
-// malformed intermediate constructor because its empty fields are eventually discarded.
+// The logical constructor retains its original array operand and must not gain the physical
+// carrier's dummy field. Successful final emission alone can hide a malformed intermediate
+// constructor because its empty fields are eventually discarded.
 // IR: AFTER legalizeRayTracingPayloads
 // IR: let %[[elements:[0-9A-Za-z_]+]] : Array({{.*}}) = makeArrayFromElement(
-// IR: : %EmptyArrayPayload = makeStruct(%[[elements]], 0 : Int)
+// IR: : %EmptyArrayPayload{{[0-9]*}} = makeStruct(%[[elements]])
 
 // SPIRV: %[[payload:[0-9A-Za-z_]+]] = OpVariable %{{[0-9A-Za-z_]+}} CallableDataKHR
 // SPIRV: OpExecuteCallableKHR %{{[0-9A-Za-z_]+}} %[[payload]]

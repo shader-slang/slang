@@ -62,7 +62,7 @@ void rgen()
     TraceRay(scene, RAY_FLAG_NONE, 0xff, 0, 0, 0, ray, payload);
 }
 
-// Both nested empty fields disappear; the outer carrier contains only the new dummy field.
+// The unchanged nested logical types disappear; only the separate ABI carrier's dummy remains.
 // HLSL_CALLER: struct {{.*}}EmptyOuter
 // HLSL_CALLER: {
 // HLSL_CALLER-NEXT: int _slang_dummy{{.*}};

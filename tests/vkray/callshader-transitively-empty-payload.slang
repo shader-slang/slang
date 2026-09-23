@@ -1,6 +1,6 @@
-// A payload whose only field is itself empty is erased by type legalization unless the target
-// requires a physical carrier. Compile caller and callee separately so the D3D entry-point
-// parameter cannot rely on discovering a CallShader call in the same module. OptiX still permits
+// A payload whose only field is itself empty is erased by type legalization. Targets that need
+// physical storage must use a separate carrier. Compile caller and callee separately so the D3D
+// entry-point parameter cannot rely on discovering a CallShader call in the same module. OptiX permits
 // the logical payload to contribute no caller argument or callee parameter.
 
 //TEST:SIMPLE(filecheck=HLSL_CALLER): -stage raygeneration -entry rgen -target hlsl -profile sm_6_7 -validate-ir
@@ -33,8 +33,8 @@ void rgen()
     CallShader(0, data);
 }
 
-// Pad only the outer carrier. Its empty source field still disappears during type legalization,
-// leaving exactly one physical int in independently compiled callers and callees.
+// Only the ABI carrier receives a dummy field. The original nested logical types remain empty
+// and disappear during legalization, leaving one int in independent callers and callees.
 // HLSL_CALLER: struct TransitivelyEmpty
 // HLSL_CALLER: {
 // HLSL_CALLER-NEXT: int _slang_dummy{{.*}};

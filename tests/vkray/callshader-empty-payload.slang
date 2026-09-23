@@ -26,9 +26,8 @@ void rgen()
     CallShader(0, d);
 }
 
-// The empty payload is padded with a dummy field, and the padded payload local is passed as
-// `CallShader`'s second argument, rather than being dropped (the bug emitted a one-argument
-// `CallShader(0U)`).
+// A separate one-int carrier is passed as CallShader's second argument. The logical EmptyData
+// type remains empty; only this ABI boundary requires storage. The bug emitted CallShader(0U).
 // HLSL-DAG: int _slang_dummy{{.*}};
 // HLSL: EmptyData{{[A-Za-z0-9_]*}} [[payload:[A-Za-z0-9_]+]];
 // HLSL: CallShader(0U, [[payload]]);
@@ -42,7 +41,7 @@ void rgen()
 // SPIRV: %[[payload:[0-9A-Za-z_]+]] = OpVariable %{{[0-9A-Za-z_]+}} CallableDataKHR
 // SPIRV: OpExecuteCallableKHR %{{[0-9A-Za-z_]+}} %[[payload]]
 
-// GLSL compiles (instead of aborting): the padded payload survives as a real `callableDataEXT`
+// GLSL compiles (instead of aborting): the physical carrier survives as a real `callableDataEXT`
 // global and the callable dispatch is emitted.
 // GLSL-DAG: _slang_dummy
 // GLSL-DAG: callableDataEXT

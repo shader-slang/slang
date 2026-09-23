@@ -455,7 +455,7 @@ bool trimOptimizableType(IRStructType* type)
             continue;
 
         // ... same for empty struct fields.
-        if (as<IRStructType>(field->getFieldType()) && isEmptyType(field->getFieldType()))
+        if (as<IRStructType>(field->getFieldType()) && isStructEmpty(field->getFieldType()))
             continue;
 
         if (!isFieldUsed(field))

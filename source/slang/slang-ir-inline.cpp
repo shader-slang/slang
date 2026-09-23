@@ -1326,6 +1326,12 @@ void performIntrinsicFunctionInlining(IRModule* module)
     }
 }
 
+bool inlineIntrinsicFunctionCall(IRCall* call)
+{
+    IntrinsicFunctionInliningPass pass(call->getModule());
+    return pass.considerCallSite(call);
+}
+
 struct CustomInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;

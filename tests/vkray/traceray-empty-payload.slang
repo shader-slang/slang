@@ -1,7 +1,7 @@
-// An unannotated TraceRay payload receives its IRRayPayloadDecoration when the D3D-only
-// ForceVarIntoRayPayloadStructTemporarily marker is resolved. Ray-tracing legalization must do
-// that before collecting empty payload structs, or general type legalization erases the payload
-// and leaves an invalid seven-argument TraceRay call.
+// An unannotated TraceRay payload is recognized through the D3D-only
+// ForceVarIntoRayPayloadStructTemporarily marker. Ray-tracing legalization must provide a physical
+// carrier at that boundary before type legalization erases the logical payload. Otherwise the
+// emitted TraceRay call has only seven arguments. The original EmptyPayload type stays empty.
 
 //TEST:SIMPLE(filecheck=HLSL): -stage raygeneration -entry main -target hlsl -profile sm_6_7
 //TEST:SIMPLE(filecheck=DXIL): -stage raygeneration -entry main -target dxil -profile sm_6_7

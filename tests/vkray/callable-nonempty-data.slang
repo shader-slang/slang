@@ -1,6 +1,6 @@
-// Regression test that target legalization leaves a non-empty callable-data struct intact on both
-// HLSL/D3D and CUDA. A spurious `_slang_dummy` would mean the physical-carrier policy was applied
-// to a type that already has a representation.
+// Regression test that target legalization preserves the data-bearing fields of callable data
+// on both HLSL/D3D and CUDA. A spurious `_slang_dummy` would mean the physical-carrier policy was
+// applied to a payload that already has a representation.
 
 //TEST:SIMPLE(filecheck=HLSL): -stage callable -entry callableMain -target hlsl -profile sm_6_7 -validate-ir
 //TEST:SIMPLE(filecheck=CUDA): -stage callable -entry callableMain -target cuda -validate-ir

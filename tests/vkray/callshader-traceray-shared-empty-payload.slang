@@ -1,9 +1,6 @@
-// Regression test for the payload-collection dedup in `legalizeRayTracingPayloads`. An empty struct
-// used as BOTH a TraceRay ray payload and a CallShader callable payload is matched by two of the
-// per-kind collectors, yet must be padded exactly once. The collectors feed one shared set that
-// deduplicates it; padding the same struct from two separate sets would add an extra dummy field.
-// A successful compile plus a single `_slang_dummy` field verifies that each carrier is padded
-// exactly once.
+// Regression test for physical-carrier reuse in `legalizeRayTracingPayloads`. An empty struct
+// used as BOTH a TraceRay ray payload and a CallShader callable payload must have a shared
+// physical carrier with exactly one dummy field. Neither payload use may add another field.
 
 //TEST:SIMPLE(filecheck=HLSL): -stage raygeneration -entry rgen -target hlsl -profile sm_6_7
 
@@ -26,5 +23,9 @@ void rgen()
     CallShader(0, p);
 }
 
-// The shared empty payload is padded exactly once — not once per collector.
-// HLSL-COUNT-1: _slang_dummy
+// Both boundary uses share one carrier with one dummy field; the logical type stays empty.
+// HLSL: struct {{.*}}
+// HLSL-NEXT: {
+// HLSL-NEXT: int _slang_dummy{{.*}};
+// HLSL-NEXT: };
+// HLSL-NOT: int _slang_dummy

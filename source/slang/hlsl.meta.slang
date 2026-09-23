@@ -19904,8 +19904,7 @@ int __callablePayloadLocation(__ref Payload payload);
 __generic<Payload>
 [require(cuda_glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
 // A target-agnostic identity so IR passes recognize a `CallShader` call regardless of the
-// `__target_switch` arm selected; see `isCallShaderCall` for why string-based recognition is not
-// enough.
+// `__target_switch` arm selected, without depending on the intrinsic's emitted spelling.
 [KnownBuiltin($( (int)KnownBuiltinDeclName::CallShader))]
 void CallShader(uint shaderIndex, inout Payload payload)
 {
