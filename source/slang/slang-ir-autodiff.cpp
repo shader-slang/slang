@@ -1363,9 +1363,34 @@ void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
         case kIROp_DebugScope:
         case kIROp_DebugNoScope:
         case kIROp_DebugInlinedVariable:
-        case kIROp_DebugFuncDecoration:
         case kIROp_DebugLocationDecoration:
             cloneDecoration(decor, destFunc);
+            break;
+        case kIROp_DebugFuncDecoration:
+            {
+                // Each derivative needs its OWN IRDebugFunction: a DebugFunction record identifies
+                // a single function body (one DebugFunctionDefinition per record) and supplies its
+                // debug name.
+                auto srcDebugFunc =
+                    cast<IRDebugFunction>(as<IRDebugFuncDecoration>(decor)->getDebugFunc());
+
+                // A derivative lacks a name hint only when its original was unnamed (its debug name
+                // came from a linkage name); reuse the source name so the record is still distinct.
+                IRInst* name = srcDebugFunc->getName();
+                if (auto nameHint = destFunc->findDecoration<IRNameHintDecoration>())
+                    name = nameHint->getNameOperand();
+
+                IRBuilder builder(destFunc->getModule());
+                builder.setInsertInto(destFunc->getModule()->getModuleInst());
+                auto derivativeDebugFunc = builder.emitDebugFunction(
+                    name,
+                    srcDebugFunc->getLine(),
+                    srcDebugFunc->getCol(),
+                    srcDebugFunc->getFile(),
+                    destFunc->getDataType(),
+                    srcDebugFunc->getParentScope());
+                builder.addDecoration(destFunc, kIROp_DebugFuncDecoration, derivativeDebugFunc);
+            }
             break;
         default:
             break;
