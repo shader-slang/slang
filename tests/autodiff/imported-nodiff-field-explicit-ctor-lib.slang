@@ -17,3 +17,14 @@ public struct Value : IDifferentiable
     public no_diff uint tag = 0;
     public __init() {}
 }
+
+// A plain `IDifferentiable` struct: synthesized member-wise constructor, no `no_diff`, no
+// explicit `__init()`. Both this defining module (via the synthesized differentiable
+// constructor) and an importer that differentiates a function over it record the
+// `DifferentialPairType` association -- on the `[export]` and the `[import]` declaration
+// respectively. Linking then sees the same-kind association on two declarations of one symbol
+// and must keep exactly one, exercising the per-(target, kind) dedup in the link recovery.
+public struct PlainValue : IDifferentiable
+{
+    public float x = 0.0;
+}
