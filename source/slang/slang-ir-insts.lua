@@ -3008,10 +3008,10 @@ local insts = {
 	{ DebugInlinedVariable = { min_operands = 2 } },
 	{
 		DebugScope = {
-			min_operands = 2,
+			min_operands = 1,
 		},
 	},
-	{ DebugNoScope = { min_operands = 1 } },
+	{ DebugNoScope = { min_operands = 0 } },
 	{
 		DebugBuildIdentifier = {
 			min_operands = 2,
