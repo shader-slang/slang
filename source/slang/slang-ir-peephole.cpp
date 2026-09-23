@@ -1,6 +1,6 @@
 #include "slang-ir-peephole.h"
 
-#include "../core/slang-math.h"
+#include "core/slang-math.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"
@@ -340,16 +340,19 @@ struct PeepholeContext : InstPassBase
                 // target-dependent
                 if (as<IRDescriptorHandleType>(baseType))
                 {
-                    bool useUint64 = targetProgram->getTargetReq()->getTargetCaps().implies(
-                        CapabilityAtom::spvBindlessTextureNV);
+                    bool hasBindlessTextureNV =
+                        targetProgram->getTargetReq()->getTargetCaps().implies(
+                            CapabilityAtom::spvBindlessTextureNV);
+                    bool useUint64 =
+                        isDescriptorHandleRepresentedAsUInt64(baseType, hasBindlessTextureNV);
 
                     IRBuilder builder(module);
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                     builder.setInsertBefore(inst);
 
-                    // Get the underlying type based on capability:
-                    // - With spvBindlessTextureNV: uint64_t
-                    // - Without: uint2
+                    // Get the underlying type based on the handle's representation:
+                    // - uint64_t for texture/sampler kinds under spvBindlessTextureNV
+                    // - uint2 otherwise
                     IRType* underlyingType;
                     if (useUint64)
                     {
@@ -361,9 +364,13 @@ struct PeepholeContext : InstPassBase
                         underlyingType = builder.getVectorType(uintType, 2);
                     }
 
+                    // A handle's size/alignment must match its underlying representation under the
+                    // requested layout rule, not always the natural rule: a `uint2` handle has
+                    // std430/std140 alignment 8 but natural alignment 4.
                     IRSizeAndAlignment sizeAlign;
-                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                    if (SLANG_FAILED(getSizeAndAlignment(
                             targetProgram->getTargetReq(),
+                            layoutRules,
                             underlyingType,
                             &sizeAlign)))
                         break;
@@ -1232,6 +1239,26 @@ struct PeepholeContext : InstPassBase
                 if (auto wrap = as<IRCastUIntToUntypedSamplerHandle>(inst->getOperand(0)))
                 {
                     inst->replaceUsesWith(wrap->getOperand(0));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_CastDescriptorHandleToUInt2:
+            {
+                if (auto wrap = as<IRCastUInt2ToDescriptorHandle>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(wrap->getValue());
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_CastDescriptorHandleToUInt64:
+            {
+                if (auto wrap = as<IRCastUInt64ToDescriptorHandle>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(wrap->getValue());
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }

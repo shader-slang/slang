@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../source/compiler-core/slang-json-value.h"
-#include "../../source/core/slang-rtti-info.h"
+#include "compiler-core/slang-json-value.h"
+#include "core/slang-rtti-info.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -316,12 +316,6 @@ struct InitializeParams
     List<WorkspaceFolder> workspaceFolders;
     static const UnownedStringSlice methodName;
     static const StructRttiInfo g_rttiInfo;
-};
-
-struct NullResponse
-{
-    static const StructRttiInfo g_rttiInfo;
-    static NullResponse* get();
 };
 
 struct InitializeResult

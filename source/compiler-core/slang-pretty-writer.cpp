@@ -1,6 +1,6 @@
 #include "slang-pretty-writer.h"
 
-#include "../core/slang-string-escape-util.h"
+#include "core/slang-string-escape-util.h"
 
 namespace Slang
 {

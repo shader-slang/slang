@@ -486,13 +486,15 @@ void callHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
     // Copy arguments to the callee's working set.
     for (uint32_t i = 0; i < funcHeader->parameterCount; ++i)
     {
+        auto& srcOperand = inst->getOperand(i + 2);
         auto dst = newWorkingSetPtr + func.m_parameterOffsets[i];
-        auto src = (uint8_t*)inst->getOperand(i + 2).getPtr();
+        auto src = (uint8_t*)srcOperand.getPtr();
 
-        // func.m_parameterOffsets should be initialized to contain parameterCount+1 elements,
-        // where the last element is the total size of the parameters.
-        auto nextParamOffset = func.m_parameterOffsets[i + 1];
-        memcpy(dst, src, nextParamOffset - func.m_parameterOffsets[i]);
+        // pushFrame does not zero the callee frame, so any slot bytes beyond what is copied here
+        // are left uninitialized. That suffix is alignment padding outside the parameter value, so
+        // its contents are never interpreted as part of the parameter (see getCallArgumentCopySize
+        // for how the copy size is bounded).
+        memcpy(dst, src, func.getCallArgumentCopySize(i, srcOperand));
     }
     ctx->m_currentWorkingSet = newWorkingSetPtr;
     ctx->m_currentFuncCode = func.m_codeBuffer.getBuffer();
@@ -915,13 +917,13 @@ VMExtFunction getCastHandler(uint32_t extCode)
         switch (arithExtCode.scalarBitWidth)
         {
         case 0:
-            return castHandler<uint8_t, From, vectorSize>;
+            return castHandler<int8_t, From, vectorSize>;
         case 1:
-            return castHandler<uint16_t, From, vectorSize>;
+            return castHandler<int16_t, From, vectorSize>;
         case 2:
-            return castHandler<uint32_t, From, vectorSize>;
+            return castHandler<int32_t, From, vectorSize>;
         case 3:
-            return castHandler<uint64_t, From, vectorSize>;
+            return castHandler<int64_t, From, vectorSize>;
         }
     case kSlangByteCodeScalarTypeUnsignedInt:
         switch (arithExtCode.scalarBitWidth)
@@ -961,13 +963,13 @@ VMExtFunction getCastHandler(uint32_t extCode)
         switch (arithExtCode.scalarBitWidth)
         {
         case 0:
-            return getCastHandler<uint8_t, vectorSize>(extCode);
+            return getCastHandler<int8_t, vectorSize>(extCode);
         case 1:
-            return getCastHandler<uint16_t, vectorSize>(extCode);
+            return getCastHandler<int16_t, vectorSize>(extCode);
         case 2:
-            return getCastHandler<uint32_t, vectorSize>(extCode);
+            return getCastHandler<int32_t, vectorSize>(extCode);
         case 3:
-            return getCastHandler<uint64_t, vectorSize>(extCode);
+            return getCastHandler<int64_t, vectorSize>(extCode);
         }
     case kSlangByteCodeScalarTypeUnsignedInt:
         switch (arithExtCode.scalarBitWidth)

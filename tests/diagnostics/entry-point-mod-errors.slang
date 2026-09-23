@@ -25,7 +25,7 @@ void computeMain(
     float test4 : packoffset(c4),
 //CHECK:  ^^^^^ modifier on entry point parameter is unsupported
 //CHECK:  ^^^^^ keyword 'packoffset' on parameter 'test4' is unsupported on entry point parameters and will be ignored
-    RWBuffer<float> output
+    RWStructuredBuffer<float> output
 )
 {
     output[0] = test2[0];

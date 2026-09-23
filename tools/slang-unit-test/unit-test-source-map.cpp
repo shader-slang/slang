@@ -1,12 +1,12 @@
 
-#include "../../source/compiler-core/slang-json-lexer.h"
-#include "../../source/compiler-core/slang-json-native.h"
-#include "../../source/compiler-core/slang-json-parser.h"
-#include "../../source/compiler-core/slang-json-source-map-util.h"
-#include "../../source/compiler-core/slang-json-value.h"
-#include "../../source/compiler-core/slang-source-map.h"
-#include "../../source/core/slang-rtti-info.h"
-#include "../../source/core/slang-string-escape-util.h"
+#include "compiler-core/slang-json-lexer.h"
+#include "compiler-core/slang-json-native.h"
+#include "compiler-core/slang-json-parser.h"
+#include "compiler-core/slang-json-source-map-util.h"
+#include "compiler-core/slang-json-value.h"
+#include "compiler-core/slang-source-map.h"
+#include "core/slang-rtti-info.h"
+#include "core/slang-string-escape-util.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

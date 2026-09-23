@@ -1,13 +1,13 @@
 #include "slang-source-embed-util.h"
 
 // Artifact
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-util.h"
-#include "../core/slang-blob.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-io.h"
-#include "../core/slang-string-escape-util.h"
-#include "../core/slang-string-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-util.h"
+#include "core/slang-blob.h"
+#include "core/slang-char-util.h"
+#include "core/slang-io.h"
+#include "core/slang-string-escape-util.h"
+#include "core/slang-string-util.h"
 
 namespace Slang
 {

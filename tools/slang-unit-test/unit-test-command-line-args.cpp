@@ -1,6 +1,6 @@
 // unit-test-command-line-args.cpp
 
-#include "../../source/compiler-core/slang-command-line-args.h"
+#include "compiler-core/slang-command-line-args.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

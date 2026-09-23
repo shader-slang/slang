@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../core/slang-string.h"
+#include "core/slang-string.h"
 #include "replay-context.h"
 #include "replay-stream.h"
 

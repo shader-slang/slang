@@ -2,10 +2,10 @@
 
 #define _CRT_SECURE_NO_WARNINGS 1
 
-#include "../../source/core/slang-test-tool-util.h"
-#include "../source/core/slang-io.h"
-#include "../source/core/slang-std-writers.h"
-#include "../source/core/slang-string-util.h"
+#include "core/slang-io.h"
+#include "core/slang-std-writers.h"
+#include "core/slang-string-util.h"
+#include "core/slang-test-tool-util.h"
 #include "core/slang-token-reader.h"
 #include "options.h"
 #include "png-serialize-util.h"
@@ -1609,10 +1609,9 @@ static SlangResult _setSessionPrelude(
         session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, buf.getBuffer());
 #endif
     }
-    else
-    {
-        session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, "");
-    }
+    // When no NVAPI slot is requested, leave the session's HLSL prelude untouched (matching
+    // slang-test) rather than blanking it, so render-test emission keeps whatever prelude the
+    // session already has — normally the compiler default an ordinary slangc user gets.
 
     return SLANG_OK;
 }

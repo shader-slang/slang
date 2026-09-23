@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:28:39Z
-//META: source_commit=7a45a039cb7fb0a34e9184c7069a96bccdf08115
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#the-major-node-families
-//META: doc_section_digest=5749d9886287d8389af87cb5a6a536a28da48a421ac9a27f86809fca6a7b5676
+//META: doc_section_digest=90f68d89058e95e927dbc5ffd876802120cff1e5fe6639465168476f05517709
 //META: purpose=Builtin unary operators (arithmetic negate, logical not, bitwise not) over builtin scalar operands are rewritten by the checker and evaluate correctly.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -794,7 +794,7 @@ Result ShaderObjectImpl::allocateDescriptorSets(
     BindingOffset const& offset,
     ShaderObjectLayoutImpl* specializedLayout)
 {
-    assert(specializedLayout->getOwnDescriptorSets().getCount() <= 1);
+    SLANG_ASSERT(specializedLayout->getOwnDescriptorSets().getCount() <= 1);
     // The number of sets to allocate and their layouts was already pre-computed
     // as part of the shader object layout, so we use that information here.
     //
@@ -844,7 +844,7 @@ Result ShaderObjectImpl::bindAsParameterBlock(
     //
     SLANG_RETURN_ON_FAIL(allocateDescriptorSets(encoder, context, offset, specializedLayout));
 
-    assert(offset.bindingSet < (uint32_t)context.descriptorSets->getCount());
+    SLANG_ASSERT(offset.bindingSet < (uint32_t)context.descriptorSets->getCount());
     SLANG_RETURN_ON_FAIL(bindAsConstantBuffer(encoder, context, offset, specializedLayout));
 
     return SLANG_OK;

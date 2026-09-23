@@ -1,15 +1,15 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-30T14:09:52Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T13:08:00Z
 target_doc: target-pipelines/spirv.md
 review_report: ../../reviews/target-pipelines/spirv.md.review.md
-target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 3
+  fixed: 5
   rejected_bogus: 0
-  rejected_out_of_scope: 0
+  rejected_out_of_scope: 1
   deferred: 0
   escalated: 0
 ---
@@ -17,17 +17,16 @@ actions:
 # Remediation report for target-pipelines/spirv.md
 
 ## Summary
-All three findings reported by the review are resolved by edits that are now
-present in the target document. F-001 (major) and F-002, F-003 (minor) are each
-recorded as `fixed`; none were rejected, deferred, or escalated. The edits add a
-Phase D diagram node, correct stale line citations, and supply the missing
-intended-reader sentence. Front-matter `source_commit` is unchanged, so
-`target_doc_source_commit_after` equals `_before`.
+
+Five of the six findings were verified against source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23` and fixed: the critical Phase D row 20 gate, the two missing rows plus the missing simplification-mode group in the consolidated gate table, the split of the combined Phase B autodiff row and the duplicate Phase C `44` label, three stale line citations, and the mis-attributed `slang-target-program.h` source bullet. F-002 (stale `watched_paths_digest`) is rejected as out of scope: remediation is explicitly forbidden from touching that front-matter field. The document was edited. None of the findings traced back to the known staleness of the generation prompt's line numbers; all six line citations involved were re-derived at HEAD in this session.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | The Phase D mermaid diagram was missing the active downstream spirv-opt node and mis-ordered the disabled `optimizeSPIRV` node. The active spirv-opt step is the `compiler->compile` call gated under `if (compiler)` in `source/slang/slang-emit.cpp`, which runs after the link/validate chain; the disabled `#if 0` `optimizeSPIRV` block precedes that setup. | Phase D diagram (doc lines ~700, 720-722): added the `spirvOpt` node labeled "(downstream) compiler->compile spirv-opt" with its connecting edges, and reordered the disabled `optimizeSPIRV` node to sit before the link/validate chain. |
-| F-002 | fixed | The Source-anchor citations were stale by 100-plus lines against HEAD: `emitSPIRVFromIR` resolves at `source/slang/slang-emit-spirv.cpp:11803` (doc previously cited ~11598) and `legalizeIRForSPIRV` at `source/slang/slang-ir-spirv-legalize.cpp:3265` (doc previously cited 3104). | Refreshed the affected line citations so `emitSPIRVFromIR` reads ~11803 and `legalizeIRForSPIRV` reads 3265, matching the recorded source commit. |
-| F-003 | fixed | `_meta/prompts/_common.md:65` requires the first body paragraph to state the intended reader; the opening paragraph lacked any audience statement. | Intro paragraph (doc lines ~14-17): added a sentence stating the page is for a compiler developer who needs to locate where in the SPIR-V direct-emit pipeline a particular pass runs. |
+| F-001 | fixed | Confirmed. `source/slang/slang-emit.cpp:3393-3394` computes `needsDownstreamCompiler` as the disjunction of `needsLink`, `needsOptimization`, `needsValidation`, and `needsSeparateDebugInfo`; lines 3399-3403 load `compiler` only when that disjunction holds; line 3404 opens `if (compiler)`; and the `compiler->compile(downstreamOptions, ...)` call at line 3473 sits inside that block with no `needsOptimization` test anywhere between. The row's Gate cell was therefore naming one contributor to a disjunction as if it were the call's own gate. | Phase D table row 20: Gate cell changed from `needsOptimization` to `compiler != nullptr` (line 3404), with the Notes cell restating the four-way `needsDownstreamCompiler` disjunction and stating explicitly that `needsOptimization` is only one reason the compiler is loaded. |
+| F-002 | rejected-out-of-scope | The finding is factually right — `regenerate.py digest target-pipelines/spirv.md` returns `acce7b597096fbbe5e6eff92e308e01122e6271397aec68a4f310b729f497200` while the front matter records `68a85e13...` — but the remediation contract at `docs/generated/design/_meta/prompts/_remediate.md:97-100` says to preserve front matter exactly "except for `generated_at` and `source_commit` and `watched_paths_digest`, which the operator refreshes by running `regenerate.py mark-fresh` after your edits. Do not edit those three fields yourself." The reviewer's own recommendation ends with "refresh it through the normal freshness workflow", which is the operator's `mark-fresh` step. | — |
+| F-003 | fixed | Confirmed on both counts. The Phase C descriptor-handle gate exists at `source/slang/slang-emit.cpp:2728-2730` (`target != CodeGenTarget::PyTorchCppBinding` conjoined with `targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(CapabilityName::descriptor_handle)) == CapabilitySet::ImpliesReturnFlags::Implied`) and is drawn as `descHandleGate` in the Phase C diagram and as table row 44, but had no consolidated-table row. The Phase D downstream-compiler gate at lines 3393-3404 likewise had none. The required group order at `docs/generated/design/_meta/prompts/target-pipelines-spirv.md:78-117` puts simplification-mode predicates in their own group 4, between context predicates and SPIR-V runtime predicates; the page had folded `minimalOptimization` into the option-set toggles. | `## Conditional gates`: two rows appended to `### Context predicates and capability gates` (the descriptor-handle gate and the `compiler != nullptr` downstream gate); new `### Simplification-mode predicates` subsection inserted between that section and `### SPIR-V-specific runtime predicates`, holding the `fastIRSimplificationOptions.minimalOptimization` row moved out of `### Option-set toggles`. |
+| F-004 | fixed | Confirmed. `source/slang/slang-emit.cpp:1446-1452` is two distinct `SLANG_PASS` calls on mutually exclusive arms, and the Phase B diagram already carried two nodes (`fADP`, `sADD`) against a single combined table row; the Phase C table had two rows both labeled `44`. Both defects are fixed. The suffixed sub-labels were deliberately retained rather than flattened to consecutive integers: `9a`/`9b` and Phase D's `5a`-`5g` encode information a flat sequence would lose (mutually exclusive arms, and loop-body membership inside pass row 5), the suffix convention is already used across the sibling target-pipeline pages, and flattening Phase D would invalidate the page's own cross-references `### simplifyIRForSpirvLegalization (Phase D, step 5)` and `### Forward-declared pointer fixup (Phase D, step 12)`. | Phase B row 9 split into rows 9a (`finalizeAutoDiffPass`, `reqSet.autodiff`) and 9b (`stripAutoDiffDecorations`, `else` arm), matching the two existing diagram nodes; Phase C's second `44` row (`collectMetadata`) renumbered to `45`, making that table's tail 43/44/45/46 consecutive. |
+| F-005 | fixed | Confirmed all three by re-deriving at HEAD. `source/slang/slang-emit.cpp:1019` is `auto metadata = new ArtifactPostEmitMetadata;` (the page said line ~944); line 1057 is `if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)` (the page said 983); and line 2188 is `SLANG_PASS(translateGlobalVaryingVar, codeGenContext)` (the page said ~1996). | Three citations updated: Phase A row 7 `line ~944` -> `line 1019`; the Phase A filtered-out note `line 983` -> `line 1057`; Phase C row 3 `line ~1996` -> `line 2188`. |
+| F-006 | fixed | Confirmed. `source/slang/slang-target-program.h:113` declares only the forwarding `TargetProgram::shouldEmitSPIRVDirectly`, whose body combines `isSPIRV(m_targetReq->getTarget())` with `getOptionSet().shouldEmitSPIRVDirectly()` (line 115); the header's only option-set-related declaration is the `getOptionSet()` accessor at line 106. The actual predicates live in `source/slang/slang-compiler-options.h` — `shouldEmitSPIRVDirectly` at line 340 and `shouldIncludeSourceInDebugInfo` at line 380 (the reviewer's "380" is the declaration line; its 381 was the opening brace). `slang-compiler-options.h` is already in this page's `watched_paths`, so no manifest change is needed. | `## Source`: the `slang-target-program.h` bullet narrowed to the forwarding method at line 113, and a new `slang-compiler-options.h` bullet added for the `CompilerOptionSet` accessors, citing lines 340 and 380. |

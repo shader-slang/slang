@@ -1,23 +1,23 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-30T13:33:12+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T12:10:09+00:00
 target_doc: pipeline/05-ir-passes.md
-target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_watched_paths_digest: cdb8cb5584a28f89a0b7db40000011a37d1ed999cfb2fc9243256f34051010a7
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 66d53e154eb63196d1c2ca1ee3a1c040e363e14dfbc86e6fad3f9c19cd0f9d21
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: fail
   cross_references: pass
   completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: fail
   front_matter_validity: pass
-finding_count: 2
+finding_count: 3
 severity_breakdown:
   critical: 0
-  major: 0
-  minor: 2
+  major: 2
+  minor: 1
   nit: 0
 ---
 
@@ -25,27 +25,21 @@ severity_breakdown:
 
 ## Summary
 
-The document mostly satisfies the prompt contract: front matter is complete, required sections are present, and all checked links resolve. I found two minor source-alignment issues where the page overstates which passes run again from `linkAndOptimizeIR` and classifies helper files as target-specific passes.
+The document satisfies its structure and style contracts, all 27 explicit line-number citations are accurate, and its links and front matter validate at the recorded commit. Three factual issues remain: one watched-path note was not updated after the manifest changed, and four pass-table purpose cells misdescribe their implementations. The most important errors label call specialization as array-generic specialization or tagged-union defunctionalization.
 
 ## Items checked
 
-- Read the target document, `_common.md`, `pipeline-05-ir-passes.md`, and the dependency document `pipeline/04-ast-to-ir.md`.
-- Used `regenerate.py show pipeline/05-ir-passes.md` to confirm the scoped prompt, watched paths, `depends_on`, and resolved watched files.
-- Verified the target front matter uses `source_commit` `c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8` and `watched_paths_digest` `cdb8cb5584a28f89a0b7db40000011a37d1ed999cfb2fc9243256f34051010a7`.
-- Checked all 185 Markdown relative links in the target document for filesystem resolution.
-- Spot-checked source claims in `slang-emit.cpp`, `slang-lower-to-ir.cpp`, `slang-ir-ssa-simplification.cpp`, `slang-ir-coverage-instrument.cpp`, `slang-ir-translate.h`, `slang-ir-translate.cpp`, `slang-ir-spirv-snippet.h`, and representative pass headers.
-- Verified at least 10 concrete claims, including the `linkAndOptimizeIR` entry point, the `SLANG_PASS` wrapper, `linkIR`, pre-link SSA/SCCP/CFG/peephole/DCE calls, the mandatory early-inlining loop, `simplifyIR`'s fixed-point contents, coverage buffer element-width handling, boolean coverage stores, `finalizeCoverageInstrumentationMetadata`, `TargetProgram::createIRModuleForLayout`, and representative pass-file existence.
+- Read `_review.md`, `_common.md`, the per-document prompt, the target document, dependency `pipeline/04-ast-to-ir.md`, and the resolved watched-file list from `regenerate.py show`.
+- Verified all 27 explicit line-number and line-range citations against `source/slang/slang-emit.cpp` at `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
+- Confirmed 162 `slang-ir-*.cpp` files and 180 `SLANG_PASS(...)` call sites in `linkAndOptimizeIR` (181 textual macro occurrences including the macro definition).
+- Spot-checked more than 18 factual claims, including all four orchestrator callers, both lowering-set scans, HostVM's early return, SPIR-V legalization order, layout-module linking, specialization options, autodiff cleanup, non-uniform-index modes, coverage counter behavior, metadata collection, SSA simplification, register allocation, DLL wrappers, and representative table purposes.
+- Ran the generated-doc linter, resolved the relative links at the recorded commit, and verified the generated peer targets exist in the manifest.
+- Verified the required sections, 65,536-byte cap (document size 44,836 bytes), universal style rules, mandatory front matter, and the historical 325-file watched-path digest (`66d53e154eb63196d1c2ca1ee3a1c040e363e14dfbc86e6fad3f9c19cd0f9d21`).
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## How the passes are ordered`, paragraph beginning `Individual category tables below` | The sentence says `constructSSA`, `propagateConstExpr`, `eliminateDeadCode`, `simplifyCFG`, and `peepholeOptimize` are `all invoked both in generateIRForTranslationUnit and again from linkAndOptimizeIR`. `propagateConstExpr` is shown in the pre-link region, but the post-link `simplifyIR` helper that `linkAndOptimizeIR` calls is documented and implemented as SSA/SCCP/SimplifyCFG/DCE plus related cleanup, not constexpr propagation. | `source/slang/slang-lower-to-ir.cpp:15339` has `propagateConstExpr(module, compileRequest->getSink());`; `source/slang/slang-ir-ssa-simplification.cpp:50` says `simplifyIR` runs "SSA, SCCP, SimplifyCFG, and DeadCodeElimination"; `source/slang/slang-emit.cpp:1452` calls `SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink)`. | Remove `propagateConstExpr` from the "invoked both" list, or state separately that it appears in the pre-link non-essential-validation block while post-link cleanup uses `simplifyIR`/SCCP rather than `propagateConstExpr`. |
-| F-002 | minor | `### Target-specific lowering`, table rows `SPIR-V snippet` and `Translate` | The section says `These passes run only for their named target`, but the rows for `SPIR-V snippet` and `Translate` describe helper infrastructure rather than target-gated lowering passes. `SpvSnippet` is a parsed SPIR-V assembly snippet helper, and `slang-ir-translate` exposes a shared translation dictionary/context used by specialization and related analysis. | `source/slang/slang-ir-spirv-snippet.h:22` says `SpvSnippet` "Represents a parsed Spv ASM from intrinsic definition"; `source/slang/slang-ir-translate.h:18` declares `initializeTranslationDictionary` / `clearTranslationDictionary` and `TranslationContext`; `source/slang/slang-emit.cpp:1479` clears the translation dictionary as shared post-link cleanup. | Move these rows to `## Pass utilities` / helper prose, or change the target-specific section wording so it does not present helper files as target-only passes. |
-
-## No-issues notes
-
-- The required top-level sections from `pipeline-05-ir-passes.md` are present.
-- The document is under the 64 KB size cap.
-- The dependency link to `pipeline/04-ast-to-ir.md` and peer links to target-pipeline pages resolve.
-- The detailed coverage instrumentation row aligns with the checked coverage pass implementation.
+| F-001 | minor | `## How the passes are ordered`, lines 101-107 | The note says `source/slang/slang-emit-spirv.cpp` falls outside this page's watched paths and “should be added,” but the current manifest entry already watches that file. It also says SPIR-V legalization has no category row, although the `SPIR-V legalize` row appears at line 356. | `docs/generated/design/_meta/manifest.yaml:196-207` includes `source/slang/slang-emit-spirv.cpp`; the target document's `SPIR-V legalize` row links `source/slang/slang-ir-spirv-legalize.cpp`. | Remove the SPIR-V half of this stale note. Retain only the actionable gap for `source/slang/slang-check-out-of-bound-access.cpp`, or add that source path to the manifest and remove the note entirely. |
+| F-002 | major | `### Specialization and generics`, `Specialize arrays` and `Defunctionalization` rows (lines 203 and 209) | Both purpose cells describe transformations these files do not implement. `slang-ir-specialize-arrays` specializes calls whose struct parameters contain array fields; it does not specialize “array-typed generic parameters.” The explicitly aspirational `slang-ir-defunctionalization` filename currently contains `specializeHigherOrderParameters`, which specializes calls receiving global functions; it does not convert function values to tagged unions. | `source/slang/slang-ir-specialize-arrays.h:9-20`; `source/slang/slang-ir-defunctionalization.h:1-16`; `source/slang/slang-ir-defunctionalization.cpp:22-33`. | Rename the first purpose to call specialization for struct parameters with array fields. Rename the second pass/purpose to `Specialize higher-order parameters` and describe specializing calls that pass global functions; delete the tagged-union claim. |
+| F-003 | major | `### Layout and binding`, `Late require capability` and `String hash` rows (lines 328 and 331) | These purpose cells also contradict their APIs. `processLateRequireCapabilityInsts` processes and eliminates late-require instructions while diagnosing unavailable capabilities; it does not add requirements. `slang-ir-string-hash` manages the global hashed-string-literal pool and verifies that `getStringHash` operands are string literals; it does not perform stable hashing “for symbols.” | `source/slang/slang-ir-late-require-capability.h:12-18`; `source/slang/slang-ir-string-hash.h:13-25`; `source/slang/slang-ir-string-hash.cpp:99-121`. | Describe late capability processing as eliminating deferred checks and diagnosing missing capabilities. Describe string-hash handling as pooling hashed string literals and validating `getStringHash` operands. |

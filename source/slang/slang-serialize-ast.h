@@ -2,7 +2,7 @@
 #ifndef SLANG_SERIALIZE_AST_H
 #define SLANG_SERIALIZE_AST_H
 
-#include "../core/slang-riff.h"
+#include "core/slang-riff.h"
 #include "slang-ast-all.h"
 #include "slang-ast-builder.h"
 #include "slang-ast-support-types.h"

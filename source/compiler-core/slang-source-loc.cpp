@@ -1,9 +1,9 @@
 // slang-source-loc.cpp
 #include "slang-source-loc.h"
 
-#include "../core/slang-char-encode.h"
-#include "../core/slang-string-escape-util.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-char-encode.h"
+#include "core/slang-string-escape-util.h"
+#include "core/slang-string-util.h"
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-impl.h"
 #include "slang-artifact-representation-impl.h"

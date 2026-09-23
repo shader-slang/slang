@@ -5,6 +5,7 @@
 
 RWStructuredBuffer<int> outputBuffer;
 
+[noinline]
 void funcWithParam(int x)
 {
     outputBuffer[0] = x;

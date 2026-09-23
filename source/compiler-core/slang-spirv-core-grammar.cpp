@@ -1,7 +1,7 @@
 #include "slang-spirv-core-grammar.h"
 
-#include "../core/slang-rtti-util.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-rtti-util.h"
+#include "core/slang-string-util.h"
 #include "slang-core-diagnostics.h"
 #include "slang-json-native.h"
 

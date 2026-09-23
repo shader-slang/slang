@@ -2,8 +2,8 @@
 #ifndef SLANG_SEMANTIC_VERSION_H
 #define SLANG_SEMANTIC_VERSION_H
 
-#include "../core/slang-basic.h"
-#include "../core/slang-hash.h"
+#include "core/slang-basic.h"
+#include "core/slang-hash.h"
 
 namespace Slang
 {

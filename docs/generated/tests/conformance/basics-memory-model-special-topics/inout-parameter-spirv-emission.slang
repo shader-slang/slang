@@ -15,6 +15,10 @@
 // multiple `OpLoad %int %val` instructions, and at least one `OpStore %val`.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 RWStructuredBuffer<int> output;
 
@@ -46,3 +50,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK: OpLoad %int %val
 // CHECK: OpLoad %int %val
 // CHECK: OpStore %val
+
+// GLSL: void multiReadWrite_{{[0-9]+}}(inout int val_{{[0-9]+}})
+// GLSL: val_{{[0-9]+}} =
+
+// HLSL: void multiReadWrite_{{[0-9]+}}(inout int val_{{[0-9]+}})
+// HLSL: val_{{[0-9]+}} =
+
+// MTL: void multiReadWrite_{{[0-9]+}}(int thread* val_{{[0-9]+}})
+// MTL: *val_{{[0-9]+}} =
+
+// WGSL: fn multiReadWrite_{{[0-9]+}}( val_{{[0-9]+}} : ptr<function, i32>)
+// WGSL: (*val_{{[0-9]+}}) =

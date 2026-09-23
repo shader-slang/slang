@@ -58,6 +58,7 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
     elementTypeLayoutBuilder.addResourceUsage(
         LayoutResourceKind::Uniform,
         LayoutSize((LayoutSize::RawValue)elementSize.getStride()));
+    elementTypeLayoutBuilder.addAlignment(LayoutResourceKind::Uniform, elementSize.alignment);
     auto elementTypeLayout = elementTypeLayoutBuilder.build();
 
     IRStructuredBufferTypeLayout::Builder elementBufferTypeLayoutBuilder(
@@ -68,6 +69,7 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
 
     IRTypeLayout::Builder counterTypeLayoutBuilder(&builder);
     counterTypeLayoutBuilder.addResourceUsage(LayoutResourceKind::Uniform, LayoutSize(4));
+    counterTypeLayoutBuilder.addAlignment(LayoutResourceKind::Uniform, 4);
     auto counterTypeLayout = counterTypeLayoutBuilder.build();
 
     IRStructuredBufferTypeLayout::Builder counterBufferTypeLayoutBuilder(

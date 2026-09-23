@@ -5,7 +5,6 @@
 #include "slang-ast-dispatch.h"
 #include "slang-syntax.h"
 
-#include <assert.h>
 
 namespace Slang
 {

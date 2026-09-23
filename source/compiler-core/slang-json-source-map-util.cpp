@@ -1,7 +1,7 @@
 #include "slang-json-source-map-util.h"
 
-#include "../core/slang-blob.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-blob.h"
+#include "core/slang-string-util.h"
 #include "slang-com-helper.h"
 #include "slang-json-native.h"
 

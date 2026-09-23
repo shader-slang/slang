@@ -29,7 +29,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from lib import analyze, manifest
+from lib import analyze, buckets, manifest
 
 # Mutually-exclusive-enough leaves for boundary attribution (compiler leaves
 # as in analyze.LEAF_TIMERS plus the backend emit timer, the legalize pair,
@@ -47,37 +47,46 @@ def headline(wl):
     return "apiTotal" if (spec and spec.mode == "api") else "compileInner"
 
 
+# Not a real timer name -- a per-workload marker carried through the same
+# {(workload, timer): value} map `daily_points` already returns, so a schema
+# transition can be detected downstream without changing this function's
+# return shape (three callers already destructure it as (date, commit, vals)).
+# Absent entirely on data recorded before bench.py started writing
+# "timer_schema"; _SCHEMA_MARKER's own .get() callers treat that as unknown.
+_SCHEMA_MARKER = analyze.SCHEMA_MARKER
+
+
 def daily_points(results_dir, metric):
     """[(date, commit9, {(workload, timer): value})], one per daily label."""
     out = []
-    ddir = os.path.join(results_dir, "daily")
-    for label in sorted(os.listdir(ddir)) if os.path.isdir(ddir) else []:
-        rpath = os.path.join(ddir, label, "results.json")
-        if not os.path.exists(rpath):
-            continue
-        mpath = os.path.join(ddir, label, "meta.json")
-        meta = analyze.read_json(mpath) if os.path.exists(mpath) else {}
+    for lab in analyze.daily_labels(results_dir):
         vals = {}
-        for r in analyze.canonical_runs(analyze.read_json(rpath)):
+        for r in analyze.canonical_runs(analyze.read_json(lab["path"])):
             for t, st in (r.get("timers") or {}).items():
                 if st:
                     vals[(r["workload"], t)] = st[metric]
+            sv = analyze.schema_value(r.get("timer_schema"))
+            if sv is not None:
+                vals[(r["workload"], _SCHEMA_MARKER)] = sv
         if vals:
-            out.append((meta.get("date", label[:10]),
-                        (meta.get("commit") or label.split("-")[-1])[:9], vals))
+            out.append((lab["date"], lab["commit"][:9], vals))
     return out
 
 
 def _partition(workload):
     """(bucket_fn, tree) for the workload's family — breakdown's mutually-
     exclusive decomposition, whose buckets tile the headline exactly (named
-    leaves + `(self)` residuals). Imported lazily: breakdown imports this
-    module for the report pages, so a top-level import would be circular."""
-    import breakdown
+    leaves + `(self)` residuals)."""
     spec = manifest.BY_NAME.get(workload)
     if spec is not None and spec.mode == "api":
-        return breakdown.api_buckets, breakdown.API_TREE
-    return breakdown.buckets, breakdown.TREE
+        return buckets.api_buckets, buckets.API_TREE
+    # SOURCE_TREE, not TREE: `buckets.buckets` picks the shape per run from the
+    # timers, and the tree returned here is used only to enumerate the names the
+    # partition already covers. SOURCE_TREE's names are a superset (it adds
+    # emitEntryPointsSourceFromIR), so it is the correct cover for either shape
+    # -- with TREE, a source-target run would list that timer a second time as
+    # an "also moved" row for a phase the buckets above already accounted for.
+    return buckets.buckets, buckets.SOURCE_TREE
 
 
 def _tree_names(tree):
@@ -85,6 +94,37 @@ def _tree_names(tree):
     for child in tree[1]:
         names |= _tree_names(child)
     return names
+
+
+def _fold_detail_only_buckets(bucket_dict):
+    """Merge buckets.DETAIL_ONLY_BUCKETS into "linkAndOptimizeIR (self)",
+    dropping them from the returned dict — brings a detailed-schema bucket
+    decomposition down to coarse-schema granularity so it tiles the same way
+    a coarse point's decomposition already does (those four names are simply
+    absent there, not zero; see buckets.py rule 5). A no-op when none of the
+    four are present, so it is safe to apply speculatively."""
+    folded = dict(bucket_dict)
+    extra = sum(folded.pop(name, 0.0) for name in buckets.DETAIL_ONLY_BUCKETS)
+    if extra:
+        key = "linkAndOptimizeIR (self)"
+        folded[key] = folded.get(key, 0.0) + extra
+    return folded
+
+
+def _comparable_buckets(bucket_a, schema_a, bucket_b, schema_b):
+    """(bucket_a, bucket_b), folded to a shared coarse granularity whenever
+    the two points might not share a timer schema. schema_a/schema_b come
+    from a point's `__timer_schema__` marker: 1.0 (detailed), 0.0 (coarse),
+    or None (unknown — recorded before bench.py started writing
+    "timer_schema"). None is treated as a POSSIBLE mismatch rather than
+    assumed equal to whatever the other side is: assuming equal is exactly
+    the bug this guards against -- a coarse/detailed schema transition
+    reading as buckets.DETAIL_ONLY_BUCKETS appearing or disappearing between
+    two daily points, rather than the measurement-granularity change it
+    actually is."""
+    if schema_a is None or schema_b is None or schema_a != schema_b:
+        return _fold_detail_only_buckets(bucket_a), _fold_detail_only_buckets(bucket_b)
+    return bucket_a, bucket_b
 
 
 # Raw counters that duplicate another counter one-to-one (same measured span
@@ -122,11 +162,16 @@ def workload_progress(points, workload, step_rel=0.05):
                     ("(remaining N buckets)", d_ms, None, pp) row so the sum
                     property stays visible. pct_own is None when the bucket
                     starts at ~0, where an own-% is undefined.
-      extras        [(name, d_ms, pct_own)] — every OTHER reported counter
+      extras        [(name, d_val, pct_own)] — every OTHER reported counter
                     (e.g. readSerializedModuleIR, loadBuiltinModule): they
                     nest inside or extend beyond the partition, so they carry
                     no pp column, but their own movement is still the signal
-                    for passes without a dedicated bucket.
+                    for passes without a dedicated bucket. `d_val` is NOT
+                    always milliseconds — this list also carries the kb-unit
+                    memory counters, so it must be rendered through
+                    analyze.fmt_qty rather than formatted as ms. (The
+                    contributors list above genuinely is ms: buckets partition
+                    compileInner.)
       steps         [(d_prev, d, c_prev, c, pct, top_buckets)] — day
                     boundaries where the headline moved >= step_rel vs the
                     PREVIOUS day (both directions), with the step's top
@@ -152,7 +197,9 @@ def workload_progress(points, workload, step_rel=0.05):
 
     bucket_fn, tree = _partition(workload)
     bks = [(d, c, bucket_fn(tm)) for d, c, tm in pts]
-    first_b, last_b = bks[0][2], bks[-1][2]
+    schemas = [tm.get(_SCHEMA_MARKER) for d, c, tm in pts]
+    first_b, last_b = _comparable_buckets(
+        bks[0][2], schemas[0], bks[-1][2], schemas[-1])
     kept, rest_ms, rest_pp, rest_n = [], 0.0, 0.0, 0
     for t in sorted(set(first_b) | set(last_b)):
         a, b = first_b.get(t, 0.0), last_b.get(t, 0.0)
@@ -185,12 +232,20 @@ def workload_progress(points, workload, step_rel=0.05):
     # missing endpoint IS a 0 ms phase), so it is dropped rather than
     # defaulted — which is also why the direct indexing below cannot KeyError.
     for t in sorted(set(first_t) & set(last_t)):
-        if t in covered or t in _ALIASES:
+        if t in covered or t in _ALIASES or t == _SCHEMA_MARKER:
             continue
         a, b = first_t[t], last_t[t]
         own = (b / a - 1) * 100 if a >= NEAR_ZERO_MS else None
         # informational counters: shown only when they moved noticeably
-        if abs(b - a) >= 1.0 or (own is not None and abs(own) >= 5.0):
+        # (1 ms, or 1 MiB for the kb-unit memory counters)
+        floor = 1024.0 if analyze.unit_of(t) == "kb" else 1.0
+        # The relative gate needs a counter big enough for a percentage to mean
+        # something. -report-detailed-perf-benchmark reports ~67 per-pass
+        # timers, most of them well under a millisecond on every workload in the
+        # suite; without this, a 0.06 ms pass drifting by 0.004 ms clears the 5%
+        # gate and buries the rows that matter under noise.
+        relevant = own is not None and max(a, b) >= 1.0
+        if abs(b - a) >= floor or (relevant and abs(own) >= 5.0):
             extras.append((t, b - a, own))
     extras.sort(key=lambda r: -abs(r[1]))
 
@@ -208,7 +263,8 @@ def workload_progress(points, workload, step_rel=0.05):
         # against step_rel * 100.
         if abs(pct) < step_rel * 100:
             continue
-        b_prev, b_cur = bks[i - 1][2], bks[i][2]
+        b_prev, b_cur = _comparable_buckets(
+            bks[i - 1][2], schemas[i - 1], bks[i][2], schemas[i])
         movers = []
         for t in set(b_prev) | set(b_cur):
             a, b = b_prev.get(t, 0.0), b_cur.get(t, 0.0)
@@ -233,9 +289,11 @@ def workload_view(points, workload, step_rel):
         print(f"   {t:32s}{d_ms:+9.1f} ms  ({o} own, {contrib:+5.1f}pp of total)")
     if extras:
         print("other reported counters (nested/overlapping; no pp):")
-        for t, d_ms, own in extras:
+        # d_val, not d_ms: extras carry kb memory counters as well as ms
+        # timers, which is why this formats through fmt_qty.
+        for t, d_val, own in extras:
             o = f"{own:+6.1f}%" if own is not None else "     -"
-            print(f"   {t:32s}{d_ms:+9.1f} ms  ({o} own)")
+            print(f"   {t:32s}{analyze.fmt_qty(t, d_val, signed=True):>12s}  ({o} own)")
     print(f"day steps >= {step_rel * 100:.0f}% vs previous day:")
     if not steps:
         print("   none")
@@ -354,6 +412,128 @@ assert len(_B) == 1 and abs(_B[0][0] - (-10.0)) < 1e-9, \
 assert timer_deltas(_P0[2], _P1[2]) == [("SemanticChecking", -10.0), ("generateIR", 5.0)], \
     "timer_deltas: signed per-leaf suite-net, sorted by |delta|"
 del _P0, _P1, _B
+
+
+# Import-time self-check for the pp-sum tiling contract against the real
+# lib/buckets partition (this used to live in breakdown.py when the partition
+# did — the former import cycle constrained fixture placement).
+# The fixture includes compileInner's DIRECT children (frontEndExecute,
+# generateOutput) so alloc() actually descends: named-leaf buckets, (self)
+# residuals at two levels, and the pp sum are all exercised, not just a
+# single degenerate compileInner (self) bucket.
+_T0 = ("2026-01-01", "aaaaaaaaa",
+       {("w", "compileInner"): 100.0, ("w", "frontEndExecute"): 70.0,
+        ("w", "SemanticChecking"): 40.0, ("w", "generateIR"): 20.0,
+        ("w", "generateOutput"): 25.0})
+_T1 = ("2026-01-02", "bbbbbbbbb",
+       {("w", "compileInner"): 80.0, ("w", "frontEndExecute"): 60.0,
+        ("w", "SemanticChecking"): 30.0, ("w", "generateIR"): 25.0,
+        ("w", "generateOutput"): 15.0})
+_ov, _contrib, _ex, _st = workload_progress([_T0, _T1], "w")
+assert _ov is not None and abs(_ov[6] - (-20.0)) < 1e-9, \
+    "workload_progress fixture: headline 100 -> 80 ms must be -20%"
+assert len(_contrib) >= 4, \
+    "workload_progress fixture must produce a MULTI-bucket partition"
+assert abs(sum(c[3] for c in _contrib) - _ov[6]) < 1e-9, \
+    "workload_progress fixture: contributor pp must sum to the overall %"
+del _T0, _T1, _ov, _contrib, _ex, _st
+
+
+# Import-time self-check that the extras gate picks its floor BY UNIT. The
+# two counters below move by exactly the same amount (+100) over the same
+# starting value, so the only thing that can separate them is unit_of: 100 ms
+# clears the 1 ms time floor and is reported, while 100 kb is a fraction of
+# the 1 MiB memory floor and is suppressed as wobble. Asserting the pair
+# rather than a specific threshold keeps this from ossifying the constants —
+# it fails if the unit stops being consulted, not if a floor is retuned.
+_K0 = ("2026-01-01", "aaaaaaaaa", {("w", "compileInner"): 1000.0,
+                                   ("w", "aTimer"): 10000.0,
+                                   ("w", "aCounterKb"): 10000.0,
+                                   ("w", "bigCounterKb"): 10000.0})
+_K1 = ("2026-01-02", "bbbbbbbbb", {("w", "compileInner"): 1000.0,
+                                   ("w", "aTimer"): 10100.0,
+                                   ("w", "aCounterKb"): 10100.0,
+                                   ("w", "bigCounterKb"): 30720.0})
+_ov, _contrib, _ex, _st = workload_progress([_K0, _K1], "w")
+_names = {n for n, _d, _own in _ex}
+assert "aTimer" in _names, \
+    "extras: a +100 ms move clears the 1 ms time floor and must be reported"
+assert "aCounterKb" not in _names, \
+    "extras: an identical +100 must be suppressed for a kb counter (1 MiB floor)"
+assert "bigCounterKb" in _names, \
+    "extras: a +20 MiB move is well over the memory floor and must be reported"
+assert analyze.fmt_qty("bigCounterKb", 20480.0, signed=True) == "+20.0 MiB", \
+    "extras: kb counters must render as MiB, not milliseconds"
+del _K0, _K1, _ov, _contrib, _ex, _st, _names
+
+# Import-time self-check that a coarse/detailed timer-schema transition does
+# not read as buckets.DETAIL_ONLY_BUCKETS appearing or disappearing between
+# two daily points. Same underlying compile both days (compileInner and
+# linkAndOptimizeIR unchanged); only the schema differs, with day 2's
+# detailed run reporting 30 ms of genuinely-real deferBufferLoad work that
+# day 1's coarse schema structurally cannot report. Without
+# _comparable_buckets folding both sides to the shared coarse granularity,
+# this reads as deferBufferLoad appearing from nothing and
+# "linkAndOptimizeIR (self)" dropping by the same 30 ms -- a synthetic step
+# on both series, not a real one.
+#
+# Also carries two uncovered (extras-candidate) counters at both endpoints,
+# unrelated to the schema transition, to exercise the `relevant` gate
+# (daily_movers.py:247) that this fixture would otherwise never reach: every
+# name in a plain bucket-only fixture lands in `covered` or the schema
+# marker, so `relevant`'s own suppression of a sub-ms drift was previously
+# unexercised and dropping the `max(a, b) >= 1.0` term from it would still
+# pass CI. `subMsPass` moves ~6.7% but stays under both the 1 ms absolute
+# floor and the relevance floor, so it must NOT appear in extras; `bigPass`
+# moves 10% well above 1 ms, so it must.
+_D0 = ("2026-03-01", "eeeeeeeee", {("w", "compileInner"): 100.0,
+                                   ("w", "generateOutput"): 60.0,
+                                   ("w", "linkAndOptimizeIR"): 60.0,
+                                   ("w", "subMsPass"): 0.060,
+                                   ("w", "bigPass"): 40.0,
+                                   ("w", "__timer_schema__"): 0.0})
+_D1 = ("2026-03-02", "fffffffff", {("w", "compileInner"): 100.0,
+                                   ("w", "generateOutput"): 60.0,
+                                   ("w", "linkAndOptimizeIR"): 60.0,
+                                   ("w", "deferBufferLoad"): 30.0,
+                                   ("w", "subMsPass"): 0.064,
+                                   ("w", "bigPass"): 44.0,
+                                   ("w", "__timer_schema__"): 1.0})
+_ov3, _contrib3, _ex3, _st3 = workload_progress([_D0, _D1], "w")
+assert not any(name == "deferBufferLoad" for name, *_ in _contrib3), \
+    "a coarse->detailed schema transition must not report deferBufferLoad as a mover"
+assert all(abs(d_ms) < 1e-9 for _n, d_ms, _own, _pp in _contrib3), \
+    "identical underlying compile across a schema transition must show zero " \
+    f"bucket movement once folded to comparable granularity, got {_contrib3!r}"
+_ex3_names = {name for name, _d, _own in _ex3}
+assert "subMsPass" not in _ex3_names, \
+    "extras: a sub-ms counter drifting under both the absolute floor and the " \
+    "relevance floor must be suppressed, not reported as a mover"
+assert "bigPass" in _ex3_names, \
+    "extras: a >=1 ms counter moving 10% must clear the relevant gate and be reported"
+del _D0, _D1, _ov3, _contrib3, _ex3, _st3, _ex3_names
+
+# Same schema-transition scenario, but day 1 OMITS __timer_schema__ entirely
+# (schemas[0] is None) rather than recording 0.0 -- the shape of real
+# historical results.json data predating this field, as opposed to a day
+# that was recorded coarse on purpose. _comparable_buckets treats None as a
+# possible mismatch (see its docstring), so this must reach the same "no
+# synthetic mover" conclusion as the explicit 0.0-vs-1.0 case above.
+_N0 = ("2026-03-03", "1111111a1", {("w", "compileInner"): 100.0,
+                                   ("w", "generateOutput"): 60.0,
+                                   ("w", "linkAndOptimizeIR"): 60.0})
+_N1 = ("2026-03-04", "2222222b2", {("w", "compileInner"): 100.0,
+                                   ("w", "generateOutput"): 60.0,
+                                   ("w", "linkAndOptimizeIR"): 60.0,
+                                   ("w", "deferBufferLoad"): 30.0,
+                                   ("w", "__timer_schema__"): 1.0})
+_ov4, _contrib4, _ex4, _st4 = workload_progress([_N0, _N1], "w")
+assert not any(name == "deferBufferLoad" for name, *_ in _contrib4), \
+    "a day with no __timer_schema__ at all (pre-dating the field) must still fold " \
+    "against a detailed day -- None is a possible mismatch, not assumed equal"
+assert all(abs(d_ms) < 1e-9 for _n, d_ms, _own, _pp in _contrib4), \
+    f"expected zero bucket movement for the None-schema case, got {_contrib4!r}"
+del _N0, _N1, _ov4, _contrib4, _ex4, _st4
 
 
 if __name__ == "__main__":

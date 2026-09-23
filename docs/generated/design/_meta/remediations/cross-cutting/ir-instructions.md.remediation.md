@@ -1,14 +1,14 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-30T13:59:10Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T09:35:44Z
 target_doc: cross-cutting/ir-instructions.md
 review_report: ../../reviews/cross-cutting/ir-instructions.md.review.md
-target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 0
-  rejected_bogus: 2
+  fixed: 7
+  rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
   escalated: 0
@@ -17,10 +17,23 @@ actions:
 # Remediation report for cross-cutting/ir-instructions.md
 
 ## Summary
-Both findings were verified against the watched Lua source and against the current target document. Each describes table content that does not exist in the document at the reviewed commit: the rows in question already use the correct Lua opcode names and operand spellings. Both findings are therefore rejected as bogus. No edits were made this cycle and the front-matter source commit is unchanged.
+
+All seven findings were checked against `slang-ir-insts.lua`, the HLSL
+emitter, the IR module headers and the CI script, and all seven held
+up, so all seven were fixed. The two major fixes correct the decoration
+table's Opcode column and scope the deduplication guarantee to a single
+`IRModule`. Nothing was rejected, deferred, or escalated. The new
+`docs/design/ir.md` link added for F-007 uses the `../../../` prefix the
+page already uses elsewhere, so it resolves.
 
 ## Actions
+
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | rejected-bogus | The Value-instructions row at `docs/generated/design/cross-cutting/ir-instructions.md:138` already lists `integer_constant, float_constant, string_constant, ...` in the Opcode column and `IntLit, FloatLit, StringLit, ...` in the `struct_name` column, matching `source/slang/slang-ir-insts.lua:870,872,877`. The reviewer's claim that the Opcode column names the wrapper structs does not hold for the current text; the recommended change is already present. | — |
-| F-002 | rejected-bogus | The Type-instructions row at `docs/generated/design/cross-cutting/ir-instructions.md:130` already names the opcode `TextureType` and spells the operand `accessOperand`, matching `source/slang/slang-ir-insts.lua:417,424`. No `Texture` opcode cell or `access` operand spelling exists in the document. | — |
+| F-001 | fixed | `source/slang/slang-ir-insts.lua:1793,1827,2087,2157` declare keys `targetIntrinsic`, `nameHint`, `entryPoint`, `keepAlive` with unprefixed `struct_name` values and operands `nameOperand`, `target`/`definitionOperand`, `profileInst`/`name`/`moduleName`. | Four decoration rows now use the Lua opcodes, `struct_name` values and source operand names; `## Decorations` prose calls `IR*Decoration` the generated C++ wrappers. |
+| F-002 | fixed | `slang-ir-insts.lua:3408-3437`: every `constexpr*` opcode has an explicit 1-3 operand list. | Line 192: `(variadic)` -> `1-3 fixed operands; see Lua entries`. |
+| F-003 | fixed | `slang-ir-insts.lua:1631-1633`: `waveGetActiveMask = {}` is nullary, `waveMaskBallot` takes `mask, condition`. | Wave row: `(variadic)` -> `none / mask, condition`, noting shape varies by opcode. |
+| F-004 | fixed | `source/slang/slang-ir.h:2303` makes `IRDeduplicationContext` an `IRModule` member (accessor `2160`) and `slang-ir.cpp:2869` numbers insts in that per-module map, so "regardless of which module asks" overstated identity. | Scoped the `getBuiltinRequirementKey` guarantee to one destination `IRModule`; noted imports dedupe on entry, not by cross-module pointer identity. |
+| F-005 | fixed | `source/slang/slang-emit-hlsl.cpp:589-591` emits `[NodeLaunch("`, the mode string, `")]`. | "an HLSL named constant" -> "a quoted HLSL attribute string". |
+| F-006 | fixed | `extras/check-inst-version-changes.sh:19-21` states it makes no GitHub API call; `156-166` writes `pr-number.txt`/`comment-body.txt` for a `workflow_run` job. | Step 3 now attributes the artifact to the script and the comment to the consuming workflow. |
+| F-007 | fixed | `_meta/prompts/cross-cutting-ir-instructions.md:57-59` requires the migration note; `docs/design/ir.md:61` still calls it future work while `slang-ir-insts.h:34-39` already defines `IRDecoration : IRInst`. | Added one sentence to `## Decorations` marking that design-note wording as history, not an active roadmap. |

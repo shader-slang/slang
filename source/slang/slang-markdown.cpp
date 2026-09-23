@@ -1,6 +1,6 @@
 #include "slang-markdown.h"
 
-#include "../core/slang-io.h"
+#include "core/slang-io.h"
 
 #include <cmark-gfm.h>
 #include <string.h>

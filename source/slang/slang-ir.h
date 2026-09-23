@@ -6,10 +6,10 @@
 // similar in spirit to LLVM (but much simpler).
 //
 
-#include "../compiler-core/slang-source-loc.h"
-#include "../compiler-core/slang-source-map.h"
-#include "../core/slang-basic.h"
-#include "../core/slang-memory-arena.h"
+#include "compiler-core/slang-source-loc.h"
+#include "compiler-core/slang-source-map.h"
+#include "core/slang-basic.h"
+#include "core/slang-memory-arena.h"
 #include "slang-ast-type.h"
 #include "slang-container-pool.h"
 #include "slang-ir-insts-enum.h"
@@ -2257,9 +2257,15 @@ public:
     // It represents the version of module regarding semantics and doesn't have
     // anything to do with serialization format
     //
-    const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 26;
+    const static UInt k_minSupportedModuleVersion = 31;
+    const static UInt k_maxSupportedModuleVersion = 31;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
+
+    /// Returns whether `version` is in the inclusive range this compiler can load.
+    static bool isModuleVersionSupported(UInt64 version)
+    {
+        return version >= k_minSupportedModuleVersion && version <= k_maxSupportedModuleVersion;
+    }
 
 private:
     friend struct IRSerialReadContext;

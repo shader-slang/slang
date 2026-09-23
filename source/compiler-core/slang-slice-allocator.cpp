@@ -1,7 +1,7 @@
 // slang-slice-allocator.cpp
 #include "slang-slice-allocator.h"
 
-#include "../core/slang-blob.h"
+#include "core/slang-blob.h"
 
 namespace Slang
 {

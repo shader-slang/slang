@@ -1,9 +1,9 @@
 #include "slang-command-line-args.h"
 
-#include "../core/slang-process-util.h"
-#include "../core/slang-string-escape-util.h"
-#include "../core/slang-string-util.h"
-#include "../core/slang-type-text-util.h"
+#include "core/slang-process-util.h"
+#include "core/slang-string-escape-util.h"
+#include "core/slang-string-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-core-diagnostics.h"
 
 namespace Slang

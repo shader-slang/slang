@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../../core/slang-smart-pointer.h"
-#include "../replay-context.h"
-#include "../replay-shared.h"
+#include "core/slang-smart-pointer.h"
 #include "slang-com-ptr.h"
+#include "slang-record-replay/replay-context.h"
+#include "slang-record-replay/replay-shared.h"
 #include "slang.h"
 
 namespace SlangRecord
@@ -34,7 +34,14 @@ public:
         // is already 0 (release would trigger re-destruction).
         // The static_cast chain is safe here because we know the concrete type.
         ISlangUnknown* identity = static_cast<ISlangUnknown*>(static_cast<TFirstInterface*>(this));
-        ReplayContext::get().unregisterProxy(identity);
+
+        // tryGet() rather than get(): a proxy the user still holds can outlive
+        // ReplayContext::destroySingleton(), and get() would construct a
+        // replacement context just to unregister into it -- leaking that
+        // context, since nothing deletes it afterwards. With no context there is
+        // no registry to remove ourselves from, so there is nothing to do.
+        if (ReplayContext* context = ReplayContext::tryGet())
+            context->unregisterProxy(identity);
     }
 
     // ISlangUnknown implementation - these are virtual so derived classes can override

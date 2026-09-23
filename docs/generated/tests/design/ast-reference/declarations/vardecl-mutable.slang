@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
-//META: doc_section_digest=1e2fffffe548d3dd55e164e2d482dadafc2362dd7c8b9d5b1675743c8d5fa05c
+//META: doc_section_digest=f9721d75e32e3ac81b4ecdd86415227aa444d40f535b1e70e943f2f43e1c5bc0
 //META: purpose=A VarDecl is an ordinary mutable variable; its value can be assigned and re-read.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented role of VarDecl ("ordinary mutable
-// variable"): the binding produced by `int x = ...;` accepts a
-// subsequent assignment and the new value is observable.
+// Verifies that the binding a `VarDecl` introduces is mutable: the local
+// declared with an initializer accepts a later assignment. The CHECK asserts
+// the second value, which only prints if the assignment took effect rather
+// than being rejected or discarded.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

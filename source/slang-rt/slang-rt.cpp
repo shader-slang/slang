@@ -1,7 +1,7 @@
 #include "slang-rt.h"
 
-#include "../core/slang-basic.h"
-#include "../core/slang-shared-library.h"
+#include "core/slang-basic.h"
+#include "core/slang-shared-library.h"
 
 #if SLANG_WINDOWS_FAMILY
 #include <windows.h>

@@ -1,0 +1,64 @@
+schema_version: 1
+id: wgsl-descriptorhandle-uniform-struct-emits-handle-types
+bundle: design/ast-reference/types
+suspected_kind: wrong-codegen
+scope: wgsl
+title: "WGSL emits DescriptorHandle members as opaque handles in a uniform struct"
+observed_at: "2026-08-05T00:00:00+00:00"
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/design/ast-reference/types/descriptorhandletype-heap-index.slang -target wgsl -entry computeMain -stage compute"
+  source_slang: docs/generated/tests/design/ast-reference/types/descriptorhandletype-heap-index.slang
+  observed_summary: |
+    A `ConstantBuffer<Stuff>` whose fields are `DescriptorHandle<Texture2D<float4>>` and
+    `DescriptorHandle<SamplerState>` emits WGSL whose uniform struct contradicts the code
+    that reads it, and whose two heap declarations collide on one binding point.
+
+    Emitted WGSL (verbatim):
+      @binding(0) @group(1) var _slang_resource_heap_0 : array<texture_2d<f32>>;
+      @binding(0) @group(1) var _slang_resource_heap_1 : array<sampler>;
+      @binding(1) @group(0) var<storage, read_write> outBuf_0 : array<vec4<f32>>;
+      struct Stuff_std140_0
+      {
+          @align(16) tex_0 : texture_2d<f32>,
+          @align(8) samp_0 : sampler,
+      };
+      @binding(0) @group(0) var<uniform> cb_0 : Stuff_std140_0;
+      ...
+      outBuf_0[i32(0)] = (textureSampleLevel((_slang_resource_heap_0[cb_0.tex_0.x]),
+                          (_slang_resource_heap_1[cb_0.samp_0.x]), ...));
+
+    Three distinct problems, all on the WGSL path only:
+      1. The struct members are emitted with the handle's *pointee* type
+         (`texture_2d<f32>` / `sampler`) instead of the two-component unsigned heap index
+         the handle actually stores. The very next statement then reads `cb_0.tex_0.x`,
+         i.e. it swizzles a member the emitter declared as an opaque texture handle, so
+         the declaration and the use disagree inside a single generated file.
+      2. WGSL forbids opaque handle types (textures, samplers) as members of a
+         `var<uniform>` struct at all, so the struct is not a legal WGSL type.
+      3. Both `_slang_resource_heap_0` and `_slang_resource_heap_1` are emitted at
+         `@binding(0) @group(1)`, a duplicate binding point.
+
+    The GLSL and SPIR-V back-ends get the same shader right from the same IR: GLSL emits
+    `uvec2 tex_0; uvec2 samp_0;` inside `block_Stuff_0` and SPIR-V emits
+    `%Stuff_std140 = OpTypeStruct %v2uint %v2uint`, then both subscript the heap with the
+    stored index. Only WGSL substitutes the resource type for the index type. slangc exits
+    0, so nothing surfaces the problem short of running the emitted WGSL through tint.
+  exit_code: 0
+expected:
+  claim: |
+    A `DescriptorHandle<T>` stored in a uniform buffer should be emitted as the unsigned
+    heap index it carries (as GLSL's `uvec2` and SPIR-V's `%v2uint` already do) so the
+    generated struct type agrees with the `cb_0.tex_0.x` subscript that reads it, and the
+    two descriptor heaps should occupy distinct binding points.
+  citation_kind: sibling-test
+  citation: docs/generated/tests/design/ast-reference/types/descriptorhandletype-heap-index.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: cb2e06e83a
+  doc_anchor: docs/generated/design/ast-reference/types.md#nodes
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug: ruled out — the shader is unchanged between targets, and glsl/spirv-asm emit a coherent index-typed struct for it."
+    - "Intentional WGSL bindless lowering that a later pass fixes up: ruled out for this invocation — this is the final emitted WGSL text and it is self-contradictory (a texture-typed member is swizzled with .x)."
+    - "WGSL genuinely cannot express bindless heaps (no runtime-sized binding arrays), so the right answer might be a capability diagnostic rather than corrected codegen; recorded as an alternative because that would also fix the silent-bad-output half of this report."

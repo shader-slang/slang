@@ -96,8 +96,19 @@ if(SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_SLANG_RHI)
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         FOLDER examples
     )
-    slang_add_target(example-main STATIC FOLDER examples)
-    slang_add_target(example-winmain STATIC FOLDER examples EXCLUDE_FROM_ALL)
+    slang_add_target(
+        example-main
+        STATIC
+        INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/examples
+        FOLDER examples
+    )
+    slang_add_target(
+        example-winmain
+        STATIC
+        EXCLUDE_FROM_ALL
+        INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/examples
+        FOLDER examples
+    )
     slang_add_target(stacktrace-windows STATIC FOLDER examples EXCLUDE_FROM_ALL)
 
     #

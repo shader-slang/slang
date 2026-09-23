@@ -1,9 +1,10 @@
 
 #include "slang-reflection-json.h"
 
-#include "../core/slang-blob.h"
+#include "core/slang-blob.h"
 #include "slang-ast-support-types.h"
 #include "slang.h"
+
 
 template<typename T>
 struct Range
@@ -54,9 +55,38 @@ Range<T> makeRange(T end)
 namespace Slang
 {
 
-static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);
-static void emitReflectionTypeLayoutJSON(PrettyWriter& writer, slang::TypeLayoutReflection* type);
-static void emitReflectionTypeJSON(PrettyWriter& writer, slang::TypeReflection* type);
+namespace
+{
+// Small helper class to avoid recursing into the same type more than once on the active path.
+// When emitting a struct the struct type gets stored in the ReflectionTracker to avoid
+// infinite recursion in the case that the struct stores a pointer to itself.
+class ReflectionTracker
+{
+public:
+    void recordVisitedType(slang::TypeReflection* type) { m_visitedTypes.add(type); }
+
+    [[nodiscard]] bool canRecurseIntoType(slang::TypeReflection* type) const
+    {
+        return !m_visitedTypes.contains(type);
+    }
+
+private:
+    HashSet<slang::TypeReflection*> m_visitedTypes;
+};
+} // namespace
+
+static void emitReflectionVarInfoJSON(
+    PrettyWriter& writer,
+    slang::VariableReflection* var,
+    ReflectionTracker& reflectionTracker);
+static void emitReflectionTypeLayoutJSON(
+    PrettyWriter& writer,
+    slang::TypeLayoutReflection* type,
+    ReflectionTracker& reflectionTracker);
+static void emitReflectionTypeJSON(
+    PrettyWriter& writer,
+    slang::TypeReflection* type,
+    ReflectionTracker& reflectionTracker);
 static slang::ShaderReflection* g_inProgramLayout = nullptr;
 
 static void emitReflectionSize(PrettyWriter& writer, size_t size)
@@ -64,6 +94,47 @@ static void emitReflectionSize(PrettyWriter& writer, size_t size)
     size == SLANG_UNBOUNDED_SIZE ? writer << "\"unbounded\""
     : size == SLANG_UNKNOWN_SIZE ? writer << "\"unknown\""
                                  : writer << (uint64_t)size;
+}
+
+// Single source of truth for the JSON spelling of a layout unit, so binding/offset and size
+// printing name a given unit identically.
+static UnownedStringSlice getReflectionParameterCategoryName(SlangParameterCategory category)
+{
+    switch (category)
+    {
+#define CASE(NAME, KIND)                  \
+    case SLANG_PARAMETER_CATEGORY_##NAME: \
+        return toSlice(#KIND)
+        CASE(UNIFORM, uniform);
+        CASE(CONSTANT_BUFFER, constantBuffer);
+        CASE(SHADER_RESOURCE, shaderResource);
+        CASE(UNORDERED_ACCESS, unorderedAccess);
+        CASE(VARYING_INPUT, varyingInput);
+        CASE(VARYING_OUTPUT, varyingOutput);
+        CASE(SAMPLER_STATE, samplerState);
+        CASE(PUSH_CONSTANT_BUFFER, pushConstantBuffer);
+        CASE(DESCRIPTOR_TABLE_SLOT, descriptorTableSlot);
+        CASE(SPECIALIZATION_CONSTANT, specializationConstant);
+        CASE(MIXED, mixed);
+        CASE(REGISTER_SPACE, registerSpace);
+        CASE(SUB_ELEMENT_REGISTER_SPACE, subElementRegisterSpace);
+        CASE(GENERIC, generic);
+        CASE(RAY_PAYLOAD, rayPayload);
+        CASE(HIT_ATTRIBUTES, hitAttributes);
+        CASE(CALLABLE_PAYLOAD, callablePayload);
+        CASE(SHADER_RECORD, shaderRecord);
+        CASE(EXISTENTIAL_TYPE_PARAM, existentialTypeParam);
+        CASE(EXISTENTIAL_OBJECT_PARAM, existentialObjectParam);
+        CASE(SUBPASS, inputAttachmentIndex);
+        CASE(METAL_ARGUMENT_BUFFER_ELEMENT, metalArgumentBufferElement);
+        CASE(METAL_ATTRIBUTE, metalAttribute);
+        CASE(METAL_PAYLOAD, metalPayload);
+#undef CASE
+
+    default:
+        SLANG_ASSERT(!"unhandled case");
+        return toSlice("unknown");
+    }
 }
 
 static void emitReflectionVarBindingInfoJSON(
@@ -76,8 +147,9 @@ static void emitReflectionVarBindingInfoJSON(
 {
     if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
     {
-        writer << "\"kind\": \"uniform\"";
-        writer << ", ";
+        writer << "\"kind\": \"";
+        writer.write(getReflectionParameterCategoryName(category));
+        writer << "\", ";
         writer << "\"offset\": ";
         emitReflectionSize(writer, index);
         writer << ", ";
@@ -90,43 +162,7 @@ static void emitReflectionVarBindingInfoJSON(
     else
     {
         writer << "\"kind\": \"";
-        switch (category)
-        {
-#define CASE(NAME, KIND)                  \
-    case SLANG_PARAMETER_CATEGORY_##NAME: \
-        writer.write(toSlice(#KIND));     \
-        break
-            CASE(CONSTANT_BUFFER, constantBuffer);
-            CASE(SHADER_RESOURCE, shaderResource);
-            CASE(UNORDERED_ACCESS, unorderedAccess);
-            CASE(VARYING_INPUT, varyingInput);
-            CASE(VARYING_OUTPUT, varyingOutput);
-            CASE(SAMPLER_STATE, samplerState);
-            CASE(UNIFORM, uniform);
-            CASE(PUSH_CONSTANT_BUFFER, pushConstantBuffer);
-            CASE(DESCRIPTOR_TABLE_SLOT, descriptorTableSlot);
-            CASE(SPECIALIZATION_CONSTANT, specializationConstant);
-            CASE(MIXED, mixed);
-            CASE(REGISTER_SPACE, registerSpace);
-            CASE(SUB_ELEMENT_REGISTER_SPACE, subElementRegisterSpace);
-            CASE(GENERIC, generic);
-            CASE(RAY_PAYLOAD, rayPayload);
-            CASE(HIT_ATTRIBUTES, hitAttributes);
-            CASE(CALLABLE_PAYLOAD, callablePayload);
-            CASE(SHADER_RECORD, shaderRecord);
-            CASE(EXISTENTIAL_TYPE_PARAM, existentialTypeParam);
-            CASE(EXISTENTIAL_OBJECT_PARAM, existentialObjectParam);
-            CASE(SUBPASS, inputAttachmentIndex);
-            CASE(METAL_ARGUMENT_BUFFER_ELEMENT, metalArgumentBufferElement);
-            CASE(METAL_ATTRIBUTE, metalAttribute);
-            CASE(METAL_PAYLOAD, metalPayload);
-#undef CASE
-
-        default:
-            writer << "unknown";
-            SLANG_ASSERT(!"unhandled case");
-            break;
-        }
+        writer.write(getReflectionParameterCategoryName(category));
         writer << "\"";
         if (space && category != SLANG_PARAMETER_CATEGORY_REGISTER_SPACE)
         {
@@ -409,7 +445,10 @@ static slang::TypeLayoutReflection* maybeChangeTypeLayoutToAgumentBufferTier2(
     return nullptr;
 }
 
-static void emitReflectionVarLayoutJSON(PrettyWriter& writer, slang::VariableLayoutReflection* var)
+static void emitReflectionVarLayoutJSON(
+    PrettyWriter& writer,
+    slang::VariableLayoutReflection* var,
+    ReflectionTracker& reflectionTracker)
 {
     writer << "{\n";
     writer.indent();
@@ -426,11 +465,11 @@ static void emitReflectionVarLayoutJSON(PrettyWriter& writer, slang::VariableLay
     writer << "\"type\": ";
     if (auto newTypeLayout = maybeChangeTypeLayoutToAgumentBufferTier2(var))
     {
-        emitReflectionTypeLayoutJSON(writer, newTypeLayout);
+        emitReflectionTypeLayoutJSON(writer, newTypeLayout, reflectionTracker);
     }
     else
     {
-        emitReflectionTypeLayoutJSON(writer, var->getTypeLayout());
+        emitReflectionTypeLayoutJSON(writer, var->getTypeLayout(), reflectionTracker);
     }
 
     if (auto variable = var->getVariable())
@@ -571,7 +610,10 @@ static void emitReflectionResourceTypeBaseInfoJSON(
     }
 }
 
-static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflection* type)
+static void emitReflectionTypeInfoJSON(
+    PrettyWriter& writer,
+    slang::TypeReflection* type,
+    ReflectionTracker& reflectionTracker)
 {
     auto kind = type->getKind();
     switch (kind)
@@ -596,6 +638,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
                 break;
 
             case SLANG_STRUCTURED_BUFFER:
+            case SLANG_TEXTURE_BUFFER:
             case SLANG_TEXTURE_1D:
             case SLANG_TEXTURE_2D:
             case SLANG_TEXTURE_3D:
@@ -605,7 +648,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
                 {
                     writer.maybeComma();
                     writer << "\"resultType\": ";
-                    emitReflectionTypeJSON(writer, resultType);
+                    emitReflectionTypeJSON(writer, resultType, reflectionTracker);
                 }
                 break;
             }
@@ -617,7 +660,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
         writer << "\"kind\": \"constantBuffer\"";
         writer.maybeComma();
         writer << "\"elementType\": ";
-        emitReflectionTypeJSON(writer, type->getElementType());
+        emitReflectionTypeJSON(writer, type->getElementType(), reflectionTracker);
         break;
 
     case slang::TypeReflection::Kind::ParameterBlock:
@@ -625,7 +668,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
         writer << "\"kind\": \"parameterBlock\"";
         writer.maybeComma();
         writer << "\"elementType\": ";
-        emitReflectionTypeJSON(writer, type->getElementType());
+        emitReflectionTypeJSON(writer, type->getElementType(), reflectionTracker);
         break;
 
     case slang::TypeReflection::Kind::TextureBuffer:
@@ -633,7 +676,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
         writer << "\"kind\": \"textureBuffer\"";
         writer.maybeComma();
         writer << "\"elementType\": ";
-        emitReflectionTypeJSON(writer, type->getElementType());
+        emitReflectionTypeJSON(writer, type->getElementType(), reflectionTracker);
         break;
 
     case slang::TypeReflection::Kind::ShaderStorageBuffer:
@@ -641,7 +684,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
         writer << "\"kind\": \"shaderStorageBuffer\"";
         writer.maybeComma();
         writer << "\"elementType\": ";
-        emitReflectionTypeJSON(writer, type->getElementType());
+        emitReflectionTypeJSON(writer, type->getElementType(), reflectionTracker);
         break;
 
     case slang::TypeReflection::Kind::Scalar:
@@ -659,7 +702,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
         emitReflectionSize(writer, type->getElementCount());
         writer.maybeComma();
         writer << "\"elementType\": ";
-        emitReflectionTypeJSON(writer, type->getElementType());
+        emitReflectionTypeJSON(writer, type->getElementType(), reflectionTracker);
         break;
 
     case slang::TypeReflection::Kind::Matrix:
@@ -673,7 +716,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
         writer << type->getColumnCount();
         writer.maybeComma();
         writer << "\"elementType\": ";
-        emitReflectionTypeJSON(writer, type->getElementType());
+        emitReflectionTypeJSON(writer, type->getElementType(), reflectionTracker);
         break;
 
     case slang::TypeReflection::Kind::Array:
@@ -686,7 +729,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
             emitReflectionSize(writer, arrayType->getElementCount());
             writer.maybeComma();
             writer << "\"elementType\": ";
-            emitReflectionTypeJSON(writer, arrayType->getElementType());
+            emitReflectionTypeJSON(writer, arrayType->getElementType(), reflectionTracker);
         }
         break;
     case slang::TypeReflection::Kind::Pointer:
@@ -696,7 +739,16 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
             writer << "\"kind\": \"pointer\"";
             writer.maybeComma();
             writer << "\"targetType\": ";
-            emitReflectionTypeJSON(writer, pointerType->getElementType());
+
+            auto pointeeType = pointerType->getElementType();
+            if (reflectionTracker.canRecurseIntoType(pointeeType))
+            {
+                emitReflectionTypeJSON(writer, pointeeType, reflectionTracker);
+            }
+            else
+            {
+                writer.writeEscapedString(UnownedStringSlice(pointeeType->getName()));
+            }
         }
         break;
 
@@ -705,16 +757,21 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
             writer.maybeComma();
             writer << "\"kind\": \"struct\"";
             writer.maybeComma();
+
+            auto structType = type;
+            reflectionTracker.recordVisitedType(structType);
             writer << "\"fields\": [\n";
             writer.indent();
 
-            auto structType = type;
             auto fieldCount = structType->getFieldCount();
             for (uint32_t ff = 0; ff < fieldCount; ++ff)
             {
                 if (ff != 0)
                     writer << ",\n";
-                emitReflectionVarInfoJSON(writer, structType->getFieldByIndex(ff));
+                emitReflectionVarInfoJSON(
+                    writer,
+                    structType->getFieldByIndex(ff),
+                    reflectionTracker);
             }
             writer.dedent();
             writer << "\n]";
@@ -767,8 +824,12 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
 static void emitReflectionParameterGroupTypeLayoutInfoJSON(
     PrettyWriter& writer,
     slang::TypeLayoutReflection* typeLayout,
+    ReflectionTracker& reflectionTracker,
     const char* kind)
 {
+    // Go through the comma tracker so a key appended after this object (e.g. `sizes`) is
+    // correctly separated.
+    writer.maybeComma();
     writer << "\"kind\": \"";
     writer.write(kind);
     writer << "\"";
@@ -780,11 +841,11 @@ static void emitReflectionParameterGroupTypeLayoutInfoJSON(
     {
         // If we are in argument buffer tier 2, we need to use the new type layout
         // that has the correct binding information.
-        emitReflectionTypeLayoutJSON(writer, newElementTypeLayout);
+        emitReflectionTypeLayoutJSON(writer, newElementTypeLayout, reflectionTracker);
     }
     else
     {
-        emitReflectionTypeLayoutJSON(writer, typeLayout->getElementTypeLayout());
+        emitReflectionTypeLayoutJSON(writer, typeLayout->getElementTypeLayout(), reflectionTracker);
     }
 
     // Note: There is a subtle detail below when it comes to the
@@ -829,17 +890,18 @@ static void emitReflectionParameterGroupTypeLayoutInfoJSON(
     }
 
     writer << ",\n\"elementVarLayout\": ";
-    emitReflectionVarLayoutJSON(writer, typeLayout->getElementVarLayout());
+    emitReflectionVarLayoutJSON(writer, typeLayout->getElementVarLayout(), reflectionTracker);
 }
 
-static void emitReflectionTypeLayoutInfoJSON(
+static void emitReflectionTypeLayoutKindInfoJSON(
     PrettyWriter& writer,
-    slang::TypeLayoutReflection* typeLayout)
+    slang::TypeLayoutReflection* typeLayout,
+    ReflectionTracker& reflectionTracker)
 {
     switch (typeLayout->getKind())
     {
     default:
-        emitReflectionTypeInfoJSON(writer, typeLayout->getType());
+        emitReflectionTypeInfoJSON(writer, typeLayout->getType(), reflectionTracker);
         break;
 
     case slang::TypeReflection::Kind::Pointer:
@@ -849,18 +911,29 @@ static void emitReflectionTypeLayoutInfoJSON(
 
             writer.maybeComma();
             writer << "\"kind\": \"pointer\"";
-
             writer.maybeComma();
             writer << "\"valueType\": ";
 
             auto typeName = valueTypeLayout->getType()->getName();
-
+            auto valueType = valueTypeLayout->getType();
             if (typeName && typeName[0])
             {
-                // TODO(JS):
-                // We can't emit the type layout, because the type could contain
-                // a pointer and we end up in a recursive loop. For now we output the typename.
-                writer.writeEscapedString(UnownedStringSlice(typeName));
+                // Avoid recursing into a pointer to self.
+                // Additionally, only expand when the pointer points to a struct
+                // int* p becomes -> { "kind": "pointer", "valueType": "int" }
+                if (reflectionTracker.canRecurseIntoType(valueType) &&
+                    valueType->getKind() == slang::TypeReflection::Kind::Struct)
+                {
+                    reflectionTracker.recordVisitedType(valueType);
+                    emitReflectionTypeLayoutJSON(
+                        writer,
+                        typeLayout->getElementTypeLayout(),
+                        reflectionTracker);
+                }
+                else
+                {
+                    writer.writeEscapedString(UnownedStringSlice(typeName));
+                }
             }
             else
             {
@@ -889,7 +962,7 @@ static void emitReflectionTypeLayoutInfoJSON(
 
             writer.maybeComma();
             writer << "\"elementType\": ";
-            emitReflectionTypeLayoutJSON(writer, elementTypeLayout);
+            emitReflectionTypeLayoutJSON(writer, elementTypeLayout, reflectionTracker);
 
             if (arrayTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0)
             {
@@ -905,7 +978,7 @@ static void emitReflectionTypeLayoutInfoJSON(
     case slang::TypeReflection::Kind::Struct:
         {
             auto structTypeLayout = typeLayout;
-
+            reflectionTracker.recordVisitedType(structTypeLayout->getType());
             writer.maybeComma();
             writer << "\"kind\": \"struct\"";
             if (auto name = structTypeLayout->getName())
@@ -922,7 +995,10 @@ static void emitReflectionTypeLayoutInfoJSON(
             {
                 if (ff != 0)
                     writer << ",\n";
-                emitReflectionVarLayoutJSON(writer, structTypeLayout->getFieldByIndex(ff));
+                emitReflectionVarLayoutJSON(
+                    writer,
+                    structTypeLayout->getFieldByIndex(ff),
+                    reflectionTracker);
             }
             writer.dedent();
             writer << "\n]";
@@ -931,19 +1007,35 @@ static void emitReflectionTypeLayoutInfoJSON(
         break;
 
     case slang::TypeReflection::Kind::ConstantBuffer:
-        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "constantBuffer");
+        emitReflectionParameterGroupTypeLayoutInfoJSON(
+            writer,
+            typeLayout,
+            reflectionTracker,
+            "constantBuffer");
         break;
 
     case slang::TypeReflection::Kind::OutputStream:
-        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "outputStream");
+        emitReflectionParameterGroupTypeLayoutInfoJSON(
+            writer,
+            typeLayout,
+            reflectionTracker,
+            "outputStream");
         break;
 
     case slang::TypeReflection::Kind::ParameterBlock:
-        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "parameterBlock");
+        emitReflectionParameterGroupTypeLayoutInfoJSON(
+            writer,
+            typeLayout,
+            reflectionTracker,
+            "parameterBlock");
         break;
 
     case slang::TypeReflection::Kind::TextureBuffer:
-        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "textureBuffer");
+        emitReflectionParameterGroupTypeLayoutInfoJSON(
+            writer,
+            typeLayout,
+            reflectionTracker,
+            "textureBuffer");
         break;
 
     case slang::TypeReflection::Kind::ShaderStorageBuffer:
@@ -952,7 +1044,7 @@ static void emitReflectionTypeLayoutInfoJSON(
 
         writer.maybeComma();
         writer << "\"elementType\": ";
-        emitReflectionTypeLayoutJSON(writer, typeLayout->getElementTypeLayout());
+        emitReflectionTypeLayoutJSON(writer, typeLayout->getElementTypeLayout(), reflectionTracker);
         break;
     case slang::TypeReflection::Kind::GenericTypeParameter:
         writer.maybeComma();
@@ -989,7 +1081,7 @@ static void emitReflectionTypeLayoutInfoJSON(
                 {
                     writer.maybeComma();
                     writer << "\"resultType\": ";
-                    emitReflectionTypeLayoutJSON(writer, resultTypeLayout);
+                    emitReflectionTypeLayoutJSON(writer, resultTypeLayout, reflectionTracker);
                 }
             }
             else if (shape & SLANG_TEXTURE_FEEDBACK_FLAG)
@@ -1000,41 +1092,97 @@ static void emitReflectionTypeLayoutInfoJSON(
                 {
                     writer.maybeComma();
                     writer << "\"resultType\": ";
-                    emitReflectionTypeJSON(writer, resultType);
+                    emitReflectionTypeJSON(writer, resultType, reflectionTracker);
                 }
             }
             else
             {
-                emitReflectionTypeInfoJSON(writer, type);
+                emitReflectionTypeInfoJSON(writer, type, reflectionTracker);
             }
         }
         break;
     }
 }
 
-static void emitReflectionTypeLayoutJSON(
+static void emitReflectionTypeLayoutSizeInfoJSON(
     PrettyWriter& writer,
     slang::TypeLayoutReflection* typeLayout)
 {
-    CommaTrackerRAII commaTracker(writer);
-    writer << "{\n";
+    writer.maybeComma();
+    writer << "\"sizes\": [\n";
     writer.indent();
-    emitReflectionTypeLayoutInfoJSON(writer, typeLayout);
+
+    bool first = true;
+    auto categoryCount = typeLayout->getCategoryCount();
+    for (uint32_t cc = 0; cc < categoryCount; ++cc)
+    {
+        auto category = SlangParameterCategory(typeLayout->getCategoryByIndex(cc));
+        auto size = typeLayout->getSize(category);
+        if (size == 0)
+            continue;
+
+        if (!first)
+            writer << ",\n";
+        first = false;
+
+        writer << "{";
+        writer << "\"kind\": \"";
+        writer.write(getReflectionParameterCategoryName(category));
+        writer << "\", ";
+        writer << "\"value\": ";
+        emitReflectionSize(writer, size);
+        if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
+        {
+            writer << ", ";
+            writer << "\"alignment\": ";
+            emitReflectionSize(writer, typeLayout->getAlignment(category));
+        }
+        writer << "}";
+    }
+
     writer.dedent();
-    writer << "\n}";
+    writer << "\n]";
 }
 
-static void emitReflectionTypeJSON(PrettyWriter& writer, slang::TypeReflection* type)
+static void emitReflectionTypeLayoutInfoJSON(
+    PrettyWriter& writer,
+    slang::TypeLayoutReflection* typeLayout,
+    ReflectionTracker& reflectionTracker)
+{
+    emitReflectionTypeLayoutKindInfoJSON(writer, typeLayout, reflectionTracker);
+    emitReflectionTypeLayoutSizeInfoJSON(writer, typeLayout);
+}
+
+static void emitReflectionTypeLayoutJSON(
+    PrettyWriter& writer,
+    slang::TypeLayoutReflection* typeLayout,
+    ReflectionTracker& reflectionTracker)
 {
     CommaTrackerRAII commaTracker(writer);
     writer << "{\n";
     writer.indent();
-    emitReflectionTypeInfoJSON(writer, type);
+    emitReflectionTypeLayoutInfoJSON(writer, typeLayout, reflectionTracker);
     writer.dedent();
     writer << "\n}";
 }
 
-static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var)
+static void emitReflectionTypeJSON(
+    PrettyWriter& writer,
+    slang::TypeReflection* type,
+    ReflectionTracker& reflectionTracker)
+{
+    CommaTrackerRAII commaTracker(writer);
+    writer << "{\n";
+    writer.indent();
+    emitReflectionTypeInfoJSON(writer, type, reflectionTracker);
+    writer.dedent();
+    writer << "\n}";
+}
+
+static void emitReflectionVarInfoJSON(
+    PrettyWriter& writer,
+    slang::VariableReflection* var,
+    ReflectionTracker& reflectionTracker)
 {
     emitReflectionNameInfoJSON(writer, var->getName());
 
@@ -1042,10 +1190,13 @@ static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableRefle
 
     writer << ",\n";
     writer << "\"type\": ";
-    emitReflectionTypeJSON(writer, var->getType());
+    emitReflectionTypeJSON(writer, var->getType(), reflectionTracker);
 }
 
-static void emitReflectionParamJSON(PrettyWriter& writer, slang::VariableLayoutReflection* param)
+static void emitReflectionParamJSON(
+    PrettyWriter& writer,
+    slang::VariableLayoutReflection* param,
+    ReflectionTracker& reflectionTracker)
 {
     // TODO: This function is likely redundant with `emitReflectionVarLayoutJSON`
     // and we should try to collapse them into one.
@@ -1070,7 +1221,82 @@ static void emitReflectionParamJSON(PrettyWriter& writer, slang::VariableLayoutR
 
     writer.maybeComma();
     writer << "\"type\": ";
-    emitReflectionTypeLayoutJSON(writer, param->getTypeLayout());
+    emitReflectionTypeLayoutJSON(writer, param->getTypeLayout(), reflectionTracker);
+
+    writer.dedent();
+    writer << "\n}";
+}
+
+// Emit a scope's `"parameters"` array from the fields of `structTypeLayout`, which holds the
+// scope's contents: one field per parameter declared in that scope. A scope's contents are always
+// modeled as a `struct`, so this is required to be a `Struct` layout — possibly with zero fields,
+// which correctly yields `"parameters": []`.
+static void emitReflectionScopeParametersJSON(
+    PrettyWriter& writer,
+    slang::TypeLayoutReflection* structTypeLayout,
+    ReflectionTracker& reflectionTracker)
+{
+    SLANG_ASSERT(structTypeLayout->getKind() == slang::TypeReflection::Kind::Struct);
+
+    writer.maybeComma();
+    writer << "\"parameters\": [\n";
+    writer.indent();
+    auto paramCount = structTypeLayout->getFieldCount();
+    for (auto pp : makeRange(paramCount))
+    {
+        if (pp != 0)
+            writer << ",\n";
+        emitReflectionParamJSON(writer, structTypeLayout->getFieldByIndex(pp), reflectionTracker);
+    }
+    writer.dedent();
+    writer << "\n]";
+}
+
+// Describe a program scope (the global scope, or an entry point's scope) as a JSON object,
+// following the same kind-based traversal as `printScope` in `examples/reflection-api/main.cpp`.
+// The key detail the flat `parameters` list cannot express is the binding of the constant buffer
+// that a scope's parameters are automatically gathered into: that container occupies a register /
+// descriptor slot / space of its own, reported here as the scope's `binding`.
+//
+// A scope layout is one of exactly two shapes, so both are handled explicitly and anything else
+// asserts. `ScopeLayoutBuilder::endLayout` (`slang-parameter-binding.cpp`) builds the scope as a
+// `StructTypeLayout` of its parameters, then passes it to `createConstantBufferTypeLayoutIfNeeded`,
+// which either returns that struct unchanged (an unwrapped scope, `kind: "none"`) or wraps it in a
+// parameter-group layout whose element var-layout is that same struct (`kind: "constantBuffer"`).
+static void emitReflectionScopeJSON(
+    PrettyWriter& writer,
+    slang::VariableLayoutReflection* scopeVarLayout,
+    ReflectionTracker& reflectionTracker)
+{
+    writer << "{\n";
+    writer.indent();
+    CommaTrackerRAII commaTracker(writer);
+
+    auto scopeTypeLayout = scopeVarLayout->getTypeLayout();
+    switch (scopeTypeLayout->getKind())
+    {
+    case slang::TypeReflection::Kind::Struct:
+        writer.maybeComma();
+        writer << "\"kind\": \"none\"";
+        emitReflectionScopeParametersJSON(writer, scopeTypeLayout, reflectionTracker);
+        break;
+
+    case slang::TypeReflection::Kind::ConstantBuffer:
+        writer.maybeComma();
+        writer << "\"kind\": \"constantBuffer\"";
+
+        emitReflectionVarBindingInfoJSON(writer, scopeTypeLayout->getContainerVarLayout());
+
+        emitReflectionScopeParametersJSON(
+            writer,
+            scopeTypeLayout->getElementVarLayout()->getTypeLayout(),
+            reflectionTracker);
+        break;
+
+    default:
+        SLANG_ASSERT(!"unexpected type layout kind for a program scope");
+        break;
+    }
 
     writer.dedent();
     writer << "\n}";
@@ -1100,7 +1326,8 @@ static void emitEntryPointParamJSON(
 
 static void emitReflectionTypeParamJSON(
     PrettyWriter& writer,
-    slang::TypeParameterReflection* typeParam)
+    slang::TypeParameterReflection* typeParam,
+    ReflectionTracker& reflectionTracker)
 {
     writer << "{\n";
     writer.indent();
@@ -1117,7 +1344,7 @@ static void emitReflectionTypeParamJSON(
         writer << "{\n";
         writer.indent();
         CommaTrackerRAII commaTracker(writer);
-        emitReflectionTypeInfoJSON(writer, typeParam->getConstraintByIndex(ee));
+        emitReflectionTypeInfoJSON(writer, typeParam->getConstraintByIndex(ee), reflectionTracker);
         writer.dedent();
         writer << "\n}";
     }
@@ -1133,6 +1360,7 @@ static void emitReflectionEntryPointJSON(
     slang::ShaderReflection* programReflection,
     int entryPointIndex)
 {
+    ReflectionTracker reflectionTracker;
     slang::EntryPointReflection* entryPoint =
         programReflection->getEntryPointByIndex(entryPointIndex);
 
@@ -1174,6 +1402,9 @@ static void emitReflectionEntryPointJSON(
         break;
     }
 
+    writer << ",\n\"scope\": ";
+    emitReflectionScopeJSON(writer, entryPoint->getVarLayout(), reflectionTracker);
+
     auto entryPointParameterCount = entryPoint->getParameterCount();
     if (entryPointParameterCount)
     {
@@ -1186,7 +1417,7 @@ static void emitReflectionEntryPointJSON(
                 writer << ",\n";
 
             auto parameter = entryPoint->getParameterByIndex(pp);
-            emitReflectionParamJSON(writer, parameter);
+            emitReflectionParamJSON(writer, parameter, reflectionTracker);
         }
 
         writer.dedent();
@@ -1199,7 +1430,7 @@ static void emitReflectionEntryPointJSON(
     if (auto resultVarLayout = entryPoint->getResultVarLayout())
     {
         writer << ",\n\"result\": ";
-        emitReflectionParamJSON(writer, resultVarLayout);
+        emitReflectionParamJSON(writer, resultVarLayout, reflectionTracker);
     }
 
     if (entryPoint->getStage() == SLANG_STAGE_COMPUTE)
@@ -1248,8 +1479,13 @@ static void emitReflectionJSON(
     SlangCompileRequest* request,
     slang::ShaderReflection* programReflection)
 {
+    ReflectionTracker reflectionTracker;
     writer << "{\n";
     writer.indent();
+
+    // Absence of this field is implicitly version "1.0" (before the scope objects existed).
+    writer << "\"version\": \"1.1\",\n";
+
     writer << "\"parameters\": [\n";
     writer.indent();
 
@@ -1260,11 +1496,17 @@ static void emitReflectionJSON(
             writer << ",\n";
 
         auto parameter = programReflection->getParameterByIndex(pp);
-        emitReflectionParamJSON(writer, parameter);
+        emitReflectionParamJSON(writer, parameter, reflectionTracker);
     }
 
     writer.dedent();
     writer << "\n]";
+
+    writer << ",\n\"globalScope\": ";
+    emitReflectionScopeJSON(
+        writer,
+        programReflection->getGlobalParamsVarLayout(),
+        reflectionTracker);
 
     auto entryPointCount = programReflection->getEntryPointCount();
     if (entryPointCount)
@@ -1296,7 +1538,7 @@ static void emitReflectionJSON(
                 writer << ",\n";
 
             auto typeParam = programReflection->getTypeParameterByIndex(ee);
-            emitReflectionTypeParamJSON(writer, typeParam);
+            emitReflectionTypeParamJSON(writer, typeParam, reflectionTracker);
         }
         writer.dedent();
         writer << "\n]";

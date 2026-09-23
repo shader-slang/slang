@@ -370,12 +370,23 @@ interface __BuiltinType
 {
 }
 
+/// A compiler-supported, non-void scalar representation.
+///
+/// Implemented by `bool`, the builtin signed and unsigned integer scalar types, and the `half`,
+/// `float`, and `double` types. This sealed marker supports representation-level dispatch such as
+/// compiler-defined casts; it does not imply any particular mathematical capabilities.
+[sealed]
+[builtin]
+interface __BuiltinScalarType : __BuiltinType
+{
+}
+
 /// A type that can be used for arithmetic operations. For defining generic functions that work with builtin scalar arithmetic types only.
 /// Builtin types implementing this interface: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `half`, `double`.
 /// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinType, IArithmetic, ICoopElement
+interface __BuiltinArithmeticType : __BuiltinScalarType, IArithmetic, ICoopElement
 {
 }
 
@@ -383,7 +394,7 @@ interface __BuiltinArithmeticType : __BuiltinType, IArithmetic, ICoopElement
 /// Builtin types implementing this interface: `bool`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int`, `uint`, `int64_t`, `uint64_t`.
 [sealed]
 [builtin]
-interface __BuiltinLogicalType : __BuiltinType, ILogical
+interface __BuiltinLogicalType : __BuiltinScalarType, ILogical
 {
 }
 
@@ -2292,13 +2303,20 @@ struct vector : IRWArray<T>
 }
 
 //@hidden:
-static const int kRowMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR);
-static const int kColumnMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
+// The in-memory element order of a `matrix`. An enum rather than an `int` so that an
+// unresolved layout is still recognizable as a generic argument, where it sits beside
+// the row and column counts.
+enum MatrixLayoutMode : int
+{
+    Unknown = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN),
+    RowMajor = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR),
+    ColumnMajor = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR),
+}
 
 //@public:
 /// A matrix with `R` rows and `C` columns, with elements of type `T`.
 /// @category math_types Math types
-__generic<T = float, let R : int = 4, let C : int = 4, let L : int = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)>
+__generic<T = float, let R : int = 4, let C : int = 4, let L : MatrixLayoutMode = MatrixLayoutMode.Unknown>
 __magic_type(MatrixExpressionType)
 struct matrix : IRWArray<vector<T,C>>
 {
@@ -2455,7 +2473,7 @@ extension vector<T,N> : IDifferentiable
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : int>
+__generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : MatrixLayoutMode>
 extension matrix<T,N,M,L> : IFloat
 {
     // TODO(sai): not sure what's going on here? With the previous commit this was (this <= other)
@@ -2498,7 +2516,7 @@ extension matrix<T,N,M,L> : IFloat
 
 }
 
-__generic<T:IDifferentiable, let N : int, let M : int, let L : int>
+__generic<T:IDifferentiable, let N : int, let M : int, let L : MatrixLayoutMode>
 extension matrix<T,N,M,L> : IDifferentiable
 {
     // IDifferentiable.
@@ -2519,7 +2537,7 @@ extension matrix<T,N,M,L> : IDifferentiable
     }
 }
 
-__generic<let R : int, let C : int, let L : int>
+__generic<let R : int, let C : int, let L : MatrixLayoutMode>
 extension matrix<int16_t,R,C,L>
 {
     typealias T = int16_t;
@@ -2536,14 +2554,14 @@ vector<T,N*2> __makeVector(vector<T,N> vec1, vector<T,N> vec2);
 __generic<T>
 extension vector<T, 4>
 {
-    __generic<let L : int>
+    __generic<let L : MatrixLayoutMode>
     [__unsafeForceInlineEarly]
     __init(matrix<T, 2, 2, L> value)
     {
         this = __makeVector(value[0], value[1]);
     }
 }
-__generic<T, let L : int>
+__generic<T, let L : MatrixLayoutMode>
 extension matrix<T, 2, 2, L>
 {
     [__unsafeForceInlineEarly]
@@ -2802,6 +2820,28 @@ __generic<T> __extension vector<T, 4>
     [__unsafeForceInlineEarly]
     __intrinsic_op($(kIROp_MakeVector))
     __init(T x, vector<T,3> yzw);
+
+    // we need to declare this initializer explicitly to avoid implicit conversion
+    // of (int2, int) to (int2, int2)
+    [__unsafeForceInlineEarly]
+    [deprecated("Three-component initializer (vector<T, 2>, T) for vector<T, 4> is deprecated. For details, see https://github.com/shader-slang/slang/issues/12093")]
+    [RemovedSince(2026, "Three-component initializer (vector<T, 2>, T) for vector<T, 4> has been removed since Slang 2026.")]
+    __init(vector<T,2> xy, T z)
+    {
+        // legacy semantics with implicit promotion of z to vector<T,2>
+        this = { xy.x, xy.y, z, z };
+    }
+
+    // we need to declare this initializer explicitly to avoid implicit conversion
+    // of (int, int2) to (int2, int2)
+    [__unsafeForceInlineEarly]
+    [deprecated("Three-component initializer (T, vector<T, 2>) for vector<T, 4> is deprecated. For details, see https://github.com/shader-slang/slang/issues/12093")]
+    [RemovedSince(2026, "Three-component initializer (T, vector<T, 2>) for vector<T, 4> has been removed since Slang 2026.")]
+    __init(T x, vector<T,2> yz)
+    {
+        // legacy semantics with implicit promotion of x to vector<T,2>
+        this = { x, x, yz.x, yz.y };
+    }
 }
 
 ${
@@ -2810,7 +2850,7 @@ ${
 for( int R = 1; R <= 4; ++R )
 for( int C = 1; C <= 4; ++C )
 {
-    sb << "__generic<T, let L:int> __extension matrix<T, " << R << "," << C << ", L>\n{\n";
+    sb << "__generic<T, let L : MatrixLayoutMode> __extension matrix<T, " << R << "," << C << ", L>\n{\n";
 
     // initialize from R*C scalars
     if (R == 1 || C == 1)
@@ -2884,7 +2924,7 @@ __generic<ToType, let N : int> extension vector<ToType,N>
 }
 
 // If T is implicitly convertible to U, then matrix<T,R,C,L> is implicitly convertible to matrix<U,R,C,L>.
-__generic<ToType, let R : int, let C : int, let L : int> extension matrix<ToType,R,C,L>
+__generic<ToType, let R : int, let C : int, let L : MatrixLayoutMode> extension matrix<ToType,R,C,L>
 {
     __implicit_conversion(constraint)
     __intrinsic_op(BuiltinCast)
@@ -2990,21 +3030,6 @@ $(fullPtrType) operator-($(fullPtrType) value, TInt offset)
     return __getOffsetPtr(value, -offset);
 }
 
-__generic<T : IArithmetic>
-[__unsafeForceInlineEarly]
-__prefix T operator+(T value)
-{ return value; }
-
-__generic<T : __BuiltinArithmeticType, let N : int>
-[__unsafeForceInlineEarly]
-__prefix vector<T,N> operator+(vector<T,N> value)
-{ return value; }
-
-__generic<T : __BuiltinArithmeticType, let R : int, let C : int>
-[__unsafeForceInlineEarly]
-__prefix matrix<T,R,C> operator+(matrix<T,R,C> value)
-{ return value; }
-
 ${
 
 static const struct IncDecOpInfo
@@ -3044,7 +3069,7 @@ vector<T,N> operator$(op.name)(in out vector<T,N> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) __builtin_cast<T>(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
-__generic<T : __BuiltinArithmeticType, let R : int, let C : int, let L : int>
+__generic<T : __BuiltinArithmeticType, let R : int, let C : int, let L : MatrixLayoutMode>
 [__unsafeForceInlineEarly]
 matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C,L> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) __builtin_cast<T>(1); return $(fixity.returnVal); }
@@ -3235,7 +3260,7 @@ __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M :
 __intrinsic_op($(info.op))
 matrix<L,N,M> operator$(info.name)(matrix<L,N,M> left, matrix<R,N,M> right);
 
-__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : int>
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : MatrixLayoutMode>
 [__unsafeForceInlineEarly]
 matrix<L, N, M> operator$(info.name)=(in out matrix<L, N, M, Layout> left, matrix<R, N, M> right)
 {
@@ -3267,7 +3292,7 @@ __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M :
 __intrinsic_op($(info.op))
 matrix<L,N,M> operator$(info.name)(matrix<L,N,M> left, R right);
 
-__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : int>
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : MatrixLayoutMode>
 [__unsafeForceInlineEarly]
 matrix<L,N,M> operator$(info.name)=(in out matrix<L,N,M, Layout> left, R right)
 {
@@ -3322,7 +3347,7 @@ ${
         return left;
     }
 
-    __generic<T : $(op.interface), let R : int, let C : int, let Layout : int>
+    __generic<T : $(op.interface), let R : int, let C : int, let Layout : MatrixLayoutMode>
     [__unsafeForceInlineEarly]
     matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C,Layout> left, matrix<T,R,C> right)
     {
@@ -3330,7 +3355,7 @@ ${
         return left;
     }
 
-    __generic<T : $(op.interface), let R : int, let C : int, let Layout : int>
+    __generic<T : $(op.interface), let R : int, let C : int, let Layout : MatrixLayoutMode>
     [__unsafeForceInlineEarly]
     matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C, Layout> left, T right)
     {
@@ -3641,6 +3666,15 @@ __prefix T operator -(T v0)
     return v0.neg();
 }
 
+$(attrib)
+__generic<T : $(interfaceName)>
+[__unsafeForceInlineEarly]
+[OverloadRank($(overloadRank))]
+__prefix T operator +(T v0)
+{
+    return v0;
+}
+
 ${
     } // foreach ["IArithmetic", "IFloat"]
 $}
@@ -3690,6 +3724,15 @@ __generic<T : IDifferentiableArithmetic>
 __prefix T operator -(T v0)
 {
     return v0.neg();
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+__prefix T operator +(T v0)
+{
+    return v0;
 }
 
 __generic<T : ILogical>
@@ -4011,10 +4054,6 @@ internal T __frem<T>(T left, T right);
 
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
-
-__generic<T>
-__intrinsic_op( $(kIROp_GetLegalizedSPIRVGlobalParamAddr))
-__Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 
 __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();
@@ -4519,6 +4558,11 @@ attribute_syntax [outputcontrolpoints(count: int)]  : OutputControlPointsAttribu
 __attributeTarget(FuncDecl)
 attribute_syntax [outputtopology(topology)]         : OutputTopologyAttribute;
 
+/// Used on an hull shader entrypoint to declare the output primitive type of the tessellator.
+/// @param topology The output primitive type, must be one of "point", "line", "triangle_cw", and "triangle_ccw".
+__attributeTarget(FuncDecl)
+attribute_syntax [OutputTopology(topology)]         : OutputTopologyAttribute;
+
 /// Used on an hull shader entrypoint to specify the patch type used by the hull shader.
 /// @param mode The patch type used by the hull shader. Valid values are "tri", "quad" and "isoline".
 __attributeTarget(FuncDecl)
@@ -4553,6 +4597,21 @@ attribute_syntax [instance(count: int)]         : InstanceAttribute;
 /// Used on a fragment shader entry point to specify that early depth stencil testing can be enabled.
 __attributeTarget(FuncDecl)
 attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
+
+/// Used on a fragment shader entry point so that its input `SV_Coverage` reports only the samples
+/// that survived the early depth/stencil test, rather than every sample the fragment covers.
+/// @remarks On SPIR-V this requires the `SampleMaskPostDepthCoverage` capability, declares
+/// `OpExtension "SPV_KHR_post_depth_coverage"`, and enables the `PostDepthCoverage` execution mode.
+/// On GLSL it requires `GL_ARB_post_depth_coverage` and emits `layout(post_depth_coverage) in;`.
+/// Post-depth coverage is only meaningful with early depth/stencil testing, so the compiler also
+/// enables `EarlyFragmentTests` (which Vulkan requires to accompany `PostDepthCoverage`); pairing
+/// this attribute with `[earlydepthstencil]` is therefore optional but harmless.
+/// @remarks This attribute currently takes effect on SPIR-V/Vulkan and GLSL only. On any other
+/// target (HLSL, Metal, WGSL, CUDA) no post-depth-coverage execution mode is emitted and the
+/// compiler warns that the attribute has no effect, rather than silently changing `SV_Coverage`
+/// semantics.
+__attributeTarget(FuncDecl)
+attribute_syntax [postdepthcoverage]    : PostDepthCoverageAttribute;
 
 // SPIR-V 64-bit indexing
 /// Used on a function to require the `SPV_EXT_shader_64bit_indexing` SPIR-V extension.
@@ -5390,7 +5449,7 @@ semantic sv_waveindex
 
 semantic sv_barycentrics
 {
-    [require(fragment)]
+    [require(fragment, fragmentshaderbarycentric)]
     get : float3;
 }
 

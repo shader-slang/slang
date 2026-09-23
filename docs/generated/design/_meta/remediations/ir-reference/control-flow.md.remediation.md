@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-30T14:01:07Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T09:02:00Z
 target_doc: ir-reference/control-flow.md
 review_report: ../../reviews/ir-reference/control-flow.md.review.md
-target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 4
+  fixed: 3
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,21 +18,18 @@ actions:
 
 ## Summary
 
-All four findings were verified against source and fixed in the target
-document. F-001 (major) replaced the `C++ wrapper` column with the exact
-`IRFoo` struct names from `slang-ir-insts.h`, keeping `—` only for the six
-opcodes (`missingReturn`, `unreachable`, `discard`, `gpuForeach`, `Printf`,
-`Abort`) that have no wrapper struct. F-002 and F-003 corrected two AST-origin
-cells from `(synthesized)` to the statements that lower to them. F-004 trimmed
-the `### Abort` callout of pass/backend legalization and emission behavior the
-IR-reference contract forbids. Breakdown: 4 fixed, 0 rejected-bogus, 0
-rejected-out-of-scope, 0 deferred, 0 escalated.
+All three findings were verified against the source and fixed; none
+was rejected, deferred, or escalated. The critical finding was
+confirmed: the page inverted the soundness precondition recorded at
+`source/slang/slang-ir-dce.h:27-29`, so the stale-entry claim was
+replaced with the real lifetime rule. The other two fixes name the
+actual lowering visitors in the opcode tables and give `emitBlock`
+its own line citation.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Wrappers confirmed in `source/slang/slang-ir-insts.h` (`IRReturn` 1935, `IRYield` 1941, `IRLoop` 1999, `IRConditionalBranch` 2017, `IRIfElse` 2037, `IRSwitch` 2047, `IRTargetSwitch` 2069, `IRThrow` 2079, `IRTryCall` 2085, `IRDefer` 2095, `IRGenericAsm` 2813, `IRRequire*`/`IRStaticAssert` 2820-2855) and `IRUnconditionalBranch` 1981; no struct for missingReturn/unreachable/discard/gpuForeach/Printf/Abort. | Wrapper cells set to exact `IRFoo` names; `—` kept for the six wrapperless opcodes |
-| F-002 | fixed | `visitTargetSwitchStmt` (`source/slang/slang-lower-to-ir.cpp:9229`) emits `kIROp_TargetSwitch` at 9265. | `targetSwitch` AST origin `(synthesized)` -> `TargetSwitchStmt` (same row edit as F-001) |
-| F-003 | fixed | `visitIntrinsicAsmStmt` (`source/slang/slang-lower-to-ir.cpp:9274`) emits `kIROp_GenericAsm` at 9294. | `GenericAsm` AST origin `(synthesized)` -> `IntrinsicAsmStmt` (same row edit as F-001) |
-| F-004 | fixed | `_meta/prompts/_common.md:266` forbids pass-by-pass behavior in IR-reference pages; callout had described spirv-legalize rewriting, OpAbortKHR terminator handling, and GLSL `abortEXT`. | Removed legalization/emission prose from `### Abort` and the SPIR-V/GLSL clause in its table row; opcode shape and origin kept |
+| F-001 | fixed | Confirmed. `source/slang/slang-ir-dce.h:27-29` states sharing is sound *only while* no pass adds an `IRAnnotation` or removes a purity decoration; the page had turned that precondition into a claim that such staleness is conservative. `source/slang/slang-ir-util.cpp:1698-1709` caches unconditionally and `:1684-1693` scans annotation users, so a stale `false` is unsafe, not conservative. | Rewrote the closing sentence of `### Moving and deleting control-flow instructions` as the lifetime rule, citing `slang-ir-util.cpp` 1670-1709, the `addAnnotation` warning at `slang-ir-insts.h` 3620-3623, and the per-iteration `clear()` at `slang-ir-ssa-simplification.cpp` line 79. |
+| F-002 | fixed | Confirmed. No AST-origin cell named a `visit*` function, and cells cited `slang-lower-to-ir.cpp` as backticked prose, which `_common.md:43-45` forbids. Subtables were kept as-is (regrouping would contradict the settled per-family layout); instead each subtable now names a real producer. | Replaced the bare filename prose in 13 AST-origin cells with the verified visitor and line number (`visitReturnStmt` 8831, `visitExpandExpr` 6565, `visitBreakStmt` 9059, `visitContinueStmt` 9077, `visitForStmt` 8410, `visitIfStmt` 8280, `visitSwitchStmt` 9495, `visitTargetSwitchStmt` 9425, `visitThrowStmt` 8942, `visitTryExpr` 8020, `visitDeferStmt` 8919, `visitIntrinsicAsmStmt` 9470, `visitDiscardStmt` 9053, `visitGpuForeachStmt` 8739, `visitSelectExpr` 7989 / `startBlock` 8193). The no-continuation subtable keeps `lowerFuncDeclInContext`, its actual producer. |
+| F-003 | fixed | Confirmed. `source/slang/slang-ir.cpp:5447` defines `IRBuilder::emitBlock`, outside the cited 6331-6560 range. | `## Source`: split `emitBlock` out with its own line 5447 citation; the branch emitters keep the 6331-6560 range. |

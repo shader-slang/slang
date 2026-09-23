@@ -2,7 +2,7 @@
 
 // This file implements the entry point for `slangi`, an interpreter for the Slang language.
 
-#include "../../source/core/slang-basic.h"
+#include "core/slang-basic.h"
 #include "core/slang-io.h"
 #include "slang-com-ptr.h"
 #include "slang.h"

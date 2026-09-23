@@ -1,11 +1,12 @@
 // slang-ir.cpp
 #include "slang-ir.h"
 
-#include "../core/slang-basic.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-writer.h"
+#include "core/slang-basic.h"
+#include "core/slang-platform.h"
+#include "core/slang-writer.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-mangle.h"
 
@@ -88,6 +89,7 @@ bool isSimpleDecoration(IROp op)
     switch (op)
     {
     case kIROp_EarlyDepthStencilDecoration:
+    case kIROp_PostDepthCoverageDecoration:
     case kIROp_GLSLFragDepthGreaterDecoration:
     case kIROp_GLSLFragDepthLessDecoration:
     case kIROp_Shader64BitIndexingDecoration:
@@ -171,7 +173,7 @@ void IRUse::init(IRInst* u, IRInst* v)
 
         v->firstUse = this;
     }
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
     debugValidate();
 #endif
 }
@@ -188,13 +190,13 @@ void IRUse::clear()
 {
     // This `IRUse` is part of the linked list
     // of uses for  `usedValue`.
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
     debugValidate();
 #endif
 
     if (usedValue)
     {
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
         auto uv = usedValue;
 #endif
         *prevLink = nextUse;
@@ -208,7 +210,7 @@ void IRUse::clear()
         nextUse = nullptr;
         prevLink = nullptr;
 
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
         if (uv->firstUse)
             uv->firstUse->debugValidate();
 #endif
@@ -874,7 +876,8 @@ void fixUpDebugFuncType(IRFunc* func)
             oldDebugFunc->getLine(),
             oldDebugFunc->getCol(),
             oldDebugFunc->getFile(),
-            funcType);
+            funcType,
+            oldDebugFunc->getParentScope());
         debugFuncDecor->removeAndDeallocate();
         builder.addDecoration(func, kIROp_DebugFuncDecoration, newDebugFunc);
     }
@@ -1014,6 +1017,68 @@ IROperandList<IRTypeSizeAttr> IRTypeLayout::getSizeAttrs()
     return findAttrs<IRTypeSizeAttr>();
 }
 
+IRTypeAlignmentAttr* IRTypeLayout::findAlignmentAttr(LayoutResourceKind kind)
+{
+    for (auto alignmentAttr : getAlignmentAttrs())
+    {
+        if (alignmentAttr->getResourceKind() == kind)
+            return alignmentAttr;
+    }
+    return nullptr;
+}
+
+IROperandList<IRTypeAlignmentAttr> IRTypeLayout::getAlignmentAttrs()
+{
+    return findAttrs<IRTypeAlignmentAttr>();
+}
+
+IRIntegerValue IRTypeLayout::getAlignment(LayoutResourceKind kind)
+{
+    if (auto alignmentAttr = findAlignmentAttr(kind))
+        return alignmentAttr->getAlignment();
+    return 1;
+}
+
+LayoutSize IRTypeLayout::getSizeInBytes()
+{
+    if (auto sizeAttr = findSizeAttr(LayoutResourceKind::Uniform))
+        return sizeAttr->getSize();
+    return LayoutSize(0);
+}
+
+IRIntegerValue IRTypeLayout::getAlignmentInBytes()
+{
+    return getAlignment(LayoutResourceKind::Uniform);
+}
+
+// Round a byte size up to a byte alignment, preserving the zero and non-finite
+// cases: a zero size strides by zero regardless of alignment, and a non-finite
+// (unsized/infinite, or invalid) size has no finite stride and is returned
+// unchanged rather than collapsed to zero.
+static LayoutSize _strideInBytes(LayoutSize size, IRIntegerValue alignment)
+{
+    if (!size.isFinite())
+        return size;
+    IRIntegerValue byteSize = IRIntegerValue(size.getFiniteValue().getValidValue());
+    if (byteSize == 0)
+        return LayoutSize(0);
+    return LayoutSize(LayoutSize::RawValue(align(byteSize, int(alignment))));
+}
+
+LayoutSize IRTypeLayout::getStrideInBytes()
+{
+    return _strideInBytes(getSizeInBytes(), getAlignmentInBytes());
+}
+
+LayoutSize IRArrayTypeLayout::getElementStrideInBytes()
+{
+    // The element's in-array alignment is the array's byte alignment, which
+    // already incorporates the layout-rule rounding (e.g. std140 rounds array
+    // elements up to 16). The element type's own alignment does not, so it must
+    // not be used here.
+    return _strideInBytes(getElementTypeLayout()->getSizeInBytes(), getAlignmentInBytes());
+}
+
 IRTypeLayout::Builder::Builder(IRBuilder* irBuilder)
     : m_irBuilder(irBuilder)
 {
@@ -1031,11 +1096,27 @@ void IRTypeLayout::Builder::addResourceUsage(IRTypeSizeAttr* sizeAttr)
     addResourceUsage(sizeAttr->getResourceKind(), sizeAttr->getSize());
 }
 
+void IRTypeLayout::Builder::addAlignment(LayoutResourceKind kind, IRIntegerValue alignment)
+{
+    auto& resInfo = m_resInfos[Int(kind)];
+    resInfo.kind = kind;
+    resInfo.alignment = alignment;
+}
+
+void IRTypeLayout::Builder::addAlignment(IRTypeAlignmentAttr* alignmentAttr)
+{
+    addAlignment(alignmentAttr->getResourceKind(), alignmentAttr->getAlignment());
+}
+
 void IRTypeLayout::Builder::addResourceUsageFrom(IRTypeLayout* typeLayout)
 {
     for (auto sizeAttr : typeLayout->getSizeAttrs())
     {
         addResourceUsage(sizeAttr);
+    }
+    for (auto alignmentAttr : typeLayout->getAlignmentAttrs())
+    {
+        addAlignment(alignmentAttr);
     }
 }
 
@@ -1056,19 +1137,40 @@ void IRTypeLayout::Builder::addOperands(List<IRInst*>& operands)
     addOperandsImpl(operands);
 }
 
+// Whether a unit that occupies `size` should carry an alignment attribute.
+// Alignment is meaningful whenever the unit occupies any bytes, which includes
+// an unsized (infinite) or unknown (invalid) extent; only a definitely-zero
+// size makes alignment irrelevant (and an absent attribute already means 1).
+static bool _occupiesLayoutUnit(LayoutSize size)
+{
+    return !size.isFinite() || size.getFiniteValue().getValidValue() != 0;
+}
+
 void IRTypeLayout::Builder::addAttrs(List<IRInst*>& operands)
 {
     auto irBuilder = getIRBuilder();
+
+    // Emit size and alignment attributes in two separate passes so that each
+    // attribute kind forms one contiguous run. `IRTypeLayout::getSizeAttrs`
+    // (and `getAlignmentAttrs`) rely on `findAttrs`, which stops at the first
+    // operand of a different type, so interleaving the two kinds would truncate
+    // the size-attribute enumeration for any layout that has both.
+    for (auto resInfo : m_resInfos)
+    {
+        if (resInfo.kind == LayoutResourceKind::None)
+            continue;
+        operands.add(irBuilder->getTypeSizeAttr(resInfo.kind, resInfo.size));
+    }
 
     for (auto resInfo : m_resInfos)
     {
         if (resInfo.kind == LayoutResourceKind::None)
             continue;
-
-        IRInst* sizeAttr = irBuilder->getTypeSizeAttr(resInfo.kind, resInfo.size);
-        operands.add(sizeAttr);
+        // An absent attribute already encodes alignment 1, so only a stronger
+        // alignment is worth recording, and only for a unit that occupies space.
+        if (resInfo.alignment > 1 && _occupiesLayoutUnit(resInfo.size))
+            operands.add(irBuilder->getTypeAlignmentAttr(resInfo.alignment, resInfo.kind));
     }
-
 
     addAttrsImpl(operands);
 }
@@ -1584,7 +1686,16 @@ IRInst* IRModule::_allocateInst(IROp op, Int operandCount, size_t minSizeInBytes
     // We handle the combination of the two cases by just taking the maximum of the two
     // different sizes.
     //
-    size_t defaultSize = sizeof(IRInst) + (operandCount) * sizeof(IRUse);
+    // The operand count is in-contract only when it is non-negative and small enough that the
+    // trailing operand array can be sized without wrapping `size_t`. That is trivially true for
+    // counts the compiler itself computes, but deserialization derives the count from a file, so
+    // we assert rather than silently allocating a buffer smaller than the operands written into
+    // it (`size_t` is 32 bits on WebAssembly and other 32-bit targets).
+    //
+    SLANG_RELEASE_ASSERT(operandCount >= 0);
+    SLANG_RELEASE_ASSERT(size_t(operandCount) <= (~size_t(0) - sizeof(IRInst)) / sizeof(IRUse));
+
+    size_t defaultSize = sizeof(IRInst) + size_t(operandCount) * sizeof(IRUse);
     size_t totalSize = minSizeInBytes > defaultSize ? minSizeInBytes : defaultSize;
 
     IRInst* inst = (IRInst*)m_memoryArena.allocateAndZero(totalSize);
@@ -3556,8 +3667,16 @@ IRInst* IRBuilder::emitDebugFunction(
     IRInst* line,
     IRInst* col,
     IRInst* file,
-    IRInst* debugType)
+    IRInst* debugType,
+    IRInst* parentScope)
 {
+    // The parent scope is an optional trailing operand: it is absent when no scope was recorded
+    // (Minimal debug level emits no compilation unit), so we never store a null operand.
+    if (parentScope)
+    {
+        IRInst* args[] = {name, line, col, file, debugType, parentScope};
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 6, args);
+    }
     IRInst* args[] = {name, line, col, file, debugType};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 5, args);
 }
@@ -3571,7 +3690,8 @@ IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
 IRInst* IRBuilder::emitDebugScope(IRInst* scope, IRInst* inlinedAt)
 {
     IRInst* args[] = {scope, inlinedAt};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 2, args);
+    SLANG_RELEASE_ASSERT(scope);
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, inlinedAt ? 2 : 1, args);
 }
 
 IRInst* IRBuilder::emitDebugNoScope()
@@ -7303,6 +7423,33 @@ IRTypeSizeAttr* IRBuilder::getTypeSizeAttr(LayoutResourceKind kind, LayoutSize s
         createIntrinsicInst(getVoidType(), kIROp_TypeSizeAttr, SLANG_COUNT_OF(operands), operands));
 }
 
+IRTypeAlignmentAttr* IRBuilder::getTypeAlignmentAttr(
+    IRIntegerValue alignment,
+    LayoutResourceKind kind)
+{
+    auto alignmentInst = getIntValue(getIntType(), alignment);
+
+    // The unit operand is omitted for the `Uniform` default so that the common
+    // byte-alignment case has a single canonical encoding.
+    if (kind == LayoutResourceKind::Uniform)
+    {
+        IRInst* operands[] = {alignmentInst};
+        return cast<IRTypeAlignmentAttr>(createIntrinsicInst(
+            getVoidType(),
+            kIROp_TypeAlignmentAttr,
+            SLANG_COUNT_OF(operands),
+            operands));
+    }
+
+    auto kindInst = getIntValue(getIntType(), IRIntegerValue(kind));
+    IRInst* operands[] = {alignmentInst, kindInst};
+    return cast<IRTypeAlignmentAttr>(createIntrinsicInst(
+        getVoidType(),
+        kIROp_TypeAlignmentAttr,
+        SLANG_COUNT_OF(operands),
+        operands));
+}
+
 IRVarOffsetAttr* IRBuilder::getVarOffsetAttr(LayoutResourceKind kind, UInt offset, UInt space)
 {
     IRInst* operands[3];
@@ -7432,6 +7579,59 @@ IRSetBase* IRBuilder::getSet(IROp op, const HashSet<IRInst*>& elements)
     getModule()->getContainerPool().free(sortedElements);
 
     return setBaseInst;
+}
+
+IRSetBase* IRBuilder::getSetFromSortedElements(IROp op, UInt count, IRInst* const* sortedElements)
+{
+    // Produces the same canonical form as `getSet`, but the caller has already
+    // put the elements in unique-ID order with duplicates removed, so neither
+    // the intermediate hash set nor the sort is needed.
+    //
+    // Violating the precondition is not benign: a non-canonical operand list
+    // produces a set inst that hash-consing cannot dedupe against its
+    // structural equals, which silently breaks the pointer-identity that
+    // `areInfosEqual` relies on. Each clause is checked as far as it can be,
+    // but the checks are best-effort and the clauses are not independent:
+    //
+    //   * globality is a cheap pointer-level test and its loop runs in every
+    //     build. It reports through `SLANG_ASSERT_FAILURE`, so it is silenced
+    //     under `SLANG_ASSERT=release-asserts-only`.
+    //   * duplicate-freedom also runs in every build, and reports through
+    //     `SLANG_RELEASE_ASSERT`, which still fires in that mode. But it
+    //     compares only *adjacent* elements, so it is a complete duplicate
+    //     check only given the ordering clause below. A mis-ordered list whose
+    //     duplicates are not adjacent passes both loops in a release build --
+    //     which is precisely the case this contract exists to warn about.
+    //   * strict ordering is checked in debug builds only, and only by
+    //     *reading* the module's unique-ID map. `getUniqueID` assigns IDs
+    //     lazily, so calling it here would hand out IDs earlier than the
+    //     normal path does and perturb the canonical order of unrelated sets.
+    //     Elements of an already-built set always have IDs, so for real
+    //     callers the read-only lookup is a hit.
+    //
+    // So the caller owns the contract: these checks catch the easy violations
+    // and cannot substitute for it.
+    for (UInt i = 0; i < count; ++i)
+        if (sortedElements[i]->getParent()->getOp() != kIROp_ModuleInst)
+            SLANG_ASSERT_FAILURE("getSetFromSortedElements called with non-global operands");
+
+    for (UInt i = 1; i < count; ++i)
+        SLANG_RELEASE_ASSERT(sortedElements[i] != sortedElements[i - 1]);
+
+#ifdef _DEBUG
+    {
+        auto uniqueIDMap = getModule()->getUniqueIdMap();
+        for (UInt i = 1; i < count; ++i)
+        {
+            auto prevID = uniqueIDMap->tryGetValue(sortedElements[i - 1]);
+            auto curID = uniqueIDMap->tryGetValue(sortedElements[i]);
+            if (prevID && curID)
+                SLANG_ASSERT(*prevID < *curID);
+        }
+    }
+#endif
+
+    return as<IRSetBase>(emitIntrinsicInst(nullptr, op, count, sortedElements));
 }
 
 IRSetBase* IRBuilder::getSingletonSet(IROp op, IRInst* element)

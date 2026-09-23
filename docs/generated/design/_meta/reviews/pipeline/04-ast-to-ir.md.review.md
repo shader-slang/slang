@@ -1,23 +1,23 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-30T13:32:43+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T12:08:18+00:00
 target_doc: pipeline/04-ast-to-ir.md
-target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_watched_paths_digest: 8a4f880d8b981d67ad88abf7aa75a535d3a572cbe530098477dde31879574746
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: bfaba4260e5950b0732424070a24791f1265e6debdda1d5c6493fbe0abe1e140
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: pass
+  completeness: partial
   style_consistency: pass
   source_alignment: partial
-  front_matter_validity: pass
-finding_count: 1
+  front_matter_validity: partial
+finding_count: 3
 severity_breakdown:
-  critical: 1
-  major: 0
-  minor: 0
+  critical: 0
+  major: 1
+  minor: 2
   nit: 0
 ---
 
@@ -25,25 +25,21 @@ severity_breakdown:
 
 ## Summary
 
-The document satisfies the requested structure, front matter, link shape, and most sampled source claims. The single issue is a factual mismatch in the `IRBuilder` section: it groups `Global` opcodes with hoistable opcodes as deduplicated values, but the source explicitly says global opcodes are hoisted and never deduplicated.
+The document satisfies the required structure and style contract, all links resolve, all 42 explicit line-number references are accurate, and the large majority of checked source claims are supported. The most important finding is that its recorded watched-path digest no longer matches the seven files resolved by the current manifest, which prevents the front matter from identifying the source set actually under review. Two smaller source-alignment issues concern an AST mutation omitted from the claimed output boundary and an overly narrow description of the separate layout module.
 
 ## Items checked
 
-- Read the target document, `_common.md`, the per-doc prompt, and dependency docs `pipeline/03-semantic-check.md` and `cross-cutting/ir-instructions.md`.
-- Resolved the manifest data with `regenerate.py show pipeline/04-ast-to-ir.md` and sampled claims against the watched files `slang-lower-to-ir.h`, `slang-lower-to-ir.cpp`, `slang-ir.h`, `slang-ir.cpp`, `slang-ir-insts.h`, and `slang-ir-insts.lua`.
-- Verified 14 concrete source claims, including the three public lowering entry points, `generateIRForTranslationUnit` entry-point/member lowering, `lowerBuiltinOperatorExpr`, `visitBuiltinOperationIntVal`, `getInterfaceRequirementKey`, pack-count witness lowering, unsupported-assignment diagnostics, synthesized-constructor debug-info gating, `IRModule::create`, `IRBuilder`, and the IR opcode enum include.
-- Checked that the required sections from `pipeline-04-ast-to-ir.md` are present and that the front matter contains the mandatory generated-doc keys.
-- Checked the relative links used by this document to dependency docs, peer generated docs, source files, and handwritten design docs.
+- Read `_review.md`, `_common.md`, the per-document prompt, the target, and both dependency documents; resolved all seven watched files with `regenerate.py show pipeline/04-ast-to-ir.md`.
+- Confirmed the watched source files have no working-tree differences from recorded source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
+- Spot-checked more than 30 factual claims, including the driver signatures, lowering visitors and caches, `IRBuilder` flags, AST mappings, builtin operators, witness lowering, generic requirement handling, diagnostics, layout generation, entry-point decorations, and debug-info behavior.
+- Re-derived all 42 explicit line-number references and the cited range endpoints; every cited number points at the claimed symbol or behavior.
+- Resolved all 34 relative-link occurrences and confirmed the referenced generated peers are present in the manifest; `regenerate.py lint pipeline/04-ast-to-ir.md` completed without structural or link errors.
+- Confirmed the required sections and size cap, and recomputed the watched-path digest; the mismatch is reported below.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | `## IRBuilder and instruction creation`, lines 64-69 | The document says `IRBuilder` hash-conses both `hoistable` and `global` values and that `kIROpFlag_Global` opcodes "take part in this deduplication." The source distinguishes the two: hoistable instructions are deduplicated, while global instructions are hoisted but not deduplicated. | `source/slang/slang-ir.h:53-56` says `kIROpFlag_Hoistable` is "a hoistable inst that needs to be deduplicated" and `kIROpFlag_Global` "should always be hoisted but should never be deduplicated." | Revise this bullet to say that `IRBuilder` deduplicates hoistable instructions, while global instructions are always hoisted to module scope but are not deduplicated. Do not list `kIROpFlag_Global` as a deduplication flag. |
-
-## No-issues notes
-
-- The lowering-driver section matches the public signatures and header comments in `source/slang/slang-lower-to-ir.h`.
-- The built-in operator section matches `lowerBuiltinOperatorExpr`, including `%` selecting `FRem` versus `IRem` and the `?:` / `&&` / `||` unexpected cases.
-- The built-in requirement-key discussion matches `getInterfaceRequirementKey`, including the `IRInst*` cache, `BuiltinRequirementModifier`, hoistable `IRBuiltinRequirementKey`, and `IRBuiltinRequirementDecoration`.
-- The pack-count witness section matches the hidden `WitnessTableType(void)` parameter and module-level proof-only witness table implementation.
+| F-001 | major | Front matter, line 6 | `watched_paths_digest` is recorded as `bfaba426...`, but the current manifest resolves seven watched files and `regenerate.py digest pipeline/04-ast-to-ir.md` produces `b5b08783...` against the unchanged source snapshot. The front matter therefore does not identify the watched source set currently associated with this document. | `docs/generated/design/_meta/freshness.json:219-223` records the authoritative digest `b5b087832fec0e249e88a0d170e419896ef6e42e51a41f7730860c109aee1cd2`; the target front matter records `bfaba4260e5950b0732424070a24791f1265e6debdda1d5c6493fbe0abe1e140`. `git diff` confirms the seven watched source files match source commit `53b76e6d...`. | Refresh the target through the generated-doc workflow so its front matter records `b5b087832fec0e249e88a0d170e419896ef6e42e51a41f7730860c109aee1cd2`, then ensure review metadata is regenerated for that digest before recording the review. Do not repair only the ledger. |
+| F-002 | minor | `## Module-level outputs`, lines 440-455; `### Entry-point-scoped decorations`, lines 468-476 | The absolute claim that `generateIRForTranslationUnit` has “no additional side artefacts” overlooks a persistent AST mutation: when a registered entry point has no explicit `EntryPointAttribute`, lowering creates one and attaches it to the AST function before lowering the function. | `source/slang/slang-lower-to-ir.cpp:15215-15223` creates an `EntryPointAttribute`, fills its capability set from the entry-point profile, and calls `addModifier(entryPointFuncDecl, entryPointAttr)`. | Qualify the output-boundary statement and mention that lowering may add an implicit entry-point attribute to the checked AST so ordinary function lowering recognizes the registered entry point; keep the returned `IRModule` as the sole separate output object. |
+| F-003 | minor | `## Adjacent pipelines`, lines 537-544 | The layout module is described as having “only” `IRLayoutDecoration`s on stub globals and entry points. It also decorates the module root, emits the supporting type/variable-layout instructions used by those decorations, and can attach `IRRequireCapabilityAtomDecoration`s to entry-point stubs. | `source/slang/slang-lower-to-ir.cpp:16395-16450` creates imported global stubs plus type/variable layouts and decorates both globals and the module root; lines 16470-16498 create entry-point stubs, add capability-atom decorations, and add their layout decorations. | Describe it as a layout-focused module containing imported global/entry-point stubs, module/global/entry-point layout decorations and their supporting layout metadata, plus relevant capability decorations; avoid saying those decorations are its only contents. |

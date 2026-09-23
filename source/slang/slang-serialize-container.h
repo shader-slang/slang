@@ -2,7 +2,7 @@
 #ifndef SLANG_SERIALIZE_CONTAINER_H
 #define SLANG_SERIALIZE_CONTAINER_H
 
-#include "../core/slang-riff.h"
+#include "core/slang-riff.h"
 #include "slang-ir-insts.h"
 #include "slang-profile.h"
 #include "slang-serialize-types.h"

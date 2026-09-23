@@ -2,8 +2,8 @@
 #ifndef SLANG_OPTIONS_H
 #define SLANG_OPTIONS_H
 
-#include "../compiler-core/slang-source-loc.h"
-#include "../core/slang-basic.h"
+#include "compiler-core/slang-source-loc.h"
+#include "core/slang-basic.h"
 
 namespace Slang
 {

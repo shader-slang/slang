@@ -13,6 +13,7 @@ __include "include-debug-function-definition-impl";
 
 RWStructuredBuffer<int> outputBuffer;
 
+[noinline]
 int TestFunctionB(int x)
 {
     return x + 200;

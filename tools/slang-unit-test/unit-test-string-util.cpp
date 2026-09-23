@@ -29,7 +29,7 @@
 //     `calcLines` returns the same line decomposition as a list.
 //   * `appendFormat / makeStringWithFormat` — printf-style.
 
-#include "../../source/core/slang-string-util.h"
+#include "core/slang-string-util.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

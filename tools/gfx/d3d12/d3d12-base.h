@@ -2,18 +2,18 @@
 // Shared header file for D3D12 implementation
 #pragma once
 
-#include "../command-encoder-com-forward.h"
-#include "../d3d/d3d-swapchain.h"
-#include "../mutable-shader-object.h"
-#include "../renderer-shared.h"
-#include "../simple-render-pass-layout.h"
-#include "../transient-resource-heap-base.h"
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "core/slang-chunked-list.h"
 #include "d3d12-descriptor-heap.h"
 #include "d3d12-posix-synchapi.h"
 #include "d3d12-resource.h"
+#include "gfx/command-encoder-com-forward.h"
+#include "gfx/d3d/d3d-swapchain.h"
+#include "gfx/mutable-shader-object.h"
+#include "gfx/renderer-shared.h"
+#include "gfx/simple-render-pass-layout.h"
+#include "gfx/transient-resource-heap-base.h"
 
 #pragma push_macro("WIN32_LEAN_AND_MEAN")
 #pragma push_macro("NOMINMAX")

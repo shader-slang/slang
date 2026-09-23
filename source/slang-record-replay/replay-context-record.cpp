@@ -1,12 +1,12 @@
-#include "../core/slang-blob.h"
-#include "../core/slang-crypto.h"
-#include "../core/slang-io.h"
-#include "../core/slang-platform.h"
-#include "../slang/slang-ast-type.h"
-#include "../slang/slang-compiler-api.h"
-#include "../slang/slang-syntax.h"
+#include "core/slang-blob.h"
+#include "core/slang-crypto.h"
+#include "core/slang-io.h"
+#include "core/slang-platform.h"
 #include "proxy/proxy-component-type.h"
 #include "replay-context.h"
+#include "slang/slang-ast-type.h"
+#include "slang/slang-compiler-api.h"
+#include "slang/slang-syntax.h"
 
 #include <chrono>
 #include <cinttypes>

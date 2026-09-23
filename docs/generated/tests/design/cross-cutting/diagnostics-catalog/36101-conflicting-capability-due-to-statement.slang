@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:30:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=ee40ae671436ac98c9b021b1bf97506d1463f211581d7a1d67255a10c9b0ac0a
 //META: purpose=Fires diagnostic E36101 (conflicting-capability-due-to-statement) - conflicting capability requirement
 //META: intent=negative
 //META: pipeline_stage=check
@@ -31,4 +31,4 @@ void main()
     use1();
 }
 
-// CHECK: E36101
+//CHECK: E36101

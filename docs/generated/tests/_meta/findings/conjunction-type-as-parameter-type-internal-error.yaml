@@ -1,0 +1,58 @@
+schema_version: 1
+id: conjunction-type-as-parameter-type-internal-error
+bundle: coverage/lower-to-ir
+suspected_kind: wrong-diagnostic
+scope: diagnostics
+title: "Conjunction type `IA & IB` in a parameter position aborts with an internal error"
+observed_at: "2026-08-05T00:00:00+00:00"
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc /tmp/p/andty3.slang -target hlsl -entry computeMain -stage compute"
+  source_slang: docs/generated/tests/coverage/lower-to-ir/conjunction-existential-param.slang
+  observed_summary: |
+    Using a conjunction type as an existential parameter type -- `int use(IA & IB t)` --
+    aborts the compiler with E99997 (exit code 255) instead of either compiling or
+    emitting a normal diagnostic. The message is an internal invariant complaint:
+    "unexpected: AndType should have been flattened before reaching member lookup",
+    attached to the first member access on the parameter (`t.a()`).
+
+    The same conjunction spelling is accepted in the two positions the hand-written
+    suite covers -- an inheritance clause (`struct MyStruct : IFoo & IBar`) and a
+    generic constraint (`int combine<T : IFoo & IBar>(T val)`) -- so the spelling
+    itself parses and type-checks; only the parameter (existential value) position
+    reaches the unflattened AndType.
+
+    The test file named below was NOT committed: an aborting input cannot be shipped
+    as a passing characterization test. The exact repro is:
+
+      interface IA { int a(); }
+      interface IB { int b(); }
+      struct S : IA, IB { int a() { return 1; } int b() { return 2; } }
+      RWStructuredBuffer<int> outputBuffer;
+      int use(IA & IB t) { return t.a() + t.b(); }
+      [numthreads(1,1,1)]
+      void computeMain() { S s; outputBuffer[0] = use(s); }
+
+    Declaring a local of the conjunction type (`IA & IB e = s;`) does not reach this
+    path -- it fails earlier with E30015 "undefined identifier", i.e. the declarator
+    is not parsed as a variable declaration at all.
+  exit_code: 255
+  stderr_tail: "error[E99997]: Slang compilation aborted due to an exception of N5Slang13InternalErrorE unexpected: AndType should have been flattened before reaching member lookup"
+expected:
+  claim: |
+    A conjunction type used in a parameter position must either compile (the
+    parameter behaves as an existential conforming to both interfaces, as the
+    generic-constraint form already does) or be rejected with a normal, actionable
+    diagnostic naming the unsupported position. An internal-invariant abort is never
+    a correct response to well-formed source text.
+  citation_kind: sibling-test
+  citation: tests/language-feature/interfaces/conjunction-inheritance-decl.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/tests/coverage/METHODOLOGY.md#per-test-contract
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out -- the same `IA & IB` spelling is exercised by the committed hand-written test tests/language-feature/interfaces/conjunction-inheritance-decl.slang in inheritance and generic-constraint positions."
+    - "Conjunction parameters are deliberately unsupported: possible, but then the compiler owes a diagnostic; the message text ('should have been flattened') is an internal invariant, not user-facing advice."
+    - "Struct inheritance deprecation: ruled out -- `struct S : IA, IB` only warns about inheritance being unstable; the abort is triggered by the member lookup on the conjunction-typed parameter, and removing the parameter makes the same program compile."

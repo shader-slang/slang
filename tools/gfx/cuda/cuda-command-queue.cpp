@@ -43,7 +43,7 @@ SLANG_NO_THROW void SLANG_MCALL CommandQueueImpl::executeCommandBuffers(
 {
     SLANG_UNUSED(valueToSignal);
     // TODO: implement fence.
-    assert(fence == nullptr);
+    SLANG_ASSERT(fence == nullptr);
     for (GfxIndex i = 0; i < count; i++)
     {
         execute(static_cast<CommandBufferImpl*>(commandBuffers[i]));

@@ -1,6 +1,6 @@
 #include "replay-stream-decoder.h"
 
-#include "../core/slang-io.h"
+#include "core/slang-io.h"
 
 #include <cstdio>
 

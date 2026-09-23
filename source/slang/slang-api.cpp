@@ -1,18 +1,18 @@
 // slang-api.cpp
 
-#include "../compiler-core/slang-artifact-associated-impl.h"
-#include "../core/slang-builtin-module-cache.h"
-#include "../core/slang-performance-profiler.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-rtti-info.h"
-#include "../core/slang-shared-library.h"
-#include "../core/slang-signal.h"
-#include "../slang-record-replay/proxy/proxy-base.h"
-#include "../slang-record-replay/proxy/proxy-macros.h"
-#include "../slang-record-replay/replay-context.h"
+#include "compiler-core/slang-artifact-associated-impl.h"
+#include "core/slang-builtin-module-cache.h"
+#include "core/slang-performance-profiler.h"
+#include "core/slang-platform.h"
+#include "core/slang-rtti-info.h"
+#include "core/slang-shared-library.h"
+#include "core/slang-signal.h"
 #include "slang-capability.h"
 #include "slang-compiler.h"
 #include "slang-internal.h"
+#include "slang-record-replay/proxy/proxy-base.h"
+#include "slang-record-replay/proxy/proxy-macros.h"
+#include "slang-record-replay/replay-context.h"
 #include "slang-repro.h"
 #include "slang-tag-version.h"
 
@@ -379,7 +379,9 @@ SLANG_API void spAddBuiltins(
     char const* sourcePath,
     char const* sourceString)
 {
+    SLANG_ALLOW_DEPRECATED_BEGIN
     session->addBuiltins(sourcePath, sourceString);
+    SLANG_ALLOW_DEPRECATED_END
 }
 
 SLANG_API void spSessionSetSharedLibraryLoader(
@@ -1248,6 +1250,12 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
                 out << ",\n    \"space\": " << (int64_t)resourceInfo.space;
             if (resourceInfo.binding >= 0)
                 out << ",\n    \"binding\": " << (int64_t)resourceInfo.binding;
+            // Present only in the bindless form, where the buffer is one
+            // element of an unbounded descriptor array. Emitted on the same
+            // >= 0 convention as space/binding so a single-buffer manifest
+            // is byte-identical to before.
+            if (resourceInfo.bindlessIndex >= 0)
+                out << ",\n    \"bindless_index\": " << (int64_t)resourceInfo.bindlessIndex;
             if (resourceInfo.uniformOffset >= 0)
                 out << ",\n    \"uniform_offset\": " << (int64_t)resourceInfo.uniformOffset;
             if (resourceInfo.uniformStride > 0)

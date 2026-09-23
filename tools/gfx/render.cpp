@@ -1,6 +1,6 @@
 // render.cpp
-#include "../../source/core/slang-blob.h"
-#include "../../source/core/slang-math.h"
+#include "core/slang-blob.h"
+#include "core/slang-math.h"
 #include "debug-layer/debug-device.h"
 #include "open-gl/render-gl.h"
 #include "renderer-shared.h"
@@ -486,7 +486,7 @@ extern "C"
             }
         default:
             {
-                assert(!"Not handled");
+                SLANG_ASSERT_FAILURE("Not handled");
             }
         }
     }

@@ -1,8 +1,8 @@
 #ifndef SLANG_SOURCE_EMBED_UTIL_H
 #define SLANG_SOURCE_EMBED_UTIL_H
 
-#include "../core/slang-basic.h"
-#include "../core/slang-name-value.h"
+#include "core/slang-basic.h"
+#include "core/slang-name-value.h"
 #include "slang-artifact.h"
 #include "slang-com-ptr.h"
 #include "slang-diagnostic-sink.h"

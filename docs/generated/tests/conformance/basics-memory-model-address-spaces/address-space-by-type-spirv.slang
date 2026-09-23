@@ -17,6 +17,8 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 
 // Uniform address space (ConstantBuffer<T> -> Uniform).
 ConstantBuffer<float> cbParam;
@@ -48,3 +50,18 @@ void computeMain(uint3 tid : SV_DispatchThreadID)  // Input address space -> Inp
 // WGSL-DAG: var<uniform> cbParam_
 // WGSL-DAG: var<storage, read_write> rwbuf_
 // WGSL-DAG: var<workgroup> lds_
+// GLSL keeps each address space in its own declaration form: a std140 uniform block
+// (Uniform), an std430 buffer block (StorageBuffer), a `shared` array (Workgroup), and the
+// gl_GlobalInvocationID builtin (Input).
+// GLSL: layout(std140) uniform block_
+// GLSL: } cbParam_
+// GLSL: buffer StructuredBuffer_float
+// GLSL: } rwbuf_
+// GLSL: shared float{{.*}} lds_
+// GLSL: gl_GlobalInvocationID
+// HLSL keeps the four address spaces as cbuffer/b-register, RWStructuredBuffer/u-register,
+// `static groupshared`, and an SV_DispatchThreadID-semantic entry parameter.
+// HLSL: cbuffer cbParam_{{.*}} : register(b
+// HLSL: RWStructuredBuffer<float{{.*}}> rwbuf_{{.*}} : register(u
+// HLSL: static groupshared float{{.*}} lds_
+// HLSL: SV_DispatchThreadID

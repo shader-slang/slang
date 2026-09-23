@@ -96,7 +96,7 @@ VkImageLayout translateImageLayout(ResourceState state)
     case ResourceState::Present:
         return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     default:
-        assert(!"Unsupported");
+        SLANG_ASSERT_FAILURE("Unsupported");
         return VK_IMAGE_LAYOUT_UNDEFINED;
     }
 }
@@ -147,7 +147,7 @@ VkAccessFlagBits calcAccessFlags(ResourceState state)
     case ResourceState::General:
         return VkAccessFlagBits(VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
     default:
-        assert(!"Unsupported");
+        SLANG_ASSERT_FAILURE("Unsupported");
         return VkAccessFlagBits(0);
     }
 }
@@ -158,7 +158,7 @@ VkPipelineStageFlagBits calcPipelineStageFlags(ResourceState state, bool src)
     {
     case ResourceState::Undefined:
     case ResourceState::PreInitialized:
-        assert(src);
+        SLANG_ASSERT(src);
         return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     case ResourceState::VertexBuffer:
     case ResourceState::IndexBuffer:
@@ -205,7 +205,7 @@ VkPipelineStageFlagBits calcPipelineStageFlags(ResourceState state, bool src)
     case ResourceState::AccelerationStructureBuildInput:
         return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR);
     default:
-        assert(!"Unsupported");
+        SLANG_ASSERT_FAILURE("Unsupported");
         return VkPipelineStageFlagBits(0);
     }
 }
@@ -236,7 +236,7 @@ VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceState state)
     case ResourceState::DepthRead:
     case ResourceState::DepthWrite:
         {
-            assert(!"Invalid resource state for buffer resource.");
+            SLANG_ASSERT_FAILURE("Invalid resource state for buffer resource.");
             return VkBufferUsageFlagBits(0);
         }
     case ResourceState::UnorderedAccess:
@@ -305,7 +305,7 @@ VkImageUsageFlagBits _calcImageUsageFlags(ResourceState state)
         return (VkImageUsageFlagBits)0;
     default:
         {
-            assert(!"Unsupported");
+            SLANG_ASSERT_FAILURE("Unsupported");
             return VkImageUsageFlagBits(0);
         }
     }
@@ -324,7 +324,7 @@ VkImageViewType _calcImageViewType(ITextureResource::Type type, const ITextureRe
     case IResource::Type::Texture3D:
         {
             // Can't have an array and 3d texture
-            assert(desc.arraySize <= 1);
+            SLANG_ASSERT(desc.arraySize <= 1);
             if (desc.arraySize <= 1)
             {
                 return VK_IMAGE_VIEW_TYPE_3D;
@@ -395,7 +395,7 @@ VkAccessFlags calcAccessFlagsFromImageLayout(VkImageLayout layout)
     case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
         return VK_ACCESS_TRANSFER_WRITE_BIT;
     default:
-        assert(!"Unsupported VkImageLayout");
+        SLANG_ASSERT_FAILURE("Unsupported VkImageLayout");
         return (VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
     }
 }
@@ -428,7 +428,7 @@ VkPipelineStageFlags calcPipelineStageFlagsFromImageLayout(VkImageLayout layout)
         return (
             VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
     default:
-        assert(!"Unsupported VkImageLayout");
+        SLANG_ASSERT_FAILURE("Unsupported VkImageLayout");
         return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     }
 }

@@ -1,11 +1,11 @@
 #include "slang-win-visual-studio-util.h"
 
-#include "../../core/slang-common.h"
-#include "../../core/slang-process-util.h"
-#include "../../core/slang-string-util.h"
-#include "../slang-json-parser.h"
-#include "../slang-json-value.h"
-#include "../slang-visual-studio-compiler-util.h"
+#include "compiler-core/slang-json-parser.h"
+#include "compiler-core/slang-json-value.h"
+#include "compiler-core/slang-visual-studio-compiler-util.h"
+#include "core/slang-common.h"
+#include "core/slang-process-util.h"
+#include "core/slang-string-util.h"
 
 #ifdef _WIN32
 #include <shlobj.h>
@@ -540,7 +540,17 @@ static SlangResult _findVersionsWithRegistery(List<WinVisualStudioUtil::VersionP
     cmdLine.addArg("&&");
     cmdLine.addArg(Path::combine(versionPath.vcvarsPath, "vcvarsall.bat"));
 
-#if SLANG_PTR_IS_32
+    // The downstream cl.exe/link.exe produce a DLL that this process loads
+    // in-process via LoadLibrary (see slang-shared-library.cpp), so the
+    // vcvarsall.bat architecture must match the architecture Slang itself
+    // is currently running as, not just "32 vs 64-bit". SLANG_PTR_IS_32/64
+    // collapse x64 and arm64 into the same 64-bit case, which previously
+    // selected the x64 toolchain unconditionally on 64-bit hosts: on a
+    // native arm64 host that produced an x64 DLL, which LoadLibrary then
+    // fails to load into a native arm64 process.
+#if SLANG_PROCESSOR_ARM_64
+    cmdLine.addArg("arm64");
+#elif SLANG_PTR_IS_32
     cmdLine.addArg("x86");
 #else
     cmdLine.addArg("x86_amd64");

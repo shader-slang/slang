@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
         {
             "name": "cbThing",
@@ -12,6 +13,9 @@ standard output = {
                     "kind": "struct",
                     "name": "Thing",
                     "fields": [
+
+                    ],
+                    "sizes": [
 
                     ]
                 },
@@ -24,9 +28,15 @@ standard output = {
                         "name": "Thing",
                         "fields": [
 
+                        ],
+                        "sizes": [
+
                         ]
                     }
-                }
+                },
+                "sizes": [
+
+                ]
             }
         },
         {
@@ -42,7 +52,10 @@ standard output = {
                             "name": "a",
                             "type": {
                                 "kind": "scalar",
-                                "scalarType": "int32"
+                                "scalarType": "int32",
+                                "sizes": [
+                                    {"kind": "uniform", "value": 4, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                         },
@@ -50,10 +63,16 @@ standard output = {
                             "name": "b",
                             "type": {
                                 "kind": "scalar",
-                                "scalarType": "int32"
+                                "scalarType": "int32",
+                                "sizes": [
+                                    {"kind": "uniform", "value": 4, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "uniform", "value": 8, "alignment": 16}
                     ]
                 },
                 "containerVarLayout": {
@@ -68,7 +87,10 @@ standard output = {
                                 "name": "a",
                                 "type": {
                                     "kind": "scalar",
-                                    "scalarType": "int32"
+                                    "scalarType": "int32",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 4, "alignment": 4}
+                                    ]
                                 },
                                 "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                             },
@@ -76,14 +98,23 @@ standard output = {
                                 "name": "b",
                                 "type": {
                                     "kind": "scalar",
-                                    "scalarType": "int32"
+                                    "scalarType": "int32",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 4, "alignment": 4}
+                                    ]
                                 },
                                 "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 8, "alignment": 16}
                         ]
                     },
                     "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
-                }
+                },
+                "sizes": [
+                    {"kind": "constantBuffer", "value": 1}
+                ]
             }
         },
         {
@@ -95,15 +126,177 @@ standard output = {
                 "access": "readWrite",
                 "resultType": {
                     "kind": "scalar",
-                    "scalarType": "int32"
-                }
+                    "scalarType": "int32",
+                    "sizes": [
+                        {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "unorderedAccess", "value": 1}
+                ]
             }
         }
     ],
+    "globalScope": {
+        "kind": "none",
+        "parameters": [
+            {
+                "name": "cbThing",
+                "type": {
+                    "kind": "constantBuffer",
+                    "elementType": {
+                        "kind": "struct",
+                        "name": "Thing",
+                        "fields": [
+
+                        ],
+                        "sizes": [
+
+                        ]
+                    },
+                    "containerVarLayout": {
+
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "struct",
+                            "name": "Thing",
+                            "fields": [
+
+                            ],
+                            "sizes": [
+
+                            ]
+                        }
+                    },
+                    "sizes": [
+
+                    ]
+                }
+            },
+            {
+                "name": "cbAnotherThing",
+                "binding": {"kind": "constantBuffer", "index": 0},
+                "type": {
+                    "kind": "constantBuffer",
+                    "elementType": {
+                        "kind": "struct",
+                        "name": "AnotherThing",
+                        "fields": [
+                            {
+                                "name": "a",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "int32",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 4, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
+                            },
+                            {
+                                "name": "b",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "int32",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 4, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 8, "alignment": 16}
+                        ]
+                    },
+                    "containerVarLayout": {
+                        "binding": {"kind": "constantBuffer", "index": 0}
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "struct",
+                            "name": "AnotherThing",
+                            "fields": [
+                                {
+                                    "name": "a",
+                                    "type": {
+                                        "kind": "scalar",
+                                        "scalarType": "int32",
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 4, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
+                                },
+                                {
+                                    "name": "b",
+                                    "type": {
+                                        "kind": "scalar",
+                                        "scalarType": "int32",
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 4, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "uniform", "value": 8, "alignment": 16}
+                            ]
+                        },
+                        "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
+                    },
+                    "sizes": [
+                        {"kind": "constantBuffer", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "outputBuffer",
+                "binding": {"kind": "unorderedAccess", "index": 0},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "structuredBuffer",
+                    "access": "readWrite",
+                    "resultType": {
+                        "kind": "scalar",
+                        "scalarType": "int32",
+                        "sizes": [
+                            {"kind": "uniform", "value": 4, "alignment": 4}
+                        ]
+                    },
+                    "sizes": [
+                        {"kind": "unorderedAccess", "value": 1}
+                    ]
+                }
+            }
+        ]
+    },
     "entryPoints": [
         {
             "name": "computeMain",
             "stage": "compute",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+                    {
+                        "name": "dispatchThreadID",
+                        "semanticName": "SV_DISPATCHTHREADID",
+                        "type": {
+                            "kind": "vector",
+                            "elementCount": 3,
+                            "elementType": {
+                                "kind": "scalar",
+                                "scalarType": "uint32"
+                            },
+                            "sizes": [
+
+                            ]
+                        }
+                    }
+                ]
+            },
             "parameters": [
                 {
                     "name": "dispatchThreadID",
@@ -114,7 +307,10 @@ standard output = {
                         "elementType": {
                             "kind": "scalar",
                             "scalarType": "uint32"
-                        }
+                        },
+                        "sizes": [
+
+                        ]
                     }
                 }
             ],

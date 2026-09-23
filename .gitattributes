@@ -6,3 +6,7 @@
 
 # Enable git archive substitution for tagged version file
 cmake/slang_git_version export-subst
+
+# The UTF-8 boundary test positions a multi-byte code point on an exact byte offset
+# (the 65535-byte SPIR-V string split); CRLF checkout would shift it, so pin to LF.
+tests/spirv/debug-info-include-source-utf8-boundary.slang text eol=lf

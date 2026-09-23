@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../../source/compiler-core/slang-artifact.h"
-#include "../../source/core/slang-common.h"
-#include "../../tools/unit-test/slang-unit-test.h"
+#include "compiler-core/slang-artifact.h"
+#include "core/slang-common.h"
+#include "unit-test/slang-unit-test.h"
 
 namespace Slang
 {

@@ -194,7 +194,7 @@ void mainOut(out Foo<int> a)
 */
 //OUT: see using of 'Foo'
 {
-    a = (Foo<int>)0;
+    a = Foo<int>();
 }
 
 [shader("vertex")]
@@ -224,7 +224,7 @@ void helper(Foo<int> a)
 [shader("vertex")]
 void mainScope(int x)
 {
-    helper((Foo<int>)0);
+    helper(Foo<int>());
 }
 
 [shader("vertex")]

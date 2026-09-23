@@ -1,5 +1,6 @@
 #include "slang-ir-util.h"
 
+#include "core/slang-short-list.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
@@ -847,6 +848,80 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     case kIROp_TextureFootprintType:
         sb << "TextureFootprint";
         break;
+    // The following opaque builtin types carry no name-hint/linkage decoration, and their operands
+    // form the type's identity. Each case renders the surface name plus those operands, so
+    // consumers (chiefly SPIR-V debug info) get a real name instead of the empty hint that would
+    // collapse distinct instantiations into the literal "unnamed".
+    case kIROp_DescriptorHandleType:
+        sb << "DescriptorHandle<";
+        getTypeNameHint(sb, as<IRDescriptorHandleType>(type)->getResourceType());
+        sb << ">";
+        break;
+    case kIROp_RayQueryType:
+        // The first operand is the ray-flags value (RayQueryType has min_operands == 1, so
+        // getOperand(0) is in bounds); include it so `RayQuery<flags>` instantiations that differ
+        // only in flags get distinct names.
+        sb << "RayQuery<";
+        getTypeNameHint(sb, type->getOperand(0));
+        sb << ">";
+        break;
+    case kIROp_CoopVectorType:
+        sb << "CoopVec<";
+        getTypeNameHint(sb, as<IRCoopVectorType>(type)->getElementType());
+        sb << ",";
+        getTypeNameHint(sb, as<IRCoopVectorType>(type)->getElementCount());
+        sb << ">";
+        break;
+    case kIROp_CoopMatrixType:
+        {
+            // Include every operand (scope and use as well as element/shape): each is part of the
+            // cooperative-matrix type identity, so omitting any would collide distinct types.
+            auto coopMat = as<IRCoopMatrixType>(type);
+            sb << "CoopMat<";
+            getTypeNameHint(sb, coopMat->getElementType());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getScope());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getRowCount());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getColumnCount());
+            sb << ",";
+            getTypeNameHint(sb, coopMat->getMatrixUse());
+            sb << ">";
+        }
+        break;
+    case kIROp_TensorAddressingTensorLayoutType:
+        {
+            auto tensorLayout = as<IRTensorAddressingTensorLayoutType>(type);
+            sb << "TensorLayout<";
+            getTypeNameHint(sb, tensorLayout->getDimension());
+            sb << ",";
+            getTypeNameHint(sb, tensorLayout->getClampMode());
+            sb << ">";
+        }
+        break;
+    case kIROp_TensorAddressingTensorViewType:
+        {
+            // Operands are [dimension, hasDimension, permutation...]; the two leading operands are
+            // rendered by name, so the remaining `getOperandCount() - 2` are the permutation. Only
+            // the first `dimension`-many permutation entries are meaningful; trailing slots are the
+            // sentinel 255 (padding that the OpTypeTensorViewNV writer in the SPIR-V emitter
+            // ignores). This function deliberately renders every slot so the name stays a faithful,
+            // collision-free function of the full operand list.
+            auto tensorView = as<IRTensorAddressingTensorViewType>(type);
+            sb << "TensorView<";
+            getTypeNameHint(sb, tensorView->getDimension());
+            sb << ",";
+            getTypeNameHint(sb, tensorView->getHasDimension());
+            UInt permutationCount = tensorView->getOperandCount() - 2;
+            for (UInt i = 0; i < permutationCount; i++)
+            {
+                sb << ",";
+                getTypeNameHint(sb, tensorView->getPermutation((int)i));
+            }
+            sb << ">";
+        }
+        break;
     case kIROp_Specialize:
         {
             auto specialize = as<IRSpecialize>(type);
@@ -952,7 +1027,16 @@ IRInst* getRootAddr(IRInst* addr)
     return addr;
 }
 
-IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes)
+// Walk `addr` to its root, appending each access-chain key LEAF-FIRST. Shared by
+// the public `getRootAddr` (which reverses afterwards, so callers see root-first)
+// and by `canAddressesPotentiallyAlias`, which indexes from the end instead so it
+// can keep its chains on the stack. Templated on the list type for exactly that
+// reason -- one walker means the two cannot drift apart.
+template<typename TChainList, typename TTypeList>
+static IRInst* _collectAccessChainLeafFirst(
+    IRInst* addr,
+    TChainList& outAccessChain,
+    TTypeList* outTypes)
 {
     for (;;)
     {
@@ -971,10 +1055,27 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
         }
         break;
     }
+    return addr;
+}
+
+// Overload for callers that want the chain but not the types. It exists so the
+// common case needs no explicit template arguments: passing `nullptr` for
+// `outTypes` cannot deduce `TTypeList` (its type is `std::nullptr_t`), which
+// would otherwise force every call site to spell out both parameters, the
+// second of them naming the type of a list that is never written.
+template<typename TChainList>
+static IRInst* _collectAccessChainLeafFirst(IRInst* addr, TChainList& outAccessChain)
+{
+    return _collectAccessChainLeafFirst<TChainList, List<IRInst*>>(addr, outAccessChain, nullptr);
+}
+
+IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes)
+{
+    auto root = _collectAccessChainLeafFirst(addr, outAccessChain, outTypes);
     outAccessChain.reverse();
     if (outTypes)
         outTypes->reverse();
-    return addr;
+    return root;
 }
 
 
@@ -1181,8 +1282,17 @@ bool canAddressesPotentiallyAlias(
     // then they cannot alias.
     if (root1 == root2)
     {
-        List<IRInst*> accessChain1;
-        List<IRInst*> accessChain2;
+        // Stack-allocated, and collected leaf-first so no reverse is needed: the
+        // loop below indexes from the end instead. This branch is the hot one
+        // whenever a target flattens shader parameters into one aggregate
+        // (Metal, and the CPU-like targets), because then every address in the
+        // function shares a root and lands here -- at which point two heap
+        // allocations per query, once per (address, instruction) scan step, are
+        // most of what the surrounding pass does. 8 is generous headroom for the access-chain
+        // depths seen in practice, not a hard limit -- nesting is user-controlled and unbounded,
+        // so deeper chains still work, they just spill to the heap as before.
+        ShortList<IRInst*, 8> accessChain1;
+        ShortList<IRInst*, 8> accessChain2;
 
         // Since getRootBufferOrAddr has a different behavior around
         // RWStructuredBufferGetElementPtr compared to getRootAddr,
@@ -1190,14 +1300,18 @@ bool canAddressesPotentiallyAlias(
         // that we can handle here, so that we don't need to handle the nuance
         // of whether or not to trace past any RWStructuredBufferGetElementPtr.
         //
-        root1 = getRootAddr(addr1, accessChain1, nullptr);
-        root2 = getRootAddr(addr2, accessChain2, nullptr);
+        root1 = _collectAccessChainLeafFirst(addr1, accessChain1);
+        root2 = _collectAccessChainLeafFirst(addr2, accessChain2);
         if (root1 != root2)
             return true;
-        for (Index i = 0; i < Math::Min(accessChain1.getCount(), accessChain2.getCount()); i++)
+        const Index count1 = accessChain1.getCount();
+        const Index count2 = accessChain2.getCount();
+        for (Index i = 0; i < Math::Min(count1, count2); i++)
         {
-            auto node1 = accessChain1[i];
-            auto node2 = accessChain2[i];
+            // Indices run root-first, as they did when both chains were reversed
+            // into root-first `List`s; these are leaf-first, so walk from the end.
+            auto node1 = accessChain1[count1 - 1 - i];
+            auto node2 = accessChain2[count2 - 1 - i];
             if (as<IRStructKey>(node1) && as<IRStructKey>(node2))
             {
                 // Two different field keys means the two addresses cannot alias.
@@ -1259,7 +1373,11 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
-bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, IRInst* addr)
+bool canInstHaveSideEffectAtAddress(
+    IRGlobalValueWithCode* func,
+    IRInst* inst,
+    IRInst* addr,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
     switch (inst->getOp())
     {
@@ -1282,7 +1400,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             if (!isChildInstOf(getRootAddr(addr), func))
             {
                 auto callee = call->getCallee();
-                if (callee && !doesCalleeHaveSideEffect(callee))
+                if (callee && !doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
                 {
                     // An exception is if the callee is side-effect free and is not reading from
                     // memory.
@@ -1658,13 +1776,37 @@ bool isSideEffectFreeFunctionalCall(
 template<typename TFunc>
 void forEachAssociatedCallee(IRInst* callee, TFunc callback)
 {
-    traverseUsers<IRAnnotation>(
-        callee,
-        [&](IRAnnotation* annotation)
+    // PRECONDITION: `callback` must not add or remove uses of `callee`. This
+    // walks the use list live, so mutating it invalidates `use->nextUse` under
+    // the iteration. `traverseUsers` snapshots into a `List<IRUse*>` precisely
+    // to tolerate that, and this does not -- because the snapshot costs a heap
+    // allocation and a full copy on every query, and on a hot intrinsic the use
+    // list holds one entry per call site. Callers that memoize the enclosing
+    // query pay that once per callee; the uncached ones that remain
+    // (slang-ir-simplify-for-emit.cpp, the autodiff passes) pay it per query.
+    //
+    // A mutating callback belongs on `traverseUsers`, not here.
+    //
+    // The precondition isn't otherwise enforced, so a future mutating callback would silently
+    // walk a freed `use->nextUse`. Re-check `firstUse` after every callback invocation to turn
+    // the most common violation -- a use added or removed at the head of the list -- into a
+    // debug-build `SLANG_ASSERT` instead of a silent use-after-free. Release builds have no
+    // guard at all (`SLANG_ASSERT` compiles out); the precondition is a hard requirement there,
+    // not just in debug. This also doesn't catch every possible mutation (e.g. one that leaves
+    // `firstUse` unchanged but frees a later use) -- it's a cheap debug-build guard rail for the
+    // shape a mutating callback is most likely to produce, not a substitute for the precondition.
+    for (auto use = callee->firstUse; use; use = use->nextUse)
+    {
+        if (use->usedValue != callee)
+            continue;
+        auto annotation = as<IRAnnotation>(use->getUser());
+        if (annotation && annotation->getTarget() == callee)
         {
-            if (annotation->getTarget() == callee)
-                callback(annotation->getInst());
-        });
+            auto expectedFirstUse = callee->firstUse;
+            callback(annotation->getInst());
+            SLANG_ASSERT(callee->firstUse == expectedFirstUse);
+        }
+    }
 }
 
 bool doesCalleeHaveSideEffect(IRInst* callee)
@@ -1969,19 +2111,6 @@ void initializeScratchData(IRInst* inst)
     }
 }
 
-void resetScratchDataBit(IRInst* inst, int bitIndex)
-{
-    List<IRInst*> workList;
-    workList.add(inst);
-    while (workList.getCount() != 0)
-    {
-        auto item = workList.getLast();
-        workList.removeLast();
-        item->scratchData &= ~(1ULL << bitIndex);
-        for (auto child = item->getLastDecorationOrChild(); child; child = child->getPrevInst())
-            workList.add(child);
-    }
-}
 
 ///
 /// IRBlock related common helper methods
@@ -2204,6 +2333,12 @@ UnownedStringSlice getBuiltinFuncName(IRInst* callee)
         return UnownedStringSlice::fromLiteral("IBwdCallable");
     case KnownBuiltinDeclName::NullDifferential:
         return UnownedStringSlice::fromLiteral("NullDifferential");
+    case KnownBuiltinDeclName::OperatorAddressOf:
+        return UnownedStringSlice::fromLiteral("OperatorAddressOf");
+    case KnownBuiltinDeclName::WaveIsFirstLane:
+        return UnownedStringSlice::fromLiteral("WaveIsFirstLane");
+    case KnownBuiltinDeclName::WaveReadLaneFirst:
+        return UnownedStringSlice::fromLiteral("WaveReadLaneFirst");
     default:
         return UnownedStringSlice();
     }
@@ -2453,6 +2588,24 @@ IRType* dropNormAttributes(IRType* const t)
     return t;
 }
 
+/// Gets a literal thread count, unwrapping a specialization constant's default when needed.
+static IRIntLit* _getDefaultThreadCount(IRInst* threadCount)
+{
+    if (auto intLit = as<IRIntLit>(threadCount))
+        return intLit;
+
+    auto globalParam = as<IRGlobalParam>(threadCount);
+    auto defaultValueDecor =
+        globalParam ? globalParam->findDecoration<IRDefaultValueDecoration>() : nullptr;
+    if (defaultValueDecor)
+        if (auto defaultIntLit = as<IRIntLit>(defaultValueDecor->getOperand(0)))
+            return defaultIntLit;
+
+    IRBuilder builder(globalParam ? (IRInst*)globalParam : threadCount);
+    return cast<IRIntLit>(
+        builder.getIntValue(globalParam ? globalParam->getDataType() : builder.getIntType(), 1));
+}
+
 void verifyComputeDerivativeGroupModifiers(
     DiagnosticSink* sink,
     SourceLoc errorLoc,
@@ -2469,15 +2622,9 @@ void verifyComputeDerivativeGroupModifiers(
             Diagnostics::OnlyOneOfDerivativeGroupLinearOrQuadCanBeSet{.location = errorLoc});
     }
 
-    IRIntegerValue x = 1;
-    IRIntegerValue y = 1;
-    IRIntegerValue z = 1;
-    if (numThreadsDecor->getX())
-        x = numThreadsDecor->getX()->getValue();
-    if (numThreadsDecor->getY())
-        y = numThreadsDecor->getY()->getValue();
-    if (numThreadsDecor->getZ())
-        z = numThreadsDecor->getZ()->getValue();
+    IRIntegerValue x = _getDefaultThreadCount(numThreadsDecor->getOperand(0))->getValue();
+    IRIntegerValue y = _getDefaultThreadCount(numThreadsDecor->getOperand(1))->getValue();
+    IRIntegerValue z = _getDefaultThreadCount(numThreadsDecor->getOperand(2))->getValue();
 
     if (quadAttr)
     {
@@ -3078,16 +3225,12 @@ bool isIROpaqueType(IRType* type)
     }
 }
 
-// True if `addr`'s chain bottoms out at `GetOptiXSbtDataPtr` (the OptiX SBT), peeling every
-// forwarding op, including the `BitCast`/`GetOffsetPtr` that `getRootAddr` does not peel.
-static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
+IRInst* peelAddressForwardingOps(IRInst* addr)
 {
     for (;;)
     {
         switch (addr->getOp())
         {
-        case kIROp_GetOptiXSbtDataPtr:
-            return true;
         case kIROp_FieldAddress:
         case kIROp_GetElementPtr:
         case kIROp_GetOffsetPtr:
@@ -3097,9 +3240,16 @@ static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
             addr = addr->getOperand(0);
             continue;
         default:
-            return false;
+            return addr;
         }
     }
+}
+
+// True if `addr`'s chain bottoms out at `GetOptiXSbtDataPtr` (the OptiX SBT), peeling every
+// forwarding op, including the `BitCast`/`GetOffsetPtr` that `getRootAddr` does not peel.
+static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
+{
+    return peelAddressForwardingOps(addr)->getOp() == kIROp_GetOptiXSbtDataPtr;
 }
 
 bool isPointerToImmutableLocation(IRInst* loc)
@@ -3286,6 +3436,68 @@ bool isReadNoneCallee(IRInst* callee)
     return false;
 }
 
+bool isReadNoneCalleeAndAllDerivatives(IRInst* callee)
+{
+    // The primary callee must be read-none first; the carry-set gate cannot
+    // weaken its existing guarantee.
+    if (!isReadNoneCallee(callee))
+        return false;
+
+    // Look annotations up on the resolved inner function rather than on the
+    // unresolved callee. This is intentionally conservative: stdlib generics
+    // (e.g. `sqrt`) attach `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]`
+    // annotations on the `IRSpecialize` wrapper, and those derivatives are
+    // genuinely pure but typically NOT marked `[__readNone]` (the stdlib
+    // doesn't bother). Looking them up on the unresolved callee would find
+    // them and force a non-readNone verdict on every call site to a stdlib
+    // math function, regressing the false-positive fixes from #11286.
+    //
+    // The trade-off is that user-defined generic primaries (whose
+    // `[ForwardDerivative]` / `[BackwardDerivative]` annotations also live
+    // on the `IRSpecialize`) bypass this gate. That's an under-approximation
+    // — a generic `[__readNone]` primary with a side-effecting user-supplied
+    // derivative is not currently caught. A more accurate fix would
+    // distinguish "stdlib-style pure derivative not explicitly annotated"
+    // from "user-supplied derivative with possible side effects" without
+    // requiring stdlib annotation churn; see follow-up tracking.
+    IRInst* annotated = getResolvedInstForDecorations(callee);
+    if (!annotated)
+        return true;
+
+    IRBuilder builder(annotated->getModule());
+
+    auto isAssociatedDerivativeReadNone = [&](AnnotationKind kind) -> bool
+    {
+        IRInst* derivativeFunc = builder.tryLookupAnnotation(annotated, kind);
+        if (!derivativeFunc)
+            return true;
+        return isReadNoneCallee(derivativeFunc);
+    };
+
+    // ForwardDerivative points directly at the user's fwd-diff function.
+    if (!isAssociatedDerivativeReadNone(AnnotationKind::ForwardDerivative))
+        return false;
+
+    // BackwardDerivativePropagate points at the synthesized propagate-phase
+    // wrapper. `isReadNoneCallee`'s `IRTranslateBase` switch above unwraps
+    // that wrapper via `kIROp_BackwardPropagateFromLegacyBwdDiffFunc`
+    // (operand 1 = user's bwd-diff function copy), so the wrapper's
+    // readNone-ness correctly inherits from the user-supplied backward
+    // function.
+    //
+    // `AnnotationKind::BackwardDerivativeApply` is intentionally NOT
+    // consulted: its wrapper is `BackwardPrimalFromLegacyBwdDiffFunc(primary,
+    // bwd_diff)`, which the same switch unwraps via
+    // `kIROp_BackwardPrimalFromLegacyBwdDiffFunc` -> operand 0 = primary.
+    // Apply therefore inherits its readNone-ness from the already-checked
+    // primary callee and adds no information beyond the first
+    // `isReadNoneCallee(callee)` gate above.
+    if (!isAssociatedDerivativeReadNone(AnnotationKind::BackwardDerivativePropagate))
+        return false;
+
+    return true;
+}
+
 
 bool isNoSideEffectCallee(IRInst* callee)
 {
@@ -3419,6 +3631,22 @@ IRType* getWorkGraphRecordElementType(IRType* type)
     }
 
     return nullptr;
+}
+
+bool isBindlessTextureNVEncodableResourceType(IRType* type)
+{
+    auto unwrapped = unwrapAttributedType(type);
+    return as<IRTextureType>(unwrapped) || as<IRSamplerStateTypeBase>(unwrapped);
+}
+
+bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool hasBindlessTextureNV)
+{
+    if (!hasBindlessTextureNV)
+        return false;
+    auto handleType = as<IRDescriptorHandleType>(descriptorHandleType);
+    if (!handleType)
+        return false;
+    return isBindlessTextureNVEncodableResourceType(handleType->getResourceType());
 }
 
 } // namespace Slang

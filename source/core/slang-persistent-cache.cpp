@@ -1,9 +1,9 @@
 #include "slang-persistent-cache.h"
 
-#include "../core/slang-blob.h"
-#include "../core/slang-io.h"
-#include "../core/slang-stream.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-blob.h"
+#include "core/slang-io.h"
+#include "core/slang-stream.h"
+#include "core/slang-string-util.h"
 
 namespace Slang
 {

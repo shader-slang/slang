@@ -1,13 +1,13 @@
 // slang-emit-metal.cpp
 #include "slang-emit-metal.h"
 
-#include "../core/slang-writer.h"
+#include "core/slang-type-text-util.h"
+#include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
-#include <assert.h>
 
 namespace Slang
 {
@@ -194,6 +194,17 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     {
         if (auto sysSemanticAttr = layout->findSystemValueSemanticAttr())
             _emitUserSemantic(sysSemanticAttr->getName(), sysSemanticAttr->getIndex());
+    }
+}
+
+void MetalSourceEmitter::emitTempModifiers(IRInst* temp)
+{
+    // Metal has no `precise` keyword; drop it and warn.
+    if (temp->findDecoration<IRPreciseDecoration>())
+    {
+        getSink()->diagnose(Diagnostics::PreciseQualifierUnsupportedOnTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+            .location = temp->sourceLoc});
     }
 }
 
@@ -713,6 +724,18 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 {
     switch (inst->getOp())
     {
+    case kIROp_MakeArray:
+    case kIROp_MakeArrayFromElement:
+        {
+            // Metal spells an array as `metal::array<T,N>`, a struct wrapping a `T[N]` member, so
+            // its initializer needs two brace levels — the struct and its member array — whereas
+            // the base emitter emits one and relies on brace-elision, which is ambiguous for nested
+            // arrays (same shape and handling as the C++ `FixedArray` target).
+            m_writer->emit("{ ");
+            defaultEmitInstExpr(inst, inOuterPrec);
+            m_writer->emit(" }");
+            return true;
+        }
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
     case kIROp_MakeVectorFromScalar:
@@ -762,12 +785,19 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         {
             if (as<IRMatrixType>(inst->getOperand(0)->getDataType()))
             {
-                // Metal does not support negate operator on matrices,
-                // we should emit "(matrix(0) - op0)" instead.
+                // Metal has no unary '-' on matrices, so lower matrix negation to
+                // "(matrix(0) - op0)". The explicit parentheses wrap the whole subtraction, so its
+                // outer context is effectively lowest-precedence: pass EmitOp::General (not the
+                // incoming outerPrec) and emit op0 as the subtraction's right-hand side. This wraps
+                // an operand that binds no tighter than '-' -- the additive "m1 + m2" (its
+                // left-associative RHS, at equal precedence) -- but not a tighter operand or an
+                // atomic.
                 m_writer->emit("(");
                 emitType(inst->getDataType());
                 m_writer->emit("(0) - ");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitOperand(
+                    inst->getOperand(0),
+                    rightSide(getInfo(EmitOp::General), getInfo(EmitOp::Sub)));
                 m_writer->emit(")");
                 return true;
             }
@@ -831,19 +861,27 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     case kIROp_CastDescriptorHandleToUInt64:
         {
             // Metal: DescriptorHandle is a pointer; emit C-style cast to ulong.
+            // Precedence-wrapped like the kIROp_BitCast case below (#12732).
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
             m_writer->emit("(ulong)(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
+            maybeCloseParens(needClose);
             return true;
         }
     case kIROp_CastUInt64ToDescriptorHandle:
         {
             // Metal: cast integer back to pointer type.
+            // Precedence-wrapped like the kIROp_BitCast case below (#12732).
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
             m_writer->emit("(");
             emitType(inst->getDataType());
             m_writer->emit(")(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
+            maybeCloseParens(needClose);
             return true;
         }
     case kIROp_BitCast:
@@ -858,12 +896,18 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
             if (toIsPointer || fromIsPointer)
             {
-                // C-style cast for pointer conversions
+                // C-style cast for pointer conversions. A cast is a prefix expression
+                // and binds looser than a postfix member access, so wrap it by
+                // precedence; otherwise `(T*)p->field` binds `->` to `p`, not the cast
+                // result, and Metal rejects it (#12732).
+                EmitOpInfo outerPrec = inOuterPrec;
+                bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
                 m_writer->emit("(");
                 emitType(toType);
                 m_writer->emit(")(");
                 emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                 m_writer->emit(")");
+                maybeCloseParens(needClose);
             }
             else
             {
@@ -886,6 +930,29 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
             m_writer->emit(buf);
 
+            return true;
+        }
+    case kIROp_Printf:
+        {
+            // Metal has no `printf`; its equivalent is the MSL 3.2 shader logging facility. Of the
+            // severity levels `log` is the one whose `MTLLogLevelNotice` survives the widest range
+            // of host `MTLLogState` configurations.
+            ensurePrelude(kMetalBuiltinPreludeLogging);
+            m_extensionTracker->requireMetalLanguageVersion(SemanticVersion(3, 2));
+            m_extensionTracker->requireLogging();
+            m_writer->emit("os_log_default.log(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            if (inst->getOperandCount() > 1)
+            {
+                List<IRInst*> args;
+                collectFlattenedVariadicOperands(inst, 1, args);
+                for (auto arg : args)
+                {
+                    m_writer->emit(", ");
+                    emitOperand(arg, getInfo(EmitOp::General));
+                }
+            }
+            m_writer->emit(")");
             return true;
         }
     case kIROp_ByteAddressBufferLoad:
@@ -1010,21 +1077,30 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     case kIROp_MetalSetIndices:
         {
             auto setIndices = as<IRMetalSetIndices>(inst);
-            const auto indices = as<IRVectorType>(setIndices->getElementValue()->getDataType());
-            UInt numIndices = as<IRIntLit>(indices->getElementCount())->getValue();
-            for (UInt i = 0; i < numIndices; ++i)
+            auto value = setIndices->getElementValue();
+            // Scalar for point topology, uint2/uint3 for lines/triangles.
+            auto vectorType = as<IRVectorType>(value->getDataType());
+            SLANG_ASSERT(vectorType || as<IRBasicType>(value->getDataType()));
+            IRIntegerValue numIndices = vectorType ? getIntVal(vectorType->getElementCount()) : 1;
+            for (IRIntegerValue i = 0; i < numIndices; ++i)
             {
                 m_writer->emit("_slang_mesh.set_index(");
-                emitOperand(setIndices->getIndex(), getInfo(EmitOp::General));
+                emitOperand(
+                    setIndices->getIndex(),
+                    leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Mul)));
                 m_writer->emit("*");
-                m_writer->emitUInt64(numIndices);
+                m_writer->emitInt64(numIndices);
                 m_writer->emit("+");
-                m_writer->emitUInt64(i);
-                m_writer->emit(",(");
-                emitOperand(setIndices->getElementValue(), getInfo(EmitOp::General));
-                m_writer->emit(")[");
-                m_writer->emitUInt64(i);
-                m_writer->emit("]);\n");
+                m_writer->emitInt64(i);
+                m_writer->emit(",");
+                emitOperand(value, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Postfix)));
+                if (vectorType)
+                {
+                    m_writer->emit("[");
+                    m_writer->emitInt64(i);
+                    m_writer->emit("]");
+                }
+                m_writer->emit(");\n");
             }
             return true;
         }

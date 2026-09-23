@@ -1,8 +1,8 @@
 #ifndef SLANG_JSON_DIAGNOSTICS_H
 #define SLANG_JSON_DIAGNOSTICS_H
 
-#include "../core/slang-basic.h"
-#include "../core/slang-writer.h"
+#include "core/slang-basic.h"
+#include "core/slang-writer.h"
 #include "slang-diagnostic-sink.h"
 #include "slang-source-loc.h"
 #include "slang-token.h"

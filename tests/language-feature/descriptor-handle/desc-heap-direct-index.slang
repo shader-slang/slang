@@ -56,7 +56,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // GLSLSPV: OpImageSampleExplicitLod
 
 // WGSL stays a text-emit check (no downstream WGSL compiler here): it must declare a
-// `_slang_resource_heap` array and index it with a thread-derived heap value, matching the
-// `DescriptorHandle<T>` path in desc-handle-3.slang — verifying the path emits, not merely gates.
+// `_slang_resource_heap` array and index it with the scalar thread component (a 1-D
+// `array<texture_2d>` takes a scalar index), matching the `.x` the HLSL check above pins.
 // WGSL: _slang_resource_heap{{[0-9_]+}}{{.*}}array<texture_2d
-// WGSL: _slang_resource_heap{{[0-9_]+}}[vec2<u32>(tid
+// WGSL: _slang_resource_heap{{[0-9_]+}}[tid{{[0-9_]+}}.x]

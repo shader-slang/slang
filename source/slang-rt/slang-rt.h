@@ -2,9 +2,9 @@
 #ifndef SLANG_RT_H
 #define SLANG_RT_H
 
-#include "../core/slang-com-object.h"
-#include "../core/slang-smart-pointer.h"
-#include "../core/slang-string.h"
+#include "core/slang-com-object.h"
+#include "core/slang-smart-pointer.h"
+#include "core/slang-string.h"
 
 #ifdef SLANG_RT_DYNAMIC_EXPORT
 #define SLANG_RT_API SLANG_DLL_EXPORT

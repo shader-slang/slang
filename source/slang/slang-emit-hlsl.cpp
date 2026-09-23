@@ -1,13 +1,12 @@
 // slang-emit-hlsl.cpp
 #include "slang-emit-hlsl.h"
 
-#include "../core/slang-writer.h"
+#include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-util-hlsl.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
-#include <assert.h>
 
 namespace Slang
 {

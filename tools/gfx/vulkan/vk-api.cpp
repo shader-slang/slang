@@ -35,7 +35,7 @@ bool VulkanApi::areDefined(ProcType type) const
         return VK_API_CHECK_FUNCTIONS(VK_API_DEVICE_PROCS);
     default:
         {
-            assert(!"Unhandled type");
+            SLANG_ASSERT_FAILURE("Unhandled type");
             return false;
         }
     }
@@ -58,7 +58,7 @@ Slang::Result VulkanApi::initGlobalProcs(const VulkanModule& module)
 
 Slang::Result VulkanApi::initInstanceProcs(VkInstance instance)
 {
-    assert(instance && vkGetInstanceProcAddr != nullptr);
+    SLANG_ASSERT(instance && vkGetInstanceProcAddr != nullptr);
 
 #define VK_API_GET_INSTANCE_PROC(x) x = (PFN_##x)vkGetInstanceProcAddr(instance, #x);
 
@@ -79,7 +79,7 @@ Slang::Result VulkanApi::initInstanceProcs(VkInstance instance)
 
 Slang::Result VulkanApi::initPhysicalDevice(VkPhysicalDevice physicalDevice)
 {
-    assert(m_physicalDevice == VK_NULL_HANDLE);
+    SLANG_ASSERT(m_physicalDevice == VK_NULL_HANDLE);
     m_physicalDevice = physicalDevice;
 
     vkGetPhysicalDeviceProperties(m_physicalDevice, &m_deviceProperties);
@@ -91,7 +91,7 @@ Slang::Result VulkanApi::initPhysicalDevice(VkPhysicalDevice physicalDevice)
 
 Slang::Result VulkanApi::initDeviceProcs(VkDevice device)
 {
-    assert(m_instance && device && vkGetDeviceProcAddr != nullptr);
+    SLANG_ASSERT(m_instance && device && vkGetDeviceProcAddr != nullptr);
 
 #define VK_API_GET_DEVICE_PROC(x) x = (PFN_##x)vkGetDeviceProcAddr(device, #x);
 
@@ -116,7 +116,7 @@ Slang::Result VulkanApi::initDeviceProcs(VkDevice device)
 
 int VulkanApi::findMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const
 {
-    assert(typeBits);
+    SLANG_ASSERT(typeBits);
 
     const int numMemoryTypes = int(m_deviceMemoryProperties.memoryTypeCount);
 
@@ -138,7 +138,7 @@ int VulkanApi::findMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags prop
 
 int VulkanApi::findQueue(VkQueueFlags reqFlags) const
 {
-    assert(m_physicalDevice != VK_NULL_HANDLE);
+    SLANG_ASSERT(m_physicalDevice != VK_NULL_HANDLE);
 
     uint32_t numQueueFamilies = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &numQueueFamilies, nullptr);

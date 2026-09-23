@@ -2,8 +2,8 @@
 #ifndef SLANG_IR_OBFUSCATE_LOC_H_INCLUDED
 #define SLANG_IR_OBFUSCATE_LOC_H_INCLUDED
 
-#include "../compiler-core/slang-source-map.h"
-#include "../core/slang-basic.h"
+#include "compiler-core/slang-source-map.h"
+#include "core/slang-basic.h"
 #include "slang-compiler.h"
 #include "slang-ir.h"
 

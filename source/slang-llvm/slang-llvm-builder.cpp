@@ -1224,7 +1224,9 @@ LLVMInst* LLVMBuilder::emitCompareOp(
         pred = isFloat ? llvm::CmpInst::Predicate::FCMP_OEQ : llvm::CmpInst::Predicate::ICMP_EQ;
         break;
     case Slang::LLVMCompareOp::NotEqual:
-        pred = isFloat ? llvm::CmpInst::Predicate::FCMP_ONE : llvm::CmpInst::Predicate::ICMP_NE;
+        // `!=` must be the complement of `==`, i.e. true when either operand is
+        // NaN, which requires the unordered float predicate FCMP_UNE.
+        pred = isFloat ? llvm::CmpInst::Predicate::FCMP_UNE : llvm::CmpInst::Predicate::ICMP_NE;
         break;
     case Slang::LLVMCompareOp::Greater:
         pred = isFloat    ? llvm::CmpInst::Predicate::FCMP_OGT
@@ -2323,9 +2325,9 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 
     std::unique_ptr<llvm::orc::LLJIT> jit;
     {
-        // Construct the LLJIT with AVX-512 disabled in the JIT TargetMachine;
-        // see #11062 and the docstring for createAVX512SafeLLJIT.
-        llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = createAVX512SafeLLJIT();
+        // Construct the LLJIT with Slang's platform configuration; see the
+        // createSlangLLJIT docstring.
+        llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = createSlangLLJIT();
 
         if (!expectJit)
         {

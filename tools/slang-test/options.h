@@ -3,9 +3,9 @@
 #ifndef OPTIONS_H_INCLUDED
 #define OPTIONS_H_INCLUDED
 
-#include "../../source/core/slang-dictionary.h"
-#include "../../source/core/slang-render-api-util.h"
-#include "../../source/core/slang-smart-pointer.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-render-api-util.h"
+#include "core/slang-smart-pointer.h"
 #include "test-reporter.h"
 
 // A category that a test can be tagged with

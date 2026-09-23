@@ -1,23 +1,23 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-30T13:24:00+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T08:19:17+00:00
 target_doc: ir-reference/control-flow.md
-target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: fail
   cross_references: pass
-  completeness: pass
+  completeness: partial
   style_consistency: partial
-  source_alignment: partial
+  source_alignment: fail
   front_matter_validity: pass
-finding_count: 4
+finding_count: 3
 severity_breakdown:
-  critical: 0
+  critical: 1
   major: 1
-  minor: 3
+  minor: 1
   nit: 0
 ---
 
@@ -25,30 +25,27 @@ severity_breakdown:
 
 ## Summary
 
-The page has the required IR-reference structure, the front matter is valid, and the opcode coverage matches the `TerminatorInst` Lua group plus `block` and `param`. The main issue is that the `C++ wrapper` column does not consistently name the actual `IR*` wrapper structs from `slang-ir-insts.h`, and a few AST-origin cells describe source-produced opcodes as synthesized.
+The opcode catalog and its links are largely accurate, but the side-effect-cache guidance is unsafe: a stale cached `false` can let DCE remove a call whose associated callee has become effectful. The opcode tables also miss the prompt's required per-subtable visitor citations, and one source line range excludes an emitter it claims to cover.
 
 ## Items checked
 
-- Verified the front-matter fields and copied `source_commit` / `watched_paths_digest` into this report.
-- Checked the manifest prompt, dependencies, and resolved watched paths from `regenerate.py show ir-reference/control-flow.md`.
-- Verified all relative links in the page resolve locally, including peer generated docs and `docs/design/ir.md`.
-- Checked the Lua declarations for `block`, `param`, every `TerminatorInst` child, `discard`, `Require*`, `StaticAssert`, `Printf`, `Abort`, and `gpuForeach`.
-- Checked wrapper declarations for `IRReturn`, `IRYield`, `IRLoop`, `IRConditionalBranch`, `IRIfElse`, `IRSwitch`, `IRTargetSwitch`, `IRThrow`, `IRTryCall`, `IRDefer`, `IRGenericAsm`, and the `IRRequire*` wrappers.
-- Checked lowering origins for `IfStmt`, `ForStmt`, `WhileStmt`, `DoWhileStmt`, `SwitchStmt`, `TargetSwitchStmt`, `ReturnStmt`, `ThrowStmt`, `DeferStmt`, `DiscardStmt`, `BreakStmt`, `ContinueStmt`, `GpuForeachStmt`, `TryExpr`, and `IntrinsicAsmStmt`.
-- Spot-checked block-parameter placement and phi-replacement claims against `IRBlock` / `IRParam` helpers.
-- Spot-checked branch operand claims against `IRBuilder::emitBranch`, `emitLoop`, `emitIfElse`, `emitSwitch`, and `emitTryCallInst`.
+- Verified all 48 explicit line-number or line-range citations against source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
+- Verified more than 30 factual claims covering Lua opcode membership, wrapper types, operand layouts, flags, AST origins, block-parameter ordering, builder behavior, and side-effect analysis.
+- Confirmed all 32 relative-link occurrences resolve at the recorded source commit and all generated peer links name manifest pages.
+- Checked every concrete `TerminatorInst` child plus `block`, `param`, `discard`, the backend-hint group, and `gpuForeach` against `slang-ir-insts.lua`.
+- Ran identifier and whole-filename sweeps; generated wrapper/range identifiers absent from checked-in source were confirmed as FIDDLE-generated.
+- Confirmed the front matter, watched-path digest, required sections, table columns, dependencies, and structural lint.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Opcodes`, `C++ wrapper` column | The wrapper column does not list the exact C++ wrapper struct names required by the IR-reference contract. It uses values such as `Return`, `Loop`, and `IfElse` instead of the actual `IRReturn`, `IRLoop`, and `IRIfElse`, and it uses `—` for opcodes that do have wrappers, including `yield`, `targetSwitch`, `throw`, `tryCall`, `defer`, `GenericAsm`, and the `Require*` opcodes. | `source/slang/slang-ir-insts.h:1935` declares `struct IRReturn`; `source/slang/slang-ir-insts.h:1941` declares `struct IRYield`; `source/slang/slang-ir-insts.h:2069` declares `struct IRTargetSwitch`; `source/slang/slang-ir-insts.h:2085` declares `struct IRTryCall`; `source/slang/slang-ir-insts.h:2813` declares `struct IRGenericAsm`; `source/slang/slang-ir-insts.h:2820` declares `struct IRRequirePrelude`. | Replace the column values with the exact wrapper names from `slang-ir-insts.h`; keep `—` only for opcodes with no corresponding wrapper struct. |
-| F-002 | minor | `## Opcodes`, `targetSwitch` row | The `targetSwitch` row says the AST origin is `(synthesized)`, but `slang-lower-to-ir.cpp` has a statement visitor that lowers `TargetSwitchStmt` directly to `kIROp_TargetSwitch`. | `source/slang/slang-lower-to-ir.cpp:9229` defines `visitTargetSwitchStmt`, and `source/slang/slang-lower-to-ir.cpp:9263` emits `kIROp_TargetSwitch`. | Change the AST origin to `TargetSwitchStmt` / `StageSwitchStmt` in `slang-lower-to-ir.cpp`, or otherwise mention that target-switch statements produce this opcode. |
-| F-003 | minor | `## Opcodes`, `GenericAsm` row | The `GenericAsm` row says the AST origin is `(synthesized)`, but lowering emits `kIROp_GenericAsm` from `IntrinsicAsmStmt`. | `source/slang/slang-lower-to-ir.cpp:9274` defines `visitIntrinsicAsmStmt`, and `source/slang/slang-lower-to-ir.cpp:9292` emits `kIROp_GenericAsm`. | Change the AST origin to `IntrinsicAsmStmt` in `slang-lower-to-ir.cpp`. |
-| F-004 | minor | `### Abort` | The `Abort` notable-opcode callout goes beyond the per-opcode shape/origin role and gives backend legalization and emission behavior: `slang-ir-spirv-legalize.cpp rewrites it`, `OpAbortKHR is a SPIR-V block terminator`, and `The GLSL emitter maps it to abortEXT`. That is pass/backend behavior, which the IR-reference family contract says belongs in pipeline or target-emission docs rather than the opcode catalog. | `docs/generated/design/_meta/prompts/_common.md:266` forbids pass-by-pass behavior descriptions in IR-reference pages and points readers to `../pipeline/05-ir-passes.md`. | Trim the `Abort` callout to opcode shape and direct source/origin facts, and move or link the legalization/emission details to the appropriate pipeline or target page. |
+| F-001 | critical | `### Moving and deleting control-flow instructions`, lines 407-417 | The claim that a stale `calleeSideEffectCache` entry “is conservative” is unsafe. `doesCalleeHaveSideEffect` may cache `false`; adding an `IRAnnotation` that associates an effectful callee changes the correct answer to `true`, so reusing the stale value can make DCE eliminate a call with effects. | `source/slang/slang-ir-insts.h:3620-3623` explicitly says adding an annotation changes the result and “must not happen while a callee-side-effect cache is live.” `source/slang/slang-ir-util.cpp:1670-1708` shows both the associated-callee scan and unconditional cache lookup. | Replace the stale-entry claim with the actual lifetime rule: share the cache only while annotations and purity facts are unchanged, and clear or discard it before such mutations. Mention that `simplifyIR` clears it each outer iteration (`source/slang/slang-ir-ssa-simplification.cpp:60-80`). |
+| F-002 | major | `## Opcodes`, lines 126-199 | None of the nine opcode subtables has an AST-origin cell that names a `visit*` visitor, despite the per-document quality checklist requiring at least one `slang-lower-to-ir.cpp` visitor citation in every subtable. Several cells cite the filename only as backticked prose rather than a Markdown source link. | `docs/generated/design/_meta/prompts/ir-reference-control-flow.md:63-67` states the per-subtable requirement; `docs/generated/design/_meta/prompts/_common.md:43-45` requires source-file citations to be Markdown links. | Regroup into the four requested subtable categories, or update every retained subtable with a direct AST producer to name and link at least one exact visitor (for example, `ReturnStmt` via `visitReturnStmt`). Merge an all-synthesized subtable into a compatible group rather than inventing a visitor. |
+| F-003 | minor | `## Source`, lines 55-58 | The text includes `emitBlock` among emitters “defined in `slang-ir.cpp` at lines 6331-6560,” but `IRBuilder::emitBlock` is at line 5447; the cited range begins with `emitReturn`. | `source/slang/slang-ir.cpp:5447-5452` defines `IRBuilder::emitBlock`; `source/slang/slang-ir.cpp:6331-6560` covers return/yield and branch/loop/if/switch emitters instead. | Give `emitBlock` its own line citation at 5447, or remove it from the list attributed to the 6331-6560 range. |
 
 ## No-issues notes
 
-- The Lua opcode coverage for `TerminatorInst` plus `block` and `param` is complete.
-- The front matter includes all required generated-document keys and uses a hex-looking watched-path digest.
-- The control-flow links resolve to existing generated docs or source/design files.
+- Every concrete opcode under the Lua `TerminatorInst` group appears in the tables.
+- The mandatory generated-document front matter is complete and the digest matches the driver.
+- All source, dependency, peer, pipeline, glossary, and design-document links resolve.

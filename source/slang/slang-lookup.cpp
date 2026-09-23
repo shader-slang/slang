@@ -1,7 +1,7 @@
 // slang-lookup.cpp
 #include "slang-lookup.h"
 
-#include "../compiler-core/slang-name.h"
+#include "compiler-core/slang-name.h"
 #include "slang-check-impl.h"
 
 // TODO(tfoley): The implementation of lookup still involves

@@ -1,4 +1,5 @@
-//TEST:SIMPLE(filecheck=SPV): -target spirv
+// This test checks the pre-optimization SPIR-V representation of folded constants.
+//TEST:SIMPLE(filecheck=SPV): -target spirv -O0
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -emit-spirv-directly -output-using-type -render-features fp8
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -output-using-type -render-features fp8

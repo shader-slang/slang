@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-d-cuda-emit-and-downstream-tools
-//META: doc_section_digest=4b4e0759c8a603e1b1c8bce1cbdccd4b05a30002e4de763fd5617a3d9f9b28cb
+//META: doc_section_digest=9d22512c322523764ce371d9c4007f35d2bbc6c883c193616d4814d1ae0d08eb
 //META: purpose=-target cuh (CUDA header) shares the CUDA IR pipeline with CUDASource and emits a C++ header containing the slang-cuda-prelude.h include and `extern "C"` global-parameter declarations; the kernel body is emitted by the sibling `-target cuda` target.
 //META: intent=expansion
 //META: pipeline_stage=emit

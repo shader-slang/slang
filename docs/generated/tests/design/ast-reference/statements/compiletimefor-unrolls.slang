@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#compiletimeforstmt
-//META: doc_section_digest=b47d8d92e9d8444a86d4940595b47a98936eeee918ce8511059d4125824088d0
+//META: doc_section_digest=b830cb9d7a4474794ded574f3685c7c52f984f5f5edfcb84dd550dbf0d9ef1ae
 //META: purpose=A CompileTimeForStmt iterates a compile-time-constant range and is unrolled at compile time; the body executes once per iteration with the loop variable bound to a compile-time constant.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc spells CompileTimeForStmt as "Range-based loop unrolled at
-// compile time" and explains that bounds must be compile-time
-// constants. The surface form is `$for(i in Range(N))`. We observe by
-// summing the iterator values: 0+1+2+3 = 6 for Range(4).
+// Verifies `$for(i in Range(N))` runs its body once per value of a
+// compile-time-constant range, with `i` bound to that value inside the
+// body. The CHECK asserts the summed iterator values are 0+1+2+3 = 6,
+// which distinguishes a correct unroll from a dropped or duplicated
+// one.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

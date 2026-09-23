@@ -1,8 +1,8 @@
 #include "slang-language-server-auto-format.h"
 
-#include "../compiler-core/slang-lexer.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-file-system.h"
+#include "compiler-core/slang-lexer.h"
+#include "core/slang-char-util.h"
+#include "core/slang-file-system.h"
 
 namespace Slang
 {

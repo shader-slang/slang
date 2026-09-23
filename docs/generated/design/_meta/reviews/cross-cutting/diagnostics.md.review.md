@@ -1,23 +1,23 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-30T13:24:00+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T12:08:39+00:00
 target_doc: cross-cutting/diagnostics.md
-target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_watched_paths_digest: d89a8a5a54b52ca27bf1790e4d64b99d371b4099edbd608a872c47d632d6eb05
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 72308d5b1cf5b2f873570484f93cd6c423c9d145955c7dd61b2a25d788038770
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
   factual_accuracy: partial
   cross_references: pass
   completeness: partial
   style_consistency: pass
   source_alignment: partial
-  front_matter_validity: pass
-finding_count: 4
+  front_matter_validity: partial
+finding_count: 5
 severity_breakdown:
-  critical: 0
-  major: 3
-  minor: 1
+  critical: 1
+  major: 1
+  minor: 3
   nit: 0
 ---
 
@@ -25,27 +25,29 @@ severity_breakdown:
 
 ## Summary
 
-The document has the required high-level structure and all 27 Markdown links resolve, but several tool-facing details do not match the source. The most important issue is the claim that machine-readable diagnostics are JSON-schema based; the sink's machine-readable renderer emits tab-separated records, while the cited JSON files define diagnostics for JSON parsing rather than a diagnostic-output schema.
+The document is broadly accurate and all links resolve, but it has five findings. Most importantly, the add-diagnostic checklist incorrectly recommends the default-enabled `Extra` group for a warning that should not fire by default. The current watched-path set also no longer matches either the prose or the recorded digest.
 
 ## Items checked
 
-- Verified the required front matter fields and copied `target_doc_source_commit` / `target_doc_watched_paths_digest` from the target document.
-- Used `regenerate.py show cross-cutting/diagnostics.md` to identify the prompt, dependency document, watched paths, and resolved watched files.
-- Read `_common.md`, `cross-cutting-diagnostics.md`, the target document, and the dependency document `architecture/overview.md`.
-- Spot-checked more than 10 concrete claims against resolved watched files: `slang-diagnostic-sink.h`, `slang-diagnostic-sink.cpp`, `slang-core-diagnostics.h`, `slang-core-diagnostics.cpp`, `slang-diagnostics.h`, `slang-diagnostics.cpp`, `slang-diagnostics.lua`, `diagnostics/type-errors.lua`, `slang-rich-diagnostics.h`, `slang-rich-diagnostics.cpp`, and `source/core/slang-common.h`.
-- Resolved all 27 Markdown links in the target document; none were missing.
+- Verified source at the recorded commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`, which is also current `HEAD`; none of the resolved watched source files differs from that commit.
+- Spot-checked more than 20 factual claims, including sink construction and routing, severity overrides, warning groups, Lua validation and generation, prototype-schema inactivity, token-paste notes, TSV rendering, lookup behavior, assertion routing, and the add-diagnostic workflow.
+- Verified every line-number citation: the body contains none, so there were zero source line-number citations to re-derive.
+- Resolved all 39 Markdown link occurrences at the recorded commit and confirmed `architecture/overview.md` is both present and declared in the manifest.
+- Verified all mandatory sections and front-matter keys, ran the document lint successfully, and confirmed the 20,624-byte document is below its 24,576-byte cap.
+- Recomputed the current watched-path digest as `1dac728438feb2408c4a0f51ee6ac7303e143cfa77dda7fe254671622fe3bac1`, which does not match the recorded digest.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Source locations and message rendering`, lines 185-191 | The paragraph says tools can install a `JSON-emitting writer` and that the JSON schema is governed by `slang-json-diagnostic-defs.h` / `slang-json-diagnostics.cpp`. Those files are a diagnostic catalog for JSON lexing / JSON-RPC errors, not the machine-readable compiler-diagnostic output schema; the sink's machine-readable rich-diagnostic path emits tab-separated records. | `source/compiler-core/slang-diagnostic-sink.h:173` describes `MachineReadableDiagnostics` as `machine-readable TSV format`; `source/compiler-core/slang-rich-diagnostics-render.cpp:893` documents `E<code>\t<severity>\t<filename>...`; `source/compiler-core/slang-json-diagnostic-defs.h:26` begins the `JSON Lexical analysis` diagnostic range. | Replace the JSON-schema claim with a description of `DiagnosticSink::Flag::MachineReadableDiagnostics` and `renderDiagnosticMachineReadable`; do not cite the JSON diagnostic catalog as the output schema. |
-| F-002 | major | `## Error codes and the name field`, lines 195-200 | The document states `Every diagnostic has a unique integer id`, but the lookup and helper code explicitly account for multiple diagnostics sharing one numeric id. This matters because suppression by id can map to only the first stored entry. | `source/compiler-core/slang-diagnostic-sink.h:467` says `it is possible for multiple diagnostics to have the same id`; `source/slang/slang-diagnostics-helpers.lua:69` defines an `intentional_shared_code_list`; `source/compiler-core/slang-json-diagnostic-defs.h:41` also contains a duplicate `20011` pair. | Reword the section to say ids live in a shared namespace and are intended to be managed centrally, but some shared ids are intentional; mention that names / flags are safer when a tool needs a precise diagnostic. |
-| F-003 | major | `## Internal-compiler errors and assertions`, lines 223-232 | The required prompt asks this section to describe `SLANG_ASSERT`, `SLANG_ASSERT_FAILURE`, and `SLANG_UNREACHABLE`, but the document only covers `SLANG_ASSERT` / `SLANG_RELEASE_ASSERT` and the sink-based `SLANG_INTERNAL_ERROR` family. It omits how `SLANG_ASSERT_FAILURE` and `SLANG_UNREACHABLE` behave. | `docs/generated/design/_meta/prompts/cross-cutting-diagnostics.md:39` requires `SLANG_ASSERT`, `SLANG_ASSERT_FAILURE`, and `SLANG_UNREACHABLE`; `source/core/slang-signal.h:31` defines `SLANG_UNREACHABLE` through `handleSignal`; `source/core/slang-signal.h:33` defines `SLANG_ASSERT_FAILURE` through `handleAssert`. | Add the missing macros to the assertion paragraph, explaining that `SLANG_ASSERT_FAILURE` also routes through `handleAssert`, while `SLANG_UNREACHABLE` routes through `handleSignal`, not the diagnostic sink. |
-| F-004 | minor | `## Diagnostic definitions in Lua`, lines 156-175 | The legacy diagnostic schema says entries have `one or more span records`, but source comments and examples allow locationless diagnostics with no span. | `source/slang/slang-diagnostics.lua:85` documents `err(name, code, message, [primary_span], ...)`; `source/slang/slang-diagnostics.lua:87` says `primary_span is optional for locationless diagnostics`; `source/slang/slang-diagnostics.lua:158` defines `cannot-deduce-source-language` with no span. | Change the legacy-schema wording to say legacy diagnostics may have an optional primary span plus additional spans / notes, and call out locationless diagnostics as valid. |
+| F-001 | critical | `## Adding a new diagnostic`, lines 420-423 | The checklist says a warning that “should not fire by default” may use `extra`, but the sink enables `WarningLevel::Extra` by default. Following this instruction produces a warning that does fire without an opt-in flag. | `source/compiler-core/slang-diagnostic-sink.h:503-512` initializes the enabled-group mask with `Extra`; `source/slang/slang-options.cpp:589-593` likewise states that `-Wextra` is on by default. | Remove `extra` from this step. Tell authors to use `all` or `pedantic` for a warning that must be off by default, and describe `extra` separately as default-enabled. |
+| F-002 | major | Front matter line 6; `## Warning groups`, lines 286-293; `## What is not in this document`, lines 445-451 | The document twice says `include/slang.h`, `slang-options.cpp`, and `slang-compiler-options.cpp` are outside its watched paths, but the current manifest includes all three. Consequently the recorded digest `72308d...` is stale; `regenerate.py digest cross-cutting/diagnostics.md` returns `1dac7284...` for the resolved watched set. | `docs/generated/design/_meta/manifest.yaml:290-295` lists the three files; `regenerate.py show cross-cutting/diagnostics.md` resolves them. | Delete both stale “not watched” statements, retain the source links, and refresh the generated document's watched-path digest through the normal regeneration/freshness workflow. |
+| F-003 | minor | `## Internal-compiler errors`, lines 372-384 | “In debug builds they emit a companion note” incorrectly applies to all three preceding macros. Only `SLANG_INTERNAL_ERROR` and `SLANG_UNIMPLEMENTED` are defined inside the debug conditional; `SLANG_DIAGNOSE_UNEXPECTED` is defined afterward and emits no compiler-location note. | `source/slang/slang-diagnostics.h:40-68` shows the two debug-only note-emitting definitions and the unconditional `SLANG_DIAGNOSE_UNEXPECTED` definition. | Change the sentence to name only `SLANG_INTERNAL_ERROR` and `SLANG_UNIMPLEMENTED` as emitting debug companion notes. |
+| F-004 | minor | `## Internal-compiler errors`, lines 386-395 | The assertion description has two inaccuracies: release-build `SLANG_ASSERT` expands to `SLANG_ASSUME` rather than consulting `SLANG_ASSERT`, and `SLANG_ASSERT` calls `handleAssert` directly rather than expanding to the separate `SLANG_ASSERT_FAILURE` macro. | `source/core/slang-common.h:364-379` defines the debug and release expansions; `source/core/slang-signal.h:31-33` defines `SLANG_ASSERT_FAILURE` independently. | Distinguish debug `SLANG_ASSERT` from release `SLANG_ASSUME`, state that `SLANG_RELEASE_ASSERT` always calls `handleAssert`, and describe `SLANG_ASSERT_FAILURE` as a separate direct `handleAssert` macro. |
+| F-005 | minor | `## Source locations and message rendering`, lines 308-316 | The exact TSV record schema is attributed only to `slang-diagnostic-sink.cpp`, which dispatches to a renderer but does not define the schema. The defining `slang-rich-diagnostics-render.cpp` is outside the resolved watched paths, contrary to the prompt's requirement that rendering claims be supported by watched source. | `source/compiler-core/slang-diagnostic-sink.cpp:661-675` only calls the renderer; `source/compiler-core/slang-rich-diagnostics-render.cpp:886-958` defines the TSV fields; `docs/generated/design/_meta/manifest.yaml:279-295` omits that renderer. | Add `source/compiler-core/slang-rich-diagnostics-render.{h,cpp}` to the watched paths, then link the implementation when stating the TSV schema. |
 
 ## No-issues notes
 
-- The severity enum and rendered severity-name list match `source/compiler-core/slang-diagnostic-sink.h`.
-- The rich diagnostic example matches `source/slang/diagnostics/type-errors.lua`.
-- The sink behavior for severity overrides, warning-state tracking, parent sinks, and writer/output-buffer routing is consistent with `slang-diagnostic-sink.h` and `slang-diagnostic-sink.cpp`.
+- The severity and warning-group enum values, public-API synchronization assertions, and default `Extra` group match the source.
+- The Lua example, optional locationless diagnostics, warning-level sentinels, generated rich-diagnostic registration, and prototype-schema status match the source.
+- Parent-sink routing, effective-severity ordering, token-paste notes, diagnostic lookup behavior, and the TSV field sequence are otherwise accurate.

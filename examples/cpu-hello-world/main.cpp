@@ -24,7 +24,7 @@
 #include "slang-com-helper.h"
 
 // This includes a useful small function for setting up the prelude (described more further below).
-#include "../../source/core/slang-test-tool-util.h"
+#include "core/slang-test-tool-util.h"
 #include "examples/example-base/example-base.h"
 
 // Slang namespace is used for elements support code (like core) which we use here
@@ -39,7 +39,7 @@ using namespace Slang;
 // compiled code. It is not necessary to include the prelude, as long as memory is
 // laid out in the manner that the generated slang code expects.
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
-#include "../../prelude/slang-cpp-types.h"
+#include "prelude/slang-cpp-types.h"
 
 static const ExampleResources resourceBase("cpu-hello-world");
 

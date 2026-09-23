@@ -225,30 +225,6 @@ public in float2 gl_SamplePosition : SV_VulkanSamplePosition;
 
 // Override operator* behavior to compute algebric product of matrices and vectors.
 
-[OverloadRank(15)]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public matrix<float, N, N> operator*<let N:int>(matrix<float, N, N> m1, matrix<float, N, N> m2)
-{
-    return mul(m2, m1);
-}
-
-[OverloadRank(15)]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public matrix<half, N, N> operator*<let N:int>(matrix<half, N, N> m1, matrix<half, N, N> m2)
-{
-    return mul(m2, m1);
-}
-
-[OverloadRank(15)]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public matrix<double, N, N> operator*<let N:int>(matrix<double, N, N> m1, matrix<double, N, N> m2)
-{
-    return mul(m2, m1);
-}
-
 [ForceInline]
 [OverloadRank(15)]
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
@@ -357,22 +333,6 @@ public bool operator!=<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, 
 [ForceInline]
 [OverloadRank(14)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-public bool operator==<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
-{
-    return all(equal(left, right));
-}
-
-[ForceInline]
-[OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-public bool operator!=<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
-{
-    return any(notEqual(left, right));
-}
-
-[ForceInline]
-[OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 public bool operator==<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -385,30 +345,6 @@ public bool operator!=<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vec
 {
     return any(notEqual(left, right));
 }
-
-${
-for (auto type : kBaseTypes) {
-    char const* typeName = type.name;
-    if (!type.flags) continue;
-$}
-[ForceInline]
-[OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-public bool operator==<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
-{
-    return all(equal(left, right));
-}
-
-[ForceInline]
-[OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-public bool operator!=<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
-{
-    return any(notEqual(left, right));
-}
-${
-}
-$}
 
 /// Array length
 __generic<T, let N : int>
@@ -979,11 +915,11 @@ public uint uaddCarry(highp uint x, highp uint y, out lowp uint carry)
     {
     case glsl: __intrinsic_asm "uaddCarry";
     case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$uint $$uint;
-        %temp:%ResType = OpIAddCarry $x $y;
-        %carry:$$uint = OpCompositeExtract %temp 1;
-        OpStore &carry %carry;
-        result:$$uint = OpCompositeExtract %temp 0
+        %__ResType = OpTypeStruct $$uint $$uint;
+        %__temp:%__ResType = OpIAddCarry $x $y;
+        %__carry:$$uint = OpCompositeExtract %__temp 1;
+        OpStore &carry %__carry;
+        result:$$uint = OpCompositeExtract %__temp 0
     };
     default:
         let result = x * y;
@@ -1002,11 +938,11 @@ public vector<uint,N> uaddCarry(highp vector<uint,N> x, highp vector<uint,N> y, 
     {
     case glsl: __intrinsic_asm "uaddCarry";
     case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
-        %temp:%ResType = OpIAddCarry $x $y;
-        %carry:$$vector<uint,N> = OpCompositeExtract %temp 1;
-        OpStore &carry %carry;
-        result:$$vector<uint,N> = OpCompositeExtract %temp 0
+        %__ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
+        %__temp:%__ResType = OpIAddCarry $x $y;
+        %__carry:$$vector<uint,N> = OpCompositeExtract %__temp 1;
+        OpStore &carry %__carry;
+        result:$$vector<uint,N> = OpCompositeExtract %__temp 0
     };
     default:
         VECTOR_MAP_TRINARY(uint, N, uaddCarry, x, y, carry);
@@ -1022,11 +958,11 @@ public uint usubBorrow(highp uint x, highp uint y, out lowp uint borrow)
     {
     case glsl: __intrinsic_asm "usubBorrow";
     case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$uint $$uint;
-        %temp:%ResType = OpISubBorrow $x $y;
-        %borrow:$$uint = OpCompositeExtract %temp 1;
-        OpStore &borrow %borrow;
-        result:$$uint = OpCompositeExtract %temp 0
+        %__ResType = OpTypeStruct $$uint $$uint;
+        %__temp:%__ResType = OpISubBorrow $x $y;
+        %__borrow:$$uint = OpCompositeExtract %__temp 1;
+        OpStore &borrow %__borrow;
+        result:$$uint = OpCompositeExtract %__temp 0
     };
     default:
         borrow = (y > x) ? 1 : 0;
@@ -1044,11 +980,11 @@ public vector<uint,N> usubBorrow(highp vector<uint,N> x, highp vector<uint,N> y,
     {
     case glsl: __intrinsic_asm "usubBorrow";
     case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
-        %temp:%ResType = OpISubBorrow $x $y;
-        %borrow:$$vector<uint,N> = OpCompositeExtract %temp 1;
-        OpStore &borrow %borrow;
-        result:$$vector<uint,N> = OpCompositeExtract %temp 0
+        %__ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
+        %__temp:%__ResType = OpISubBorrow $x $y;
+        %__borrow:$$vector<uint,N> = OpCompositeExtract %__temp 1;
+        OpStore &borrow %__borrow;
+        result:$$vector<uint,N> = OpCompositeExtract %__temp 0
     };
     default:
         VECTOR_MAP_TRINARY(uint, N, usubBorrow, x, y, borrow);
@@ -1064,12 +1000,12 @@ public void umulExtended(highp uint x, highp uint y, out highp uint msb, out hig
     {
     case glsl: __intrinsic_asm "umulExtended";
     case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$uint $$uint;
-        %temp:%ResType = OpUMulExtended $x $y;
-        %lsb:$$uint = OpCompositeExtract %temp 0;
-        %msb:$$uint = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
+        %__ResType = OpTypeStruct $$uint $$uint;
+        %__temp:%__ResType = OpUMulExtended $x $y;
+        %__lsb:$$uint = OpCompositeExtract %__temp 0;
+        %__msb:$$uint = OpCompositeExtract %__temp 1;
+        OpStore &lsb %__lsb;
+        OpStore &msb %__msb;
     };
     default:
         uint64_t result = uint64_t(x) * uint64_t(y);
@@ -1088,12 +1024,12 @@ public void umulExtended(highp vector<uint,N> x, highp vector<uint,N> y, out hig
     {
     case glsl: __intrinsic_asm "umulExtended";
     case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
-        %temp:%ResType = OpUMulExtended $x $y;
-        %lsb:$$vector<uint,N> = OpCompositeExtract %temp 0;
-        %msb:$$vector<uint,N> = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
+        %__ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
+        %__temp:%__ResType = OpUMulExtended $x $y;
+        %__lsb:$$vector<uint,N> = OpCompositeExtract %__temp 0;
+        %__msb:$$vector<uint,N> = OpCompositeExtract %__temp 1;
+        OpStore &lsb %__lsb;
+        OpStore &msb %__msb;
     };
     default:
         [ForceUnroll]
@@ -1113,12 +1049,12 @@ public void imulExtended(highp int x, highp int y, out highp int msb, out highp 
     {
     case glsl: __intrinsic_asm "imulExtended";
     case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$int $$int;
-        %temp:%ResType = OpSMulExtended $x $y;
-        %lsb:$$int = OpCompositeExtract %temp 0;
-        %msb:$$int = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
+        %__ResType = OpTypeStruct $$int $$int;
+        %__temp:%__ResType = OpSMulExtended $x $y;
+        %__lsb:$$int = OpCompositeExtract %__temp 0;
+        %__msb:$$int = OpCompositeExtract %__temp 1;
+        OpStore &lsb %__lsb;
+        OpStore &msb %__msb;
     };
     default:
         int64_t result = int64_t(x) * int64_t(y);
@@ -1137,12 +1073,12 @@ public void imulExtended(highp vector<int,N> x, highp vector<int,N> y, out highp
     {
     case glsl: __intrinsic_asm "imulExtended";
     case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$vector<int,N> $$vector<int,N>;
-        %temp:%ResType = OpSMulExtended $x $y;
-        %lsb:$$vector<int,N> = OpCompositeExtract %temp 0;
-        %msb:$$vector<int,N> = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
+        %__ResType = OpTypeStruct $$vector<int,N> $$vector<int,N>;
+        %__temp:%__ResType = OpSMulExtended $x $y;
+        %__lsb:$$vector<int,N> = OpCompositeExtract %__temp 0;
+        %__msb:$$vector<int,N> = OpCompositeExtract %__temp 1;
+        OpStore &lsb %__lsb;
+        OpStore &msb %__msb;
     };
     default:
         [ForceUnroll]
@@ -4505,6 +4441,17 @@ internal typealias __ImagePtr<T> =
 __intrinsic_op($(kIROp_ImageTexelPointer))
 __ImagePtr<T> __imageTexelPointer<T, TImage, TCoord>(TImage image, TCoord coord, int sample);
 
+// Internal SPIR-V-legalization helper for the image-atomic snippets below. Its
+// `GetLegalizedSPIRVGlobalParamAddr` inst has no emitter; the SPIR-V legalize
+// pass only strips it while rewriting a global parameter's uses. A user call
+// passes an ordinary rvalue, not a global parameter, so that rewrite never
+// reaches it and the inst would survive to emit and abort. `internal` keeps the
+// name out of user scope; it is declared here, in the same module as its only
+// callers (the image-atomic snippets below), so those callers can still see it.
+internal __generic<T>
+__intrinsic_op($(kIROp_GetLegalizedSPIRVGlobalParamAddr))
+__Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
+
 ${
 {
     struct ImageTypeInfo
@@ -5235,8 +5182,8 @@ public property mat3x4 gl_ObjectToWorld3x4EXT
         {
             return spirv_asm
             {
-                %mat:$$mat4x3 = OpLoad builtin(ObjectToWorldKHR:mat4x3);
-                result:$$mat3x4 = OpTranspose %mat
+                %__mat:$$mat4x3 = OpLoad builtin(ObjectToWorldKHR:mat4x3);
+                result:$$mat3x4 = OpTranspose %__mat
             };
         }
         }
@@ -5282,8 +5229,8 @@ public property mat3x4 gl_WorldToObject3x4EXT
         {
             return spirv_asm
             {
-                %mat:$$mat4x3 = OpLoad builtin(WorldToObjectKHR:mat4x3);
-                result:$$mat3x4 = OpTranspose %mat
+                %__mat:$$mat4x3 = OpLoad builtin(WorldToObjectKHR:mat4x3);
+                result:$$mat3x4 = OpTranspose %__mat
             };
         }
         }
@@ -9966,7 +9913,7 @@ public uint atomicCounterDecrement(atomic_uint c)
         // we want a discarded side effect and then return the new value
         return spirv_asm
         {
-            %discardedValue:$$uint = OpAtomicIDecrement $c Device AtomicCounterMemory;
+            %__discardedValue:$$uint = OpAtomicIDecrement $c Device AtomicCounterMemory;
             OpLoad $$uint result $c
         };
     }
