@@ -878,6 +878,78 @@ private:
     Dictionary<int, int64_t> bindingToByteOffset;
 };
 
+/// Describes whether semantic checking has traversed one concrete interface witness table.
+enum class ConformanceInterfaceCheckStatus
+{
+    /// The table may contain lazily prepared entries, but whole-interface checking has not begun.
+    Unchecked,
+
+    /// An enclosing semantic operation is checking the table.
+    Checking,
+
+    /// Whole-interface traversal completed without a failed requirement.
+    Succeeded,
+
+    /// At least one requirement in the interface failed.
+    Failed,
+};
+
+/// Stores the declaration-context inputs needed to check one concrete interface witness table.
+///
+/// A witness table is shared by every specialization of its declaring conformance, so all fields
+/// are deliberately unspecialized. This state retains its `owner`, so an ephemeral child context
+/// used during generic-witness synthesis cannot leave the table with a dangling semantic context.
+/// A table has exactly one authoritative state even when synthesis creates such a child context.
+struct ConformanceInterfaceCheckingState : public RefObject
+{
+    /// The conformance context that owns the table's declaration-context state.
+    RefPtr<struct ConformanceCheckingContext> owner;
+
+    /// The type whose conformance this table witnesses.
+    Type* conformingType = nullptr;
+
+    /// The interface type implemented by `conformingType`.
+    Type* interfaceType = nullptr;
+
+    /// The declared conformance or inherited-interface requirement that introduced this table.
+    InheritanceDecl* inheritanceDecl = nullptr;
+
+    /// The declaration-context reference to the interface implemented by this table.
+    DeclRef<InterfaceDecl> interfaceDeclRef;
+
+    /// The unspecialized table whose entries are checked by this state.
+    RefPtr<WitnessTable> witnessTable;
+
+    /// The witness used to project interface requirements into `conformingType`.
+    SubtypeWitness* conformingWitness = nullptr;
+
+    /// Distinguishes registration or lazy preparation from whole-interface validation.
+    ConformanceInterfaceCheckStatus status = ConformanceInterfaceCheckStatus::Unchecked;
+};
+
+/// Stores semantic state shared by whole and on-demand checking of one declared conformance.
+///
+/// The context is keyed by its root `InheritanceDecl`. Its interface map contains the root table
+/// and any canonical inherited-interface tables already encountered while checking that
+/// conformance.
+struct ConformanceCheckingContext : public RefObject
+{
+    /// The declaration-context type whose conformance is being checked.
+    Type* conformingType = nullptr;
+
+    /// The witness for `conformingType` and the root interface.
+    SubtypeWitness* conformingWitness = nullptr;
+
+    /// The type or extension declaration that owns the root conformance.
+    ContainerDecl* parentDecl = nullptr;
+
+    /// The inheritance clause that declared the root conformance.
+    InheritanceDecl* rootInheritanceDecl = nullptr;
+
+    /// Maps each encountered interface application to its declaration-context witness table.
+    Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
+};
+
 /// Shared state for a semantics-checking session.
 struct SharedSemanticsContext : public RefObject
 {
@@ -894,9 +966,6 @@ struct SharedSemanticsContext : public RefObject
     SlangLanguageVersion m_languageVersion = SLANG_LANGUAGE_VERSION_UNKNOWN;
 
     DiagnosticSink* m_sink = nullptr;
-
-    // Whether the current module has imported the GLSL module.
-    ModuleDecl* glslModuleDecl = nullptr;
 
     /// (optional) modules that comes from previously processed translation units in the
     /// front-end request that are made visible to the module being checked. This allows
@@ -939,24 +1008,45 @@ struct SharedSemanticsContext : public RefObject
     // buffer allocation.
     Dictionary<Val*, List<Decl*>> m_genericSolverValToDependentDeclsCache;
 
+    // On-demand and whole-conformance checking must reuse the same declaration-context state. The
+    // inheritance map owns root contexts, and the table map lets a forceful lookup recover the
+    // exact semantic inputs needed to check one missing entry.
+    Dictionary<InheritanceDecl*, RefPtr<ConformanceCheckingContext>>
+        m_mapInheritanceDeclToConformanceCheckingContext;
+    Dictionary<WitnessTable*, RefPtr<ConformanceInterfaceCheckingState>>
+        m_mapWitnessTableToConformanceInterfaceCheckingState;
+
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
 
-    // Whether the `glsl` module has been imported into this checking session. Set when the
-    // `glsl` import is handled (see `importModuleIntoScope`), rather than scanning the imported
-    // module list on demand, because the builtin-operator fast path consults
-    // `isGLSLOperatorScope()` for every operator expression.
-    bool m_isGLSLModuleImported = false;
+    /// Whether semantic checking has imported the `glsl` module.
+    bool m_hasImportedGLSLModule = false;
 
 public:
-    /// Is the current checking session in GLSL operator scope? True when `-allow-glsl` is set or
-    /// the `glsl` module has been imported (its overloads give builtin operators GLSL semantics).
-    bool isGLSLOperatorScope()
+    /// Whether the translation unit being checked uses the GLSL source language.
+    ///
+    /// A null translation-unit request denotes a module/reflection checking context that has no
+    /// parser-language provenance, so it cannot establish GLSL source semantics and returns false.
+    bool isGLSLSourceLanguage()
     {
-        return getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL) ||
-               m_isGLSLModuleImported;
+        if (!m_translationUnitRequest)
+        {
+            // Reflection, specialization, and API expression-checking contexts can perform
+            // semantic work without originating in a parsed translation unit. Such a context has
+            // no source-language provenance, so it must not enable GLSL-specific semantic rules.
+            return false;
+        }
+
+        return m_translationUnitRequest->sourceLanguage == SourceLanguage::GLSL;
     }
+
+    /// Whether builtin operators should use the legacy GLSL operator rules.
+    ///
+    /// Actual GLSL source always uses those rules. For backward compatibility, explicitly
+    /// importing the `glsl` module into non-GLSL source also opts operator checking into them
+    /// without changing the source language or parser behavior.
+    bool isGLSLOperatorScope() { return isGLSLSourceLanguage() || m_hasImportedGLSLModule; }
 
 private:
     static SlangLanguageVersion _getModuleLanguageVersion(Module* module)
@@ -2269,6 +2359,15 @@ public:
         ConversionCost* outCost,
         TypeCoercionWitness** outWitnessOfConversion);
 
+    /// Determine whether an unscoped enum may implicitly convert to the builtin
+    /// scalar type `toType`. This is an HLSL-compatibility widening: it holds
+    /// only for an enum that `isUnscopedEnum`
+    /// accepts (one carrying `UnscopedEnumAttribute`, from either `-unscoped-enum`
+    /// or an explicit `[UnscopedEnum]` — see that predicate for the exact routes),
+    /// in a translation unit using the HLSL-flavored dialect, and never for `bool`
+    /// (which already has its own implicit conversion from any `__EnumType`).
+    bool isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType);
+
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
     ///
     /// If conversion is possible, returns `true` and sets `outCost` to the cost
@@ -2392,18 +2491,82 @@ public:
     // or an extension of that type) conforms to the interfaces it claims
     // via its inheritance clauses.
     //
-    struct ConformanceCheckingContext
+    using ConformanceCheckingContext = Slang::ConformanceCheckingContext;
+    using ConformanceInterfaceCheckingState = Slang::ConformanceInterfaceCheckingState;
+
+    // Requirement resolution reports state at several adjacent layers:
+    //
+    // * `RequirementCheckState` persists the state of one entry in a `WitnessTable`, while
+    //   `ConformanceInterfaceCheckStatus` persists whole-table traversal state.
+    // * `RequirementWitnessLookupFrontierStatus` describes how far passive structural lookup got.
+    // * `ConformanceRequirementCheckResult` reports one semantic attempt to populate an entry.
+    // * `RequirementLookupStatus` reports forceful traversal of a complete witness path.
+    // * `RequirementProjectionResolutionStatus` reports whether the resulting value is concrete,
+    //   remains a valid symbolic projection, or belongs to a failed concrete conformance.
+    //
+    // The first three types live with their persistent or structural data; the semantic result
+    // types are declared below beside the operations that convert between these layers.
+
+    /// The result of requesting one interface-requirement witness.
+    enum class ConformanceRequirementCheckResult
     {
-        /// The type for which conformances are being checked
-        Type* conformingType;
+        /// The table contains a final witness for this requirement.
+        Satisfied,
 
-        Witness* conformingWitness;
+        /// An enclosing semantic operation owns the check and has not published a final witness.
+        InProgress,
 
-        /// The outer declaration for the conformances being checked (either a type or `extension`
-        /// declaration)
-        ContainerDecl* parentDecl;
+        /// Checking proved that the concrete type does not satisfy this requirement.
+        Failed,
+    };
 
-        Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
+    /// Selects whether an inherited-interface requirement is only made traversable or is fully
+    /// checked after its witness has been published.
+    enum class InheritedInterfaceRequirementMode
+    {
+        PrepareForLookup,
+        CheckConformance,
+    };
+
+    /// The result of looking up a requirement through a conformance witness.
+    enum class RequirementLookupStatus
+    {
+        /// A structural witness is available; its conformance may still be under validation.
+        Found,
+        /// No existing witness was found and this witness path cannot be forced here.
+        Unavailable,
+        /// The same entry is recursively requested and has not published a structural witness.
+        Recursive,
+
+        /// Semantic checking proved that the concrete requirement cannot be satisfied.
+        Failed,
+    };
+
+    struct RequirementLookupResult
+    {
+        RequirementLookupStatus status = RequirementLookupStatus::Unavailable;
+        RequirementWitness witness;
+    };
+
+    /// Describes the result of forcefully resolving a possible requirement projection.
+    enum class RequirementProjectionResolutionStatus
+    {
+        /// The returned value is structurally resolved, whether or not the input was a projection.
+        Resolved,
+
+        /// A valid abstract, external, or recursively owned projection remains symbolic.
+        Unchanged,
+
+        /// Checking a concrete conformance requirement failed.
+        Failed,
+    };
+
+    /// The result of forcefully resolving a value that may project an interface requirement.
+    struct RequirementProjectionResolutionResult
+    {
+        RequirementProjectionResolutionStatus status =
+            RequirementProjectionResolutionStatus::Unchanged;
+        Val* value = nullptr;
     };
 
     /// Reasons why witness synthesis can fail
@@ -2641,9 +2804,16 @@ public:
 
     // Find the default implementation of an interface requirement,
     // and insert it to the witness table, if it exists.
+    //
+    // `subTypeConformsToInterfaceWitness` is the witness that the conforming type satisfies the
+    // interface whose requirement is being witnessed here. It is the witness for the *specific*
+    // (possibly nested base-interface) table being populated, not necessarily the outer conformance
+    // being checked; the default-impl generic is specialized against it so its interior
+    // `lookupWitness` calls resolve against the correct table (see #12814).
     bool findDefaultInterfaceImpl(
         ConformanceCheckingContext* context,
         DeclRef<Decl> requiredMemberDeclRef,
+        SubtypeWitness* subTypeConformsToInterfaceWitness,
         RefPtr<WitnessTable> witnessTable);
 
     // Find the appropriate member of a declared type to
@@ -2668,6 +2838,74 @@ public:
         DeclRef<Decl> requiredMemberDeclRef,
         RefPtr<WitnessTable> witnessTable,
         SubtypeWitness* subTypeConformsToSuperInterfaceWitness);
+
+    /// Ensures that an inherited-interface requirement has a structural witness and optionally
+    /// checks the nested conformance selected by `mode`.
+    bool ensureInheritedInterfaceRequirement(
+        ConformanceCheckingContext* context,
+        Type* subType,
+        DeclRef<InheritanceDecl> requiredInheritanceDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        InheritedInterfaceRequirementMode mode);
+
+    /// Ensures that one requirement in a concrete interface conformance has been checked.
+    ConformanceRequirementCheckResult ensureConformanceRequirement(
+        ConformanceCheckingContext* context,
+        Type* subType,
+        Type* superInterfaceType,
+        InheritanceDecl* inheritanceDecl,
+        DeclRef<InterfaceDecl> superInterfaceDeclRef,
+        DeclRef<Decl> requiredMemberDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        SubtypeWitness* subTypeConformsToSuperInterfaceWitness);
+
+    /// Returns the persistent declaration-context state for a concrete conformance.
+    ConformanceCheckingContext* getOrCreateConformanceCheckingContext(
+        Type* conformingType,
+        InheritanceDecl* inheritanceDecl,
+        ContainerDecl* parentDecl);
+
+    /// Registers the semantic information needed to force entries in one interface table.
+    ConformanceInterfaceCheckingState* registerConformanceInterfaceCheckingState(
+        ConformanceCheckingContext* context,
+        Type* conformingType,
+        Type* interfaceType,
+        InheritanceDecl* inheritanceDecl,
+        DeclRef<InterfaceDecl> interfaceDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        SubtypeWitness* conformingWitness);
+
+    /// Ensures one entry using the persistent state registered for its witness table.
+    ConformanceRequirementCheckResult ensureConformanceRequirement(
+        WitnessTable* witnessTable,
+        DeclRef<Decl> requiredMemberDeclRef);
+
+    /// Ensures and returns one specialized witness when its lookup path reaches concrete tables.
+    ///
+    /// A missing entry on an abstract, existential, dynamic, serialized, or external path cannot be
+    /// synthesized here and remains unavailable. The specialized requirement stays a `DeclRef` at
+    /// this boundary; only the final lookup into a known witness table converts it to that table's
+    /// identity key.
+    RequirementLookupResult ensureAndLookupRequirementWitness(
+        SubtypeWitness* conformanceWitness,
+        DeclRef<Decl> requirementDeclRef);
+
+    /// Resolves a projected conformance path and continues one requirement lookup through it.
+    RequirementLookupResult ensureAndLookupRequirementWitnessThroughProjectedConformance(
+        SubtypeWitness* projectedConformanceWitness,
+        DeclRef<Decl> requirementDeclRef);
+
+    /// Resolves one endpoint needed to reconstruct a concrete projected conformance.
+    ///
+    /// `Found` guarantees that `outType` is populated. `Unavailable` means the endpoint remains a
+    /// valid symbolic projection, and `Failed` means its concrete conformance could not be
+    /// satisfied. This operation never returns `Recursive`: recursive projection resolution is
+    /// represented as an unchanged endpoint and therefore maps to `Unavailable` here.
+    RequirementLookupStatus ensureConcreteConformanceEndpoint(Type* type, Type*& outType);
+
+    /// Resolves ordinary aliases and then forcefully resolves one remaining concrete requirement
+    /// projection. Valid projections that cannot be forced remain unchanged.
+    RequirementProjectionResolutionResult ensureAndResolveRequirementProjection(Val* value);
 
     // Check that the type declaration `typeDecl`, which
     // declares conformance to the interface `interfaceDeclRef`,
@@ -3321,8 +3559,18 @@ public:
         Type* type,
         Type* interfaceType);
 
-    // Try to compute the "join" between two types
-    Type* TryJoinTypes(GenericInferenceContext* constraints, QualType left, QualType right);
+    // Try to compute the "join" between two types.
+    //
+    // `allowEnumScalarJoin` opts in to decaying an enum to its tag type so it can
+    // join with a scalar; it is enabled only for common-type/convertibility
+    // inference of ordinary call arguments (e.g. the arms of `?:`/`select`), and
+    // left off for the witness/subtype/equality constraint solver, where a
+    // fabricated enum->tag join would wrongly constrain a type parameter.
+    Type* TryJoinTypes(
+        GenericInferenceContext* constraints,
+        QualType left,
+        QualType right,
+        bool allowEnumScalarJoin = false);
 
     // Try to solve the ordinary and witness arguments for one generic
     // application. The inference context must be moved into the solver because
@@ -3414,6 +3662,12 @@ public:
 
         // Full list of all candidates being considered, in the ambiguous case
         List<OverloadCandidate> bestCandidates;
+
+        // Generic candidates whose recorded inference failure is a constraint failure (an
+        // unsatisfied interface conformance or `where`-clause). Status-based pruning usually keeps
+        // them out of `bestCandidates`, so they are retained here purely to render notes on the "no
+        // overload applicable" error (issue #12965); this list never participates in selection.
+        List<OverloadCandidate> constraintFailedGenericCandidates;
     };
 
     struct ParamCounts
@@ -4000,6 +4254,7 @@ public:
 
     Expr* visitThisExpr(ThisExpr* expr);
     Expr* visitThisTypeExpr(ThisTypeExpr* expr);
+    Expr* visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr* expr);
     Expr* visitThisInterfaceExpr(ThisInterfaceExpr* expr);
     Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr);
     Expr* visitReturnValExpr(ReturnValExpr* expr);
@@ -4086,6 +4341,47 @@ private:
         Expr* rightArg,
         Expr*& outLeftArg,
         Expr*& outRightArg);
+
+    /// The scalar family (integer, floating-point, or boolean) that an operand element type is
+    /// known to belong to for the purposes of the builtin-operator fast path. All three fields
+    /// are false when the type is not known to belong to any of them.
+    struct BuiltinArithmeticElementFamily
+    {
+        bool isInteger = false;
+        bool isFloat = false;
+        // True only for a genuinely `bool`-typed element: the concrete-type branch of
+        // `classifyBuiltinArithmeticElementType` sets this from `baseType == BaseType::Bool`
+        // directly. There is no sealed marker interface implemented by `bool` alone --
+        // `__BuiltinLogicalType` (see `isLogical` below) is implemented by `bool` AND every
+        // builtin integer type -- so a generic type parameter can never prove `isBool`; only a
+        // concrete `bool` operand can. Required for unary logical-not (`!`), whose result must
+        // be `bool`-shaped: taking the fast path for a `__BuiltinLogicalType`-constrained
+        // generic instantiated with an integer would build a `Not` node typed as that integer.
+        bool isBool = false;
+        // True for a *generic* element type that conforms to `__BuiltinLogicalType` (`bool` and
+        // every builtin integer type; see core.meta.slang) -- the concrete-type branch never sets
+        // this, since a concrete `bool`/integer is already fully classified by `isBool`/
+        // `isInteger`. Safe for an operator whose builtin semantics don't depend on which of
+        // those the element actually is, e.g. equality (`==`/`!=`, which lower to the same
+        // `kIROp_Eql`/`kIROp_Neq` regardless): a generic parameter constrained only to
+        // `__BuiltinLogicalType` still needs equality fast-pathed, but must NOT take the
+        // logical-not fast path -- that's exactly why this is a separate flag from `isBool`
+        // rather than folded into it.
+        bool isLogical = false;
+        bool isKnown() const { return isInteger || isFloat || isBool || isLogical; }
+    };
+
+    /// Classifies `elementType`'s scalar family for the builtin-operator fast path in
+    /// `convertToBuiltinArithmeticOp`. A concrete `BasicExpressionType` (`int`, `float`, `bool`,
+    /// ...) is classified directly from `BaseTypeInfo`. A generic type parameter constrained to
+    /// one of the `[sealed]` builtin marker interfaces (`__BuiltinIntegerType`,
+    /// `__BuiltinFloatingPointType`, `__BuiltinLogicalType`; see core.meta.slang) is classified
+    /// the same way: those interfaces are sealed, so only the compiler's own builtin scalar types
+    /// can conform to them, which means every legal instantiation of such a parameter is itself a
+    /// `BasicExpressionType` of that family, even though the parameter is not one yet. Any other
+    /// type (aggregates, an unconstrained or differently-constrained generic parameter, etc.)
+    /// classifies as unknown, which the caller treats as "not eligible for the fast path."
+    BuiltinArithmeticElementFamily classifyBuiltinArithmeticElementType(Type* elementType);
 
     // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either
     // `-allow-glsl` is set, or the `glsl` module is in scope (its `operator*` overloads

@@ -501,6 +501,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // A hash set to prevent redecorating the same spv inst.
     HashSet<SpvId> m_decoratedSpvInsts;
 
+    // The floating-point arithmetic instructions that must carry `NoContraction` because
+    // they contribute to a `precise`-qualified value; filled once by `computePreciseInsts()`
+    // before emission begins.
+    HashSet<IRInst*> m_preciseInsts;
+
     SpvAddressingModel m_addressingMode = SpvAddressingModelLogical;
 
     // We will store the logical sections of the SPIR-V module
@@ -584,6 +589,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     // Map a Slang IR instruction to the corresponding SPIR-V debug instruction.
     Dictionary<IRInst*, SpvInst*> m_mapIRInstToSpvDebugInst;
+
+    // DebugFunction records for which a DebugFunctionDefinition has already been emitted. A record
+    // binds to at most one definition (the NonSemantic invariant), so we dedup by record; see
+    // maybeEmitDebugFunctionDefinition.
+    HashSet<SpvInst*> m_debugFunctionsWithDefinition;
 
     /// Register that `irInst` maps to `spvInst`
     void registerInst(IRInst* irInst, SpvInst* spvInst)
@@ -6411,6 +6421,26 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 getIRInstSpvID(entryPoint),
                                 SpvExecutionModeEarlyFragmentTests);
                             break;
+                        case kIROp_PostDepthCoverageDecoration:
+                            // PostDepthCoverage makes the input `SV_Coverage` report only the
+                            // samples that survived the early depth/stencil test. The capability
+                            // and execution mode come from SPV_KHR_post_depth_coverage. Per Vulkan
+                            // the PostDepthCoverage execution mode is only valid together with
+                            // EarlyFragmentTests, so require that too; the funnel dedups, so
+                            // pairing with `[earlydepthstencil]` does not emit EarlyFragmentTests
+                            // twice.
+                            ensureExtensionDeclaration(
+                                UnownedStringSlice("SPV_KHR_post_depth_coverage"));
+                            requireSPIRVCapability(SpvCapabilitySampleMaskPostDepthCoverage);
+                            requireSPIRVExecutionMode(
+                                nullptr,
+                                getIRInstSpvID(entryPoint),
+                                SpvExecutionModeEarlyFragmentTests);
+                            requireSPIRVExecutionMode(
+                                nullptr,
+                                getIRInstSpvID(entryPoint),
+                                SpvExecutionModePostDepthCoverage);
+                            break;
                         default:
                             break;
                         }
@@ -10474,6 +10504,134 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
+    // Return true if `inst` is a floating-point arithmetic instruction that
+    // `emitArithmetic` lowers to a `NoContraction`-eligible opcode (OpFAdd/OpFSub/
+    // OpFMul/OpFDiv/OpFRem/OpFNegate). These are exactly the instructions through which
+    // `precise`-ness must propagate, because reassociation by the downstream optimizer
+    // happens among them. The float-classification test reuses the emitter's own
+    // `isFloatOrPackedFloatType` (which unwraps vector/matrix and covers the packed-float
+    // types) so it stays in step with how `emitArithmetic` decides to emit an F* opcode.
+    bool isPreciseCandidateFloatArithmetic(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Add:
+        case kIROp_Sub:
+        case kIROp_Mul:
+        case kIROp_Div:
+        case kIROp_FRem:
+        case kIROp_Neg:
+            return isFloatOrPackedFloatType(inst->getDataType());
+        default:
+            return false;
+        }
+    }
+
+    // Populate `m_preciseInsts` with every floating-point arithmetic instruction that
+    // transitively contributes to a `precise`-qualified value, so `emitArithmetic` can
+    // decorate them with `NoContraction` even when the global floating-point mode is not
+    // `Precise`.
+    //
+    // The `precise` qualifier lowers to an `IRPreciseDecoration` on the directly-qualified
+    // value only (slang-lower-to-ir.cpp), so consider:
+    //
+    //     precise float s = axy + ayz + azx;
+    //
+    // This lowers to two adds -- a temporary `t = axy + ayz` and then `s = t + azx` -- but
+    // only `s` carries the decoration; the temporary `t` does not. Without marking `t`, the
+    // downstream SPIR-V optimizer is free to algebraically reassociate the whole expression
+    // (issue #12198). We therefore seed from every `precise`-decorated value and walk
+    // backward over value-flow edges to a fixpoint, marking each floating-point arithmetic
+    // instruction reached. This mirrors the whole-function decoration that `-fp-mode precise`
+    // already produces, but scoped to the `precise` cone so fast math is preserved for the
+    // rest of the module. Marking an extra op is safe -- `NoContraction` only forbids the
+    // optimizer from contracting/reassociating it, so decorating an op that did not need it
+    // can at worst forgo an optimization -- so the walk over-approximates rather than risk
+    // missing a contributor. For instance, a value projected out of an aggregate reaches the
+    // whole aggregate's initializer, so a `precise` field's siblings may be decorated too;
+    // that is a conservative loss of fast math, not a change to their permitted result.
+    //
+    // Value-flow edges are followed by inst kind, because a value can reach a `precise`
+    // consumer without being one of its direct operands: through a phi when the initializer
+    // crosses control flow (`precise float s = cond ? a*b + c*d : 0;` puts the decoration on
+    // the block parameter, whose incoming values are the predecessors' branch args), or
+    // through a store when the `precise` local is address-taken (its value comes from the
+    // stores into it, not an operand).
+    void computePreciseInsts()
+    {
+        HashSet<IRInst*> visited;
+        List<IRInst*> workList;
+        auto enqueue = [&](IRInst* inst)
+        {
+            if (inst && visited.add(inst))
+                workList.add(inst);
+        };
+
+        // Seed from every `precise`-decorated value inside a function body, then walk backward
+        // to a fixpoint. Propagation stays within a function: a value computed in a callee is
+        // reached only if that callee is inlined before emit. Making a called function's body
+        // precise for one precise call site -- without penalizing its other, non-precise
+        // callers -- would require specializing the callee, which is out of scope here. (A
+        // `precise` global variable is likewise not covered: by the time the SPIR-V emitter
+        // runs, its decoration is no longer reachable from the module's global insts.)
+        for (auto globalInst : m_irModule->getGlobalInsts())
+        {
+            auto func = as<IRGlobalValueWithCode>(globalInst);
+            if (!func)
+                continue;
+            for (auto block : func->getBlocks())
+                for (auto inst : block->getChildren())
+                    if (inst->findDecoration<IRPreciseDecoration>())
+                        enqueue(inst);
+        }
+
+        for (Index i = 0; i < workList.getCount(); i++)
+        {
+            IRInst* inst = workList[i];
+            if (isPreciseCandidateFloatArithmetic(inst))
+                m_preciseInsts.add(inst);
+
+            if (as<IRParam>(inst))
+            {
+                // A phi/block parameter's incoming values are the branch arguments of its
+                // predecessor blocks. (For a function-entry parameter there are none, so
+                // `getPhiArgs` returns empty and propagation simply stops.)
+                for (auto arg : getPhiArgs(inst))
+                    enqueue(arg);
+            }
+            else
+            {
+                for (UInt opIndex = 0; opIndex < inst->getOperandCount(); opIndex++)
+                    enqueue(inst->getOperand(opIndex));
+            }
+
+            // A pointer's contents are the precise value, so follow the values written
+            // into it. Stores may target the pointer directly, or a sub-address derived
+            // from it (`value.x` / `arr[i]` lower to a store through a `getElementPtr` /
+            // `fieldAddress`), so also enqueue those derived pointers -- each is itself a
+            // pointer and gets the same treatment, so a store behind any depth of
+            // element/field access is reached.
+            if (as<IRPtrTypeBase>(inst->getDataType()))
+            {
+                for (auto use = inst->firstUse; use; use = use->nextUse)
+                {
+                    IRInst* user = use->getUser();
+                    if (auto store = as<IRStore>(user))
+                    {
+                        if (store->getPtr() == inst)
+                            enqueue(store->getVal());
+                    }
+                    else if (
+                        as<IRPtrTypeBase>(user->getDataType()) && user->getOperandCount() > 0 &&
+                        user->getOperand(0) == inst)
+                    {
+                        enqueue(user);
+                    }
+                }
+            }
+        }
+    }
+
     // Return true when floating-point contraction must be disabled for `inst`, i.e.
     // the effective floating-point mode is `Precise`. The mode comes from the global
     // `-fp-mode` option, but a function may override it via
@@ -10526,7 +10684,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
     {
-        const bool isPrecise = isFloatingPointModePrecise(inst);
+        const bool isPrecise = isFloatingPointModePrecise(inst) || m_preciseInsts.contains(inst);
         if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
         {
             auto rowCount = getIntVal(matrixType->getRowCount());
@@ -10633,9 +10791,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugScope(SpvInstParent* parent, IRDebugScope* debugScope)
     {
-        auto inlinedAt = ensureInst(debugScope->getInlinedAt());
-        if (!inlinedAt)
-            return nullptr;
+        auto inlinedAt =
+            debugScope->getInlinedAt() ? ensureInst(debugScope->getInlinedAt()) : nullptr;
 
         SpvInst* scope = ensureInst(debugScope->getScope());
         if (!scope)
@@ -10651,6 +10808,43 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
+    // Emit the DebugFunctionDefinition that binds the concrete OpFunction body `spvFunc` (whose
+    // first block is `firstBlock`) to its DebugFunction record `debugFuncInfo`, at most once per
+    // record. A DebugFunction binds to a single body — the NonSemantic invariant that a
+    // DebugFunction has one DebugFunctionDefinition — so we dedup on the record, not the body. This
+    // is separate from the record cache (m_mapIRInstToSpvInst) because the record may already have
+    // been emitted early and bare via the global debug-inst path — for example when a
+    // caller-scope-restore DebugScope inserted by inlining precedes a DebugVar and resolves this
+    // function as that var's scope — whereas the definition must still be emitted for the concrete
+    // body. Deduping on the record is load-bearing, not merely defensive: reverse-mode autodiff can
+    // make several generated OpFunctions share one IRDebugFunction (copyDebugInfo clones the
+    // decoration and the module-global record is not remapped), and without this dedup a definition
+    // would be emitted for each shared body, breaking the one-definition-per-record invariant.
+    void maybeEmitDebugFunctionDefinition(
+        SpvInst* firstBlock,
+        SpvInst* spvFunc,
+        SpvInst* debugFuncInfo)
+    {
+        // firstBlock and spvFunc are supplied as a pair: both null when only the DebugFunction
+        // record is being emitted (the global debug-inst path, which has no body to bind), and both
+        // non-null for a concrete OpFunction body. There is nothing to bind in the record-only
+        // case.
+        SLANG_RELEASE_ASSERT((firstBlock != nullptr) == (spvFunc != nullptr));
+        if (!firstBlock || !spvFunc)
+            return;
+        SLANG_RELEASE_ASSERT(debugFuncInfo);
+        if (m_debugFunctionsWithDefinition.add(debugFuncInfo))
+        {
+            emitOpDebugFunctionDefinition(
+                firstBlock,
+                nullptr,
+                m_voidType,
+                getNonSemanticDebugInfoExtInst(),
+                debugFuncInfo,
+                spvFunc);
+        }
+    }
+
     SpvInst* emitDebugFunction(
         SpvInstParent* parent,
         SpvInst* firstBlock,
@@ -10661,6 +10855,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvInst* debugFuncInfo = nullptr;
         if (debugFunc && m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
         {
+            // The record was already emitted, possibly bare via the global debug-inst path (which
+            // passes a null irFunc, so this function was never registered as its own debug scope).
+            // The record cache covers neither the per-body definition nor that scope registration,
+            // so we do both here for a concrete body. Without the registration, findDebugScope's
+            // IRFunc fallback misses and a pre-inline DebugVar (a parameter, or a local before the
+            // first inlined call) resolves its OpDebugLocalVariable scope to the module compilation
+            // unit instead of the function.
+            if (irFunc && !m_mapIRInstToSpvDebugInst.containsKey(irFunc))
+                registerDebugInst(irFunc, debugFuncInfo);
+            maybeEmitDebugFunctionDefinition(firstBlock, spvFunc, debugFuncInfo);
             return debugFuncInfo;
         }
 
@@ -10706,16 +10910,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             registerDebugInst(irFunc, debugFuncInfo);
         }
 
-        if (firstBlock && spvFunc)
-        {
-            emitOpDebugFunctionDefinition(
-                firstBlock,
-                nullptr,
-                m_voidType,
-                getNonSemanticDebugInfoExtInst(),
-                debugFuncInfo,
-                spvFunc);
-        }
+        maybeEmitDebugFunctionDefinition(firstBlock, spvFunc, debugFuncInfo);
         return debugFuncInfo;
     }
 
@@ -10975,7 +11170,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     matrixType->getElementType(),
                     matrixType->getRowCount(),
                     matrixType->getColumnCount(),
-                    builder.getIntValue(builder.getIntType(), kMatrixLayoutMode_RowMajor));
+                    builder.getIntValue(
+                        matrixType->getLayout()->getFullType(),
+                        kMatrixLayoutMode_RowMajor));
             }
         }
         return type;
@@ -12196,6 +12393,13 @@ SlangResult emitSPIRVFromIR(
 #endif
 
     removeAvailableInDownstreamModuleDecorations(irModule, CodeGenTarget::SPIRV);
+
+    // With the IR now in its final emit-visible shape -- legalized, and the bodies of
+    // functions available in a downstream module gutted just above -- precompute the
+    // arithmetic instructions that transitively feed a `precise` value. Doing it here keeps
+    // `emitArithmetic` a plain lookup, and doing it after the gutting keeps the set free of
+    // pointers to now-deallocated instructions.
+    context.computePreciseInsts();
 
     auto shouldPreserveParams = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::PreserveParameters);

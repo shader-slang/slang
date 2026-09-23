@@ -1,6 +1,6 @@
 // Test that StructuredBuffer of ParameterBlock (NonAddressable type) is not allowed
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -allow-glsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -stage compute -entry computeMain
 
 // Direct ParameterBlock in StructuredBuffer - should error
 StructuredBuffer<ParameterBlock<Texture2D>> myBuffer1;
