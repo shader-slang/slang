@@ -1,6 +1,6 @@
 // `DescriptorHandle.lessThan`/`lessThanOrEquals` compare in the handle's native representation: a handle
-// that is a native `uint64` under `spvBindlessTextureNV` (the texture/sampler types, i.e. those for which
-// `isBindlessTextureNVEncodable` is true) compares as a single 64-bit value, while any other handle
+// that is a native `uint64` under `spvBindlessTextureNV` (the texture/sampler types, i.e. those the
+// internal `__isBindlessTextureNVEncodable<T>()` query identifies) compares as a single 64-bit value, while any other handle
 // compares as a `uint2` component-wise. The split keys on the type, not on `DescriptorKind`:
 // `SubpassInput` (lowers to `IRSubpassInputType`, shares `DescriptorKind.Texture`) and `TextureBuffer`
 // (lowers to `IRTextureBufferType`, shares `DescriptorKind.UniformTexelBuffer`) are NOT encodable, so

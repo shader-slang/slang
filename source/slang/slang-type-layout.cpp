@@ -104,8 +104,8 @@ void _typeLayout_keepFunctions()
 
 // True if a `DescriptorHandle<elementType>` is represented as `uint64` rather than `uint2` under
 // `spvBindlessTextureNV`. This is the AST-side mirror of the IR classifier
-// `isBindlessTextureNVEncodableResourceType` (`slang-ir-util.cpp`) and the core-module property
-// `IOpaqueDescriptor::isBindlessTextureNVEncodable` (`hlsl.meta.slang`); all three must agree. Only
+// `isBindlessTextureNVEncodableResourceType` (`slang-ir-util.cpp`), through which the core-module
+// query `__isBindlessTextureNVEncodable<T>()` folds; the two must agree. Only
 // the texture/sampler-family kinds the extension can convert use the wide form, so layout and
 // reflection agree with emission. `Buffer<T>` / `RWBuffer<T>` are `TextureType` (buffer shape) and
 // so are included; constant/structured buffers and acceleration structures are not and stay

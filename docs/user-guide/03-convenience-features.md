@@ -886,10 +886,6 @@ interface IOpaqueDescriptor
     /// The kind of the descriptor.
     static const DescriptorKind kind;
     static const DescriptorAccess descriptorAccess;
-    /// Defined by the compiler's built-in resource types and used internally to decide the descriptor
-    /// handle's representation. `IOpaqueDescriptor` is sealed, so only these built-in types conform;
-    /// user code neither defines nor reads this member.
-    static const bool isBindlessTextureNVEncodable;
 }
 ```
 

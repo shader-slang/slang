@@ -27692,27 +27692,32 @@ interface IOpaqueDescriptor
     /// The kind of the descriptor.
     static const DescriptorKind kind;
     static const DescriptorAccess descriptorAccess;
+}
 
-    /// True when this descriptor's `DescriptorHandle` is a native `uint64` bindless handle under
-    /// `spvBindlessTextureNV` (converted with the `SPV_NV_bindless_texture` opcodes) rather than a
-    /// `uint2` heap index. True exactly for texture and sampler types; `DescriptorKind` is too coarse
-    /// to answer this (e.g. `SubpassInput` and `TextureBuffer` share a texture/texel kind but are not
-    /// texture types). Compiler-defined and user-inert: user code may read it, but its value is fixed
-    /// per type by the compiler.
-    static const bool isBindlessTextureNVEncodable;
-    // `isBindlessTextureNVEncodable` is the core-module (`.slang`) face of a single classification that
-    // each compiler phase spells in its own vocabulary: the IR twin is
-    // `isBindlessTextureNVEncodableResourceType` (`slang-ir-util.cpp`, over `IRType`) and the AST twin is
-    // `_isBindlessTextureNVUInt64ElementType` (`slang-type-layout.cpp`, over `Type`, for
-    // layout/reflection). All three must stay in agreement.
+/// True when `T` lowers to a texture or sampler type — the types whose `DescriptorHandle` is a native
+/// `uint64` handle under `spvBindlessTextureNV` rather than a `uint2` heap index. Folds to a
+/// compile-time constant once `T` is concrete (peephole over `kIROp_IsBindlessTextureNVEncodable`), so
+/// it serves as a `static_assert` condition and lets dead-branch elimination drop the native cast for a
+/// non-encodable `T`. The fold calls the IR classifier `isBindlessTextureNVEncodableResourceType`
+/// (`slang-ir-util.cpp`) — the single source of truth; the AST twin `_isBindlessTextureNVUInt64ElementType`
+/// (`slang-type-layout.cpp`, for layout/reflection) must stay in agreement.
+__generic<T>
+__intrinsic_op($(kIROp_IsBindlessTextureNVEncodable))
+bool __isBindlessTextureNVEncodable_impl(T t);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isBindlessTextureNVEncodable()
+{
+    return __isBindlessTextureNVEncodable_impl(__declVal<T>());
 }
 
 /// True when `T`'s `DescriptorHandle` uses the native `SPV_NV_bindless_texture` `uint64` representation
 /// on the current SPIR-V target: `spvBindlessTextureNV` is enabled and `T` is an encodable
-/// texture/sampler. It pairs the capability check with the per-type `isBindlessTextureNVEncodable`
-/// predicate for call sites not already inside a `case spvBindlessTextureNV:` — e.g. a `static_assert`
-/// condition or a target-agnostic comparison. (The native-cast dispatch in `defaultGetDescriptorFromHandle`
-/// tests `isBindlessTextureNVEncodable` directly, since its arms already select the capability.) The
+/// texture/sampler. It pairs the capability check with `__isBindlessTextureNVEncodable<T>()` for call
+/// sites not already inside a `case spvBindlessTextureNV:` — e.g. a `static_assert` condition or a
+/// target-agnostic comparison. (The native-cast dispatch in `defaultGetDescriptorFromHandle` calls
+/// `__isBindlessTextureNVEncodable<T>()` directly, since its arms already select the capability.) The
 /// `case spirv:`/`default` arm keeps the switch's inferred SPIR-V
 /// capability at `{spirv}`, so a caller does not inherit a spurious `spvBindlessTextureNV` requirement on
 /// the default model. `[ForceInline]` inlines the `__target_switch` at each call site so it folds to a
@@ -27724,7 +27729,7 @@ bool usesNativeSpirvDescriptorHandle<T : IOpaqueDescriptor>()
     __target_switch
     {
     case spvBindlessTextureNV:
-        return T.isBindlessTextureNVEncodable;
+        return __isBindlessTextureNVEncodable<T>();
     case spirv:
     default:
         return false;
@@ -27764,9 +27769,6 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
         (access == $(kCoreModule_ResourceAccessReadOnly) ? DescriptorKind.UniformTexelBuffer : DescriptorKind.StorageTexelBuffer) : (isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture)
 );
     static const DescriptorAccess descriptorAccess = (DescriptorAccess)access;
-    // Every `_Texture<...>` instance (including buffer-shape `Buffer`/`RWBuffer` and combined) lowers
-    // to `IRTextureType`, which `isBindlessTextureNVEncodableResourceType` accepts.
-    static const bool isBindlessTextureNVEncodable = true;
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
     [ForceInline]
@@ -27821,9 +27823,6 @@ extension __SubpassImpl<T, isMS> : __IDynamicResourceCastable<__DynamicResourceK
 
     static const DescriptorKind kind = DescriptorKind.Texture;
     static const DescriptorAccess descriptorAccess = DescriptorAccess.Read;
-    // `SubpassInput` shares `DescriptorKind.Texture` but lowers to `IRSubpassInputType`, not
-    // `IRTextureType`, so it is not a native bindless texture handle.
-    static const bool isBindlessTextureNVEncodable = false;
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
     [ForceInline]
@@ -27871,13 +27870,6 @@ for (auto type : kDynamicResourceCastableTypes) {
     auto typeName = type.name;
     auto access = type.access;
     bool isSampler = (strcmp(dynamicKind, "Sampler") == 0);
-    // Only the sampler types lower to `IRSamplerStateTypeBase`; every other generated type here
-    // (structured/byte-address buffers, `ConstantBuffer`, `TextureBuffer`, acceleration structures)
-    // is not a texture or sampler type, so `isBindlessTextureNVEncodableResourceType` rejects it. The
-    // ternary is therefore correct only while this loop emits no texture-family type: a future
-    // texture-family entry added to `kDynamicResourceCastableTypes` would be encodable and must set
-    // `true` here (matching the IR classifier), not take the `false` default.
-    auto encodableStr = isSampler ? "true" : "false";
     auto untypedHandleType = isSampler ? "UntypedSamplerHandle" : "UntypedResourceHandle";
     auto untypedHandleIndexFn = isSampler ? "__getUntypedSamplerHandleIndex" : "__getUntypedResourceHandleIndex";
     if (strstr(typeName, "<T, L>"))
@@ -27894,7 +27886,6 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
 
     static const DescriptorKind kind = DescriptorKind.$(kind);
     static const DescriptorAccess descriptorAccess = DescriptorAccess.$(access);
-    static const bool isBindlessTextureNVEncodable = $(encodableStr);
 
     typealias Handle = DescriptorHandle<$(typeName)>;
 
@@ -27962,7 +27953,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
     // Ordering compares in the handle's native representation. Handles that are `uint64` — all kinds on
     // `cuda`, and on SPIR-V exactly the types `usesNativeSpirvDescriptorHandle` identifies (an encodable
     // texture/sampler under `spvBindlessTextureNV`) — compare as `uint64`; everything else uses the
-    // `uint2` lexicographic order. The SPIR-V split keys on `isBindlessTextureNVEncodable`, not on
+    // `uint2` lexicographic order. The SPIR-V split keys on `__isBindlessTextureNVEncodable<T>()`, not on
     // `DescriptorKind`: buffers and acceleration structures are `uint2`, and so are `SubpassInput` and
     // `TextureBuffer`, which share a texture/texel `DescriptorKind` but are not encodable texture/sampler
     // types. `equals` needs no such split: bit-equality is the same in either representation.
@@ -28377,7 +28368,7 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
     case spvBindlessTextureNV:
-        if (T.isBindlessTextureNVEncodable)
+        if (__isBindlessTextureNVEncodable<T>())
             return __castDescriptorHandleToResource<T>(handleValue);
         return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
     case spvDescriptorHeapEXT:
@@ -28387,7 +28378,7 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
         __target_switch
         {
         case spvBindlessTextureNV:
-            if (T.isBindlessTextureNVEncodable)
+            if (__isBindlessTextureNVEncodable<T>())
                 return __castDescriptorHandleToResource<T>(handleValue);
             break;
         default:

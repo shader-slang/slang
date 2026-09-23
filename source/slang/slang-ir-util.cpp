@@ -3635,9 +3635,9 @@ IRType* getWorkGraphRecordElementType(IRType* type)
 
 // True when a resource `type`'s `DescriptorHandle` is a native `uint64` bindless handle under
 // `spvBindlessTextureNV` (rather than a `uint2` heap index) — exactly the texture and sampler
-// types. This is the IR-side classifier; the AST twin is `_isBindlessTextureNVUInt64ElementType`
-// (`slang-type-layout.cpp`) and the core-module twin is
-// `IOpaqueDescriptor::isBindlessTextureNVEncodable` (`hlsl.meta.slang`). All three must agree.
+// types. This is the source of truth: the core-module query `__isBindlessTextureNVEncodable<T>()`
+// folds through this classifier (peephole over `kIROp_IsBindlessTextureNVEncodable`), and the AST
+// twin `_isBindlessTextureNVUInt64ElementType` (`slang-type-layout.cpp`) must stay in agreement.
 bool isBindlessTextureNVEncodableResourceType(IRType* type)
 {
     auto unwrapped = unwrapAttributedType(type);
