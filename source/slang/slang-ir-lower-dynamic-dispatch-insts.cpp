@@ -277,9 +277,10 @@ IRFunc* createDispatchFunc(
     TargetRequest* targetReq)
 {
     // Both target-dependent choices below dereference `targetReq` (force-inline via
-    // `isCPUTargetViaLLVM`, the default-arm terminator via `targetSupportsUnreachableTerminator`),
-    // so a null request is a contract violation, not a "skip".
-    SLANG_ASSERT(targetReq);
+    // `isCPUTargetViaLLVM`, the default-arm terminator via
+    // `doesTargetSupportUnreachableTerminator`), so a null request is a contract violation, not a
+    // "skip".
+    SLANG_RELEASE_ASSERT(targetReq);
 
     // Create a dispatch function with switch-case for each function
     IRBuilder builder(dispatchFuncType->getModule());
@@ -322,21 +323,16 @@ IRFunc* createDispatchFunc(
     // Create default block
     auto defaultBlock = builder.emitBlock();
     builder.setInsertInto(defaultBlock);
-    if (targetSupportsUnreachableTerminator(targetReq))
+    if (doesTargetSupportUnreachableTerminator(targetReq))
     {
-        // This arm is dead: no tag value ever selects it. Every tag feeding this switch comes from
-        // one closed witness-table set -- produced directly by `GetTagOfElementInSet`, by the
-        // set->set remap, or, for an externally-supplied sequential ID, by
-        // `GetTagFromSequentialID`, whose integer map clamps any unregistered ID to an in-set tag
-        // (that map's default is `mapping[defaultSeqID]`, an in-set value built by
-        // `createIntegerMappingFunc` at the `GetTagFromSequentialID` call site). That in-set clamp
-        // is load-bearing for this arm's deadness, which is why the structurally near-identical
-        // `createIntegerMappingFunc` default is deliberately left a defined value and must NOT be
-        // turned into `unreachable`. (The reverse `GetSequentialIDFromTag` path produces sequential
-        // IDs, not set tags, and does not feed this switch.) On targets that can express it we
-        // therefore terminate this dead arm with `unreachable`, so the backend drops the range
-        // check and matches handwritten dispatch; targets without the spelling keep the defined
-        // default below.
+        // Every tag produced by a closed-set source -- `GetTagOfElementInSet`, the set->set remap,
+        // and the in-set-clamped `GetTagFromSequentialID` -- has a `case`, so none of them selects
+        // this arm. We mark it `unreachable` so the backend drops the range check;
+        // `SLANG_PRELUDE_UNREACHABLE` lowers to a no-return in release and to a loud trap in debug.
+        // One producer is not in that set: force-unwrapping a `none` `Optional<Interface>` lowers
+        // to an unclamped `GetTagForSubSet`, which can carry an out-of-set tag here; the debug trap
+        // catches that case if it occurs. Targets without the spelling keep the defined default
+        // below.
         builder.emitUnreachable();
     }
     else if (resultType->getOp() == kIROp_VoidType)

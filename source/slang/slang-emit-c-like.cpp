@@ -3714,7 +3714,7 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion, Region* breakRegionToOmit)
                     // drop the dead path. On other C-like targets we emit nothing, which is valid
                     // because the terminator itself guarantees control cannot continue past this
                     // block.
-                    if (targetSupportsUnreachableTerminator(getTarget()))
+                    if (doesTargetSupportUnreachableTerminator(getTarget()))
                         m_writer->emit("SLANG_PRELUDE_UNREACHABLE();\n");
                     break;
                 }

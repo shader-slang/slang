@@ -16,6 +16,7 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -stage compute -entry computeMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=CPP): -target cpp -stage compute -entry computeMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -line-directive-mode none
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain -line-directive-mode none
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=EXEC): -shaderobj -output-using-type -cpu
 
 interface IHit
@@ -70,8 +71,9 @@ void computeMain()
 }
 
 // CUDA and C++ can express an unreachable terminator, so the dispatcher's dead default arm is the
-// marker (the prelude spells it `__builtin_unreachable()` on CUDA/clang/gcc, `__assume(0)` on MSVC,
-// and `abort()` on any other host compiler).
+// marker. In a release build the prelude spells it as a no-return (`__builtin_unreachable()` on
+// CUDA/clang/gcc, `__assume(0)` on MSVC); in a debug build it traps (`__trap()` on CUDA, `abort()`
+// on the host compiler) so the never-taken arm fails loudly if it is ever reached.
 //CUDA: default:
 //CUDA: SLANG_PRELUDE_UNREACHABLE();
 //CPP: default:
@@ -83,3 +85,8 @@ void computeMain()
 //HLSL: default:
 //HLSL: 0U
 //HLSL-NOT: SLANG_PRELUDE_UNREACHABLE
+
+// GLSL is also gated out (no unreachable spelling is wired up for it), so it likewise keeps a
+// defined default and never emits the marker.
+//GLSL: local_size
+//GLSL-NOT: SLANG_PRELUDE_UNREACHABLE

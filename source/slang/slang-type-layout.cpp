@@ -3364,7 +3364,7 @@ bool isCUDATarget(CodeGenTarget codeGenTarget)
     }
 }
 
-bool targetSupportsUnreachableTerminator(CodeGenTarget target)
+bool doesTargetSupportUnreachableTerminator(CodeGenTarget target)
 {
     // The bytecode VM is classified CPU-like, but its emitter drops an unreachable block instead of
     // emitting a no-return terminator, and an interpreter gains nothing from pruning a dead arm, so
@@ -3372,17 +3372,31 @@ bool targetSupportsUnreachableTerminator(CodeGenTarget target)
     if (target == CodeGenTarget::HostVM)
         return false;
 
-    // CUDA (NVRTC/nvcc) and the remaining CPU targets do express a no-return "unreachable"
-    // terminator -- the C-family source emitters via `SLANG_PRELUDE_UNREACHABLE`, and the LLVM
-    // backend natively -- so the downstream compiler can drop a provably-dead path such as the
-    // default arm of a closed dynamic-dispatch switch. HLSL/GLSL/WGSL/Metal have no such spelling
-    // wired up here, so on those targets a dead arm keeps a defined terminator and stays valid.
+    // Standalone `-target c` (CSource) is classified CPU-like, but no C-language prelude defines
+    // `SLANG_PRELUDE_UNREACHABLE`, so emitting the marker there would reference an undefined macro.
+    // Every other CPU target emits C++ (which gets the macro from `slang-cpp-types-core.h`) or goes
+    // through the LLVM backend natively, so only raw C output is excluded here.
+    if (target == CodeGenTarget::CSource)
+        return false;
+
+    // CUDA (NVRTC/nvcc) and the C-family CPU source emitters express a no-return "unreachable"
+    // terminator via `SLANG_PRELUDE_UNREACHABLE`, so the downstream compiler can drop a
+    // provably-dead path such as the default arm of a closed dynamic-dispatch switch.
+    // HLSL/GLSL/WGSL/Metal have no such spelling wired up here, so on those targets a dead arm
+    // keeps a defined terminator and stays valid. (CPU emission through the LLVM backend is
+    // excluded in the `TargetRequest*` overload, since the debug trap does not reach it.)
     return isCUDATarget(target) || isCPUTarget(target);
 }
 
-bool targetSupportsUnreachableTerminator(TargetRequest* targetReq)
+bool doesTargetSupportUnreachableTerminator(TargetRequest* targetReq)
 {
-    return targetSupportsUnreachableTerminator(targetReq->getTarget());
+    // The debug-mode trap that backs this optimization lives in the C-family preludes (the
+    // `SLANG_PRELUDE_UNREACHABLE` macro), so it only covers C-family source emission. A CPU target
+    // emitted through the LLVM backend renders the `unreachable` terminator directly, with no such
+    // trap, so we exclude it here and keep the defined default on that path.
+    if (isCPUTargetViaLLVM(targetReq))
+        return false;
+    return doesTargetSupportUnreachableTerminator(targetReq->getTarget());
 }
 
 bool isWGPUTarget(CodeGenTarget target)

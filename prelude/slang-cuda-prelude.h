@@ -19,10 +19,16 @@
 #endif
 
 // Marks a code path the Slang compiler has proved dead (for example the default arm of a closed
-// dynamic-dispatch switch). Both NVRTC and nvcc accept `__builtin_unreachable()`, which lets the
-// driver JIT drop the dead path instead of emitting a range check for a tag that can never occur.
+// dynamic-dispatch switch). In a release build this is `__builtin_unreachable()` (accepted by both
+// NVRTC and nvcc), so the driver JIT drops the dead path instead of emitting a range check for a
+// tag that can never occur; in a debug build it is `__trap()`, so a supposedly-dead path that is
+// somehow reached halts the kernel loudly instead of executing undefined behavior.
 #ifndef SLANG_PRELUDE_UNREACHABLE
+#ifdef NDEBUG
 #define SLANG_PRELUDE_UNREACHABLE() __builtin_unreachable()
+#else
+#define SLANG_PRELUDE_UNREACHABLE() __trap()
+#endif
 #endif
 
 // Define SLANG_CUDA_ENABLE_HALF to use the cuda_fp16 include to add half support.
