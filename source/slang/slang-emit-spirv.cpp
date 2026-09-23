@@ -12101,11 +12101,6 @@ SlangResult emitSPIRVFromIR(
     SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
 
-    // Now that legalization has put the IR in its final, emit-ready shape, precompute the
-    // set of arithmetic instructions that transitively feed a `precise` value, so that
-    // `emitArithmetic` only has to do a per-instruction lookup.
-    context.computePreciseInsts();
-
 #if 0
     {
         DiagnosticSinkWriter writer(codeGenContext->getSink());
@@ -12119,6 +12114,13 @@ SlangResult emitSPIRVFromIR(
 #endif
 
     removeAvailableInDownstreamModuleDecorations(irModule, CodeGenTarget::SPIRV);
+
+    // With the IR now in its final emit-visible shape -- legalized, and the bodies of
+    // functions available in a downstream module gutted just above -- precompute the
+    // arithmetic instructions that transitively feed a `precise` value. Doing it here keeps
+    // `emitArithmetic` a plain lookup, and doing it after the gutting keeps the set free of
+    // pointers to now-deallocated instructions.
+    context.computePreciseInsts();
 
     auto shouldPreserveParams = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::PreserveParameters);
