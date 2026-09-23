@@ -103,7 +103,7 @@ struct BlobOutputTempReleaser
 // The temporary is named `_temp_<arg>` and is zero-initialized. Besides the null-redirect above,
 // call sites may redirect `arg` to `&_temp_<arg>` on a failure path so a subsequent RECORD_OUTPUT
 // serializes a defined 0 rather than dereferencing caller memory the wrapped API left unwritten on
-// failure (see GlobalSessionProxy::getDownstreamCompilerVersion, issue #11865).
+// failure (see GlobalSessionProxy::getDownstreamCompilerPath, issue #11865).
 // A BlobOutputTempReleaser is attached so a blob left in `_temp_<arg>` on the
 // replay path is released at scope exit rather than leaked (issue #11936).
 // Usage: PREPARE_POINTER_OUTPUT(outBlob) where outBlob is ISlangBlob**
@@ -134,6 +134,16 @@ struct BlobOutputTempReleaser
 // Wraps the returned object via RECORD_COM_OUTPUT, then stores a reference in
 // m_returnedEntryPoints so the proxy outlives user code that doesn't properly
 // track the reference (matching Slang's internal lifetime behaviour).
+//
+// The ComPtr here takes a *second* reference and must not attach: `outEntryPoint`
+// is a COM out-parameter, so the reference RECORD_COM_OUTPUT left in `*arg` is
+// the one the caller owns and will release. On the playback path that same
+// reference is instead the orphaned creation reference tracked by
+// notePlaybackOrphanedProxy, and it keeps its note -- teardown releasing it only
+// takes the proxy from two references down to one, and m_returnedEntryPoints
+// still holds that one until the owning component proxy is destroyed. Cancelling
+// the note here would leave the creation reference with no owner at all.
+//
 // Requires: RECORD_CALL() has been called (provides _ctx), and the class has
 //           m_returnedEntryPoints.
 // Usage: RECORD_ENTRYPOINT_OUTPUT(outEntryPoint)

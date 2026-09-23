@@ -1,5 +1,6 @@
 // unit-test-process.cpp
 
+#include "compiler-core/slang-json-rpc-connection.h"
 #include "core/slang-http.h"
 #include "core/slang-io.h"
 #include "core/slang-platform.h"
@@ -139,6 +140,38 @@ static void _checkHTTPHeaderContentLengthValidation()
         SLANG_FAILED(HTTPHeader::parse(UnownedStringSlice("Content-Length: -1\r\n\r\n"), header)));
     SLANG_CHECK(SLANG_FAILED(
         HTTPHeader::parse(UnownedStringSlice("Content-Length: not-a-number\r\n\r\n"), header)));
+}
+
+static RefPtr<JSONRPCConnection> _createMemoryJSONRPCConnection(const char* input)
+{
+    RefPtr<Stream> inputStream = new MemoryStreamBase(FileAccess::Read, input, strlen(input));
+    RefPtr<BufferedReadStream> bufferedInput = new BufferedReadStream(inputStream);
+    RefPtr<Stream> outputStream = new OwnedMemoryStream(FileAccess::Write);
+    RefPtr<HTTPPacketConnection> packetConnection =
+        new HTTPPacketConnection(bufferedInput, outputStream);
+    RefPtr<JSONRPCConnection> rpcConnection = new JSONRPCConnection();
+    SLANG_CHECK(SLANG_SUCCEEDED(rpcConnection->init(packetConnection)));
+    return rpcConnection;
+}
+
+static void _checkJSONRPCReadErrorClassification()
+{
+    {
+        auto connection = _createMemoryJSONRPCConnection("Content-Length: nope\r\n\r\n");
+        SLANG_CHECK(SLANG_FAILED(connection->waitForResult(10)));
+        SLANG_CHECK(connection->getReadError() == JSONRPCConnection::ReadError::Protocol);
+    }
+    {
+        auto connection = _createMemoryJSONRPCConnection("Content-Length: 1\r\n\r\n{");
+        SLANG_CHECK(SLANG_SUCCEEDED(connection->waitForResult(10)));
+        SLANG_CHECK(!connection->hasMessage());
+        SLANG_CHECK(connection->getReadError() == JSONRPCConnection::ReadError::Protocol);
+    }
+    {
+        auto connection = _createMemoryJSONRPCConnection("Content-Length: 4\r\n\r\nabc");
+        SLANG_CHECK(SLANG_FAILED(connection->waitForResult(10)));
+        SLANG_CHECK(connection->getReadError() == JSONRPCConnection::ReadError::ConnectionClosed);
+    }
 }
 
 #if defined(_WIN32)
@@ -707,6 +740,11 @@ SLANG_UNIT_TEST(TestServerParentMonitorInvalidArguments)
 SLANG_UNIT_TEST(HTTPHeaderContentLengthValidation)
 {
     _checkHTTPHeaderContentLengthValidation();
+}
+
+SLANG_UNIT_TEST(JSONRPCReadErrorClassification)
+{
+    _checkJSONRPCReadErrorClassification();
 }
 
 #if defined(_WIN32)

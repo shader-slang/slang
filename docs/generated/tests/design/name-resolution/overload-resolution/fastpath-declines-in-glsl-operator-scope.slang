@@ -1,0 +1,36 @@
+//META: generated=true
+//META: model=gpt-5.6-sol
+//META: generated_at=2026-09-17T06:27:35Z
+//META: source_commit=9f55ec61a25834c304d71fd1e9a58bf72b3864b3
+//META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#the-builtin-operator-fast-path
+//META: doc_section_digest=16e17f0dd7f2f633f3f55fe47544e0f4c04b1b5b2ce0bf083439c29eeb4a3acc
+//META: purpose=In GLSL operator scope the fast path declines matrix operands, so mat * mat resolves through the glsl module's overload to an algebraic matrix product.
+//META: intent=boundary
+//META: pipeline_stage=check
+//META: warning=Auto-generated. May drift from source. Do not edit by hand.
+
+// Verifies the GLSL-operator-scope carve-out: with the `glsl` module in scope
+// the fast path refuses matrix operands and the general path selects the
+// module's `operator*`, which is the algebraic product. Multiplying {{1,2},{3,4}}
+// by the identity leaves the off-diagonal entries intact; CHECK asserts 2 and 3
+// in the buffer, whereas a component-wise fast-path multiply would give 0.
+
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+
+import glsl;
+
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+RWStructuredBuffer<float> outputBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    float a = outputBuffer[0] + 1.0;
+    float2x2 m = float2x2(a, 2.0 * a, 3.0 * a, 4.0 * a);
+    float2x2 identity = float2x2(a, 0.0, 0.0, a);
+    float2x2 prod = m * identity;
+    outputBuffer[0] = prod[0][1];
+    outputBuffer[1] = prod[1][0];
+    // CHECK: 2.0
+    // CHECK: 3.0
+}

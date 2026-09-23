@@ -1,6 +1,10 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 
 // Regression test for shader-slang/slang#12260: a `switch` on an `enum : bool`
 // value must compile and select the matching case. The CPU test checks the
@@ -8,6 +12,11 @@
 // selector is legalized to an integer switch (these targets require an integer
 // selector, so an un-legalized bool switch would fail to compile / emit invalid
 // output).
+//
+// Regression test for shader-slang/slang#12298: on the C-family targets that do
+// NOT legalize the switch to an integer selector (HLSL, C++, CUDA, Metal), the
+// bool-typed case labels must be emitted as `false`/`true`, not as `int8_t(0)`/
+// `int8_t(1)`.
 
 enum Mode : bool
 {
@@ -40,6 +49,25 @@ int classify(Mode m)
 // WGSL: switch(select(i32(0), i32(1),
 // WGSL: case i32(0)
 // WGSL: case i32(1)
+
+// The C-family targets keep the bool selector and must spell the case labels as the
+// canonical bool literals `false`/`true` (`Immediate = false` first, `Deferred = true`
+// second); the `-NOT` between the labels pins that no integer `int8_t` spelling is emitted.
+// HLSL: case false:
+// HLSL-NOT: int8_t
+// HLSL: case true:
+
+// CPP: case false:
+// CPP-NOT: int8_t
+// CPP: case true:
+
+// CUDA: case false:
+// CUDA-NOT: int8_t
+// CUDA: case true:
+
+// METAL: case false:
+// METAL-NOT: int8_t
+// METAL: case true:
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

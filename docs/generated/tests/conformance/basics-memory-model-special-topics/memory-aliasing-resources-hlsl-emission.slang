@@ -16,6 +16,10 @@
 // client might bind both to the same underlying memory.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 ConstantBuffer<int> cbuf;
 RWStructuredBuffer<int> rwbuf;
@@ -33,3 +37,19 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK: cbuffer cbuf_{{[0-9]+}}
 // RWStructuredBuffer emits as a UAV declaration
 // CHECK: RWStructuredBuffer<int > rwbuf_{{[0-9]+}}
+
+// GLSL: layout({{.*}}) uniform block_{{.*}}
+// GLSL: layout(std430, binding = {{[0-9]+}}) buffer StructuredBuffer_int_t_{{[0-9]+}}
+
+// MTL: int constant{{.*}} cbuf_{{[0-9]+}};
+// MTL: int device{{.*}} rwbuf_{{[0-9]+}};
+
+// WGSL: var<uniform> cbuf_{{[0-9]+}} : i32
+// WGSL: var<storage, read_write> rwbuf_{{[0-9]+}} : array<i32>
+
+// SPIRV-DAG: OpDecorate %cbuf{{.*}} Binding
+// SPIRV-DAG: OpDecorate %cbuf{{.*}} DescriptorSet
+// SPIRV-DAG: OpDecorate %rwbuf{{.*}} Binding
+// SPIRV-DAG: OpDecorate %rwbuf{{.*}} DescriptorSet
+// SPIRV-DAG: %cbuf = OpVariable %_ptr_Uniform_{{.*}} Uniform
+// SPIRV-DAG: %rwbuf = OpVariable %_ptr_StorageBuffer_{{.*}} StorageBuffer

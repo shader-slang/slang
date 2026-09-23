@@ -1,16 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#arithmetic-and-bitwise
-//META: doc_section_digest=1d2f08dfecd3e2ccb26b50652f1294ebe4c1c5182a6aab140a589ccecd16faa1
+//META: doc_section_digest=9e56dc6fbb032bd27e7464356d0ae573f83ef6e509f182c79ec8316e29e88dc0
 //META: purpose=Negative boundary: integer `a / 0` is rejected by semantic check with "divide by zero" — no `div` IR opcode is produced. (Float divide-by-zero is permitted; see `div-float-by-positive-zero-uniform.slang`.)
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists `div` for `/` and keys the integer/float choice
-// by operand type. On integers, dividing by the zero literal is
+// Verifies the negative edge of the `div` claim: `/` normally produces
+// `div`, but on integers, dividing by the zero literal is
 // undefined behavior and Slang rejects it at semantic check
 // rather than lowering it to a `div` opcode.
 

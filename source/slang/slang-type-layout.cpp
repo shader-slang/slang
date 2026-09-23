@@ -102,6 +102,17 @@ void _typeLayout_keepFunctions()
     SLANG_UNUSED(b);
 }
 
+// True if a `DescriptorHandle<elementType>` is represented as `uint64` rather than `uint2` under
+// `spvBindlessTextureNV`. This is the AST-side mirror of the IR classifier
+// `isBindlessTextureNVEncodableResourceType`: only the texture/sampler-family kinds the extension
+// can convert use the wide form, so layout and reflection agree with emission. `Buffer<T>` /
+// `RWBuffer<T>` are `TextureType` (buffer shape) and so are included; constant/structured buffers
+// and acceleration structures are not and stay `uint2`.
+static bool _isBindlessTextureNVUInt64ElementType(Type* elementType)
+{
+    return as<TextureType>(elementType) || as<SamplerStateType>(elementType);
+}
+
 // Given a Type returns the equivalent ShaderParameterKind
 static ShaderParameterKind _getShaderParameterKindForResourceType(Type* type)
 {
@@ -473,13 +484,13 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         Type* elementType,
         const TypeLayoutContext& context) override
     {
-        SLANG_UNUSED(elementType);
-
-        // Check if SPIRV with spvBindlessTextureNV extension is enabled
+        // Under spvBindlessTextureNV only the texture/sampler kinds the extension converts are
+        // represented as uint64; buffers and acceleration structures stay on the default (uint2)
+        // layout, matching the SPIR-V type emission.
         if (context.targetReq &&
-            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV) &&
+            _isBindlessTextureNVUInt64ElementType(elementType))
         {
-            // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
             auto uint64Info = GetScalarLayout(BaseType::UInt64, context);
             return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint64Info.size, uint64Info.alignment));
         }
@@ -1334,8 +1345,8 @@ HLSLRayTracingLayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl(
 //
 CUDARayTracingLayoutRulesImpl kCUDARayPayloadParameterLayoutRulesImpl(
     LayoutResourceKind::RayPayload);
-// CUDARayTracingLayoutRulesImpl
-// kCUDACallablePayloadParameterLayoutRulesImpl(LayoutResourceKind::CallablePayload);
+CUDARayTracingLayoutRulesImpl kCUDACallablePayloadParameterLayoutRulesImpl(
+    LayoutResourceKind::CallablePayload);
 CUDARayTracingLayoutRulesImpl kCUDAHitAttributesParameterLayoutRulesImpl(
     LayoutResourceKind::HitAttributes);
 
@@ -1812,6 +1823,12 @@ LayoutRulesImpl kCUDAEntryPointParameterLayoutRulesImpl_ = {
 LayoutRulesImpl kCUDARayPayloadParameterLayoutRulesImpl_ = {
     &kCUDALayoutRulesFamilyImpl,
     &kCUDARayPayloadParameterLayoutRulesImpl,
+    &kCUDAObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCUDACallablePayloadParameterLayoutRulesImpl_ = {
+    &kCUDALayoutRulesFamilyImpl,
+    &kCUDACallablePayloadParameterLayoutRulesImpl,
     &kCUDAObjectLayoutRulesImpl,
 };
 
@@ -2551,7 +2568,7 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getRayPayloadParameterRules()
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getCallablePayloadParameterRules()
 {
-    return nullptr;
+    return &kCUDACallablePayloadParameterLayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getHitAttributesParameterRules()
 {
@@ -4398,6 +4415,59 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferWithCounterTypeLayout(
     return typeLayout;
 }
 
+// Build the "content" variable layout for a structured buffer: a var layout over an unbounded
+// array of the element type, carrying no offsets (navigating to the content resets the byte-offset
+// root). The element layout is reused as-is; a structured buffer element carries no resource kind
+// other than uniform data and existential params, so the general array-layout path's AoS-to-SoA
+// element adjustment does not apply and the content array's usage is just strided uniform storage
+// plus those existentials.
+static RefPtr<VarLayout> createStructuredBufferContentVarLayout(
+    TypeLayoutContext const& context,
+    TypeLayout* elementTypeLayout)
+{
+    auto elementRules = elementTypeLayout->rules;
+
+    RefPtr<ArrayTypeLayout> contentTypeLayout = new ArrayTypeLayout();
+    contentTypeLayout->type =
+        context.astBuilder->getArrayType(elementTypeLayout->type, /* unbounded */ nullptr);
+    contentTypeLayout->rules = elementRules;
+    contentTypeLayout->elementTypeLayout = elementTypeLayout;
+    contentTypeLayout->originalElementTypeLayout = elementTypeLayout;
+    contentTypeLayout->uniformAlignment = elementTypeLayout->uniformAlignment;
+
+    // The stride/size come from the same rules a real array uses (`GetArrayLayout`), which asserts
+    // a finite element uniform size (`SLANG_RELEASE_ASSERT(elementInfo.size.isFinite())`). Only
+    // synthesize the content array's uniform stride/size when the element reports a finite uniform
+    // size; when it has no uniform resource at all (e.g. a pure interface value) or a non-finite
+    // one (unbounded or as-yet-unknown), there is no finite footprint to feed `GetArrayLayout`, so
+    // the content array carries no uniform size/stride.
+    if (auto elementUniformInfo = elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+        elementUniformInfo && elementUniformInfo->count.isFinite())
+    {
+        SimpleLayoutInfo elementInfo(
+            LayoutResourceKind::Uniform,
+            elementUniformInfo->count,
+            elementTypeLayout->uniformAlignment);
+        auto arrayInfo = elementRules->GetArrayLayout(elementInfo, LayoutSize::infinite());
+        contentTypeLayout->uniformStride = arrayInfo.elementStride;
+        contentTypeLayout->uniformAlignment = arrayInfo.alignment;
+        contentTypeLayout->addResourceUsage(LayoutResourceKind::Uniform, arrayInfo.size);
+    }
+
+    // Mirror the specialization footprint the buffer propagates from its element type, so a
+    // structured buffer of an interface type reports the same existential usage on its content.
+    for (auto kind :
+         {LayoutResourceKind::ExistentialTypeParam, LayoutResourceKind::ExistentialObjectParam})
+    {
+        if (auto info = elementTypeLayout->FindResourceInfo(kind))
+            contentTypeLayout->addResourceUsage(kind, info->count);
+    }
+
+    RefPtr<VarLayout> contentVarLayout = new VarLayout();
+    contentVarLayout->typeLayout = contentTypeLayout;
+    return contentVarLayout;
+}
+
 // Create a type layout for a structured buffer type.
 RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
     TypeLayoutContext const& context,
@@ -4414,6 +4484,8 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
     typeLayout->rules = rules;
 
     typeLayout->elementTypeLayout = elementTypeLayout;
+    typeLayout->contentVarLayout =
+        createStructuredBufferContentVarLayout(context, elementTypeLayout);
 
     typeLayout->uniformAlignment = info.alignment;
 
@@ -5683,9 +5755,12 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     {
         maybePromoteDescriptorHandleCapability(context.targetReq);
 
-        // For spvBindlessTextureNV, DescriptorHandle<T> has the layout of uint64_t
+        // Under spvBindlessTextureNV only the texture/sampler kinds the extension converts have the
+        // layout of uint64; buffers and acceleration structures stay uint2 (below), matching the
+        // SPIR-V type emission.
         if (context.targetReq &&
-            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV) &&
+            _isBindlessTextureNVUInt64ElementType(resPtrType->getElementType()))
         {
             auto uint64Type = context.astBuilder->getUInt64Type();
             return _createTypeLayout(context, uint64Type);
@@ -5727,6 +5802,14 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             makeArray(optionalType->getValueType(), context.astBuilder->getBoolType());
         auto tupleType = context.astBuilder->getTupleType(types.getView());
         return _createTypeLayout(context, tupleType);
+    }
+    else if (auto modifiedType = as<ModifiedType>(type))
+    {
+        // Every modifier a `ModifiedType` can carry (`noDiff`, `unorm`, `snorm`)
+        // is layout-transparent: `unorm`/`snorm` only select a texture image
+        // format at emit and never change storage size or alignment. So the type
+        // lays out exactly as its base.
+        return _createTypeLayout(context, modifiedType->getBase());
     }
     else if (auto tupleType = as<TupleType>(type))
     {

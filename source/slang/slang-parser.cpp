@@ -88,10 +88,21 @@ enum class ParsingStage
     Body,
 };
 
+enum class AllowCaseDefaultStatements : bool
+{
+    Disallow = false,
+    Allow = true,
+};
+
 struct ParserOptions
 {
     bool enableEffectAnnotations = false;
-    bool allowGLSLInput = false;
+
+    /// The effective source language whose grammar and builtin scope the parser applies.
+    ///
+    /// Callers pass the language already resolved for the translation unit. `Unknown` keeps the
+    /// parser language-neutral and must not enable any dialect-specific syntax or builtin import.
+    SourceLanguage sourceLanguage = SourceLanguage::Unknown;
     bool isInLanguageServer = false;
     bool isCoreModule = false;
     ParsingStage stage = ParsingStage::Body;
@@ -104,12 +115,13 @@ class Parser
 {
 public:
     NamePool* namePool;
-    SourceLanguage sourceLanguage;
     ASTBuilder* astBuilder;
     SemanticsVisitor* semanticsVisitor = nullptr;
 
     NamePool* getNamePool() { return namePool; }
-    SourceLanguage getSourceLanguage() { return sourceLanguage; }
+
+    /// Returns the single effective source language used for every dialect-specific parse rule.
+    SourceLanguage getSourceLanguage() const { return options.sourceLanguage; }
 
     int anonymousCounter = 0;
 
@@ -206,8 +218,11 @@ public:
     Decl* ParseStruct();
     ClassDecl* ParseClass();
     Decl* ParseGLSLInterfaceBlock();
-    Stmt* ParseStatement(Stmt* parentStmt = nullptr);
-    Stmt* parseBlockStatement();
+    Stmt* ParseStatement(
+        Stmt* parentStmt = nullptr,
+        AllowCaseDefaultStatements allowCaseDefault = AllowCaseDefaultStatements::Disallow);
+    Stmt* parseBlockStatement(
+        AllowCaseDefaultStatements allowCaseDefault = AllowCaseDefaultStatements::Disallow);
     Stmt* parseLabelStatement();
     DeclStmt* parseVarDeclrStatement(Modifiers modifiers);
     IfStmt* parseIfStatement();
@@ -1269,7 +1284,7 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                     AddModifier(&modifierLink, parsedModifier);
                     continue;
                 }
-                else if (parser->options.allowGLSLInput)
+                else if (parser->getSourceLanguage() == SourceLanguage::GLSL)
                 {
                     if (AdvanceIf(parser, "flat"))
                     {
@@ -1353,6 +1368,33 @@ static NodeBase* parseImportDecl(Parser* parser, void* /*userData*/)
 {
     auto decl = parser->astBuilder->create<ImportDecl>();
     parseFileReferenceDeclBase(parser, decl);
+
+    if (decl->moduleNameAndLoc.name && getText(decl->moduleNameAndLoc.name) == "glsl")
+    {
+        // Actual GLSL receives a synthetic import in `parseSourceFile`, so spelling it in the
+        // source is redundant. Importing GLSL declarations and operator rules into HLSL is
+        // suspicious but remains a warning for compatibility. Legacy Slang source may still use
+        // the import, but Slang 202c removes that compatibility path.
+        if (parser->getSourceLanguage() == SourceLanguage::GLSL)
+        {
+            parser->sink->diagnose(
+                Diagnostics::RedundantGlslModuleImport{.location = decl->moduleNameAndLoc.loc});
+        }
+        else if (parser->getSourceLanguage() == SourceLanguage::HLSL)
+        {
+            parser->sink->diagnose(
+                Diagnostics::GlslModuleImportInHlsl{.location = decl->moduleNameAndLoc.loc});
+        }
+        else if (
+            parser->getSourceLanguage() == SourceLanguage::Slang &&
+            parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_202C)
+        {
+            // `parseTranslationUnit` installs the preprocessed module-wide language version before
+            // parsing any primary file, so this also applies when a later file selects 202c.
+            parser->sink->diagnose(Diagnostics::GlslModuleImportNotAllowedInSlang202c{
+                .location = decl->moduleNameAndLoc.loc});
+        }
+    }
     return decl;
 }
 
@@ -2134,6 +2176,7 @@ public:
         if (expr->base.exp)
             dispatch(expr->base.exp);
     }
+    void visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr*) {}
     void visitModifiedTypeExpr(ModifiedTypeExpr* expr)
     {
         if (expr->base.exp)
@@ -2985,6 +3028,12 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
                 }
             }
         }
+
+        if (as<MemberExpr>(base) &&
+            (as<DeclRefExpr>(checkedBase) || as<OverloadedExpr>(checkedBase)))
+        {
+            base = checkedBase;
+        }
     }
     else
     {
@@ -3396,6 +3445,83 @@ static TypeSpec _applyModifiersToTypeSpec(Parser* parser, TypeSpec typeSpec, Mod
     return typeSpec;
 }
 
+/// Reports whether the next token starts a traditional integer type specifier in HLSL input.
+static bool isHLSLTraditionalIntegerTypeSpecifierStart(Parser* parser)
+{
+    return parser->getSourceLanguage() == SourceLanguage::HLSL &&
+           (parser->LookAheadToken("unsigned") || parser->LookAheadToken("signed"));
+}
+
+/// Parses an HLSL integer type specifier that starts with `unsigned` or `signed`.
+///
+/// Consider these examples:
+///
+///     unsigned int value;
+///     vector<unsigned int, 4> values;
+///
+/// The first example reaches this routine through `_parseSimpleTypeSpec`, where the parser already
+/// knows it needs a type. The second reaches it through `parseAtomicExpr`, because a generic
+/// argument can be either a type or a value. Keeping the grammar here gives both paths the same
+/// recognition and diagnostic recovery rules.
+/// Returns `HLSLUnsignedTypeExpr` for an accepted spelling and a non-null `IncompleteExpr` after
+/// diagnosing a rejected spelling.
+static Expr* parseHLSLTraditionalIntegerTypeSpecifier(Parser* parser)
+{
+    SLANG_ASSERT(isHLSLTraditionalIntegerTypeSpecifierStart(parser));
+
+    const Token signToken = parser->ReadToken(TokenType::Identifier);
+    const bool isUnsigned = signToken.getContent() == "unsigned";
+
+    StringBuilder typeNameBuilder;
+    typeNameBuilder << signToken.getContent();
+
+    bool hasUnsupportedTypeNameSuffix = false;
+    if (AdvanceIf(parser, "int"))
+    {
+        typeNameBuilder << " int";
+    }
+    else if (
+        parser->LookAheadToken("char") || parser->LookAheadToken("short") ||
+        parser->LookAheadToken("long"))
+    {
+        const Token widthToken = parser->ReadToken(TokenType::Identifier);
+        typeNameBuilder << " " << widthToken.getContent();
+        hasUnsupportedTypeNameSuffix = true;
+
+        if (widthToken.getContent() == "long" && AdvanceIf(parser, "long"))
+            typeNameBuilder << " long";
+
+        // C and C++ also allow a trailing `int` in spellings such as `unsigned short int`.
+        // Consume it as part of the unsupported spelling so it does not produce an unrelated
+        // follow-on error.
+        if (widthToken.getContent() != "char" && AdvanceIf(parser, "int"))
+            typeNameBuilder << " int";
+    }
+
+    // Diagnose the complete spelling first, because suggesting `int` for a type such as
+    // `signed short` would discard the requested width.
+    if (hasUnsupportedTypeNameSuffix)
+    {
+        parser->sink->diagnose(Diagnostics::UnsupportedTraditionalIntegerTypeNameInHlsl{
+            .typeName = typeNameBuilder.produceString(),
+            .location = signToken.loc});
+    }
+    else if (!isUnsigned)
+    {
+        parser->sink->diagnose(Diagnostics::SignedTypeNameInHlsl{.location = signToken.loc});
+    }
+    else
+    {
+        auto expr = parser->astBuilder->create<HLSLUnsignedTypeExpr>();
+        expr->loc = signToken.loc;
+        return expr;
+    }
+
+    auto errorExpr = parser->astBuilder->create<IncompleteExpr>();
+    errorExpr->loc = signToken.loc;
+    return errorExpr;
+}
+
 /// Parse a type specifier, without dealing with modifiers.
 static TypeSpec _parseSimpleTypeSpec(Parser* parser)
 {
@@ -3421,7 +3547,11 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     // closing `}` is at the end of its line, as a bit of a special case
     // to allow the common idiom.
     //
-    if (parser->LookAheadToken("struct"))
+    if (isHLSLTraditionalIntegerTypeSpecifierStart(parser))
+    {
+        typeExpr = parseHLSLTraditionalIntegerTypeSpecifier(parser);
+    }
+    else if (parser->LookAheadToken("struct"))
     {
         auto decl = parser->ParseStruct();
         typeSpec.decl = decl;
@@ -3520,7 +3650,7 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
 
 static Modifier* findPotentialGLSLInterfaceBlockModifier(Parser* parser, Modifiers& mods)
 {
-    if (!parser->options.allowGLSLInput)
+    if (parser->getSourceLanguage() != SourceLanguage::GLSL)
         return nullptr;
 
     for (auto mod : mods)
@@ -4116,7 +4246,8 @@ static Decl* ParseBufferBlockDecl(
         parser->ReadToken(TokenType::Semicolon);
     }
     else if (
-        parser->options.allowGLSLInput && parser->LookAheadToken(TokenType::Identifier) &&
+        parser->getSourceLanguage() == SourceLanguage::GLSL &&
+        parser->LookAheadToken(TokenType::Identifier) &&
         parser->LookAheadToken(TokenType::LBracket, 1))
     {
         // GLSL bindless buffers are denoted with [] after the name.
@@ -4176,8 +4307,8 @@ static Decl* ParseBufferBlockDecl(
 
 static NodeBase* parseHLSLCBufferDecl(Parser* parser, void* /*userData*/)
 {
-    // Check for GLSL layout qualifiers when GLSL input is allowed
-    if (parser->options.allowGLSLInput && parser->pendingModifiers)
+    // Check for GLSL layout qualifiers only when parsing a GLSL translation unit.
+    if (parser->getSourceLanguage() == SourceLanguage::GLSL && parser->pendingModifiers)
     {
         auto getLayoutArg = [&](const char* defaultLayout)
         {
@@ -5640,30 +5771,6 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
     }
 }
 
-static EnumDecl* isUnscopedEnum(Decl* decl)
-{
-    EnumDecl* enumDecl = as<EnumDecl>(decl);
-    if (!enumDecl)
-        return nullptr;
-    for (auto mod : enumDecl->modifiers)
-    {
-        if (as<UnscopedEnumAttribute>(mod))
-        {
-            return enumDecl;
-        }
-        else if (auto uncheckedAttribute = as<UncheckedAttribute>(mod))
-        {
-            // We have to perform an ugly string comparison here, because the attributes
-            // haven't been checked during parsing.
-            if (getText(uncheckedAttribute->keywordName) == "UnscopedEnum")
-            {
-                return enumDecl;
-            }
-        }
-    }
-    return nullptr;
-}
-
 // Finish up work on a declaration that was parsed
 static void CompleteDecl(
     Parser* parser,
@@ -5704,7 +5811,7 @@ static void CompleteDecl(
     }
     else
     {
-        if (parser->options.allowGLSLInput)
+        if (parser->getSourceLanguage() == SourceLanguage::GLSL)
         {
             addSpecialGLSLModifiersBasedOnType(parser, declToModify, &modifiers);
         }
@@ -5839,7 +5946,7 @@ static DeclBase* ParseDeclWithModifiers(
             }
 
             // This can also be a GLSL style buffer block declaration.
-            if (parser->options.allowGLSLInput)
+            if (parser->getSourceLanguage() == SourceLanguage::GLSL)
             {
                 auto getLayoutArg = [&](const char* defaultLayout)
                 {
@@ -6219,7 +6326,7 @@ static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedToke
     bool parentIsInterface = containerDecl->astNodeType == ASTNodeType::InterfaceDecl;
     while (!AdvanceIfMatch(parser, matchType, &closingBraceToken))
     {
-        if (parser->options.allowGLSLInput)
+        if (parser->getSourceLanguage() == SourceLanguage::GLSL)
         {
             if (parseGLSLGlobalDecl(parser, containerDecl))
                 continue;
@@ -6303,7 +6410,7 @@ void Parser::parseSourceFile(ContainerDecl* program)
     currentModule = getModuleDecl(program);
 
     // Verify that the language version is valid.
-    if (sourceLanguage == SourceLanguage::Slang)
+    if (getSourceLanguage() == SourceLanguage::Slang)
     {
         if (!isValidSlangLanguageVersion(currentModule->languageVersion))
         {
@@ -6337,7 +6444,7 @@ void Parser::parseSourceFile(ContainerDecl* program)
         program->loc = tokenReader.peekLoc();
     }
 
-    if (options.allowGLSLInput)
+    if (getSourceLanguage() == SourceLanguage::GLSL)
     {
         auto glslName = getName(this, "glsl");
         if (program->nameAndLoc.name != glslName)
@@ -6347,8 +6454,6 @@ void Parser::parseSourceFile(ContainerDecl* program)
             importDecl->scope = currentScope;
             AddMember(currentScope, importDecl);
         }
-        auto glslModuleModifier = astBuilder->create<GLSLModuleModifier>();
-        addModifier(currentModule, glslModuleModifier);
     }
 
     parseDecls(this, program, MatchedTokenType::File);
@@ -6576,7 +6681,7 @@ static Stmt* ParseSwitchStmt(Parser* parser)
     parser->ReadToken(TokenType::LParent);
     stmt->condition = parser->ParseExpression();
     parser->ReadToken(TokenType::RParent);
-    stmt->body = parser->parseBlockStatement();
+    stmt->body = parser->parseBlockStatement(AllowCaseDefaultStatements::Allow);
     return stmt;
 }
 
@@ -6856,8 +6961,19 @@ Stmt* parseCompileTimeForStmt(Parser* parser)
     CompileTimeForStmt* stmt = parser->astBuilder->create<CompileTimeForStmt>();
     stmt->scopeDecl = scopeDecl;
 
+    Token forTok = parser->ReadToken("for");
 
-    parser->ReadToken("for");
+    if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_202C)
+    {
+        // $for has been removed in Slang 202c
+        parser->sink->diagnose(Diagnostics::CompileTimeForIsRemoved{.location = forTok.loc});
+    }
+    else if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025)
+    {
+        // we'll warn about the deprecation of $for in Slang 2025 and 2026
+        parser->sink->diagnose(Diagnostics::CompileTimeForIsDeprecated{.location = forTok.loc});
+    }
+
     parser->ReadToken(TokenType::LParent);
 
     NameLoc varNameAndLoc = expectIdentifier(parser);
@@ -6910,7 +7026,7 @@ Stmt* parseCompileTimeStmt(Parser* parser)
     }
 }
 
-Stmt* Parser::ParseStatement(Stmt* parentStmt)
+Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowCaseDefault)
 {
     auto modifiers = ParseModifiers(this);
 
@@ -6956,9 +7072,19 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     else if (LookAheadToken("__intrinsic_asm"))
         statement = parseIntrinsicAsmStmt(this);
     else if (LookAheadToken("case"))
-        statement = ParseCaseStmt(this);
+    {
+        statement = ParseCaseStmt(this); // should always return non-null
+        SLANG_RELEASE_ASSERT(statement); // ... so we'll assert that it's the case
+        if (allowCaseDefault != AllowCaseDefaultStatements::Allow)
+            sink->diagnose(Diagnostics::CaseOutsideSwitch{.stmt = statement});
+    }
     else if (LookAheadToken("default"))
-        statement = ParseDefaultStmt(this);
+    {
+        statement = ParseDefaultStmt(this); // should always return non-null
+        SLANG_RELEASE_ASSERT(statement);    // ... so we'll assert that it's the case
+        if (allowCaseDefault != AllowCaseDefaultStatements::Allow)
+            sink->diagnose(Diagnostics::DefaultOutsideSwitch{.stmt = statement});
+    }
     else if (LookAheadToken("__GPU_FOREACH"))
         statement = ParseGpuForeachStmt(this);
     else if (LookAheadToken(TokenType::Dollar))
@@ -7126,7 +7252,7 @@ bool lookAheadTokenAfterModifiers(Parser* parser, const char* token)
     return false;
 }
 
-Stmt* Parser::parseBlockStatement()
+Stmt* Parser::parseBlockStatement(AllowCaseDefaultStatements allowCaseDefault)
 {
     if (!beginMatch(this, MatchedTokenType::CurlyBraces))
     {
@@ -7201,7 +7327,7 @@ Stmt* Parser::parseBlockStatement()
             continue;
         }
 
-        auto stmt = ParseStatement();
+        auto stmt = ParseStatement(nullptr, allowCaseDefault);
 
         if (stmt)
             addStmt(stmt);
@@ -7582,6 +7708,7 @@ ThrowStmt* Parser::ParseThrowStatement()
     FillPosition(throwStatement);
     ReadToken("throw");
     throwStatement->expression = ParseExpression();
+    ReadToken(TokenType::Semicolon);
     return throwStatement;
 }
 
@@ -8253,7 +8380,8 @@ static IntegerLiteralValue _fixIntegerLiteral(
 
 static bool _isCast(Parser* parser, Expr* expr)
 {
-    if (as<PointerTypeExpr>(expr))
+    // These nodes always denote types, so a following `+` or `-` starts a unary cast operand.
+    if (as<PointerTypeExpr>(expr) || as<HLSLUnsignedTypeExpr>(expr))
     {
         return true;
     }
@@ -8866,7 +8994,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                     // but rather as a tuple element separator.
                     //
                     Precedence exprLevel = Precedence::Comma;
-                    if (parser->sourceLanguage == SourceLanguage::Slang &&
+                    if (parser->getSourceLanguage() == SourceLanguage::Slang &&
                         parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
                     {
                         // Setting exprLevel to Assignment here will allow the following
@@ -9058,6 +9186,11 @@ static Expr* parseAtomicExpr(Parser* parser)
         }
     case TokenType::Identifier:
         {
+            if (isHLSLTraditionalIntegerTypeSpecifierStart(parser))
+            {
+                return parseHLSLTraditionalIntegerTypeSpecifier(parser);
+            }
+
             // We will perform name lookup here so that we can find syntax
             // keywords registered for use as expressions.
             Token nameToken = peekToken(parser);
@@ -9938,12 +10071,11 @@ Expr* parseTermFromSourceFile(
     SourceLanguage sourceLanguage)
 {
     ParserOptions options;
-    options.allowGLSLInput = sourceLanguage == SourceLanguage::GLSL;
+    options.sourceLanguage = sourceLanguage;
     options.stage = ParsingStage::Body;
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.currentScope = outerScope;
     parser.namePool = namePool;
-    parser.sourceLanguage = sourceLanguage;
     return parser.ParseExpression();
 }
 
@@ -9961,9 +10093,7 @@ Stmt* parseUnparsedStmt(
     options.stage = ParsingStage::Body;
     options.enableEffectAnnotations = translationUnit->compileRequest->optionSet.getBoolOption(
         CompilerOptionName::EnableEffectAnnotations);
-    options.allowGLSLInput =
-        translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::AllowGLSL) ||
-        sourceLanguage == SourceLanguage::GLSL;
+    options.sourceLanguage = sourceLanguage;
     options.isInLanguageServer =
         translationUnit->compileRequest->getLinkage()->isInLanguageServer();
     options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
@@ -9972,7 +10102,6 @@ Stmt* parseUnparsedStmt(
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.currentScope = outerScope;
     parser.namePool = translationUnit->getNamePool();
-    parser.sourceLanguage = sourceLanguage;
     parser.semanticsVisitor = semanticsVisitor;
     parser.currentScope = parser.currentLookupScope = currentScope;
     parser.currentModule = semanticsVisitor->getShared()->getModule()->getModuleDecl();
@@ -9993,9 +10122,7 @@ void parseSourceFile(
     options.stage = ParsingStage::Decl;
     options.enableEffectAnnotations = translationUnit->compileRequest->optionSet.getBoolOption(
         CompilerOptionName::EnableEffectAnnotations);
-    options.allowGLSLInput =
-        translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::AllowGLSL) ||
-        sourceLanguage == SourceLanguage::GLSL;
+    options.sourceLanguage = sourceLanguage;
     options.isInLanguageServer =
         translationUnit->compileRequest->getLinkage()->isInLanguageServer();
     options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
@@ -10003,8 +10130,6 @@ void parseSourceFile(
 
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.namePool = translationUnit->getNamePool();
-    parser.sourceLanguage = sourceLanguage;
-
     return parser.parseSourceFile(parentDecl);
 }
 
@@ -10262,9 +10387,8 @@ static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
 {
     Modifier* modifier = nullptr;
 
-    // While in GLSL compatibility mode, 'shared' = 'groupshared' and not the
-    // D3D11 effect syntax.
-    if (parser->options.allowGLSLInput)
+    // In GLSL source, 'shared' = 'groupshared' and not the D3D11 effect syntax.
+    if (parser->getSourceLanguage() == SourceLanguage::GLSL)
     {
         modifier = parser->astBuilder->create<HLSLGroupSharedModifier>();
     }
@@ -10279,7 +10403,7 @@ static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
 
 static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
 {
-    if ((!parser->options.allowGLSLInput) &&
+    if ((parser->getSourceLanguage() != SourceLanguage::GLSL) &&
         (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026))
     {
         parser->sink->diagnose(Diagnostics::RemovedModifierUsage{
@@ -10288,7 +10412,7 @@ static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
             .location = parser->tokenReader.peekLoc()});
     }
     else if (
-        (!parser->options.allowGLSLInput) &&
+        (parser->getSourceLanguage() != SourceLanguage::GLSL) &&
         (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025))
     {
         parser->sink->diagnose(Diagnostics::DeprecatedModifierUsage{
@@ -10369,6 +10493,7 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
     GLSLLayoutLocalSizeAttribute* numThreadsAttrib = nullptr;
     GLSLLayoutDerivativeGroupQuadAttribute* derivativeGroupQuadAttrib = nullptr;
     GLSLLayoutDerivativeGroupLinearAttribute* derivativeGroupLinearAttrib = nullptr;
+    GLSLLayoutEarlyFragmentTestsAttribute* earlyFragmentTestsAttrib = nullptr;
     GLSLInputAttachmentIndexLayoutAttribute* inputAttachmentIndexLayoutAttribute = nullptr;
     ImageFormat format;
 
@@ -10434,6 +10559,11 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
         {
             derivativeGroupLinearAttrib =
                 parser->astBuilder->create<GLSLLayoutDerivativeGroupLinearAttribute>();
+        }
+        else if (nameText == "early_fragment_tests")
+        {
+            earlyFragmentTestsAttrib =
+                parser->astBuilder->create<GLSLLayoutEarlyFragmentTestsAttribute>();
         }
         else if (findImageFormatByName(nameText.getUnownedSlice(), &format))
         {
@@ -10514,6 +10644,8 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
         listBuilder.add(derivativeGroupQuadAttrib);
     if (derivativeGroupLinearAttrib)
         listBuilder.add(derivativeGroupLinearAttrib);
+    if (earlyFragmentTestsAttrib)
+        listBuilder.add(earlyFragmentTestsAttrib);
     if (inputAttachmentIndexLayoutAttribute)
         listBuilder.add(inputAttachmentIndexLayoutAttribute);
 

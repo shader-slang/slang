@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
-//META: doc_section_digest=1e2fffffe548d3dd55e164e2d482dadafc2362dd7c8b9d5b1675743c8d5fa05c
-//META: purpose=A GenericValueParamDecl introduces a value parameter on a GenericDecl; the inner decl uses the value as a compile-time integer.
+//META: doc_section_digest=f9721d75e32e3ac81b4ecdd86415227aa444d40f535b1e70e943f2f43e1c5bc0
+//META: purpose=A GenericValueParamDecl introduces a compile-time value parameter that the generic body can use as an integer.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented role of GenericValueParamDecl: a generic
-// parameter named with `let` (a compile-time int value) is reachable
-// inside the generic body and specializes to its concrete value at
-// the call site.
+// Verifies that a `let N : int` generic parameter is a value, not a type: the
+// body multiplies by it and the call site supplies a literal. The CHECK
+// asserts the product, which requires the substituted value to have reached
+// the body.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

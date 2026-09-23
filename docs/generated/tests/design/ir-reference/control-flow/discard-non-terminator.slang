@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#discard
-//META: doc_section_digest=9148728e2771b240bdfccaa8dd48eb1252c215ce162b5be9a123df22827fe577
+//META: doc_section_digest=514f555500d363eea7dd98f26b6683cfaa8b8f6c0c28b30280011646ebaa5e52
 //META: purpose=`discard` is not a terminator: it sits as an ordinary instruction inside a block, and the block's real terminator (unconditionalBranch to the post-if merge) follows.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // a `discard` instruction followed by an `unconditionalBranch` —
 // the branch, not the discard, is the block's terminator.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage fragment
 
 uniform float threshold;
 

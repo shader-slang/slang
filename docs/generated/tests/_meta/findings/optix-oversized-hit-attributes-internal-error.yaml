@@ -1,0 +1,52 @@
+schema_version: 1
+id: optix-oversized-hit-attributes-internal-error
+bundle: coverage/legalize
+suspected_kind: wrong-diagnostic
+title: "Hit attributes over 32 bytes report E99999 instead of a user error"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: cuda
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc /tmp/cand/optix-attr-big.slang -target cuda -entry chit -stage closesthit"
+  source_slang: docs/generated/tests/coverage/legalize/optix-hit-attribute-fetch-cuda.slang
+  observed_summary: |
+    Exceeding OptiX's eight-slot hit-attribute budget — an ordinary, user-correctable
+    mistake — is reported as an internal compiler error that asks the user to file a
+    GitHub issue:
+
+      struct Attribs { float v[9]; };
+      struct Payload { float4 color; };
+      [shader("closesthit")]
+      void chit(inout Payload p, in Attribs attr)
+      { p.color = float4(attr.v[0], attr.v[4], attr.v[8], 1); }
+
+      internal error[E99999]: unexpected condition encountered in Slang compiler: the
+      supplied hit attribute exceeds the maximum hit attribute structure size (32 bytes)
+      For assistance, file an issue on GitHub (...) or join the Slang Discord (...)
+       --> optix-attr-big.slang:4:39
+        | void chit(inout Payload p, in Attribs attr)
+        |                                       ^^^^
+
+    The message text is correct and the source location is right; only the diagnostic
+    class is wrong. `CUDAEntryPointVaryingParamLegalizeContext` raises it through
+    `Diagnostics::Unexpected` (slang-ir-legalize-varying-params.cpp:2383), which is the
+    internal-error channel. Reducing the array to 8 floats compiles normally, so the
+    boundary itself behaves as intended.
+  exit_code: 255
+  stderr_tail: "internal error[E99999]: unexpected condition encountered in Slang compiler: the supplied hit attribute exceeds the maximum hit attribute structure size (32 bytes)"
+expected:
+  claim: |
+    A hit-attribute struct larger than OptiX's 32-byte limit is invalid user input, not
+    an impossible compiler state, so it should be reported as a normal user-facing error
+    with its own diagnostic id — the way the neighbouring unsupported-system-value case
+    is reported as E55202 — rather than as E99999 with an invitation to file a bug.
+  citation_kind: sibling-test
+  citation: tests/cuda/optix-get-attributes-mixed.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/target-pipelines/cuda.md#legalizeentrypointvaryingparamsforcuda
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug: ruled out — the shape is legal Slang and the same struct with 8 floats compiles cleanly, so the only trigger is crossing the documented limit."
+    - "Deliberate use of the internal channel as a stopgap: plausible; the code comment at the site treats the state as reachable and guards the deref in release, which suggests it is known to be user-reachable."

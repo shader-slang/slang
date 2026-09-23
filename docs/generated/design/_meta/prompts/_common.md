@@ -80,6 +80,40 @@ Everything below the closing `---` is the body of the document.
 - Verbatim text from `docs/design/`, `docs/user-guide/`, the language
   reference, or upstream third-party documentation.
 
+## Liquid safety (GitHub Pages)
+
+**Never write a raw `{{` or `{%` anywhere in the body — not even inside a
+code span or a fenced block.** Every file you produce here carries YAML
+front-matter, so the GitHub Pages Jekyll build treats it as a page and
+runs Liquid over the whole body before Markdown. `{{` and `{%` open
+Liquid tags, and both ways they can fail are wrong:
+
+- **Unterminated — fatal.** Liquid's scan for the closing `}}` stops at
+  the first single `}`. In `float2x2 m = {{1,2},{3,4}}` that is the `}`
+  after `1,2`, so the tag never closes and the **entire site build
+  aborts**. This took the Pages build down for five days.
+- **Terminated — silently wrong.** A FileCheck wildcard such as
+  `{{[0-9]+}}` parses and is then evaluated as a template expression,
+  rendering empty. The pattern you were documenting does not appear on
+  the published page.
+
+These files are also read on github.com, where Liquid is not processed,
+so a `{% raw %}` wrapper or an HTML entity inside a backtick span is
+wrong too — both show up literally there. Two spellings are correct on
+both surfaces:
+
+- Where whitespace does not matter, space the braces: write
+  `float2x2 m = { {1,2},{3,4} }`, never `{{1,2},{3,4}}`.
+- Where the exact token matters, use a raw `<code>` element with numeric
+  brace entities:
+  `<code>&#123;&#123;[0-9]+&#125;&#125;</code>` renders as the literal
+  `{{[0-9]+}}` on github.com and on Pages alike. A backtick span will not
+  do — GitHub-Flavored Markdown does not decode entities inside one.
+
+`regenerate.py lint` enforces this over every front-matter file in the
+tree and fails the build on any raw opener, so this is a hard gate rather
+than a style preference.
+
 ## AST reference family contract
 
 The pages under `docs/generated/design/ast-reference/` share a common shape.

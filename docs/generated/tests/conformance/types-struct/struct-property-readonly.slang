@@ -15,6 +15,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry main -stage compute -O0
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
@@ -45,6 +46,13 @@ void main()
 // GLSL: struct ReadOnlyProp_{{[0-9]+}}
 // GLSL: m_x_{{[0-9]+}}
 // GLSL: ReadOnlyProp_xVal_get_{{[0-9]+}}
+
+// SPIR-V emits the sole `get` accessor as a function returning the property type and taking
+// only `this`; there is no corresponding `.set` function because the property declares no set
+// accessor. Pinned at -O0, where the accessor call has not yet been inlined away.
+// SPV: OpMemberName %ReadOnlyProp 0 "m_x"
+// SPV: OpName %ReadOnlyProp_xVal_get "ReadOnlyProp.xVal.get"
+// SPV: %ReadOnlyProp_xVal_get = OpFunction %int None
 
 // Metal emits struct ReadOnlyProp with field and get accessor function.
 // METAL: struct ReadOnlyProp_{{[0-9]+}}

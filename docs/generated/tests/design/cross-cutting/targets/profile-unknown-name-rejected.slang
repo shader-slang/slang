@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#profiles
-//META: doc_section_digest=d4fdc256b63091b576a1224e1ef7e5c69edbdda207c4f87eb2742b3fb509fb67
+//META: doc_section_digest=469973558ae9131458179def57cec815ce506922c2ef82e0e161360ad76f32c5
 //META: purpose=A `-profile` value that does not appear in slang-profile-defs.h is rejected with `E00014: unknown profile`; profile parsing is closed-set against the Family + Version table.
 //META: intent=negative
 //META: pipeline_stage=check

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:30:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=bf9709a87d03505b21d57a281f2d43132ddc810d48aef711c415b54b39b39ee8
 //META: purpose=Fires diagnostic E38036 (cannot-use-constref-on-differentiable-member-method) - '[constref]' on differentiable member method
 //META: intent=negative
 //META: pipeline_stage=check
@@ -22,4 +22,4 @@ struct S : IDifferentiable
     [constref] float compute(float x) { return 0; }
 }
 
-// CHECK: E38036
+//CHECK: E38036

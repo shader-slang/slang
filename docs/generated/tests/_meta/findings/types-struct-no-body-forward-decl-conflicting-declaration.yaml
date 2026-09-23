@@ -1,0 +1,53 @@
+schema_version: 1
+id: types-struct-no-body-forward-decl-conflicting-declaration
+bundle: conformance/types-struct
+suspected_kind: doc-claim-overstated
+title: "[types-struct] no-body struct decl + later definition rejected as conflicting"
+observed_at: "2026-08-05T08:11:40+00:00"
+scope: diagnostics
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/conformance/types-struct/struct-no-body-decl.slang -target hlsl -entry main -stage compute"
+  source_slang: docs/generated/tests/conformance/types-struct/struct-no-body-decl.slang
+  observed_summary: |
+    A no-body struct declaration followed by a with-members definition of the same name is
+    rejected, so the documented "forward declaration then full definition" pattern does not
+    compile:
+      struct ForwardDeclared;
+      struct ForwardDeclared { int x; }
+      ... ForwardDeclared fd;
+    produces
+      error[E30200]: conflicting declaration
+        declaration of 'ForwardDeclared' conflicts with existing declaration
+        note: see previous declaration of 'ForwardDeclared'
+      error[E39999]: ambiguous reference to 'ForwardDeclared'
+        note[E40011]: candidate: struct ForwardDeclared   (the with-members decl)
+        note[E40011]: candidate: struct ForwardDeclared   (the no-body decl)
+    The two declarations are kept as two distinct types rather than one being completed by
+    the other. This is a front-end rejection, so it is identical on every target: hlsl,
+    glsl, spirv-asm, metal and wgsl all produce the same two errors and none reaches
+    emission.
+
+    The no-body form on its own is accepted: `struct Fwd;` followed by `Fwd f;` with no
+    second declaration compiles and emits. Only the combination with a later definition
+    fails.
+
+    Noted while closing an emission fan-out gap: the existing test's CHECKs were
+    `ForwardDeclared` and `x`, which matched the error text itself, so the test reported
+    "passed" while the input never compiled. The CHECKs now pin the diagnostic explicitly.
+expected:
+  claim: |
+    A no-body struct declaration declares the existence of a structure type and a later
+    with-members declaration of the same name defines it, so the name resolves to a single
+    type and the program compiles.
+  citation_kind: doc
+  citation: docs/language-reference/types-struct.md
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: ed8fa34c20f7ed61ca34b92ea83626541d602495
+  doc_anchor: docs/language-reference/types-struct.md#description
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug: ruled out — the no-body grammar production is in the language reference's Syntax section and the Description section says the no-body form 'specifies an existence of a structure type ... This enables its use in type expressions without the member declarations', so the input is the documented form, not a malformed test."
+    - "The doc overstates the feature and Slang never intended C-style forward declaration + later definition: plausible, which is why this is filed as doc-claim-overstated rather than wrong-diagnostic. Triage decides whether the compiler should merge the two declarations or the language reference should state that a no-body declaration cannot be completed in the same module."
+    - "Target-specific: ruled out — verified identical output on hlsl, glsl, spirv-asm, metal and wgsl."

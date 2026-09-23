@@ -100,7 +100,7 @@ script with a single Mermaid flowchart and two reference tables.
    | 5 | Attach import linkage if missing | `builder->addImportDecoration(irFunc, mangledName)` | Wires the stub to its real implementation by mangled name |
    | 6 | Forward capability atoms | iterate `inferredCapabilityRequirements` and call `builder->addRequireCapabilityAtomDecoration` for SPIR-V (`_spirv_1_0..latestSpirvAtom`) and Metal (`metallib_2_3..latestMetalAtom`) atoms | Lets the layout module advertise the SPIR-V / Metal capability set per entry point |
    | 7 | Lower the entry-point layout | `lowerEntryPointLayout(context, entryPointLayout)` | Produces an `IREntryPointLayout` |
-   | 8 | Attach `IRLayoutDecoration` | `builder->addLayoutDecoration(irFunc, irEntryPointLayout)` |
+   | 8 | Attach `IRLayoutDecoration` | `builder->addLayoutDecoration(irFunc, irEntryPointLayout)` | The decoration the reflection API and the linker query. |
 10. `## Optional obfuscation pass` — short subsection covering
     the `if (linkage->m_optionSet.shouldObfuscateCode())` block
     near line 16502:

@@ -290,6 +290,7 @@ them.
 | `source/slang/slang-emit-metal.cpp`                                                   | Metal emitter's atomic handling (`atomic_fetch_add_explicit`, 32-bit `atomic_uint` only)                                         |
 | `tests/language-feature/coverage/`                                                    | End-to-end tests                                                                                                                 |
 | `tools/slang-unit-test/unit-test-coverage-metal-runtime.cpp`                          | GPU execution test — validates the Metal binding contract and exact line/function/branch counter values on a real dispatch       |
+| `tools/slang-static-unit-test/unit-test-coverage-coalescing.cpp`                      | Static unit test — drives `assignCoverageCounterSlots` on hand-built IR to pin the counter-coalescing properties                 |
 | `examples/shader-coverage-image-pipeline/`, `examples/shader-coverage-bvh-traversal/` | Runnable raw-Vulkan reference hosts — compile with coverage, bind via metadata, dispatch, read back, render LCOV reports         |
 | `tools/slang-unit-test/unit-test-descriptor-set-space-offset-reflection.cpp`          | Reflection unit test for `DescriptorSetInfo::spaceOffset` (regression-watch for the non-zero space mis-binding bug)              |
 
@@ -418,10 +419,18 @@ category. Per-test attribution and source-region coverage are the
 highest-leverage near-term picks.
 
 `ICoverageTracingMetadata` is intentionally source-entry based rather
-than LCOV-line-only. Today line, function, and branch coverage emit one
-entry per counter, with `counterMode == Count` and `counterIndex`
-pointing at the runtime counter slot. This is an implementation detail
-of the current producers, not a permanent metadata contract. The same
+than LCOV-line-only. Every marker emits one entry, with
+`counterMode` reporting the selected recording mode (`Count` by
+default, `Boolean` under `-trace-coverage-boolean`) and `counterIndex`
+pointing at the runtime counter slot, but entries and counters are not
+one-to-one: line
+coverage coalesces the entries of a straight-line region onto a shared
+counter, so `getCounterCount()` is never larger than the entry count,
+and smaller whenever a straight-line region is coalesced. A compile that
+enables only function and/or branch coverage leaves the two equal.
+Function and branch entries keep dedicated counters. Which entries
+share a counter is an implementation detail of the current producers,
+not a permanent metadata contract. The same
 object already has room for future lower-density region entries:
 source ranges, function names, and branch site/arm ids live on
 `CoverageEntryInfo`, while `getCounterCount()` continues to describe

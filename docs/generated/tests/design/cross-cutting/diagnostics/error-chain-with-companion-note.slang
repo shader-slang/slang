@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=d245d3be9942f0847c45c138b4c2780e7df19ecb
-//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#anatomy-of-a-legacy-diagnostic
-//META: doc_section_digest=04e6b41a5ed7b7f40deee827fed8dac1f618dc77bdfc81ebd67f98a5810bb953
-//META: purpose=Boundary: an error diagnostic with a companion `note` helper renders the primary error code followed by a `note:` line on a separate location — the diagnostic chain.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#anatomy-of-a-diagnostic-entry
+//META: doc_section_digest=3a623795b5dd78e308025c61705ad0257495b87ee059b06c6f6541a5d86c1a61
+//META: purpose=Boundary: an error entry with a companion note renders the primary error code and a separately-located `note` record.
 //META: intent=boundary
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "anatomy of a legacy diagnostic" example shows a
-// primary `err(...)` plus a `note(...)` companion. Probe the
-// chained-diagnostic boundary: an error line followed by a
-// physically separate `note:` line on the previous definition.
-// This pins the multi-record rendering (error + note) which is
-// distinct from the single-record cases tested elsewhere.
+// Verifies that an entry whose primary span is followed by a note renders as
+// two separate records: the error at the offending declaration and a note at
+// the earlier one. Two globals named `dup` are declared; CHECK asserts both
+// the `error[E30200]` line and a `note:` line naming the previous declaration,
+// which only appear together if the note companion survives rendering.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

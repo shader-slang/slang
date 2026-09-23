@@ -1,12 +1,13 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#downstream-nvrtc
-//META: doc_section_digest=8526e0a7ba1a3f8cb12721f5aa8d1eab984f2e7568e1a48784b7f3070691fb26
+//META: doc_section_digest=5fd8b654610eb53a347bc6fa7bbe231ed19030077a9448cce02372f505e1eca7
 //META: purpose=-target ptx triggers the downstream nvrtc invocation that translates the CUDA C++ text into PTX assembly with a .version header and a .visible .entry kernel symbol.
 //META: intent=expansion
 //META: pipeline_stage=emit
+//META: requires-tool=nvrtc
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Per `## Downstream nvrtc`: `-target ptx` invokes nvrtc on the

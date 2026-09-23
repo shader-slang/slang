@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#basicexpressiontype-vectorexpressiontype-matrixexpressiontype
-//META: doc_section_digest=5f41283b162e626d8a46ba0564c2bfa3960821954aadd78336372f0416cb5f48
-//META: purpose=A VectorExpressionType is parameterised by element-type and count; a float4 value's four components are independently readable by swizzle.
+//META: doc_section_digest=eb9e797ca9c3dbb949a62072e232852c0f820f49dd331388c5e7ffcde24a8c1c
+//META: purpose=A VectorExpressionType carries an element type and an element count; a float4 value's four components are independently readable by swizzle.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies VectorExpressionType carries (element-type, count): a
-// float4 value has four float components addressable as .x .y .z .w.
-// Each component is printed; CHECK asserts the four distinct values,
-// proving the count-4 vector shape and per-component read.
+// Verifies the (element-type, count) shape of the vector arithmetic
+// leaf: a float4 exposes exactly four float components addressable as
+// .x/.y/.z/.w. Each is printed with a distinct value; CHECK asserts all
+// four, which only holds if the count-4 shape survived checking.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

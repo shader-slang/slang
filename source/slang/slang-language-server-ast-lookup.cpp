@@ -461,6 +461,7 @@ public:
     }
 
     bool visitThisTypeExpr(ThisTypeExpr*) { return false; }
+    bool visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr*) { return false; }
     bool visitThisInterfaceExpr(ThisInterfaceExpr*) { return false; }
 
     bool visitAndTypeExpr(AndTypeExpr* expr)

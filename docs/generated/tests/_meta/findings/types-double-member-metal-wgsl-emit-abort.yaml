@@ -1,0 +1,36 @@
+schema_version: 1
+id: types-double-member-metal-wgsl-emit-abort
+bundle: design/ast-reference/types
+suspected_kind: wrong-codegen
+title: "`double` struct member aborts Metal/WGSL emit (InternalError)"
+observed_at: "2026-06-11T00:00:00+00:00"
+scope: metal
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc -target metal -stage compute -entry main docs/generated/tests/design/ast-reference/types/struct-mixed-precision-glsl-spirv-emit.slang"
+  source_slang: docs/generated/tests/design/ast-reference/types/struct-mixed-precision-glsl-spirv-emit.slang
+  observed_summary: |
+    A struct DeclRefType carrying a `double` field, emitted to Metal or WGSL,
+    aborts with:
+    "error[E99997]: Slang compilation aborted due to an exception of
+    N5Slang13InternalErrorE unexpected: 'double' type emitted"
+    (exit code 255).
+
+    HLSL, GLSL, and SPIR-V emit the same struct cleanly (GLSL renders a
+    `double` member; SPIR-V declares `OpTypeFloat 64`). Metal and WGSL have
+    no 64-bit float, but the compiler should emit a clean unsupported-feature
+    diagnostic rather than abort with an internal error.
+expected:
+  claim: |
+    Emitting a struct whose member has a target-unsupported scalar type
+    (`double` on Metal/WGSL) should produce a graceful unsupported-feature
+    diagnostic, not an unhandled-type internal-error abort.
+  citation_kind: doc
+  citation: docs/generated/design/ast-reference/types.md
+provenance:
+  agent_model: claude-opus-4-8[1m]
+  source_commit: 1ee81dae21143fb69ccb9999f0fd013b4db2d922
+  doc_anchor: docs/generated/design/ast-reference/types.md#declreftype
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Intentional unsupported target: plausible since Metal/WGSL lack 64-bit float, but the compiler should emit a clean diagnostic (e.g. E36107-style capability error) rather than crash with E99997."

@@ -3,13 +3,67 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
 
     ],
+    "globalScope": {
+        "kind": "none",
+        "parameters": [
+
+        ]
+    },
     "entryPoints": [
         {
             "name": "main",
             "stage": "fragment",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+                    {
+                        "name": "input",
+                        "stage": "fragment",
+                        "binding": {"kind": "varyingInput", "index": 0},
+                        "type": {
+                            "kind": "struct",
+                            "name": "PSInput",
+                            "fields": [
+                                {
+                                    "name": "color",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "varyingInput", "value": 1}
+                                        ]
+                                    },
+                                    "stage": "fragment",
+                                    "binding": {"kind": "varyingInput", "index": 0},
+                                    "semanticName": "COLOR"
+                                },
+                                {
+                                    "name": "sampleIndex",
+                                    "type": {
+                                        "kind": "scalar",
+                                        "scalarType": "uint32",
+                                        "sizes": [
+
+                                        ]
+                                    },
+                                    "semanticName": "SV_SAMPLEINDEX"
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "varyingInput", "value": 1}
+                            ]
+                        }
+                    }
+                ]
+            },
             "parameters": [
                 {
                     "name": "input",

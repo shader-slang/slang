@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=d606a21c71d21efca994cdce3cbb90801a9986c7147b70db8931b31e52199857
+//META: doc_section_digest=dbbdcdbd50b8d41758446399be6e3e88fb8453b08c9491480435093ead3da448
 //META: purpose=Fires diagnostic E31213 (cuda-kernel-must-return-void) -- CUDA kernel return type error
 //META: intent=negative
 //META: pipeline_stage=check
@@ -17,4 +17,4 @@
 int main() { return 0; }
 
 
-// CHECK: E31213
+//CHECK: E31213
