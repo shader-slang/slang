@@ -1,9 +1,9 @@
 // Regression test for the payload-collection dedup in `legalizeRayTracingPayloads`. An empty struct
 // used as BOTH a TraceRay ray payload and a CallShader callable payload is matched by two of the
 // per-kind collectors, yet must be padded exactly once. The collectors feed one shared set that
-// deduplicates it; padding the same struct from two separate sets would re-enter
-// `padEmptyStructWithDummyField` on an already-padded (no longer empty) struct and trip its
-// empty-struct assert. A successful compile plus a single `_slang_dummy` field is the signal.
+// deduplicates it; padding the same struct from two separate sets would add an extra dummy field.
+// A successful compile plus a single `_slang_dummy` field verifies that each carrier is padded
+// exactly once.
 
 //TEST:SIMPLE(filecheck=HLSL): -stage raygeneration -entry rgen -target hlsl -profile sm_6_7
 

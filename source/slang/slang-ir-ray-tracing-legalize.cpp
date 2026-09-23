@@ -59,30 +59,25 @@ static void addRayPayloadDecorationIfNeeded(IRBuilder& builder, IRType* type)
         builder.addRayPayloadDecoration(type);
 }
 
-// Check whether the struct has no fields before type legalization. This misses transitively empty
-// carriers: for `struct Outer { Empty inner; }`, where Empty has no fields, legalization removes
-// inner and then Outer. Such a payload still loses its required argument or parameter on D3D,
-// or its required global on Khronos. Fixing that requires preserving the carrier when its fields
-// legalize to `none`; this immediate-field check does not establish that it will survive.
-static bool isZeroFieldStruct(IRStructType* structType)
-{
-    return !structType->getFields().getFirst();
-}
-
 static void addIfEmptyStruct(IRType* type, HashSet<IRStructType*>& set)
 {
     auto structType = as<IRStructType>(type);
-    if (structType && isZeroFieldStruct(structType))
+    if (structType && isEmptyType(structType))
         set.add(structType);
 }
 
-// Give a zero-field struct a legal one-field physical layout and update its constructors. The
-// target policy and semantic collectors decide which structs need a physical representation; this
-// helper only performs the shared mechanical rewrite.
+// Add storage to the payload struct itself and update its constructors. Consider this example:
+//
+//     struct EmptyInner {}
+//     struct EmptyOuter { EmptyInner inner; }
+//
+// EmptyOuter is a valid payload, but all its fields will disappear during type legalization. Add
+// an int to EmptyOuter and leave EmptyInner unchanged, so legalization can still erase inner while
+// retaining the outer carrier. The same applies when inner is an array of empty elements.
+// Collection checks emptiness before any types are changed. Do not repeat that check here: another
+// selected payload may itself be a field type of this one and may already have been padded.
 static void padEmptyStructWithDummyField(IRBuilder& builder, IRStructType* structType)
 {
-    SLANG_RELEASE_ASSERT(isZeroFieldStruct(structType));
-
     // Insert the key before the struct type so it is defined before being referenced.
     builder.setInsertBefore(structType);
     auto dummyKey = builder.createStructKey();
@@ -101,8 +96,13 @@ static void padEmptyStructWithDummyField(IRBuilder& builder, IRStructType* struc
     for (auto makeStructInst : makeStructsToUpdate)
     {
         builder.setInsertBefore(makeStructInst);
-        auto defaultValue = builder.getIntValue(builder.getIntType(), 0);
-        auto newMakeStruct = builder.emitMakeStruct(structType, 1, &defaultValue);
+        // Keep the operands for the original fields until type legalization removes them. A
+        // nested-empty struct still has constructor operands even though they carry no data.
+        List<IRInst*> args;
+        for (UInt i = 0; i < makeStructInst->getOperandCount(); ++i)
+            args.add(makeStructInst->getOperand(i));
+        args.add(builder.getIntValue(builder.getIntType(), 0));
+        auto newMakeStruct = builder.emitMakeStruct(structType, args.getCount(), args.getBuffer());
         makeStructInst->replaceUsesWith(newMakeStruct);
         makeStructInst->removeAndDeallocate();
     }
@@ -212,16 +212,52 @@ static void legalizeForcedStructArgumentsInChildren(IRInst* inst)
     }
 }
 
-static void legalizeD3DForcedStructArguments(IRModule* module)
+// Mark payload types inferred from a D3D entry-point signature. For example, a separately compiled
+// `[shader("miss")] void missMain(inout EmptyOuter payload)` has no TraceRay call whose temporary
+// marker could identify EmptyOuter as a payload. Parameter binding treats mutable parameters of
+// hit and miss shaders as ray payloads; record that same role here so collection and SM 6.7 access
+// qualifiers also cover these entry points without requiring an explicit [raypayload] attribute.
+static void markD3DEntryPointRayPayloadTypes(IRFunc* func)
 {
+    auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
+    if (!entryPointDecor)
+        return;
+    switch (entryPointDecor->getProfile().getStage())
+    {
+    case Stage::AnyHit:
+    case Stage::ClosestHit:
+    case Stage::Miss:
+        break;
+    default:
+        return;
+    }
+
+    IRBuilder builder(func);
+    for (auto param : func->getParams())
+    {
+        auto outType = as<IROutParamTypeBase>(param->getFullType());
+        if (!outType)
+            continue;
+        auto structType = as<IRStructType>(outType->getValueType());
+        if (structType)
+            addRayPayloadDecorationIfNeeded(builder, structType);
+    }
+}
+
+static void prepareD3DRayTracingPayloads(IRModule* module)
+{
+    // Establish payload roles from both caller arguments and receiving entry-point parameters
+    // before collection or access-qualifier normalization inspects the types.
     // Both marker opcodes are part of the same HLSL ray-tracing support path. The ray-payload
     // variant also records semantic payload identity; retaining the generic variant here preserves
     // the established lowering contract for callers of the adjacent core-module helper.
     for (auto globalInst : module->getGlobalInsts())
     {
         auto func = as<IRFunc>(globalInst);
-        if (func)
-            legalizeForcedStructArgumentsInChildren(func);
+        if (!func)
+            continue;
+        legalizeForcedStructArgumentsInChildren(func);
+        markD3DEntryPointRayPayloadTypes(func);
     }
 }
 
@@ -347,7 +383,7 @@ static void legalizeRayPayloadAccessQualifiersForD3D(IRModule* module)
 
 struct RayTracingPayloadLegalizationPolicy
 {
-    bool legalizeD3DForcedStructArguments = false;
+    bool prepareD3DRayTracingPayloads = false;
     bool materializeEmptyRayPayloads = false;
     bool materializeEmptyD3DCallableData = false;
     bool materializeEmptyKhronosCallableData = false;
@@ -362,7 +398,7 @@ static RayTracingPayloadLegalizationPolicy getRayTracingPayloadLegalizationPolic
 
     if (isD3DTarget(targetRequest))
     {
-        policy.legalizeD3DForcedStructArguments = true;
+        policy.prepareD3DRayTracingPayloads = true;
         policy.materializeEmptyRayPayloads = true;
         policy.materializeEmptyD3DCallableData = true;
 
@@ -387,8 +423,8 @@ static RayTracingPayloadLegalizationPolicy getRayTracingPayloadLegalizationPolic
 // insts. The payload kinds inspect different global-inst shapes, so we dispatch each inst to the
 // per-kind collectors the policy enables instead of walking the global list once per kind. All
 // three collectors feed one shared set: a struct reused as both a ray payload and callable data
-// must be padded exactly once, and the set deduplicates it (padding it from two sets would trip
-// `padEmptyStructWithDummyField`'s empty-struct assert on the second pass).
+// must be padded exactly once. Finish collection before padding so emptiness is evaluated on the
+// original types, independently of the order in which the selected structs will be modified.
 static void collectEmptyPayloadStructs(
     IRModule* module,
     RayTracingPayloadLegalizationPolicy const& policy,
@@ -409,11 +445,11 @@ void legalizeRayTracingPayloads(IRModule* module, TargetProgram* targetProgram)
 {
     const auto policy = getRayTracingPayloadLegalizationPolicy(targetProgram);
 
-    // Resolve the frontend marker before collecting ray payloads. For an unannotated empty struct,
-    // this step is what applies IRRayPayloadDecoration; collecting first would miss the struct and
-    // allow type legalization to erase it.
-    if (policy.legalizeD3DForcedStructArguments)
-        legalizeD3DForcedStructArguments(module);
+    // Identify ray-payload types from both call-site markers and entry-point parameters before
+    // collecting empty payloads. Without their IRRayPayloadDecoration, an unannotated payload
+    // struct would be missed and type legalization could erase it.
+    if (policy.prepareD3DRayTracingPayloads)
+        prepareD3DRayTracingPayloads(module);
 
     if (policy.materializeEmptyRayPayloads || policy.materializeEmptyD3DCallableData ||
         policy.materializeEmptyKhronosCallableData)

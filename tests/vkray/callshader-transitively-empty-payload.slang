@@ -1,10 +1,16 @@
-// An OptiX direct call emits the physical arguments that survive type legalization. A payload
-// whose only field is itself empty therefore contributes no caller argument or callee parameter,
-// just like a directly empty struct. This also verifies that CUDA does not depend on a shallow
-// zero-field padding heuristic.
+// A payload whose only field is itself empty is erased by type legalization unless the target
+// requires a physical carrier. Compile caller and callee separately so the D3D entry-point
+// parameter cannot rely on discovering a CallShader call in the same module. OptiX still permits
+// the logical payload to contribute no caller argument or callee parameter.
 
-//TEST:SIMPLE(filecheck=CALLER): -stage raygeneration -entry rgen -target cuda
-//TEST:SIMPLE(filecheck=CALLEE): -stage callable -entry callableMain -target cuda
+//TEST:SIMPLE(filecheck=HLSL_CALLER): -stage raygeneration -entry rgen -target hlsl -profile sm_6_7 -validate-ir
+//TEST:SIMPLE(filecheck=HLSL_CALLEE): -stage callable -entry callableMain -target hlsl -profile sm_6_7 -validate-ir
+//TEST:SIMPLE(filecheck=DXIL): -stage raygeneration -entry rgen -target dxil -profile sm_6_7 -validate-ir
+//TEST:SIMPLE(filecheck=DXIL): -stage callable -entry callableMain -target dxil -profile sm_6_7 -validate-ir
+//TEST:SIMPLE(filecheck=SPIRV): -stage raygeneration -entry rgen -target spirv -validate-ir
+//TEST:SIMPLE(filecheck=GLSL): -stage raygeneration -entry rgen -target glsl -validate-ir
+//TEST:SIMPLE(filecheck=CUDA_CALLER): -stage raygeneration -entry rgen -target cuda -validate-ir
+//TEST:SIMPLE(filecheck=CUDA_CALLEE): -stage callable -entry callableMain -target cuda -validate-ir
 
 struct Empty
 {
@@ -27,9 +33,28 @@ void rgen()
     CallShader(0, data);
 }
 
-// CALLER-NOT: _slang_dummy
-// CALLER-LABEL: void __raygen__rgen()
-// CALLER: optixDirectCall<void>(0U);
+// Pad only the outer carrier. Its empty source field still disappears during type legalization,
+// leaving exactly one physical int in independently compiled callers and callees.
+// HLSL_CALLER: struct TransitivelyEmpty
+// HLSL_CALLER: {
+// HLSL_CALLER-NEXT: int _slang_dummy{{.*}};
+// HLSL_CALLER-NEXT: };
+// HLSL_CALLER: TransitivelyEmpty{{[A-Za-z0-9_]*}} [[payload:[A-Za-z0-9_]+]];
+// HLSL_CALLER: CallShader(0U, [[payload]]);
+// HLSL_CALLEE: struct TransitivelyEmpty
+// HLSL_CALLEE: {
+// HLSL_CALLEE-NEXT: int _slang_dummy{{.*}};
+// HLSL_CALLEE-NEXT: };
+// HLSL_CALLEE: void callableMain(inout TransitivelyEmpty{{.*}} {{[A-Za-z0-9_]+}})
+// DXIL: define void @
 
-// CALLEE-NOT: _slang_dummy
-// CALLEE: void __direct_callable__callableMain()
+// SPIRV: %[[payload:[0-9A-Za-z_]+]] = OpVariable %{{[0-9A-Za-z_]+}} CallableDataKHR
+// SPIRV: OpExecuteCallableKHR %{{[0-9A-Za-z_]+}} %[[payload]]
+// GLSL-DAG: callableDataEXT
+// GLSL: executeCallableEXT(
+
+// CUDA_CALLER-NOT: _slang_dummy
+// CUDA_CALLER-LABEL: void __raygen__rgen()
+// CUDA_CALLER: optixDirectCall<void>(0U);
+// CUDA_CALLEE-NOT: _slang_dummy
+// CUDA_CALLEE: void __direct_callable__callableMain()

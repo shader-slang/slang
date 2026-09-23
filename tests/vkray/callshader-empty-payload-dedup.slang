@@ -2,8 +2,8 @@
 // BOTH as a callable entry point's payload and as a `CallShader` caller's payload, in a single
 // module, must be padded exactly once. The ray-tracing legalization pass collects both use sites
 // into one `HashSet<IRStructType*>`, so the struct is padded a single time; a
-// double-pad would re-enter `padEmptyStructWithDummyField` on a now-non-empty struct and trip its
-// `SLANG_RELEASE_ASSERT`, aborting the compile (so a successful compile is itself the dedup signal).
+// double-pad would add an extra dummy field, so the field count below verifies that the shared
+// carrier is padded only once.
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -profile sm_6_7
 

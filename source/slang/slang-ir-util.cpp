@@ -10,6 +10,26 @@
 namespace Slang
 {
 
+bool isEmptyType(IRType* type)
+{
+    if (type->findDecoration<IRTargetIntrinsicDecoration>())
+        return false;
+    if (as<IRVoidType>(type))
+        return true;
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+        return isEmptyType(arrayType->getElementType());
+
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return false;
+    for (auto field : structType->getFields())
+    {
+        if (!isEmptyType(field->getFieldType()))
+            return false;
+    }
+    return true;
+}
+
 bool isPointerOfType(IRInst* type, IROp opCode)
 {
     if (auto ptrType = as<IRPtrTypeBase>(type))
