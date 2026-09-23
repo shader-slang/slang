@@ -585,6 +585,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Map a Slang IR instruction to the corresponding SPIR-V debug instruction.
     Dictionary<IRInst*, SpvInst*> m_mapIRInstToSpvDebugInst;
 
+    // OpFunction bodies whose DebugFunctionDefinition has already been emitted. We track this
+    // separately from the DebugFunction record cache (m_mapIRInstToSpvInst) because the two SPIR-V
+    // insts have different lifetimes; see maybeEmitDebugFunctionDefinition.
+    HashSet<SpvInst*> m_debugFunctionDefinitionsEmitted;
+
     /// Register that `irInst` maps to `spvInst`
     void registerInst(IRInst* irInst, SpvInst* spvInst)
     {
@@ -10670,6 +10675,33 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
+    // Emit the DebugFunctionDefinition that binds the concrete OpFunction body `spvFunc` (whose
+    // first block is `firstBlock`) to its DebugFunction record `debugFuncInfo`, at most once per
+    // body. We track emitted definitions separately from the DebugFunction record cache because the
+    // record (once per IRDebugFunction) and the definition (once per OpFunction body) have
+    // different lifetimes: the record may already have been emitted early and bare via the global
+    // debug-inst path — for example when a caller-scope-restore DebugScope inserted by inlining
+    // precedes a DebugVar and resolves this function as that var's scope — whereas the definition
+    // must still be emitted for each concrete OpFunction body regardless of whether the record was
+    // already cached.
+    void maybeEmitDebugFunctionDefinition(
+        SpvInst* firstBlock,
+        SpvInst* spvFunc,
+        SpvInst* debugFuncInfo)
+    {
+        if (!firstBlock || !spvFunc || !debugFuncInfo)
+            return;
+        if (!m_debugFunctionDefinitionsEmitted.add(spvFunc))
+            return;
+        emitOpDebugFunctionDefinition(
+            firstBlock,
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            debugFuncInfo,
+            spvFunc);
+    }
+
     SpvInst* emitDebugFunction(
         SpvInstParent* parent,
         SpvInst* firstBlock,
@@ -10680,6 +10712,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvInst* debugFuncInfo = nullptr;
         if (debugFunc && m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
         {
+            // The record was already emitted (possibly bare, via the global debug-inst path). The
+            // record cache does not cover the per-body definition, so still bind this concrete
+            // OpFunction body to the record.
+            maybeEmitDebugFunctionDefinition(firstBlock, spvFunc, debugFuncInfo);
             return debugFuncInfo;
         }
 
@@ -10725,16 +10761,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             registerDebugInst(irFunc, debugFuncInfo);
         }
 
-        if (firstBlock && spvFunc)
-        {
-            emitOpDebugFunctionDefinition(
-                firstBlock,
-                nullptr,
-                m_voidType,
-                getNonSemanticDebugInfoExtInst(),
-                debugFuncInfo,
-                spvFunc);
-        }
+        maybeEmitDebugFunctionDefinition(firstBlock, spvFunc, debugFuncInfo);
         return debugFuncInfo;
     }
 
