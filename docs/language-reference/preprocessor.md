@@ -28,6 +28,10 @@ Slang supports a C-style preprocessor with the following directives:
 >
 > *`SourceLanguageVersion`* = **`<[[:alnum:]]+>`**
 
+`#language` selects the Slang language and Slang language version for its translation unit.
+When multiple primary source files belong to one translation unit, a directive in any of them selects the version for the complete module, and their directives must agree.
+See [Language Versioning](../user-guide/11-language-version.md) for the supported version names and their compatibility rules.
+
 ## Version Directive (GLSL)
 
 > *`VersionDirective`* =<br>
@@ -35,5 +39,15 @@ Slang supports a C-style preprocessor with the following directives:
 > &nbsp;&nbsp;&nbsp;&nbsp;*`GlslLanguageVersion`*<br>
 >
 > *`GlslLanguageVersion`* = **`<[[:digit:]]+>`**
+
+`#version` selects GLSL and declares the GLSL version used by that source unit.
+
+All primary source units in one translation unit must use one source language.
+The source language explicitly requested through the compilation API or `-lang` takes precedence over the language inferred from file-name extensions, and source directives are expected to agree with that selection.
+For backward compatibility, a conflicting `#language` or `#version` currently produces a warning and overrides the request-level selection before parsing begins.
+Conflicting source directives within one translation unit are an error.
+
+The deprecated `-allow-glsl` option is equivalent to explicitly requesting GLSL for every translation unit in a compilation request.
+It has no independent effect on preprocessing, parsing, semantic checking, or code generation after that request-level normalization.
 
 > Note: This section is not yet complete.

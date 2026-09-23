@@ -131,10 +131,74 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 }
 
-// CHECK-COUNT-14: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugInlinedAt %uint_{{[0-9]+}} %{{[0-9]+}}
-// CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugInlinedAt %uint_{{[0-9]+}} %{{[0-9]+}}
-// CHECK-COUNT-28: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
-// CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
 
-// NOSCOPE-COUNT-14: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
 // NOSCOPE-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
+
+// Every inlined call must restore its own caller before updating that caller's
+// result. Matching the inline scope first excludes block-entry scope markers.
+// CHECK-DAG: %[[BASIC_NAME:[0-9]+]] = OpString "testMultipleBasicBlockCalls"
+// CHECK-DAG: %[[BASIC:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction %[[BASIC_NAME]]
+// CHECK-DAG: %[[MULTI_NAME:[0-9]+]] = OpString "testMultipleBlockCalls"
+// CHECK-DAG: %[[MULTI:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction %[[MULTI_NAME]]
+// CHECK-DAG: %[[BASIC_INST_NAME:[0-9]+]] = OpString "testBasicBlockWithInstructions"
+// CHECK-DAG: %[[BASIC_INST:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction %[[BASIC_INST_NAME]]
+// CHECK-DAG: %[[MULTI_INST_NAME:[0-9]+]] = OpString "testMultipleBlockWithInstructions"
+// CHECK-DAG: %[[MULTI_INST:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction %[[MULTI_INST_NAME]]
+// CHECK-DAG: %[[MIXED_NAME:[0-9]+]] = OpString "testBasicToMultipleBlock"
+// CHECK-DAG: %[[MIXED:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction %[[MIXED_NAME]]
+// CHECK-DAG: %[[COND_NAME:[0-9]+]] = OpString "testMixedCallsWithCondition"
+// CHECK-DAG: %[[COND:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction %[[COND_NAME]]
+
+// CHECK-LABEL: %testMultipleBasicBlockCalls = OpFunction
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[BASIC]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[BASIC_RESULT:result[0-9_]*]] %{{[a-zA-Z0-9_]+}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[BASIC]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[BASIC_RESULT]] %{{[a-zA-Z0-9_]+}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[BASIC]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[BASIC_RESULT]] %{{[a-zA-Z0-9_]+}}
+
+// CHECK-LABEL: %testMultipleBlockCalls = OpFunction
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[MULTI]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[MULTI_RESULT:result[0-9_]*]] %{{[a-zA-Z0-9_]+}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[MULTI]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[MULTI_RESULT]] %{{[a-zA-Z0-9_]+}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[MULTI]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[MULTI_RESULT]] %{{[a-zA-Z0-9_]+}}
+
+// CHECK-LABEL: %testBasicBlockWithInstructions = OpFunction
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[BASIC_INST]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[BASIC_INST_RESULT:result[0-9_]*]] %{{[a-zA-Z0-9_]+}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[BASIC_INST]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[BASIC_INST_RESULT]] %{{[a-zA-Z0-9_]+}}
+
+// CHECK-LABEL: %testMultipleBlockWithInstructions = OpFunction
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[MULTI_INST]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[MULTI_INST_RESULT:result[0-9_]*]] %{{[a-zA-Z0-9_]+}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[MULTI_INST]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[MULTI_INST_RESULT]] %{{[a-zA-Z0-9_]+}}
+
+// CHECK-LABEL: %testBasicToMultipleBlock = OpFunction
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[MIXED]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[MIXED_RESULT:result[0-9_]*]] %{{[a-zA-Z0-9_]+}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[MIXED]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[MIXED_RESULT]] %{{[a-zA-Z0-9_]+}}
+
+// CHECK-LABEL: %testMixedCallsWithCondition = OpFunction
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[COND]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[COND_RESULT:result[0-9_]*]] %{{[a-zA-Z0-9_]+}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugScope %[[COND]]{{$}}
+// CHECK-NEXT: OpExtInst %void %{{[0-9]+}} DebugValue %[[COND_RESULT]] %{{[a-zA-Z0-9_]+}}

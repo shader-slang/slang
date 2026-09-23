@@ -711,7 +711,16 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 `ResourceDescriptorHeap` only converts to resource (CBV/SRV/UAV) types and `SamplerDescriptorHeap` only
 to sampler types; a heap-family mismatch (for example `SamplerState s = ResourceDescriptorHeap[i];`, or
-`Texture2D.Handle th = SamplerDescriptorHeap[j];`) is a compile error. The recovered value rides the
+`Texture2D.Handle th = SamplerDescriptorHeap[j];`) is a compile error. Separately, a combined
+texture-sampler (e.g. `Sampler2D`) needs two distinct heap indices -- one for the texture and one for
+the sampler -- on HLSL and on SPIR-V with the `spvDescriptorHeapEXT` extension, whose lowering keeps
+the two as separate descriptors. A single-index `ResourceDescriptorHeap[i]` handle supplies only one,
+so building a combined sampler from it is a compile-time error on those targets; use the explicit
+`Sampler2D.Handle(uint2(resourceIndex, samplerIndex))` form, which supplies both, instead. The
+single-index form is accepted on the default SPIR-V and GLSL model, where a combined sampler is a
+single native descriptor read by one heap index. (On WGSL, recovering a combined texture-sampler from
+the descriptor heap is not currently supported in either form -- an unrelated limitation of WGSL's
+combined-sampler lowering.) The recovered value rides the
 existing `DescriptorHandle<T>` lowering, so this syntax is available on the same targets as the
 `DescriptorHandle<T>` representation it builds — HLSL, SPIR-V, GLSL, and WGSL — and lowers through the
 bindless path described below. On targets where that representation is unavailable (Metal, CUDA, CPU),
@@ -1073,6 +1082,10 @@ void g()
 ```
 
 You can chain multiple catch statements for different types of errors.
+
+A shader entry point function may not have a `throws` declaration, since it is
+invoked by the pipeline rather than by other Slang code. An entry point that
+calls a throwing function must handle the error with a `do-catch` statement.
 
 Special Scoping Syntax
 -------------------

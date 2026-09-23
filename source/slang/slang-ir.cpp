@@ -89,6 +89,7 @@ bool isSimpleDecoration(IROp op)
     switch (op)
     {
     case kIROp_EarlyDepthStencilDecoration:
+    case kIROp_PostDepthCoverageDecoration:
     case kIROp_GLSLFragDepthGreaterDecoration:
     case kIROp_GLSLFragDepthLessDecoration:
     case kIROp_Shader64BitIndexingDecoration:
@@ -1685,7 +1686,16 @@ IRInst* IRModule::_allocateInst(IROp op, Int operandCount, size_t minSizeInBytes
     // We handle the combination of the two cases by just taking the maximum of the two
     // different sizes.
     //
-    size_t defaultSize = sizeof(IRInst) + (operandCount) * sizeof(IRUse);
+    // The operand count is in-contract only when it is non-negative and small enough that the
+    // trailing operand array can be sized without wrapping `size_t`. That is trivially true for
+    // counts the compiler itself computes, but deserialization derives the count from a file, so
+    // we assert rather than silently allocating a buffer smaller than the operands written into
+    // it (`size_t` is 32 bits on WebAssembly and other 32-bit targets).
+    //
+    SLANG_RELEASE_ASSERT(operandCount >= 0);
+    SLANG_RELEASE_ASSERT(size_t(operandCount) <= (~size_t(0) - sizeof(IRInst)) / sizeof(IRUse));
+
+    size_t defaultSize = sizeof(IRInst) + size_t(operandCount) * sizeof(IRUse);
     size_t totalSize = minSizeInBytes > defaultSize ? minSizeInBytes : defaultSize;
 
     IRInst* inst = (IRInst*)m_memoryArena.allocateAndZero(totalSize);
@@ -3680,7 +3690,8 @@ IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
 IRInst* IRBuilder::emitDebugScope(IRInst* scope, IRInst* inlinedAt)
 {
     IRInst* args[] = {scope, inlinedAt};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 2, args);
+    SLANG_RELEASE_ASSERT(scope);
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, inlinedAt ? 2 : 1, args);
 }
 
 IRInst* IRBuilder::emitDebugNoScope()
