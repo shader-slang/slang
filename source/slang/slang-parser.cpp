@@ -9032,8 +9032,7 @@ static Expr* parseAtomicExpr(Parser* parser)
             }
 
             Token openParen = parser->ReadToken(TokenType::LParent);
-            const auto parenthesizedMatrixLayoutMode =
-                parser->getMatrixLayoutModeAtCurrentToken();
+            const auto parenthesizedMatrixLayoutMode = parser->getMatrixLayoutModeAtCurrentToken();
 
             // Only handles cases of `(type)`, where type is a single identifier,
             // and at this point the type is known
