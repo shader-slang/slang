@@ -390,12 +390,19 @@ static void validateDebugScopeOperands(IRValidateContext* context, IRInst* inst)
     switch (inst->getOp())
     {
     case kIROp_DebugLexicalBlock:
+        {
+            bool validCount = inst->getOperandCount() == 4;
+            validate(context, validCount, inst, "invalid debug declaration operand count");
+            if (!validCount)
+                return;
+            scope = inst->getOperand(3);
+            break;
+        }
     case kIROp_DebugVar:
     case kIROp_DebugInlinedAt:
         {
             auto count = inst->getOperandCount();
-            bool validCount =
-                count == 4 || (inst->getOp() != kIROp_DebugLexicalBlock && count == 5);
+            bool validCount = count == 4 || count == 5;
             validate(context, validCount, inst, "invalid debug declaration operand count");
             if (!validCount)
                 return;

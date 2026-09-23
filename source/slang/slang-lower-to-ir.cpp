@@ -10241,6 +10241,8 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
     {
         auto previousScope = context->currentDebugScope;
         auto lexicalScope = maybeEmitDebugLexicalBlock(context, stmt);
+        // Restore the context if lowering unwinds with an exception. The normal path
+        // below also emits a scope marker after restoring the enclosing scope.
         SLANG_DEFER(context->currentDebugScope = previousScope);
         if (lexicalScope)
         {
