@@ -2,18 +2,15 @@
 //TEST:SIMPLE(filecheck=CHECKCUDA):-target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECKHLSL):-target hlsl -entry computeMain -stage compute
 
-// Regression for #13233. Forward-mode differentiation of a function whose parameter is an
-// `IDifferentiable` struct imported from another module used to mistype the derivative's
-// parameter as the primal struct with a hardcoded zero tangent -- but only when the struct
-// combined an explicit `__init()` with a `no_diff` field.
+// Regression for #13233: forward-mode differentiation of a function taking an imported
+// `IDifferentiable` struct that combines an explicit `__init()` with a `no_diff` field.
 //
-// The differentiable-type association for the imported `Value` is emitted onto this
-// module's `[import]` declaration, while link selects the defining module's `[export]`
-// (which lacks the association, because its explicit `__init()` means it never
-// differentiates `Value`) as the canonical inst. Before the fix the association was not
-// carried across, so `fwd_diff(metric)` fell back to a non-differentiable parameter: the
-// interpreter returned a zero tangent, and the CUDA derivative took the primal `Value`
-// instead of `DifferentialPair<Value>`.
+// The struct's `DifferentialPairType` association is recorded on this module's `[import]`
+// declaration of `Value`, since it is this module that differentiates `Value`; the defining
+// module's `[export]` carries no such association (see the -lib file). Linking must preserve
+// that association onto the canonical `Value`, so `fwd_diff(metric)` types the parameter as
+// `DifferentialPair<Value>` with a real tangent rather than the primal `Value` with a zero
+// tangent -- checked here on the interpreter (value) and CUDA/HLSL (emitted signature).
 
 import "imported-nodiff-field-explicit-ctor-lib";
 
