@@ -743,11 +743,11 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
 }
 
 // Evaluate every `static_assert` in the module (via `checkStaticAssert`) and then delete the
-// synthesized carrier functions that hosted the out-of-function-body ones. This runs on the codegen
-// path of *every* target — including the interpreter's early-out in `linkAndOptimizeIR` — because
-// `checkStaticAssert` is the only place a `static_assert` is diagnosed (the front end defers
-// evaluation), and a surviving carrier or `kIROp_StaticAssert` would otherwise reach a backend that
-// has no lowering for it (e.g. the VM emitter aborts on the unhandled op).
+// synthesized carrier functions that hosted the out-of-function-body ones. `checkStaticAssert`
+// diagnoses a `static_assert` (the front end defers evaluation to here), and a surviving carrier or
+// `kIROp_StaticAssert` would otherwise reach a backend that has no lowering for it (e.g. the VM
+// emitter aborts on the unhandled op). It is therefore run on each target-codegen exit of
+// `linkAndOptimizeIR`, including the interpreter's early-out.
 static void checkAndRemoveStaticAsserts(IRModule* irModule, DiagnosticSink* sink)
 {
     checkStaticAssert(irModule->getModuleInst(), sink);
