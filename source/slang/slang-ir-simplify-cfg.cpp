@@ -356,6 +356,8 @@ static bool isTrivialIfElseBranch(IRIfElse* condBranch, IRBlock* branchBlock)
             case kIROp_DebugLine:
             case kIROp_DebugScope:
             case kIROp_DebugNoScope:
+                // These are attribution-only markers, with no runtime or control-flow effect.
+                // As in switch forwarding below, the destination retains its own scope marker.
                 continue;
 
             case kIROp_UnconditionalBranch:

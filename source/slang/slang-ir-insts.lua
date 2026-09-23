@@ -3001,7 +3001,7 @@ local insts = {
 	},
 	{
 		DebugVar = {
-			operands = { { "source" }, { "line" }, { "col" }, { "scope" }, { "argIndex", optional = true } },
+			min_operands = 5,
 		},
 	},
 	{

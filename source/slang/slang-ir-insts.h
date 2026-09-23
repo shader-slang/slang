@@ -2746,6 +2746,13 @@ FIDDLE()
 struct IRDebugVar : IRInst
 {
     FIDDLE(leafInst())
+    IRInst* getSource() { return getOperand(0); }
+    IRInst* getLine() { return getOperand(1); }
+    IRInst* getCol() { return getOperand(2); }
+    IRInst* getScope() { return getOperand(3); }
+    IRInst* getArgIndex() { return getOperandCount() > 4 ? getOperand(4) : nullptr; }
+
+    // Update an existing optional argument index; this does not append one to a local variable.
     void setArgIndex(IRInst* argIndex)
     {
         if (getOperandCount() > 4)
@@ -2818,8 +2825,7 @@ struct IRDebugFunction : IRInst
     IRInst* getFile() { return getOperand(3); }
     IRInst* getDebugType() { return getOperand(4); }
 
-    // The function's lexical parent scope, or null when the function has none: at Minimal debug
-    // level (no compilation units exist), when its source has no compilation unit of its own (an
+    // The function's lexical parent scope, or null when its source has no compilation unit (an
     // #include'd/#line-remapped source), or for a function from an IR blob that predates this
     // operand. The only parent scope produced is the DebugCompilationUnit of the source file the
     // function is defined in, so an imported function resolves to its own module's compilation unit
