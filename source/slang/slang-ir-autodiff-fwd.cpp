@@ -551,6 +551,27 @@ struct ForwardDiffTranslationContext
         auto origPtr = origLoad->getPtr();
         auto primalPtr = lookupPrimalInst(builder, origPtr, nullptr);
 
+        // Use the existing primal/differential storage mapping before interpreting a pair type.
+        // Consider this example:
+        //
+        //   [Differentiable] void square(float x, out float y) { y = x * x; }
+        //   [Differentiable] float derivative(float x)
+        //   {
+        //       DifferentialPair<float> y;
+        //       fwd_diff(square)(diffPair(x, 1.0), y);
+        //       return y.d;
+        //   }
+        //
+        // When differentiating derivative, translateVar creates separate primal and differential
+        // storage for y, both holding complete pairs. Load both values so that translating y.d
+        // can extract the differential field from each. Unwrapping the primal load here would
+        // discard a pair level and leave translateDifferentialPairGetElement accessing a scalar.
+        if (auto diffPtr = lookupDiffInst(origPtr, nullptr))
+        {
+            auto primalLoad = maybeCloneForPrimalInst(builder, origLoad);
+            return InstPair(primalLoad, builder->emitLoad(diffPtr));
+        }
+
         if (auto primalPtrType = as<IRPtrTypeBase>(primalPtr->getFullType()))
         {
             if (auto diffPairType = as<IRDifferentialPairType>(primalPtrType->getValueType()))
@@ -586,14 +607,7 @@ struct ForwardDiffTranslationContext
             }
         }
 
-        auto primalLoad = maybeCloneForPrimalInst(builder, origLoad);
-        IRInst* diffLoad = nullptr;
-        if (auto diffPtr = lookupDiffInst(origPtr, nullptr))
-        {
-            // Default case, we're loading from a known differential inst.
-            diffLoad = as<IRLoad>(builder->emitLoad(diffPtr));
-        }
-        return InstPair(primalLoad, diffLoad);
+        return InstPair(maybeCloneForPrimalInst(builder, origLoad), nullptr);
     }
 
     InstPair translateStore(IRBuilder* builder, IRStore* origStore)
