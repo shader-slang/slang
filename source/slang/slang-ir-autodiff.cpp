@@ -1376,15 +1376,22 @@ void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
                 auto srcDebugFunc =
                     cast<IRDebugFunction>(as<IRDebugFuncDecoration>(decor)->getDebugFunc());
 
-                // generateName / translateFuncHeader give the derivative its name hint before this
-                // runs, but only when the original itself had one; a derivative therefore lacks a
-                // name hint only for an unnamed original whose debug name came from a linkage name.
-                // Reuse that source name for it -- the derivative still gets its own
-                // IRDebugFunction instance (preserving the one-record-per-body binding); only the
-                // name text is shared.
-                IRInst* name = srcDebugFunc->getName();
+                // Name the record from the derivative's own name hint. generateName /
+                // translateFuncHeader add that hint before this runs, but only when the original
+                // had one, so a missing hint means the original was itself unnamed (its debug name
+                // came from a linkage name) -- asserted below. In that case we reuse the source
+                // name; the derivative still gets its own IRDebugFunction instance, only the name
+                // text is shared.
+                IRInst* name;
                 if (auto nameHint = destFunc->findDecoration<IRNameHintDecoration>())
+                {
                     name = nameHint->getNameOperand();
+                }
+                else
+                {
+                    SLANG_ASSERT(!srcFunc->findDecoration<IRNameHintDecoration>());
+                    name = srcDebugFunc->getName();
+                }
 
                 // Insert the record in the derivative's own scope (before destFunc), as
                 // lower-to-ir does. copyDebugInfo can run while a derivative is still nested in an
