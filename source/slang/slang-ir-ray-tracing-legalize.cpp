@@ -59,10 +59,12 @@ static void addRayPayloadDecorationIfNeeded(IRBuilder& builder, IRType* type)
         builder.addRayPayloadDecoration(type);
 }
 
-// An empty struct has no fields and legalizes to `LegalType::Flavor::none`. A struct whose fields
-// all legalize to `none` has the same eventual representation, but is deliberately not classified
-// as empty here; handling that recursive case requires a separate type-legalization design.
-static bool isEmptyStruct(IRStructType* structType)
+// A zero-field struct legalizes to `LegalType::Flavor::none`. A struct whose fields all legalize
+// to `none` has the same eventual representation, but is deliberately not classified here:
+// reproducing general type legalization with a recursive structural predicate would be incomplete
+// (for example, arrays of empty structs also legalize to `none`) and can make padding dependent on
+// which related carrier is processed first.
+static bool isZeroFieldStruct(IRStructType* structType)
 {
     return !structType->getFields().getFirst();
 }
@@ -70,16 +72,16 @@ static bool isEmptyStruct(IRStructType* structType)
 static void addIfEmptyStruct(IRType* type, HashSet<IRStructType*>& set)
 {
     auto structType = as<IRStructType>(type);
-    if (structType && isEmptyStruct(structType))
+    if (structType && isZeroFieldStruct(structType))
         set.add(structType);
 }
 
-// Give an empty struct a legal one-field physical layout and update its constructors. The target
-// policy and semantic collectors decide which structs need a physical representation; this helper
-// only performs the shared mechanical rewrite.
+// Give a zero-field struct a legal one-field physical layout and update its constructors. The
+// target policy and semantic collectors decide which structs need a physical representation; this
+// helper only performs the shared mechanical rewrite.
 static void padEmptyStructWithDummyField(IRBuilder& builder, IRStructType* structType)
 {
-    SLANG_RELEASE_ASSERT(isEmptyStruct(structType));
+    SLANG_RELEASE_ASSERT(isZeroFieldStruct(structType));
 
     // Insert the key before the struct type so it is defined before being referenced.
     builder.setInsertBefore(structType);
@@ -106,16 +108,21 @@ static void padEmptyStructWithDummyField(IRBuilder& builder, IRStructType* struc
     }
 }
 
-// Rewrite the ray-tracing "force this argument to be a struct" markers in `inst`'s calls into real
-// struct-typed arguments, recursing through nested blocks. HLSL ray-tracing lowering emits
-// `ForceVarIntoStructTemporarily` / `ForceVarIntoRayPayloadStructTemporarily` on a call operand
-// (for example a `TraceRay` or `HitObject` ray payload) because DXC requires such operands to be a
-// user struct rather than a bare value. When the marked variable already points at a struct we
-// forward it directly, and for the ray-payload variant we also tag that struct with
-// `IRRayPayloadDecoration` so the later payload passes can find it. Otherwise we synthesize a
-// one-field wrapper struct, copy the value in before the call, pass the wrapper, and — only for a
-// mutable (pointer-like) parameter — copy the updated field back out after the call, preserving the
-// operand's original in/out behavior.
+// Resolve the temporary markers in `inst`'s calls, recursing through nested blocks. Consider this
+// example:
+//
+//     int payload = 1;
+//     TraceRay(scene, flags, mask, 0, 0, 0, ray, payload);
+//
+// The public TraceRay API accepts any `payload_t`, but the HLSL intrinsic requires its payload to
+// be a user struct. The specialized wrapper therefore passes `payload` through
+// ForceVarIntoRayPayloadStructTemporarily. If `payload_t` is already a struct, this pass forwards
+// the original variable and marks its type with `IRRayPayloadDecoration` so later payload passes
+// can find it. Otherwise, as in the example, it creates a local `struct { int data; }`, copies the
+// value in, passes the wrapper, and copies the field back after the call when the intrinsic
+// parameter is mutable. ForceVarIntoStructTemporarily performs the same two rewrites for other
+// struct-only parameters without adding ray-payload semantics. Specialization must expose the
+// concrete argument type before this choice, and no marker may remain when HLSL emission begins.
 static void legalizeForcedStructArgumentsInChildren(IRInst* inst)
 {
     for (auto child : inst->getChildren())
@@ -345,7 +352,6 @@ static RayTracingPayloadLegalizationPolicy getRayTracingPayloadLegalizationPolic
 {
     RayTracingPayloadLegalizationPolicy policy;
     auto targetRequest = targetProgram->getTargetReq();
-    const auto target = targetRequest->getTarget();
 
     if (isD3DTarget(targetRequest))
     {
@@ -359,9 +365,9 @@ static RayTracingPayloadLegalizationPolicy getRayTracingPayloadLegalizationPolic
     }
     else if (isKhronosTarget(targetRequest))
     {
-        // SPIR-V output needs a physical ray-payload object. Both SPIR-V and GLSL lower CallShader
-        // through a decorated module-scope callable-data object.
-        policy.materializeEmptyRayPayloads = isSPIRV(target);
+        // Both SPIR-V and GLSL lower ray payloads and CallShader callable data through decorated
+        // module-scope objects that must keep a physical representation.
+        policy.materializeEmptyRayPayloads = true;
         policy.materializeEmptyKhronosCallableData = true;
     }
 

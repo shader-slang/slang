@@ -14,8 +14,8 @@ struct IRModule;
 /// target's complete pre-type-legalization policy: it resolves D3D forced-payload markers,
 /// materializes required D3D and Khronos payload carriers, and normalizes D3D SM 6.7 payload access
 /// qualifiers. Targets whose ABI permits an empty payload, such as CUDA/OptiX, need no
-/// materialization and are intentionally left to ordinary empty-type legalization. Transitively
-/// empty structs are not classified as empty by this pass.
+/// materialization and are intentionally left to ordinary empty-type legalization. Structs that
+/// only become empty through legalization of their fields require a separate legalization design.
 void legalizeRayTracingPayloads(IRModule* module, TargetProgram* targetProgram);
 
 } // namespace Slang

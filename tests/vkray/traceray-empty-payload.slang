@@ -5,6 +5,8 @@
 
 //TEST:SIMPLE(filecheck=HLSL): -stage raygeneration -entry main -target hlsl -profile sm_6_7
 //TEST:SIMPLE(filecheck=DXIL): -stage raygeneration -entry main -target dxil -profile sm_6_7
+//TEST:SIMPLE(filecheck=SPIRV): -stage raygeneration -entry main -target spirv
+//TEST:SIMPLE(filecheck=GLSL): -stage raygeneration -entry main -target glsl
 
 RaytracingAccelerationStructure scene;
 
@@ -32,3 +34,12 @@ void main()
 
 // A successful DXIL compile is the end-to-end check that DXC accepts the eight-argument call.
 // DXIL: define void @
+
+// Khronos ray tracing also carries the payload through a decorated module-scope object. It must
+// remain physical for both direct SPIR-V and GLSL emission.
+// SPIRV: OpMemberName %{{[0-9A-Za-z_]+}} {{[0-9]+}} "_slang_dummy"
+// SPIRV: %[[payload:[0-9A-Za-z_]+]] = OpVariable %{{[0-9A-Za-z_]+}} RayPayloadKHR
+// SPIRV: OpTraceRayKHR {{.*}} %[[payload]]
+// GLSL-DAG: _slang_dummy
+// GLSL-DAG: rayPayloadEXT
+// GLSL: traceRayEXT(
