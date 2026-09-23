@@ -42,16 +42,15 @@ been evaluated.
 If a deferred statement is scheduled within the `do` body of a
 [`do-catch` statement](statements-do-catch.md) and an exception is caught, the deferred statement is
 executed after the `catch` body has been executed. This applies to every scope nested within the `do` body
-that is still active when the exception is thrown, not only to the body itself. The pending
-deferred statements of those scopes are executed after the `catch` body, in LIFO order across the scopes. A
-nested scope that has already exited normally is unaffected, because its deferred statements were executed
-at that exit.
+that is still active when the exception is thrown. The pending deferred statements of those scopes are
+executed after the `catch` body, in LIFO order across the scopes. A nested scope that has already exited
+normally is unaffected, because its deferred statements were executed at that exit.
 
 If an exception propagates out of the enclosing function, the deferred statements of the exited scopes are
 executed before the exception is delivered to the `catch` body of the caller.
 
 A [`discard` statement](statements-discard.md) does not trigger the execution of deferred statements before
-the thread is disabled. Therefore, the deferred statements of the exited scopes have no effect.
+the thread is disabled. As a result, pending deferred statements have no effect.
 
 A [break](statements-break-and-continue.md), [continue](statements-break-and-continue.md),
 [return](statements-return.md), or [throw](statements-throw.md) may not escape an enclosing deferred

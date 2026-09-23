@@ -18,9 +18,9 @@ Compile-time `$for` loop (Slang 2026 and earlier):
 ## Description
 
 A _compile-time_ `$for` loop replicates *`loop-stmt`* for every integer value in the specified range, starting
-from *`init-expr`* and ending to *`upper-bound-expr`*. The upper bound is exclusive.
+from *`init-expr`* and ending at *`upper-bound-expr`*. The upper bound is exclusive.
 
 The expressions *`init-expr`* and *`upper-bound-expr`* are
 [compile-time constants](expressions-evaluation-classes.md) and they must have [integer](types-fundamental.md) types.
 
-The loop iterator value is provided as *`identifier`* as an immutable variable.
+The loop iterator value is provided to the loop statement as an immutable variable named *`identifier`*.
