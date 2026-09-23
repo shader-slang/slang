@@ -28,8 +28,8 @@ HullOutput hullMain()
 }
 
 PatchOutput constants()
-//CHECK:    ^^^^^^^^^ file-scope static resource requires rewritable direct calls
-//CHECK:    ^^^^^^^^^ function 'constants' accesses a file-scope static resource but may be invoked without an in-module direct call that can receive the resource as an added argument; pass the resource explicitly instead
+//CHECK:    ^^^^^^^^^ resource declared static at file or namespace scope is unavailable to a function whose invocations cannot all be rewritten
+//CHECK:    ^^^^^^^^^ function 'constants' may be invoked without a direct call that Slang can rewrite, so Slang cannot automatically pass the resource that it accesses; pass the resource explicitly instead
 {
     PatchOutput result;
     result.edgeFactors[0] = 1;

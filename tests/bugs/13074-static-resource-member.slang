@@ -1,10 +1,10 @@
 //TEST:SIMPLE: -target hlsl -entry main -stage compute -validate-ir -verify-debug-serial-ir -o 13074-static-resource-member.hlsl
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -stage compute -validate-ir -verify-debug-serial-ir
 
-// A static data member and a file-scope `static` variable both lower to IR global variables, but
-// resource-global legalization handles only the file-scope form. The emitted declaration and
-// assignment prove that resource-global legalization did not replace this member with an
-// entry-point local.
+// A static data member and a file- or namespace-scope `static` variable both lower to IR global
+// variables, but resource-global legalization handles only the file- or namespace-scope form. The
+// emitted global declaration and assignment prove that resource-global legalization did not
+// replace this member with an entry-point local.
 
 //CHECK: static Texture2D<float4 > [[CACHE:cachedTexture_[0-9]+]];
 //CHECK-LABEL: void main()

@@ -120,12 +120,21 @@ bool isPointerOfType(IRInst* ptrType, IROp opCode);
 
 bool isUserPointerType(IRInst* type);
 
-// True if inst produces a derived address from another base address.
+/// Return whether `inst` projects a field, element, or pointer-offset address from operand zero.
 bool isAddressInst(IRInst* inst);
 
-/// Return whether `use` is the base-address operand of an instruction that derives another
-/// address.
-bool isUseBaseOfDerivedAddress(IRUse* use);
+/// Return whether the result of `use->getUser()` may transfer a later storage access to or from the
+/// storage supplied through `use`.
+///
+/// This predicate recognizes only operand zero of address projections, pointer-to-pointer casts,
+/// `GetAddress`, `AssumeAddress`, and l-value implicit casts. Address operations and pointer casts
+/// can make a later access through the result affect storage reached from operand zero. The
+/// predicate therefore treats both reads and writes as transferable; a caller that needs an exact
+/// complete-value, subobject, or unknown relation must classify that relation separately.
+/// `InOutImplicitCast` transfers reads into its temporary and writes back to the source;
+/// `OutImplicitCast` transfers only writes back. A caller that does not track direction must treat
+/// every later access conservatively.
+bool mayUseTransferStorageAccess(IRUse* use);
 
 /// Return the formal parameter type corresponding to `argumentUse`, after removing outer
 /// attributed and rate-qualified wrappers. Parameter-direction wrappers such as `BorrowIn` and
@@ -133,7 +142,7 @@ bool isUseBaseOfDerivedAddress(IRUse* use);
 ///
 /// Return null when the use is not an argument of `call`, or when the callee's function type does
 /// not provide a corresponding parameter.
-IRInst* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse);
+IRType* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse);
 
 // Builds a dictionary that maps from requirement key to requirement value for `interfaceType`.
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType);
@@ -219,13 +228,16 @@ IRType* getMatrixElementType(IRType* type);
 /// A value-use analysis may ignore these instructions without treating their operands as read.
 bool doesInstOnlyDependOnOperandTypes(IRInst* inst);
 
-/// Return whether `globalVar` is marked as a file-scope `static` variable, has no explicit rate, and
-/// stores one resource value or an array of resource values.
+/// Return whether `globalVar` is marked as a `static` variable declared at file or namespace
+/// scope, has no explicit rate, and stores one resource value or an array of resource values.
 ///
-/// This predicate recognizes the IR shape selected for replacement with entry-point locals. It
-/// assumes that source semantic checking has already restricted the resource type and storage
-/// modifiers to the subset supported by that transformation.
-bool isFileScopeStaticResourceGlobalToReplace(IRGlobalVar* globalVar);
+/// This predicate recognizes the marker, rate, and value-type conditions that identify globals
+/// selected for replacement. It assumes that source semantic checking has already restricted the
+/// resource type and storage modifiers to the subset supported by that transformation.
+bool isFileOrNamespaceScopeStaticResourceGlobalToReplace(IRGlobalVar* globalVar);
+
+/// Return whether `func` is a shader entry point or a CUDA kernel.
+bool isShaderOrCudaKernelEntryPoint(IRFunc* func);
 
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
@@ -674,8 +686,11 @@ IRInst* peelAddressForwardingOps(IRInst* addr);
 /// Return whether `inst` records source-level debug information without affecting execution.
 bool isDebugInfoInst(IRInst* inst);
 
-/// Return whether `op` reads resource contents but does not report a memory side effect.
-bool isResourceLoadNotReportedAsSideEffecting(IROp op);
+/// Return whether `op` is a dedicated IR operation that reads resource contents.
+bool doesOpReadResourceContents(IROp op);
+
+/// Return whether `op` directly produces an address into a resource's contents.
+bool doesOpProduceResourceContentAddress(IROp op);
 
 // Returns true if the memory location pointed to by `ptrInst` is immutable.
 // An immutable location is the memory region that can't be modified by the user code.

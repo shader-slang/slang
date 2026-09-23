@@ -15,8 +15,9 @@ void readThenReplace()
 void main()
 {
     readThenReplace();
-//CHECK: use of uninitialized variable
-//CHECK: use of uninitialized variable 'cachedTexture'
-    // The call reads the incoming value before definitely replacing it, so later reads are valid.
+//CHECK:           ^ use of uninitialized variable
+//CHECK:           ^ use of uninitialized variable 'cachedTexture'
+// The call reads the incoming value and then definitely assigns a replacement, so later reads are
+// valid.
     output[1] = cachedTexture.Load(int3(0, 0, 0));
 }

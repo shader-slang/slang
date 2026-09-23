@@ -5982,57 +5982,78 @@ warning(
 err(
     "resource-static-used-by-function-without-rewritable-call",
     56006,
-    "file-scope static resource requires rewritable direct calls",
-    span { loc = "location", message = "function '~function:IRInst' accesses a file-scope static resource but may be invoked without an in-module direct call that can receive the resource as an added argument; pass the resource explicitly instead" }
+    "resource declared static at file or namespace scope is unavailable to a function whose invocations cannot all be rewritten",
+    span { loc = "location", message = "function '~function:IRInst' may be invoked without a direct call that Slang can rewrite, so Slang cannot automatically pass the resource that it accesses; pass the resource explicitly instead" }
 )
 
 err(
     "resource-static-has-conflicting-call-aliases",
     56007,
-    "file-scope static resource cannot be both passed by reference and accessed by name",
-    span { loc = "location", message = "file-scope static resource '~variable:IRInst' is passed by reference to function '~function:IRInst', which also accesses the same variable by name; pass the resource through only one of those paths" }
+    "resource declared static at file or namespace scope cannot be passed by reference and accessed by name when either path may modify it",
+    span { loc = "location", message = "resource '~variable:IRInst' is declared static at file or namespace scope and is passed by reference to function '~function:IRInst', which also accesses the resource by name, and at least one of those paths may modify it; pass the resource through only one path" }
 )
 
 err(
-    "resource-static-requires-externally-visible-storage",
+    "resource-static-requires-module-scope-storage",
     56008,
-    "file-scope static resource must keep one externally visible address",
-    span { loc = "location", message = "file-scope static resource '~variable:IRInst' must retain one externally visible address, so it cannot be replaced by a separate local in each entry point" }
+    "resource declared static at file or namespace scope must remain in module-scope storage",
+    span { loc = "location", message = "resource '~variable:IRInst' is declared static at file or namespace scope and must remain in module-scope storage because it is externally accessible or explicitly retained; Slang cannot replace it with function-local storage" }
 )
 
 err(
     "resource-static-address-has-unsupported-use",
     56009,
-    "unsupported use of the address of a file-scope static resource",
-    span { loc = "location", message = "the address of file-scope static resource '~variable:IRInst' is retained or observed in a way that cannot be preserved when each function has separate storage" }
+    "address use may observe the identity of storage for a resource declared static at file or namespace scope",
+    span { loc = "location", message = "the program may retain the address of resource '~variable:IRInst', which is declared static at file or namespace scope, or observe its storage identity; replacing the variable with function-local storage might change that behavior" }
 )
 
 err(
     "resource-static-used-by-callable-entry-point",
     56010,
-    "file-scope static resource is not supported in a callable entry point",
-    span { loc = "location", message = "entry point '~function:IRInst' can also be invoked as an ordinary function and accesses a file-scope static resource; move the shared implementation to a separate function without an entry-point attribute" }
+    "resource declared static at file or namespace scope is not supported in a callable entry point",
+    span { loc = "location", message = "entry point '~function:IRInst' may also be invoked as a callable function, and it accesses a resource declared static at file or namespace scope; Slang cannot use one function both as an entry point that creates the replacement local and as a callee that receives the replacement value; move the shared implementation to a separate function without an entry-point attribute" }
 )
 
 err(
     "resource-static-used-outside-function",
     56011,
-    "file-scope static resource is used by another global initializer",
-    span { loc = "location", message = "file-scope static resource '~variable:IRInst' is used while initializing another global variable; move that initialization into a function" }
+    "resource declared static at file or namespace scope is used by executable code outside a function",
+    span { loc = "location", message = "resource '~variable:IRInst' is declared static at file or namespace scope and is referenced by an operation outside a function body; perform that operation inside an entry point or another function" }
 )
 
 err(
-    "resource-static-array-element-initialization-not-proven",
+    "resource-static-array-complete-initialization-not-proven",
     56012,
-    "cannot prove element-wise initialization of file-scope static resource array",
-    span { loc = "location", message = "file-scope static resource array '~variable:IRInst' has individual element writes and may be read before a whole-array assignment; assign the whole array before reading it" }
+    "cannot prove complete initialization of a resource array declared static at file or namespace scope",
+    span { loc = "location", message = "resource array '~variable:IRInst' is declared static at file or namespace scope, may be written one element at a time, and may be read before a whole-array assignment; assign the whole array before reading it" }
 )
 
 err(
-    "resource-static-initializer-has-observable-effect",
+    "resource-static-initializer-cannot-be-moved-safely",
     56013,
-    "unsupported file-scope static resource initializer",
-    span { loc = "location", message = "initializer for file-scope static resource '~variable:IRInst' has a side effect or reads mutable state; initialize the resource explicitly in an entry point instead" }
+    "initializer for a resource declared static at file or namespace scope cannot be moved safely",
+    span { loc = "location", message = "Slang cannot prove that moving the initializer for resource '~variable:IRInst', which is declared static at file or namespace scope, to each entry point preserves observable behavior. The initializer may have externally observable side effects or may read preexisting mutable storage, resource contents, or non-resource data from a source-declared parameter group; initialize the resource explicitly in an entry point instead" }
+)
+
+err(
+    "resource-static-used-by-generic-assembly-function",
+    56014,
+    "resource declared static at file or namespace scope is unavailable to a generic-assembly function",
+    span { loc = "location", message = "function '~function:IRInst' uses generic assembly as its emitted implementation, so Slang cannot preserve the function body's access to resources declared static at file or namespace scope; pass the resource explicitly as an assembly operand instead" }
+)
+
+err(
+    "resource-static-used-by-target-intrinsic-function",
+    56015,
+    "resource declared static at file or namespace scope is unavailable to a target-intrinsic function",
+    span { loc = "location", message = "function '~function:IRInst' has a target-intrinsic implementation for this compilation target, so Slang emits that implementation instead of the function body and cannot preserve the body's access to a resource declared static at file or namespace scope; pass the resource as an explicit function argument and reference it from the target intrinsic instead" }
+)
+
+err(
+    "resource-static-has-reference-outside-function-body",
+    56016,
+    "resource declared static at file or namespace scope has an unsupported reference outside a function body",
+    span { loc = "location", message = "resource '~variable:IRInst' is declared static at file or namespace scope and is referenced by an instruction that is not inside a function body; Slang cannot preserve that reference after replacing the variable with function-local storage" }
 )
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics

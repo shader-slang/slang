@@ -38,7 +38,10 @@ void computeMain(
     uint3 id : SV_DispatchThreadID
 )
 {
-    DifferentialPair<float4> dp;
+    // A backward derivative reads the primal component of an `inout` differential pair before it
+    // replaces the differential component. We therefore provide the point at which to evaluate the
+    // derivative instead of passing an entirely uninitialized pair.
+    DifferentialPair<float4> dp = diffPair(float4(0.0f));
     bwd_diff(splat)(s, dp, float4(1.0f));
     outBuffer[id.x] = dp.d;
 }

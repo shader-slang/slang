@@ -14,5 +14,5 @@ float4 main(Texture2D<float4> inputTexture) : SV_Target
     return cachedTexture.Load(int3(0, 0, 0));
 }
 
-//CHECK-LABEL: void main()
+//CHECK-LABEL: float4 main()
 //CHECK: .Load

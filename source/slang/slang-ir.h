@@ -2258,6 +2258,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 31;
+    // Version 32 adds `IRFileOrNamespaceScopeStaticVarDecoration`.
     const static UInt k_maxSupportedModuleVersion = 32;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 

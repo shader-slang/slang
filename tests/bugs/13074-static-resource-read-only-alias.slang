@@ -1,9 +1,8 @@
 //TEST:SIMPLE: -target hlsl -entry main -stage fragment -validate-ir -o 13074-static-resource-read-only-alias.hlsl
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -stage fragment -validate-ir
 
-// A read-only explicit argument may refer to the same resource that the callee also reads by name.
-// The source parameter and generated parameter preserve the two reads without introducing
-// competing writes.
+// The explicit `__constref` parameter and the generated parameter may carry the same resource
+// because neither path can write through it.
 
 //CHECK-LABEL: float4 readExplicitlyAndByName_
 //CHECK: .Load({{.*}}) + {{.*}}.Load({{.*}});

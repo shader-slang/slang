@@ -7,20 +7,25 @@ class DiagnosticSink;
 struct IRModule;
 class TargetProgram;
 
-/// Move each eligible global initializer selected by the target policy to the start of every
-/// defined entry point.
+/// Move each global initializer selected by `targetProgram`'s module-scope initialization rules to
+/// the start of every defined module-scope entry point.
 ///
-/// Selected globals retain their storage but no longer contain initializer bodies. A variable
-/// whose lifetime extends beyond one entry-point invocation is not eligible for this operation.
+/// Selected globals retain their storage but no longer contain initializer bodies. `ActualGlobal`
+/// variables are excluded because their storage lifetime spans entry-point invocations.
 void moveGlobalVarInitializationToEntryPoints(IRModule* module, TargetProgram* targetProgram);
 
-/// Move eligible file-scope `static` resource initializers to every defined entry point.
+/// Move each initializer for a resource-valued `static` variable declared at file or namespace
+/// scope to every defined module-scope shader entry point and CUDA kernel.
 ///
-/// Require each moved initializer to have no side effects and not to read mutable state.
-/// This restriction makes the initializer independent of its position among the initializers that
-/// remain at global scope. Diagnose an initializer that does not meet this requirement. Call this
-/// operation immediately before replacing the selected global storage declarations.
+/// The operation moves an initializer only if the analysis proves that evaluating it at the start
+/// of each entry point cannot change observable behavior. The proof rejects externally observable
+/// side effects and reads of preexisting mutable storage, resource contents, or non-resource data
+/// from a source-declared parameter group. If any selected initializer fails this proof, the
+/// operation diagnoses all failures and leaves the module unchanged. Call this function after any
+/// resource- or empty-type legalization selected for the target and immediately before
+/// `legalizeResourceGlobalVars`.
 void moveGlobalVarInitializationToEntryPointsForResourceGlobalLegalization(
     IRModule* module,
+    TargetProgram* targetProgram,
     DiagnosticSink* sink);
 } // namespace Slang

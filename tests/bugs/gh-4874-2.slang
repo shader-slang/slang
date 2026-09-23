@@ -1,6 +1,8 @@
-// A file-scope `static` `RWStructuredBuffer` remains one resource value during legalization, so it
-// is supported. Group-shared and coherent storage cannot be replaced with ordinary entry-point
-// locals, and an ordinary struct containing resources must be split, so those cases remain errors.
+// `legalizeResourceGlobalVars` can replace a plain file- or namespace-scope
+// `static RWStructuredBuffer` with one entry-point local. A function-local variable cannot provide
+// `groupshared` visibility or preserve the access guarantees requested by `globallycoherent`.
+// Structs also remain unsupported because one source variable may contain several resource and
+// non-resource fields.
 //
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 RWStructuredBuffer<uint> outputBuffer;
@@ -17,7 +19,6 @@ static groupshared RWStructuredBuffer<uint> gSharedBuffer;
 globallycoherent static RWStructuredBuffer<uint> coherentBuffer = inputBuffer;
 //CHECK:                                         ^^^^^^^^^^^^^^ global variable cannot have opaque type
 //CHECK:                                         ^^^^^^^^^^^^^^ global variable cannot have opaque type.
-//CHECK:                                         ^^^^^^^^^^^^^^ do you intend to define a `static const` instead?
 
 struct Stuff
 {
@@ -35,7 +36,6 @@ static Stuff gStuff = Stuff( inputBuffer, inputBuffer );
 /*CHECK:
              ^^^^^^ global variable cannot have opaque type
              ^^^^^^ global variable cannot have opaque type.
-             ^^^^^^ do you intend to define a `static const` instead?
 */
 
 uint test(uint x)

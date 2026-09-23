@@ -6,8 +6,8 @@ static Texture2D<float4> cachedTexture = textures[0];
 [shader("fragment")]
 float4 callee() : SV_Target
 /*CHECK:
-       ^^^^^^ file-scope static resource is not supported in a callable entry point
-       ^^^^^^ entry point 'callee' can also be invoked as an ordinary function and accesses a file-scope static resource; move the shared implementation to a separate function without an entry-point attribute
+       ^^^^^^ resource declared static at file or namespace scope is not supported in a callable entry point
+       ^^^^^^ entry point 'callee' may also be invoked as a callable function, and it accesses a resource declared static at file or namespace scope; Slang cannot use one function both as an entry point that creates the replacement local and as a callee that receives the replacement value; move the shared implementation to a separate function without an entry-point attribute
 */
 {
     return cachedTexture.Load(int3(0, 0, 0));

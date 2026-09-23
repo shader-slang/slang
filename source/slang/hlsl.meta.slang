@@ -26163,7 +26163,7 @@ struct HitObject
 
     // SetShaderBindingTableRecordIndex EXT helper
     [require(spirv, spvShaderInvocationReorderEXT)]
-    static void __spirvSetShaderTableIndexEXT(out HitObject hitObject, uint sbtRecordIndex)
+    static void __spirvSetShaderTableIndexEXT(inout HitObject hitObject, uint sbtRecordIndex)
     {
         spirv_asm
         {

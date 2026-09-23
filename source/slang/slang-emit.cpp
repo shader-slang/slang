@@ -1949,21 +1949,6 @@ Result linkAndOptimizeIR(
         SLANG_PASS(inlineGlobalConstantsForLegalization);
     }
 
-    // `legalizeResourceGlobalVars` replaces each selected global storage declaration, so its
-    // initializer body must move first. The initializer pass rejects any initializer that could
-    // observe the resulting change in execution time or order.
-    SLANG_PASS(moveGlobalVarInitializationToEntryPointsForResourceGlobalLegalization, sink);
-    if (sink->getErrorCount() != 0)
-        return SLANG_FAIL;
-
-    // Resource-global legalization creates resource-typed locals and parameters. We run it before
-    // resource-type legalization so that the existing legalization and simplification passes can
-    // process those new values. This ordering is required for resource arrays on Khronos targets,
-    // where a resource-typed local cannot reach the emitter.
-    SLANG_PASS(legalizeResourceGlobalVars, sink);
-    if (sink->getErrorCount() != 0)
-        return SLANG_FAIL;
-
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
@@ -2097,6 +2082,37 @@ Result linkAndOptimizeIR(
         // they are not part of public interface.
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
     }
+
+    // Any resource- or empty-type legalization selected for the target has now run. Source checking
+    // admits only resource values and homogeneous resource arrays that remain one global IR value
+    // at this point, whether or not the target required those legalization passes. We can therefore
+    // move each selected initializer without having to coordinate several replacement values.
+    //
+    // TODO: Consolidate the resource-only call below with the target-selected calls later in the
+    // pipeline. We cannot move the later calls to this sequence point as-is. The resource-specific
+    // call is safe at this point because the immediately following `legalizeResourceGlobalVars`
+    // rejects an entry point that both receives injected resource initialization and can be called
+    // as an ordinary function. General initialization has no such restriction:
+    // `fixEntryPointCallsites` would clone the injected calls and stores into its ordinary-function
+    // copy, causing an ordinary call to rerun global initialization. Any consolidation must
+    // preserve the rule that target-selected initialization executes only on entry into a shader.
+    // The combined selection policy must also continue to move cooperative-vector and selected
+    // resource initializers for HLSL while leaving every other HLSL global initializer at module
+    // scope.
+    SLANG_PASS(
+        moveGlobalVarInitializationToEntryPointsForResourceGlobalLegalization,
+        codeGenContext->getTargetProgram(),
+        sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    // Each selected global still has one IR value and now has no initializer body. We can replace
+    // it with function-local storage and pass its value through generated parameters and call
+    // arguments. Because replacement precedes `specializeResourceUsage`, that later pass can
+    // specialize any generated resource parameter that is illegal for the target.
+    SLANG_PASS(legalizeResourceGlobalVars, targetRequest->getTargetCaps(), sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     if (isCPUTargetViaLLVM(targetRequest))
     {

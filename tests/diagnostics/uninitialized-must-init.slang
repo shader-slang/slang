@@ -101,7 +101,7 @@ float switch_fallthrough(int val)
         // falls through to case 1
     case 1:
         return d.value;
-//CHK: E41035
+//CHK:  ^^^^^^ possible use of uninitialized variable
 //CHK: variable 'd' may be uninitialized on some paths
     default:
         break;
@@ -207,7 +207,7 @@ uint wave_elect_negated_guard_warn(bool bIsAlive)
         gWaveCounterBuffer.InterlockedAdd(0, WaveActiveCountBits(bIsAlive), nBaseIndex);
     }
     return WaveReadLaneFirst(nBaseIndex) + WavePrefixCountBits(bIsAlive);
-//CHK: E41035
+//CHK:                      ^ possible use of uninitialized variable
 //CHK: variable 'nBaseIndex' may be uninitialized on some paths
 }
 

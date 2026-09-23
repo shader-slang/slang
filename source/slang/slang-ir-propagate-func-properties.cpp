@@ -81,8 +81,7 @@ public:
                 // Is this inst known to not have global side effect/analyzable?
                 if (!isKnownOpCodeWithSideEffect(inst->getOp()))
                 {
-                    if (inst->mightHaveSideEffects() ||
-                        isResourceLoadNotReportedAsSideEffecting(inst->getOp()))
+                    if (inst->mightHaveSideEffects() || doesOpReadResourceContents(inst->getOp()))
                     {
                         // We have a inst that has side effect that is not understood by this
                         // method, e.g. bufferStore, discard, etc. or we are seeing a resource load.

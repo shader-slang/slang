@@ -3414,38 +3414,54 @@ static Type* _getUnmodifiedInnermostArrayElementType(Type* type)
     }
 }
 
-/// Return whether `type` remains one resource value that resource-global legalization can replace.
-static bool _isResourceTypeSupportedForFileStaticReplacement(Type* type)
+/// Return whether `type` is a supported resource type that remains one IR value during replacement.
+static bool _isResourceTypeSupportedForFileOrNamespaceStaticReplacement(Type* type)
 {
-    // Type modifiers do not change the underlying resource category. An array remains one IR value
-    // through resource-type legalization when its element type does, so we classify its unmodified
-    // innermost element. `legalizeResourceGlobalVars` recognizes whole-array initialization and
-    // emits a specific diagnostic when a proof would need to combine separate element writes.
+    // Type modifiers do not change the underlying resource category. Arrays are single IR values
+    // when `legalizeResourceGlobalVars` runs, so we classify the unmodified innermost element. The
+    // pass recognizes a whole-array assignment as complete initialization. If an array may be read
+    // after only element writes, it diagnoses the program instead of trying to prove that every
+    // element was assigned.
     type = _getUnmodifiedInnermostArrayElementType(type);
 
-    // `legalizeResourceGlobalVars` replaces one global address with one local in each affected
-    // function. Parameter groups and append or consume buffers are instead lowered to several IR
-    // values. The pass cannot yet relate those values back to one source variable and replace them
-    // as a unit. We reject append and consume buffers on every target so that this language rule
-    // does not depend on the selected code-generation target.
-    return as<ResourceType>(type) || as<SamplerStateType>(type) ||
-           as<HLSLStructuredBufferType>(type) || as<HLSLRWStructuredBufferType>(type) ||
+    // The allow-list below is narrower than all types tagged as opaque. We recurse through
+    // homogeneous arrays, but we do not recursively classify fields of a struct. Supporting a
+    // struct would require replacing its resource fields while leaving its other fields intact.
+    // Parameter groups and combined texture-sampler types can expand into several resource values,
+    // so we reject them until the replacement pass handles those values explicitly. Append and
+    // consume buffers remain one value for HLSL, but `lowerAppendConsumeStructuredBuffers` splits
+    // them before this pass for other targets. Replacing an acceleration structure would create
+    // function-local acceleration-structure variables, which Khronos and WGSL targets do not allow.
+    // `__DynamicResource` remains one IR value, but its Khronos legalization requires each cast to
+    // resolve to one module-scope dynamic-resource parameter or one indexed element. A mutable
+    // replacement local can merge values from several such sources, which that legalization
+    // cannot represent. We reject these categories on every target until replacement can
+    // preserve their target-specific requirements, so source legality does not depend on the
+    // selected target.
+    if (auto resourceType = as<ResourceType>(type))
+        return !resourceType->isCombined();
+
+    return as<SamplerStateType>(type) || as<HLSLStructuredBufferType>(type) ||
+           as<HLSLRWStructuredBufferType>(type) ||
            as<HLSLRasterizerOrderedStructuredBufferType>(type) ||
            as<HLSLByteAddressBufferType>(type) || as<HLSLRWByteAddressBufferType>(type) ||
            as<HLSLRasterizerOrderedByteAddressBufferType>(type);
 }
 
-/// Return whether `varDecl` has a type and storage class that entry-point locals can reproduce.
-static bool _hasTypeAndStorageSupportedForFileStaticResourceReplacement(VarDeclBase* varDecl)
+/// Return whether `varDecl` has a type and storage modifiers that allow replacement with
+/// function-local resource storage.
+static bool _hasTypeAndStorageModifiersSupportedForStaticResourceReplacement(VarDeclBase* varDecl)
 {
-    // The caller has already established that `varDecl` is a mutable file-scope `static` variable. We
-    // now require a resource type that remains one IR value, and reject storage modifiers whose
-    // lifetime or memory behavior cannot be reproduced by an ordinary entry-point local.
-    if (!_isResourceTypeSupportedForFileStaticReplacement(varDecl->getType()))
+    // The caller has already established that `varDecl` is a mutable `static` variable declared at
+    // file or namespace scope. We require a supported resource type that remains one IR value. We
+    // reject `groupshared` and memory-qualified declarations because function-local replacement
+    // cannot preserve their sharing or memory-access guarantees. After linking,
+    // `legalizeResourceGlobalVars` checks facts that per-module semantic checking cannot know:
+    // whether the variable must remain in module-scope storage and whether every invocation of a
+    // resource-using function can receive a generated argument.
+    if (!_isResourceTypeSupportedForFileOrNamespaceStaticReplacement(varDecl->getType()))
         return false;
     if (varDecl->hasModifier<HLSLGroupSharedModifier>())
-        return false;
-    if (varDecl->hasModifier<ActualGlobalModifier>())
         return false;
     if (varDecl->hasModifier<MemoryQualifierSetModifier>())
         return false;
@@ -3453,17 +3469,18 @@ static bool _hasTypeAndStorageSupportedForFileStaticResourceReplacement(VarDeclB
     return true;
 }
 
-/// Return whether `varDecl` is a mutable file-scope `static` variable that needs opaque storage.
-static bool _isMutableFileStaticOpaqueVariable(VarDeclBase* varDecl, TypeTag typeTags)
+/// Return whether `varDecl` is a mutable, opaque-typed `static` variable declared at file or
+/// namespace scope.
+static bool _isMutableFileOrNamespaceStaticOpaqueVariable(VarDeclBase* varDecl, TypeTag typeTags)
 {
-    // We first determine whether the value needs opaque storage. The general type-tag logic already
-    // marks most parameter groups as `Opaque`, but omits `ParameterBlock`. The explicit parameter-
-    // group check ensures that a file-scope `static ParameterBlock` reaches this diagnostic. We then
-    // require file scope, `static` variable storage, and a mutable rather than `const` declaration.
-    bool needsOpaqueStorage = (int(typeTags) & int(TypeTag::Opaque)) != 0;
+    // We first determine whether the declared type is opaque. The general type-tag logic does not
+    // mark `ParameterBlock` as `Opaque`, so the explicit parameter-group check ensures that a file-
+    // or namespace-scope `static ParameterBlock` reaches this diagnostic. We then require file or
+    // namespace scope, `static` variable storage, and a mutable rather than `const` declaration.
+    bool hasOpaqueType = (int(typeTags) & int(TypeTag::Opaque)) != 0;
     auto type = _getUnmodifiedInnermostArrayElementType(varDecl->getType());
-    needsOpaqueStorage |= as<UniformParameterGroupType>(type) != nullptr;
-    if (!needsOpaqueStorage)
+    hasOpaqueType |= as<UniformParameterGroupType>(type) != nullptr;
+    if (!hasOpaqueType)
         return false;
     if (!isGlobalDecl(varDecl))
         return false;
@@ -3474,25 +3491,31 @@ static bool _isMutableFileStaticOpaqueVariable(VarDeclBase* varDecl, TypeTag typ
     return true;
 }
 
-/// Diagnose an unsupported mutable file-scope `static` variable of opaque type.
+/// Diagnose an unsupported mutable, opaque-typed `static` variable declared at file or namespace
+/// scope.
 static void maybeDiagnoseOpaqueTypeGlobalVar(
     DiagnosticSink* sink,
     VarDeclBase* varDecl,
     TypeTag typeTags)
 {
-    // We diagnose only mutable file-scope `static` variables of opaque type. The IR pass can
-    // replace a supported subset with entry-point locals, so we allow that subset to proceed. Every
-    // remaining declaration would require opaque global storage that Slang cannot emit.
-    if (!_isMutableFileStaticOpaqueVariable(varDecl, typeTags))
+    // We first identify mutable, opaque-typed `static` variables declared at file or namespace
+    // scope. We then allow the source forms that `legalizeResourceGlobalVars` can validate and
+    // replace after linking. Every remaining declaration would require opaque global storage that
+    // Slang cannot emit.
+    if (!_isMutableFileOrNamespaceStaticOpaqueVariable(varDecl, typeTags))
         return;
 
-    if (_hasTypeAndStorageSupportedForFileStaticResourceReplacement(varDecl))
+    if (_hasTypeAndStorageModifiersSupportedForStaticResourceReplacement(varDecl))
         return;
 
     sink->diagnose(Diagnostics::GlobalVarCannotHaveOpaqueType{.decl = varDecl});
-    if (varDecl->initExpr)
-        sink->diagnose(Diagnostics::DoYouMeanStaticConst{.decl = varDecl});
-    else
+    // Some opaque initializers become valid when the declaration is made `static const`, while a
+    // runtime value copied from a shader parameter does not. Semantic checking does not produce a
+    // compile-time `Val` for either kind, so this check cannot prove when adding `const` is valid.
+    // We therefore omit that suggestion for initialized declarations. For an uninitialized
+    // declaration, we preserve the existing suggestion that the author may have intended to
+    // declare a uniform parameter.
+    if (!varDecl->initExpr)
         sink->diagnose(Diagnostics::DoYouMeanUniform{.decl = varDecl});
 }
 

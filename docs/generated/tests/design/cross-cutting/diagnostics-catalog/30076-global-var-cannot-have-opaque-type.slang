@@ -11,9 +11,8 @@
 //META: catalog_name=global-var-cannot-have-opaque-type
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// A parameter block describes externally bound storage and cannot be represented by an ordinary
-// entry-point local. Declaring a mutable file-scope `static ParameterBlock` is therefore rejected,
-// and the CHECK pins that error.
+// Parameter blocks have a target-dependent legalized representation that resource-global
+// replacement does not yet support, so the front end rejects this declaration.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 struct MaterialState

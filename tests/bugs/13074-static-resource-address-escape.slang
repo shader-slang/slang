@@ -9,8 +9,8 @@ Ptr<Texture2D<float4>> getCachedTexture()
 {
     return &cachedTexture;
 /*CHECK:
-    ^^^^^^ unsupported use of the address of a file-scope static resource
-    ^^^^^^ the address of file-scope static resource 'cachedTexture' is retained or observed in a way that cannot be preserved when each function has separate storage
+    ^^^^^^ address use may observe the identity of storage for a resource declared static at file or namespace scope
+    ^^^^^^ the program may retain the address of resource 'cachedTexture', which is declared static at file or namespace scope, or observe its storage identity; replacing the variable with function-local storage might change that behavior
 */
 }
 
@@ -26,8 +26,8 @@ void retainCachedTexture(
 uintptr_t getCachedTextureAddress()
 {
     return uintptr_t(&cachedTexture);
-//CHECK:            ^ unsupported use of the address of a file-scope static resource
-//CHECK:            ^ the address of file-scope static resource 'cachedTexture' is retained or observed in a way that cannot be preserved when each function has separate storage
+//CHECK:            ^ address use may observe the identity of storage for a resource declared static at file or namespace scope
+//CHECK:            ^ the program may retain the address of resource 'cachedTexture', which is declared static at file or namespace scope, or observe its storage identity; replacing the variable with function-local storage might change that behavior
 }
 
 [numthreads(1, 1, 1)]
@@ -35,8 +35,8 @@ void main()
 {
     Ptr<Texture2D<float4>> cached = getCachedTexture();
     retainCachedTexture(&cachedTexture, cached);
-//CHECK:               ^ unsupported use of the address of a file-scope static resource
-//CHECK:               ^ the address of file-scope static resource 'cachedTexture' is retained or observed in a way that cannot be preserved when each function has separate storage
+//CHECK:               ^ address use may observe the identity of storage for a resource declared static at file or namespace scope
+//CHECK:               ^ the program may retain the address of resource 'cachedTexture', which is declared static at file or namespace scope, or observe its storage identity; replacing the variable with function-local storage might change that behavior
     uint address = uint(getCachedTextureAddress());
     output[0] = (*cached).Load(int3(0, 0, 0));
     output[1] = float4(float(address), 0.0, 0.0, 0.0);

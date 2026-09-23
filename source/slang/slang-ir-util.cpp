@@ -12,9 +12,10 @@ namespace Slang
 
 bool doesInstOnlyDependOnOperandTypes(IRInst* inst)
 {
-    // Some static type queries take a runtime value and inspect only its static type. Others compare
-    // types directly or query their layout. We enumerate both forms so that value-use analyses can
-    // ignore their operands while conservatively treating every unlisted instruction as a value use.
+    // Some static type queries take a runtime value and inspect only its static type. Others
+    // compare types directly or query their layout. We enumerate both forms so that value-use
+    // analyses can ignore their operands while conservatively treating every unlisted instruction
+    // as a value use.
     switch (inst->getOp())
     {
     case kIROp_IsBool:
@@ -34,11 +35,15 @@ bool doesInstOnlyDependOnOperandTypes(IRInst* inst)
     }
 }
 
-static bool _isResourceValueType(IRType* type)
+static bool _isResourceValueTypeSupportedForStaticReplacement(IRType* type)
 {
-    // The front-end allow-list admits only resource types that remain one IR value through the part
-    // of the pipeline that calls this predicate. We therefore recognize the corresponding broad IR
-    // categories here and leave the source-language policy in semantic checking.
+    // Semantic checking has already limited replacement candidates to resource, sampler,
+    // structured-buffer, and byte-address-buffer types that remain one IR value. In particular, it
+    // excludes acceleration structures because Khronos and WGSL reject the generated local
+    // variables. It excludes dynamic resources because Khronos legalization requires each cast to
+    // resolve to one module-scope dynamic-resource parameter or one indexed element. We remove
+    // attributed, rate-qualified, and array wrappers, then recognize the IR types produced for the
+    // accepted source types. The source-language policy remains in semantic checking.
     type = cast<IRType>(unwrapAttributedType(type));
     while (auto arrayType = as<IRArrayTypeBase>(type))
         type = cast<IRType>(unwrapAttributedType(arrayType->getElementType()));
@@ -47,20 +52,28 @@ static bool _isResourceValueType(IRType* type)
            as<IRHLSLStructuredBufferTypeBase>(type) || as<IRByteAddressBufferTypeBase>(type);
 }
 
-bool isFileScopeStaticResourceGlobalToReplace(IRGlobalVar* globalVar)
+bool isFileOrNamespaceScopeStaticResourceGlobalToReplace(IRGlobalVar* globalVar)
 {
-    // AST-to-IR lowering adds `IRFileScopeStaticVarDecoration` only to a variable declared
-    // `static` at file or namespace scope. We test that marker instead of IR linkage decorations
-    // because static data members receive those decorations too. An explicit rate gives the storage
-    // a lifetime that cannot be reproduced by a fresh entry-point local.
-    if (globalVar->getRate() || !globalVar->findDecoration<IRFileScopeStaticVarDecoration>())
+    // AST-to-IR lowering adds `IRFileOrNamespaceScopeStaticVarDecoration` only to a `static`
+    // variable declared at file or namespace scope. We test that marker instead of linkage
+    // decorations, which are also present on static data members. Any explicit rate is outside the
+    // local-storage model: for example, `groupshared` storage is shared among threads, and
+    // `actual-global` storage persists across entry-point invocations.
+    if (globalVar->getRate() ||
+        !globalVar->findDecoration<IRFileOrNamespaceScopeStaticVarDecoration>())
         return false;
 
     auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
     if (!ptrType)
         return false;
 
-    return _isResourceValueType(ptrType->getValueType());
+    return _isResourceValueTypeSupportedForStaticReplacement(ptrType->getValueType());
+}
+
+bool isShaderOrCudaKernelEntryPoint(IRFunc* func)
+{
+    return func->findDecoration<IREntryPointDecoration>() != nullptr ||
+           func->findDecoration<IRCudaKernelDecoration>() != nullptr;
 }
 
 bool isPointerOfType(IRInst* type, IROp opCode)
@@ -95,11 +108,14 @@ bool isAddressInst(IRInst* inst)
     }
 }
 
-bool isUseBaseOfDerivedAddress(IRUse* use)
+bool mayUseTransferStorageAccess(IRUse* use)
 {
-    // Address instructions and pointer-to-pointer casts derive their result from operand zero. We
-    // require that exact operand because another pointer operand may be a value being stored or
-    // otherwise consumed rather than the base of the result address.
+    // Address projections and pointer casts can make a later access through the result affect
+    // storage reached from operand zero. We therefore treat both reads and writes as transferable;
+    // callers that need an exact relation classify it separately. An `inout` cast copies the
+    // source into its temporary and copies the temporary back; an `out` cast performs only the copy
+    // back. Each cast can transfer at least one access direction. We require operand zero because
+    // another operand may supply an index or a value rather than the source storage.
     auto user = use->getUser();
     if (user->getOperandCount() == 0 || user->getOperandUse(0) != use)
         return false;
@@ -109,9 +125,13 @@ bool isUseBaseOfDerivedAddress(IRUse* use)
 
     switch (user->getOp())
     {
+    case kIROp_GetAddress:
+    case kIROp_AssumeAddress:
+        return true;
     case kIROp_BitCast:
     case kIROp_Reinterpret:
     case kIROp_PtrCast:
+    case kIROp_OutImplicitCast:
     case kIROp_InOutImplicitCast:
         return as<IRPtrTypeBase>(use->get()->getDataType()) != nullptr &&
                as<IRPtrTypeBase>(user->getDataType()) != nullptr;
@@ -120,7 +140,7 @@ bool isUseBaseOfDerivedAddress(IRUse* use)
     }
 }
 
-IRInst* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse)
+IRType* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse)
 {
     // We match the exact operand use rather than its value, because one value may be passed to
     // multiple parameters with different direction contracts. Operand zero is the callee, and the
@@ -143,7 +163,10 @@ IRInst* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse)
     auto funcType = as<IRFuncType>(call->getCallee()->getDataType());
     if (!funcType || UInt(argumentIndex) >= funcType->getParamCount())
         return nullptr;
-    return unwrapAttributedType(funcType->getParamType(UInt(argumentIndex)));
+    auto parameterType =
+        as<IRType>(unwrapAttributedType(funcType->getParamType(UInt(argumentIndex))));
+    SLANG_RELEASE_ASSERT(parameterType);
+    return parameterType;
 }
 
 IRType* getVectorElementType(IRType* type)
@@ -3374,20 +3397,43 @@ bool isDebugInfoInst(IRInst* inst)
     }
 }
 
-bool isResourceLoadNotReportedAsSideEffecting(IROp op)
+bool doesOpReadResourceContents(IROp op)
 {
-    // These loads have no write side effect, so `mightHaveSideEffects()` returns false for them.
-    // Their results still depend on resource contents. Analyses that require a computation to be
-    // independent of external state must therefore reject them explicitly.
+    // These dedicated operations produce results that depend on resource contents. A resource
+    // method represented as an `IRCall` is classified through its callee instead. Operations that
+    // only query resource dimensions or other metadata do not read the contents.
     switch (op)
     {
+    case kIROp_ImageGatherOffset:
     case kIROp_ImageLoad:
+    case kIROp_Sample:
+    case kIROp_SampleGrad:
     case kIROp_StructuredBufferLoad:
     case kIROp_ByteAddressBufferLoad:
     case kIROp_StructuredBufferLoadStatus:
     case kIROp_RWStructuredBufferLoad:
     case kIROp_RWStructuredBufferLoadStatus:
+    case kIROp_StructuredBufferConsume:
     case kIROp_SubpassLoad:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool doesOpProduceResourceContentAddress(IROp op)
+{
+    // These operations create an address whose storage belongs to a resource. Analyses should
+    // classify them as resource-content roots before applying the general rule that follows operand
+    // zero through other address projections and pointer casts.
+    switch (op)
+    {
+    case kIROp_GetStructuredBufferPtr:
+    case kIROp_GetUntypedBufferPtr:
+    case kIROp_RWStructuredBufferGetElementPtr:
+    case kIROp_ImageSubscript:
+    case kIROp_ImageTexelPointer:
+    case kIROp_SPIRVLoadTexelPointerFromHeap:
         return true;
     default:
         return false;

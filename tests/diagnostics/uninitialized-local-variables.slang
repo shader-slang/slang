@@ -76,8 +76,9 @@ float filled_array(int mode)
     return array[0];
 }
 
-// A value-to-pointer bit cast reads its source value; it does not derive an address from that
-// value. The uninitialized-value check must therefore diagnose this use of `bits`.
+// A value-to-pointer bit cast reads its source value; it does not produce another address of the
+// source variable's storage. The uninitialized-value check must therefore diagnose this use of
+// `bits`.
 int* pointer_from_uninitialized_bits()
 {
     uint2 bits;

@@ -13,8 +13,8 @@ Texture2D<float4> chooseTexture()
 }
 
 static Texture2D<float4> cachedTexture = chooseTexture();
-//CHECK:                 ^^^^^^^^^^^^^ unsupported file-scope static resource initializer
-//CHECK:                 ^^^^^^^^^^^^^ initializer for file-scope static resource 'cachedTexture' has a side effect or reads mutable state; initialize the resource explicitly in an entry point instead
+//CHECK:                 ^^^^^^^^^^^^^ initializer for a resource declared static at file or namespace scope cannot be moved safely
+//CHECK:                 ^^^^^^^^^^^^^ Slang cannot prove that moving the initializer for resource 'cachedTexture', which is declared static at file or namespace scope, to each entry point preserves observable behavior. The initializer may have externally observable side effects or may read preexisting mutable storage, resource contents, or non-resource data from a source-declared parameter group; initialize the resource explicitly in an entry point instead
 
 RWStructuredBuffer<float4> output;
 

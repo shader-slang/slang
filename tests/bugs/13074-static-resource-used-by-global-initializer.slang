@@ -7,8 +7,8 @@
 Texture2D<float4> inputTexture;
 static Texture2D<float4> cachedTexture = inputTexture;
 static float4 cachedValue = cachedTexture.Load(int3(0, 0, 0));
-//CHECK:                                      ^ file-scope static resource is used by another global initializer
-//CHECK:                                      ^ file-scope static resource 'cachedTexture' is used while initializing another global variable; move that initialization into a function
+//CHECK:                                      ^ resource declared static at file or namespace scope is used by executable code outside a function
+//CHECK:                                      ^ resource 'cachedTexture' is declared static at file or namespace scope and is referenced by an operation outside a function body; perform that operation inside an entry point or another function
 
 [shader("fragment")]
 float4 main() : SV_Target

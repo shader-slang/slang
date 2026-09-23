@@ -2,8 +2,8 @@
 
 Texture2D<float4> textures[2];
 static Texture2D<float4> cachedTextures[2];
-//CHECK:                 ^^^^^^^^^^^^^^ cannot prove element-wise initialization of file-scope static resource array
-//CHECK:                 ^^^^^^^^^^^^^^ file-scope static resource array 'cachedTextures' has individual element writes and may be read before a whole-array assignment; assign the whole array before reading it
+//CHECK:                 ^^^^^^^^^^^^^^ cannot prove complete initialization of a resource array declared static at file or namespace scope
+//CHECK:                 ^^^^^^^^^^^^^^ resource array 'cachedTextures' is declared static at file or namespace scope, may be written one element at a time, and may be read before a whole-array assignment; assign the whole array before reading it
 
 // Assigning every element initializes this particular array, but resource-global legalization does
 // not track a separate definite-assignment fact for each index. We reject the element-wise form
