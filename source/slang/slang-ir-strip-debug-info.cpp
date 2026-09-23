@@ -28,6 +28,7 @@ static void findDebugInfo(IRInst* inst, List<IRInst*>& debugInstructions)
         break;
     }
 
+    // DebugFunc and DebugLocation decorations also hold references to debug metadata.
     for (auto child : inst->getDecorationsAndChildren())
         findDebugInfo(child, debugInstructions);
 }
@@ -36,6 +37,9 @@ void stripDebugInfo(IRModule* irModule)
 {
     List<IRInst*> debugInstructions;
     findDebugInfo(irModule->getModuleInst(), debugInstructions);
+    // Collection is pre-order; remove descendants before their owners so recursive removal
+    // does not revisit collected children. This is not dependency order across functions:
+    // instruction storage remains in the module arena while removal unlinks operand uses.
     while (debugInstructions.getCount())
     {
         auto inst = debugInstructions.getLast();

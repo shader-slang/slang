@@ -12431,11 +12431,13 @@ SlangResult emitSPIRVFromIR(
     auto generateWholeProgram = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::GenerateWholeProgram);
 
-    // Note: Debug info emission is controlled by the IR generation phase based on the debug level:
+    // IR generation preserves debug information according to the source module's debug level.
+    // The emission level may differ when compiling a serialized module:
     // - None (g0): No debug instructions in IR
-    // - Minimal (g1): IRDebugSource (content only when `-debug-info-include-source` is set) and
-    //                 IRDebugLine for line numbers only. Emits standard SPIR-V debug instructions
-    //                 (OpString, OpLine, OpSource)
+    // - Minimal (g1): Source/line records and function/compilation-unit scope metadata.
+    //                 Source text is retained only with `-debug-info-include-source`.
+    //                 Emitting at g1 uses only standard SPIR-V debug instructions
+    //                 (OpString, OpLine, OpSource).
     // - Standard (g2): Full NonSemantic debug info including IRDebugVar for local variables
     // - Maximal (g3): Same as Standard
     //

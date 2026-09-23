@@ -719,6 +719,8 @@ struct IRGenContext
 
 // Scope markers assign state; a newly entered block cannot inherit the lexical state of the
 // block that happened to be emitted before it. This also preserves scope across CFG folding.
+// After entering a new block, lowering must emit the active scope before its instructions.
+// This stays in lowering because the IR builder does not own the AST declaration-scope state.
 static void emitCurrentDebugScope(IRGenContext* context)
 {
     if (context->debugInfoLevel < DebugInfoLevel::Standard || !context->currentDebugScope)
@@ -10178,9 +10180,7 @@ static IRInst* maybeEmitDebugFunction(IRGenContext* context, IRInst* irFunc)
         {
             // Parent the function to the compilation unit of its own source file. Only
             // non-included files have a compilation unit, so this is null for a function whose
-            // source is an #include'd/__include'd file or a #line-remapped source, and for
-            // every function at Minimal debug level (where no compilation unit is built at
-            // all).
+            // source is an #include'd/__include'd file or a #line-remapped source.
             IRDebugCompilationUnit* parentScope = nullptr;
             if (auto debugSource = as<IRDebugSource>(locationDecor->getSource()))
             {
@@ -10208,6 +10208,7 @@ static IRInst* maybeEmitDebugFunction(IRGenContext* context, IRInst* irFunc)
 
 // Source braces and scoped loop initializers introduce declaration scopes. HLSL's unscoped
 // for initializer remains in the enclosing scope, matching semantic lookup.
+// Other control-flow statements get lexical blocks from their braced bodies, not the statement.
 static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
 {
     if (context->debugInfoLevel < DebugInfoLevel::Standard || !context->currentDebugScope ||
@@ -15949,11 +15950,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                 source->isIncludedFile()));
             context->shared->mapSourceFileToDebugSourceInst[source] = debugSource;
 
-            // For Standard and Maximal debug info, emit a DebugCompilationUnit for each
-            // non-included source file. This makes the IR the source of truth for which
-            // source files are compilation units, removing the need for heuristics during
-            // SPIR-V emission.
-            if (context->debugInfoLevel >= DebugInfoLevel::Standard && !source->isIncludedFile())
+            // Minimal IR already contains DebugFunction records. Retain their compilation-unit
+            // ownership too: a module serialized at -g1 can later be compiled at -g2, where
+            // inline scopes need that parent. The emitter still omits extended debug info at -g1.
+            if (!source->isIncludedFile())
             {
                 auto compilationUnit =
                     cast<IRDebugCompilationUnit>(builder->emitDebugCompilationUnit(debugSource));
