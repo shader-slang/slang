@@ -1562,23 +1562,16 @@ IRInst* cloneGlobalValueImpl(
         cloneInst(context, &context->shared->builderStorage, originalInst, originalValues);
     clonedValue->moveToEnd();
 
-    // A linked symbol can have several declarations across modules (an importing module's
-    // `[import]` and the defining module's `[export]`), which link collapses into this one
-    // inst via `originalInst`. Their module-scope annotations -- the auto-diff trait
-    // associations -- are emitted by whichever module differentiates the symbol, which need
-    // not be the selected definition: a module differentiating an imported type or function
-    // records them on its own `[import]` declaration. Cloning annotations from only the
-    // selected declaration then loses them, and forward mode mistypes the parameter as the
-    // primal type with a zero tangent (a type association, #13233) or emits a zero
-    // derivative for an imported `[Differentiable]` function (its callable associations, as
-    // in `cross-module-differentiable.slang`). A symbol's associations are interdependent --
-    // a `DifferentialPairType` and the derivative-context annotations reference one another
-    // -- so we recover them as the whole set from each declaration, not a subset. The
-    // selected definition is cloned first so its associations win for any kind recorded on
-    // more than one declaration (`cloneAnnotations` dedups per kind, so a sibling only fills
-    // a kind the selected definition genuinely lacks). A declaration in the module we are
-    // linking into is skipped, since its annotations are neither linked away nor (during
-    // prelink) backed by prebuilt linking info.
+    // A linked symbol can have several same-mangled-name declarations across the input
+    // modules (e.g. an importing module's `[import]` and the defining module's `[export]`),
+    // which link collapses into this one inst. Any of them may carry module-scope auto-diff
+    // trait annotations, since the module that differentiates a symbol records them on its
+    // own declaration, which need not be the one selected as `originalInst`. We therefore
+    // recover the annotations from every declaration, not just `originalInst`. The selected
+    // declaration is cloned first and `cloneAnnotations` dedups per (target, kind), so its
+    // annotations take precedence and a sibling only supplies a kind it lacks. A declaration
+    // in the module we are linking into is skipped: its annotations stay in place, and its
+    // linking info is not prebuilt.
     cloneAnnotations(context, clonedValue, originalInst);
     for (auto s = originalValues.sym; s; s = s->nextWithSameName)
     {

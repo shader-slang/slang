@@ -1,5 +1,6 @@
 //TEST:INTERPRET(filecheck=CHECK):
 //TEST:SIMPLE(filecheck=CHECKCUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECKHLSL):-target hlsl -entry computeMain -stage compute
 
 // Regression for #13233. Forward-mode differentiation of a function whose parameter is an
 // `IDifferentiable` struct imported from another module used to mistype the derivative's
@@ -44,4 +45,5 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     var dp = diffPair(v, {1.0});
     outputBuffer[0] = fwd_diff(metric)(dp).d;
     // CHECKCUDA: s_fwd_metric{{.*}}(DiffPair_Value
+    // CHECKHLSL: s_fwd_metric{{.*}}(DiffPair_Value
 }
