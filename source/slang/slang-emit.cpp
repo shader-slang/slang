@@ -1949,14 +1949,17 @@ Result linkAndOptimizeIR(
         SLANG_PASS(inlineGlobalConstantsForLegalization);
     }
 
-    // Apply target-specific ray-tracing payload policy before general type legalization: resolve
-    // D3D payload markers, materialize required physical carriers, and normalize D3D payload
-    // access qualifiers. CUDA/OptiX intentionally takes the no-materialization policy here.
-    SLANG_PASS(legalizeRayTracingPayloads, targetProgram);
-
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
+        // Materialize target-specific ray-tracing payload carriers before the general type
+        // legalization below erases them (resolve D3D payload markers, pad empty D3D/Khronos
+        // carriers, normalize D3D access qualifiers). Gating this on the block is safe: every
+        // target that disables it — CPP/C/CUDA downstream source and the direct-LLVM entry-point
+        // path (emitLLVMForEntryPoints) — is neither D3D nor Khronos, so its payload policy is
+        // empty and the pass is a no-op there.
+        SLANG_PASS(legalizeRayTracingPayloads, targetProgram);
+
         if (isMetalTarget(targetRequest))
         {
             // Metal is a special target in that we want to legalize constant buffer

@@ -106,6 +106,16 @@ static void padEmptyStructWithDummyField(IRBuilder& builder, IRStructType* struc
     }
 }
 
+// Rewrite the ray-tracing "force this argument to be a struct" markers in `inst`'s calls into real
+// struct-typed arguments, recursing through nested blocks. HLSL ray-tracing lowering emits
+// `ForceVarIntoStructTemporarily` / `ForceVarIntoRayPayloadStructTemporarily` on a call operand
+// (for example a `TraceRay` or `HitObject` ray payload) because DXC requires such operands to be a
+// user struct rather than a bare value. When the marked variable already points at a struct we
+// forward it directly, and for the ray-payload variant we also tag that struct with
+// `IRRayPayloadDecoration` so the later payload passes can find it. Otherwise we synthesize a
+// one-field wrapper struct, copy the value in before the call, pass the wrapper, and — only for a
+// mutable (pointer-like) parameter — copy the updated field back out after the call, preserving the
+// operand's original in/out behavior.
 static void legalizeForcedStructArgumentsInChildren(IRInst* inst)
 {
     for (auto child : inst->getChildren())
@@ -208,31 +218,30 @@ static void legalizeD3DForcedStructArguments(IRModule* module)
     }
 }
 
-static void collectEmptyRayPayloadStructs(
-    IRModule* module,
+// Collect the empty ray-payload struct reachable from a single global inst, if any. A semantic ray
+// payload is a struct carrying `IRRayPayloadDecoration`/`IRVulkanRayPayloadDecoration`, or — for
+// built-ins such as `__spirvTraceRayHitObjectEXT` that put the Vulkan decoration on a global
+// variable rather than on the struct type — the pointee of such a decorated global.
+static void collectIfEmptyRayPayload(
+    IRInst* globalInst,
     HashSet<IRStructType*>& emptyRayPayloadStructs)
 {
-    for (auto globalInst : module->getGlobalInsts())
+    if (auto structType = as<IRStructType>(globalInst))
     {
-        if (auto structType = as<IRStructType>(globalInst))
+        if (structType->findDecoration<IRRayPayloadDecoration>() ||
+            structType->findDecoration<IRVulkanRayPayloadDecoration>())
         {
-            if (structType->findDecoration<IRRayPayloadDecoration>() ||
-                structType->findDecoration<IRVulkanRayPayloadDecoration>())
-            {
-                addIfEmptyStruct(structType, emptyRayPayloadStructs);
-            }
-            continue;
+            addIfEmptyStruct(structType, emptyRayPayloadStructs);
         }
-
-        // Built-ins such as `__spirvTraceRayHitObjectEXT` put the Vulkan payload decoration on a
-        // global variable rather than on its struct type.
-        auto globalVar = as<IRGlobalVar>(globalInst);
-        if (!globalVar || !globalVar->findDecoration<IRVulkanRayPayloadDecoration>())
-            continue;
-        auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
-        SLANG_RELEASE_ASSERT(ptrType);
-        addIfEmptyStruct(ptrType->getValueType(), emptyRayPayloadStructs);
+        return;
     }
+
+    auto globalVar = as<IRGlobalVar>(globalInst);
+    if (!globalVar || !globalVar->findDecoration<IRVulkanRayPayloadDecoration>())
+        return;
+    auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
+    SLANG_RELEASE_ASSERT(ptrType);
+    addIfEmptyStruct(ptrType->getValueType(), emptyRayPayloadStructs);
 }
 
 static bool isCallShaderCall(IRCall* call)
@@ -240,66 +249,61 @@ static bool isCallShaderCall(IRCall* call)
     return getBuiltinFuncEnum(call->getCallee()) == KnownBuiltinDeclName::CallShader;
 }
 
-static void collectEmptyD3DCallableDataStructs(
-    IRModule* module,
+// Collect the empty D3D callable-data structs reachable from a single global inst. A D3D callable
+// entry point has a fixed-shape mutable callable-data parameter, and a `CallShader` payload is the
+// second, pointer-typed argument of the call; `KnownBuiltin` gives this target-neutral IR pass a
+// stable identity for `CallShader` independent of the eventual intrinsic spelling.
+static void collectIfEmptyD3DCallableData(
+    IRInst* globalInst,
     HashSet<IRStructType*>& emptyCallableDataStructs)
 {
-    for (auto globalInst : module->getGlobalInsts())
+    auto func = as<IRFunc>(globalInst);
+    if (!func)
+        return;
+
+    auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
+    if (entryPointDecor && entryPointDecor->getProfile().getStage() == Stage::Callable)
     {
-        auto func = as<IRFunc>(globalInst);
-        if (!func)
-            continue;
-
-        // A D3D callable entry point has a fixed-shape mutable callable-data parameter.
-        auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
-        if (entryPointDecor && entryPointDecor->getProfile().getStage() == Stage::Callable)
+        for (auto param : func->getParams())
         {
-            for (auto param : func->getParams())
-            {
-                if (auto outType = as<IROutParamTypeBase>(param->getFullType()))
-                    addIfEmptyStruct(outType->getValueType(), emptyCallableDataStructs);
-            }
+            if (auto outType = as<IROutParamTypeBase>(param->getFullType()))
+                addIfEmptyStruct(outType->getValueType(), emptyCallableDataStructs);
         }
+    }
 
-        // A CallShader payload is its second, pointer-typed argument. KnownBuiltin gives this
-        // target-neutral IR pass a stable identity independent of the eventual intrinsic spelling.
-        for (auto block : func->getBlocks())
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
         {
-            for (auto inst : block->getChildren())
-            {
-                auto call = as<IRCall>(inst);
-                if (!call || !isCallShaderCall(call))
-                    continue;
-                SLANG_RELEASE_ASSERT(call->getArgCount() == 2);
-                auto ptrType = as<IRPtrTypeBase>(call->getArg(1)->getDataType());
-                SLANG_RELEASE_ASSERT(ptrType);
-                addIfEmptyStruct(ptrType->getValueType(), emptyCallableDataStructs);
-            }
+            auto call = as<IRCall>(inst);
+            if (!call || !isCallShaderCall(call))
+                continue;
+            SLANG_RELEASE_ASSERT(call->getArgCount() == 2);
+            auto ptrType = as<IRPtrTypeBase>(call->getArg(1)->getDataType());
+            SLANG_RELEASE_ASSERT(ptrType);
+            addIfEmptyStruct(ptrType->getValueType(), emptyCallableDataStructs);
         }
     }
 }
 
-static void collectEmptyKhronosCallableDataStructs(
-    IRModule* module,
+// Collect the empty Khronos callable-data struct reachable from a single global inst. Vulkan-style
+// `CallShader` lowering stores callable data in a decorated module-scope global; the intrinsic call
+// may already have been inlined by this point, so the global is the canonical surviving carrier.
+static void collectIfEmptyKhronosCallableData(
+    IRInst* globalInst,
     HashSet<IRStructType*>& emptyCallableDataStructs)
 {
-    // Vulkan-style CallShader lowering stores callable data in a decorated module-scope global.
-    // The intrinsic call may already have been inlined by this point, so the global is the
-    // canonical surviving carrier to inspect.
-    for (auto globalInst : module->getGlobalInsts())
+    auto globalVar = as<IRGlobalVar>(globalInst);
+    if (!globalVar)
+        return;
+    if (!globalVar->findDecoration<IRVulkanCallablePayloadDecoration>() &&
+        !globalVar->findDecoration<IRVulkanCallablePayloadInDecoration>())
     {
-        auto globalVar = as<IRGlobalVar>(globalInst);
-        if (!globalVar)
-            continue;
-        if (!globalVar->findDecoration<IRVulkanCallablePayloadDecoration>() &&
-            !globalVar->findDecoration<IRVulkanCallablePayloadInDecoration>())
-        {
-            continue;
-        }
-        auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
-        SLANG_RELEASE_ASSERT(ptrType);
-        addIfEmptyStruct(ptrType->getValueType(), emptyCallableDataStructs);
+        return;
     }
+    auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
+    SLANG_RELEASE_ASSERT(ptrType);
+    addIfEmptyStruct(ptrType->getValueType(), emptyCallableDataStructs);
 }
 
 static void padEmptyStructs(IRModule* module, HashSet<IRStructType*> const& emptyStructs)
@@ -366,6 +370,28 @@ static RayTracingPayloadLegalizationPolicy getRayTracingPayloadLegalizationPolic
     return policy;
 }
 
+// Collect every empty payload struct the policy asks for in a single walk of the module's global
+// insts. The payload kinds inspect different global-inst shapes, so we dispatch each inst to the
+// per-kind collectors the policy enables instead of walking the global list once per kind. All
+// three collectors feed one shared set: a struct reused as both a ray payload and callable data
+// must be padded exactly once, and the set deduplicates it (padding it from two sets would trip
+// `padEmptyStructWithDummyField`'s empty-struct assert on the second pass).
+static void collectEmptyPayloadStructs(
+    IRModule* module,
+    RayTracingPayloadLegalizationPolicy const& policy,
+    HashSet<IRStructType*>& emptyPayloadStructs)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (policy.materializeEmptyRayPayloads)
+            collectIfEmptyRayPayload(globalInst, emptyPayloadStructs);
+        if (policy.materializeEmptyD3DCallableData)
+            collectIfEmptyD3DCallableData(globalInst, emptyPayloadStructs);
+        if (policy.materializeEmptyKhronosCallableData)
+            collectIfEmptyKhronosCallableData(globalInst, emptyPayloadStructs);
+    }
+}
+
 void legalizeRayTracingPayloads(IRModule* module, TargetProgram* targetProgram)
 {
     const auto policy = getRayTracingPayloadLegalizationPolicy(targetProgram);
@@ -376,21 +402,12 @@ void legalizeRayTracingPayloads(IRModule* module, TargetProgram* targetProgram)
     if (policy.legalizeD3DForcedStructArguments)
         legalizeD3DForcedStructArguments(module);
 
-    if (policy.materializeEmptyRayPayloads)
+    if (policy.materializeEmptyRayPayloads || policy.materializeEmptyD3DCallableData ||
+        policy.materializeEmptyKhronosCallableData)
     {
-        HashSet<IRStructType*> emptyRayPayloadStructs;
-        collectEmptyRayPayloadStructs(module, emptyRayPayloadStructs);
-        padEmptyStructs(module, emptyRayPayloadStructs);
-    }
-
-    if (policy.materializeEmptyD3DCallableData || policy.materializeEmptyKhronosCallableData)
-    {
-        HashSet<IRStructType*> emptyCallableDataStructs;
-        if (policy.materializeEmptyD3DCallableData)
-            collectEmptyD3DCallableDataStructs(module, emptyCallableDataStructs);
-        if (policy.materializeEmptyKhronosCallableData)
-            collectEmptyKhronosCallableDataStructs(module, emptyCallableDataStructs);
-        padEmptyStructs(module, emptyCallableDataStructs);
+        HashSet<IRStructType*> emptyPayloadStructs;
+        collectEmptyPayloadStructs(module, policy, emptyPayloadStructs);
+        padEmptyStructs(module, emptyPayloadStructs);
     }
 
     if (policy.normalizeD3DPayloadAccessQualifiers)
