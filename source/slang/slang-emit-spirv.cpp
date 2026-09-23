@@ -10693,10 +10693,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // record is being emitted (the global debug-inst path, which has no body to bind), and both
         // non-null for a concrete OpFunction body. There is nothing to bind in the record-only
         // case.
-        SLANG_ASSERT((firstBlock != nullptr) == (spvFunc != nullptr));
+        SLANG_RELEASE_ASSERT((firstBlock != nullptr) == (spvFunc != nullptr));
         if (!firstBlock || !spvFunc)
             return;
-        SLANG_ASSERT(debugFuncInfo);
+        SLANG_RELEASE_ASSERT(debugFuncInfo);
         if (m_debugFunctionDefinitionsEmitted.add(spvFunc))
         {
             emitOpDebugFunctionDefinition(
