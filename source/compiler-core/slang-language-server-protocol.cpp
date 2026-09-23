@@ -351,6 +351,12 @@ static const StructRttiInfo _makeInitializeParamsRtti()
     InitializeParams obj;
     StructRttiBuilder builder(&obj, "LanguageServerProtocol::InitializeParams", nullptr);
     builder.addField("workspaceFolders", &obj.workspaceFolders, StructRttiInfo::Flag::Optional);
+    builder.addField("rootUri", &obj.rootUri, StructRttiInfo::Flag::Optional);
+    builder.addField("rootPath", &obj.rootPath, StructRttiInfo::Flag::Optional);
+    builder.addField(
+        "initializationOptions",
+        &obj.initializationOptions,
+        StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
 }

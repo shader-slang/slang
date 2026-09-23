@@ -2725,12 +2725,29 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     }
     auto connection = context->m_languageServerConnection.Ptr();
     LanguageServerProtocol::InitializeParams initParams;
-    LanguageServerProtocol::WorkspaceFolder wsFolder;
-    wsFolder.name = "test";
     String fullPath;
     Path::getCanonical(input.filePath, fullPath);
-    wsFolder.uri = URI::fromLocalFilePath(Path::getParentDirectory(fullPath).getUnownedSlice()).uri;
-    initParams.workspaceFolders.add(wsFolder);
+    String rootDir = Path::getParentDirectory(fullPath);
+    String rootUri = URI::fromLocalFilePath(rootDir.getUnownedSlice()).uri;
+    // A client can announce its workspace root through the modern `workspaceFolders` or the
+    // deprecated single-root `rootUri` / `rootPath` fields. The `-init-root-uri` /
+    // `-init-root-path` test args select the deprecated shapes (with an empty `workspaceFolders`)
+    // so we can regress the fallback path; the default remains `workspaceFolders`.
+    if (input.testOptions->args.indexOf(String("-init-root-uri")) >= 0)
+    {
+        initParams.rootUri = rootUri;
+    }
+    else if (input.testOptions->args.indexOf(String("-init-root-path")) >= 0)
+    {
+        initParams.rootPath = rootDir;
+    }
+    else
+    {
+        LanguageServerProtocol::WorkspaceFolder wsFolder;
+        wsFolder.name = "test";
+        wsFolder.uri = rootUri;
+        initParams.workspaceFolders.add(wsFolder);
+    }
     if (SLANG_FAILED(connection->sendCall(
             LanguageServerProtocol::InitializeParams::methodName,
             &initParams,

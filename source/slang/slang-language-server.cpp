@@ -65,6 +65,18 @@ SlangResult LanguageServerCore::init(const InitializeParams& args)
     {
         rootUris.add(URI::fromString(wd.uri.getUnownedSlice()));
     }
+    // Fall back to the deprecated single-root handshake when the client announces no
+    // workspaceFolders. Some clients only send rootUri/rootPath; without any root the recursive
+    // scan in Workspace::init that populates the #include search path never runs, so a search-path
+    // include resolves only for files that happen to be open (shader-slang/slang#13179). rootUri
+    // takes precedence over the older rootPath, matching the LSP field resolution order.
+    if (rootUris.getCount() == 0)
+    {
+        if (args.rootUri.getLength())
+            rootUris.add(URI::fromString(args.rootUri.getUnownedSlice()));
+        else if (args.rootPath.getLength())
+            rootUris.add(URI::fromLocalFilePath(args.rootPath.getUnownedSlice()));
+    }
     m_workspace->init(rootUris, getOrCreateGlobalSession());
     return SLANG_OK;
 }
@@ -186,6 +198,13 @@ SlangResult LanguageServer::parseNextMessage()
                     fillCapability(result.capabilities);
                     m_connection->sendResult(&result, call.id);
                 }
+                // Editors that do not answer the server-initiated `workspace/configuration` pull
+                // (which is VS Code centric) deliver their startup settings in
+                // `initializationOptions` instead. We apply them through the same dispatcher used
+                // for `didChangeConfiguration`; it ignores anything that is not a `slang.*` object,
+                // so an absent or unrelated payload is a no-op. This runs after the initialize
+                // response is sent so that any resulting refresh request follows it in order.
+                updateConfigFromJSON(args.initializationOptions);
                 return SLANG_OK;
             }
             else if (call.method == "initialized")
@@ -212,18 +231,22 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 15)
-                    {
-                        updatePredefinedMacros(arr[0]);
-                        updateSearchPaths(arr[1]);
-                        updateSearchInWorkspace(arr[2]);
-                        updateCommitCharacters(arr[3]);
-                        updateFormattingOptions(arr[4], arr[5], arr[6], arr[7], arr[8], arr[9]);
-                        updateInlayHintOptions(arr[10], arr[11]);
-                        updateWorkspaceFlavor(arr[12]);
-                        updateTraceOptions(arr[13]);
-                        updatePredefinedLanguageVersion(arr[14]);
-                    }
+                    // The reply carries one entry per section requested by sendConfigRequest(), in
+                    // the same order. A spec-compliant client returns all of them; we apply
+                    // whatever prefix is present rather than dropping the entire reply when the
+                    // count differs, since each updateX() no-ops on an invalid JSONValue and a
+                    // short reply simply leaves the trailing settings at their current values.
+                    auto item = [&](Index i) -> JSONValue
+                    { return i < arr.getCount() ? arr[i] : JSONValue::makeInvalid(); };
+                    updatePredefinedMacros(item(0));
+                    updateSearchPaths(item(1));
+                    updateSearchInWorkspace(item(2));
+                    updateCommitCharacters(item(3));
+                    updateFormattingOptions(item(4), item(5), item(6), item(7), item(8), item(9));
+                    updateInlayHintOptions(item(10), item(11));
+                    updateWorkspaceFlavor(item(12));
+                    updateTraceOptions(item(13));
+                    updatePredefinedLanguageVersion(item(14));
                 }
                 break;
             }
@@ -2459,10 +2482,16 @@ void LanguageServer::updateInlayHintOptions(
 {
     auto container = m_connection->getContainer();
     JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
-    bool showDeducedType = false;
-    bool showParameterNames = false;
-    converter.convert(deducedTypes, &showDeducedType);
-    converter.convert(parameterNames, &showParameterNames);
+    // Seed from the current settings so an absent key (an invalid JSONValue) keeps its value.
+    // Callers pass only the key that changed (updateConfigFromJSON's per-key dispatch) or a
+    // possibly truncated configuration reply, and converting an invalid value would otherwise reset
+    // the untouched setting to false.
+    bool showDeducedType = m_core.m_inlayHintOptions.showDeducedType;
+    bool showParameterNames = m_core.m_inlayHintOptions.showParameterNames;
+    if (deducedTypes.isValid())
+        converter.convert(deducedTypes, &showDeducedType);
+    if (parameterNames.isValid())
+        converter.convert(parameterNames, &showParameterNames);
     if (showDeducedType != m_core.m_inlayHintOptions.showDeducedType ||
         showParameterNames != m_core.m_inlayHintOptions.showParameterNames)
     {
@@ -3084,7 +3113,13 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         updateConfigFromJSON(obj[0].value);
         return;
     }
-    for (auto kv : obj)
+    // getObject() returns a view into the container's internal m_objectValues buffer. An update
+    // handler below can serialize an outbound refresh request into that same container
+    // (createObject -> m_objectValues.addRange), which may reallocate the buffer and dangle the
+    // view mid-iteration. Snapshot the entries first so iteration is independent of any container
+    // growth the handlers trigger.
+    List<JSONKeyValue> entries(obj);
+    for (auto kv : entries)
     {
         auto key = m_connection->getContainer()->getStringFromKey(kv.key);
         if (key == "slang.predefinedMacros")
@@ -3094,6 +3129,10 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         else if (key == "slang.additionalSearchPaths")
         {
             updateSearchPaths(kv.value);
+        }
+        else if (key == "slang.searchInAllWorkspaceDirectories")
+        {
+            updateSearchInWorkspace(kv.value);
         }
         else if (key == "slang.enableCommitCharactersInAutoCompletion")
         {
@@ -3170,6 +3209,10 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         else if (key == "slang.workspaceFlavor")
         {
             updateWorkspaceFlavor(kv.value);
+        }
+        else if (key == "slangLanguageServer.trace.server")
+        {
+            updateTraceOptions(kv.value);
         }
         else if (key == "slang.predefinedLanguageVersion")
         {
