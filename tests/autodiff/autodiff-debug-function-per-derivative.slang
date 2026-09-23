@@ -9,11 +9,22 @@
 // guard is the only regression coverage. Each check is ID-anchored -- it binds an id (a name's
 // OpString in the SPIR-V pass, a record in the IR pass) and then requires the record / definition /
 // decoration that references it -- so it cannot self-match any embedded-source OpString.
+//
+// A concrete function (diffSquare) and a generic one (genPoly) are both differentiated: the generic
+// case additionally guards the derivative's debug record being built in the derivative's own scope,
+// since copyDebugInfo can run while a derivative is still nested in an IRGeneric (compiling at -g2
+// would hit a dominance/scope violation if the record were emitted at module scope instead).
 
 [Differentiable]
 float diffSquare(float x)
 {
     return x * x;
+}
+
+[Differentiable]
+T genPoly<T : IDifferentiable & IFloat>(T x)
+{
+    return x * x * x;
 }
 
 RWStructuredBuffer<float> outputBuffer;
@@ -26,21 +37,33 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
     var dpFwd = diffPair(x, 1.0);
     outputBuffer[0] = fwd_diff(diffSquare)(dpFwd).d;
-
     var dpRev = diffPair(x, 0.0);
     bwd_diff(diffSquare)(dpRev, 1.0);
     outputBuffer[1] = dpRev.d;
+
+    var dpGenFwd = diffPair(x, 1.0);
+    outputBuffer[2] = fwd_diff(genPoly<float>)(dpGenFwd).d;
+    var dpGenRev = diffPair(x, 0.0);
+    bwd_diff(genPoly<float>)(dpGenRev, 1.0);
+    outputBuffer[3] = dpGenRev.d;
 }
 
 // The derivatives that survive to SPIR-V (forward and backward-propagate) each own a distinct
 // DebugFunction record, and that record -- not the original's -- is the one bound to the
-// derivative's own body by its DebugFunctionDefinition.
+// derivative's own body by its DebugFunctionDefinition. Both the concrete and the generic function
+// are covered.
 //CHECK-DAG: [[FWD_NAME:%[0-9]+]] = OpString "s_fwd_diffSquare"
 //CHECK-DAG: [[BWD_NAME:%[0-9]+]] = OpString "s_bwdProp_diffSquare"
 //CHECK-DAG: [[FWD_REC:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction [[FWD_NAME]]
 //CHECK-DAG: [[BWD_REC:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction [[BWD_NAME]]
 //CHECK-DAG: DebugFunctionDefinition [[FWD_REC]] %s_fwd_diffSquare
 //CHECK-DAG: DebugFunctionDefinition [[BWD_REC]] %s_bwdProp_diffSquare
+//CHECK-DAG: [[GFWD_NAME:%[0-9]+]] = OpString "s_fwd_genPoly"
+//CHECK-DAG: [[GBWD_NAME:%[0-9]+]] = OpString "s_bwdProp_genPoly"
+//CHECK-DAG: [[GFWD_REC:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction [[GFWD_NAME]]
+//CHECK-DAG: [[GBWD_REC:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction [[GBWD_NAME]]
+//CHECK-DAG: DebugFunctionDefinition [[GFWD_REC]] %s_fwd_genPoly
+//CHECK-DAG: DebugFunctionDefinition [[GBWD_REC]] %s_bwdProp_genPoly
 
 // The apply and remat derivatives are folded away before SPIR-V, so their per-derivative records
 // are checked at the IR level (after autodiff): each is a distinct record named after itself, and

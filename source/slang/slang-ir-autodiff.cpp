@@ -1380,8 +1380,12 @@ void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
                 if (auto nameHint = destFunc->findDecoration<IRNameHintDecoration>())
                     name = nameHint->getNameOperand();
 
+                // Insert the record in the derivative's own scope (before destFunc), as
+                // lower-to-ir does. copyDebugInfo can run while a derivative is still nested in an
+                // IRGeneric, and its type operand may reference that generic's parameters, so the
+                // record must share the derivative's scope rather than sit at module scope.
                 IRBuilder builder(destFunc->getModule());
-                builder.setInsertInto(destFunc->getModule()->getModuleInst());
+                builder.setInsertBefore(destFunc);
                 auto derivativeDebugFunc = builder.emitDebugFunction(
                     name,
                     srcDebugFunc->getLine(),
