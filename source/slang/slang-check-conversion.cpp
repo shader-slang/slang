@@ -3170,6 +3170,10 @@ bool SemanticsVisitor::tryCoerceLambdaToFuncType(
         lambdaStruct.getDecl()->addMember(synStaticFunc);
     }
 
+    // This adapter can be synthesized after the surrounding declaration tree has already passed
+    // its signature-checking walk. Advance it explicitly before publishing a reference to it.
+    ensureDecl(synStaticFunc, DeclCheckState::SignatureChecked);
+
     // If we have a static method for operator(), we can convert the lambda to a function type.
     if (outToExpr)
     {

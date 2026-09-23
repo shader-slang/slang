@@ -1373,8 +1373,8 @@ FIDDLE() namespace Slang
         // The kind of lookup step that was performed
         Kind kind;
 
-        // For the `Kind::This` case, what does the implicit
-        // `this` or `This` parameter refer to?
+        // For the `Kind::This` case, should lookup reconstruct a `this` value or a `This` type,
+        // and is that value mutable?
         //
         enum class ThisParameterMode : uint8_t
         {
@@ -1908,6 +1908,34 @@ FIDDLE() namespace Slang
         ///
         Ref,
     };
+
+    /// Combined information about the type and parameter-passing mode of a parameter.
+    FIDDLE()
+    struct ParamInfo
+    {
+        FIDDLE(...)
+
+        /// The effective parameter type.
+        FIDDLE() Type* type = nullptr;
+
+        /// The parameter-passing mode.
+        FIDDLE() ParamPassingMode mode = ParamPassingMode::In;
+    };
+
+    /// Returns whether `mode` passes writable storage to the callee.
+    inline bool doesParamPassingModeIndicateWritableStorage(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::Out:
+        case ParamPassingMode::BorrowInOut:
+        case ParamPassingMode::Ref:
+            return true;
+
+        default:
+            return false;
+        }
+    }
 
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 

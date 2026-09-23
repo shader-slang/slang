@@ -2193,8 +2193,10 @@ public:
     Type* tryGetDifferentialPairType(Type* primalType);
 
     // Convert a function's original type to it's forward/backward diff'd type.
-    Type* getForwardDiffFuncType(FuncType* originalType, QualType thisType);
-    Type* getBackwardDiffFuncType(FuncType* originalType, QualType thisType = QualType());
+    Type* getForwardDiffFuncType(FuncType* originalType, std::optional<ParamInfo> thisParamInfo);
+    Type* getBackwardDiffFuncType(
+        FuncType* originalType,
+        std::optional<ParamInfo> thisParamInfo = std::nullopt);
 
     /// Registers a type as conforming to IDifferentiable, along with a witness
     /// describing the relationship.
@@ -3155,6 +3157,23 @@ public:
 
     /// Determine what type `This` should refer to in an extension of `type`.
     Type* calcThisType(Type* type);
+
+    /// Compute the effective `this` parameter information for `decl`, if it has one.
+    ///
+    /// This operation is only used while advancing a declaration to
+    /// `DeclCheckState::SignatureChecked`. Other semantic-checking code should use the queries
+    /// below so that it reads the information attached to the declaration.
+    std::optional<ParamInfo> checkEffectiveThisParamInfo(Decl* decl);
+
+    /// Compute and attach the effective `this` parameter information owned by `decl`.
+    void checkAndAttachEffectiveThisParamInfo(Decl* decl);
+
+    /// Return the effective `this` parameter information for `decl`, if it has one.
+    ///
+    /// These wrappers first ensure that the declaration has completed signature checking. The
+    /// underlying passive queries assert that precondition themselves.
+    std::optional<ParamInfo> findEffectiveThisParamInfo(DeclRef<Decl> const& declRef);
+    ParamInfo getEffectiveThisParamInfo(DeclRef<Decl> const& declRef);
 
     DeclRef<Decl> getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl);
 
@@ -4488,10 +4507,6 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 
     ConstructorDecl* createCtor(AggTypeDecl* decl, DeclVisibility ctorVisibility);
 };
-
-QualType getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl);
-
-QualType getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> funcDeclRef);
 
 bool isUnsizedArrayType(Type* type);
 

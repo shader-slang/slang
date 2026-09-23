@@ -23,11 +23,11 @@ using namespace Slang;
 namespace
 {
 
-/// Find the first direct member of `moduleDecl` of type `T` whose name matches.
+/// Find the first direct member of `containerDecl` of type `T` whose name matches.
 template<typename T>
-T* findMemberDecl(ModuleDecl* moduleDecl, const char* name)
+T* findMemberDecl(ContainerDecl* containerDecl, const char* name)
 {
-    for (auto member : moduleDecl->getDirectMemberDecls())
+    for (auto member : containerDecl->getDirectMemberDecls())
     {
         auto decl = as<T>(member);
         if (!decl || !decl->getName())
@@ -135,6 +135,97 @@ SLANG_UNIT_TEST(checkedOverloadsMangleDistinctly)
     SLANG_CHECK_ABORT(mangledNames.getCount() == 2);
     SLANG_CHECK(mangledNames[0].getLength() > 0);
     SLANG_CHECK(mangledNames[0] != mangledNames[1]);
+}
+
+// Moving mangling to the checked effective `this` parameter information must not change the
+// established names. In particular, only explicitly `[mutating]` and `[__ref]` ordinary methods
+// had mode suffixes; a borrowed method, a setter's writable default, and a direct function-type
+// declaration did not.
+SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes)
+{
+    StaticUnitTestEnv env(unitTestContext);
+
+    String diagnostics;
+    Module* module = env.checkModuleFromSource(
+        "checkedEffectiveThisManglingPreservesLegacySuffixes",
+        "struct Receiver\n"
+        "{\n"
+        "    [constref] int ordinaryBorrow(int value) { return value; }\n"
+        "    [mutating] int ordinaryMutating(int value) { return value; }\n"
+        "    [__ref] int ordinaryRef(int value) { return value; }\n"
+        "    [mutating] [__ref] int overlappingModes(int value) { return value; }\n"
+        "    [NoDiffThis] static int staticNoDiffThis(int value) { return value; }\n"
+        "    property int item { get { return 0; } set {} }\n"
+        "}\n"
+        "[__NonCopyableType]\n"
+        "struct NonCopyableReceiver\n"
+        "{\n"
+        "    int defaultBorrow() { return 0; }\n"
+        "}\n"
+        "interface DirectRequirement\n"
+        "{\n"
+        "    [constref] __associatedfunc functype(int) -> int directBorrow;\n"
+        "    [mutating] __associatedfunc functype(int) -> int directMutating;\n"
+        "    [__ref] __associatedfunc functype(int) -> int directRef;\n"
+        "}\n"
+        "[NoDiffThis] int freeNoDiffThis(int value) { return value; }\n",
+        &diagnostics);
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto moduleDecl = module->getModuleDecl();
+    auto receiverDecl = findMemberDecl<StructDecl>(moduleDecl, "Receiver");
+    auto nonCopyableReceiverDecl = findMemberDecl<StructDecl>(moduleDecl, "NonCopyableReceiver");
+    auto interfaceDecl = findMemberDecl<InterfaceDecl>(moduleDecl, "DirectRequirement");
+    auto freeNoDiffThis = findMemberDecl<FuncDecl>(moduleDecl, "freeNoDiffThis");
+    SLANG_CHECK_ABORT(receiverDecl != nullptr);
+    SLANG_CHECK_ABORT(nonCopyableReceiverDecl != nullptr);
+    SLANG_CHECK_ABORT(interfaceDecl != nullptr);
+    SLANG_CHECK_ABORT(freeNoDiffThis != nullptr);
+
+    auto ordinaryBorrow = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryBorrow");
+    auto ordinaryMutating = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryMutating");
+    auto ordinaryRef = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryRef");
+    auto overlappingModes = findMemberDecl<FuncDecl>(receiverDecl, "overlappingModes");
+    auto staticNoDiffThis = findMemberDecl<FuncDecl>(receiverDecl, "staticNoDiffThis");
+    auto propertyDecl = findMemberDecl<PropertyDecl>(receiverDecl, "item");
+    auto defaultBorrow = findMemberDecl<FuncDecl>(nonCopyableReceiverDecl, "defaultBorrow");
+    auto directBorrow = findMemberDecl<FuncDecl>(interfaceDecl, "directBorrow");
+    auto directMutating = findMemberDecl<FuncDecl>(interfaceDecl, "directMutating");
+    auto directRef = findMemberDecl<FuncDecl>(interfaceDecl, "directRef");
+    SLANG_CHECK_ABORT(ordinaryBorrow != nullptr);
+    SLANG_CHECK_ABORT(ordinaryMutating != nullptr);
+    SLANG_CHECK_ABORT(ordinaryRef != nullptr);
+    SLANG_CHECK_ABORT(overlappingModes != nullptr);
+    SLANG_CHECK_ABORT(staticNoDiffThis != nullptr);
+    SLANG_CHECK_ABORT(propertyDecl != nullptr);
+    SLANG_CHECK_ABORT(defaultBorrow != nullptr);
+    SLANG_CHECK_ABORT(directBorrow != nullptr);
+    SLANG_CHECK_ABORT(directMutating != nullptr);
+    SLANG_CHECK_ABORT(directRef != nullptr);
+
+    SetterDecl* setterDecl = nullptr;
+    for (auto member : propertyDecl->getDirectMemberDecls())
+    {
+        if (auto setter = as<SetterDecl>(member))
+        {
+            setterDecl = setter;
+            break;
+        }
+    }
+    SLANG_CHECK_ABORT(setterDecl != nullptr);
+
+    auto astBuilder = env.getASTBuilder();
+    SLANG_CHECK(getMangledName(astBuilder, freeNoDiffThis).endsWith("n"));
+    SLANG_CHECK(getMangledName(astBuilder, ordinaryBorrow).endsWith("ii"));
+    SLANG_CHECK(getMangledName(astBuilder, ordinaryMutating).endsWith("m"));
+    SLANG_CHECK(getMangledName(astBuilder, ordinaryRef).endsWith("r"));
+    SLANG_CHECK(getMangledName(astBuilder, overlappingModes).endsWith("mr"));
+    SLANG_CHECK(getMangledName(astBuilder, staticNoDiffThis).endsWith("n"));
+    SLANG_CHECK(!getMangledName(astBuilder, setterDecl).endsWith("m"));
+    SLANG_CHECK(!getMangledName(astBuilder, defaultBorrow).endsWith("c"));
+    SLANG_CHECK(getMangledName(astBuilder, directBorrow).endsWith("B"));
+    SLANG_CHECK(getMangledName(astBuilder, directMutating).endsWith("B"));
+    SLANG_CHECK(getMangledName(astBuilder, directRef).endsWith("B"));
 }
 
 // Source that fails to check reports a diagnostic rather than returning a

@@ -967,6 +967,15 @@ ParamPassingMode adjustParamPassingModeBasedOnParamType(
     ParamPassingMode originalMode,
     Type* paramType);
 
+/// Returns the mode used for an effective `this` parameter when it becomes an explicit parameter
+/// of a derivative function.
+///
+/// BorrowIn maps to In and Ref maps to BorrowInOut to preserve the established derivative-function
+/// ABI. Other modes retain their effective parameter-passing behavior and may be transformed
+/// further by the applicable forward- or reverse-mode rule. After those transformations, callers
+/// must use `adjustParamPassingModeBasedOnParamType()` with the final parameter value type.
+ParamPassingMode getDifferentiatedThisParamMode(ParamPassingMode effectiveMode);
+
 // A function type is defined by its parameter types
 // and its result type.
 FIDDLE()
@@ -1026,17 +1035,6 @@ class FuncType : public Type
     /// Get the parameter-passing mode of one of the function's parameters, by index.
     ///
     ParamPassingMode getParamPassingMode(Index index);
-
-    /// Combined information on the type and parameter-passing mode of a parameter.
-    ///
-    struct ParamInfo
-    {
-        /// The parameter-passing mode for the parameter.
-        ParamPassingMode mode = ParamPassingMode::In;
-
-        /// The user-perceived type of the parameter.
-        Type* type = nullptr;
-    };
 
     /// Get combined information on the type and parameter-passing mode of a parameter.
     ///

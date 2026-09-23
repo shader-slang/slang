@@ -812,7 +812,8 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
         List<ParamPassingMode> paramPassingModes;
         Type* resultType = nullptr;
 
-        if (!callableDeclRef.getDecl()->funcType.type)
+        bool hasDirectFuncType = callableDeclRef.getDecl()->funcType.type != nullptr;
+        if (!hasDirectFuncType)
         {
             auto parameters = getParameters(context->astBuilder, callableDeclRef);
             for (auto paramDeclRef : parameters)
@@ -865,48 +866,6 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             {
                 emitType(context, resultType);
             }
-
-            // Include key modifiers in the mangled name so we never deduplicate
-            // things like a nonmutating method and a mutating method.
-            bool isMutating = false;
-            bool isRefThis = false;
-            bool isFwdDiff = false;
-            bool isBwdDiff = false;
-            bool isNoDiffThis = false;
-            for (auto modifier : callableDeclRef.getDecl()->modifiers)
-            {
-                if (as<MutatingAttribute>(modifier))
-                {
-                    isMutating = true;
-                }
-                else if (as<RefAttribute>(modifier))
-                {
-                    isRefThis = true;
-                }
-                else if (as<ForwardDifferentiableAttribute>(modifier))
-                {
-                    isFwdDiff = true;
-                }
-                else if (as<BackwardDifferentiableAttribute>(modifier))
-                {
-                    isBwdDiff = true;
-                }
-                else if (as<NoDiffThisAttribute>(modifier))
-                {
-                    isNoDiffThis = true;
-                }
-            }
-
-            if (isMutating)
-                emitRaw(context, "m");
-            if (isRefThis)
-                emitRaw(context, "r");
-            if (isFwdDiff)
-                emitRaw(context, "f");
-            if (isBwdDiff)
-                emitRaw(context, "b");
-            if (isNoDiffThis)
-                emitRaw(context, "n");
         }
         else
         {
@@ -916,6 +875,61 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
                              ->resolve());
             emitType(context, resolvedFuncType);
         }
+
+        auto thisParamInfo = findEffectiveThisParamInfo(context->astBuilder, callableDeclRef);
+
+        // Keep the established mangling stable while changing the source of truth for the
+        // effective `this` parameter. Historically, ordinary callables emitted `m` and `r` only
+        // for modes requested directly with `[mutating]` and `[__ref]`; `[constref]`, a setter's
+        // writable default, and modes inherited from an enclosing declaration emitted no suffix.
+        // Direct function-type declarations emitted none of these suffixes. The checked
+        // information cannot reproduce those spelling distinctions by itself because several
+        // spellings intentionally produce the same ParamInfo, and overlapping attributes can
+        // produce more than one suffix even though they resolve to one effective mode.
+        //
+        // We therefore use the checked information to determine whether the declaration has an
+        // effective `this` parameter, and inspect declaration provenance only to reproduce the
+        // legacy suffix bits. Changing the format to encode every effective mode belongs with the
+        // semantic change that needs those new ABI distinctions, rather than in this
+        // behavior-preserving refactor.
+        bool isMutating = false;
+        bool isRefThis = false;
+        bool isNoDiffThis =
+            !hasDirectFuncType && callableDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>();
+        if (!hasDirectFuncType && thisParamInfo)
+        {
+            isMutating = callableDeclRef.getDecl()->hasModifier<MutatingAttribute>();
+            isRefThis = callableDeclRef.getDecl()->hasModifier<RefAttribute>();
+        }
+
+        // Include other signature-relevant modifiers.
+        bool isFwdDiff = false;
+        bool isBwdDiff = false;
+        if (!hasDirectFuncType)
+        {
+            for (auto modifier : callableDeclRef.getDecl()->modifiers)
+            {
+                if (as<ForwardDifferentiableAttribute>(modifier))
+                {
+                    isFwdDiff = true;
+                }
+                else if (as<BackwardDifferentiableAttribute>(modifier))
+                {
+                    isBwdDiff = true;
+                }
+            }
+        }
+
+        if (isMutating)
+            emitRaw(context, "m");
+        if (isRefThis)
+            emitRaw(context, "r");
+        if (isFwdDiff)
+            emitRaw(context, "f");
+        if (isBwdDiff)
+            emitRaw(context, "b");
+        if (isNoDiffThis)
+            emitRaw(context, "n");
     }
 }
 

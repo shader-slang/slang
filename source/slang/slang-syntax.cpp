@@ -1,6 +1,7 @@
 #include "slang-syntax.h"
 
 #include "slang-ast-print.h"
+#include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-visitor.h"
 
@@ -977,6 +978,63 @@ std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
     {
         return {paramTypeWithDirection, ParamPassingMode::In};
     }
+}
+
+std::optional<ParamInfo> findEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
+{
+    SLANG_RELEASE_ASSERT(astBuilder);
+    SLANG_RELEASE_ASSERT(declRef);
+
+    auto decl = declRef.getDecl();
+    SLANG_RELEASE_ASSERT(decl->isChecked(DeclCheckState::SignatureChecked));
+
+    auto attribute = decl->findModifier<ThisParamInfoAttribute>();
+    if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
+    {
+        if (auto callableDeclRef = isDeclRefTypeOf<CallableDecl>(lookupDeclRef->getLookupSource()))
+        {
+            // Consider `apply_bwd`, an interface requirement looked up through a function-as-type.
+            // Its declaration's receiver is the interface `This`, but its callable ABI follows the
+            // function used as the lookup source: a free function has no effective `this`
+            // parameter, while a method has the same one as its primal declaration. Delegate to
+            // that callable's checked information so this query preserves both possibilities.
+            SLANG_RELEASE_ASSERT(
+                callableDeclRef.getDecl()->isChecked(DeclCheckState::SignatureChecked));
+            if (attribute)
+                return findEffectiveThisParamInfo(astBuilder, DeclRef<Decl>(callableDeclRef));
+        }
+    }
+
+    if (!attribute)
+        return std::nullopt;
+
+    ParamInfo result = attribute->info;
+    SLANG_RELEASE_ASSERT(result.type);
+    result.type = declRef.substitute(astBuilder, result.type);
+
+    // A specialization can replace an abstract effective `this` parameter type with a class type.
+    // Class-typed effective `this` parameters always use `In`, regardless of the mode recorded for
+    // the unspecialized declaration.
+    auto canonicalType = unwrapModifiedType(result.type)->getCanonicalType();
+    if (isDeclRefTypeOf<ClassDecl>(unwrapModifiedType(canonicalType)))
+    {
+        result.mode = ParamPassingMode::In;
+    }
+    else
+    {
+        // A specialization can also change whether the effective parameter type is copyable.
+        // Reapply the general type-dependent adjustment after substitution so that the returned
+        // mode agrees with the specialized type.
+        result.mode = adjustParamPassingModeBasedOnParamType(result.mode, result.type);
+    }
+    return result;
+}
+
+ParamInfo getEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
+{
+    auto result = findEffectiveThisParamInfo(astBuilder, declRef);
+    SLANG_RELEASE_ASSERT(result.has_value());
+    return *result;
 }
 
 bool doesTypeHaveNoDiffModifier(Type* type)

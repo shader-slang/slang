@@ -947,7 +947,7 @@ static void _lookUpInScopes(
             if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(containerDecl))
             {
                 // If we are checking an interface default method implementation,
-                // we should look up members from implicit `this` whose type is the explicit `This`
+                // we should look up members through `this`, whose type is the explicit `This`
                 // generic parameter, and skip looking up in the interface decl itself.
 
                 // Instead of looking up in the interface decl itself, we should
@@ -964,24 +964,24 @@ static void _lookUpInScopes(
                 }
 
                 // We need to skip looking up in the interface decl itself, since we are
-                // looking up in the implicit `this` type.
+                // looking up in the effective `this` type.
                 for (; scope && !as<InterfaceDecl>(scope->containerDecl); scope = scope->parent)
                 {
                     // We need to skip looking up in the interface decl itself, since we are
-                    // looking up in the implicit `this` type.
+                    // looking up in the effective `this` type.
                 }
                 break;
             }
 
             // Before we proceed up to the next outer scope to perform lookup
             // again, we need to consider what the current scope tells us
-            // about how to interpret uses of implicit `this` or `This`. For
-            // example, if we are inside a `[mutating]` method, then the implicit
-            // `this` that we use for lookup should be an l-value.
+            // about how to interpret uses of `this` or `This`. For example, the
+            // effective `this` parameter of a writable method makes the `this`
+            // value used for lookup an l-value.
             //
             // Similarly, if we look up a member in a type from the scope
-            // of some nested type, then there shouldn't be an implicit `this`
-            // expression for the outer type, but instead an implicit `This`.
+            // of some nested type, then there shouldn't be a `this` expression
+            // for the outer type; only its `This` type is available.
             //
             if (containerDeclRef.is<ConstructorDecl>())
             {
@@ -990,60 +990,52 @@ static void _lookUpInScopes(
                 //
                 thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
             }
-            else if (containerDeclRef.is<SetterDecl>())
-            {
-                // In the context of a `set` accessor, the members of the
-                // surrounding type are accessible through a mutable `this`.
-                //
-                // TODO: At some point we may want a way to opt out of this
-                // behavior; it is possible to have a setter on a `struct`
-                // that actually just sets data into a buffer that is
-                // referenced by one of the `struct`'s fields.
-                //
-                thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
-            }
             else if (auto funcDeclRef = containerDeclRef.as<FunctionDeclBase>())
             {
-                // The implicit `this`/`This` for a function-like declaration
-                // depends on modifiers attached to the declaration.
-                //
-                if (isEffectivelyStatic(funcDeclRef.getDecl()))
+                // Header checking can perform lookup through the callable that is currently being
+                // checked. Its effective `this` parameter information is attached only after that
+                // header pass completes, so querying it here would recursively try to finish the
+                // same declaration. Leave the breadcrumb unchanged until the checked information
+                // is available; lookup performed from the body and later phases takes the path
+                // below.
+                if (funcDeclRef.getDecl()->isChecked(DeclCheckState::SignatureChecked))
                 {
-                    // A `static` method only has access to an implicit `This`,
-                    // and does not have a `this` expression available.
-                    //
+                    std::optional<ParamInfo> thisParamInfo;
+                    if (request.semantics)
+                    {
+                        thisParamInfo = request.semantics->findEffectiveThisParamInfo(funcDeclRef);
+                    }
+                    else
+                    {
+                        thisParamInfo = findEffectiveThisParamInfo(astBuilder, funcDeclRef);
+                    }
+
+                    if (thisParamInfo)
+                    {
+                        thisParameterMode =
+                            doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode)
+                                ? LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue
+                                : LookupResultItem::Breadcrumb::ThisParameterMode::ImmutableValue;
+                    }
+                    else
+                    {
+                        // A function without an effective `this` parameter only has access to
+                        // `This`.
+                        thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
+                    }
+                }
+                else if (isEffectivelyStatic(funcDeclRef.getDecl()))
+                {
+                    // Signature checking can need lookup before the checked parameter information
+                    // is attached. Staticness is already known at that point and must still prevent
+                    // lookup from constructing a `this` value.
                     thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
-                }
-                else if (funcDeclRef.getDecl()->hasModifier<MutatingAttribute>())
-                {
-                    // In a non-`static` method marked `[mutating]` there is
-                    // an implicit `this` parameter that is mutable.
-                    //
-                    thisParameterMode =
-                        LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
-                }
-                else if (funcDeclRef.getDecl()->hasModifier<RefAttribute>())
-                {
-                    // In a non-`static` method marked `[ref]` there is
-                    // an implicit `this` parameter that is mutable.
-                    //
-                    thisParameterMode =
-                        LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
-                }
-                else
-                {
-                    // In all other cases, there is an implicit `this` parameter
-                    // that is immutable.
-                    //
-                    thisParameterMode =
-                        LookupResultItem::Breadcrumb::ThisParameterMode::ImmutableValue;
                 }
             }
             else if (containerDeclRef.as<AggTypeDeclBase>())
             {
-                // When lookup moves from a nested typed declaration to an
-                // outer scope, there is no ability to use an implicit `this`
-                // expression, and we have only the `This` type available.
+                // When lookup moves from a nested typed declaration to an outer scope, there is no
+                // `this` expression for the outer type, and only the `This` type is available.
                 //
                 thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
             }

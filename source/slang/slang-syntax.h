@@ -3,6 +3,8 @@
 
 #include "slang-ast-builder.h"
 
+#include <optional>
+
 namespace Slang
 {
 
@@ -567,6 +569,22 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
 /// adjusted to something else.
 ///
 ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
+
+/// Finds the checked information for `declRef`'s effective `this` parameter.
+///
+/// The declaration must have reached `DeclCheckState::SignatureChecked`. A declaration has a
+/// `ThisParamInfoAttribute` if and only if it has an effective `this` parameter, so an empty result
+/// means that the checked declaration has no such parameter. The returned type includes the
+/// substitutions carried by `declRef`. When a declaration with an effective receiver is looked up
+/// through a callable-as-type, the result is the callable lookup source's checked information;
+/// receiverless requirements remain receiverless.
+std::optional<ParamInfo> findEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
+
+/// Gets the checked information for `declRef`'s effective `this` parameter.
+///
+/// The declaration must have reached `DeclCheckState::SignatureChecked` and must have an effective
+/// `this` parameter. The returned type includes the substitutions carried by `declRef`.
+ParamInfo getEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
 
 /// Returns true if `type` or one of its modified-type bases carries `no_diff`.
 bool doesTypeHaveNoDiffModifier(Type* type);
