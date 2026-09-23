@@ -52,7 +52,7 @@ ArrayView<const char*> getCommitChars()
 {
     static const char* _commitCharsArray[] = {",", ".", ";", ":", "(", ")", "[", "]",
                                               "<", ">", "{", "}", "*", "&", "^", "%",
-                                              "!", "-", "=", "+", "|", "/", "?", " "};
+                                              "!", "-", "=", "+", "|", "/", "?"};
     return makeArrayView(_commitCharsArray, SLANG_COUNT_OF(_commitCharsArray));
 }
 
@@ -64,6 +64,13 @@ SlangResult LanguageServerCore::init(const InitializeParams& args)
     for (auto& wd : m_workspaceFolders)
     {
         rootUris.add(URI::fromString(wd.uri.getUnownedSlice()));
+    }
+    if (rootUris.getCount() == 0)
+    {
+        if (args.rootUri.hasValue && args.rootUri.value.getLength())
+            rootUris.add(URI::fromString(args.rootUri.value.getUnownedSlice()));
+        else if (args.rootPath.hasValue && args.rootPath.value.getLength())
+            rootUris.add(URI::fromLocalFilePath(args.rootPath.value.getUnownedSlice()));
     }
     m_workspace->init(rootUris, getOrCreateGlobalSession());
     return SLANG_OK;
@@ -3094,6 +3101,10 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         else if (key == "slang.additionalSearchPaths")
         {
             updateSearchPaths(kv.value);
+        }
+        else if (key == "slang.searchInAllWorkspaceDirectories")
+        {
+            updateSearchInWorkspace(kv.value);
         }
         else if (key == "slang.enableCommitCharactersInAutoCompletion")
         {
