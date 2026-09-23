@@ -66,9 +66,13 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: DebugFunctionDefinition [[GBWD_REC]] %s_bwdProp_genPoly
 
 // The apply and remat derivatives are folded away before SPIR-V, so their per-derivative records
-// are checked at the IR level (after autodiff): each is a distinct record named after itself, and
-// the derivative function carries it via a DebugFunction decoration that references that record.
+// are checked at the IR level (after autodiff): each is a distinct record named after itself. For
+// the concrete function the check also ties the record to its function via the DebugFunction
+// decoration; the generic function's apply/remat records still live inside the IRGeneric at this
+// point, so those are anchored on the record name alone.
 //IR-DAG: [[APPLY_REC:%[0-9]+]]{{.*}}DebugFunction("s_apply_diffSquare"
 //IR-DAG: [DebugFunction([[APPLY_REC]])]
 //IR-DAG: [[REMAT_REC:%[0-9]+]]{{.*}}DebugFunction("s_remat_diffSquare"
 //IR-DAG: [DebugFunction([[REMAT_REC]])]
+//IR-DAG: DebugFunction("s_apply_genPoly"
+//IR-DAG: DebugFunction("s_remat_genPoly"

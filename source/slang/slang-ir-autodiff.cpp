@@ -1354,7 +1354,9 @@ bool isDiffInst(IRInst* inst)
 
 void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
 {
-    // Copy debug decorations.
+    // Copy debug decorations. All are cloned except DebugFuncDecoration, which is rebuilt
+    // per-derivative below -- each derivative needs its own IRDebugFunction, not a shared
+    // reference.
     for (auto decor : srcFunc->getDecorations())
     {
         switch (decor->getOp())
@@ -1374,8 +1376,12 @@ void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
                 auto srcDebugFunc =
                     cast<IRDebugFunction>(as<IRDebugFuncDecoration>(decor)->getDebugFunc());
 
-                // A derivative lacks a name hint only when its original was unnamed (its debug name
-                // came from a linkage name); reuse the source name so the record is still distinct.
+                // generateName / translateFuncHeader give the derivative its name hint before this
+                // runs, but only when the original itself had one; a derivative therefore lacks a
+                // name hint only for an unnamed original whose debug name came from a linkage name.
+                // Reuse that source name for it -- the derivative still gets its own
+                // IRDebugFunction instance (preserving the one-record-per-body binding); only the
+                // name text is shared.
                 IRInst* name = srcDebugFunc->getName();
                 if (auto nameHint = destFunc->findDecoration<IRNameHintDecoration>())
                     name = nameHint->getNameOperand();
