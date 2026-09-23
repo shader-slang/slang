@@ -15675,19 +15675,17 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                     addModifier(paramDecl, noDiffModifier);
                 }
             }
-            // A `groupshared` parameter is passed by reference, so there is nowhere to propagate a
-            // derivative back to. Span the diagnostic on the `groupshared` modifier the user wrote:
-            // the reference modifier is injected during parameter checking and carries no source
-            // location, and the `BorrowModifier` message below would name a spelling that appears
-            // nowhere in the source. This sits outside the `no_diff` check because `no_diff` does
-            // not stop the parameter being passed by reference -- without it, both spellings reach
-            // an unconditional abort in the backward-diff type builders.
+            // A differentiable `groupshared` parameter is passed by reference, and current autodiff
+            // lowering has no backward-diff signature for a by-reference differentiable value, so
+            // it is rejected here rather than failing later in lowering. `no_diff` (excluded from
+            // differentiation) and a non-differentiable element type (no derivative expected) need
+            // no gradient through the parameter, so this check skips them. The diagnostic is
+            // spanned on the `groupshared` modifier the user wrote, because the reference modifier
+            // is injected during parameter checking and carries no source location.
             if (auto groupSharedModifier = paramDecl->findModifier<HLSLGroupSharedModifier>())
             {
-                // Only a differentiable parameter type is a problem: a derivative is only expected
-                // through a parameter whose type conforms to `IDifferentiable`, so
-                // `const groupshared uint[N]` is fine while `const groupshared float[N]` is not.
                 if (isTypeDifferentiable(paramDecl->type.type) &&
+                    !paramDecl->hasModifier<NoDiffModifier>() &&
                     (paramDecl->hasModifier<RefModifier>() ||
                      paramDecl->hasModifier<BorrowModifier>()))
                 {

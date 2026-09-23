@@ -5913,11 +5913,15 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
             }
         case ParamPassingMode::Ref:
             {
-                // Not allowed..
-                SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
-            }
+                // A `no_diff` `ref` parameter legitimately uses this no-diff type; the same mapping
+                // also keeps an unsupported differentiable `ref` parameter (which autodiff cannot
+                // lower) from aborting here.
+                paramTypes.add(m_astBuilder->getModifiedType(
+                    paramValType,
+                    {m_astBuilder->getNoDiffModifierVal()}));
 
-            break;
+                break;
+            }
         }
     }
 
@@ -7666,20 +7670,18 @@ static Expr* getBaseObjectOfProjection(Expr* expr)
     }
 }
 
-// A `groupshared` parameter is a by-reference alias of a single thread-group-shared location, so
-// its argument must itself name thread-group-shared storage. Passing a private local, a copy, or an
-// rvalue would silently alias non-shared memory as shared, breaking the group-shared aliasing
-// semantics HLSL requires (DXC rejects it outright with error 0043). `getValidTypeForAddressOf`
-// already computes the addressable pointer type -- carrying its address space -- for an addressable
-// expression, so reuse it as the source of truth rather than re-deriving addressability here.
-void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
+// Return whether `arg` names thread-group-shared storage: strip the projections that read a part of
+// an object to reach the addressed object, then ask `getValidTypeForAddressOf` for its addressable
+// pointer type and inspect that pointer's address space. `getValidTypeForAddressOf` already
+// computes the addressable pointer type -- carrying its address space -- for an addressable
+// expression, so it is reused as the source of truth rather than re-deriving addressability here.
+bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
 {
-    if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>())
-        return;
+    if (!arg)
+        return false;
 
-    auto addressedExpr = getBaseObjectOfProjection(argIn);
+    auto addressedExpr = getBaseObjectOfProjection(arg);
 
-    bool namesGroupSharedStorage = false;
     if (auto ptrType = getValidTypeForAddressOf(
             this,
             m_astBuilder,
@@ -7687,11 +7689,21 @@ void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr*
             getType(m_astBuilder, addressedExpr)))
     {
         if (auto addrSpaceVal = as<ConstantIntVal>(ptrType->getAddressSpace()))
-            namesGroupSharedStorage =
-                (AddressSpace)addrSpaceVal->getValue() == AddressSpace::GroupShared;
+            return (AddressSpace)addrSpaceVal->getValue() == AddressSpace::GroupShared;
     }
+    return false;
+}
 
-    if (!namesGroupSharedStorage)
+// A `groupshared` parameter is a by-reference alias of a single thread-group-shared location, so
+// its argument must itself name thread-group-shared storage. Passing a private local, a copy, or an
+// rvalue would silently alias non-shared memory as shared, breaking the group-shared aliasing
+// semantics HLSL requires (DXC rejects it outright with error 0043).
+void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
+{
+    if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>())
+        return;
+
+    if (!argumentNamesGroupSharedStorage(argIn))
         getSink()->diagnose(Diagnostics::GroupsharedArgumentMustBeGroupsharedLvalue{
             .param = getText(paramIn->getName()),
             .arg = argIn});

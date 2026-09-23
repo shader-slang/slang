@@ -1,11 +1,7 @@
-// A `groupshared` parameter is passed by reference, so a differentiable function cannot propagate a
-// derivative back through it. Both the read-write and the `const` spelling are rejected, and
-// `no_diff` does not change that -- the parameter is still passed by reference. Without this
-// diagnostic each case reaches an unconditional abort in the backward-diff type builders
-// (shader-slang/slang#10641).
-//
-// A parameter whose type is not differentiable is unaffected: `uint[N]` does not conform to
-// `IDifferentiable`, so no derivative is expected through it in the first place.
+// A `groupshared` parameter of a differentiable function is passed by reference, which autodiff
+// cannot currently lower, so both the bare and `const groupshared` spellings are rejected. A
+// `no_diff` parameter (excluded from differentiation) and a non-differentiable element type (no
+// derivative expected) need no gradient through the parameter and compile.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry computeMain -stage compute
 
@@ -13,6 +9,7 @@ static const uint N = 8;
 groupshared float sharedFloats[N];
 groupshared uint sharedUInts[N];
 
+// Rejected: a bare (read-write) `groupshared` parameter with a differentiable element type.
 [Differentiable]
 float readWrite(uint tid, groupshared float s[N])
 //CHECK:                  ^^^^^^^^^^^ error E38038
@@ -20,6 +17,8 @@ float readWrite(uint tid, groupshared float s[N])
     return s[tid];
 }
 
+// Rejected: a read-only `const groupshared` parameter with a differentiable element type is likewise
+// unlowerable in backward-diff today.
 [Differentiable]
 float readOnly(uint tid, const groupshared float s[N])
 //CHECK:                       ^^^^^^^^^^^ error E38038
@@ -27,15 +26,15 @@ float readOnly(uint tid, const groupshared float s[N])
     return s[tid];
 }
 
-// `no_diff` does not help: the parameter is still passed by reference.
+// Accepted: `no_diff` excludes the parameter from differentiation, so its passing mode is irrelevant.
 [Differentiable]
 float noDiff(uint tid, no_diff const groupshared float s[N])
-//CHECK:                             ^^^^^^^^^^^ error E38038
 {
     return s[tid];
 }
 
-// A non-differentiable element type is accepted -- `uint[N]` does not conform to `IDifferentiable`.
+// Accepted: a non-differentiable element type expects no derivative -- `uint[N]` does not conform to
+// `IDifferentiable`.
 [Differentiable]
 float nonDifferentiableElement(uint tid, const groupshared uint s[N])
 {

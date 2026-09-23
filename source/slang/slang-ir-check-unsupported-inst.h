@@ -4,7 +4,7 @@ namespace Slang
 {
 struct IRModule;
 class DiagnosticSink;
-class TargetProgram;
+class TargetRequest;
 
-void checkUnsupportedInst(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
+void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink);
 } // namespace Slang

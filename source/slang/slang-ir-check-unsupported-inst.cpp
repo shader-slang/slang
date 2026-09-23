@@ -3,7 +3,6 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-target-program.h"
 #include "slang-target.h"
 
 namespace Slang
@@ -175,16 +174,8 @@ static bool instReferencesStringType(IRInst* inst)
     return false;
 }
 
-void checkUnsupportedInst(TargetProgram* targetProgram, IRFunc* func, DiagnosticSink* sink)
+void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
 {
-    auto target = targetProgram->getTargetReq();
-
-    // Minimum-optimization mode intentionally skips the non-essential checks in this pass.
-    // The effective option set lives on the `TargetProgram`, since component options passed to
-    // `linkWithOptions` override the target's own.
-    const bool checksGatedOnOptimizations =
-        !targetProgram->getOptionSet().shouldPerformMinimumOptimizations();
-
     // Khronos targets (SPIR-V and GLSL) and WGSL cannot place an
     // image/sampler/subpass/acceleration-structure handle in a function-local
     // variable: SPIR-V forbids OpStore/OpLoad (and OpPhi) of such a handle, GLSL
@@ -193,35 +184,13 @@ void checkUnsupportedInst(TargetProgram* targetProgram, IRFunc* func, Diagnostic
     // of those types reaching here is invalid output we cannot legalize yet
     // (issue #10526, typically from selecting or returning a resource through
     // control flow); reject it with a diagnostic rather than emitting invalid code.
-    const bool rejectOpaqueLocals =
-        checksGatedOnOptimizations && (isKhronosTarget(target) || isWGPUTarget(target));
+    const bool rejectOpaqueLocals = isKhronosTarget(target) || isWGPUTarget(target);
 
     // The `String` type has no runtime representation in kernel C++/CUDA output;
     // a use there (e.g. `let s : String = "1"; s.getLength();`) would otherwise
     // emit uncompilable code referencing an undefined `String`/method instead of
     // any diagnostic.
-    const bool rejectString = checksGatedOnOptimizations && isKernelCPPOrCUDASourceTarget(target);
-
-    // HLSL cannot pass thread-group-shared memory across a function boundary -- DXC rejects it with
-    // error 0043 -- so a `groupshared` parameter that the inliner could not remove is invalid
-    // output we cannot legalize.
-    if (isD3DTarget(target))
-    {
-        for (auto param : func->getParams())
-        {
-            if (!as<IRGroupSharedRate>(param->getRate()))
-                continue;
-
-            // A mesh-shader payload also carries the group-shared rate, but HLSL has dedicated
-            // `in payload` syntax for it, so it crosses the boundary legitimately.
-            if (param->findDecoration<IRHLSLMeshPayloadDecoration>())
-                continue;
-
-            auto loc = param->sourceLoc.isValid() ? param->sourceLoc : func->sourceLoc;
-            sink->diagnose(
-                Diagnostics::GroupsharedParameterNotAllowedOnHlslWithBoundary{.location = loc});
-        }
-    }
+    const bool rejectString = isKernelCPPOrCUDASourceTarget(target);
 
     const bool supportsFuncTypedValue = doesTargetSupportFuncTypedValue(target);
 
@@ -256,11 +225,8 @@ void checkUnsupportedInst(TargetProgram* targetProgram, IRFunc* func, Diagnostic
             switch (inst->getOp())
             {
             case kIROp_GetArrayLength:
-                if (checksGatedOnOptimizations)
-                {
-                    sink->diagnose(
-                        Diagnostics::AttemptToQuerySizeOfUnsizedArray{.location = inst->sourceLoc});
-                }
+                sink->diagnose(
+                    Diagnostics::AttemptToQuerySizeOfUnsizedArray{.location = inst->sourceLoc});
                 break;
             case kIROp_Var:
                 if (rejectOpaqueLocals)
@@ -317,7 +283,7 @@ void checkUnsupportedInst(TargetProgram* targetProgram, IRFunc* func, Diagnostic
     }
 }
 
-void checkUnsupportedInst(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
+void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
     // The CUDA/PTX emitter has no type name for a multisampled texture, whereas
     // the host C++ emitter does.
@@ -359,8 +325,7 @@ void checkUnsupportedInst(IRModule* module, TargetProgram* targetProgram, Diagno
         case kIROp_VectorType:
         case kIROp_MatrixType:
             {
-                if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations() &&
-                    !as<IRBasicType>(globalInst->getOperand(0)) &&
+                if (!as<IRBasicType>(globalInst->getOperand(0)) &&
                     !as<IRPackedFloatType>(globalInst->getOperand(0)))
                 {
                     sink->diagnose(Diagnostics::UnsupportedBuiltinType{
@@ -384,14 +349,14 @@ void checkUnsupportedInst(IRModule* module, TargetProgram* targetProgram, Diagno
                 break;
             }
         case kIROp_Func:
-            checkUnsupportedInst(targetProgram, as<IRFunc>(globalInst), sink);
+            checkUnsupportedInst(target, as<IRFunc>(globalInst), sink);
             break;
         case kIROp_Generic:
             {
                 auto generic = as<IRGeneric>(globalInst);
                 auto innerFunc = as<IRFunc>(findGenericReturnVal(generic));
                 if (innerFunc)
-                    checkUnsupportedInst(targetProgram, innerFunc, sink);
+                    checkUnsupportedInst(target, innerFunc, sink);
                 break;
             }
         default:

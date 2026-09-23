@@ -2920,7 +2920,8 @@ Result linkAndOptimizeIR(
     }
     SLANG_PASS(collectMetadata, targetProgram, *metadata);
 
-    SLANG_PASS(checkUnsupportedInst, targetProgram, sink);
+    if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
+        SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
 

@@ -4691,7 +4691,7 @@ err(
     "cannot-use-groupshared-on-differentiable-function-parameter",
     38038,
     "'~spelling' on a parameter of a differentiable function",
-    span { loc = "modifier:Modifier", message = "a 'groupshared' parameter is passed by reference, so no derivative can be propagated back through it; 'no_diff' does not help, because the parameter is still passed by reference." }
+    span { loc = "modifier:Modifier", message = "a 'groupshared' parameter is passed by reference, so no derivative can be propagated back through it; mark it 'no_diff' to exclude it from differentiation." }
 )
 
 err(
