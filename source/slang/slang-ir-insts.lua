@@ -2068,10 +2068,10 @@ local insts = {
 				availableInDownstreamIR = { struct_name = "AvailableInDownstreamIRDecoration", min_operands = 1 },
 			},
 			{
+				-- Added to an entry point's input parameter, and copied onto the entry-point function
 				GeometryInputPrimitiveTypeDecoration = {
 					{
 						pointPrimitiveType = {
-							-- Added to IRParam parameters to an entry point
 							struct_name = "PointInputPrimitiveTypeDecoration",
 						},
 					},

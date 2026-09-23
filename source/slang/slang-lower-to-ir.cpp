@@ -14994,6 +14994,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addDecoration(irFunc, kIROp_NonDynamicUniformReturnDecoration);
         }
 
+        // Explicitly add a geometry input primitive topology decoration to handle the case where
+        // the input struct is empty.
+        if (auto firstBlock = irFunc->getFirstBlock();
+            firstBlock && !irFunc->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
+        {
+            for (auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam())
+            {
+                if (auto geomDecor = pp->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
+                {
+                    getBuilder()->addDecoration(irFunc, geomDecor->getOp());
+                    break;
+                }
+            }
+        }
+
         verifyComputeDerivativeGroupModifiers(
             getSink(),
             decl->loc,

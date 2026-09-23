@@ -1594,9 +1594,9 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
                 m_writer->emit(") in;\n");
             }
 
-            // These decorations were moved from the parameters to the entry point by
-            // ir-glsl-legalize. The actual parameters have become potentially multiple global
-            // parameters.
+            // The input primitive topology is available on the entry-point function by emit time;
+            // the emitter reads it there because the input parameter may have been split into
+            // multiple globals or erased entirely (e.g. an empty input struct).
             if (auto decor = as<IRGeometryInputPrimitiveTypeDecoration>(decoration))
             {
                 switch (decor->getOp())
