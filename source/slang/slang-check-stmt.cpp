@@ -91,13 +91,7 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
 
         // A local generic type is wrapped in a `GenericDecl`, which is not an
         // `AggTypeDeclBase`, so the loop above does not reach it. Its inner type still
-        // needs the same eager conformance checking; `ensureAllDeclsRec` recurses into
-        // `genericDecl->inner` to provide it, as the module-scope path relies on.
-        // Restricting to an aggregate inner is the exactly-right condition, not just an
-        // optimization: only an aggregate inner can contain the `InheritanceDecl` whose
-        // `witnessTable` this block pre-check must populate. A generic wrapping a function
-        // or a type alias has no such conformance table for this pass to fill, so relaxing
-        // the guard would only drive unrelated decls into early checking.
+        // needs the same conformance checking.
         for (auto genericDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<GenericDecl>())
         {
             if (as<AggTypeDeclBase>(genericDecl->inner))
