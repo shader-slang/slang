@@ -652,7 +652,9 @@ struct IRGenContext
     DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
     // Declaration scope is independent of the basic block where a variable is eventually stored.
     IRInst* currentDebugScope = nullptr;
+    // Insert lexical metadata before this function so its enclosing generic owns it.
     IRInst* debugScopeOwner = nullptr;
+    // The function scope already covers this body; it needs no additional lexical block.
     Stmt* debugFunctionBody = nullptr;
 
     // Shader-coverage instrumentation. Line, function, and branch modes
@@ -10212,8 +10214,11 @@ static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
         stmt == context->debugFunctionBody)
         return nullptr;
     auto scopedStmt = as<ScopeStmt>(stmt);
-    if (!scopedStmt || !scopedStmt->scopeDecl ||
-        !(as<BlockStmt>(stmt) || (as<ForStmt>(stmt) && !as<UnscopedForStmt>(stmt))))
+    if (!scopedStmt || !scopedStmt->scopeDecl)
+        return nullptr;
+    if (as<UnscopedForStmt>(stmt))
+        return nullptr;
+    if (!as<BlockStmt>(stmt) && !as<ForStmt>(stmt))
         return nullptr;
     auto source = getOrEmitDebugSource(context, stmt->loc);
     if (!source)
