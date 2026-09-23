@@ -585,10 +585,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Map a Slang IR instruction to the corresponding SPIR-V debug instruction.
     Dictionary<IRInst*, SpvInst*> m_mapIRInstToSpvDebugInst;
 
-    // OpFunction bodies whose DebugFunctionDefinition has already been emitted. We track this
-    // separately from the DebugFunction record cache (m_mapIRInstToSpvInst) because the two SPIR-V
-    // insts have different lifetimes; see maybeEmitDebugFunctionDefinition.
-    HashSet<SpvInst*> m_debugFunctionDefinitionsEmitted;
+    // DebugFunction records for which a DebugFunctionDefinition has already been emitted. A record
+    // binds to at most one definition (the NonSemantic invariant), so we dedup by record; see
+    // maybeEmitDebugFunctionDefinition.
+    HashSet<SpvInst*> m_debugFunctionsWithDefinition;
 
     /// Register that `irInst` maps to `spvInst`
     void registerInst(IRInst* irInst, SpvInst* spvInst)
@@ -10677,15 +10677,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     // Emit the DebugFunctionDefinition that binds the concrete OpFunction body `spvFunc` (whose
     // first block is `firstBlock`) to its DebugFunction record `debugFuncInfo`, at most once per
-    // body. We track emitted definitions separately from the DebugFunction record cache because the
-    // record (once per IRDebugFunction) and the definition (once per OpFunction body) have
-    // different lifetimes: the record may already have been emitted early and bare via the global
-    // debug-inst path — for example when a caller-scope-restore DebugScope inserted by inlining
-    // precedes a DebugVar and resolves this function as that var's scope — whereas the definition
-    // must still be emitted for each concrete OpFunction body regardless of whether the record was
-    // already cached. The only caller passing a non-null spvFunc is emitFuncDefinition, once per
-    // body, so the per-spvFunc set is defensive against a future path binding a body twice rather
-    // than load-bearing today.
+    // record. A DebugFunction binds to a single body — the NonSemantic invariant that a
+    // DebugFunction has one DebugFunctionDefinition — so we dedup on the record, not the body. This
+    // is separate from the record cache (m_mapIRInstToSpvInst) because the record may already have
+    // been emitted early and bare via the global debug-inst path — for example when a
+    // caller-scope-restore DebugScope inserted by inlining precedes a DebugVar and resolves this
+    // function as that var's scope — whereas the definition must still be emitted for the concrete
+    // body. Deduping on the record is load-bearing, not merely defensive: reverse-mode autodiff can
+    // make several generated OpFunctions share one IRDebugFunction (copyDebugInfo clones the
+    // decoration and the module-global record is not remapped), and without this dedup a definition
+    // would be emitted for each shared body, breaking the one-definition-per-record invariant.
     void maybeEmitDebugFunctionDefinition(
         SpvInst* firstBlock,
         SpvInst* spvFunc,
@@ -10699,7 +10700,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (!firstBlock || !spvFunc)
             return;
         SLANG_RELEASE_ASSERT(debugFuncInfo);
-        if (m_debugFunctionDefinitionsEmitted.add(spvFunc))
+        if (m_debugFunctionsWithDefinition.add(debugFuncInfo))
         {
             emitOpDebugFunctionDefinition(
                 firstBlock,
