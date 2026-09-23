@@ -14,7 +14,7 @@ Control flow statements define the control flow of the program. The control flow
 
 - [if](statements-if.md) — conditional branching.
 - [for](statements-loop.md) — loop execution consisting of initialization, loop condition (evaluated before
-  iteration), loop statement, and a post-loop action.
+  iteration), and loop statement with a post-iteration expression (evaluated after each iteration).
 - [while](statements-loop.md) — loop execution consisting of loop condition (evaluated before iteration) and
   loop statement.
 - [do-while](statements-loop.md) — loop execution consisting of loop condition (evaluated after iteration) and

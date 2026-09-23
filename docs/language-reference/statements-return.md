@@ -20,8 +20,8 @@ return value type, the provided return value is [implicitly converted](expressio
 function return value type. The return value expression may also be an initializer list in which case the
 initializer list is passed to the appropriate constructor of the return value type.
 
-A function with a non-void return value type must execute a `return` statement on every path that completes normally.
-Omitting the `return` statement on such a path is an error.
+A function with a non-void return value type must execute a `return` statement on every path that completes
+normally. Omitting the `return` statement on such a path is an error.
 
 If the return value type of the enclosing function is [void](types-fundamental.md), the return value may be
 omitted. It is also permitted to explicitly return a `void` value. Omitting the `return` statement is also

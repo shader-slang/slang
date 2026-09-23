@@ -27,9 +27,9 @@ declaration (*`stmt-label-decl`*) matches, which need not be the innermost break
 
 A `continue` statement skips the rest of the current loop iteration. In `while` and `do-while` loops, a
 `continue` statement jumps to the loop condition evaluation. In `for` loops, a `continue` statement jumps to
-the post-loop expression evaluation, after which the loop condition is evaluated. In both cases, if the loop
-condition evaluates to `true`, looping continues. A `continue` statement cannot target an outer loop, as it
-does not accept a statement label.
+the post-iteration expression evaluation, after which the loop condition is evaluated. In both cases, if the
+loop condition evaluates to `true`, looping continues. A `continue` statement cannot target an outer loop, as
+it does not accept a statement label.
 
 Any breakable statement can be prefixed by a statement label declaration (*`stmt-label-decl`*).
 

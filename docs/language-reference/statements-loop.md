@@ -21,7 +21,7 @@
 > **`'for'`** **`'('`**<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`init-stmt`*<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[*`cond-expr`*] **`';'`**<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[*`post-loop-expr`*] **`')'`**<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[*`post-iter-expr`*] **`')'`**<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`loop-stmt`*
 
 ## Description
@@ -53,8 +53,8 @@ In sequential form:
 A `for` loop is a variation of the `while` loop. It begins by executing the initialization statement
 *`init-stmt`*. Then the loop condition *`cond-expr`* is evaluated. If the loop condition evaluates to `false`,
 the `for` loop terminates and the `for` statement completes. Otherwise, the loop statement *`loop-stmt`* is
-executed, after which the post-loop expression *`post-loop-expr`* is evaluated. Then the loop condition is
-evaluated again to determine whether the looping continues.
+executed, after which the post-iteration expression *`post-iter-expr`* is evaluated. Then the loop condition
+is evaluated again to determine whether the looping continues.
 
 In sequential form:
 
@@ -62,14 +62,13 @@ In sequential form:
 2. Evaluate the loop condition *`cond-expr`*.
 3. If the loop condition is `false`, go to step 7.
 4. Execute *`loop-stmt`*.
-5. Evaluate *`post-loop-expr`*.
+5. Evaluate *`post-iter-expr`*.
 6. Go to step 2.
 7. End of `for` loop.
 
 In a `for` loop, the *`init-stmt`* may be an [empty statement](statements-empty.md), i.e., just the semicolon
 (**`';'`**). The loop condition *`cond-expr`* may be omitted, in which case it is substituted with `true`. The
-post-loop expression *`post-loop-expr`* may also be omitted, in which case the post-loop expression is not
-evaluated.
+post-iteration expression *`post-iter-expr`* may also be omitted, in which case it is not evaluated.
 
 The loop condition may not be omitted in `while` and `do-while` statements.
 
@@ -80,10 +79,10 @@ A loop statement is a [breakable statement](statements-break-and-continue.md), a
 statement label declaration. A [`break` statement](statements-break-and-continue.md) can be used to exit a
 loop statement.
 
-A loop iteration can be terminated with a [`continue` statement](statements-break-and-continue.md). In
-`for` loops, a `continue` statement jumps to post-loop expression evaluation after which the loop condition
-*`cond-expr`* is evaluated to determine whether the looping continues. In `while` loops and `do-while`
-loops, a `continue` statement jumps to evaluating the loop condition.
+A loop iteration can be terminated with a [`continue` statement](statements-break-and-continue.md). In `for`
+loops, a `continue` statement jumps to the post-iteration expression evaluation, after which the loop
+condition *`cond-expr`* is evaluated to determine whether the looping continues. In `while` loops and
+`do-while` loops, a `continue` statement jumps to evaluating the loop condition.
 
 A loop statement can be unrolled with the
 [\[ForceUnroll\]](../../../core-module-reference/attributes/forceunroll-05.html) attribute. This forces the
