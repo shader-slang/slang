@@ -7299,6 +7299,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return false;
     }
 
+    // Returns true if this module has an intersection-shader entry point.
+    // We use this when deciding whether RayTmaxKHR must be Volatile under
+    // the GLSL450 memory model (see getBuiltinGlobalVar).
+    bool moduleHasIntersectionEntryPoint()
+    {
+        for (auto globalInst : m_irModule->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            if (auto entryPointDecor = func->findDecoration<IREntryPointDecoration>())
+            {
+                if (entryPointDecor->getProfile().getStage() == Stage::Intersection)
+                    return true;
+            }
+        }
+        return false;
+    }
+
     bool needFlatDecorationForBuiltinVar(IRInst* irInst)
     {
         if (!irInst)
@@ -7357,6 +7376,30 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 nullptr,
                 varInst,
                 SpvDecorationPatch);
+            break;
+        case SpvBuiltInRayTmaxKHR:
+            // Without VulkanMemoryModel, spirv-val requires Volatile on a
+            // RayTmaxKHR Input variable used from IntersectionKHR
+            // (VUID-StandaloneSpirv-VulkanMemoryModel-04678). VulkanKHR
+            // forbids Volatile on the variable itself.
+            //
+            // Consider this example:
+            //
+            //     [shader("intersection")]
+            //     void main() { float t = RayTCurrent(); ... }
+            //
+            // We lower RayTCurrent() to this builtin. If any entry point in
+            // the module is an intersection shader and the memory model is
+            // still GLSL450, we decorate the variable Volatile so validation
+            // matches the Vulkan standalone SPIR-V rules.
+            if (m_memoryModel != SpvMemoryModelVulkan && moduleHasIntersectionEntryPoint())
+            {
+                emitOpDecorate(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    nullptr,
+                    varInst,
+                    SpvDecorationVolatile);
+            }
             break;
         }
         m_builtinGlobalVars[key] = varInst;
