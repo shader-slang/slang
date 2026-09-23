@@ -530,7 +530,7 @@ ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob**
 
     DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         auto linked = fillRequirements(this);
         if (!linked)
@@ -539,6 +539,7 @@ ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob**
         *outLinkedComponentType = ComPtr<slang::IComponentType>(linked).detach();
         return SLANG_OK;
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         outputExceptionDiagnostic(e, sink, outDiagnostics);
@@ -554,6 +555,7 @@ ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob**
         outputExceptionDiagnostic(sink, outDiagnostics);
         return SLANG_FAIL;
     }
+#endif
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::linkWithOptions(
@@ -761,7 +763,7 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             return artifact.get();
         }
     }
-    try
+    SLANG_EXCEPTION_TRY
     {
         // If the user hasn't specified any entry points, then we should
         // discover all entrypoints that are defined in linked modules, and
@@ -828,6 +830,7 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
         }
         return artifact.get();
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const Exception& e)
     {
         if (outDiagnostics && !*outDiagnostics)
@@ -842,6 +845,7 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
         }
         return nullptr;
     }
+#endif
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL

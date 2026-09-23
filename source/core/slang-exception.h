@@ -4,6 +4,15 @@
 #include "slang-common.h"
 #include "slang-string.h"
 
+// Macroizes the opening `try` of an exception-guarded block. The matching `catch` clauses must
+// still be wrapped in `#if SLANG_HAS_EXCEPTIONS` directly: they name exception types, bind the
+// caught object, and rethrow, none of which is valid syntax under -fno-exceptions.
+#if SLANG_HAS_EXCEPTIONS
+#define SLANG_EXCEPTION_TRY try
+#else
+#define SLANG_EXCEPTION_TRY
+#endif
+
 namespace Slang
 {
 // NOTE!
