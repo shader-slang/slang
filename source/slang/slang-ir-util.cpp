@@ -100,12 +100,14 @@ bool isAnnotation(IRInst* inst)
 
 bool isDebugInst(IRInst* inst)
 {
-    // The debug "local" instructions that lowering/inlining interleaves among a function's
-    // ordinary insts under `-g` (the set the emitters process per block, plus DebugLine/
-    // DebugVar). They have no runtime or control-flow effect, so cost/ordering heuristics may
-    // ignore them. (Some define handles referenced elsewhere, so a transform that erases insts
-    // must still check uses.) Module-level debug insts (DebugSource, DebugFunction, ...) and
-    // DebugLocationDecoration never appear as a block's ordinary insts and are omitted.
+    // The debug "local" attribution opcodes — those classified within a function body's
+    // instructions (the set the emitters process per block, plus DebugLine/DebugVar), as
+    // opposed to the module-level DebugSource/DebugFunction/DebugBuildIdentifier/
+    // DebugCompilationUnit or the DebugLocationDecoration, which never appear as a block's
+    // ordinary insts and are omitted. Recognizing the full set keeps callers correct
+    // regardless of which are currently emitted. They have no runtime or control-flow effect,
+    // so cost/ordering heuristics may ignore them; a transform that erases insts must still
+    // check uses, since some define handles referenced elsewhere.
     switch (inst->getOp())
     {
     case kIROp_DebugLine:

@@ -108,11 +108,12 @@ IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IR
 
 bool isAnnotation(IRInst* inst);
 
-// True if inst is a debug attribution instruction (DebugLine/DebugScope/DebugVar/DebugValue
-// and related) that lowering/inlining interleaves among the ordinary insts of a function body
-// under `-g`. These have no runtime or control-flow effect, so cost/ordering heuristics may
-// ignore them; a transform that *erases* insts must still respect uses (some, such as DebugVar
-// and DebugInlinedAt, define handles referenced elsewhere).
+// True if inst is one of the block-local debug attribution opcodes (DebugLine/DebugScope/
+// DebugVar/DebugValue and related) — the debug ops classified within a function body's
+// instructions, as opposed to module-level debug insts. These have no runtime or control-flow
+// effect, so cost/ordering heuristics may ignore them; a transform that *erases* insts must
+// still respect uses (some, such as DebugVar and DebugInlinedAt, define handles referenced
+// elsewhere).
 bool isDebugInst(IRInst* inst);
 
 bool isPtrToClassType(IRInst* type);
