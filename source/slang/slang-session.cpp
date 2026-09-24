@@ -211,7 +211,7 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
             DiagnosticSink::Flag::MachineReadableDiagnostics);
     }
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         auto name = getNamePool()->getName(moduleName);
 
@@ -220,6 +220,7 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
 
         return asExternal(module);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         outputExceptionDiagnostic(e, sink, outDiagnostics);
@@ -235,6 +236,7 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
         outputExceptionDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
+#endif
 }
 
 slang::IModule* Linkage::loadModuleFromBlob(
@@ -257,7 +259,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
     }
 
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         // When `source` is null, read the file at `path` and reuse the one blob
         // for the digest and the load so both see identical bytes, incl.
@@ -338,6 +340,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
         sink.getBlobIfNeeded(outDiagnostics);
         return asExternal(module.get());
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         outputExceptionDiagnostic(e, sink, outDiagnostics);
@@ -353,6 +356,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
         outputExceptionDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
+#endif
 }
 
 SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
@@ -505,7 +509,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
     }
 
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
-    try
+    SLANG_EXCEPTION_TRY
     {
         auto specializedType =
             specializeType(unspecializedType, typeArgs.getCount(), typeArgs.getBuffer(), &sink);
@@ -513,6 +517,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
 
         return asExternal(specializedType);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         outputExceptionDiagnostic(e, sink, outDiagnostics);
@@ -523,6 +528,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
         outputExceptionDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
+#endif
 }
 
 DeclRef<GenericDecl> getGenericParentDeclRef(
@@ -897,7 +903,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
     DiagnosticSink sink;
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         auto sharedSemanticsContext = getSemanticsForReflection();
         SemanticsVisitor visitor(sharedSemanticsContext);
@@ -912,9 +918,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
             result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
         }
     }
-    catch (...)
-    {
-    }
+#if SLANG_HAS_EXCEPTIONS
+    catch (...) {}
+#endif
     sink.getBlobIfNeeded(outDiagnostics);
     bool success = (result != nullptr);
     *outConformanceComponentType = result.detach();
@@ -1139,16 +1145,18 @@ void Linkage::loadParsedModule(
 
     int errorCountBefore = sink->getErrorCount();
     int errorCountAfter;
-    try
+    SLANG_EXCEPTION_TRY
     {
         compileRequest->checkAllTranslationUnits();
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
         mapPathToLoadedModule.remove(mostUniqueIdentity);
         mapNameToLoadedModules.remove(name);
         throw;
     }
+#endif
     errorCountAfter = sink->getErrorCount();
     if (isInLanguageServer())
     {
@@ -1298,7 +1306,7 @@ RefPtr<Module> Linkage::loadSerializedModule(
 
     mapPathToLoadedModule.add(mostUniqueIdentity, module);
     mapNameToLoadedModules.add(moduleName, module);
-    try
+    SLANG_EXCEPTION_TRY
     {
         if (SLANG_FAILED(loadSerializedModuleContents(
                 module,
@@ -1316,12 +1324,14 @@ RefPtr<Module> Linkage::loadSerializedModule(
         loadedModulesList.add(module);
         return module;
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
         mapPathToLoadedModule.remove(mostUniqueIdentity);
         mapNameToLoadedModules.remove(moduleName);
         throw;
     }
+#endif
 }
 
 RefPtr<Module> Linkage::loadBinaryModuleImpl(
@@ -1565,15 +1575,17 @@ RefPtr<Module> Linkage::loadSourceModuleImpl(
         return nullptr;
     }
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         loadParsedModule(frontEndReq, translationUnit, name, filePathInfo);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const Slang::AbortCompilationException&)
     {
         // Something is fatally wrong, we should return nullptr.
         module = nullptr;
     }
+#endif
     errorCountAfter = sink->getErrorCount();
 
     if (errorCountAfter != errorCountBefore && !isInLanguageServer())
