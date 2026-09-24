@@ -11,8 +11,9 @@
 namespace Slang
 {
 
-// Debug location markers attribute the following instructions but do not add work to a block.
-static bool isDebugLocationMarker(IRInst* inst)
+// Returns whether the instruction attributes a source location or lexical scope to later
+// instructions. DebugVar and DebugValue carry variable state, so they must not be ignored here.
+static bool isDebugLocationOrScopeMarker(IRInst* inst)
 {
     switch (inst->getOp())
     {
@@ -25,18 +26,22 @@ static bool isDebugLocationMarker(IRInst* inst)
     }
 }
 
+// Returns whether scrutinee is target or can be erased after redirecting its sole use to target.
+// Leading location and scope markers do not prevent an argument-free branch from being trivial.
 static bool isSameBlockOrTrivialBranch(IRBlock* target, IRBlock* scrutinee)
 {
     if (target == scrutinee)
         return true;
     auto firstInst = scrutinee->getFirstOrdinaryInst();
-    while (firstInst && isDebugLocationMarker(firstInst))
+    while (firstInst && isDebugLocationOrScopeMarker(firstInst))
         firstInst = firstInst->getNextInst();
     const auto br = as<IRUnconditionalBranch>(firstInst);
     return br && br->getTargetBlock() == target && br->getArgCount() == 0 &&
            !scrutinee->hasMoreThanOneUse();
 };
 
+// Returns whether duplicating the block fits the instruction budget.
+// Location and scope markers do not count toward that budget.
 static bool isSmallBlock(IRBlock* c)
 {
     // Somewhat arbitrarily, 4 instructions, enough for:
@@ -46,7 +51,7 @@ static bool isSmallBlock(IRBlock* c)
     // - Terminator
     Int n = 0;
     for (const auto inst : c->getOrdinaryInsts())
-        if (!isDebugLocationMarker(inst) && ++n > 4)
+        if (!isDebugLocationOrScopeMarker(inst) && ++n > 4)
             return false;
     return true;
 }
