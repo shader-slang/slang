@@ -15,6 +15,9 @@
 // case additionally guards the derivative's debug record being built in the derivative's own scope,
 // since copyDebugInfo can run while a derivative is still nested in an IRGeneric (compiling at -g2
 // would hit a dominance/scope violation if the record were emitted at module scope instead).
+//
+// Companion to tests/spirv/debug-function-definition-autodiff-distinct.slang, which covers the
+// reverse-mode loop / [ForceInline] scenario; this file covers concrete + generic in both directions.
 
 [Differentiable]
 float diffSquare(float x)

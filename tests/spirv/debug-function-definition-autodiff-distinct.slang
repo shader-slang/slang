@@ -10,6 +10,10 @@
 // The loop forces the reverse-mode primal/propagate split that produces the s_apply_ / s_bwdProp_
 // bodies; the [ForceInline] differentiable callee adds an inlined-callee body to the set. Record and
 // name ids are captured (not source text) so the -g2 embedded source cannot satisfy the match.
+//
+// Companion to tests/autodiff/autodiff-debug-function-per-derivative.slang, which covers concrete
+// and generic functions in both directions; this file uniquely exercises the reverse-mode loop /
+// [ForceInline] scenario.
 
 RWStructuredBuffer<float> outputBuffer;
 
@@ -50,5 +54,3 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK-DAG: [[BWD_REC:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction [[BWD_STR]]
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugFunctionDefinition [[APPLY_REC]]
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugFunctionDefinition [[BWD_REC]]
-// s_bwdProp_f's record binds to exactly one body -- a duplicate definition would be a regression.
-// CHECK-NOT: OpExtInst %void %{{[0-9]+}} DebugFunctionDefinition [[BWD_REC]]

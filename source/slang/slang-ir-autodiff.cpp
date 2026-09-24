@@ -1354,7 +1354,10 @@ bool isDiffInst(IRInst* inst)
 
 void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
 {
-    // DebugFuncDecoration is rebuilt per-derivative below; the rest are cloned as-is.
+    // cloneDecoration re-references (shares) a decoration's operands rather than deep-copying them,
+    // which is fine for the decorations cloned below: they reference shared source/scope context.
+    // A function's IRDebugFunction, however, uniquely names and identifies one function body, so
+    // DebugFuncDecoration is not cloned -- each derivative gets its own record, rebuilt below.
     for (auto decor : srcFunc->getDecorations())
     {
         switch (decor->getOp())
