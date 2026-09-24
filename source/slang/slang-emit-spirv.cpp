@@ -10816,10 +10816,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // been emitted early and bare via the global debug-inst path — for example when a
     // caller-scope-restore DebugScope inserted by inlining precedes a DebugVar and resolves this
     // function as that var's scope — whereas the definition must still be emitted for the concrete
-    // body. Deduping on the record is load-bearing, not merely defensive: reverse-mode autodiff can
-    // make several generated OpFunctions share one IRDebugFunction (copyDebugInfo clones the
-    // decoration and the module-global record is not remapped), and without this dedup a definition
-    // would be emitted for each shared body, breaking the one-definition-per-record invariant.
+    // body.
     void maybeEmitDebugFunctionDefinition(
         SpvInst* firstBlock,
         SpvInst* spvFunc,
