@@ -38,23 +38,49 @@ def is_nullptr(valobj: lldb.SBValue) -> bool:
 
 # Slang::String summary
 def String_summary(valobj: lldb.SBValue, dict) -> str:
-    buffer_ptr = get_ref_pointer(valobj.GetChildMemberWithName("m_buffer"))
-    if is_nullptr(buffer_ptr):
+    if not valobj.IsValid():
+        return '""'
+    m_buffer = valobj.GetChildMemberWithName("m_buffer")
+    if not m_buffer.IsValid():
+        return '""'
+    buffer_ptr = get_ref_pointer(m_buffer)
+    if not buffer_ptr.IsValid() or is_nullptr(buffer_ptr):
         return '""'
     buffer = buffer_ptr.Dereference()
-    length = buffer.GetChildMemberWithName("length").GetValueAsUnsigned(0)
+    if not buffer.IsValid():
+        return '""'
+    length_val = buffer.GetChildMemberWithName("length")
+    if not length_val.IsValid():
+        return '""'
+    length = length_val.GetValueAsUnsigned(0)
+    if length == 0:
+        return '""'
     data = buffer_ptr.GetPointeeData(1, length)
+    if not data.IsValid():
+        return '""'
     return make_string(data, length)
 
 
 # Slang::UnownedStringSlice summary
 def UnownedStringSlice_summary(valobj: lldb.SBValue, dict) -> str:
+    if not valobj.IsValid():
+        return '""'
     begin = valobj.GetChildMemberWithName("m_begin")
+    if not begin.IsValid():
+        return '""'
     end = valobj.GetChildMemberWithName("m_end")
-    length = end.GetValueAsUnsigned(0) - begin.GetValueAsUnsigned(0)
+    if not end.IsValid():
+        return '""'
+    begin_addr = begin.GetValueAsUnsigned(0)
+    end_addr = end.GetValueAsUnsigned(0)
+    if begin_addr == 0 or end_addr == 0:
+        return '""'
+    length = end_addr - begin_addr
     if length <= 0:
         return '""'
     data = begin.GetPointeeData(0, length)
+    if not data.IsValid():
+        return '""'
     return make_string(data, length)
 
 
@@ -82,21 +108,35 @@ class RefPtr_synthetic(lldb.SBSyntheticValueProvider):
             return None
 
     def update(self):
-        self.pointer = self.valobj.GetNonSyntheticValue().GetChildMemberWithName(
-            "pointer"
-        )
+        valobj_nonsyn = self.valobj.GetNonSyntheticValue()
+        if not valobj_nonsyn.IsValid():
+            self.children = []
+            return
+        self.pointer = valobj_nonsyn.GetChildMemberWithName("pointer")
         self.children = []
-        if not is_nullptr(self.pointer):
-            self.children = self.pointer.Dereference().children
+        if self.pointer.IsValid() and not is_nullptr(self.pointer):
+            pointee = self.pointer.Dereference()
+            if pointee.IsValid():
+                self.children = pointee.children
 
 
 # Slang::RefPtr summary
 def RefPtr_summary(valobj: lldb.SBValue, dict) -> str:
-    pointer = valobj.GetNonSyntheticValue().GetChildMemberWithName("pointer")
-    if is_nullptr(pointer):
+    if not valobj.IsValid():
+        return "nullptr"
+    valobj_nonsyn = valobj.GetNonSyntheticValue()
+    if not valobj_nonsyn.IsValid():
+        return "nullptr"
+    pointer = valobj_nonsyn.GetChildMemberWithName("pointer")
+    if not pointer.IsValid() or is_nullptr(pointer):
         return "nullptr"
     pointee = pointer.Dereference()
-    refcount = pointee.GetChildMemberWithName("referenceCount").GetValueAsUnsigned()
+    if not pointee.IsValid():
+        return str(pointer.GetValue()) + " <invalid deref>"
+    refcount_val = pointee.GetChildMemberWithName("referenceCount")
+    if not refcount_val.IsValid():
+        return str(pointer.GetValue())
+    refcount = refcount_val.GetValueAsUnsigned(0)
     return str(pointer.GetValue()) + " refcount=" + str(refcount)
 
 
@@ -124,16 +164,26 @@ class ComPtr_synthetic(lldb.SBSyntheticValueProvider):
             return None
 
     def update(self):
+        if not self.valobj.IsValid():
+            self.children = []
+            return
         self.pointer = self.valobj.GetChildMemberWithName("m_ptr")
         self.children = []
-        if not is_nullptr(self.pointer):
-            self.children = self.pointer.Dereference().children
+        if self.pointer.IsValid() and not is_nullptr(self.pointer):
+            pointee = self.pointer.Dereference()
+            if pointee.IsValid():
+                self.children = pointee.children
 
 
 # Slang::ComPtr summary
 def ComPtr_summary(valobj: lldb.SBValue, dict) -> str:
-    pointer = valobj.GetNonSyntheticValue().GetChildMemberWithName("m_ptr")
-    if is_nullptr(pointer):
+    if not valobj.IsValid():
+        return "nullptr"
+    valobj_nonsyn = valobj.GetNonSyntheticValue()
+    if not valobj_nonsyn.IsValid():
+        return "nullptr"
+    pointer = valobj_nonsyn.GetChildMemberWithName("m_ptr")
+    if not pointer.IsValid() or is_nullptr(pointer):
         return "nullptr"
     return str(pointer.GetValue())
 
@@ -162,9 +212,19 @@ class Array_synthetic(lldb.SBSyntheticValueProvider):
             return None
 
     def update(self):
+        if not self.valobj.IsValid():
+            self.count = lldb.SBValue()
+            return
         self.count = self.valobj.GetChildMemberWithName("m_count")
         self.buffer = self.valobj.GetChildMemberWithName("m_buffer")
-        self.data_type = self.buffer.GetType().GetArrayElementType()
+        if not self.buffer.IsValid():
+            return
+        buffer_type = self.buffer.GetType()
+        if not buffer_type.IsValid():
+            return
+        self.data_type = buffer_type.GetArrayElementType()
+        if not self.data_type.IsValid():
+            return
         self.data_size = self.data_type.GetByteSize()
 
 
@@ -192,9 +252,19 @@ class List_synthetic(lldb.SBSyntheticValueProvider):
             return None
 
     def update(self):
+        if not self.valobj.IsValid():
+            self.count = lldb.SBValue()
+            return
         self.count = self.valobj.GetChildMemberWithName("m_count")
         self.buffer = self.valobj.GetChildMemberWithName("m_buffer")
-        self.data_type = self.buffer.GetType().GetPointeeType()
+        if not self.buffer.IsValid():
+            return
+        buffer_type = self.buffer.GetType()
+        if not buffer_type.IsValid():
+            return
+        self.data_type = buffer_type.GetPointeeType()
+        if not self.data_type.IsValid():
+            return
         self.data_size = self.data_type.GetByteSize()
 
 
@@ -227,11 +297,25 @@ class ShortList_synthetic(lldb.SBSyntheticValueProvider):
             return None
 
     def update(self):
+        if not self.valobj.IsValid():
+            self.count = lldb.SBValue()
+            self.short_count = 0
+            return
         self.count = self.valobj.GetChildMemberWithName("m_count")
         self.buffer = self.valobj.GetChildMemberWithName("m_buffer")
         self.short_buffer = self.valobj.GetChildMemberWithName("m_shortBuffer")
-        self.short_count = self.short_buffer.GetNumChildren()
-        self.data_type = self.buffer.GetType().GetPointeeType()
+        if not self.short_buffer.IsValid():
+            self.short_count = 0
+        else:
+            self.short_count = self.short_buffer.GetNumChildren()
+        if not self.buffer.IsValid():
+            return
+        buffer_type = self.buffer.GetType()
+        if not buffer_type.IsValid():
+            return
+        self.data_type = buffer_type.GetPointeeType()
+        if not self.data_type.IsValid():
+            return
         self.data_size = self.data_type.GetByteSize()
 
 
