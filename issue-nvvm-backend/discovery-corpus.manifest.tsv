@@ -86,3 +86,5 @@ cuda/nvvm-undefined-sampler.slang	0	mixed-resources,helper-generic,control-flow	
 cuda/nvvm-texture-dimensions.slang	0	texture-query,integer-dimensions,descriptor-handle	Real geometry queries across numeric texel families and signed/unsigned outputs, including the material descriptor helper.
 cuda/nvvm-mutable-parameter-forwarding.slang	0	aggregate-pointer,helper-generic,mutable-forwarding	Initialized out aggregate calls mutating helpers; nested scalar and BorrowInOut-to-Out forwarding preserve storage.
 cuda/nvvm-mutable-pointer-payload-forwarding.slang	0	aggregate-pointer,helper-generic,mutable-forwarding	Pointer-bearing helper aggregate preserves exact local storage while mutable parameter roles forward.
+cuda/nvvm-local-boolean-lanes.slang	0	boolean-vector,local-pointer	Dynamic private bool2/3/4 lane updates and complete initialization preserve independent lane oracles.
+cuda/nvvm-vector-classification.slang	0	boolean-vector,intrinsic	Runtime vector isnan/isinf classification exercises local Boolean lane construction with edge-case expected output.

@@ -7870,3 +7870,20 @@ layouts, global-reference casts, exact element identity and provider ABI35 are u
 `nvvm-mutable-parameter-forwarding.slang` and `nvvm-mutable-pointer-payload-forwarding.slang` exercise
 both families with independent output oracles at NVRTC O3 and NVVM O0/O3. This proves the material's
 output-to-mutating-helper boundary, not the material's runtime behavior.
+
+### Slice 206: Private Boolean vector lane normalization
+
+Local Boolean vectors retain the semantic LLVM `<N x i1>` representation, with N in 2–4. Scalar i1
+GEP stride does not address packed vector bits, so sequential numeric-pointer admission must not
+be widened to Boolean lanes. At the NVVM legality boundary, direct local Var lane addresses with
+only Load/Store address-operand uses become whole-vector value operations: load/extract for reads,
+and per-lane index comparison/select/construction/store for writes. Canonical Generic ReadWrite
+same-element pointer layouts and 32-bit indices are checked through the existing classifiers.
+Already initialized lanes survive each update; selecting a replacement does not depend on an old
+undef lane, so complete lane-by-lane initialization defines the vector without default values.
+Shared/external roots and escaping lane addresses remain outside this transformation.
+
+This normalization makes the generic vector isnan/isinf result-building loop executable without
+changing provider ABI 35, Boolean physical resource storage, helper signatures or the material
+source. All registered eval/sample cells compile and assemble in slice206; material runtime proof
+still requires its application binding/input/output contract.

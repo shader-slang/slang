@@ -8566,6 +8566,29 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         const char* expectedConstruct;
     };
     static const UnsupportedCase kCases[] = {
+        // Local packed-vector legalization must not turn shared or external lane writes into
+        // whole-vector read/modify/write operations: independent lanes may have different writers.
+        {R"(
+            groupshared bool4 flags;
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(4, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                flags[tid.x] = (tid.x % 2) == 0;
+                GroupMemoryBarrierWithGroupSync();
+                outputBuffer[tid.x] = uint(flags[tid.x]);
+            }
+        )",
+         "'array element pointer relation'"},
+        {R"(
+            RWStructuredBuffer<bool4> flags;
+            [numthreads(4, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                flags[0][tid.x] = (tid.x % 2) == 0;
+            }
+        )",
+         "'sequential element pointer: Ptr<bool,"},
         {kDirectNVVMUnsupportedPointerHelperParameterSource, "'helper function parameter:"},
         {kDirectNVVMUnsupportedPointerHelperResultSource, "'helper function result type:"},
         {kDirectNVVMUnsupportedFloatArraySource, "'entry-point parameter'"},

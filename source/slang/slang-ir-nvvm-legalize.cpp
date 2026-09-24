@@ -572,6 +572,99 @@ void _removeDeadNVVMAggregateInitializers(LinkedIR& linkedIR)
         call->removeAndDeallocate();
 }
 
+// Legalizes nonescaping Boolean lane accesses to private local vectors. Consider this example:
+//
+//     bool3 flags = bool3(false, true, false);
+//     flags[index] = value;
+//
+// IRBuilder creates a GetElementPtr for the subscript, and buffer-element lowering attaches its
+// scalar layout. That is valid semantic IR, but LLVM packs the local value into <3 x i1>; a scalar
+// i1 GEP advances by bytes and cannot address those packed bits. Keep the canonical vector value:
+// extract on reads, and select the replacement lane while preserving its neighbors on writes.
+// Only direct local Vars and nonescaping load/store users belong here. Shared/external storage
+// needs its own physical representation and must still be checked by ordinary NVVM preflight.
+void _legalizeNVVMLocalBooleanVectorAddresses(LinkedIR& linkedIR)
+{
+    List<IRGetElementPtr*> addresses;
+    for (auto globalInst : linkedIR.module->getGlobalInsts())
+    {
+        auto function = as<IRFunc>(globalInst);
+        if (!function)
+            continue;
+        for (auto block : function->getBlocks())
+            for (auto inst : block->getOrdinaryInsts())
+                if (auto address = as<IRGetElementPtr>(inst))
+                    addresses.add(address);
+    }
+
+    IRBuilder builder(linkedIR.module);
+    for (auto address : addresses)
+    {
+        auto base = address->getBase();
+        IRType* valueType = nullptr;
+        auto baseType =
+            asNVVMSupportedLocalCopyableValuePointerType(base->getDataType(), &valueType);
+        uint32_t laneCount = 0;
+        auto vectorType = asNVVMSupportedValueVectorType(valueType, &laneCount);
+        auto resultType = asNVVMSupportedDerivedCopyableValuePointerType(address->getDataType());
+        if (base->getOp() != kIROp_Var || !baseType || !vectorType ||
+            !isNVVMBoolType(vectorType->getElementType()) || !resultType ||
+            resultType->getAccessQualifier() != AccessQualifier::ReadWrite ||
+            !isTypeEqual(resultType->getValueType(), vectorType->getElementType()) ||
+            !isNVVMInteger32Type(address->getIndex()->getDataType()))
+        {
+            continue;
+        }
+
+        bool hasOnlyMemoryUses = true;
+        for (auto use = address->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if ((user->getOp() != kIROp_Load && user->getOp() != kIROp_Store) ||
+                use != &user->getOperands()[0])
+            {
+                hasOnlyMemoryUses = false;
+                break;
+            }
+        }
+        if (!hasOnlyMemoryUses)
+            continue;
+
+        while (auto use = address->firstUse)
+        {
+            auto user = use->getUser();
+            builder.setInsertBefore(user);
+            IRBuilderSourceLocRAII sourceLocationScope(&builder, user->sourceLoc);
+            auto oldValue = builder.emitLoad(base);
+            if (user->getOp() == kIROp_Load)
+            {
+                user->replaceUsesWith(builder.emitElementExtract(oldValue, address->getIndex()));
+            }
+            else
+            {
+                IRInst* lanes[4] = {};
+                for (uint32_t i = 0; i < laneCount; ++i)
+                {
+                    auto laneIndex = builder.getIntValue(address->getIndex()->getDataType(), i);
+                    auto isSelected = builder.emitEql(address->getIndex(), laneIndex);
+                    IRInst* operands[] = {
+                        isSelected,
+                        cast<IRStore>(user)->getVal(),
+                        builder.emitElementExtract(oldValue, laneIndex)};
+                    lanes[i] = builder.emitIntrinsicInst(
+                        vectorType->getElementType(),
+                        kIROp_Select,
+                        3,
+                        operands);
+                }
+                builder.emitStore(base, builder.emitMakeVector(vectorType, laneCount, lanes));
+            }
+            user->removeAndDeallocate();
+        }
+        address->removeAndDeallocate();
+    }
+}
+
 SlangResult _verifyNVVMReadyIR(CodeGenContext* codeGenContext, const LinkedIR& linkedIR)
 {
     for (auto globalInst : linkedIR.module->getGlobalInsts())
@@ -614,6 +707,7 @@ SlangResult legalizeIRForNVVM(CodeGenContext* codeGenContext, LinkedIR& linkedIR
     SLANG_RETURN_ON_FAIL(_foldNVVMCompileTimeLayoutQueries(codeGenContext, linkedIR));
     SLANG_RETURN_ON_FAIL(_removeNVVMCompileTimeOnlyInstructions(codeGenContext, linkedIR));
     _legalizeNVVMSemanticIntrinsics(linkedIR);
+    _legalizeNVVMLocalBooleanVectorAddresses(linkedIR);
 
     IRDeadCodeEliminationOptions options;
     options.keepLayoutsAlive = true;
