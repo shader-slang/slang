@@ -1,7 +1,6 @@
 //TEST():SIMPLE(filecheck=CHECK):-entry computeMain -stage compute -line-directive-mode none -target hlsl -loop-inversion
-// The same compile with debug info enabled (`-g`) must still invert the loops.
-// Before the fix, the interleaved DebugLine/DebugValue insts defeated the
-// structural predicates in slang-ir-loop-inversion.cpp and inversion was skipped.
+// Enabling debug info (`-g`) must not change loop-inversion eligibility: the debug
+// attribution insts it interleaves carry no semantics, so the same loops still invert.
 //TEST():SIMPLE(filecheck=CHECKG):-entry computeMain -stage compute -line-directive-mode none -target hlsl -loop-inversion -g
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-dx12 -shaderobj -output-using-type
