@@ -12378,7 +12378,10 @@ SlangResult emitSPIRVFromIR(
 #endif
 
     SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
+    const auto errorCountBeforeLegalize = sink->getErrorCount();
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
+    if (sink->getErrorCount() > errorCountBeforeLegalize)
+        return SLANG_FAIL;
 
 #if 0
     {
