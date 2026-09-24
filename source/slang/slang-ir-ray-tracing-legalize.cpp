@@ -77,41 +77,45 @@ struct EmptyPayloadCarrier
     IRStructKey* dataKey;
 };
 
-// Find the empty payload parameters and variables that must survive, then change just those
-// parameters and variables to use EmptyPayloadCarrier wrappers. Do not change the source types.
-// Consider this example:
-//
-//     struct Empty {}
-//     struct Data { Empty unused; uint value; }
-//     [shader("raygeneration")]
-//     void rgen()
-//     {
-//         Empty empty;
-//         Data data = { empty, 37 };
-//         CallShader(0, empty);
-//         CallShader(1, data);
-//     }
-//     [shader("callable")]
-//     void callee(inout Data data) { data.value += 5; }
-//
-// Adding a dummy field to Empty itself would also add storage to Data.unused. Compiling callee
-// alone would not see CallShader(0, empty), so its Data would have a different layout from rgen's.
-// Instead, wrap only the first call's payload and leave both Empty and Data unchanged. After type
-// legalization, the relevant generated HLSL has this shape (names simplified):
-//
-//     struct EmptyCarrier { int _slang_dummy; }
-//     struct Data { uint value; }
-//     EmptyCarrier carrier = { 0 };
-//     Data data = { 37 };
-//     CallShader(0, carrier);
-//     CallShader(1, data);
-//
-// Data now contains one uint in both rgen and a separately compiled callee. The sets below record
-// the parameters/globals to rewrite; the cache lets them reuse one wrapper for each source type.
+// Per-module state for one run of empty-payload legalization. It finds the payload parameters
+// and variables whose source type is empty but must survive for the target ABI, then rewrites
+// only those to use an EmptyPayloadCarrier wrapper, without changing the source types. The sets
+// below record the parameters and globals to rewrite; `carriers` caches one wrapper per source
+// type.
 struct EmptyPayloadLegalizationContext
 {
     IRModule* module;
-    // Reuse wrappers without adding fields to the original types used as dictionary keys.
+    // Cache of the wrapper built for each empty source type, so a type used at several payloads
+    // is wrapped once. The wrapper holds the original value plus a dummy int; we change just the
+    // selected parameters and variables to use it, and never change the source types. Consider
+    // this example:
+    //
+    //     struct Empty {}
+    //     struct Data { Empty unused; uint value; }
+    //     [shader("raygeneration")]
+    //     void rgen()
+    //     {
+    //         Empty empty;
+    //         Data data = { empty, 37 };
+    //         CallShader(0, empty);
+    //         CallShader(1, data);
+    //     }
+    //     [shader("callable")]
+    //     void callee(inout Data data) { data.value += 5; }
+    //
+    // Adding a dummy field to Empty itself would also add storage to Data.unused. Compiling callee
+    // alone would not see CallShader(0, empty), so its Data would have a different layout from
+    // rgen's. Instead, wrap only the first call's payload and leave both Empty and Data unchanged.
+    // After type legalization, the relevant generated HLSL has this shape (names simplified):
+    //
+    //     struct EmptyCarrier { int _slang_dummy; }
+    //     struct Data { uint value; }
+    //     EmptyCarrier carrier = { 0 };
+    //     Data data = { 37 };
+    //     CallShader(0, carrier);
+    //     CallShader(1, data);
+    //
+    // Data now contains one uint in both rgen and a separately compiled callee.
     Dictionary<IRType*, EmptyPayloadCarrier> carriers;
     // HLSL/DXIL intrinsic or entry-point parameters whose empty value needs a wrapper.
     HashSet<IRParam*> d3dParams;
