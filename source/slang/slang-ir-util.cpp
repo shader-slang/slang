@@ -100,10 +100,11 @@ bool isAnnotation(IRInst* inst)
 
 bool isDebugInst(IRInst* inst)
 {
-    // The debug "local" instructions that lowering interleaves among a function's ordinary
-    // insts under `-g` (the set the emitters process per block, plus DebugLine/DebugVar).
-    // They carry no runtime or control-flow semantics, so structural/cost heuristics over IR
-    // skip them. Module-level debug insts (DebugSource, DebugFunction, ...) and
+    // The debug "local" instructions that lowering/inlining interleaves among a function's
+    // ordinary insts under `-g` (the set the emitters process per block, plus DebugLine/
+    // DebugVar). They have no runtime or control-flow effect, so cost/ordering heuristics may
+    // ignore them. (Some define handles referenced elsewhere, so a transform that erases insts
+    // must still check uses.) Module-level debug insts (DebugSource, DebugFunction, ...) and
     // DebugLocationDecoration never appear as a block's ordinary insts and are omitted.
     switch (inst->getOp())
     {

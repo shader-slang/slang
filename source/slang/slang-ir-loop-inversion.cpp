@@ -12,25 +12,25 @@ namespace Slang
 {
 
 // Return the first ordinary inst of `b` that the trivial-branch match treats as real content,
-// or null if there is none. Result-less debug markers (DebugLine/DebugScope/DebugNoScope/
-// DebugValue/DebugInlinedAt) are skipped: a matched block is erased, and since these markers
-// carry no result, dropping them is harmless and lets inversion behave the same with and
-// without `-g`. A value-defining DebugVar/DebugInlinedVariable is NOT skipped — its handle may
-// be referenced by a DebugValue elsewhere, so a block holding one is not a trivial (erasable)
-// forwarding block.
+// or null if there is none. A debug attribution inst is skipped only when it has no uses: an
+// unreferenced marker (e.g. DebugLine/DebugValue) is erased harmlessly with a matched block,
+// which is what lets inversion behave the same with and without `-g`. A debug inst that is
+// referenced elsewhere — a DebugVar used by a DebugValue, or a DebugInlinedAt used by a
+// DebugScope — is treated as significant, so a block holding one is not a trivial (erasable)
+// forwarding block and removeAndDeallocate never drops something still in use.
 static IRInst* getFirstSignificantInst(IRBlock* b)
 {
     for (auto inst = b->getFirstOrdinaryInst(); inst; inst = inst->getNextInst())
-        if (!isDebugInst(inst) || inst->getOp() == kIROp_DebugVar ||
-            inst->getOp() == kIROp_DebugInlinedVariable)
+        if (!isDebugInst(inst) || inst->hasUses())
             return inst;
     return nullptr;
 }
 
 // True if `scrutinee` is `target` itself, or a block that does nothing but unconditionally
-// branch to `target` (ignoring result-less debug markers). The caller erases such a trivial
-// forwarding block; getFirstSignificantInst guarantees it holds only those markers plus the
-// branch, so removeAndDeallocate drops nothing referenced elsewhere.
+// branch to `target` (ignoring unreferenced debug markers). The caller erases such a trivial
+// forwarding block; getFirstSignificantInst only looks past debug insts with no uses, so a
+// matched block holds only those plus the branch and removeAndDeallocate drops nothing still
+// referenced.
 static bool isSameBlockOrTrivialBranch(IRBlock* target, IRBlock* scrutinee)
 {
     if (target == scrutinee)

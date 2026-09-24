@@ -109,9 +109,10 @@ IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IR
 bool isAnnotation(IRInst* inst);
 
 // True if inst is a debug attribution instruction (DebugLine/DebugScope/DebugVar/DebugValue
-// and related) that lowering interleaves among the ordinary insts of a function body when
-// debug info is enabled. These carry no runtime semantics — they feed debug-info emission
-// only — so structural or cost heuristics over IR should skip them.
+// and related) that lowering/inlining interleaves among the ordinary insts of a function body
+// under `-g`. These have no runtime or control-flow effect, so cost/ordering heuristics may
+// ignore them; a transform that *erases* insts must still respect uses (some, such as DebugVar
+// and DebugInlinedAt, define handles referenced elsewhere).
 bool isDebugInst(IRInst* inst);
 
 bool isPtrToClassType(IRInst* type);
