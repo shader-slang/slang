@@ -20,12 +20,15 @@ struct VOut { float4 pos : SV_Position; float4 color : COLOR; };
 
 // Walking the dump in order: the original record (pre-lowering VOut return) and the wrapper
 // record (lifted result struct) get distinct ids. Tie the original's id to a DebugFunction
-// decoration, then the wrapper's id to the decoration on the [entryPoint] function and to its
-// lifted signature -- a shared record, or a record on the wrong function, fails.
+// decoration; then the wrapper's id to a decoration that -- with no intervening func boundary --
+// belongs to the [entryPoint] function, and to that record's lifted signature. A shared record,
+// or a record on the wrong function, fails.
 //VSMAIN: [[ORIG:%[0-9]+]]{{.*}}= DebugFunction("vsMain",{{.*}}Func(%VOut,
 //VSMAIN: [DebugFunction([[ORIG]])]
 //VSMAIN: [DebugFunction([[WRAP:%[0-9]+]])]
+//VSMAIN-NOT: func %
 //VSMAIN: [entryPoint(
+//VSMAIN: func %
 //VSMAIN: [[WRAP]]{{.*}}= DebugFunction("vsMain",{{.*}}Func(%{{.*}}Result{{.*}}BorrowInParam(UInt
 [shader("vertex")]
 VOut vsMain(uint vid : SV_VertexID, uniform GridCfg* cfg)
@@ -41,7 +44,9 @@ VOut vsMain(uint vid : SV_VertexID, uniform GridCfg* cfg)
 //VSOUT: [[ORIG:%[0-9]+]]{{.*}}= DebugFunction("vsOut",{{.*}}OutParam
 //VSOUT: [DebugFunction([[ORIG]])]
 //VSOUT: [DebugFunction([[WRAP:%[0-9]+]])]
+//VSOUT-NOT: func %
 //VSOUT: [entryPoint(
+//VSOUT: func %
 //VSOUT: [[WRAP]]{{.*}}= DebugFunction("vsOut",{{.*}}Func(%{{.*}}Result{{.*}}BorrowInParam(UInt
 [shader("vertex")]
 void vsOut(uint vid : SV_VertexID, uniform GridCfg* cfg, out float4 pos : SV_Position)
