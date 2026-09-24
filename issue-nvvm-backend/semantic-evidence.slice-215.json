@@ -1,0 +1,395 @@
+{
+  "schema": 1,
+  "slice": 215,
+  "status": "accepted-research",
+  "date_utc": "2026-09-24",
+  "scope": "FP64 masked min/max semantic admission research; stopped at predeclared early supported-FP32 singleton defect gate.",
+  "production_changes": false,
+  "new_registered_corpus_cells": 0,
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-214.json",
+    "sha256": "42bd8acf1ff72f43bf7f4bc4bf11a49f3ed1880aa98cdf83174cf4c696697c21",
+    "all_runtime_outcomes_inherited": true
+  },
+  "provenance": {
+    "source_commit": "357d270587d132e1de92060b51e83f6a9be062b2",
+    "branch": "nvvm-backend",
+    "configuration": "RelWithDebInfo",
+    "provider_abi": 36,
+    "target_architecture": 80,
+    "host": "native Ubuntu 24.04",
+    "gpu": "NVIDIA L4, 580.126.09, 8.9",
+    "compiler_sha256": "2775a5783a7dd1310ab9773d259bf1bdafc464a4f55a376c1fc22c472a6b1bf0",
+    "provider_sha256": "ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372",
+    "cuda": "12.9.2",
+    "nvrtc": "12.9.86",
+    "llvm": 14
+  },
+  "identity_recheck": {
+    "accepted214_tested_sources": 15,
+    "accepted214_artifacts": 12,
+    "runtime_sources": 546,
+    "all_match": true,
+    "ir_dump_ptx_equals_measured_o0": true
+  },
+  "independent_oracle": {
+    "domain": "FP32 singleton CUDA source-helper identity",
+    "mask": "80000000",
+    "participant_lane": 31,
+    "block_threads": 32,
+    "method": "Return original integer input word for both min/max. Source singleton executes no combine; no host floating arithmetic and no NVRTC-derived expectations.",
+    "input_buffer_words": 128,
+    "initial_word": "deadbeef",
+    "mask_word_index": 0,
+    "input_word_index": 63,
+    "output_word_indices": [95, 127],
+    "patterns": {
+      "finite": "3f800000",
+      "negative-zero": "80000000",
+      "qnan": "7fc12345",
+      "snan": "7f812345"
+    },
+    "defined_participation": "Every named non-exited lane (lane31 only) executes both operations with the same mask; other lanes are not named."
+  },
+  "results": [
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "finite",
+      "mask": "80000000",
+      "input": "3f800000",
+      "expected_min": "3f800000",
+      "expected_max": "3f800000",
+      "actual_min": "3f800000",
+      "actual_max": "3f800000",
+      "pass": true
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "negative-zero",
+      "mask": "80000000",
+      "input": "80000000",
+      "expected_min": "80000000",
+      "expected_max": "80000000",
+      "actual_min": "80000000",
+      "actual_max": "80000000",
+      "pass": true
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "qnan",
+      "mask": "80000000",
+      "input": "7fc12345",
+      "expected_min": "7fc12345",
+      "expected_max": "7fc12345",
+      "actual_min": "7fc12345",
+      "actual_max": "7fc12345",
+      "pass": true
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "snan",
+      "mask": "80000000",
+      "input": "7f812345",
+      "expected_min": "7f812345",
+      "expected_max": "7f812345",
+      "actual_min": "7f812345",
+      "actual_max": "7f812345",
+      "pass": true
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "finite",
+      "mask": "80000000",
+      "input": "3f800000",
+      "expected_min": "3f800000",
+      "expected_max": "3f800000",
+      "actual_min": "3f800000",
+      "actual_max": "3f800000",
+      "pass": true
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "negative-zero",
+      "mask": "80000000",
+      "input": "80000000",
+      "expected_min": "80000000",
+      "expected_max": "80000000",
+      "actual_min": "80000000",
+      "actual_max": "80000000",
+      "pass": true
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "qnan",
+      "mask": "80000000",
+      "input": "7fc12345",
+      "expected_min": "7fc12345",
+      "expected_max": "7fc12345",
+      "actual_min": "7f800000",
+      "actual_max": "ff800000",
+      "pass": false
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "snan",
+      "mask": "80000000",
+      "input": "7f812345",
+      "expected_min": "7f812345",
+      "expected_max": "7f812345",
+      "actual_min": "7f800000",
+      "actual_max": "ff800000",
+      "pass": false
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "finite",
+      "mask": "80000000",
+      "input": "3f800000",
+      "expected_min": "3f800000",
+      "expected_max": "3f800000",
+      "actual_min": "3f800000",
+      "actual_max": "3f800000",
+      "pass": true
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "negative-zero",
+      "mask": "80000000",
+      "input": "80000000",
+      "expected_min": "80000000",
+      "expected_max": "80000000",
+      "actual_min": "80000000",
+      "actual_max": "80000000",
+      "pass": true
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "qnan",
+      "mask": "80000000",
+      "input": "7fc12345",
+      "expected_min": "7fc12345",
+      "expected_max": "7fc12345",
+      "actual_min": "7f800000",
+      "actual_max": "ff800000",
+      "pass": false
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "snan",
+      "mask": "80000000",
+      "input": "7f812345",
+      "expected_min": "7f812345",
+      "expected_max": "7f812345",
+      "actual_min": "7f800000",
+      "actual_max": "ff800000",
+      "pass": false
+    }
+  ],
+  "summary": {
+    "smoke_executed": 4,
+    "smoke_correct": 4,
+    "research_executions": 12,
+    "research_correct": 8,
+    "research_mismatch": 4,
+    "output_words_compared": 24,
+    "output_words_equal": 16,
+    "output_words_unequal": 8,
+    "ptx_assemblies": 3
+  },
+  "ptx_observations": {
+    "nvrtc-o3": {
+      "numeric_min": 0,
+      "numeric_max": 0,
+      "ordered_float_less": 2,
+      "ordered_float_greater": 2,
+      "float_select": 4,
+      "indexed_shuffle": 2,
+      "butterfly_shuffle": 2,
+      "assembled": true
+    },
+    "nvvm-o0": {
+      "numeric_min": 1,
+      "numeric_max": 1,
+      "ordered_float_less": 0,
+      "ordered_float_greater": 0,
+      "float_select": 0,
+      "indexed_shuffle": 2,
+      "butterfly_shuffle": 0,
+      "assembled": true
+    },
+    "nvvm-o3": {
+      "numeric_min": 1,
+      "numeric_max": 1,
+      "ordered_float_less": 0,
+      "ordered_float_greater": 0,
+      "float_select": 0,
+      "indexed_shuffle": 2,
+      "butterfly_shuffle": 0,
+      "assembled": true
+    }
+  },
+  "defect": {
+    "id": "research-215-fp32-singleton-minmax-nan",
+    "first_known_slice": 215,
+    "first_known_source_commit": "357d270587d132e1de92060b51e83f6a9be062b2",
+    "existing_accepted_artifact": 214,
+    "introducing_revision": "not bisected",
+    "category": "CUDA source-helper compatibility defect on supported FP32 reduction",
+    "modes": ["nvvm-o0", "nvvm-o3"],
+    "actual_min": "7f800000",
+    "actual_max": "ff800000",
+    "cause": "FP32 recipe injects +/-infinity and scans with numeric min/max; only FP64 reductions activate singleton original-operand selection.",
+    "not_claimed": "No new cross-target NaN payload/zero/order guarantee and no earlier-binary regression claim.",
+    "separate_from_registered53": true
+  },
+  "deferred_after_stop": [
+    "Independent full XOR/ascending-scan raw-word oracle model",
+    "FP64 scalar and vector/matrix GPU matrix",
+    "FP32 nonsingleton matrix",
+    "Fresh FP64 unsupported preflight; inherit exact214 instead",
+    "Full-warp/low16/high16/15-17/sparse/zero-tie/mixed-or-all-NaN/position permutations"
+  ],
+  "next_slice": {
+    "number": 216,
+    "scope": "Preserve original FP32 singleton min/max reduction operand using existing typed singleton machinery, with scalar/vector/matrix raw-bit coverage.",
+    "non_goals": [
+      "No FP64 min/max admission",
+      "No nonsingleton reduction semantic change",
+      "No unrelated sum/product or prefix investigation",
+      "No provider numeric-min/max contract change"
+    ]
+  },
+  "inherited_ledger": {
+    "latest_implementation": 214,
+    "latest_full_checkpoint": 214,
+    "implementation_slices_since_full": 0,
+    "frozen_cells": 1356,
+    "discovery_cells": 294,
+    "total_cells": 1650,
+    "correct": 1597,
+    "open_failures": 53,
+    "resolved_histories": 4,
+    "units_passed": 477,
+    "unit_windows_only_skips": 1,
+    "toolkit_cells": 18,
+    "material_compile_assemble_cells": 6,
+    "material_runtime_claim": false
+  },
+  "sources": [
+    {
+      "path": "prelude/slang-cuda-prelude.h",
+      "facts": "_waveCalcPow2Offset; _waveReduceScalar/Multiple; WaveOpMin/Max."
+    },
+    {
+      "path": "source/slang/hlsl.meta.slang",
+      "facts": "WaveMultiMin/Max scalar/vector/matrix GenericAsm producers."
+    },
+    {
+      "path": "source/slang/slang-emit-nvvm.cpp",
+      "facts": "_getNVVMMaskedWaveScalarIdentity; _initializeNVVMMaskedWaveScalarOperation; _emitNVVMMaskedWaveScalarValue."
+    },
+    {
+      "path": "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp",
+      "facts": "FloatBinary MIN/MAX select numeric libdevice helpers; existing ordered compare predicates."
+    },
+    {
+      "path": "docs/wave-intrinsics.md",
+      "facts": "WaveMulti correspondence without explicit NaN/order bitwise guarantee."
+    },
+    {
+      "url": "https://docs.nvidia.com/cuda/libdevice-users-guide/__nv_fminf.html",
+      "facts": "Numeric operand selected over a NaN."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/waveallmin",
+      "facts": "WaveActiveMin leaves operation order undefined; distinct API, not a WaveMulti payload guarantee."
+    }
+  ],
+  "raw_evidence": [
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton.slang",
+      "sha256": "5e851b51a4566b332a1add3e0a1aa07d9f903b220acded4a4a03064d2ef790c0"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/probe.py",
+      "sha256": "199243c88811934676f91a3bb38c7a13456847a39ff6d0a0ef07b9101964442e"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-results.json",
+      "sha256": "12690cc99b9ee9044871ca6c08195e680e966c8acbe8586c5707c0b1306ae398"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/identity.json",
+      "sha256": "9361831d11fb246ba56b27a99ee354eff67e07e7f3f3e479fdcb985aa554d853"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/gpu.csv",
+      "sha256": "22420c3ef2f77ce7e95772fcdf47940effd9e12ad7e4e9a864968eaed24b6e8f"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/runtime/results.json",
+      "sha256": "91f7b68f3175585cd9680571362a68cd89264c8cece985e85d49437207e88d32"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-ir.log",
+      "sha256": "5fc5df1f16ee2ec25677f00387b25308d77743443733a7564055d0ace0b5daab"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-ir.ptx",
+      "sha256": "4f9317dfe26df268ae335005faa980bf05ead39e07871b2c836b1a091a77e315"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-nvrtc-o3.ptx",
+      "sha256": "142a9ae5df417c08724df00b0e979270614561969422fc03baf359e2e820730c"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-nvrtc-o3.cubin",
+      "sha256": "991ecb44b97f9bed1e315b84503b58704e3b364ff5e6c78b3c9bc2c37f91829d"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-nvrtc-o3.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-nvrtc-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-nvvm-o0.ptx",
+      "sha256": "4f9317dfe26df268ae335005faa980bf05ead39e07871b2c836b1a091a77e315"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-nvvm-o0.cubin",
+      "sha256": "b20a1700f61862489a4c854e77243e8bed70f5f173a9e868295acb9bf636ff2f"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-nvvm-o0.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-nvvm-o0.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-nvvm-o3.ptx",
+      "sha256": "bfa764405875742b0f16bbfeece921e009df5db0487629055a34f096b1e6bdf8"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-nvvm-o3.cubin",
+      "sha256": "f17582042d760d2f8e1151448767d5b6b6ae6bcae199061020f5ff7c20976844"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-nvvm-o3.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-215-semantics/singleton-nvvm-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "reproduce": "source build/nvvm-loop/slice-203-env.sh; timeout --kill-after=10s 180s python3 build/nvvm-loop/slice-215-semantics/probe.py",
+  "system_changes": false,
+  "gpu_loss": false,
+  "worker_commit": false,
+  "push": false
+}

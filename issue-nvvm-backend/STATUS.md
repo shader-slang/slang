@@ -4,6 +4,15 @@ Updated 2026-09-24. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
+**Slice 215 is accepted research: a supported FP32 singleton min/max defect.** Read the
+[completed research plan](plan.slice-215-fp64-minmax-semantics.md),
+[five-part report](report.slice-215-fp64-minmax-semantics.md), and
+[semantic evidence](semantic-evidence.slice-215.json). On exact accepted 214 binaries, dynamic
+singleton quiet/signaling NaNs return +infinity for min and -infinity for max at NVVM O0/O3;
+CUDA helper semantics and NVRTC preserve the original bits. Finite and negative-zero controls pass.
+The predeclared supported-defect stop intentionally prevented the broader FP64/aggregate/order
+probe matrix. This is a separate research observation, not a change to the registered 1,650-cell / 53-failure ledger.
+
 **Slice 214 is accepted with a full checkpoint.** Read the
 [completed worker plan](plan.slice-214-complex-batching.md),
 [five-part report](report.slice-214-complex-batching.md), and
@@ -23,12 +32,14 @@ invocations slower: one sample takes 13.40 seconds fresh versus 24.08 shared; ac
 (warmup 1, samples 3) take 43.87 versus 48.83 seconds. These whole-command values are single
 observations, not repeated benchmark estimates. Keep the existing default and explicit opt-in.
 
-Next action: start slice 215 as a bounded semantic research gate for FP64 masked min/max, the two existing frozen failures. Audit
-CUDA comparison/select semantics, seeds, and XOR versus ordered reduction branches for NaNs, signed
-zero and order dependence before considering production admission. No further batching optimization
-belongs to this slice. Latest accepted implementation and full checkpoint: 214. Implementation
+Next action: slice 216 fixes the proven FP32 singleton min/max reduction contract, reusing existing
+typed singleton-preservation machinery where appropriate. Require scalar/vector/matrix raw-bit
+coverage plus unchanged non-singleton neighbors. Keep FP64 min/max admission, nonsingleton
+NaN/order semantics, unrelated arithmetic, prefixes and provider numeric-min contracts outside
+that slice. Resume the deferred FP64 semantic gate only after this correctness work. No further
+batching optimization belongs to either slice. Latest accepted implementation and full checkpoint: 214. Implementation
 slices since the full checkpoint: 0. Rolling 210/213/214 covers shared literal correctness, FP64 implicit shuffle admission,
-and complex-driven process-lifetime work; research 211/212 does not advance implementation cadence.
+and complex-driven process-lifetime work; research 211/212/215 does not advance implementation cadence.
 
 ## Checkpoints and evidence
 
