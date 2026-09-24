@@ -4,13 +4,18 @@ Updated 2026-09-24. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
-**Slice 211 research is accepted.** Read its
-[plan](plan.slice-211-material-compile-profile.md),
-[five-part report](report.slice-211-material-compile-profile.md), and
-[compile-time measurements](compile-time.slice-211.json). All six unchanged material cells compile
-and assemble; repeated profiling identifies session-lifetime amortization as one harness-level
-candidate, with no backend-local optimization justified yet. No compiler/provider/runner/shader
-changes or material runtime claims.
+**Slice 212 research is accepted.** Read its
+[plan](plan.slice-212-batch-lifetime.md), [five-part report](report.slice-212-batch-lifetime.md),
+and [batch lifecycle measurements](batch-lifetime.slice-212.json). Complete six-cell API batches
+improve 10.767% (8848.207 to 7895.490 ms), including global creation/destruction. Every paired
+improvement exceeds 10%, all six compile-call medians improve, all 168 outputs exactly match
+210/211, and six distinct PTX hashes freshly assemble. Post-release RSS grows 9000 KiB equally
+at both policy boundaries, then plateaus for the last three pairs; bounded evidence only.
+No production compiler/provider/runner/shader changes or material runtime claims.
+
+**Slice 211 remains accepted supporting research.** Its
+[measurements](compile-time.slice-211.json) established the initial steady-state candidate;
+212 supplies the previously missing finite-batch startup/teardown and order/lifetime evidence.
 
 **Slice 210 remains accepted as the latest full checkpoint.** Read the
 [completed worker plan](plan.slice-210-double-roundtrip.md),
@@ -24,18 +29,17 @@ motivating `(1 + 2^-30) / 65536` roundtrips in CUDA, HLSL, GLSL and C++. Classic
 and existing trimming remain. No NVVM semantic, provider or ABI change occurred.
 
 Latest accepted implementation and full checkpoint: 210. Implementation slices since it: 0.
-Next: run the bounded six-cell API lifetime experiment before any session-amortization
-implementation. One eval/NVVM O3 probe shows 11.90% lower steady-state
-request lifecycle median with identical PTX; it excludes shared startup/teardown and is not a
-corpus-runner speedup. Require finite-batch startup/teardown, order/lifetime evidence and >=10%
-median batch improvement without >5% per-cell compile-call regression. Any production runner
-change must preserve fresh-session coverage and requires a full checkpoint. Application runtime
-contracts remain absent; do not infer runtime semantics.
+Next: select slice 213 to validate and admit FP64 implicit aggregate shuffles now that slice 209
+corrected hardware-mask acquisition. Prefer this bounded backend feature over a production batching
+protocol for this iteration. Batching remains a measured performance candidate; its opt-in worker
+must preserve mandatory fresh-process coverage, exact identities/options/oracles, deadlines and
+crash isolation, and pass a full checkpoint before adoption. Its own performance evidence must
+include process startup/exit; the API metric is not a production-runner speedup.
+Application runtime contracts remain absent; do not infer runtime semantics.
 
-Research 211 does not advance implementation cadence or reset checkpoint obligations. Primary
-2-warmup/7-sample process medians span 1.617–1.817 s with approximately 50 ms timeout-wait
-quantization. Separate precise attribution samples, assembly timings and API lifecycle evidence
-are distinguished in the report. All accepted 210 recorded source/artifact hashes still match.
+Research 211/212 does not advance implementation cadence or reset checkpoint obligations. All
+accepted 210 recorded source/artifact hashes still match. Full 210 results remain inherited,
+with zero fresh runtime cells in 212 and every open/resolved failure history retained.
 
 ## Checkpoints and evidence
 
