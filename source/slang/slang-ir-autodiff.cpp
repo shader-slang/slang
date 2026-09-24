@@ -1354,9 +1354,7 @@ bool isDiffInst(IRInst* inst)
 
 void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
 {
-    // Copy debug decorations. All are cloned except DebugFuncDecoration, which is rebuilt
-    // per-derivative below -- each derivative needs its own IRDebugFunction, not a shared
-    // reference.
+    // DebugFuncDecoration is rebuilt per-derivative below; the rest are cloned as-is.
     for (auto decor : srcFunc->getDecorations())
     {
         switch (decor->getOp())
@@ -1389,7 +1387,7 @@ void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
                 }
                 else
                 {
-                    SLANG_ASSERT(!srcFunc->findDecoration<IRNameHintDecoration>());
+                    SLANG_RELEASE_ASSERT(!srcFunc->findDecoration<IRNameHintDecoration>());
                     name = srcDebugFunc->getName();
                 }
 

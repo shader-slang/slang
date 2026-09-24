@@ -5,8 +5,8 @@
 // own DebugFunction record, named after the derivative, rather than sharing the original function's
 // record. A shared record reports the derivative body under the original's name and, because a
 // DebugFunctionDefinition binds one record to one body, lets only one sharing body be described.
-// The bug is invisible to spirv-val (NonSemantic debug info is not validated), so this FileCheck
-// guard is the only regression coverage. The checks anchor on SPIR-V ids or the IR
+// The bug is invisible to spirv-val (NonSemantic debug info is not validated), so an explicit
+// FileCheck guard is required. The checks anchor on SPIR-V ids or the IR
 // `DebugFunction(...)` record syntax rather than on bare name text, so they cannot self-match any
 // embedded-source OpString: the SPIR-V pass binds each name's OpString id, the concrete IR checks
 // bind each record id and its decoration, and the generic IR checks match the record line itself.
