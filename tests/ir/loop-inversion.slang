@@ -1,6 +1,8 @@
 //TEST():SIMPLE(filecheck=CHECK):-entry computeMain -stage compute -line-directive-mode none -target hlsl -loop-inversion
+//TEST():SIMPLE(filecheck=CHECK):-entry computeMain -stage compute -line-directive-mode none -target hlsl -loop-inversion -g
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-dx12 -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-cpu -shaderobj -output-using-type -Xslang -loop-inversion -Xslang -g
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-cpu -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-cpu -shaderobj -output-using-type

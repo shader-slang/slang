@@ -11,11 +11,28 @@
 namespace Slang
 {
 
+// Debug location markers attribute the following instructions but do not add work to a block.
+static bool isDebugLocationMarker(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_DebugLine:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+        return true;
+    default:
+        return false;
+    }
+}
+
 static bool isSameBlockOrTrivialBranch(IRBlock* target, IRBlock* scrutinee)
 {
     if (target == scrutinee)
         return true;
-    const auto br = as<IRUnconditionalBranch>(scrutinee->getFirstOrdinaryInst());
+    auto firstInst = scrutinee->getFirstOrdinaryInst();
+    while (firstInst && isDebugLocationMarker(firstInst))
+        firstInst = firstInst->getNextInst();
+    const auto br = as<IRUnconditionalBranch>(firstInst);
     return br && br->getTargetBlock() == target && br->getArgCount() == 0 &&
            !scrutinee->hasMoreThanOneUse();
 };
@@ -28,8 +45,8 @@ static bool isSmallBlock(IRBlock* c)
     // - Negation
     // - Terminator
     Int n = 0;
-    for ([[maybe_unused]] const auto i : c->getOrdinaryInsts())
-        if (++n > 4)
+    for (const auto inst : c->getOrdinaryInsts())
+        if (!isDebugLocationMarker(inst) && ++n > 4)
             return false;
     return true;
 }
