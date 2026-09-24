@@ -26,8 +26,8 @@ static IRInst* getFirstNonDebugOrdinaryInst(IRBlock* b)
 
 // True if `scrutinee` is `target` itself, or a block that does nothing but unconditionally
 // branch to `target` (ignoring debug markers). The caller erases such a trivial forwarding
-// block; apart from debug markers it holds only the branch — never a value-defining inst —
-// so the erase is safe.
+// block; apart from debug markers it holds only the branch — never a value-defining inst such
+// as DebugVar/DebugInlinedVariable, which live at a variable's scope — so the erase is safe.
 static bool isSameBlockOrTrivialBranch(IRBlock* target, IRBlock* scrutinee)
 {
     if (target == scrutinee)

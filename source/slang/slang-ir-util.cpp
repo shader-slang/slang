@@ -100,10 +100,11 @@ bool isAnnotation(IRInst* inst)
 
 bool isDebugInst(IRInst* inst)
 {
-    // The debug-instruction ops that lowering interleaves among the ordinary insts of a
-    // function body under `-g`. This mirrors the instruction entries recognized by
-    // slang-ir-strip-debug-info.cpp (excluding its decoration and module-level entries,
-    // which never appear as a block's ordinary insts).
+    // The debug "local" instructions that lowering interleaves among a function's ordinary
+    // insts under `-g` (the set the emitters process per block, plus DebugLine/DebugVar).
+    // They carry no runtime or control-flow semantics, so structural/cost heuristics over IR
+    // skip them. Module-level debug insts (DebugSource, DebugFunction, ...) and
+    // DebugLocationDecoration never appear as a block's ordinary insts and are omitted.
     switch (inst->getOp())
     {
     case kIROp_DebugLine:
@@ -112,6 +113,7 @@ bool isDebugInst(IRInst* inst)
     case kIROp_DebugVar:
     case kIROp_DebugValue:
     case kIROp_DebugInlinedAt:
+    case kIROp_DebugInlinedVariable:
         return true;
     default:
         return false;
