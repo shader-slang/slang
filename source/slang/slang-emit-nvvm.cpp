@@ -5645,35 +5645,65 @@ bool _getNVVMPointerBitCast(IRInst* inst, NVVMPointerBitCast& outCast)
     return true;
 }
 
-// Resolves only the identity conversions emitted by buffer-element lowering around an exact
-// `DescriptorHandle<T>`. CUDA's bindless layout producer defines that handle as `T` itself, so a
-// conversion is executable without a provider operation precisely when both canonical types name
-// the same selected resource. This does not admit integer descriptor encodings or search through
-// other casts.
+// Resolves descriptor conversions that preserve the resource's CUDA representation. Consider:
+//
+//     float4 loadTexture(uint64_t handle, int2 coordinate)
+//     {
+//         Texture2D<float4> texture = DescriptorHandle<Texture2D<float4>>(handle);
+//         return texture.Load(int3(coordinate, 0));
+//     }
+//
+// The standard-library constructor produces CastUInt64ToDescriptorHandle, followed by
+// CastDescriptorHandleToResource. CUDA layout gives the descriptor its resource's layout, and
+// type lowering represents a selected read-only texture as i64. Both conversions therefore
+// preserve the same provider value, as does the inverse conversion to UInt64. Buffer descriptors
+// instead carry a pointer/count aggregate, so only their resource/descriptor casts are identities.
 bool _getNVVMDescriptorHandleConversion(IRInst* inst, IRInst*& outValue)
 {
     outValue = nullptr;
-    if (!inst || inst->getOperandCount() != 1 ||
-        (inst->getOp() != kIROp_CastDescriptorHandleToResource &&
-         inst->getOp() != kIROp_CastResourceToDescriptorHandle))
-    {
+    if (!inst || inst->getOperandCount() != 1)
         return false;
-    }
 
     IRInst* value = inst->getOperand(0);
+    if (!value)
+        return false;
+
     IRType* resourceType = nullptr;
-    if (inst->getOp() == kIROp_CastDescriptorHandleToResource)
+    switch (inst->getOp())
     {
-        if (!value || !asNVVMSupportedDescriptorHandleType(value->getDataType(), &resourceType) ||
+    case kIROp_CastDescriptorHandleToResource:
+        if (!asNVVMSupportedDescriptorHandleType(value->getDataType(), &resourceType) ||
             inst->getDataType() != resourceType)
         {
             return false;
         }
-    }
-    else if (
-        !asNVVMSupportedDescriptorHandleType(inst->getDataType(), &resourceType) || !value ||
-        value->getDataType() != resourceType)
-    {
+        break;
+
+    case kIROp_CastResourceToDescriptorHandle:
+        if (!asNVVMSupportedDescriptorHandleType(inst->getDataType(), &resourceType) ||
+            value->getDataType() != resourceType)
+        {
+            return false;
+        }
+        break;
+
+    case kIROp_CastUInt64ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToUInt64:
+        {
+            const bool toHandle = inst->getOp() == kIROp_CastUInt64ToDescriptorHandle;
+            auto handleType =
+                as<IRDescriptorHandleType>(toHandle ? inst->getDataType() : value->getDataType());
+            IRType* bitsType = toHandle ? value->getDataType() : inst->getDataType();
+            NVVMReadOnlyTextureType textureType;
+            if (!handleType || bitsType->getOp() != kIROp_UInt64Type ||
+                !getNVVMSupportedReadOnlyTextureType(handleType->getResourceType(), textureType))
+            {
+                return false;
+            }
+        }
+        break;
+
+    default:
         return false;
     }
 
@@ -8342,6 +8372,8 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_CastDescriptorHandleToResource:
             case kIROp_CastResourceToDescriptorHandle:
+            case kIROp_CastUInt64ToDescriptorHandle:
+            case kIROp_CastDescriptorHandleToUInt64:
                 {
                     IRInst* value = nullptr;
                     if (!_getNVVMDescriptorHandleConversion(inst, value))
@@ -9073,6 +9105,8 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_CastDescriptorHandleToResource:
             case kIROp_CastResourceToDescriptorHandle:
+            case kIROp_CastUInt64ToDescriptorHandle:
+            case kIROp_CastDescriptorHandleToUInt64:
                 {
                     IRInst* value = nullptr;
                     SLANG_RELEASE_ASSERT(_getNVVMDescriptorHandleConversion(inst, value));
@@ -14455,6 +14489,8 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_CastDescriptorHandleToResource:
                 case kIROp_CastResourceToDescriptorHandle:
+                case kIROp_CastUInt64ToDescriptorHandle:
+                case kIROp_CastDescriptorHandleToUInt64:
                     {
                         IRInst* value = nullptr;
                         SLANG_RELEASE_ASSERT(_getNVVMDescriptorHandleConversion(inst, value));

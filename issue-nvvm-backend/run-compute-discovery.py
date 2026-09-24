@@ -6,6 +6,8 @@ The checked-in manifest selects one existing active compare-compute contract fro
 its source-test ordinal. This script verifies that no selected source is represented in frozen
 corpus v1, adapts only target-specific harness arguments to native CUDA in a disposable mirror,
 and reuses the established census machinery for NVRTC O3 and direct NVVM O0/O3 execution.
+A selected contract may already target CUDA; frozen membership is checked by source identity,
+not inferred from the presence of a CUDA directive.
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ ARGUMENT_TOKEN_RE = re.compile(r'''"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\S+''')
 
 
 TARGET_FLAGS = {
+    "-cuda",
     "-cpu",
     "-d3d11",
     "-d3d12",
@@ -190,8 +193,6 @@ def _adapt_arguments_to_cuda(arguments: str) -> str:
     while index < len(tokens):
         token = tokens[index]
         lowered = token.lower()
-        if lowered == "-cuda":
-            raise ValueError("discovery source already has a native CUDA directive")
         if lowered in TARGET_FLAGS or lowered in TARGET_EMISSION_FLAGS:
             index += 1
             continue

@@ -61,6 +61,8 @@ Use existing manifest entries by reference. Add eligible new source contracts to
 additions separately from preservation counts. Discovery excludes sources already in frozen v1;
 if the needed shape is in an existing frozen source, keep its focused regression beside that source
 or add a distinct focused fixture. Do not defeat overlap checks or silently expand frozen v1.
+An explicitly selected source outside frozen v1 may already have a native CUDA directive; the
+discovery runner normalizes that target and preserves the selected inputs and output oracle.
 If the discovery runner cannot faithfully express the required harness, add a documented runnable
 extension with explicit selection and expected results before counting it as corpus coverage.
 

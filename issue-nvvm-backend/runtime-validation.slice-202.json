@@ -1,0 +1,3876 @@
+{
+  "schema": 3,
+  "slice": 202,
+  "status": "accepted-with-recorded-capability-gaps",
+  "validation_date_utc": "2026-09-24",
+  "scope": "Full fresh Linux L4/CUDA 12.9.2 SM80 acceptance; texture descriptor conversions; no material runtime claim.",
+  "provenance": {
+    "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+    "source_changes_at_start": "Base source plus the listed tested file contents; final source verified before commit.",
+    "artifact_sha256": {
+      "build/Debug/bin/slangc": "8f1938259bd32aa55b4e9a2ac320b2d379b3bce426c35cf597a2e81b5186134a",
+      "build/Debug/bin/slang-test": "60073a17f21170b1147fc9b6425154e8375f234ae56114828d49cbed0f275325",
+      "build/Debug/bin/libslang-llvm-nvvm.so": "044c6d04d5f85e2650abd79eea51db966a92787937dc44a50991fee863e6e7f9",
+      "build/Debug/lib/libslang-compiler.so": "da332ae8706666d75f91b19c1a13da3562faef88a997962c1da50a0f7a66fec6",
+      "build/Debug/lib/slang-core-module.bin": "5d0be7d7841b38eb84aad7a5e287b57eb4d658532d148fcbfdc0fcd65b448090",
+      "build/Debug/lib/librender-test-tool.so": "8dc3fd0bd155cfcc7cfc329bb0b80ed747996331c66444533c5266122e7cefa4",
+      "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "/usr/local/cuda-12.9/lib64/libnvrtc.so": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a",
+      "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+      "build/Debug/lib/libslang-unit-test-tool.so": "609363124633e4cca4a81aa884c985e0defca72679f5a0a0e5cab138423f9d0e"
+    },
+    "configuration": "Debug",
+    "target_architecture": 80,
+    "device": "name, driver_version, compute_cap\nNVIDIA L4, 580.126.09, 8.9",
+    "concurrency": "Frozen four workers, discovery two workers, selected unit tests two servers; no performance claim.",
+    "tested_source_sha256": {
+      "source/slang/slang-emit-nvvm.cpp": "625c443cb4e916d70d875a2d427d659da83796db8f850e7ddcaca5a9fcba4e6a",
+      "tests/cuda/nvvm-texture-descriptor-conversion.slang": "4b83edec23adf83e676303ee8e0f394ed96696452bf88ac6707b0b55892e0d22",
+      "tests/cuda/nvvm-texture-descriptor-buffer-unsupported.slang": "3b27a5123c9d272faa12955a39edf255515e7edb6b8a50b9602a6ad96a893758",
+      "issue-nvvm-backend/run-compute-discovery.py": "fed1e9c6a527c4d03057278ab3f8bdca8b61cd53d4901b422aedf0c17b39a2df",
+      "issue-nvvm-backend/test-run-compute-discovery.py": "7685338a408c51e0a18286037dba384beed0bc19d2d26aafd87b8e0b7646d98c",
+      "issue-nvvm-backend/discovery-corpus.manifest.tsv": "bbca688192a95b38fe230ff71c127c5e1fcbd722694096a7f946b0dd7b4404bd"
+    },
+    "compiler_version": "2026.16-228-g74f227e10",
+    "toolkit": {
+      "path": "/usr/local/cuda-12.9",
+      "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_May_27_02:21:03_PDT_2025\nCuda compilation tools, release 12.9, V12.9.86\nBuild cuda_12.9.r12.9/compiler.36037853_0"
+    },
+    "toolkit_libraries": {
+      "required_libnvvm": "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0",
+      "required_nvrtc": "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86",
+      "libnvvm_sha256": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "nvrtc_sha256": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+    },
+    "device_detail": {
+      "name": "NVIDIA L4",
+      "ordinal": 0,
+      "visible_device_count": 1,
+      "compute_capability": 89,
+      "driver_api_version": 13000,
+      "cuda_visible_devices": null
+    },
+    "submodule_pins": [
+      " 9dc178a86fcbbf13c94b4cd4cb046f238d26c8da external/WindowsToolchain (v0.12.0-9-g9dc178a)",
+      " 924936d0427cb25a61169739a7660230bffa6ea6 external/cmark (swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-09-15-a)",
+      " e0b53eaf63c6d00e0725788ef1dbb759aa321d79 external/fast_float (v6.1.0-352-ge0b53ea)",
+      " efec5db081e3aad807d0731e172ac597f6a39447 external/glm (0.9.5.3-2723-gefec5db0)",
+      " d1f52c8993a501bd52d4fbd044bfeb9ecdceb9f4 external/glslang (11.1.0-1385-gd1f52c89)",
+      " 8936b58fe26e8c3da834b8f60b06511d537b4c63 external/imgui (v1.62-5420-g8936b58fe)",
+      " 3fe7be956f23385aa1950dc31e2f25127ccfc0ea external/lua (v5.4-beta-333-g3fe7be95)",
+      " 7f71be01f2c6f6b2c3cddb67eef8c38eab12ffd4 external/lz4 (v1.9.2-1351-g7f71be01)",
+      " a63bd172ddcba73a3d87ca32032b66ad41ddb9a6 external/metal-cpp (remotes/origin/metal-cpp_macOS14.2_iOS17.2)",
+      " 8c532c32c3c96e5ba1f2283e032f69ead8add00f external/mimalloc (v2.1.7)",
+      " 6ef6c68f4fcbb8287aa8edf9c6670804932f41c6 external/miniz (3.0.2-68-g6ef6c68)",
+      " a1280c1863ff19d87f8e827468a4cc906ba9032a external/optix-dev (v9.0.0-1-ga1280c1)",
+      " d6d31411a3ab5417945daa6b1d8811cfc340cb66 external/slang-rhi (d6d31411)",
+      " 29981f65241605e08b0ede4cfeb999fe3b723c6a external/spirv-headers (1.5.4.raytracing.fixed-498-g29981f6)",
+      " 0d6fd73ca73830ccab5fa1f00ed5ed40124e2c55 external/spirv-tools (v2022.4-1300-g0d6fd73c)",
+      " d541711a794343de4ef5ea76f037c9fb9c127a55 external/tinyobjloader (v1.0.6-85-gd541711)",
+      " 73f3cbb237e84d483afafc743f1f14ec53e12314 external/unordered_dense (v4.5.0)",
+      " 387259ecf4b0fe0cfac161b1d0b0a74e42796710 external/vulkan (v1.4.347)"
+    ]
+  },
+  "provider_abi": 35,
+  "historical_denominators": {
+    "frozen_healthy_mvp": 427,
+    "discovery_healthy": 72,
+    "unchanged": true
+  },
+  "baseline": {
+    "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+    "provenance": {
+      "path": "build/nvvm-loop/slice-202-before/provenance.json",
+      "sha256": "d2d0a9cc0139108bc4e95fb379558f92b0cbab4dd44cd1c7466cb27c8b1d1df2"
+    },
+    "frozen": {
+      "path": "build/nvvm-loop/slice-202-before/frozen/comparison.json",
+      "sha256": "2df9d915e51de2fc157a41a7d4f4352b75df253acd13c5c25e9e759cd8d77230"
+    },
+    "discovery": {
+      "path": "build/nvvm-loop/slice-202-before/discovery/comparison.json",
+      "sha256": "7b69f3ae14636451180cbcbdba26666307ac5f668489a5db8cf42c49cf7b3944"
+    },
+    "note": "Full current-host baseline preserved every slice-195 plus slice-201-overlay classification; no inherited runtime rows."
+  },
+  "comparison": {
+    "frozen": {
+      "old_cells": 1356,
+      "current_cells": 1356,
+      "preserved_correct_cells": 1325,
+      "transitions": [],
+      "diagnostic_changes": [],
+      "added_cells": [],
+      "before_sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5",
+      "after_sha256": "385b1aaac310b971614daeac4c764289c89377b201e48a1ed3b259231d3d0216"
+    },
+    "discovery": {
+      "old_cells": 246,
+      "current_cells": 249,
+      "preserved_correct_cells": 216,
+      "transitions": [],
+      "diagnostic_changes": [],
+      "added_cells": [
+        {
+          "id": "cuda/nvvm-texture-descriptor-conversion.slang#discovery-1",
+          "mode": "nvrtc-o3",
+          "classification": "correct"
+        },
+        {
+          "id": "cuda/nvvm-texture-descriptor-conversion.slang#discovery-1",
+          "mode": "nvvm-o0",
+          "classification": "correct"
+        },
+        {
+          "id": "cuda/nvvm-texture-descriptor-conversion.slang#discovery-1",
+          "mode": "nvvm-o3",
+          "classification": "correct"
+        }
+      ],
+      "before_sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47",
+      "after_sha256": "0ae9311e723745c55aa8dce48adcab256b6eaf4a8ba1ccbd36c39f20d17e9633"
+    }
+  },
+  "corpora": {
+    "frozen": {
+      "identities": 452,
+      "cells": 1356,
+      "inventory_exact": true,
+      "counts": {
+        "nvrtc-o3": {
+          "correct": 449,
+          "infrastructure": 3
+        },
+        "nvvm-o0": {
+          "correct": 438,
+          "infrastructure": 1,
+          "preflight": 13
+        },
+        "nvvm-o3": {
+          "correct": 438,
+          "infrastructure": 1,
+          "preflight": 13
+        }
+      },
+      "exit_code": 2,
+      "per_identity": {
+        "path": "issue-nvvm-backend/census.slice-202.tsv",
+        "sha256": "6d919b76587a614a9cc3aeb69dc827370df68382f32772d76be5e221e9580ed9"
+      },
+      "raw_results": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/results.json",
+        "sha256": "385b1aaac310b971614daeac4c764289c89377b201e48a1ed3b259231d3d0216"
+      },
+      "selection": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/eligible-workloads.tsv",
+        "sha256": "bff679b996a5823e838bf579583c45b5b39a7b118aa3633a2999052950226471"
+      }
+    },
+    "discovery": {
+      "identities": 83,
+      "cells": 249,
+      "inventory_exact": true,
+      "counts": {
+        "nvrtc-o3": {
+          "correct": 73,
+          "infrastructure": 8,
+          "runtime-mismatch": 2
+        },
+        "nvvm-o0": {
+          "correct": 73,
+          "infrastructure": 7,
+          "runtime-mismatch": 1,
+          "preflight": 2
+        },
+        "nvvm-o3": {
+          "correct": 73,
+          "infrastructure": 7,
+          "runtime-mismatch": 1,
+          "preflight": 2
+        }
+      },
+      "exit_code": 2,
+      "per_identity": {
+        "path": "issue-nvvm-backend/discovery-census.slice-202.tsv",
+        "sha256": "5414146714c57c23e113f82fdc29d9cedfcabcd9a19439c67ff06c104ce182cb"
+      },
+      "raw_results": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/results.json",
+        "sha256": "0ae9311e723745c55aa8dce48adcab256b6eaf4a8ba1ccbd36c39f20d17e9633"
+      },
+      "selection": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/selected-workloads.tsv",
+        "sha256": "57c6009c7c8e50ba8828045b1050c7bee3bfd9b1eba43f6f024df8babbf8f291"
+      }
+    }
+  },
+  "unresolved_failures": [
+    {
+      "id": "compute/byte-address-buffer-atomic-mixed-width-12265.slang#cuda-1",
+      "mode": "nvrtc-o3",
+      "classification": "infrastructure",
+      "diagnostic": "profile implicitly upgraded",
+      "canonical_shape": "",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvrtc-o3/64d53307d4519589853acd0987aa6113ca982346.log",
+        "sha256": "eea8207e2a550ea2261f0ac39b396d1349a4b16d3e5e00a77971746085f2d299"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvrtc-o3",
+        "--match",
+        "compute/byte-address-buffer-atomic-mixed-width-12265.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/39c928ad3596bb267667807db98a1885453becf6"
+      ]
+    },
+    {
+      "id": "compute/half-vector-calc.slang#cuda-1",
+      "mode": "nvrtc-o3",
+      "classification": "infrastructure",
+      "diagnostic": "",
+      "canonical_shape": "",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvrtc-o3/8a2b84f4deae4525148a2536ddb488bd1820541a.log",
+        "sha256": "e53a988fb9ec426257b9d3fee57ca3d75cc6ca17b25bdd7f09198383d49d80df"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvrtc-o3",
+        "--match",
+        "compute/half-vector-calc.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/1a3a80fc7505cac05c058bf77f29091d62d276fc"
+      ]
+    },
+    {
+      "id": "compute/texture-subscript.slang#cuda-1",
+      "mode": "nvrtc-o3",
+      "classification": "infrastructure",
+      "diagnostic": "",
+      "canonical_shape": "",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvrtc-o3/1f6333e791d11b41e89aa131c141ad7a5f95211d.log",
+        "sha256": "7b49b55bbfe6bc414b7021efec785a2285e07fcf2c634078c9e698d15c963e7a"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvrtc-o3",
+        "--match",
+        "compute/texture-subscript.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/6f05c33d2a8a84ccf94db004098168a1551f8486"
+      ]
+    },
+    {
+      "id": "compute/byte-address-buffer-atomic-mixed-width-12265.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "infrastructure",
+      "diagnostic": "profile implicitly upgraded",
+      "canonical_shape": "",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/55efe12b56041c193a9e56f2763cde5b6ff67eb8.log",
+        "sha256": "5623a9c68962d067719f38de3508b36ddb179037cd7aed391024640b7f4d7fd4"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "compute/byte-address-buffer-atomic-mixed-width-12265.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/4c6421612ca3a0af5dfe64009110ea51cc4c0bfb"
+      ]
+    },
+    {
+      "id": "compute/dynamic-dispatch-substandard-float.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function result type: A'",
+      "canonical_shape": "helper function result type",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/154f96d61a4928c8717fd6dbfa1c762011d21f23.log",
+        "sha256": "b3d57e0aac009db6528857bd3c039b8e8ad8843cdb7a59a6a16a52e74e043096"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "compute/dynamic-dispatch-substandard-float.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/8c82c6b9392f183d0e73cf649195b21c61d0ff42"
+      ]
+    },
+    {
+      "id": "cuda/require-prelude.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'RequirePrelude'",
+      "canonical_shape": "RequirePrelude",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/a511244d56e607eb70026a58c439a6147e764cab.log",
+        "sha256": "f6da40560e6c0b8634e14b872f30e48557f80b8214a63ec53e6bc3f6af614149"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "cuda/require-prelude.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/91be34a4f5e3a9dce221d11577f1909bd4f0b602"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/quad-control/quad-control-comp-functionality.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'RequireMaximallyReconverges'",
+      "canonical_shape": "RequireMaximallyReconverges",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/3ad3b250f0c0b0ec069eb764c5da42c652338925.log",
+        "sha256": "6298b0000268c0a1f58a6d8c936d6f1c9b618a5be2d42458ca9801c99db2fb0b"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "hlsl-intrinsic/quad-control/quad-control-comp-functionality.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/c186ce85a921b692480d7d6c7cd0d1422095e3c7"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function result type: BFloat16'",
+      "canonical_shape": "helper function result type",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/e48b3507f473e8ad205bfd22cfb1f5c8e847312e.log",
+        "sha256": "009977bd6b12ce1a43940480ea79ecf4c180e81ebc2f43e2afba74fc5152376c"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/5415bdfb763dd66640f930864f005c1ed866cc9c"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/substandard-fp-folding.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: FloatE4M3'",
+      "canonical_shape": "helper function parameter",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/2c28bfea4ad9f9d3258ee173c5396418463d39fd.log",
+        "sha256": "1527e722c01f1716a6468611296eb39f14c6fb0f35db1e65150290b5c0d6439c"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "hlsl-intrinsic/substandard-fp-folding.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/f123388c8a3ccef6ff27e7c04f2587120b369248"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-min-max.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMin($1.x, $0), signature=double(double, vector<uint,4>)'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/43074cff854abc66020d82a9411730258683decd.log",
+        "sha256": "81e9c5eedc8c0d33ba84d81d1c74f19b6448e3de2dba5592011e504efd644bc5"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-min-max.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/bb067771b35f0788dd3a8f7630abd28019e34e71"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-max.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Ptr<KernelContext, addressSpace=1, access=0, operands=4, layout=DefaultLayout>'",
+      "canonical_shape": "helper function parameter",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/e5f37c0ff921a627e653365848152f3b53bf004e.log",
+        "sha256": "b3f473e9782e6c8bbadd3d24e7859b4fdcf0ef5f4d5677d04cd8dc35d930be3c"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-prefix-max.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/34f7ace5ea051bf8f778399aa3e576f146694ddc"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Ptr<KernelContext, addressSpace=1, access=0, operands=4, layout=DefaultLayout>'",
+      "canonical_shape": "helper function parameter",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/6c792edea7a863b70f6aa58250329ecca3b34888.log",
+        "sha256": "b2de6e61c5466d958e2d4da69b7da31e49e7292997e9501470a51df6dd2af492"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/46918d573420fc13dfd213fd9457dd4cdb757631"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-sum-product.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixSum($1.x, $0) + $0, signature=double(double, vector<uint,4>)'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/129df4aac176bc03e9ac3eb785fde0b3b083cc16.log",
+        "sha256": "a2e419e58543dec7944075f50079035b9682f7ee2ff5a2dcddc75ef177a7a452"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-prefix-sum-product.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/97c2f9a3b2d9453367cc0f116120113dd3358c8b"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-sum-product.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveSum($1.x, $0), signature=double(double, vector<uint,4>)'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/d654ed4abde7bce1b9a58630cb311ef994bfebf6.log",
+        "sha256": "2ae099ed28fc0cf541953ba3d980293dad29a6ff9832bfbc5b04d628b813b5cc"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-sum-product.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/63f4f3df0a0786fad14137e245e44364a00d6884"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-rotate/wave-rotate-clustered.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_slang_waveClusteredRotate($0, $1, $2), signature=float(float, uint, uint)'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/55e0d81f497e9be9eecc34ab6ff0dd5780e6196f.log",
+        "sha256": "b8b20f723a47e3224b9049fb8fd8dfe23648232fcd529667e72f956e48519b88"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "hlsl-intrinsic/wave-rotate/wave-rotate-clustered.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/8722ab269622f2b9609216096faadfe49cc305da"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-rotate/wave-rotate.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=__shfl_sync(0xFFFFFFFF, $0, (_getLaneId() + $1) % 32), signature=float(float, uint)'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/5066eb4e9760e9895151bcfc0e0abf062c690618.log",
+        "sha256": "43f0f911d7d9d0b3a94c45a36617f69e46cf0dedb51fa079973798452332cb81"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "hlsl-intrinsic/wave-rotate/wave-rotate.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/5361b53d1b102a5e4b2895a6332c4adcf4a11faf"
+      ]
+    },
+    {
+      "id": "slang-extension/realtime-clock.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=clock, signature=uint()'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o0/8ecd37f474050f6574289af81af44c7b51adda7a.log",
+        "sha256": "418e3e9ae639eacf7835dab5214de64eca8ab844881588cf9e1f0b04e7f24809"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "slang-extension/realtime-clock.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/3304835d9ee5e7c833e65a51669db91b2862943f"
+      ]
+    },
+    {
+      "id": "compute/byte-address-buffer-atomic-mixed-width-12265.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "infrastructure",
+      "diagnostic": "profile implicitly upgraded",
+      "canonical_shape": "",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/ebcef5301364bdc0a2f8cd00b5661a05a1a8f896.log",
+        "sha256": "155ad03f17b145b51ba3a3268c90c3b662bd65d9cd641b439456abd59aeef3cb"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "compute/byte-address-buffer-atomic-mixed-width-12265.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/a882058be28d507eb71aaa499c7a6057da728270"
+      ]
+    },
+    {
+      "id": "compute/dynamic-dispatch-substandard-float.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function result type: A'",
+      "canonical_shape": "helper function result type",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/2b363b28f5cbc31065074de5f59768fd0c18c6ff.log",
+        "sha256": "04c4dbaa9258cfc38168e281703b3705db86dffb4a1161ed929e238c52ef6e61"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "compute/dynamic-dispatch-substandard-float.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/22830b26de85337e97b89cbdcb1ade8354bb96da"
+      ]
+    },
+    {
+      "id": "cuda/require-prelude.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'RequirePrelude'",
+      "canonical_shape": "RequirePrelude",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/f27064062ef8152826af4bc3c86e913f64e3b0a0.log",
+        "sha256": "08f093d0afed009667315dfdb7196c0033e64337d20cab4f68c2816339886247"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "cuda/require-prelude.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/0b248a343de80668dcedad8f77387ad43693dffe"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/quad-control/quad-control-comp-functionality.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'RequireMaximallyReconverges'",
+      "canonical_shape": "RequireMaximallyReconverges",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/b2296d3a919ddf8b1c8ad75735f4d19a3c2f519d.log",
+        "sha256": "9a38a1b829ffa03c61acee4bffccd207d2a17cd98885514b99af048fe32b7d61"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "hlsl-intrinsic/quad-control/quad-control-comp-functionality.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/b903773e481b7f9dc1f3a4cfc7a666335c331ca9"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function result type: BFloat16'",
+      "canonical_shape": "helper function result type",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/dfae1229391a0aa15b4241855c06cff3125fe2d5.log",
+        "sha256": "38a048576af2d51fa1482bd51a942f78a5c1cc91b3637977f78597dd80471b52"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/455f9df03f5ee99369b73560624b811156268f3b"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/substandard-fp-folding.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: FloatE4M3'",
+      "canonical_shape": "helper function parameter",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/d3c609e25c6ae5b4bdb4f8ea17af1bf06e039280.log",
+        "sha256": "dd9aada2a28fda7657f96dbc080539865ac2fb7e5bf13c8420e12f668863d7b6"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "hlsl-intrinsic/substandard-fp-folding.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/b76ea1ede942fefaa79e2fe86cb34b2ec114d745"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-min-max.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMin($1.x, $0), signature=double(double, vector<uint,4>)'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/32b62f4259c8a6772225790d8d679d3569f3408b.log",
+        "sha256": "836bf0ab7de9b4d967cb36f79fd19a6151a0b550fc2929df5272fc69e08a9d04"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-min-max.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/b4f4f222008ba204d30fbd53dc28f006d694cc53"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-max.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Ptr<KernelContext, addressSpace=1, access=0, operands=4, layout=DefaultLayout>'",
+      "canonical_shape": "helper function parameter",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/1becc24df12c518be6a5fd7c79a22d268c3d692e.log",
+        "sha256": "3ca1aaab8d41418c99aad23ca395e8b443a4b52f2c5224c6a26ecab04253257d"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-prefix-max.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/33ba69eaaf9350d56cd6d11ad2978f3699539feb"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Ptr<KernelContext, addressSpace=1, access=0, operands=4, layout=DefaultLayout>'",
+      "canonical_shape": "helper function parameter",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/2dc0d57bfecb5fdb3871166354428e03efda56e2.log",
+        "sha256": "dd6fb056a56828a5261dc725335e9ea74705c6d556be04a9dc9997b6acc9e5e3"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/576969fe2ca4b209224552fea20794d37d3d2c39"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-sum-product.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixSum($1.x, $0) + $0, signature=double(double, vector<uint,4>)'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/90bca5589d9472aee7cd6f9b38d78377104d227d.log",
+        "sha256": "a7c3d168781f4d810fba7481d364fe224ff1ba919707dc7ccb7f36a74da89a23"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-prefix-sum-product.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/35a57999a4c5c1021956877958a4866e9d629250"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-sum-product.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveSum($1.x, $0), signature=double(double, vector<uint,4>)'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/6074e8a19d060e0576f161ddc033485baebce32b.log",
+        "sha256": "7d32879d7c6c9246e41d5074a4cca855806b487a5ff305e9a78057b9b4bfc43e"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-sum-product.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/7220020deb2ac05580a27c7d646092822fe268aa"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-rotate/wave-rotate-clustered.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_slang_waveClusteredRotate($0, $1, $2), signature=float(float, uint, uint)'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/d81364a7529ccb94ecf04bcdcb010d7aeb617e7f.log",
+        "sha256": "58938374fbda64a0e98fd0d94953eccce45ad15fc2c9d8a0e7bb6fb245afcd6a"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "hlsl-intrinsic/wave-rotate/wave-rotate-clustered.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/14a077633cdfb1cb10f5a0d4656efea677799607"
+      ]
+    },
+    {
+      "id": "hlsl-intrinsic/wave-rotate/wave-rotate.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=__shfl_sync(0xFFFFFFFF, $0, (_getLaneId() + $1) % 32), signature=float(float, uint)'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/0ff4357f115c6d16c785eb59751bb0011c841a1f.log",
+        "sha256": "f8b9368f79cb1fd12db1ae83b6b2b6ae979dddd0bdc9ea7b6dea2ef3a757b9b0"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "hlsl-intrinsic/wave-rotate/wave-rotate.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/abae2e06df86d8315a6cf15ab8ee37a50790cd77"
+      ]
+    },
+    {
+      "id": "slang-extension/realtime-clock.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=clock, signature=uint()'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+          "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/frozen/logs/nvvm-o3/03eb5afe29d83cae053218758a21864806c7e48a.log",
+        "sha256": "bc6353ebb2983283b8722c519f485d8a76e1964b1e0bdb2ba10a2b036d9db748"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "slang-extension/realtime-clock.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/66ebc2c135e54420ecac2b173ce4b30957922d20"
+      ]
+    },
+    {
+      "id": "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+      "mode": "nvrtc-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvrtc-o3/bfa7b7d9fdd3b5225f860a70f97588d47e287633.log",
+        "sha256": "b4708e2d067550078e568a74767eba5597107d73b90348d3f8a5d6e72d1ca0ad"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvrtc-o3",
+        "--match",
+        "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/d6ef203760bb953e10c680e642ca30342e00df79"
+      ]
+    },
+    {
+      "id": "compute/atomics-buffer.slang#discovery-1",
+      "mode": "nvrtc-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvrtc-o3/4abc646b2048fd0b199f5c26f74bbd908abc2359.log",
+        "sha256": "d7f462455615bbe0a95a65861f536835dbfe35e3424cd6a25a72153d0178860e"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvrtc-o3",
+        "--match",
+        "compute/atomics-buffer.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/386e91f2a6dda9ff8abb15feb3957f75f24ec295"
+      ]
+    },
+    {
+      "id": "compute/constexpr.slang#discovery-1",
+      "mode": "nvrtc-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvrtc-o3/2be305e1c2b1860fde73f53aa44ed559034cc431.log",
+        "sha256": "561f75e875cdae48a754a02c610754a8eb8474eb7b227aef33d966695c1442ee"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvrtc-o3",
+        "--match",
+        "compute/constexpr.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/a03423b2fed8d638c38830adba522068872e6406"
+      ]
+    },
+    {
+      "id": "compute/non-square-column-major.slang#discovery-1",
+      "mode": "nvrtc-o3",
+      "classification": "runtime-mismatch",
+      "diagnostic": "",
+      "canonical_shape": "",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvrtc-o3/11b1c7864283a74b087ffd33fa490544581b62df.log",
+        "sha256": "3010d0ff83a368c8f0364ed3f01fa53ad5de89d5d7a5e884ff6fba9282af6c4f"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvrtc-o3",
+        "--match",
+        "compute/non-square-column-major.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/0d1a0b2556132644f91b29bd23353ffbef3810af"
+      ]
+    },
+    {
+      "id": "compute/texture-get-dimensions.slang#discovery-1",
+      "mode": "nvrtc-o3",
+      "classification": "runtime-mismatch",
+      "diagnostic": "",
+      "canonical_shape": "",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvrtc-o3/8c494e4ea960e132ffff6a29ad2828aa42d4eca4.log",
+        "sha256": "0b10aad9a5a26241950ab989d05e9f26771d184d5f53edd48373b9e66925568e"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvrtc-o3",
+        "--match",
+        "compute/texture-get-dimensions.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/3da1f1139ac5b1147156a68ee160e4e2e6c381ec"
+      ]
+    },
+    {
+      "id": "compute/texture-subscript-multisample.slang#discovery-1",
+      "mode": "nvrtc-o3",
+      "classification": "infrastructure",
+      "diagnostic": "Slang compilation aborted due to an exception of N5Slang13InternalErrorE assert failure: slang-emit-cpp.cpp(133): handle != StringSlicePool::kNullHandle",
+      "canonical_shape": "",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvrtc-o3/be15e8b3d4c153109f34d6110f40510a53614204.log",
+        "sha256": "28ef6b8e8bc182d0249810c975bcfe948b2fa453aead2df9bb006fb2155214b4"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvrtc-o3",
+        "--match",
+        "compute/texture-subscript-multisample.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/a8fc32be4c9134bf3b33417f355fbd6ce155c77c"
+      ]
+    },
+    {
+      "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+      "mode": "nvrtc-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvrtc-o3/c20187a757678720bf14bb4cc1ff1c4b6c6d1d91.log",
+        "sha256": "9ff96e6848e475f1f6a7d2c41240a76797502cf0fa9a27331f5f79f03815d62e"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvrtc-o3",
+        "--match",
+        "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/fadcab2ed4003cf9f020f4b322de8277703dda5b"
+      ]
+    },
+    {
+      "id": "language-feature/pointer/coherent-load-store-physical-storage-buffer.slang#discovery-1",
+      "mode": "nvrtc-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvrtc-o3/31f55e846a2ebce3ec521fa419f561fb579b20cc.log",
+        "sha256": "7efd79cec834428114462f87c08cc2ca11a0d0fdfc3bd9f1e4813004b548eb2d"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvrtc-o3",
+        "--match",
+        "language-feature/pointer/coherent-load-store-physical-storage-buffer.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/f8f45cafa1ded0667b5f2ea9deaca016e2eb5744"
+      ]
+    },
+    {
+      "id": "language-feature/pointer/data-layouts.slang#discovery-1",
+      "mode": "nvrtc-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvrtc-o3/68382fd12bc551f8a0b21bb97a37d3c8f8083b8d.log",
+        "sha256": "b8f7a90985f5acf9e2f7e85099d46cedd4c032263e47cc6cd9e29830867672e3"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvrtc-o3",
+        "--match",
+        "language-feature/pointer/data-layouts.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/62df58f8ba3a2fe798942e6bdbefffeb5d24f4b1"
+      ]
+    },
+    {
+      "id": "language-feature/pointer/redundant-coherent-load.slang#discovery-1",
+      "mode": "nvrtc-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvrtc-o3/70c6295e40f574c1a81897fdfdc8003dbfd48e0f.log",
+        "sha256": "bb3c70220311ea7fec5a72f9bd199ae38a7691572dc66a696f86faaec89de49f"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvrtc-o3",
+        "--match",
+        "language-feature/pointer/redundant-coherent-load.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/e960567a6fc0ff1291987b107e8f1d265abe92a4"
+      ]
+    },
+    {
+      "id": "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o0/17af9ea1fc1f2359c61d8f53c898bbeb58b48c92.log",
+        "sha256": "b4708e2d067550078e568a74767eba5597107d73b90348d3f8a5d6e72d1ca0ad"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/615e09028d40b4b3f8dfd580dcfbeaa91cd355bc"
+      ]
+    },
+    {
+      "id": "compute/atomics-buffer.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o0/256ff67758a78c5c2f3952768b31c8cae49b38db.log",
+        "sha256": "d7f462455615bbe0a95a65861f536835dbfe35e3424cd6a25a72153d0178860e"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "compute/atomics-buffer.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/d850ea04464c0a3da6796606938afa03cb8a6fd3"
+      ]
+    },
+    {
+      "id": "compute/constexpr.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o0/5e4b9fa17552a241be6df7bf7535ae302b03cd5c.log",
+        "sha256": "561f75e875cdae48a754a02c610754a8eb8474eb7b227aef33d966695c1442ee"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "compute/constexpr.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/df64d5715e8cd7f20c00970f17441514d08126c6"
+      ]
+    },
+    {
+      "id": "compute/non-square-column-major.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "classification": "runtime-mismatch",
+      "diagnostic": "",
+      "canonical_shape": "",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o0/eff8a12373ca097fcd38acc5ba01fa9690766471.log",
+        "sha256": "3010d0ff83a368c8f0364ed3f01fa53ad5de89d5d7a5e884ff6fba9282af6c4f"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "compute/non-square-column-major.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/bd2d2f97d912a5ee67af7d8aa9e5f1df067b4b7d"
+      ]
+    },
+    {
+      "id": "compute/texture-get-dimensions.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o0/cb9ad0fdc501b8a937c17bd39dcbdccc81cd2b6e.log",
+        "sha256": "a662351c93c7d20ee77d5248649fe39c06cbba93b0f89e25cf63196e26e56faf"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "compute/texture-get-dimensions.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/64cd87f9030ad5772a3b13cfb74f17cda0cd97ad"
+      ]
+    },
+    {
+      "id": "compute/texture-subscript-multisample.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'",
+      "canonical_shape": "struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o0/a8d0b64c0ba60f17f020c47a06a06cd1596b78a8.log",
+        "sha256": "e2bedb9add3fd5a3b8a04286339f59ce571c1a43406b1670be2dccdf18431844"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "compute/texture-subscript-multisample.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/c8b9dd880b81a5ed9cb86156568db4a9b31d88fe"
+      ]
+    },
+    {
+      "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o0/f114ce026511157483fc10ad5ffef6b5227e6f98.log",
+        "sha256": "9ff96e6848e475f1f6a7d2c41240a76797502cf0fa9a27331f5f79f03815d62e"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/450c67834fc803af5476981409b0e7a9c2767968"
+      ]
+    },
+    {
+      "id": "language-feature/pointer/coherent-load-store-physical-storage-buffer.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o0/302dc96156e8a42a09d2a1ba5388fc9b7a10f925.log",
+        "sha256": "7efd79cec834428114462f87c08cc2ca11a0d0fdfc3bd9f1e4813004b548eb2d"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "language-feature/pointer/coherent-load-store-physical-storage-buffer.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/367cc0caa60d3fade09418fe39850d56a486f1d9"
+      ]
+    },
+    {
+      "id": "language-feature/pointer/data-layouts.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o0/0dd8ff6eab7822786d434dd86d94eea963d6d4c2.log",
+        "sha256": "b8f7a90985f5acf9e2f7e85099d46cedd4c032263e47cc6cd9e29830867672e3"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "language-feature/pointer/data-layouts.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/9dcca96acef9b48d219b04dd7858818eb89f0931"
+      ]
+    },
+    {
+      "id": "language-feature/pointer/redundant-coherent-load.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o0/c863f9889003d42206dd1a9e78a5f41be2ccdc34.log",
+        "sha256": "bb3c70220311ea7fec5a72f9bd199ae38a7691572dc66a696f86faaec89de49f"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "language-feature/pointer/redundant-coherent-load.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/16d6ffc54c606acf62afe35a5ec61cc52145a419"
+      ]
+    },
+    {
+      "id": "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o3/9651719bf3aa61fdbb5243049e2fd25029b0bae3.log",
+        "sha256": "b4708e2d067550078e568a74767eba5597107d73b90348d3f8a5d6e72d1ca0ad"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/ddf9ec0e8bef52b56cff88296cb2580b99198b58"
+      ]
+    },
+    {
+      "id": "compute/atomics-buffer.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o3/23cffb7beff70c7007f7faf7a0202657a8804015.log",
+        "sha256": "d7f462455615bbe0a95a65861f536835dbfe35e3424cd6a25a72153d0178860e"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "compute/atomics-buffer.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/398cd3b8bfe32e44163f904da5c66f0527f6d075"
+      ]
+    },
+    {
+      "id": "compute/constexpr.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o3/1a9b5ae2457576a949fd5877e8f6980fedff5507.log",
+        "sha256": "561f75e875cdae48a754a02c610754a8eb8474eb7b227aef33d966695c1442ee"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "compute/constexpr.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/7629590d1b5c5ad577347c22f17c90b7a8398b6e"
+      ]
+    },
+    {
+      "id": "compute/non-square-column-major.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "classification": "runtime-mismatch",
+      "diagnostic": "",
+      "canonical_shape": "",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o3/86c4e9fce4fb5ffce5829dbd0a70421b8d60ad58.log",
+        "sha256": "3010d0ff83a368c8f0364ed3f01fa53ad5de89d5d7a5e884ff6fba9282af6c4f"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "compute/non-square-column-major.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/9d0a0c2298e8abfc333966d13ee603ce911a2ad8"
+      ]
+    },
+    {
+      "id": "compute/texture-get-dimensions.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)'",
+      "canonical_shape": "GenericAsm",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o3/4f6a570174ca985a67b8be9d934a2c7e4b0a303b.log",
+        "sha256": "a662351c93c7d20ee77d5248649fe39c06cbba93b0f89e25cf63196e26e56faf"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "compute/texture-get-dimensions.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/279342a64be25565888c6be333580f74f064de2c"
+      ]
+    },
+    {
+      "id": "compute/texture-subscript-multisample.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'",
+      "canonical_shape": "struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o3/5c3010140e22c3ee8b120e9f7786e5d70a138c3c.log",
+        "sha256": "e2bedb9add3fd5a3b8a04286339f59ce571c1a43406b1670be2dccdf18431844"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "compute/texture-subscript-multisample.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/abe2d2a99f8121db12ae54bc013e6f7f7ad4a1d6"
+      ]
+    },
+    {
+      "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o3/a93b28a4e6c04a4f70302a8ef5fa39d75c5b8934.log",
+        "sha256": "9ff96e6848e475f1f6a7d2c41240a76797502cf0fa9a27331f5f79f03815d62e"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/aab12456a1a9e6bb4b14586e1ecad9ff29ad6a98"
+      ]
+    },
+    {
+      "id": "language-feature/pointer/coherent-load-store-physical-storage-buffer.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o3/b5a42f14134e9bb7742c20c0462418c6dc0af48e.log",
+        "sha256": "7efd79cec834428114462f87c08cc2ca11a0d0fdfc3bd9f1e4813004b548eb2d"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "language-feature/pointer/coherent-load-store-physical-storage-buffer.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/d94c101a75c8c5027f4220b46c535c9df921a529"
+      ]
+    },
+    {
+      "id": "language-feature/pointer/data-layouts.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o3/62018b6996b6b5a785d9a2f7746efd6efd9156a0.log",
+        "sha256": "b8f7a90985f5acf9e2f7e85099d46cedd4c032263e47cc6cd9e29830867672e3"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "language-feature/pointer/data-layouts.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/cbefbfdd31f292f46cc05d6ce95b8338b9f90b16"
+      ]
+    },
+    {
+      "id": "language-feature/pointer/redundant-coherent-load.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "classification": "infrastructure",
+      "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+      "canonical_shape": "target capability requirement",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "discovery",
+      "predates_slice": true,
+      "historical_category_evidence": "issue-nvvm-backend/discovery-census.slice-195.tsv",
+      "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+      "diagnostic_observed_before_this_change": {
+        "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+        "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-202-before/discovery/results.json",
+          "sha256": "97fcbffdc7a848d2b013f9720b4ae7edefebf5a4b2ecfa2d9125eee887ee4e47"
+        }
+      },
+      "evidence": {
+        "path": "build/nvvm-loop/slice-202-after/discovery/logs/nvvm-o3/121588b06e338d99b74e132c7790f4f2cad18127.log",
+        "sha256": "bb3c70220311ea7fec5a72f9bd199ae38a7691572dc66a696f86faaec89de49f"
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-discovery.py",
+        "--config",
+        "Debug",
+        "--bin-dir",
+        "build/Debug/bin",
+        "--provider",
+        "build/Debug/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "language-feature/pointer/redundant-coherent-load.slang#discovery-1",
+        "--manifest",
+        "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+        "--output",
+        "build/nvvm-slice202-reproduce/19accd34524c8c5af8bdc085f83e013b9fb66136"
+      ]
+    }
+  ],
+  "focused": {
+    "runtime_lanes": 3,
+    "negative_lanes": 4,
+    "existing_cuda_source_lanes": 1,
+    "evidence": {
+      "path": "build/nvvm-loop/slice-202-after/focused.log",
+      "sha256": "012702e647596857b534b77a1b694da5200673a646a934800ce9b57f38278398"
+    },
+    "before_evidence": {
+      "path": "build/nvvm-loop/descriptor-probe/boundaries-before.json",
+      "sha256": "1f63eef169e7e038aacdd1f3d4890707a9ef4b8d35aa6ccc17a991e3ffe65efa"
+    }
+  },
+  "runtime_gate": {
+    "passed": 4,
+    "evidence": {
+      "path": "build/nvvm-loop/slice-202-after/runtime/results.json",
+      "sha256": "ffc56114ee23d31d25f70b8e3c0c6b59f80ad2f00729bf1378d19c274d706c16"
+    },
+    "optimization": "compiler-default (explicit O0/O3 coverage belongs to the compute census)"
+  },
+  "units": {
+    "passed": 473,
+    "ignored": 1,
+    "ignored_fixture": "nvvmSlangIntegerBitHelpersRequestTypedOperations (Windows only)",
+    "evidence": {
+      "path": "build/nvvm-loop/slice-202-after/units.log",
+      "sha256": "3ce71b085ecc7487fce50ba82270f18d3faf8752d6bafc53bef24ceca8b87333"
+    }
+  },
+  "toolkit": {
+    "passed": 18,
+    "evidence": {
+      "path": "build/nvvm-loop/slice-202-after/toolkit/results.json",
+      "sha256": "c7e7722ed8443ebe5d62efa193b86e0993846ed2c365549b2f15f2e7ccdaf1f3"
+    }
+  },
+  "focused_compile_assembly": {
+    "passed_commands": 6,
+    "evidence": {
+      "path": "build/nvvm-loop/slice-202-after/focused-assembly/results.json",
+      "sha256": "7c91d959cf355db40403113694aa1e07ffb2179221c80dee9a7a611d5b760e15"
+    }
+  },
+  "discovery_contract_tests": {
+    "passed": 4,
+    "evidence": {
+      "path": "build/nvvm-loop/slice-202-after/discovery-contract-tests.log",
+      "sha256": "967c92d36cebcf36f2f214cac7698609db89c071c595426864067899c8d2dcc7"
+    }
+  },
+  "rejected_discovery_selection": {
+    "exit_code": 1,
+    "reason": "Native CUDA target was rejected before any workload executed.",
+    "evidence": {
+      "path": "build/nvvm-loop/slice-202-after/discovery-selection-rejected.log",
+      "sha256": "5e26d72d07647b33f116fc7af818f79693846d3e8acba1b42f5e3ae42e180911"
+    }
+  },
+  "self_review": "Extended one existing conversion helper and its three consumers; reused the canonical texture classifier. Removed discovery target-based membership proxy; exact source overlap/duplicate checks remain. No new compiler helper, fallback, representation, provider API, or ABI.",
+  "stopping_condition": "Maintainer requested stopping after slice 202 is finished and committed; no slice 203 started.",
+  "complex_corpus": {
+    "schema": 1,
+    "scope": "compile-and-assemble-only; one sample, no performance claim",
+    "source": "tests/cuda/complex/tiled_brass_material.slang",
+    "source_sha256": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92",
+    "raw_results": "build/nvvm-loop/slice-202-after/complex/results.json",
+    "raw_results_sha256": "45d8a89f0b0196716bc301caefee68a77490943986387f6b3e0503b7c25c6a81",
+    "cells": [
+      {
+        "id": "tiled-brass-material-eval_buffer-nvrtc-o3",
+        "entry": "eval_buffer",
+        "backend": "nvrtc",
+        "optimization": 3,
+        "architecture": 80,
+        "status": "passed",
+        "diagnostics": [],
+        "attempts": [
+          {
+            "command": [
+              "/home/skallweit/codex/agent-sandbox/slang/build/Debug/bin/slangc",
+              "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+              "-entry",
+              "eval_buffer",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O3",
+              "-emit-cuda-via-nvrtc",
+              "-report-perf-benchmark",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-eval_buffer-nvrtc-o3/attempt-0.ptx"
+            ],
+            "return_code": 0,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-eval_buffer-nvrtc-o3/attempt-0.log",
+            "log_sha256": "1b046424b144e067e44dcb963a1aeb4292c44248e696c0f4223cbfe002b0c456"
+          }
+        ],
+        "assembly": {
+          "command": [
+            "/usr/local/cuda-12.9/bin/ptxas",
+            "-v",
+            "-arch=sm_80",
+            "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-eval_buffer-nvrtc-o3/attempt-0.ptx",
+            "-o",
+            "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-eval_buffer-nvrtc-o3/out.cubin"
+          ],
+          "return_code": 0,
+          "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-eval_buffer-nvrtc-o3/ptxas.log",
+          "log_sha256": "c7b025c1e64c079d6b949711d7910b1ce21360c8301266b8eec6399c3f60e2b5"
+        }
+      },
+      {
+        "id": "tiled-brass-material-eval_buffer-nvvm-o0",
+        "entry": "eval_buffer",
+        "backend": "nvvm",
+        "optimization": 0,
+        "architecture": 80,
+        "status": "preflight-rejected",
+        "diagnostics": [
+          "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'LoadFromUninitializedMemory'"
+        ],
+        "attempts": [
+          {
+            "command": [
+              "/home/skallweit/codex/agent-sandbox/slang/build/Debug/bin/slangc",
+              "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+              "-entry",
+              "eval_buffer",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O0",
+              "-emit-cuda-via-nvvm",
+              "-report-perf-benchmark",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-eval_buffer-nvvm-o0/attempt-0.ptx"
+            ],
+            "return_code": 255,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-eval_buffer-nvvm-o0/attempt-0.log",
+            "log_sha256": "20ce4f34447a531d5a8c94b9e1e97eab19637574aa28c4d8b9a9320cbf06100d"
+          }
+        ]
+      },
+      {
+        "id": "tiled-brass-material-eval_buffer-nvvm-o3",
+        "entry": "eval_buffer",
+        "backend": "nvvm",
+        "optimization": 3,
+        "architecture": 80,
+        "status": "preflight-rejected",
+        "diagnostics": [
+          "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'LoadFromUninitializedMemory'"
+        ],
+        "attempts": [
+          {
+            "command": [
+              "/home/skallweit/codex/agent-sandbox/slang/build/Debug/bin/slangc",
+              "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+              "-entry",
+              "eval_buffer",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O3",
+              "-emit-cuda-via-nvvm",
+              "-report-perf-benchmark",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-eval_buffer-nvvm-o3/attempt-0.ptx"
+            ],
+            "return_code": 255,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-eval_buffer-nvvm-o3/attempt-0.log",
+            "log_sha256": "7086f6005ec3ccabb9b5221fb525adf80a0f28ca31a3efb334d1d1028e104d07"
+          }
+        ]
+      },
+      {
+        "id": "tiled-brass-material-sample_buffer-nvrtc-o3",
+        "entry": "sample_buffer",
+        "backend": "nvrtc",
+        "optimization": 3,
+        "architecture": 80,
+        "status": "passed",
+        "diagnostics": [],
+        "attempts": [
+          {
+            "command": [
+              "/home/skallweit/codex/agent-sandbox/slang/build/Debug/bin/slangc",
+              "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+              "-entry",
+              "sample_buffer",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O3",
+              "-emit-cuda-via-nvrtc",
+              "-report-perf-benchmark",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-sample_buffer-nvrtc-o3/attempt-0.ptx"
+            ],
+            "return_code": 0,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-sample_buffer-nvrtc-o3/attempt-0.log",
+            "log_sha256": "de5527fe98a53a837e876af5f4317f17a6a62404ed01c4e2c8ca0cb6984925f7"
+          }
+        ],
+        "assembly": {
+          "command": [
+            "/usr/local/cuda-12.9/bin/ptxas",
+            "-v",
+            "-arch=sm_80",
+            "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-sample_buffer-nvrtc-o3/attempt-0.ptx",
+            "-o",
+            "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-sample_buffer-nvrtc-o3/out.cubin"
+          ],
+          "return_code": 0,
+          "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-sample_buffer-nvrtc-o3/ptxas.log",
+          "log_sha256": "c210f3c6c24e2dd72edad9118063132db1ed45903757ff166d61b7ee71f3e8ee"
+        }
+      },
+      {
+        "id": "tiled-brass-material-sample_buffer-nvvm-o0",
+        "entry": "sample_buffer",
+        "backend": "nvvm",
+        "optimization": 0,
+        "architecture": 80,
+        "status": "preflight-rejected",
+        "diagnostics": [
+          "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'LoadFromUninitializedMemory'"
+        ],
+        "attempts": [
+          {
+            "command": [
+              "/home/skallweit/codex/agent-sandbox/slang/build/Debug/bin/slangc",
+              "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+              "-entry",
+              "sample_buffer",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O0",
+              "-emit-cuda-via-nvvm",
+              "-report-perf-benchmark",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-sample_buffer-nvvm-o0/attempt-0.ptx"
+            ],
+            "return_code": 255,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-sample_buffer-nvvm-o0/attempt-0.log",
+            "log_sha256": "6598cf00bbb40cdc943453d171149e80ba43d159875f2d86d1298a6f66433b1f"
+          }
+        ]
+      },
+      {
+        "id": "tiled-brass-material-sample_buffer-nvvm-o3",
+        "entry": "sample_buffer",
+        "backend": "nvvm",
+        "optimization": 3,
+        "architecture": 80,
+        "status": "preflight-rejected",
+        "diagnostics": [
+          "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'LoadFromUninitializedMemory'"
+        ],
+        "attempts": [
+          {
+            "command": [
+              "/home/skallweit/codex/agent-sandbox/slang/build/Debug/bin/slangc",
+              "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+              "-entry",
+              "sample_buffer",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O3",
+              "-emit-cuda-via-nvvm",
+              "-report-perf-benchmark",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-sample_buffer-nvvm-o3/attempt-0.ptx"
+            ],
+            "return_code": 255,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-202-after/complex/tiled-brass-material-sample_buffer-nvvm-o3/attempt-0.log",
+            "log_sha256": "e66915178a073298c2a71b3c7a817dc34328ee2d38cc9ba761e901ea4b43834c"
+          }
+        ]
+      }
+    ],
+    "next_blocker_trace": "The retained eval-buffer IR has LoadFromUninitializedMemory : SamplerState after texture descriptor conversion in render.TextureHandle.sample; SSA readVar/readVarRec emit the undefined read. Aggregate constructor occurrences also exist. The generic diagnostic does not identify the first visited occurrence. See the slice report.",
+    "ir_trace": {
+      "path": "build/nvvm-loop/slice-202-after/material-trace.log",
+      "sha256": "3ae5dd54b0a88740ee53fbbd6feb0b463e0d9c6bc1419668cef4e80361e539d6"
+    },
+    "material_runtime": "Not assessed: bindings, texture/LUT inputs, and expected outputs are absent."
+  },
+  "reproduction_environment": "Run from the repository root after sourcing build/nvvm-setup/env.sh, or use the explicit CUDA 12.9/SM80 environment in WORKFLOW.md.",
+  "historical_diagnostic_note": "The multisample NVRTC compiler assertion is explicitly recorded in report.slice-200-gpu-correctness.md; its infrastructure category already exists in slice 195. No claim is made that slice 195 has the same exact assertion text.",
+  "post_acceptance_gpu": "NVIDIA L4, driver 580.126.09; nvidia-smi responsive, 41 C and 4 MiB used after all runs."
+}

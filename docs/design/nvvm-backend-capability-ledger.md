@@ -2765,3 +2765,19 @@ memory load selection are corrected; source checks pass 7/7 and compile/assembly
 `issue-nvvm-backend/runtime-validation.slice-200.json` records native-Linux counts, known gaps,
 hashes, and retained/refreshed evidence separately from historical Windows manifests. No new
 language capability or physical SM70/SM90 coverage is claimed.
+
+## CUDA integer texture descriptor conversions
+
+`DescriptorHandle<T>` retains its resource's CUDA layout. For the read-only texture family
+accepted by `getNVVMSupportedReadOnlyTextureType`, both the resource and its descriptor lower to
+the same i64 texture-object value. Exact `CastUInt64ToDescriptorHandle` and
+`CastDescriptorHandleToUInt64` operations therefore use the existing descriptor identity path in
+`_getNVVMDescriptorHandleConversion`, together with resource/descriptor conversions. No provider
+operation or ABI change is needed. Buffer descriptor integer conversions remain rejected because
+the buffer representation carries a pointer and count.
+
+The executable contract is `tests/cuda/nvvm-texture-descriptor-conversion.slang`: real floating-point
+and unsigned-integer texture objects plus 64-bit boundary transport across noinline helpers. It is
+an explicit discovery addition outside frozen v1. Discovery target normalization accepts an
+already-CUDA contract; source identity checks still reject frozen overlap and duplicate selection.
+A focused conversion test does not establish the tiled-brass material's full runtime semantics.

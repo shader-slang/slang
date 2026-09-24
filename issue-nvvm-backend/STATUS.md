@@ -4,97 +4,101 @@ Updated 2026-09-24. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
-**Ready to start in a new session; no feature loop is running.** There is no unfinished feature
-acceptance. Slice 201 is accepted. This session prepared the loop as requested and stops here.
-The next feature slice number is **202**; its implementation has not been selected or started.
+**Slice 202 is accepted. The loop stops after this local commit at the maintainer's request.**
+There is no unfinished feature acceptance, and slice 203 has not been selected or started.
+The [completed plan](plan.slice-202.md) and [report](report.slice-202-texture-descriptor-conversion.md)
+record the implementation, validation, and representation audit.
 
-On an explicit request to start the loop:
+Slice 202 supports exact UInt64 conversions for already-supported read-only CUDA texture
+descriptors, preserving buffer descriptor rejection and provider ABI 35. The new executable
+fixture checks actual floating-point/integer textures and 64-bit boundary payloads. Discovery now
+normalizes an explicitly selected native CUDA contract while retaining frozen-source overlap and
+duplicate rejection.
 
-1. Check the checkout and environment, rebuild if needed, and run the four-fixture runtime gate.
-2. Establish a full current-host baseline for the frozen, discovery, and complex corpora using
-   WORKFLOW's command reference, with output under `build/nvvm-loop/slice-202-before`. Compare
-   historical preservation obligations and the accepted wave snapshot; investigate differences.
-   The 391 other frozen and 82 discovery identities have not yet been freshly run on this L4 host.
-3. Rank a small candidate set from those results. Prefer the bounded CUDA integer-to-texture-
-   descriptor feature if the refreshed evidence supports it, with runnable companion coverage.
-   Write `plan.slice-202-<topic>.md`, then implement and follow the acceptance/commit loop.
-
-Suggested new-session instruction:
-
-> Read issue-nvvm-backend/WORKFLOW.md and STATUS.md, then start the NVVM development loop.
-> Continue through accepted, committed slices until a recorded stopping condition needs my input.
+On a future explicit resume request, verify the checkout/build/device and run the small runtime
+gate. Use the full current-host slice-202 records below as the accepted baseline, then rank the
+next bounded candidates. The material's new `LoadFromUninitializedMemory` blocker is a candidate;
+no change for that blocker is included in slice 202. A new host/toolchain still needs a full
+baseline as required by WORKFLOW.
 
 ## Accepted checkpoints and evidence
 
-| Area                                           | Authoritative record                                                                                                                                                                                      | Interpretation                                                                                                                                                                 |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Complex corpus, committed as `63c118b8d`       | [Assessment](assessment.tiled-brass.json), [report](report.tiled-brass-assessment.md), [manifest](complex-corpus.manifest.json)                                                                           | Two material entries; NVRTC O3 compiles/assembles both; NVVM O0/O3 reject `CastUInt64ToDescriptorHandle`. Compile-only, not runtime proof.                                     |
-| Slice 201, acceptance committed as `187d87148` | [Runtime manifest](runtime-validation.slice-201.json), [wave outcomes](census.slice-201-wave.tsv), [report](report.slice-201-wave-prefix-count.md), [completed plan](plan.slice-201-wave-prefix-count.md) | Fresh 61 identities / 183 cells. NVRTC 61 correct; NVVM O0/O3 each 53 correct and 8 preflight gaps. All 165 old-correct cells preserved; prefix count gains both direct modes. |
-| Historical native Linux baseline               | [Slice 200 manifest](runtime-validation.slice-200.json), [report](report.slice-200-gpu-correctness.md)                                                                                                    | A6000/CUDA 13.4 results, including known failures and inherited rows. Its raw per-row files are absent on this host.                                                           |
-| Historical per-identity outcomes               | [Frozen slice 195](census.slice-195.tsv), [discovery slice 195](discovery-census.slice-195.tsv)                                                                                                           | Durable comparison inputs, not fresh L4 results. Overlay the accepted wave outcomes for those 61 IDs and consult slice 200 for documented environment differences.             |
+| Area                               | Authoritative record                                                                                                                                                                                              | Interpretation                                                                                                                                                           |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Slice 202, latest accepted         | [Runtime manifest](runtime-validation.slice-202.json), [frozen outcomes](census.slice-202.tsv), [discovery outcomes](discovery-census.slice-202.tsv), [report](report.slice-202-texture-descriptor-conversion.md) | Full fresh 452 frozen + 83 discovery identities, 1,605 runtime cells. All 1,541 previous correct cells preserved; three new texture cells pass.                          |
+| Current complex checkpoint         | `complex_corpus` in the [slice-202 manifest](runtime-validation.slice-202.json), [source manifest](complex-corpus.manifest.json)                                                                                  | Both NVRTC entries compile/assemble; both direct modes for both entries now reject `LoadFromUninitializedMemory`. Compile-only, not runtime proof.                       |
+| Slice 201                          | [Manifest](runtime-validation.slice-201.json), [report](report.slice-201-wave-prefix-count.md)                                                                                                                    | Accepted wave-prefix support; its 61 wave identities are included in the full slice-202 replay.                                                                          |
+| Historical preservation references | [Slice 195 frozen](census.slice-195.tsv), [slice 195 discovery](discovery-census.slice-195.tsv), [slice 200](runtime-validation.slice-200.json)                                                                   | Retained historical records; slice 202 compared the slice-195 outcomes plus the accepted slice-201 wave overlay and then completed a full fresh before/after comparison. |
 
-Frozen selection remains 452 identities; its historical healthy MVP denominator is 427. Discovery
-currently selects 82 identities with a historical healthy denominator of 72. Those denominators
-and the historical manifests were not rewritten during reconciliation. Record future runnable
-additions separately; maintain each old identity's preservation obligation.
+Frozen correct counts are **449 / 438 / 438** for NVRTC O3 / NVVM O0 / NVVM O3.
+Discovery correct counts are **73 / 73 / 73**, including the one added identity. The original
+1,602 runtime cells retain exactly the same classifications and diagnostics; all 82 original
+discovery contracts are unchanged. The 61 existing failing cells remain explicit, not passes.
+
+Frozen selection remains 452 identities with historical healthy MVP denominator 427. Discovery
+now selects 83 identities, preserving historical healthy denominator 72 and reporting the one
+runnable addition separately. Historical manifests and denominators were not rewritten.
 
 ## Unresolved failures and next candidates
 
-The linked manifests/reports are the failure ledger. Keep exact IDs/modes and reproductions there;
-this list provides priorities without duplicating every diagnostic.
+The slice-202 manifest's `unresolved_failures` is the fresh failure ledger: exact IDs/modes,
+classifications, diagnostic/shape, historical references, current-host before-change evidence,
+reproductions, and log hashes. Its `complex_corpus` separately records compile-only failures.
 
-- **Complex material:** `CastUInt64ToDescriptorHandle` is the first observed blocker for both
-  entries at both direct optimization levels. The [assessment trace](report.tiled-brass-assessment.md)
-  identifies the valid standard-library constructor and NVVM preflight boundary. Find executable
-  tests using real CUDA texture objects and the same typed conversion. Audit texture versus buffer
-  descriptor representations; do not assume every descriptor is a scalar integer. Later material
-  blockers are unknown until this one is resolved.
-- **Wave/quad coverage:** eight identities still reject in both direct modes: quad-control
-  functionality, five wave-multi workloads, and two wave-rotation workloads. Exact diagnostics and
-  log hashes are in `runtime-validation.slice-201.json` under `known_gaps`. Shared shuffle transport
-  was previously identified as a candidate prerequisite for rotation, but has not been implemented.
-- **Other historical gaps:** slice 200 records frozen FP8/prelude/BF16 limitations and discovery
-  infrastructure/output failures. These are unresolved historical observations, not fresh L4
-  diagnoses. Reassess them during the full baseline; do not inherit the A6000's lack of SM89 support
-  as a limitation of this L4 or count previously skipped cases as passes without executing them.
-- **Material runtime:** host bindings, texture-object mapping, LUT/material/input fixtures and output
-  oracles are still missing. They block claims about this shader's execution and generated-kernel
-  performance, but do not block independently testable backend support slices.
-- **Performance:** current material timings use a Debug compiler. No NVVM material speedup or code-
-  quality win is established. Use an optimized build and controlled measurement when that becomes
-  a slice's objective; inspect actual kernel runtime only after correctness is established.
+- **Complex material:** descriptor conversions are now admitted. Both entries at direct O0/O3
+  stop at `LoadFromUninitializedMemory`. The retained eval-buffer IR contains a `SamplerState`
+  undefined read after conversion in `render.TextureHandle.sample`, passed to
+  `render.ExplicitLodSampler.sample`; SSA `readVar` / `readVarRec` produce that shape. Uninitialized
+  aggregate constructor results also occur. The generic diagnostic does not identify the first
+  visited occurrence. Audit CUDA sampler-placeholder semantics separately from real uninitialized
+  data before selecting the next fix; the [report](report.slice-202-texture-descriptor-conversion.md)
+  records the trace and its limits.
+- **Wave/quad coverage:** eight identities still reject in both direct modes: quad-control,
+  five wave-multi workloads, and two wave-rotation workloads. Shared shuffle transport remains
+  a possible prerequisite for rotation and has not been implemented.
+- **Other current gaps:** frozen FP8/prelude/BF16 and reference/harness limitations, plus discovery
+  infrastructure/output failures, were freshly replayed. The multisample NVRTC compiler assertion
+  predates this slice and is also documented in the slice-200 report. L4 executes the FP8 NVRTC
+  references that the old SM86 A6000 skipped; direct support gaps remain recorded.
+- **Material runtime:** host bindings, texture-object mapping, texture/LUT/material/input fixtures,
+  and output oracles remain absent. They prevent claims about full material execution and kernel
+  performance, but do not prevent independently executable backend support slices.
+- **Performance:** this acceptance uses a Debug compiler and concurrent correctness suites.
+  Timing samples establish no speedup. Use an optimized build and controlled measurements for a
+  future performance slice after the relevant runtime contract is available.
 
-Cadence at handoff: slice 199 was toolkit infrastructure, 200 was correctness/validation, and 201
-was runnable wave support. The complex assessment is a corpus checkpoint, not a feature slice.
-Begin the new three-feature window with 202 and ensure at least one complex-driven feature in
-202-204 unless a documented correctness/infrastructure priority overrides it.
+Rolling accepted history: 200 was correctness/validation, 201 was runnable wave support, and
+202 is a complex-driven feature with real runtime coverage. The 202-204 window therefore already
+contains one complex-driven feature. Re-rank from current evidence after an explicit resume.
 
 ## Current working environment
 
 - Repository: `/home/skallweit/codex/agent-sandbox/slang`, branch `nvvm-backend`, native Ubuntu 24.04.
-- NVIDIA L4, SM89; driver 580.126.09. Tests target SM80. Post-acceptance GPU query was healthy.
+- NVIDIA L4, SM89; driver 580.126.09; tests target SM80. Post-acceptance query was healthy
+  (41 C, 4 MiB used).
 - CUDA root `/usr/local/cuda-12.9`, vendor version 12.9.2; NVCC/NVRTC 12.9.86.
-- Debug compiler/test tools: `build/Debug/bin`; test libraries: `build/Debug/lib`.
-- Provider: `build/Debug/bin/libslang-llvm-nvvm.so`, built against isolated pinned LLVM14.
-  Provider ABI remains 35. Required submodules and dependency downloads are locally present.
-- Source `build/nvvm-setup/env.sh` for this host's paths and four-job build limit. It is ignored local
-  state. WORKFLOW documents equivalent explicit runtime environment settings if it is absent.
-- The local build skill is `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`. If missing,
-  follow repository skill lookup and `docs/building.md` fallback; do not assume temporary network
-  access is still available. No remote access is required for the existing configured build.
-- Git has no configured author identity on this machine. Recent commits use the existing branch
-  identity via `git -c user.name='Simon Kallweit'` and
-  `-c user.email='skallweit@x11-0090.cl1c1.colossus.nvidia.com'`, without global configuration changes.
+- Debug tools: `build/Debug/bin`; test libraries: `build/Debug/lib`.
+- Provider: `build/Debug/bin/libslang-llvm-nvvm.so`, isolated pinned LLVM14, ABI 35 unchanged.
+- Source `build/nvvm-setup/env.sh` for local paths and four-job build limit. It is ignored local
+  state; WORKFLOW records equivalent explicit runtime environment settings.
+- Local build skill: `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`. If absent, follow
+  skill lookup and `docs/building.md` fallback. The configured build requires no new remote access.
+- Git has no configured author identity. Local commits use the existing branch identity with
+  `git -c user.name='Simon Kallweit' -c user.email='skallweit@x11-0090.cl1c1.colossus.nvidia.com'`.
 
-Fresh slice-201 checks passed 6/6 focused CUDA lanes, 4/4 runtime fixtures, 473/473 selected unit
-tests (one Windows-only skip), and 8/8 compile/assembly commands. Raw evidence is under
-`build/nvvm-slice201-reconcile`; initial complex measurements are under `build/nvvm-tiled-brass`.
-The old A6000 GPU-loss incident is retained in the slice-201 manifest's historical attempt; it is
-not an active blocker on this host, and no cause was established or reboot performed here.
+Additional slice-202 gates passed: 8/8 focused checks, 4/4 runtime fixtures, 473/473 selected units
+with one Windows-only skip, 18/18 toolkit cells, six focused compiler/assembler commands, and four
+runner regression tests. Raw before/after evidence is under `build/nvvm-loop/slice-202-before`
+and `build/nvvm-loop/slice-202-after`; exploratory fixture evidence is under
+`build/nvvm-loop/descriptor-probe`. Tested base revision and exact source/binary/toolkit hashes
+are in the manifest; the accepted slice is the commit containing this handoff.
+
+The old A6000 GPU-loss incident remains historical in the slice-201 manifest. No cause was
+established, no driver was changed, and no reboot was performed in this slice.
 
 ## Updating this handoff
 
-At each checkpoint, replace the current-state/next-action section, link the active or completed
-plan and newest accepted results, and update the candidate list, unresolved failures, environment
-changes, and rolling three-feature cadence. Keep acceptance distinct from implementation progress.
-Do not leave obsolete machine failures as active instructions or claim stale evidence was rerun.
+At each checkpoint, replace the current state and next action, link the active/completed plan and
+newest accepted results, and update failures, candidates, environment changes, and cadence.
+Keep acceptance distinct from implementation progress. Do not resume beyond the maintainer's
+recorded stop without a new resume request.
