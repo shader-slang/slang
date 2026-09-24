@@ -4443,28 +4443,27 @@ static bool _isTextureOperationSupported(const SlangNVVMTextureOperationDesc& op
         operation.elementType.bitWidth == 32 &&
         (operation.elementType.laneCount == 1 || operation.elementType.laneCount == 2 ||
          operation.elementType.laneCount == 4);
-    const bool isScalarFloat = isSampleElement && operation.elementType.laneCount == 1;
-    const bool isFetchElement =
+    const bool isNumericElement =
         (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
          operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
          operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
         operation.elementType.bitWidth == 32 &&
         (operation.elementType.laneCount == 1 || operation.elementType.laneCount == 2 ||
          operation.elementType.laneCount == 4);
-    const bool isGatherElement = isFetchElement && operation.elementType.laneCount == 4;
+    const bool isGatherElement = isNumericElement && operation.elementType.laneCount == 4;
     switch (operation.operation)
     {
     case SLANG_NVVM_TEXTURE_OP_SAMPLE:
     case SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL:
         return isSampleElement;
     case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
-        return isScalarFloat;
+        return isNumericElement;
     case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
-        return isScalarFloat && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D;
+        return isNumericElement && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D;
     case SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH:
-        return isScalarFloat && operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D;
+        return isNumericElement && operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D;
     case SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL:
-        return isFetchElement &&
+        return isNumericElement &&
                (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D ||
                 (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D && !operation.isArray));
     case SLANG_NVVM_TEXTURE_OP_GATHER:

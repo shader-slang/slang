@@ -7836,3 +7836,19 @@ sampler arguments and noinline sampling helpers are tested with real gradient an
 This admission does not widen the numeric copyable-value algebra or admit undefined texture
 handles, resource-containing aggregates, comparison-sampler helper values, or sampler helper return
 types. Shared lowering and provider ABI 35 remain unchanged.
+
+### Slice 204: Texture geometry queries across numeric texel families
+
+Non-mip `GetDimensions` helpers admit the existing read-only texture domain: Float32, Int32 and
+UInt32 texels with one, two or four lanes. Their output parameters may be signed or unsigned i32.
+`TextureTypeInfo::writeGetDimensionFunctions` produces the same CUDA `txq` assembly for these element
+families. The exact assembly and shape checks remain in `_resolveNVVMTextureDimensionsGenericAsm`;
+the existing read-only texture classifier owns resource eligibility.
+
+The provider's width/height/depth operations validate the same numeric element domain already used
+for fetches, then call `llvm.nvvm.txq.*` with only the i64 texture handle. The query returns i32;
+it does not read texels or use the element descriptor to select a typed sampling instruction.
+The existing output store therefore handles either integer signedness without conversion. Array
+helpers continue to store the CUDA prelude's explicit zero for the unavailable array count.
+Floating outputs, mip queries and multisample textures remain outside this contract. No shared
+texture representation, provider interface layout or ABI version changes.

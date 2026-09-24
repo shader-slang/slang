@@ -267,29 +267,39 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedTextureOperations)
     };
     SLANG_CHECK(!builder.supportsTextureOperation(unsupported));
 
-    for (const auto shape : shapes)
-    {
-        SlangNVVMTextureOperationDesc query = {
-            SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH,
-            shape,
-            0,
-            floatType,
-        };
-        SLANG_CHECK(builder.supportsTextureOperation(query));
-        if (shape != SLANG_NVVM_TEXTURE_SHAPE_3D)
-        {
-            query.isArray = 1;
-            SLANG_CHECK(builder.supportsTextureOperation(query));
-            query.isArray = 0;
-        }
+    const SlangNVVMValueTypeKind queryKinds[] = {
+        SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
+        SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
+        SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+    };
+    const uint32_t queryLaneCounts[] = {1, 2, 4};
+    for (const auto kind : queryKinds)
+        for (const auto laneCount : queryLaneCounts)
+            for (const auto shape : shapes)
+            {
+                SlangNVVMTextureOperationDesc query = {
+                    SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH,
+                    shape,
+                    0,
+                    {kind, 32, laneCount},
+                };
+                SLANG_CHECK(builder.supportsTextureOperation(query));
+                if (shape != SLANG_NVVM_TEXTURE_SHAPE_3D)
+                {
+                    query.isArray = 1;
+                    SLANG_CHECK(builder.supportsTextureOperation(query));
+                    query.isArray = 0;
+                }
 
-        query.operation = SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT;
-        SLANG_CHECK(
-            builder.supportsTextureOperation(query) == (shape != SLANG_NVVM_TEXTURE_SHAPE_1D));
-        query.operation = SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH;
-        SLANG_CHECK(
-            builder.supportsTextureOperation(query) == (shape == SLANG_NVVM_TEXTURE_SHAPE_3D));
-    }
+                query.operation = SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT;
+                SLANG_CHECK(
+                    builder.supportsTextureOperation(query) ==
+                    (shape != SLANG_NVVM_TEXTURE_SHAPE_1D));
+                query.operation = SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH;
+                SLANG_CHECK(
+                    builder.supportsTextureOperation(query) ==
+                    (shape == SLANG_NVVM_TEXTURE_SHAPE_3D));
+            }
 
     const SlangNVVMValueTypeKind fetchKinds[] = {
         SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,

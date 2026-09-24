@@ -14,4 +14,4 @@ void computeMain()
     outputBuffer[0] = inputTexture[0];
 }
 
-//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm'
+//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=tex1Dfetch_int

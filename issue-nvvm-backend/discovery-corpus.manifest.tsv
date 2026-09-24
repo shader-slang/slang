@@ -83,3 +83,4 @@ bugs/gh-7748-switch-continue-bug.slang	0	control-flow	Switch/continue regression
 compute/conditional-link-time-const.slang	0	control-flow,helper-generic	Link-time constants controlling helper branches.
 cuda/nvvm-texture-descriptor-conversion.slang	0	mixed-resources,helper-generic	Real CUDA texture integer/descriptor conversions and 64-bit boundary transport across helpers.
 cuda/nvvm-undefined-sampler.slang	0	mixed-resources,helper-generic,control-flow	Undefined CUDA sampler placeholders across branch joins and helpers sample real gradient and zero textures.
+cuda/nvvm-texture-dimensions.slang	0	texture-query,integer-dimensions,descriptor-handle	Real geometry queries across numeric texel families and signed/unsigned outputs, including the material descriptor helper.

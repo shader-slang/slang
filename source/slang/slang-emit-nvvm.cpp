@@ -3240,6 +3240,15 @@ bool _resolveNVVMTextureGatherGenericAsm(
 
 // Resolves the finalized CUDA texture dimension helpers. Array helpers deliberately write zero to
 // their final element-count output because that is the behavior encoded by the CUDA prelude.
+// Consider this example:
+//
+//     Texture2D<uint> texture;
+//     int2 size;
+//     texture.GetDimensions(size.x, size.y);
+//
+// The prelude produces the same handle query as for float texels and uint outputs: txq returns
+// an i32 dimension, independent of texel type. The provider's query result can therefore be
+// stored through either integer output pointer without conversion.
 bool _resolveNVVMTextureDimensionsGenericAsm(
     IRGenericAsm* genericAsm,
     IRFunc* function,
@@ -3255,9 +3264,7 @@ bool _resolveNVVMTextureDimensionsGenericAsm(
 
     IRParam* texture = function->getFirstParam();
     NVVMReadOnlyTextureType textureType;
-    if (!getNVVMSupportedReadOnlyTextureType(texture->getDataType(), textureType) ||
-        textureType.elementType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
-        textureType.elementType.bitWidth != 32 || textureType.elementType.laneCount != 1)
+    if (!getNVVMSupportedReadOnlyTextureType(texture->getDataType(), textureType))
         return false;
 
     uint32_t outputParameterCount = 0;
@@ -3322,7 +3329,7 @@ bool _resolveNVVMTextureDimensionsGenericAsm(
         auto pointerType =
             asNVVMSupportedLocalNumericPointerType(output->getDataType(), &valueType);
         if (!pointerType || pointerType->getOp() != kIROp_OutParamType ||
-            !isNVVMUnsignedI32Type(valueType))
+            (!isNVVMUnsignedI32Type(valueType) && !isNVVMSignedI32Type(valueType)))
         {
             return false;
         }
