@@ -1,6 +1,7 @@
 //TEST():SIMPLE(filecheck=CHECK):-entry computeMain -stage compute -line-directive-mode none -target hlsl -loop-inversion
 // Enabling debug info (`-g`) must not change loop-inversion eligibility: the debug
-// attribution insts it interleaves carry no semantics, so the same loops still invert.
+// attribution insts it interleaves carry no runtime or control-flow semantics, so the
+// same loops still invert.
 //TEST():SIMPLE(filecheck=CHECKG):-entry computeMain -stage compute -line-directive-mode none -target hlsl -loop-inversion -g
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-dx12 -shaderobj -output-using-type
