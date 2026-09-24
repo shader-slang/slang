@@ -7922,14 +7922,12 @@ does. Singleton sum/product selects the original caller value without altering p
 including signaling NaNs. Prefix sum and product identities remain positive zero and one. These
 rules are confined to newly admitted FP64 reductions; existing 32-bit recipes are unchanged.
 
-Explicit-mask matrix indexed shuffles reuse the same homogeneous leaf transport. FP64 implicit
-matrix shuffle remains rejected because the existing implicit-mask recipe uses a full-mask ballot,
-which does not establish a divergent active mask. NVIDIA's [PTX vote.sync contract](https://docs.nvidia.com/cuda/pdf/ptx_isa_8.8.pdf)
-requires participation from all non-exited lanes named by the mask. A provisional divergent test
-passing on one GPU is insufficient evidence for that contract. Existing 32-bit behavior is
-unchanged and this active-mask issue remains a separate correctness candidate. Return-by-value
-FP64 vector shuffles still use a separate restricted compound resolver. FP64 masked min/max is
-also deferred until its comparison/select versus numeric min/max edge semantics are reconciled.
+Explicit-mask matrix indexed shuffles reuse the same homogeneous leaf transport. Slice 208 retained
+an FP64 implicit-matrix guard because the old full-mask ballot did not establish a divergent active
+mask. Slice 209 corrected that composition, and slice 213 admits the Float64 helper after exact-bit
+runtime validation. Return-by-value FP64 vector shuffles still use a separate restricted compound
+resolver. FP64 masked min/max is also deferred until its comparison/select versus numeric min/max
+edge semantics are reconciled.
 
 Independent runtime fixtures cover all scalar/vector components, FP64 precision beyond float32,
 full/sparse/partial/singleton masks, matrix reductions and explicit partial transport, signed-zero
@@ -7968,3 +7966,17 @@ boundary and above the existing large-value threshold. Classic locale, signed-ze
 decimal mantissa trimming remain unchanged. This is source serialization, not an IR legalization
 rule. Tests use hexadecimal input patterns and runtime integer-word oracles independent of emitted
 decimal values; comparing two source constants could fold away the defect.
+
+### FP64 implicit aggregate transport (slice 213)
+
+The canonical OutParam matrix helper now accepts Float64 leaves with implicit masks. It uses the
+same raw hardware read followed by ballot(snapshot,true) as existing aggregate shuffles, then
+recurses through homogeneous arrays/vectors and requests the existing typed scalar shuffle.
+The provider transports both 32-bit halves without arithmetic; signed zero and NaN payloads survive.
+No provider, catalog, library or ABI change occurs. Source and lowered signatures remain canonical.
+
+Validation uses full-warp indexed movement before divergence and self-lane transport inside partial,
+sparse and singleton branches. The latter remains defined even when hardware cohorts are smaller
+than source branches; it does not establish arbitrary sparse cross-lane convergence. This admission
+does not alter the CUDA prelude's logical-mask-tracking limitation or the separate vector-by-value
+compound resolver.

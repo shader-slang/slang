@@ -4563,7 +4563,9 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntrinsic(
         const bool typeMatches = kind == SLANG_NVVM_VALUE_TYPE_BOOL
                                      ? _isFakeNVVMBuilderBooleanValue(arguments[i])
                                  : kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT
-                                     ? _isFakeNVVMBuilderFloatingPointValue(arguments[i], 32)
+                                     ? _isFakeNVVMBuilderFloatingPointValue(
+                                           arguments[i],
+                                           operation.operandTypes[i].bitWidth)
                                      : _isFakeNVVMBuilderIntegerValue(arguments[i]);
         if (!typeMatches)
             return SLANG_E_INVALID_ARG;
@@ -11042,6 +11044,18 @@ void computeMain(
     destination[lane] = vectorSum.x + vectorSum.y + int(vectorPrefixMin.x) +
         matrixSum[0][0] + matrixShuffle[1][1] + implicitShuffle[0][0] +
         int(convergedMask + convergedMulti.x);
+}
+)";
+static const char kDirectNVVMFloat64ImplicitAggregateShuffleSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int sourceLane)
+{
+    double lane = double(WaveGetLaneIndex());
+    double2x2 value = double2x2(lane, lane + 1.0l, lane + 2.0l, lane + 3.0l);
+    double2x2 shuffled = WaveReadLaneAt(value, sourceLane);
+    *destination = int(shuffled[0][0] + shuffled[0][1] + shuffled[1][0] + shuffled[1][1]);
 }
 )";
 static const char kDirectNVVMUnsupportedMaskedWaveScalarSignatureSource[] = R"SLANG(

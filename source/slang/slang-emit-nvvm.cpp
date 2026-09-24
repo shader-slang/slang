@@ -5311,13 +5311,6 @@ bool _resolveNVVMAggregateWaveOperation(
         SlangNVVMValueTypeDesc leafSemantic = {};
         if (!_getNVVMSemanticType(leafType, leafSemantic))
             return false;
-        // Float64 implicit aggregate transport remains outside the validated helper domain.
-        // Its admission and runtime coverage are separate from correcting existing mask reads.
-        if (isImplicitMaskShuffle && leafSemantic.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-            leafSemantic.bitWidth == 64)
-        {
-            return false;
-        }
         const SlangNVVMValueTypeDesc operands[] = {
             NVVMSemantics::kUnsignedI32,
             leafSemantic,
