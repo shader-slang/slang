@@ -48,6 +48,8 @@ void main()
 
 // CHECK: OpEntryPoint Intersection{{NV|KHR}} %main "main"
 // CHECK: OpDecorate %{{[a-zA-Z0-9_]+}} BuiltIn RayTmin{{NV|KHR}}
+// CHECK-DAG: OpDecorate %[[TMAX:[A-Za-z0-9_]+]] BuiltIn RayTmax{{NV|KHR}}
+// CHECK-DAG: OpDecorate %[[TMAX]] Volatile
 
 // CHECK-DAG: %[[ATTR:[A-Za-z0-9_]+]] = OpVariable %_ptr_HitAttribute{{NV|KHR}}_SphereHitAttributes{{.*}} HitAttribute{{NV|KHR}}
 // CHECK-DAG: %[[VAL:[A-Za-z0-9_]+]] = Op{{.+}} %SphereHitAttributes{{.*}} {{.*}}
