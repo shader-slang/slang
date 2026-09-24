@@ -38,8 +38,11 @@ void performGLSLResourceReturnFunctionInlining(IRModule* module, TargetProgram* 
 /// Inline simple intrinsic functions whose definition is a single asm block.
 void performIntrinsicFunctionInlining(IRModule* module);
 
-/// Inline a specific call if it is a simple intrinsic defined by an asm block and trivial
-/// load/store operations. Return whether the call was inlined.
+/// Apply performIntrinsicFunctionInlining's eligibility rules to just this call. Return true if
+/// it was inlined; otherwise leave it unchanged. This lets a caller expose one SPIR-V assembly
+/// helper before rewriting its operands without running the module-wide pass early. For example,
+/// empty-payload legalization needs the assembly inside a HitObject trace helper to refer directly
+/// to the payload global before it changes that global's type.
 bool inlineIntrinsicFunctionCall(IRCall* call);
 
 /// Inline a specific call.

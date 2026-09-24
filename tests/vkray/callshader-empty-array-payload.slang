@@ -36,8 +36,29 @@ void rgen()
     CallShader(0, payload);
 }
 
-// The logical array and its empty element type disappear. Only the separate ABI carrier gets
-// an int.
+// Consider the carrier created before type legalization (shown here as source-like code):
+//
+//     struct EmptyArrayPayloadCarrier
+//     {
+//         EmptyArrayPayload _slang_data;
+//         int _slang_dummy;
+//     };
+//
+// The original EmptyArrayPayload still contains only Empty values[2]. Type legalization removes
+// that array and then the carrier's now-empty _slang_data field. The emitted HLSL is therefore
+// equivalent to the following, with compiler-generated suffixes omitted:
+//
+//     struct EmptyArrayPayloadCarrier { int _slang_dummy; };
+//     void rgen()
+//     {
+//         EmptyArrayPayloadCarrier carrier = { 0 };
+//         CallShader(0U, carrier);
+//     }
+//     void callableMain(inout EmptyArrayPayloadCarrier payload) {}
+//
+// The carrier inherits the logical payload's name hint, so the emitted name starts with
+// EmptyArrayPayload rather than literally ending in Carrier. The checks verify its exact
+// one-field body in both independently compiled entry points; no nested empty type survives.
 // HLSL_CALLER: struct EmptyArrayPayload
 // HLSL_CALLER: {
 // HLSL_CALLER-NEXT: int _slang_dummy{{.*}};

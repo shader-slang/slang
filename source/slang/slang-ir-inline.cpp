@@ -1328,6 +1328,8 @@ void performIntrinsicFunctionInlining(IRModule* module)
 
 bool inlineIntrinsicFunctionCall(IRCall* call)
 {
+    // Reuse the existing pass for a single call site. Unlike performIntrinsicFunctionInlining,
+    // this does not visit other functions or repeatedly inline calls throughout the module.
     IntrinsicFunctionInliningPass pass(call->getModule());
     return pass.considerCallSite(call);
 }

@@ -1,8 +1,10 @@
 // slang-ir-ray-tracing-legalize.cpp
-// Preserve required ray-tracing storage without changing the program's logical data types.
-// First identify payload parameters and globals, then give empty ones a physical carrier. Its
-// logical data field is left to ordinary type legalization; only a dummy int survives. This makes
-// caller and receiver layouts independent of which other types happen to be payloads in a module.
+// Keep required ray-tracing payload arguments and variables when their source type is empty.
+// HLSL/DXIL need a payload argument and receiving parameter; GLSL/SPIR-V need a payload variable.
+// We give these parameters and variables a wrapper containing the original value and a dummy int,
+// without adding fields to the user's type. General type legalization then removes the empty
+// value and keeps the dummy int. CUDA/OptiX permits the empty argument to disappear and needs no
+// wrapper. The target policy at the end of this file selects these actions.
 #include "slang-ir-ray-tracing-legalize.h"
 
 #include "slang-compiler.h"
@@ -65,35 +67,64 @@ static void addRayPayloadDecorationIfNeeded(IRBuilder& builder, IRType* type)
         builder.addRayPayloadDecoration(type);
 }
 
-// A boundary-only representation of an empty logical payload. The data field lets existing IR
-// keep using the original type until general type legalization erases that field and its accesses.
+// An internal wrapper used in place of an empty payload at a ray-tracing call or entry point.
+// For a source type T, `type` describes `struct { T _slang_data; int _slang_dummy; }`, and
+// `dataKey` identifies its _slang_data field. Shader code still reads and writes T through that
+// field. Later type legalization removes _slang_data because T is empty, leaving just _slang_dummy.
 struct EmptyPayloadCarrier
 {
     IRStructType* type;
     IRStructKey* dataKey;
 };
 
-// Own the per-module carrier cache and the boundary objects that need storage. Selection is by
-// use, not by type: padding Empty itself would also change Data in this valid program:
+// Find the empty payload parameters and variables that must survive, then change just those
+// parameters and variables to use EmptyPayloadCarrier wrappers. Do not change the source types.
+// Consider this example:
 //
 //     struct Empty {}
 //     struct Data { Empty unused; uint value; }
-//     Empty empty;
-//     Data data;
-//     CallShader(0, empty);
+//     [shader("raygeneration")]
+//     void rgen()
+//     {
+//         Empty empty;
+//         Data data = { empty, 37 };
+//         CallShader(0, empty);
+//         CallShader(1, data);
+//     }
+//     [shader("callable")]
+//     void callee(inout Data data) { data.value += 5; }
+//
+// Adding a dummy field to Empty itself would also add storage to Data.unused. Compiling callee
+// alone would not see CallShader(0, empty), so its Data would have a different layout from rgen's.
+// Instead, wrap only the first call's payload and leave both Empty and Data unchanged. After type
+// legalization, the relevant generated HLSL has this shape (names simplified):
+//
+//     struct EmptyCarrier { int _slang_dummy; }
+//     struct Data { uint value; }
+//     EmptyCarrier carrier = { 0 };
+//     Data data = { 37 };
+//     CallShader(0, carrier);
 //     CallShader(1, data);
 //
-// A separately compiled Data receiver must have the same layout even without the first call.
+// Data now contains one uint in both rgen and a separately compiled callee. The sets below record
+// the parameters/globals to rewrite; the cache lets them reuse one wrapper for each source type.
 struct EmptyPayloadLegalizationContext
 {
     IRModule* module;
+    // Reuse wrappers without adding fields to the original types used as dictionary keys.
     Dictionary<IRType*, EmptyPayloadCarrier> carriers;
+    // HLSL/DXIL intrinsic or entry-point parameters whose empty value needs a wrapper.
     HashSet<IRParam*> d3dParams;
+    // The subset used for TraceRay/HitObject or hit/miss entry points, which need ray qualifiers.
     HashSet<IRParam*> d3dRayParams;
+    // GLSL/SPIR-V payload globals. Each shader invocation has its own instance of these variables.
     HashSet<IRGlobalVar*> khronosGlobals;
 
-    // Return a shared wrapper for this logical type without modifying it or its constructors.
-    // Arrays are valid logical payloads too; the wrapper supplies the outer struct required by D3D.
+    // Return the wrapper for an empty source type, creating it on first use. For example, an
+    // Empty[2] payload becomes `struct { Empty _slang_data[2]; int _slang_dummy; }`. The array
+    // field disappears during type legalization, leaving one int rather than padding each element.
+    // Keeping _slang_data until then lets us redirect existing loads/stores without changing
+    // their value types. The original type and its constructors are not modified.
     EmptyPayloadCarrier getCarrier(IRType* logicalType)
     {
         EmptyPayloadCarrier carrier;
@@ -117,7 +148,10 @@ struct EmptyPayloadLegalizationContext
         return carrier;
     }
 
-    // Select only mutable empty payload parameters, retaining whether D3D ray qualifiers apply.
+    // Record a D3D payload parameter for materializeParam if it is an out/inout empty value.
+    // Callers establish its payload role from a ray-tracing intrinsic or entry-point signature;
+    // this method only checks whether its data will disappear. isRayPayload distinguishes ray
+    // payloads from callable data so only ray wrappers receive payload access qualifiers.
     void collectParam(IRParam* param, bool isRayPayload)
     {
         auto ptrType = as<IROutParamTypeBase>(param->getDataType());
@@ -128,7 +162,9 @@ struct EmptyPayloadLegalizationContext
             d3dRayParams.add(param);
     }
 
-    // Select a decorated Khronos carrier by its logical contents, including root arrays.
+    // Record a GLSL/SPIR-V payload global for materializeGlobal if its value is empty. The caller
+    // has already checked its ray-payload or callable-data decoration. An Empty[2] variable needs
+    // the same treatment as an Empty variable: both lose all their data during type legalization.
     void collectGlobal(IRGlobalVar* global)
     {
         auto ptrType = cast<IRPtrTypeBase>(global->getDataType());
@@ -136,9 +172,18 @@ struct EmptyPayloadLegalizationContext
             khronosGlobals.add(global);
     }
 
-    // Expose dispatch operands in small SPIR-V helpers that receive this payload global, such as
-    // HitObject's trace wrapper. Reuse the normal intrinsic inliner's eligibility test, but leave
-    // unrelated intrinsics at their normal pipeline stage. Return whether a helper was inlined.
+    // Inline eligible assembly helper calls that take this empty payload global. Return true if
+    // any call was inlined, so the caller can remove the now-unused helper definitions.
+    //
+    // For example, HitObject.TraceRay passes its thread-local payload variable p to
+    // __spirvTraceRayHitObjectEXT(..., p). That helper's assembly refers to its payload parameter,
+    // not directly to p. If materializeGlobal redirected this ordinary call argument to
+    // p._slang_data, type legalization would erase the argument and the assembly operand with it.
+    // Inlining first makes the assembly refer directly to p. materializeGlobal can then keep
+    // that reference on the wrapper while redirecting only shader loads/stores to p._slang_data.
+    //
+    // Reuse the existing intrinsic inliner's eligibility rules for these calls only. Other
+    // intrinsics still run through the normal, later module-wide inlining pass.
     bool inlinePayloadIntrinsicCalls(IRGlobalVar* global)
     {
         HashSet<IRCall*> calls;
@@ -153,9 +198,18 @@ struct EmptyPayloadLegalizationContext
         return changed;
     }
 
-    // Retype a D3D boundary parameter and adapt all calls to the same intrinsic signature. The
-    // standard-library intrinsic has a GenericAsm body that implicitly consumes its parameters;
-    // entry points instead access the logical data field in their ordinary shader code.
+    // Replace an empty HLSL/DXIL payload parameter with its wrapper and update every call to it.
+    // For example, CallShader(0, empty) is temporarily rewritten as:
+    //
+    //     EmptyCarrier carrier = { empty, 0 };
+    //     CallShader(0, carrier);
+    //     empty = carrier._slang_data;
+    //
+    // The intrinsic's parameter changes from `inout Empty` to `inout EmptyCarrier` too. Its
+    // GenericAsm body emits the target CallShader using that parameter. A receiving entry point,
+    // such as `void callableMain(inout Empty data)`, gets the same parameter type; existing shader
+    // accesses to data are redirected to data._slang_data. These copies and field accesses remain
+    // well-typed until general type legalization removes them along with the empty data field.
     void materializeParam(IRParam* param)
     {
         auto func = getParentFunc(param);
@@ -208,9 +262,24 @@ struct EmptyPayloadLegalizationContext
         fixUpFuncType(func);
     }
 
-    // Give a Khronos payload global physical storage. Dispatch operands and location queries
-    // must still name that global, while source-level loads/stores use its empty logical field.
-    // Payload-helper inlining exposes SPIR-V dispatch operands before this rewrite.
+    // Change an empty GLSL/SPIR-V payload global to use its wrapper, keeping dispatch instructions
+    // attached to the variable itself. Consider CallShader(0, data) with empty source data. The
+    // standard-library implementation uses a thread-local global p, with operations like:
+    //
+    //     p = data;
+    //     OpExecuteCallableKHR 0 &p;
+    //     data = p;
+    //
+    // After changing p's type to EmptyCarrier, rewrite this to:
+    //
+    //     p._slang_data = data;
+    //     OpExecuteCallableKHR 0 &p;
+    //     data = p._slang_data;
+    //
+    // Type legalization erases the empty assignments but leaves p with one int, so the dispatch
+    // still has a payload variable. GLSL's payload-location query must likewise keep referring to
+    // p, not p._slang_data. inlinePayloadIntrinsicCalls must first expose any SPIR-V assembly
+    // hidden inside eligible helper calls, so we can distinguish it from ordinary data accesses.
     void materializeGlobal(IRGlobalVar* global)
     {
         auto oldPtrType = cast<IRPtrTypeBase>(global->getDataType());
@@ -405,13 +474,15 @@ static void markD3DEntryPointRayPayloadTypes(IRFunc* func, EmptyPayloadLegalizat
     }
 }
 
+// Prepare HLSL/DXIL ray-payload arguments and receiving parameters before empty types are removed.
+// For example, TraceRay(..., payload) leaves a ForceVarIntoRayPayloadStructTemporarily marker on
+// its payload argument: legalizeForcedStructArgumentsInChildren wraps a scalar payload in a struct,
+// marks an existing nonempty struct as a ray payload, or records an empty parameter for wrapping.
+// A separately compiled `void missMain(inout Empty payload)` has no TraceRay call, so
+// markD3DEntryPointRayPayloadTypes identifies the payload from the shader stage and parameter.
+// Both paths also identify the types that later need D3D payload access qualifiers.
 static void prepareD3DRayTracingPayloads(IRModule* module, EmptyPayloadLegalizationContext& context)
 {
-    // Establish payload roles from both caller arguments and receiving entry-point parameters
-    // before collection or access-qualifier normalization inspects the types.
-    // Both marker opcodes are part of the same HLSL ray-tracing support path. The ray-payload
-    // variant also records semantic payload identity; retaining the generic variant here preserves
-    // the established lowering contract for callers of the adjacent core-module helper.
     for (auto globalInst : module->getGlobalInsts())
     {
         auto func = as<IRFunc>(globalInst);
@@ -422,11 +493,12 @@ static void prepareD3DRayTracingPayloads(IRModule* module, EmptyPayloadLegalizat
     }
 }
 
-// Collect an empty Khronos ray-payload global by its semantic decoration. For example, the wrapper
-// that calls __spirvTraceRayHitObjectEXT declares `[__vulkanRayPayload] static T p;` and passes p
-// to the intrinsic. Lowering attaches IRVulkanRayPayloadDecoration to that global, so the
-// global-variable check below finds its payload type without checking the intrinsic's name or
-// looking for a call.
+// Record empty GLSL/SPIR-V ray-payload variables, on both the sending and receiving sides.
+// For example, the HitObject.TraceRay implementation declares `[__vulkanRayPayload] static T p;`
+// and passes p to __spirvTraceRayHitObjectEXT. Lowering attaches IRVulkanRayPayloadDecoration to
+// that global thread-local variable. A receiving hit/miss shader uses the corresponding
+// IRVulkanRayPayloadInDecoration. These decorations identify which variables need a payload
+// wrapper; there is no need to recognize the names of the functions that use them.
 static void collectIfEmptyKhronosRayPayload(
     IRInst* globalInst,
     EmptyPayloadLegalizationContext& context)
@@ -474,9 +546,13 @@ static void collectIfEmptyD3DCallableData(
     }
 }
 
-// Collect an empty Khronos callable-data global. Vulkan-style
-// `CallShader` lowering stores callable data in a decorated module-scope global; the intrinsic call
-// may already have been inlined by this point, so the global is the canonical surviving carrier.
+// Record empty GLSL/SPIR-V callable-data variables. For example, CallShader(0, data) uses the
+// standard-library implementation that declares `[__vulkanCallablePayload] static T p;`, copies
+// data into p, dispatches the callable shader with p, and copies p back to data. After inlining,
+// the shader contains those operations directly: there need not be a CallShader function call
+// left to find. The global thread-local variable p still has IRVulkanCallablePayloadDecoration,
+// so we find it by that decoration. Receiving callable shaders use the matching
+// IRVulkanCallablePayloadInDecoration and need the same wrapper if their variable survives here.
 static void collectIfEmptyKhronosCallableData(
     IRInst* globalInst,
     EmptyPayloadLegalizationContext& context)
@@ -492,11 +568,11 @@ static void collectIfEmptyKhronosCallableData(
     context.collectGlobal(globalVar);
 }
 
+// Fill in missing SM 6.7+ read/write qualifiers on fields of D3D ray-payload structs. Visit all
+// marked structs, not just types found at TraceRay calls: a separately compiled hit/miss shader
+// also needs the qualifiers. This runs after wrapper creation so the dummy field is covered too.
 static void legalizeRayPayloadAccessQualifiersForD3D(IRModule* module)
 {
-    // A hit-shader-only translation unit has no TraceRay call and therefore no forced-payload
-    // marker to visit. Sweep every semantic ray-payload struct so those separately compiled
-    // stages receive the same SM 6.7 access-qualifier normalization as a ray-generation module.
     List<IRStructType*> rayPayloadStructs;
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -510,17 +586,52 @@ static void legalizeRayPayloadAccessQualifiersForD3D(IRModule* module)
         addDefaultPayloadAccessQualifiersToStruct(builder, structType);
 }
 
-// Select the physical boundary forms required by a target and its shader model.
+// Choose which ray-tracing rewrites run for the output target. D3D means HLSL/DXIL; Khronos means
+// GLSL/SPIR-V. D3D passes payloads as arguments/parameters, whereas Khronos dispatch instructions
+// use decorated global thread-local variables. The flags separate finding those different forms,
+// preserving empty payloads, and adding D3D field qualifiers. They are not optimization options.
 struct RayTracingPayloadLegalizationPolicy
 {
+    // HLSL/DXIL: resolve the struct-conversion markers on TraceRay/HitObject arguments and inspect
+    // hit/miss entry-point parameters. For `int p; TraceRay(..., p)`, create a struct containing p
+    // because the target intrinsic requires a struct. For an empty p, record its parameter for
+    // the dummy-field wrapper instead. Also mark ray-payload types for the qualifier step below.
     bool prepareD3DRayTracingPayloads = false;
+
+    // GLSL/SPIR-V: find decorated outgoing/incoming ray-payload variables and wrap empty ones.
+    // For `Empty p; TraceRay(..., p)`, the library uses a [__vulkanRayPayload] variable. Keep that
+    // variable with one dummy int so OpTraceRayKHR (or GLSL's payload-location query) can name it
+    // even after the source Empty value is erased. HitObject uses the same variable decorations.
     bool materializeEmptyKhronosRayPayloads = false;
+
+    // HLSL/DXIL: wrap the empty payload parameter of CallShader and of callable entry points,
+    // updating the intrinsic's callers too. `CallShader(0, empty)` must still have two arguments,
+    // and `[shader("callable")] void f(inout Empty data)` must still have its data parameter.
+    // Both sides end up using a struct with one dummy int, even when compiled separately.
     bool materializeEmptyD3DCallableData = false;
+
+    // GLSL/SPIR-V: find decorated outgoing/incoming callable-data variables and wrap empty ones.
+    // CallShader(0, empty) lowers through a [__vulkanCallablePayload] variable, not a fixed D3D
+    // call signature. OpExecuteCallableKHR and GLSL's payload-location query still need that
+    // variable. A receiving variable, when present, must have the same one-int representation.
     bool materializeEmptyKhronosCallableData = false;
+
+    // SPIR-V targets: inline eligible assembly helpers taking a selected empty payload
+    // variable before rewriting its uses. For example, __spirvTraceRayHitObjectEXT(..., p) hides
+    // the dispatch operand inside its body. Inlining makes the assembly refer directly to p,
+    // so materializeGlobal keeps the wrapper as that operand instead of its erasable data field.
+    // GLSL uses a payload-location query directly and does not need this SPIR-V-specific step.
     bool inlineSPIRVPayloadIntrinsics = false;
+
+    // D3D shader model 6.7+: fill in missing field-level payload access qualifiers, preserving
+    // explicit qualifiers. For example, a ray wrapper's new _slang_dummy field needs the default
+    // read(caller, anyhit, closesthit, miss) and write(caller, anyhit, closesthit, miss)
+    // annotations. This applies to ray payloads, not callable data, and runs after wrappers have
+    // been created.
     bool normalizeD3DPayloadAccessQualifiers = false;
 };
 
+// Enable the rewrites needed by this target; leave unsupported or unnecessary actions disabled.
 static RayTracingPayloadLegalizationPolicy getRayTracingPayloadLegalizationPolicy(
     TargetProgram* targetProgram)
 {
