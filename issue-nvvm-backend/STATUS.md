@@ -16,12 +16,20 @@ normalizes an explicitly selected native CUDA contract while retaining frozen-so
 duplicate rejection.
 
 On a future explicit resume request, verify the checkout/build/device and run the small runtime
-gate. Use the full current-host slice-202 records below as the accepted baseline, then rank the
-next bounded candidates. The material's new `LoadFromUninitializedMemory` blocker is a candidate;
+gate. The workflow now defaults to `RelWithDebInfo`; build matching compiler/provider/test tools
+and establish a full checkpoint for that configuration before selecting a new feature. Preserve
+the slice-202 Debug results below as the comparison obligations, and classify any configuration
+differences. Then rank the next bounded candidates and delegate one slice to a fresh-context worker.
+The material's new `LoadFromUninitializedMemory` blocker is a candidate;
 no change for that blocker is included in slice 202. A new host/toolchain still needs a full
 baseline as required by WORKFLOW.
 
 ## Accepted checkpoints and evidence
+
+Latest accepted slice and last full checkpoint: **202 (Debug)**. Implementation slices since that
+checkpoint: **0**. No targeted-only slices are pending full replay. The next configuration-transition
+checkpoint is due before feature work; afterward, use targeted acceptance and the three-slice full
+checkpoint cadence in WORKFLOW. This documentation update does not resume the loop.
 
 | Area                               | Authoritative record                                                                                                                                                                                              | Interpretation                                                                                                                                                           |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -79,8 +87,10 @@ contains one complex-driven feature. Re-rank from current evidence after an expl
 - CUDA root `/usr/local/cuda-12.9`, vendor version 12.9.2; NVCC/NVRTC 12.9.86.
 - Debug tools: `build/Debug/bin`; test libraries: `build/Debug/lib`.
 - Provider: `build/Debug/bin/libslang-llvm-nvvm.so`, isolated pinned LLVM14, ABI 35 unchanged.
-- Source `build/nvvm-setup/env.sh` for local paths and four-job build limit. It is ignored local
-  state; WORKFLOW records equivalent explicit runtime environment settings.
+- The ignored `build/nvvm-setup/env.sh` currently selects Debug and a four-job build limit. Inspect
+  and override its compiler/provider/test paths for `RelWithDebInfo` before reuse; WORKFLOW records
+  the new default command examples. Optimized binaries have not been built or validated by this
+  documentation update. Share the four-worker budget across concurrent suites and builds.
 - Local build skill: `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`. If absent, follow
   skill lookup and `docs/building.md` fallback. The configured build requires no new remote access.
 - Git has no configured author identity. Local commits use the existing branch identity with
@@ -99,6 +109,7 @@ established, no driver was changed, and no reboot was performed in this slice.
 ## Updating this handoff
 
 At each checkpoint, replace the current state and next action, link the active/completed plan and
-newest accepted results, and update failures, candidates, environment changes, and cadence.
+newest accepted results, and update failures, candidates, environment changes, and cadence. Name
+the last full checkpoint and count slices since it separately from the latest targeted acceptance.
 Keep acceptance distinct from implementation progress. Do not resume beyond the maintainer's
 recorded stop without a new resume request.
