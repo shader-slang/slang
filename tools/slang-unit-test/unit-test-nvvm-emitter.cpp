@@ -8463,16 +8463,30 @@ SLANG_UNIT_TEST(nvvmSlangAggregateWaveHelpersUseRecursiveScalarRecipes)
 
         uint32_t readLaneAtCount = 0;
         uint32_t laneIndexCount = 0;
-        uint32_t ballotCount = 0;
+        uint32_t activeMaskCount = 0;
         for (SlangNVVMValueOperation operation : gFakeNVVMBuilder.intrinsicOperations)
         {
             readLaneAtCount += operation == SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT;
             laneIndexCount += operation == SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX;
-            ballotCount += operation == SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT;
+            activeMaskCount += operation == SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK;
         }
-        SLANG_CHECK(readLaneAtCount == 12);
+        SLANG_CHECK(readLaneAtCount == 16);
         SLANG_CHECK(laneIndexCount >= 2);
-        SLANG_CHECK(ballotCount == 2);
+        SLANG_CHECK(activeMaskCount == 3);
+        uint32_t ballotCount = 0;
+        for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
+        {
+            if (gFakeNVVMBuilder.intrinsicOperations[i] != SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT)
+                continue;
+            ++ballotCount;
+            const Index offset = gFakeNVVMBuilder.intrinsicArgumentOffsets[i];
+            const auto mask = gFakeNVVMBuilder.intrinsicArgumentValueRefs[offset];
+            SLANG_CHECK_ABORT(mask.kind == FakeNVVMBuilderValueKind::Intrinsic);
+            SLANG_CHECK(
+                gFakeNVVMBuilder.intrinsicOperations[mask.index] ==
+                SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK);
+        }
+        SLANG_CHECK(ballotCount == 1);
 
         uint32_t floatMinimumCount = 0;
         for (const auto& operation : gFakeNVVMBuilder.scalarOperations)

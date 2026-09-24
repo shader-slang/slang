@@ -567,6 +567,13 @@ inline constexpr CatalogEntry kCatalog[] = {
         "Float64 wave read-lane-at intrinsic",
     },
     {
+        SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK,
+        kUnsignedI32,
+        {kNoType, kNoType, kNoType},
+        0,
+        "hardware wave active mask",
+    },
+    {
         SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT,
         kUnsignedI32,
         {kUnsignedI32, kBool, kNoType},

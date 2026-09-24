@@ -1817,6 +1817,22 @@ static SlangResult _emitIntrinsic(
         operation.operandTypes[1].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
     switch (operation.operation)
     {
+    case SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK:
+        {
+            if (argumentCount != 0)
+                return SLANG_E_INVALID_ARG;
+            // LLVM 14 has no intrinsic for this hardware read. Consider a call inside a divergent
+            // branch: a full-mask ballot would name lanes that never execute the call. Read the
+            // currently executing lanes directly, and preserve its control dependence and distinct
+            // observations with convergent and sideeffect. This does not synthesize a logical mask.
+            llvm::FunctionType* functionType = llvm::FunctionType::get(int32Type, false);
+            llvm::InlineAsm* assembly =
+                llvm::InlineAsm::get(functionType, "activemask.b32 $0;", "=r", true);
+            llvm::CallInst* call = state->builder.CreateCall(assembly);
+            call->setConvergent();
+            *outValue = reinterpret_cast<SlangNVVMValueHandle>(call);
+            return SLANG_OK;
+        }
     case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX:
         intrinsicID = llvm::Intrinsic::nvvm_read_ptx_sreg_laneid;
         break;
@@ -3636,6 +3652,7 @@ static SlangResult _emitCatalogOperation(
         return _emitBarrier(module, llvm::Intrinsic::nvvm_membar_gl, outValue);
     case SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER:
         return _emitBarrier(module, llvm::Intrinsic::nvvm_membar_cta, outValue);
+    case SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK:
     case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX:
     case SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT:
     case SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT:

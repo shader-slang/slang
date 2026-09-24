@@ -11036,10 +11036,12 @@ void computeMain(
     matrix<int, 2, 2> matrixShuffle =
         WaveMaskReadLaneAt(mask, matrixValue, sourceLane);
 
+    matrix<int, 2, 2> implicitShuffle = WaveReadLaneAt(matrixValue, int(lane));
     uint convergedMask = WaveGetConvergedMask();
     uint4 convergedMulti = WaveGetConvergedMulti();
     destination[lane] = vectorSum.x + vectorSum.y + int(vectorPrefixMin.x) +
-        matrixSum[0][0] + matrixShuffle[1][1] + int(convergedMask + convergedMulti.x);
+        matrixSum[0][0] + matrixShuffle[1][1] + implicitShuffle[0][0] +
+        int(convergedMask + convergedMulti.x);
 }
 )";
 static const char kDirectNVVMUnsupportedMaskedWaveScalarSignatureSource[] = R"SLANG(

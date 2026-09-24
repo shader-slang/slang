@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 35u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 36u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -185,7 +185,9 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_FMA ((SlangNVVMValueOperation)76u)
 #define SLANG_NVVM_VALUE_OP_MODF_FRACTION ((SlangNVVMValueOperation)77u)
 #define SLANG_NVVM_VALUE_OP_MODF_INTEGRAL ((SlangNVVMValueOperation)78u)
-#define SLANG_NVVM_VALUE_OPERATION_COUNT 79u
+/** Snapshots currently executing lanes without synchronization; not a logical convergence mask. */
+#define SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK ((SlangNVVMValueOperation)79u)
+#define SLANG_NVVM_VALUE_OPERATION_COUNT 80u
 
     /** Describes one complete semantic value-operation overload. */
     typedef struct SlangNVVMValueOperationDesc

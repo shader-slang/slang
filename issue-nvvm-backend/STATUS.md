@@ -4,84 +4,78 @@ Updated 2026-09-24. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
-**Slice 208 is accepted with targeted validation.** The last full checkpoint remains 207. Read the
-[completed worker plan](plan.slice-208-fp64-masked-wave.md),
-[five-part report](report.slice-208-fp64-masked-wave.md), and
-[result manifest](runtime-validation.slice-208.json).
+**Slice 209 is accepted as the latest full checkpoint.** Read the
+[completed worker plan](plan.slice-209-active-mask.md),
+[five-part report](report.slice-209-active-mask.md), and
+[result manifest](runtime-validation.slice-209.json). Parent completed independent acceptance
+review and owns the local commit. No push is authorized.
 
-FP64 masked sum/product reductions and inclusive/exclusive prefixes now execute through existing
-typed recipes for scalars/vectors, with matrix reductions and explicit-mask matrix transport.
-The two unchanged frozen sum/product workloads pass NVVM O0/O3. Source-faithful negative/positive
-zero identities and singleton passthrough preserve raw signaling-NaN, quiet-NaN, infinity and
-negative-zero bits. FP64 min/max, vector-return shuffles and implicit matrix shuffles remain
-explicitly unsupported; provider/library/catalog/ABI 35/general type handling are unchanged.
+The existing hardware-mask mapping now uses a sideeffect/convergent PTX active-mask read through
+typed provider ABI 36. Raw scalar/uint4 CUDA intrinsics no longer emit illegal full-mask ballots.
+Existing implicit aggregate shuffle matches the CUDA prelude's raw-read then ballot(mask,true)
+composition. Logical `WaveGetActiveMask` synthesis is unchanged. Hardware snapshots do not promise
+source-level logical reconvergence; the prelude's tracking TODO remains.
 
-Next: investigate and correct the audited active-mask semantics gap in a bounded slice. All six material cells compile/assemble; application runtime bindings,
-texture/LUT/input and expected-output contracts remain absent. No material speed/correctness claim.
+Latest accepted implementation and full checkpoint: 209. Implementation slices since it: 0.
+Next: investigate and correct the demonstrated tiny-double source-literal roundtrip defect in a
+bounded slice. Correctness takes priority; all six material cells compile, but application runtime
+contracts remain absent. Reconsider complex motivation at each selection.
 
 ## Checkpoints and evidence
 
-Latest accepted implementation and targeted acceptance: 208. Last full checkpoint: 207.
-Implementation slices since the full checkpoint: 1. Slice 208 is not a full checkpoint.
+| Area                        | Record                                                                                                                     | Interpretation                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Slice 209 accepted full     | [Manifest](runtime-validation.slice-209.json), [frozen](census.slice-209.tsv), [discovery](discovery-census.slice-209.tsv) | 1644 fresh cells: 1591 correct, 53 retained failures. Six additions, no old deltas. |
+| Slice 208 accepted targeted | [Manifest](runtime-validation.slice-208.json)                                                                              | Four old fixes and nine additions, preserved freshly by 209.                        |
+| Slice 207 accepted full     | [Manifest](runtime-validation.slice-207.json)                                                                              | Previous accepted full checkpoint; 209 refreshes all preservation obligations.      |
 
-| Area                               | Authoritative record                                                                                                                                                                      | Interpretation                                                                                                                 |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Slice 208 accepted targeted        | [Manifest](runtime-validation.slice-208.json), [frozen outcomes](census.slice-208.tsv), [discovery outcomes](discovery-census.slice-208.tsv), [selection](selection.slice-208-frozen.tsv) | 603 fresh cells: 565 correct, 38 retained failures. Four old fixes and nine additions. 1035 frozen cells explicitly inherited. |
-| Slice 207 accepted full checkpoint | [Manifest](runtime-validation.slice-207.json), [report](report.slice-207-wave-rotation.md)                                                                                                | 1629 fresh cells: 1572 correct, 57 retained failures.                                                                          |
-| Complex support                    | `complex_corpus` in [slice 208 manifest](runtime-validation.slice-208.json)                                                                                                               | All six cells freshly compile/assemble; no runtime contract.                                                                   |
+Full frozen 452 × 3 has 1333 correct (449/442/442); discovery 96 × 3 has 258 correct (86/86/86).
+All 1585 accepted 208 correct cells are freshly preserved, with no inherited runtime cells. Exact
+identity/mode, classification, return code, full execution counts, diagnostics and canonical shapes
+match cumulative 207+208 for every old cell. No missing/duplicate cells or lost prior passes.
+Historical healthy denominators remain 427 frozen and 72 discovery. No old source/oracle changed.
 
-Fresh selection covers 107 frozen identities (all wave/quad, double/helper neighbors) and the complete
-94-identity discovery manifest, all three modes. Exact keys, classifications, return codes, full
-execution counts, diagnostics and canonical shapes match 207 except four expected sum/product fixes.
-No missing/duplicate cells or lost prior passes. Cumulative ledger: 1638 cells, 1585 correct, 53 known
-failures; 552 previous passes refreshed and 1020 inherited. Cumulative frozen correct counts are
-449/442/442 over 452 identities; fresh discovery 84/84/84 over 94 identities. Historical healthy
-benchmarks remain 427 frozen and 72 discovery. No frozen source or old discovery oracle changed.
+## Unresolved failures and limitations
 
-## Unresolved failures and next candidates
+The slice 209 manifest preserves all 53 open failures with history/evidence and all four resolved
+records from slice 208. Frozen retains 18 preflight and 5 infrastructure cells; discovery retains 4 preflight,
+22 infrastructure and 4 runtime mismatches. Both full runners return the expected diagnostic exit 2.
 
-The slice 208 manifest preserves all 57 prior failure histories: 53 remain unresolved and 4 are resolved
-with exact transitions. It identifies each fresh/inherited failure and links prior evidence.
+- Quad reconvergence, FP64 min/max and prefix-min/max KernelContext pointer shapes remain separate.
+- FP64 vector-by-value and implicit matrix shuffle admission remain deferred; this slice only
+  corrects existing hardware-mask semantics. Slice 208 explicit matrix and FP64 arithmetic stay valid.
+- Hardware mask subsets are scheduling-dependent. New oracles check caller/exclusion/singleton
+  membership and own-lane matrix transport; exact PTX and operand provenance prove the correction.
+- FP8/BF16/prelude and discovery infrastructure/output gaps remain visible.
+- A demonstrated next correctness candidate is tiny-double CUDA spelling: `SourceWriter::emit(double)`
+  in `source/slang/slang-emit-source-writer.cpp:227` uses fixed fractional precision for small
+  exponents, losing significant digits below one. Slice 208's retained
+  `build/nvvm-loop/slice-208-before/aggregate.cu:326` contains `0.00001525878907671`.
+  Parent may select a bounded round-trip precision slice; no implementation was started here.
+- Six complex cells freshly compile/assemble. Bindings, textures/LUT/input and output contract are
+  absent; no material runtime, speed or correctness claim.
 
-- Four wave/quad frozen identities remain: quad-control reconvergence, scalar/vector FP64 min/max,
-  and the two prefix-min/max KernelContext pointer shapes. They remain separate features.
-- A newly audited existing correctness gap: `_emitNVVMActiveMaskValue` uses a full-mask ballot,
-  not a divergent active-mask read. Actual PTX and the authoritative participation contract are
-  linked in the manifest. A provisional implicit low16 pass is excluded from correctness evidence;
-  new FP64 implicit matrix support is rejected pending the correct semantics. Existing 32-bit behavior is unchanged.
-- FP64 vector-by-value shuffle still reaches a separate 32-bit compound resolver. The admitted
-  explicit matrix OutParam path is covered independently.
-- FP8/BF16/prelude and discovery infrastructure/output gaps remain visible. A development probe
-  also exposed pre-existing tiny-double CUDA constant spelling precision; raw evidence is retained,
-  no source-emitter change or new corpus claim made.
-- Slice 207 lower-target rotation probes remain inherited, including its explicit SM50/SM60 options
-  and exploratory half-prelude limitation. Their library/standard-module implementation is unchanged.
+Rolling 207 rotation, 208 FP64 wave arithmetic, 209 active-mask correctness is wave-heavy. The existing
+correctness defect explicitly overrides complex cadence; do not infer material semantics to meet it.
 
-Rolling accepted history: 206 Boolean lanes (complex-driven), 207 rotation (wave), 208 FP64 wave
-arithmetic (wave). Reconsider complex cadence at next selection; correctness work can override it
-only with an explicit reason. Material runtime/performance still needs application semantics.
+## Current working environment and final gates
 
-## Current working environment
+Native Ubuntu 24.04, branch `nvvm-backend`, repository `/home/skallweit/codex/agent-sandbox/slang`.
+L4 SM89, driver 580.126.09; target SM80. CUDA 12.9.2/NVRTC 86, LLVM 14, provider ABI 36. Matching
+optimized tools/libraries are in `build/RelWithDebInfo/{bin,lib}`. Source
+`build/nvvm-loop/slice-203-env.sh`; the bare setup environment selects Debug. Use the local
+`build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`. Four total CPU workers, two unit servers,
+sequential suites and `CMAKE_BUILD_PARALLEL_LEVEL=1`.
 
-- Native Ubuntu 24.04, branch `nvvm-backend`, repository `/home/skallweit/codex/agent-sandbox/slang`.
-- L4 SM89, driver 580.126.09; target SM80. CUDA 12.9.2, NVRTC/NVCC 12.9.86, LLVM 14, provider ABI 35.
-- Matching optimized tools/libraries: `build/RelWithDebInfo/{bin,lib}`. Source optimized environment
-  `build/nvvm-loop/slice-203-env.sh`; bare setup `env.sh` selects Debug.
-- Four build/corpus workers, two unit servers, sequential suites, `CMAKE_BUILD_PARALLEL_LEVEL=1`.
-- Build skill: `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`.
-- Parent accepted the slice after independent review and owns local commits; no push is authorized.
+Final gates: focused 9, runtime 4, units 475 with one existing Windows-only skip, toolkit 18, full
+corpora and complex 6 pass their defined criteria. Explicit SM50/60 raw-mask probes compile/assemble
+in both NVRTC and NVVM (four cells). Lower-target probes make no runtime claim.
 
-Final 208 gates pass: focused 10, runtime 4, units 474 with one Windows-only skip, toolkit 18, selected
-corpora and complex 6. Compiler SHA256:
-`242c23acfafa2e08d5ae9d23fdaa2457656550a7ba7a0a687d978d18f05319c8`.
-Provider SHA256: `6da3abff11e6b67a1dcd5e3b12f341bc7cbfa356fd29c9d7b5dcad8e20efd676`.
-Tested source base `cdb5a654732183df67b5c6db834eee652723e690` plus exact manifest source hashes.
-Raw artifacts: `build/nvvm-loop/slice-208-before` and `slice-208-after`. Exact final fixtures reject
-on the reverted accepted compiler (same 207 library hash), then pass after restoration. All tested
-source/artifact hashes match after gates. No GPU loss, driver change or reboot occurred. The old
-A6000 incident remains historical in slice 201 with no established cause.
-
-## Updating this handoff
-
-Keep slices bounded and all historical evidence distinctions intact. Parent owns acceptance/local
-commits; one fresh worker owns each implementation slice.
+Compiler SHA256: `483db7465914c1626c8fd427f425eebbcd04e8f996a26ba031dec65c0893a231`.
+Provider SHA256: `ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372`.
+Tested source base: `d54288b4d9483bd3d6a3036453fa7079321fd163` plus manifest source hashes.
+Raw artifacts: `build/nvvm-loop/slice-209-before` and `slice-209-after`. Exact final-fixture
+emitter-only revert proves the old full-mask ballot defect without dispatching undefined kernels.
+After unit-whitespace cleanup, units were rebuilt/rerun; compiler/provider/runtime hashes are
+unchanged. All final hashes match. No GPU loss, driver change or reboot occurred; old A6000 history
+remains in slice 201 without an established cause.

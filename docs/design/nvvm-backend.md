@@ -7936,3 +7936,20 @@ full/sparse/partial/singleton masks, matrix reductions and explicit partial tran
 seeds, NaN/infinity classification and exact singleton payloads. The slice's targeted acceptance
 replays all wave/quad frozen identities and double/helper neighbors plus the full discovery corpus;
 unselected frozen cells retain explicitly inherited slice-207 full-checkpoint evidence.
+
+### Hardware and logical active masks (slice 209)
+
+Builder ABI 36 distinguishes `WAVE_ACTIVE_MASK` (zero operands, unsigned 32-bit result) from
+`WAVE_MASK_BALLOT` (explicit participation mask and predicate). The LLVM 14 provider lowers the
+hardware snapshot to fixed `activemask.b32` inline assembly with `sideeffect` and `convergent`.
+LLVM 14 has no intrinsic enum for this instruction; the provider does not invent a reserved LLVM
+intrinsic declaration. The instruction requires PTX 6.2 and SM 30 or later, within the CUDA 12.9
+backend's supported targets.
+
+`WaveGetConvergedMask` and `WaveGetConvergedMulti` map their canonical CUDA raw reads to this
+operation. Existing aggregate `_waveShuffleMultiple(_getActiveMask(),...)` helpers instead compose
+that read with ballot(mask,true), matching the CUDA prelude. Preflight includes both operations.
+The distinct logical `WaveGetActiveMask` IR still uses the existing active-mask synthesis pass.
+The prelude's TODO about logical participation tracking remains: a hardware snapshot may contain
+only a subset of lanes taking the same source branch. Runtime tests therefore use caller membership,
+excluded-lane invariants and own-lane aggregate transport rather than assuming source reconvergence.

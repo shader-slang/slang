@@ -5165,6 +5165,7 @@ struct NVVMAggregateWaveOperation
     bool activeMaskResultIsVector = false;
     const char* diagnosticName = nullptr;
     NVVMValueRecipeStep activeMaskStep;
+    NVVMValueRecipeStep activeMaskBallotStep;
     NVVMValueRecipeStep shuffleStep;
     NVVMMaskedWaveScalarOperation maskedScan;
 };
@@ -5224,19 +5225,16 @@ bool _isExactNVVMAggregateWaveOutParameter(IRParam* parameter, IRType* aggregate
            isTypeEqual(pointeeType, aggregateType);
 }
 
+// Requests the hardware snapshot used by CUDA __activemask(), without a ballot.
 bool _initializeNVVMActiveMaskStep(NVVMValueRecipeStep& outStep)
 {
-    const SlangNVVMValueTypeDesc operands[] = {
-        NVVMSemantics::kUnsignedI32,
-        NVVMSemantics::kBool,
-    };
     return _setNVVMSupportedValueRecipeStep(
         outStep,
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT,
+        SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK,
         NVVMSemantics::kUnsignedI32,
-        operands,
-        SLANG_COUNT_OF(operands),
-        "CUDA active mask");
+        nullptr,
+        0,
+        "CUDA hardware active mask");
 }
 
 // Resolves the exact CUDA-prelude aggregate wave helpers measured by the census. Assembly selects
@@ -5313,9 +5311,8 @@ bool _resolveNVVMAggregateWaveOperation(
         SlangNVVMValueTypeDesc leafSemantic = {};
         if (!_getNVVMSemanticType(leafType, leafSemantic))
             return false;
-        // Float64 aggregate transport requires an explicit participation mask. The existing
-        // implicit-mask recipe uses a full-mask ballot, which cannot represent a divergent
-        // active mask. Do not extend that incomplete contract to newly admitted Float64 leaves.
+        // Float64 implicit aggregate transport remains outside the validated helper domain.
+        // Its admission and runtime coverage are separate from correcting existing mask reads.
         if (isImplicitMaskShuffle && leafSemantic.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
             leafSemantic.bitWidth == 64)
         {
@@ -5336,6 +5333,22 @@ bool _resolveNVVMAggregateWaveOperation(
             (isImplicitMaskShuffle && !_initializeNVVMActiveMaskStep(outOperation.activeMaskStep)))
         {
             return false;
+        }
+
+        if (isImplicitMaskShuffle)
+        {
+            const SlangNVVMValueTypeDesc ballotOperands[] = {
+                NVVMSemantics::kUnsignedI32,
+                NVVMSemantics::kBool,
+            };
+            if (!_setNVVMSupportedValueRecipeStep(
+                    outOperation.activeMaskBallotStep,
+                    SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT,
+                    NVVMSemantics::kUnsignedI32,
+                    ballotOperands,
+                    SLANG_COUNT_OF(ballotOperands),
+                    "CUDA aggregate shuffle active-mask ballot"))
+                return false;
         }
 
         outOperation.kind = NVVMAggregateWaveKind::Shuffle;
@@ -6630,6 +6643,10 @@ void _requireNVVMAggregateWaveOperations(
             operation.shuffleStep.diagnosticName);
         if (!operation.usesImplicitActiveMask)
             return;
+        _requireValueOperation(
+            requirements,
+            operation.activeMaskBallotStep.getDesc(),
+            operation.activeMaskBallotStep.diagnosticName);
         [[fallthrough]];
     case NVVMAggregateWaveKind::ActiveMask:
         _requireValueOperation(
@@ -13018,6 +13035,7 @@ SlangResult _emitNVVMMaskedWaveScalarOperation(
     return _finishNVVMMaskedWavePhi(codeGenContext, builder, module, pendingPhi);
 }
 
+// Reads the hardware mask without imposing a participation set or a synchronization.
 SlangResult _emitNVVMActiveMaskValue(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
@@ -13025,36 +13043,10 @@ SlangResult _emitNVVMActiveMaskValue(
     const NVVMValueRecipeStep& activeMaskStep,
     SlangNVVMValueHandle& outMask)
 {
-    SlangNVVMTypeHandle int32Type = nullptr;
-    SlangNVVMTypeHandle boolType = nullptr;
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        "active-mask i32 type",
-        builder.getIntegerType(module, 32, int32Type)));
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        "active-mask Boolean type",
-        builder.getIntegerType(module, 1, boolType)));
-    SlangNVVMValueHandle fullMask = nullptr;
-    SlangNVVMValueHandle trueValue = nullptr;
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        "active-mask full participation constant",
-        builder.getIntegerConstant(module, int32Type, -1, fullMask)));
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        "active-mask true constant",
-        builder.getIntegerConstant(module, boolType, 1, trueValue)));
-    const SlangNVVMValueHandle operands[] = {fullMask, trueValue};
     return _requireBuilderOperation(
         codeGenContext,
         activeMaskStep.diagnosticName,
-        builder.emitValueOperation(
-            module,
-            activeMaskStep.getDesc(),
-            operands,
-            SLANG_COUNT_OF(operands),
-            outMask));
+        builder.emitValueOperation(module, activeMaskStep.getDesc(), nullptr, 0, outMask));
 }
 
 SlangResult _emitNVVMWaveAggregateElement(
@@ -13388,6 +13380,28 @@ SlangResult _emitNVVMAggregateWaveOperation(
                 module,
                 operation.activeMaskStep,
                 mask));
+            // Match _getActiveMask(): synchronize only the lanes observed by the raw read.
+            // The CUDA prelude's separate logical-mask-tracking TODO still applies.
+            SlangNVVMTypeHandle boolType = nullptr;
+            SlangNVVMValueHandle trueValue = nullptr;
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "active-mask Boolean type",
+                builder.getIntegerType(module, 1, boolType)));
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "active-mask true constant",
+                builder.getIntegerConstant(module, boolType, 1, trueValue)));
+            const SlangNVVMValueHandle ballotOperands[] = {mask, trueValue};
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                operation.activeMaskBallotStep.diagnosticName,
+                builder.emitValueOperation(
+                    module,
+                    operation.activeMaskBallotStep.getDesc(),
+                    ballotOperands,
+                    SLANG_COUNT_OF(ballotOperands),
+                    mask)));
         }
         else
         {
