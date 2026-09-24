@@ -1,0 +1,9 @@
+source	source_test_ordinal	selection_tags	rationale
+compute/texture-get-dimensions.slang	1	mixed-resources,helper-generic	Texture queries across ordinary helper lowering.
+compute/texture-subscript-multisample.slang	2	mixed-resources	Multisampled texture access and result comparison.
+compute/struct-make.slang	0	aggregate-pointer	Aggregate construction and storage.
+language-feature/types/opaque/inout-param-opaque-type-in-struct.slang	0	aggregate-pointer,mixed-resources	Opaque resource nested in an inout aggregate.
+language-feature/types/opaque/return-opaque-type-in-struct.slang	0	aggregate-pointer,mixed-resources	Opaque resource returned inside an aggregate.
+compute/ssa-reduce-bug.slang	0	control-flow,aggregate-pointer	SSA reduction with aggregate state.
+cuda/nvvm-texture-descriptor-conversion.slang	0	mixed-resources,helper-generic	Real CUDA texture integer/descriptor conversions and 64-bit boundary transport across helpers.
+cuda/nvvm-undefined-sampler.slang	0	mixed-resources,helper-generic,control-flow	Undefined CUDA sampler placeholders across branch joins and helpers sample real gradient and zero textures.

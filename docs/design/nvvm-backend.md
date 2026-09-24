@@ -7823,3 +7823,16 @@ The [CICC reverse-engineering notes](https://github.com/GrigoryEvko/crucible-not
 may suggest focused experiments, but their own project disclaimer identifies them as static,
 AI-generated best-guess reconstructions. They do not override the public specifications or runtime
 probes.
+
+### Slice 203: Chosen undefined CUDA sampler placeholders
+
+The ephemeral-value path also admits ordinary `SamplerState` through the existing sampler-value
+classification. SSA construction's `LoadFromUninitializedMemory` has a consistent arbitrary-value
+contract. The emitter selects zero in the already-established i64 sampler representation and caches
+it in the SSA map. CUDA texture objects own sampling state; the checked SampleLevel helper retains
+its sampler argument but the provider's texture operation does not consume it. Branch-joined
+sampler arguments and noinline sampling helpers are tested with real gradient and zero textures.
+
+This admission does not widen the numeric copyable-value algebra or admit undefined texture
+handles, resource-containing aggregates, comparison-sampler helper values, or sampler helper return
+types. Shared lowering and provider ABI 35 remain unchanged.

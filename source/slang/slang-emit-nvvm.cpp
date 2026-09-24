@@ -2611,8 +2611,11 @@ bool _resolveNVVMEphemeralValue(IRInst* inst, NVVMPlannedEphemeralValue& outValu
     switch (inst->getOp())
     {
     case kIROp_LoadFromUninitializedMemory:
-        if (!isNVVMSupportedCopyableValueType(inst->getDataType()))
+        if (!isNVVMSupportedCopyableValueType(inst->getDataType()) &&
+            !asNVVMSupportedSamplerValueType(inst->getDataType()))
+        {
             return false;
+        }
         outValue.kind = NVVMPlannedEphemeralValueKind::ChosenUndefined;
         outValue.valueType = inst->getDataType();
         outValue.source = inst;
@@ -9986,9 +9989,16 @@ SlangResult _emitNVVMChosenUndefinedValue(
     SlangNVVMValueHandle& outValue)
 {
     outValue = nullptr;
-    SLANG_RELEASE_ASSERT(isNVVMSupportedCopyableValueType(type));
+    SLANG_RELEASE_ASSERT(
+        isNVVMSupportedCopyableValueType(type) || asNVVMSupportedSamplerValueType(type));
 
-    if (isNVVMSupportedIntegerScalarType(type) || isNVVMBoolType(type))
+    // Consider `SamplerState sampler; texture.SampleLevel(sampler, uv, 0);` on CUDA.
+    // SSA construction produces an undefined sampler, but the texture object already owns its
+    // sampling state. SampleLevel validates the sampler argument without passing it to the
+    // provider. Select zero for its existing i64 placeholder, just as for numeric undefined
+    // values; this does not create a texture handle or admit undefined resource aggregates.
+    if (isNVVMSupportedIntegerScalarType(type) || isNVVMBoolType(type) ||
+        asNVVMSupportedSamplerValueType(type))
     {
         SlangNVVMTypeHandle loweredType = nullptr;
         SLANG_RETURN_ON_FAIL(typeContext.lowerType(type, NVVMTypeUse::Value, loweredType));

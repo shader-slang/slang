@@ -1,0 +1,1223 @@
+{
+  "schema": 1,
+  "slice": 203,
+  "status": "accepted-targeted-with-recorded-capability-gaps",
+  "validation_date_utc": "2026-09-24",
+  "scope": "targeted compiler-local sampler undefined admission; no full replay claimed",
+  "provider_abi": 35,
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.optimized-checkpoint.json",
+    "sha256": "9907028c63fb2d484d8cb21ac4f3ce8188ff0ed175354fba317942793c7c04e7"
+  },
+  "baseline_source_commit": "ecfacff50002bd9b60f5250b56a2023a399581e5",
+  "historical_denominators": {
+    "frozen_healthy_mvp": 427,
+    "discovery_healthy": 72,
+    "unchanged": true
+  },
+  "provenance": {
+    "source_commit": "60e2277f1522fd64a062960b43471d8a4ef33423",
+    "source_changes": "Only slang-emit-nvvm.cpp modified in compiler; exact hashes below. Tests, manifest and documentation additions.",
+    "configuration": "RelWithDebInfo",
+    "target_architecture": 80,
+    "artifact_sha256": {
+      "build/RelWithDebInfo/bin/slangc": "79f46ef0dba116bdfdce8a03b40f7d3bb2c7b481529b452b483d650cf0958e43",
+      "build/RelWithDebInfo/bin/slang-test": "9c83731b05689bbdbd15956198ad10759e4e9142bd663fe2452fda4954d96a69",
+      "build/RelWithDebInfo/bin/test-server": "fd964f03c3c57b4352ce75f720706fdc852e3a0cd231b90cb0c89068190b827e",
+      "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "d67220907e03909d2b57da115f9491ea2089362ad193dd9c991aadba7d5e7ef8",
+      "build/RelWithDebInfo/lib/libslang-compiler.so": "fe80f943831841eb419cf2317037d7d83f57339545fb854581ca0175b513bb57",
+      "build/RelWithDebInfo/lib/slang-core-module.bin": "86cef9389384fb77e71e49cb63aad4f81f6942367cba742865009173dc584279",
+      "build/RelWithDebInfo/lib/librender-test-tool.so": "96baec31673b6f33a619eb7cc8fd7a518942da12d9374718f475b84cc94ccbc4",
+      "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "084631ea6fb1c54234fbb8dd25193126bea9f62169e414aadf26bb87cdbe274f",
+      "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "/usr/local/cuda-12.9/lib64/libnvrtc.so": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a",
+      "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+      "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461"
+    },
+    "tested_source_sha256": {
+      "source/slang/slang-emit-nvvm.cpp": "a8b32d3481b17014f66978b32edd51ec72702d09949eb215606a22f0b3ba18d6",
+      "source/slang/slang-emit-nvvm-type-lowering.cpp": "8057ca7d0b72b847025b6f57be2f33dffe00303162290c9203531ed93fd7efed",
+      "source/slang/slang-emit-nvvm-type-lowering.h": "47eb8680e88093a54524487e7e0e607400976edf25f0f8751114fc01c8dbb0c2",
+      "source/slang/slang-ir-ssa.cpp": "cf1c131963ac0778e35fb1263ec96ff2d6173485907b73a5d3325588aeeebd85",
+      "source/slang/slang-ir-insts.lua": "026f69a13551d81b50cdaf3d34c9ac15817ca73e0e4100182c89ae5067155940",
+      "tests/cuda/nvvm-undefined-sampler.slang": "a70b87e52a3023b06f5bd6d35510b50dcd1582f69bafe43861a92e645956d299",
+      "tests/cuda/nvvm-undefined-resource-unsupported.slang": "2a149d52456016ec83682d9fff442084f8eb09e838a256b1e7456a0b7a4b10ee",
+      "tests/cuda/nvvm-undefined-comparison-sampler-unsupported.slang": "0e48eb8a87f14ab2876b2fde8d11731b2f1a41aa19a919d7587aa441aee92ee8",
+      "issue-nvvm-backend/discovery-corpus.manifest.tsv": "fe0608b9ab28bb02fc3769be23ce8dfb501435e3f5c35cc2c19b435543b05af3",
+      "issue-nvvm-backend/selection.slice-203-frozen.tsv": "56ac11213015e5c954a9e1ced603a934434dd16b27fb24eeedcc3c774897590b",
+      "issue-nvvm-backend/selection.slice-203-discovery.tsv": "37083d2d93a390dd888368b051dfde5806143954956f4084287f51e2fbc0d35f",
+      "issue-nvvm-backend/run-compute-census.py": "d464fab86c35e23b38dca664d722a4e79a664ee544da190c669ca51645491113",
+      "issue-nvvm-backend/run-compute-discovery.py": "fed1e9c6a527c4d03057278ab3f8bdca8b61cd53d4901b422aedf0c17b39a2df",
+      "issue-nvvm-backend/run-complex-corpus.py": "17b776ae5d734393c84466d78b8bfb68d3021d709e03d2cb1884db294edbe876"
+    },
+    "submodule_pins": [
+      " 9dc178a86fcbbf13c94b4cd4cb046f238d26c8da external/WindowsToolchain (v0.12.0-9-g9dc178a)",
+      " 924936d0427cb25a61169739a7660230bffa6ea6 external/cmark (swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-09-15-a)",
+      " e0b53eaf63c6d00e0725788ef1dbb759aa321d79 external/fast_float (v6.1.0-352-ge0b53ea)",
+      " efec5db081e3aad807d0731e172ac597f6a39447 external/glm (0.9.5.3-2723-gefec5db0)",
+      " d1f52c8993a501bd52d4fbd044bfeb9ecdceb9f4 external/glslang (11.1.0-1385-gd1f52c89)",
+      " 8936b58fe26e8c3da834b8f60b06511d537b4c63 external/imgui (v1.62-5420-g8936b58fe)",
+      " 3fe7be956f23385aa1950dc31e2f25127ccfc0ea external/lua (v5.4-beta-333-g3fe7be95)",
+      " 7f71be01f2c6f6b2c3cddb67eef8c38eab12ffd4 external/lz4 (v1.9.2-1351-g7f71be01)",
+      " a63bd172ddcba73a3d87ca32032b66ad41ddb9a6 external/metal-cpp (remotes/origin/metal-cpp_macOS14.2_iOS17.2)",
+      " 8c532c32c3c96e5ba1f2283e032f69ead8add00f external/mimalloc (v2.1.7)",
+      " 6ef6c68f4fcbb8287aa8edf9c6670804932f41c6 external/miniz (3.0.2-68-g6ef6c68)",
+      " a1280c1863ff19d87f8e827468a4cc906ba9032a external/optix-dev (v9.0.0-1-ga1280c1)",
+      " d6d31411a3ab5417945daa6b1d8811cfc340cb66 external/slang-rhi (d6d31411)",
+      " 29981f65241605e08b0ede4cfeb999fe3b723c6a external/spirv-headers (1.5.4.raytracing.fixed-498-g29981f6)",
+      " 0d6fd73ca73830ccab5fa1f00ed5ed40124e2c55 external/spirv-tools (v2022.4-1300-g0d6fd73c)",
+      " d541711a794343de4ef5ea76f037c9fb9c127a55 external/tinyobjloader (v1.0.6-85-gd541711)",
+      " 73f3cbb237e84d483afafc743f1f14ec53e12314 external/unordered_dense (v4.5.0)",
+      " 387259ecf4b0fe0cfac161b1d0b0a74e42796710 external/vulkan (v1.4.347)"
+    ]
+  },
+  "corpora": {
+    "frozen": {
+      "selection": {
+        "path": "issue-nvvm-backend/selection.slice-203-frozen.tsv",
+        "sha256": "56ac11213015e5c954a9e1ced603a934434dd16b27fb24eeedcc3c774897590b"
+      },
+      "baseline_outcomes": {
+        "path": "issue-nvvm-backend/census.optimized-checkpoint.tsv",
+        "sha256": "efc1eeb3e89a212dae16224a126882aea95d4bdd0076ba478c601eeff88009ec"
+      },
+      "fresh_outcomes": {
+        "path": "issue-nvvm-backend/census.slice-203-targeted.tsv",
+        "sha256": "64de5c3f26ba633b254019f321094c9ebd0452b36dea52276126bd996394a153"
+      },
+      "raw_results": {
+        "path": "build/nvvm-loop/slice-203-after/frozen/results.json",
+        "sha256": "0bb92430632be14869bf77afb65715075dbdd0a5fc00b10a63a3c7afd6e6b9c5"
+      },
+      "expected_identities": 16,
+      "observed_identities": 16,
+      "expected_cells": 48,
+      "observed_cells": 48,
+      "missing_cells": [],
+      "extra_cells": [],
+      "duplicate_cells": 0,
+      "fresh_old_cells": 48,
+      "fresh_addition_cells": 0,
+      "inherited_old_cells": 1308,
+      "fresh_old_correct_cells": 47,
+      "inherited_correct_cells": 1278,
+      "counts": {
+        "nvrtc-o3": {
+          "correct": 15,
+          "infrastructure": 1
+        },
+        "nvvm-o0": {
+          "correct": 16
+        },
+        "nvvm-o3": {
+          "correct": 16
+        }
+      },
+      "execution_totals": {
+        "passed": 47,
+        "executed": 48,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "outcome_deltas": [],
+      "diagnostic_deltas": [],
+      "additions": []
+    },
+    "discovery": {
+      "selection": {
+        "path": "issue-nvvm-backend/selection.slice-203-discovery.tsv",
+        "sha256": "37083d2d93a390dd888368b051dfde5806143954956f4084287f51e2fbc0d35f"
+      },
+      "baseline_outcomes": {
+        "path": "issue-nvvm-backend/discovery-census.optimized-checkpoint.tsv",
+        "sha256": "f09c66f3529733da7ae92c4b9b85f4f901a9a856363e68bff0251ac09279c6d6"
+      },
+      "fresh_outcomes": {
+        "path": "issue-nvvm-backend/discovery-census.slice-203-targeted.tsv",
+        "sha256": "c38a42ae567399f9dec7d27e8482f15bc233d133e55aa5071a6724b8d5b9f5f7"
+      },
+      "raw_results": {
+        "path": "build/nvvm-loop/slice-203-after/discovery/results.json",
+        "sha256": "83ca2827c0f2d4bcdfece9868e22c6b78f9df5fcd0789ac6edb2881bd3c33365"
+      },
+      "expected_identities": 8,
+      "observed_identities": 8,
+      "expected_cells": 24,
+      "observed_cells": 24,
+      "missing_cells": [],
+      "extra_cells": [],
+      "duplicate_cells": 0,
+      "fresh_old_cells": 21,
+      "fresh_addition_cells": 3,
+      "inherited_old_cells": 228,
+      "fresh_old_correct_cells": 15,
+      "inherited_correct_cells": 204,
+      "counts": {
+        "nvrtc-o3": {
+          "runtime-mismatch": 1,
+          "infrastructure": 1,
+          "correct": 6
+        },
+        "nvvm-o0": {
+          "preflight": 2,
+          "correct": 6
+        },
+        "nvvm-o3": {
+          "preflight": 2,
+          "correct": 6
+        }
+      },
+      "execution_totals": {
+        "passed": 18,
+        "executed": 24,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "outcome_deltas": [],
+      "diagnostic_deltas": [],
+      "additions": [
+        {
+          "id": "cuda/nvvm-undefined-sampler.slang#discovery-1",
+          "mode": "nvrtc-o3",
+          "classification": "correct"
+        },
+        {
+          "id": "cuda/nvvm-undefined-sampler.slang#discovery-1",
+          "mode": "nvvm-o0",
+          "classification": "correct"
+        },
+        {
+          "id": "cuda/nvvm-undefined-sampler.slang#discovery-1",
+          "mode": "nvvm-o3",
+          "classification": "correct"
+        }
+      ],
+      "source_contract_ordinals_preserved": true
+    }
+  },
+  "unresolved_failures": {
+    "inherited_ledger": {
+      "path": "issue-nvvm-backend/runtime-validation.optimized-checkpoint.json",
+      "sha256": "9907028c63fb2d484d8cb21ac4f3ce8188ff0ed175354fba317942793c7c04e7"
+    },
+    "json_path": "unresolved_failures",
+    "existing_failure_count": 61,
+    "fresh_rows": [
+      {
+        "id": "compute/texture-subscript.slang#cuda-1",
+        "mode": "nvrtc-o3",
+        "classification": "infrastructure",
+        "return_code": 1,
+        "diagnostic": "",
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "log": {
+          "path": "build/nvvm-loop/slice-203-after/frozen/logs/nvrtc-o3/1f6333e791d11b41e89aa131c141ad7a5f95211d.log",
+          "sha256": "eda5c6101af320e3ee7ee8bcf4753260e3c6e62861e53c6ca9851717133c8a8b"
+        },
+        "reproduction": [
+          "python3",
+          "issue-nvvm-backend/run-compute-census.py",
+          "--config",
+          "RelWithDebInfo",
+          "--bin-dir",
+          "build/RelWithDebInfo/bin",
+          "--provider",
+          "build/RelWithDebInfo/bin",
+          "--architecture",
+          "80",
+          "--jobs",
+          "1",
+          "--match",
+          "compute/texture-subscript.slang#cuda-1",
+          "--modes",
+          "nvrtc-o3",
+          "--output",
+          "build/nvvm-loop/slice-203-reproduce",
+          "--workload-ids-from",
+          "issue-nvvm-backend/selection.slice-203-frozen.tsv"
+        ],
+        "first_known": "Retained optimized-checkpoint unresolved_failures record and historical slice-202 references.",
+        "raw_diagnostic_excerpt": [
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/frozen/mirrors/nvrtc-o3/compute/nvvm-census-texture-subscript-3ddb43212c.slang(48): error : expression must have pointer-to-object type but it has type \"unsigned int\"",
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/frozen/mirrors/nvrtc-o3/compute/nvvm-census-texture-subscript-3ddb43212c.slang(50): error : expression must have pointer-to-object type but it has type \"unsigned int\"",
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/frozen/mirrors/nvrtc-o3/compute/nvvm-census-texture-subscript-3ddb43212c.slang(52): error : no operator \"[]\" matches these operands",
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/frozen/mirrors/nvrtc-o3/compute/nvvm-census-texture-subscript-3ddb43212c.slang(54): error : no operator \"[]\" matches these operands",
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/frozen/mirrors/nvrtc-o3/compute/nvvm-census-texture-subscript-3ddb43212c.slang(56): error : no operator \"[]\" matches these operands",
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/frozen/mirrors/nvrtc-o3/compute/nvvm-census-texture-subscript-3ddb43212c.slang(58): error : no operator \"[]\" matches these operands",
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/frozen/mirrors/nvrtc-o3/compute/nvvm-census-texture-subscript-3ddb43212c.slang(60): error : no operator \"[]\" matches these operands",
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/frozen/mirrors/nvrtc-o3/compute/nvvm-census-texture-subscript-3ddb43212c.slang(62): error : no operator \"[]\" matches these operands",
+          "[build/nvvm-loop/slice-203-after/frozen/mirrors/nvrtc-o3/compute/nvvm-census-texture-subscript-3ddb43212c.slang (cuda)] \u001b[1mslang-test: build/nvvm-loop/slice-203-after/frozen/mirrors/nvrtc-o3/compute/nvvm-census-texture-subscript-3ddb43212c.slang:79:8: \u001b[0m\u001b[0;1;31merror: \u001b[0m\u001b[1mBUF: expected string not found in input"
+        ]
+      },
+      {
+        "id": "compute/texture-get-dimensions.slang#discovery-1",
+        "mode": "nvrtc-o3",
+        "classification": "runtime-mismatch",
+        "return_code": 1,
+        "diagnostic": "",
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "log": {
+          "path": "build/nvvm-loop/slice-203-after/discovery-texture/logs/nvrtc-o3/8c494e4ea960e132ffff6a29ad2828aa42d4eca4.log",
+          "sha256": "6aba09803736f7cc31874eaacf6a1c6b3c6e3e48455c2b9773b7ad8a3156dfcb"
+        },
+        "reproduction": [
+          "python3",
+          "issue-nvvm-backend/run-compute-discovery.py",
+          "--config",
+          "RelWithDebInfo",
+          "--bin-dir",
+          "build/RelWithDebInfo/bin",
+          "--provider",
+          "build/RelWithDebInfo/bin",
+          "--architecture",
+          "80",
+          "--jobs",
+          "1",
+          "--match",
+          "compute/texture-get-dimensions.slang#discovery-1",
+          "--modes",
+          "nvrtc-o3",
+          "--output",
+          "build/nvvm-loop/slice-203-reproduce",
+          "--manifest",
+          "issue-nvvm-backend/discovery-corpus.manifest.tsv"
+        ],
+        "first_known": "Retained optimized-checkpoint unresolved_failures record and historical slice-202 references.",
+        "raw_diagnostic_excerpt": []
+      },
+      {
+        "id": "compute/texture-subscript-multisample.slang#discovery-1",
+        "mode": "nvrtc-o3",
+        "classification": "infrastructure",
+        "return_code": 1,
+        "diagnostic": "",
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "log": {
+          "path": "build/nvvm-loop/slice-203-after/discovery-texture/logs/nvrtc-o3/be15e8b3d4c153109f34d6110f40510a53614204.log",
+          "sha256": "8b9d601f54c70292bfd4b6015173da306c2e612fe24f4e2403dda8ba1a909a74"
+        },
+        "reproduction": [
+          "python3",
+          "issue-nvvm-backend/run-compute-discovery.py",
+          "--config",
+          "RelWithDebInfo",
+          "--bin-dir",
+          "build/RelWithDebInfo/bin",
+          "--provider",
+          "build/RelWithDebInfo/bin",
+          "--architecture",
+          "80",
+          "--jobs",
+          "1",
+          "--match",
+          "compute/texture-subscript-multisample.slang#discovery-1",
+          "--modes",
+          "nvrtc-o3",
+          "--output",
+          "build/nvvm-loop/slice-203-reproduce",
+          "--manifest",
+          "issue-nvvm-backend/discovery-corpus.manifest.tsv"
+        ],
+        "first_known": "Retained optimized-checkpoint unresolved_failures record and historical slice-202 references.",
+        "raw_diagnostic_excerpt": [
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/discovery-texture/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang(17): error : this declaration has no storage class or type specifier",
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/discovery-texture/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang(18): error : this declaration has no storage class or type specifier",
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/discovery-texture/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang(22): error : no operator \"[]\" matches these operands",
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/discovery-texture/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang(23): error : no operator \"[]\" matches these operands",
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/discovery-texture/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang(25): error : no operator \"[]\" matches these operands",
+          "nvrtc 12.9: build/nvvm-loop/slice-203-after/discovery-texture/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang(26): error : no operator \"[]\" matches these operands",
+          "[build/nvvm-loop/slice-203-after/discovery-texture/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang (cuda)] \u001b[1mslang-test: build/nvvm-loop/slice-203-after/discovery-texture/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang:37:8: \u001b[0m\u001b[0;1;31merror: \u001b[0m\u001b[1mBUF: expected string not found in input"
+        ]
+      },
+      {
+        "id": "compute/texture-get-dimensions.slang#discovery-1",
+        "mode": "nvvm-o0",
+        "classification": "preflight",
+        "return_code": 1,
+        "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)'",
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "log": {
+          "path": "build/nvvm-loop/slice-203-after/discovery-texture/logs/nvvm-o0/cb9ad0fdc501b8a937c17bd39dcbdccc81cd2b6e.log",
+          "sha256": "6e3223121f0172ebcbeaa3c624cdd41ca12169fcdd1f520090ae58e8859c2904"
+        },
+        "reproduction": [
+          "python3",
+          "issue-nvvm-backend/run-compute-discovery.py",
+          "--config",
+          "RelWithDebInfo",
+          "--bin-dir",
+          "build/RelWithDebInfo/bin",
+          "--provider",
+          "build/RelWithDebInfo/bin",
+          "--architecture",
+          "80",
+          "--jobs",
+          "1",
+          "--match",
+          "compute/texture-get-dimensions.slang#discovery-1",
+          "--modes",
+          "nvvm-o0",
+          "--output",
+          "build/nvvm-loop/slice-203-reproduce",
+          "--manifest",
+          "issue-nvvm-backend/discovery-corpus.manifest.tsv"
+        ],
+        "first_known": "Retained optimized-checkpoint unresolved_failures record and historical slice-202 references.",
+        "raw_diagnostic_excerpt": [
+          "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)'"
+        ]
+      },
+      {
+        "id": "compute/texture-subscript-multisample.slang#discovery-1",
+        "mode": "nvvm-o0",
+        "classification": "preflight",
+        "return_code": 1,
+        "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'",
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "log": {
+          "path": "build/nvvm-loop/slice-203-after/discovery-texture/logs/nvvm-o0/a8d0b64c0ba60f17f020c47a06a06cd1596b78a8.log",
+          "sha256": "75abf0f4fd7352d6e3d11d901a20c087deaa7596ddf5b44ff32932e22357b4ea"
+        },
+        "reproduction": [
+          "python3",
+          "issue-nvvm-backend/run-compute-discovery.py",
+          "--config",
+          "RelWithDebInfo",
+          "--bin-dir",
+          "build/RelWithDebInfo/bin",
+          "--provider",
+          "build/RelWithDebInfo/bin",
+          "--architecture",
+          "80",
+          "--jobs",
+          "1",
+          "--match",
+          "compute/texture-subscript-multisample.slang#discovery-1",
+          "--modes",
+          "nvvm-o0",
+          "--output",
+          "build/nvvm-loop/slice-203-reproduce",
+          "--manifest",
+          "issue-nvvm-backend/discovery-corpus.manifest.tsv"
+        ],
+        "first_known": "Retained optimized-checkpoint unresolved_failures record and historical slice-202 references.",
+        "raw_diagnostic_excerpt": [
+          "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'",
+          "[build/nvvm-loop/slice-203-after/discovery-texture/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang (cuda)] \u001b[1mslang-test: build/nvvm-loop/slice-203-after/discovery-texture/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang:37:8: \u001b[0m\u001b[0;1;31merror: \u001b[0m\u001b[1mBUF: expected string not found in input"
+        ]
+      },
+      {
+        "id": "compute/texture-get-dimensions.slang#discovery-1",
+        "mode": "nvvm-o3",
+        "classification": "preflight",
+        "return_code": 1,
+        "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)'",
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "log": {
+          "path": "build/nvvm-loop/slice-203-after/discovery-texture/logs/nvvm-o3/4f6a570174ca985a67b8be9d934a2c7e4b0a303b.log",
+          "sha256": "6e3223121f0172ebcbeaa3c624cdd41ca12169fcdd1f520090ae58e8859c2904"
+        },
+        "reproduction": [
+          "python3",
+          "issue-nvvm-backend/run-compute-discovery.py",
+          "--config",
+          "RelWithDebInfo",
+          "--bin-dir",
+          "build/RelWithDebInfo/bin",
+          "--provider",
+          "build/RelWithDebInfo/bin",
+          "--architecture",
+          "80",
+          "--jobs",
+          "1",
+          "--match",
+          "compute/texture-get-dimensions.slang#discovery-1",
+          "--modes",
+          "nvvm-o3",
+          "--output",
+          "build/nvvm-loop/slice-203-reproduce",
+          "--manifest",
+          "issue-nvvm-backend/discovery-corpus.manifest.tsv"
+        ],
+        "first_known": "Retained optimized-checkpoint unresolved_failures record and historical slice-202 references.",
+        "raw_diagnostic_excerpt": [
+          "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)'"
+        ]
+      },
+      {
+        "id": "compute/texture-subscript-multisample.slang#discovery-1",
+        "mode": "nvvm-o3",
+        "classification": "preflight",
+        "return_code": 1,
+        "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'",
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "log": {
+          "path": "build/nvvm-loop/slice-203-after/discovery-texture/logs/nvvm-o3/5c3010140e22c3ee8b120e9f7786e5d70a138c3c.log",
+          "sha256": "75abf0f4fd7352d6e3d11d901a20c087deaa7596ddf5b44ff32932e22357b4ea"
+        },
+        "reproduction": [
+          "python3",
+          "issue-nvvm-backend/run-compute-discovery.py",
+          "--config",
+          "RelWithDebInfo",
+          "--bin-dir",
+          "build/RelWithDebInfo/bin",
+          "--provider",
+          "build/RelWithDebInfo/bin",
+          "--architecture",
+          "80",
+          "--jobs",
+          "1",
+          "--match",
+          "compute/texture-subscript-multisample.slang#discovery-1",
+          "--modes",
+          "nvvm-o3",
+          "--output",
+          "build/nvvm-loop/slice-203-reproduce",
+          "--manifest",
+          "issue-nvvm-backend/discovery-corpus.manifest.tsv"
+        ],
+        "first_known": "Retained optimized-checkpoint unresolved_failures record and historical slice-202 references.",
+        "raw_diagnostic_excerpt": [
+          "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'",
+          "[build/nvvm-loop/slice-203-after/discovery-texture/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang (cuda)] \u001b[1mslang-test: build/nvvm-loop/slice-203-after/discovery-texture/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang:37:8: \u001b[0m\u001b[0;1;31merror: \u001b[0m\u001b[1mBUF: expected string not found in input"
+        ]
+      }
+    ]
+  },
+  "comparison": {
+    "fresh_old_cells": 69,
+    "fresh_addition_cells": 3,
+    "inherited_old_cells": 1536,
+    "fresh_old_correct_cells": 62,
+    "inherited_correct_cells": 1482,
+    "all_previous_correct_cells_preserved_by_fresh_or_inherited_evidence": 1544,
+    "new_correct_cells": 3,
+    "old_failures_retained": 61,
+    "lost_correct_cells": [],
+    "interpretation": "69 old cells freshly replayed; other 1536 old cells inherited from accepted optimized checkpoint, not claimed fresh on this source."
+  },
+  "runtime_gate": {
+    "raw_results": {
+      "path": "build/nvvm-loop/slice-203-after/runtime/results.json",
+      "sha256": "0250d2092cc6b0e1afba0175d6ef2c030cdbdcb7e2ebd1faa943ffd8af2e71b8"
+    },
+    "status": "passed",
+    "expected_fixtures": [
+      "nvvmSlangCUDAExecutionRuntimeMatchesNVRTC",
+      "nvvmSlangSharedMemoryRuntimeMatchesNVRTC",
+      "nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC",
+      "nvvmSlangWaveReadLaneAtUIntRuntimeMatchesNVRTC"
+    ],
+    "results": [
+      {
+        "fixture": "nvvmSlangCUDAExecutionRuntimeMatchesNVRTC",
+        "command": [
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test",
+          "-disable-retries",
+          "slang-unit-test-tool/nvvmSlangCUDAExecutionRuntimeMatchesNVRTC.internal"
+        ],
+        "return_code": 0,
+        "classification": "correct",
+        "diagnostic": "",
+        "execution_counts": {
+          "passed": 1,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/runtime/nvvmSlangCUDAExecutionRuntimeMatchesNVRTC.log",
+        "elapsed_ms": 1457
+      },
+      {
+        "fixture": "nvvmSlangSharedMemoryRuntimeMatchesNVRTC",
+        "command": [
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test",
+          "-disable-retries",
+          "slang-unit-test-tool/nvvmSlangSharedMemoryRuntimeMatchesNVRTC.internal"
+        ],
+        "return_code": 0,
+        "classification": "correct",
+        "diagnostic": "",
+        "execution_counts": {
+          "passed": 1,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/runtime/nvvmSlangSharedMemoryRuntimeMatchesNVRTC.log",
+        "elapsed_ms": 1455
+      },
+      {
+        "fixture": "nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC",
+        "command": [
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test",
+          "-disable-retries",
+          "slang-unit-test-tool/nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC.internal"
+        ],
+        "return_code": 0,
+        "classification": "correct",
+        "diagnostic": "",
+        "execution_counts": {
+          "passed": 1,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/runtime/nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC.log",
+        "elapsed_ms": 1461
+      },
+      {
+        "fixture": "nvvmSlangWaveReadLaneAtUIntRuntimeMatchesNVRTC",
+        "command": [
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test",
+          "-disable-retries",
+          "slang-unit-test-tool/nvvmSlangWaveReadLaneAtUIntRuntimeMatchesNVRTC.internal"
+        ],
+        "return_code": 0,
+        "classification": "correct",
+        "diagnostic": "",
+        "execution_counts": {
+          "passed": 1,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/runtime/nvvmSlangWaveReadLaneAtUIntRuntimeMatchesNVRTC.log",
+        "elapsed_ms": 1419
+      }
+    ],
+    "device": {
+      "name": "NVIDIA L4",
+      "ordinal": 0,
+      "visible_device_count": 1,
+      "compute_capability": 89,
+      "driver_api_version": 13000,
+      "cuda_visible_devices": null
+    },
+    "toolkit": {
+      "path": "/usr/local/cuda-12.9",
+      "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_May_27_02:21:03_PDT_2025\nCuda compilation tools, release 12.9, V12.9.86\nBuild cuda_12.9.r12.9/compiler.36037853_0"
+    },
+    "toolkit_libraries": {
+      "required_libnvvm": "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0",
+      "required_nvrtc": "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86",
+      "libnvvm_sha256": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "nvrtc_sha256": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+    }
+  },
+  "toolkit": {
+    "raw_results": {
+      "path": "build/nvvm-loop/slice-203-after/toolkit/results.json",
+      "sha256": "2099f4aa94db6bc12bbfc87014a350c401b7ba8a13b63e1524c80d37279c3dd1"
+    },
+    "required_cell_count": 18,
+    "status": "passed",
+    "cells": [
+      {
+        "id": "core-execution-sm80-o0",
+        "status": "passed",
+        "source_sha256": "e3e3e78e3296d49fa9a385d80cf8d25b5f65cfc552c2b3270be699cf3d812589",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "12c3abcfca5ffbb301cb5a293ab6f1b216c587929affedd560257347228b7e78",
+        "cubin_sha256": "7652d0bb1664ff7c148b236c58c211b414561102fa0dbf87c905fd07391d3bfe"
+      },
+      {
+        "id": "core-execution-sm80-o3",
+        "status": "passed",
+        "source_sha256": "e3e3e78e3296d49fa9a385d80cf8d25b5f65cfc552c2b3270be699cf3d812589",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "0ad71592fbc3fad3d828f285da5aa9013d46b42c3d612345e3dcc12a4e90a864",
+        "cubin_sha256": "64b001f7857c61284d8a7871250b987b29895dbdd2cb8e8a2c39eecdbaa55874"
+      },
+      {
+        "id": "mixed-numeric-sm80-o0",
+        "status": "passed",
+        "source_sha256": "7860270efbfd0a15b31383683e7f6fbfeaafafe9745af00594b3a41f0e447b2e",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "328dc0fe0003bc7b5c8b844d93ae114b51f9ea2cbab6686ed31fcbb3cb166f12",
+        "cubin_sha256": "04ebbfc3a94ee06e3de76a94d6b485f73e1d4e7890f839d3bde0fb246f38c162"
+      },
+      {
+        "id": "mixed-numeric-sm80-o3",
+        "status": "passed",
+        "source_sha256": "7860270efbfd0a15b31383683e7f6fbfeaafafe9745af00594b3a41f0e447b2e",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "be08e20809681273fec7c60199c5a3b5aac5df7061b0e1cec405d19b9276c899",
+        "cubin_sha256": "be778a181466ffff0a1f284dae206d6db7b171983d894dd2d82f3aac3427f509"
+      },
+      {
+        "id": "native-float-surface-sm80-o0",
+        "status": "passed",
+        "source_sha256": "802708c20f945ce3ffbfd7de5ac5121efb3a8ed8d51345fcc83028678c4ab32f",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "37f2839fed30574a64d1613d48c0c8100fbb5fa43f0dfc455044c1380e70ea4d",
+        "cubin_sha256": "b3ef5624ff147dda4e53d28a68702d39ba297bf50b1a9c03b8fd40ecc1e46f22"
+      },
+      {
+        "id": "native-float-surface-sm80-o3",
+        "status": "passed",
+        "source_sha256": "802708c20f945ce3ffbfd7de5ac5121efb3a8ed8d51345fcc83028678c4ab32f",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "e74bd9a13f27510a476bc46626bcd1853215cc8035e181c1c8fbd9d6780b7999",
+        "cubin_sha256": "17d20eae0cad38f20cac32b7976cb704415df002edd859ab1e2f1ce0648812da"
+      },
+      {
+        "id": "float64-values-sm80-o0",
+        "status": "passed",
+        "source_sha256": "a6a4cfbb73708680345f6d7bbe2b072a93c6b5069683586afdffba53020cdfbd",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "65882b9e7820f13793260580796bbe9ef2cf26a4bd4e46657f152b443c25065b",
+        "cubin_sha256": "cbad5f8e209b8afd4f087d7d33f1839d5a53e5c678f4b1ef28cb8026e9b57e71"
+      },
+      {
+        "id": "float64-values-sm80-o3",
+        "status": "passed",
+        "source_sha256": "a6a4cfbb73708680345f6d7bbe2b072a93c6b5069683586afdffba53020cdfbd",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "3c3476b0c698d9264cd10a17d82975bcfa68825648870df54fccc89d517fac31",
+        "cubin_sha256": "f64224347674a0637de1051daa07ec158e1253e842c25b979ba14e35285f9b34"
+      },
+      {
+        "id": "thread-local-global-context-sm80-o0",
+        "status": "passed",
+        "source_sha256": "03f479d5910edda26e05903947f06a9ff3d615e5283626b92c10c00e28e409f2",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "083ad8ceb46321c74804cc469b00c263f1adae37c24dc7f39b40b579b62d3558",
+        "cubin_sha256": "16f3b63af857d6b4dc9cebc8c88af96c2038c26cc4527daed9cdbb8368bd7c89"
+      },
+      {
+        "id": "thread-local-global-context-sm80-o3",
+        "status": "passed",
+        "source_sha256": "03f479d5910edda26e05903947f06a9ff3d615e5283626b92c10c00e28e409f2",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "93953d0b775b7208e5b031390ac1e83c1ce5975e5bb6639abde0265905f0057c",
+        "cubin_sha256": "41aee3d78f2f06492026cbe02b2238fa7331b2135746ea1e3ad92a96bafdb6d1"
+      },
+      {
+        "id": "half-values-sm80-o0",
+        "status": "passed",
+        "source_sha256": "71f8b3975ed988ec10cabd603ec1d828a12dfb159ed903892bb9c7510f67f266",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "60e87970794702947ca6b31a835283a839bd722fd0ebac819057e9b294597ff9",
+        "cubin_sha256": "5ba58c8928b6a8889c99d5d0a76de784652f0c0e19a591ea86e03cdb96630502"
+      },
+      {
+        "id": "half-values-sm80-o3",
+        "status": "passed",
+        "source_sha256": "71f8b3975ed988ec10cabd603ec1d828a12dfb159ed903892bb9c7510f67f266",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "e711393db1a7317f63de166f5bc7862bb524998d8a46d0a587e4d96af30c88e4",
+        "cubin_sha256": "aa8a374416c966a86a6b6f8c16e54e3cb8efaffb3bd5838aa7d75729ea945133"
+      },
+      {
+        "id": "float-matrix-values-sm80-o0",
+        "status": "passed",
+        "source_sha256": "3b3a93008ab34d062aba2c8dd96ff6af480367dba0701545ebe4a24dd8c94863",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "811249e0698322abbbde7c0a5dfb1107a819c5d4220e299dacdc80d7598d8690",
+        "cubin_sha256": "fa562db81df12f3e52b42c65e6868d8ceb1b1007c2d3709c54f9e3842a4eb50e"
+      },
+      {
+        "id": "float-matrix-values-sm80-o3",
+        "status": "passed",
+        "source_sha256": "3b3a93008ab34d062aba2c8dd96ff6af480367dba0701545ebe4a24dd8c94863",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "21cdd27c9d52face22c89bf9de5e1d04bd5b9161451a3dbb9e3dd0734c39d7c0",
+        "cubin_sha256": "667524bc52275f4a811bbf19bb3bf93db9d97f1c06c87816ab2ef90645db8f5a"
+      },
+      {
+        "id": "helper-copyable-values-sm80-o0",
+        "status": "passed",
+        "source_sha256": "ba6bad934e66c1889315314c5ba02deb8e8b21c50da2f99919a8ccdde065e09a",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "6c5cfca9b324dba78c250d287f0315a6942c56a5a7c5eecbfcc8cde2e9bd8fc0",
+        "cubin_sha256": "a5620800686cfb25c506664b3791311f76b49eed0d9b884f81b7d750e2951e46"
+      },
+      {
+        "id": "helper-copyable-values-sm80-o3",
+        "status": "passed",
+        "source_sha256": "ba6bad934e66c1889315314c5ba02deb8e8b21c50da2f99919a8ccdde065e09a",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "568f100c72c4be0115003de4384d6761fa4bec55ce109376a935bb2ba7236242",
+        "cubin_sha256": "b271959f20d98b62f648217289d4e8c5666e102ab0826510e2249c247dcde188"
+      },
+      {
+        "id": "conventional-global-multi-resource-sm80-o0",
+        "status": "passed",
+        "source_sha256": "89718a32a5fb46ab55426d2c4a595ffb12dec0868e871f2c76826e857ac2e17b",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "c10b8dac8a7eb43170835b77751e95f70e9d670ee8becd6636eed6b60a472414",
+        "cubin_sha256": "91d71210d922198f83f0852e8d4ae8ff2ec4ea7493d8ffbc3b166db50726c216"
+      },
+      {
+        "id": "conventional-global-multi-resource-sm80-o3",
+        "status": "passed",
+        "source_sha256": "89718a32a5fb46ab55426d2c4a595ffb12dec0868e871f2c76826e857ac2e17b",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "22e38dc4c27658f8970577eb4fdb761422695a360c218a65248627626ba982a7",
+        "cubin_sha256": "9db73003c34bde673d36b7afc1bf1b548238382b35256f956b248b9e1eda2972"
+      }
+    ],
+    "exact_identity_set_matches_checkpoint": true
+  },
+  "units": {
+    "evidence": {
+      "path": "build/nvvm-loop/slice-203-after/units.log",
+      "sha256": "1a78a9a0b7e9c85335d27c977397279c65acbcf0f6863ac6b99fa26d81da5ebd"
+    },
+    "counts": {
+      "passed": 473,
+      "executed": 473,
+      "ignored": 1
+    },
+    "ignored_fixture": "nvvmSlangIntegerBitHelpersRequestTypedOperations (Windows only)",
+    "exact_passed_identity_set_matches_checkpoint": true
+  },
+  "focused": {
+    "evidence": {
+      "path": "build/nvvm-loop/slice-203-after/focused.log",
+      "sha256": "0d88a043d0ea0c1eaf18bf9ff703f27b046a54c287795aef564e09c7f9e94090"
+    },
+    "counts": {
+      "passed": 17,
+      "executed": 17,
+      "ignored": 0
+    },
+    "before_evidence": {
+      "path": "build/nvvm-loop/slice-203-before/revert-focused.log",
+      "sha256": "1f240aca1c9db9fe7527e8316bd159c42a79191bd41b650c1646f199ff0caf6f"
+    },
+    "before_counts": {
+      "passed": 7,
+      "executed": 9,
+      "failed": 2
+    },
+    "before_failure": "Both direct positive modes: E52017 LoadFromUninitializedMemory",
+    "before_hashes": {
+      "path": "build/nvvm-loop/slice-203-before/revert-sha256.txt",
+      "sha256": "3f3d8e819922c8eca5077b61cdfa141b1aff775603b15f04dac8ab77e1c7dfa3"
+    },
+    "exact_fixture_sha256": "a70b87e52a3023b06f5bd6d35510b50dcd1582f69bafe43861a92e645956d299",
+    "before_ir": {
+      "path": "build/nvvm-loop/slice-203-before/revert-focused-ir.log",
+      "sha256": "bd611b64ca4732b12f80a1626a4fc69977fc4b3331a0eb19fa9f65c66b4d9553"
+    },
+    "after_ir": {
+      "path": "build/nvvm-loop/slice-203-after/focused-ir.log",
+      "sha256": "b1ee5710711ad6e8d2222e8d11acd0d1e70803900d9f7c788e38c27a2b5fa310"
+    }
+  },
+  "complex_corpus": {
+    "scope": "compile/assembly only; no material runtime/performance claim",
+    "raw_results": {
+      "path": "build/nvvm-loop/slice-203-after/complex/results.json",
+      "sha256": "57d92a1fdb6531f44a3a0a155b5517b117173e93735cd90fdc207ddddaf29f04"
+    },
+    "source": "tests/cuda/complex/tiled_brass_material.slang",
+    "source_sha256": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92",
+    "expected_cells": 6,
+    "observed_cells": 6,
+    "missing_cells": [],
+    "extra_cells": [],
+    "duplicate_cells": 0,
+    "cells": [
+      {
+        "id": "tiled-brass-material-eval_buffer-nvrtc-o3",
+        "entry": "eval_buffer",
+        "backend": "nvrtc",
+        "optimization": 3,
+        "architecture": 80,
+        "status": "passed",
+        "attempts": [
+          {
+            "command": [
+              "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
+              "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+              "-entry",
+              "eval_buffer",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O3",
+              "-emit-cuda-via-nvrtc",
+              "-report-perf-benchmark",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-eval_buffer-nvrtc-o3/attempt-0.ptx"
+            ],
+            "return_code": 0,
+            "log": {
+              "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-eval_buffer-nvrtc-o3/attempt-0.log",
+              "sha256": "561ec9bac3ef8ae02d3a98113fc2f07e91252ec26a596dbead1ee25e7551439e"
+            },
+            "diagnostics": []
+          }
+        ],
+        "assembly": {
+          "command": [
+            "/usr/local/cuda-12.9/bin/ptxas",
+            "-v",
+            "-arch=sm_80",
+            "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-eval_buffer-nvrtc-o3/attempt-0.ptx",
+            "-o",
+            "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-eval_buffer-nvrtc-o3/out.cubin"
+          ],
+          "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-eval_buffer-nvrtc-o3/ptxas.log",
+          "return_code": 0,
+          "elapsed_seconds": 0.215
+        },
+        "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+        "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+        "ptx_unchanged": true
+      },
+      {
+        "id": "tiled-brass-material-eval_buffer-nvvm-o0",
+        "entry": "eval_buffer",
+        "backend": "nvvm",
+        "optimization": 0,
+        "architecture": 80,
+        "status": "preflight-rejected",
+        "attempts": [
+          {
+            "command": [
+              "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
+              "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+              "-entry",
+              "eval_buffer",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O0",
+              "-emit-cuda-via-nvvm",
+              "-report-perf-benchmark",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-eval_buffer-nvvm-o0/attempt-0.ptx"
+            ],
+            "return_code": 255,
+            "log": {
+              "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-eval_buffer-nvvm-o0/attempt-0.log",
+              "sha256": "ab96e57f8731870e8d360d2363fe8b4533253b00a4475469694f79660bec9023"
+            },
+            "diagnostics": [
+              "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t w, h; asm(\"txq.width.b32 %0, [%2]; txq.height.b32 %1, [%2];\" : \"=r\"(w), \"=r\"(h) : \"l\"($0)); *($1) = w;*($2) = h;}, signature=Void(Texture2D, OutParam<int>, OutParam<int>)'"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "tiled-brass-material-eval_buffer-nvvm-o3",
+        "entry": "eval_buffer",
+        "backend": "nvvm",
+        "optimization": 3,
+        "architecture": 80,
+        "status": "preflight-rejected",
+        "attempts": [
+          {
+            "command": [
+              "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
+              "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+              "-entry",
+              "eval_buffer",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O3",
+              "-emit-cuda-via-nvvm",
+              "-report-perf-benchmark",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-eval_buffer-nvvm-o3/attempt-0.ptx"
+            ],
+            "return_code": 255,
+            "log": {
+              "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-eval_buffer-nvvm-o3/attempt-0.log",
+              "sha256": "acb58d46d7d57d87d6c6d72a726efd8ca5fef542e9017a704e525635788ed616"
+            },
+            "diagnostics": [
+              "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t w, h; asm(\"txq.width.b32 %0, [%2]; txq.height.b32 %1, [%2];\" : \"=r\"(w), \"=r\"(h) : \"l\"($0)); *($1) = w;*($2) = h;}, signature=Void(Texture2D, OutParam<int>, OutParam<int>)'"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "tiled-brass-material-sample_buffer-nvrtc-o3",
+        "entry": "sample_buffer",
+        "backend": "nvrtc",
+        "optimization": 3,
+        "architecture": 80,
+        "status": "passed",
+        "attempts": [
+          {
+            "command": [
+              "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
+              "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+              "-entry",
+              "sample_buffer",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O3",
+              "-emit-cuda-via-nvrtc",
+              "-report-perf-benchmark",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-sample_buffer-nvrtc-o3/attempt-0.ptx"
+            ],
+            "return_code": 0,
+            "log": {
+              "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-sample_buffer-nvrtc-o3/attempt-0.log",
+              "sha256": "bb3df58de50db118871b50e173dd40c3e5227f871bc9030dfcf7212eaeb66b90"
+            },
+            "diagnostics": []
+          }
+        ],
+        "assembly": {
+          "command": [
+            "/usr/local/cuda-12.9/bin/ptxas",
+            "-v",
+            "-arch=sm_80",
+            "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-sample_buffer-nvrtc-o3/attempt-0.ptx",
+            "-o",
+            "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-sample_buffer-nvrtc-o3/out.cubin"
+          ],
+          "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-sample_buffer-nvrtc-o3/ptxas.log",
+          "return_code": 0,
+          "elapsed_seconds": 0.265
+        },
+        "ptx_sha256": "214dd03be9f4d7635d26cba874c1b4f3913c43c7e7e2ea4bb62355cf6857fd25",
+        "cubin_sha256": "26e250e48bf3acfe639495cd04a899e78e4e9e370d80ad9749fd3e5ec69b7666",
+        "ptx_unchanged": true
+      },
+      {
+        "id": "tiled-brass-material-sample_buffer-nvvm-o0",
+        "entry": "sample_buffer",
+        "backend": "nvvm",
+        "optimization": 0,
+        "architecture": 80,
+        "status": "preflight-rejected",
+        "attempts": [
+          {
+            "command": [
+              "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
+              "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+              "-entry",
+              "sample_buffer",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O0",
+              "-emit-cuda-via-nvvm",
+              "-report-perf-benchmark",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-sample_buffer-nvvm-o0/attempt-0.ptx"
+            ],
+            "return_code": 255,
+            "log": {
+              "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-sample_buffer-nvvm-o0/attempt-0.log",
+              "sha256": "8c1ae4ae4679981c09429818ea57dd40d81699572bfa07042451333004e3706d"
+            },
+            "diagnostics": [
+              "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t w, h; asm(\"txq.width.b32 %0, [%2]; txq.height.b32 %1, [%2];\" : \"=r\"(w), \"=r\"(h) : \"l\"($0)); *($1) = w;*($2) = h;}, signature=Void(Texture2D, OutParam<int>, OutParam<int>)'"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "tiled-brass-material-sample_buffer-nvvm-o3",
+        "entry": "sample_buffer",
+        "backend": "nvvm",
+        "optimization": 3,
+        "architecture": 80,
+        "status": "preflight-rejected",
+        "attempts": [
+          {
+            "command": [
+              "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
+              "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+              "-entry",
+              "sample_buffer",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O3",
+              "-emit-cuda-via-nvvm",
+              "-report-perf-benchmark",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-sample_buffer-nvvm-o3/attempt-0.ptx"
+            ],
+            "return_code": 255,
+            "log": {
+              "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-203-after/complex/tiled-brass-material-sample_buffer-nvvm-o3/attempt-0.log",
+              "sha256": "59411aff3b63512725fc07760b79cef349a075a1d1fafb2ea1780db6d649ff2e"
+            },
+            "diagnostics": [
+              "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t w, h; asm(\"txq.width.b32 %0, [%2]; txq.height.b32 %1, [%2];\" : \"=r\"(w), \"=r\"(h) : \"l\"($0)); *($1) = w;*($2) = h;}, signature=Void(Texture2D, OutParam<int>, OutParam<int>)'"
+            ]
+          }
+        ]
+      }
+    ],
+    "diagnostic_transitions": [
+      {
+        "id": "tiled-brass-material-eval_buffer-nvvm-o0",
+        "before": "E52017 LoadFromUninitializedMemory",
+        "after": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t w, h; asm(\"txq.width.b32 %0, [%2]; txq.height.b32 %1, [%2];\" : \"=r\"(w), \"=r\"(h) : \"l\"($0)); *($1) = w;*($2) = h;}, signature=Void(Texture2D, OutParam<int>, OutParam<int>)'",
+        "classification_before": "preflight-rejected",
+        "classification_after": "preflight-rejected"
+      },
+      {
+        "id": "tiled-brass-material-eval_buffer-nvvm-o3",
+        "before": "E52017 LoadFromUninitializedMemory",
+        "after": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t w, h; asm(\"txq.width.b32 %0, [%2]; txq.height.b32 %1, [%2];\" : \"=r\"(w), \"=r\"(h) : \"l\"($0)); *($1) = w;*($2) = h;}, signature=Void(Texture2D, OutParam<int>, OutParam<int>)'",
+        "classification_before": "preflight-rejected",
+        "classification_after": "preflight-rejected"
+      },
+      {
+        "id": "tiled-brass-material-sample_buffer-nvvm-o0",
+        "before": "E52017 LoadFromUninitializedMemory",
+        "after": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t w, h; asm(\"txq.width.b32 %0, [%2]; txq.height.b32 %1, [%2];\" : \"=r\"(w), \"=r\"(h) : \"l\"($0)); *($1) = w;*($2) = h;}, signature=Void(Texture2D, OutParam<int>, OutParam<int>)'",
+        "classification_before": "preflight-rejected",
+        "classification_after": "preflight-rejected"
+      },
+      {
+        "id": "tiled-brass-material-sample_buffer-nvvm-o3",
+        "before": "E52017 LoadFromUninitializedMemory",
+        "after": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t w, h; asm(\"txq.width.b32 %0, [%2]; txq.height.b32 %1, [%2];\" : \"=r\"(w), \"=r\"(h) : \"l\"($0)); *($1) = w;*($2) = h;}, signature=Void(Texture2D, OutParam<int>, OutParam<int>)'",
+        "classification_before": "preflight-rejected",
+        "classification_after": "preflight-rejected"
+      }
+    ],
+    "next_blocker_trace": "render.TextureHandle.resolve_udim constructs Texture2D<uint> from UInt64 descriptor; GetDimensions(dim.x, dim.y) lowers to _Texture.GetDimensions with OutParam<Int> element addresses and txq.width/height GenericAsm.",
+    "retained_ir": {
+      "path": "build/nvvm-loop/slice-203-after/material-ir.log",
+      "sha256": "d2e9f2aa45d5a1119791d2943f1e88fa14123a287fb70843c567e3c3a197fe5d"
+    }
+  },
+  "gate_exits": {
+    "focused": 0,
+    "runtime": 0,
+    "units": 0,
+    "toolkit": 0,
+    "frozen": 2,
+    "discovery-texture": 2,
+    "discovery-sampler": 0,
+    "discovery-opaque-type-in-struct": 0,
+    "discovery-struct-make": 0,
+    "discovery-ssa-reduce-bug": 0,
+    "complex": 1
+  },
+  "post_validation_gpu": "name, driver_version, temperature.gpu, memory.used [MiB]\nNVIDIA L4, 580.126.09, 35, 4 MiB\n",
+  "self_review": {
+    "inventory": [
+      "Existing _resolveNVVMEphemeralValue: ordinary sampler classification survives.",
+      "Existing _emitNVVMChosenUndefinedValue: assert and integer constant path extend to same exact domain."
+    ],
+    "input_shape": "Canonical readVar/readVarRec undefined sampler, branch phi and helper argument; valid source IR, not malformed representation. Existing sampler type lowering and SampleLevel provider omission are semantic sources of truth.",
+    "revert_drill": "Restoring original emitter reproduces optimized checkpoint compiler hashes, fails identical final positive at direct O0/O3, passes NVRTC O3 and all six negatives. Final emitter restores both direct passes.",
+    "excluded": "Undefined real resources/resource aggregates and comparison helper values; no shared type helper/provider/ABI change.",
+    "material_undefined_aggregate_audit": {
+      "evidence": {
+        "path": "build/nvvm-loop/slice-203-after/undefined-aggregate-audit.txt",
+        "sha256": "8a2d67cf5a5bb2b881d78ffc38735713fedddeacf08139d30b06e1191889ceaf"
+      },
+      "result": "Specialized conductor/dielectric constructor structs contain only float vectors, Bool and numeric Fresnel structs. Existing numeric copyable recursion owns them. Undefined resource aggregates are tested separately and remain rejected."
+    }
+  },
+  "discovery_selection_preservation": {
+    "previous_identities": 83,
+    "current_identities": 84,
+    "new_source": "cuda/nvvm-undefined-sampler.slang",
+    "no_overlap": true,
+    "old_contracts_unchanged": true
+  },
+  "discovery_batch_execution": {
+    "initial_nonexecuting_attempt": {
+      "reason": "Subset manifest has eight rows; loader requires 50--100 before filtering. No runner changed.",
+      "return_code": 1,
+      "log": {
+        "path": "build/nvvm-loop/slice-203-after/discovery-invalid-subset.log",
+        "sha256": "91bf7782beacfdc642b8c7bba654aa176979ad3985655109381ac33f7db2fbe6"
+      }
+    },
+    "batches": {
+      "texture": {
+        "path": "build/nvvm-loop/slice-203-after/discovery-texture/results.json",
+        "sha256": "82987bdab8d3594c799f61bffa5766b5155b06c2b09103eed36cc71ede1352cb"
+      },
+      "sampler": {
+        "path": "build/nvvm-loop/slice-203-after/discovery-sampler/results.json",
+        "sha256": "fe3ff22be9a13fd640f43dd3552beccb2f459fb8cee7ede9bc1ef155804412e4"
+      },
+      "opaque-type-in-struct": {
+        "path": "build/nvvm-loop/slice-203-after/discovery-opaque-type-in-struct/results.json",
+        "sha256": "5294e3ab777a6fe81d81aafe985769053cb3946b215556593aac11fdd085802b"
+      },
+      "struct-make": {
+        "path": "build/nvvm-loop/slice-203-after/discovery-struct-make/results.json",
+        "sha256": "a4746f8b4102246b18494aa5ba87122c5004f462753d12c864a6616c133628d7"
+      },
+      "ssa-reduce-bug": {
+        "path": "build/nvvm-loop/slice-203-after/discovery-ssa-reduce-bug/results.json",
+        "sha256": "35b71bfd04fba4352e2bc2ad13d04e79e8918a883e0a5c800c11bb66966a50e1"
+      }
+    },
+    "merged_inventory": "Exactly eight requested identities, three modes each; disjoint with no missing/duplicate/extra keys."
+  },
+  "final_source_and_binary_hash_recheck": "passed after every validation gate; no compiler/test/source-contract edits since final validation",
+  "integration_review": {
+    "independent_targeted_classification_comparison": true,
+    "final_source_and_binary_hashes_verified": true,
+    "responsible_layer_and_helper_inventory_reviewed": true
+  }
+}

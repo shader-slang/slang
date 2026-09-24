@@ -82,3 +82,4 @@ bugs/mutating/mutating-call-in-loop-dce.slang	0	control-flow,helper-generic	Muta
 bugs/gh-7748-switch-continue-bug.slang	0	control-flow	Switch/continue regression workload.
 compute/conditional-link-time-const.slang	0	control-flow,helper-generic	Link-time constants controlling helper branches.
 cuda/nvvm-texture-descriptor-conversion.slang	0	mixed-resources,helper-generic	Real CUDA texture integer/descriptor conversions and 64-bit boundary transport across helpers.
+cuda/nvvm-undefined-sampler.slang	0	mixed-resources,helper-generic,control-flow	Undefined CUDA sampler placeholders across branch joins and helpers sample real gradient and zero textures.
