@@ -7774,6 +7774,24 @@ snapshots. See the [slice 200 report](../../issue-nvvm-backend/report.slice-200-
 for the memory-space audit, recovery history, and exact validation commands. The GPU fault's cause
 is not established; physical SM70/SM90 validation remains separate.
 
+## Slice 201: typed wave prefix count and completed acceptance
+
+The CUDA prefix-count producer composes the existing typed ballot, lane index, integer arithmetic,
+and population count instead of hiding them in GenericAsm. The original membership mask remains
+intact. No provider ABI or active-mask synthesis change is needed.
+
+After the earlier A6000 run lost its GPU, the authorized replacement-host replay on L4/CUDA 12.9.2
+completed the exact 61-identity wave/quad selection in all three modes at SM80. NVRTC passed 61;
+NVVM O0/O3 each passed 53 with eight existing preflight gaps. All 165 prior-correct cells survive;
+the only gains are prefix count in both direct modes. Focused CUDA tests passed 6/6, the runtime
+gate 4/4, selected units 473/473 with one Windows-only skip, and compile/assembly commands 8/8.
+
+The [acceptance manifest](../../issue-nvvm-backend/runtime-validation.slice-201.json),
+[wave census](../../issue-nvvm-backend/census.slice-201-wave.tsv), and
+[report](../../issue-nvvm-backend/report.slice-201-wave-prefix-count.md) distinguish this bounded
+fresh replay from inherited evidence for the other 391 frozen and 82 discovery identities.
+Historical denominators are unchanged. A full current-host baseline precedes the next feature.
+
 ## Complex material compile corpus
 
 The [complex compile corpus](../../tests/cuda/complex/README.md) preserves application-sized inputs
@@ -7786,7 +7804,8 @@ The [assessment report](../../issue-nvvm-backend/report.tiled-brass-assessment.m
 [measurement summary](../../issue-nvvm-backend/assessment.tiled-brass.json) record reproducible
 commands, Debug-only exploratory timing, and assembly resources. Runtime correctness, optimized
 compile-speed comparison, and kernel code-quality assessment remain separate future gates.
-Historical corpus denominators and slice-201 acceptance are unchanged.
+Adding the complex corpus does not change historical runtime denominators; slice-201 acceptance
+is recorded separately above.
 
 ## Authoritative References
 

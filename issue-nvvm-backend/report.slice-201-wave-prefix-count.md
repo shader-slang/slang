@@ -1,7 +1,8 @@
 # Slice 201: Typed wave prefix bit count
 
-**Checkpoint status:** The implementation and focused checks pass, but final regression acceptance
-is blocked by another GPU bus-loss fault. Slice 201 is not complete.
+**Status:** Accepted on 2026-09-24 after the replacement-host wave/quad replay completed with
+zero regressions. The 2026-09-22 GPU fault below is retained as historical evidence, not an active
+blocker. Full current-host frozen/discovery validation remains a prerequisite for the next feature.
 
 ## Motivation
 
@@ -22,8 +23,9 @@ Leave active-mask synthesis, other targets, and provider ABI revision 35 unchang
 - `tests/hlsl-intrinsic/wave-prefix-count-bits.slang`: add permanent SM80 direct O0/O3 lanes.
 - `tests/hlsl-intrinsic/wave-prefix-count-bits-cuda.slang`: add per-lane GPU correctness checks
   for full-warp boundaries, all-false/all-true/mixed predicates, explicit sparse masks, and divergence.
-- The checkpoint plan/report and blocked native-Linux manifest preserve measured evidence.
-  Historical design/capability counts remain unchanged until the corpus gate completes.
+- The plan/report, `runtime-validation.slice-201.json`, and `census.slice-201-wave.tsv` preserve
+  accepted replacement-host outcomes and the original interrupted attempt. Historical denominators
+  remain unchanged; the 391 unrelated frozen and 82 discovery identities retain prior evidence.
 
 ## Concepts and vocabulary
 
@@ -77,7 +79,7 @@ The [HLSL contract](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl
 defines the exclusive active-lane count. The synchronized ballot preserves the CUDA membership
 contract documented in the [CUDA programming guide](https://docs.nvidia.com/cuda/archive/12.5.0/pdf/CUDA_C_Programming_Guide.pdf).
 
-## Validation
+## Historical validation on 2026-09-22
 
 Native Linux Debug uses CUDA 13.4, target SM80, RTX A6000 SM86, and the isolated LLVM14 provider.
 The new fixture passed only its NVRTC lane before the fix (1/3); after the fix it passed all three
@@ -106,3 +108,64 @@ Self-review and an independent read-only review found no new helper, fallback, o
 representation fix. Shared shuffle transport was audited as the next prerequisite for rotation,
 but no implementation of that next slice has started. The checkpoint is ready to resume after
 stable hardware is available; raw diagnostics remain under ignored build directories.
+
+## Acceptance reconciliation on 2026-09-24
+
+The maintainer authorized resuming on the configured native Linux NVIDIA L4 (SM89), driver
+580.126.09, CUDA 12.9.2 (NVCC/NVRTC 12.9.86), targeting SM80 with the Debug compiler and isolated
+LLVM14 provider. No production source changed. The source checkpoint is `63c118b8d`, which adds
+only the complex corpus to implementation checkpoint `74f227e10`; the binary's embedded version
+still names that implementation checkpoint. The incremental build passed.
+
+The old 61-identity selection was reconstructed byte-for-byte from the slice-195 rows and matches
+the recorded SHA-256, including its original CRLF serialization. All 183 requested identity/mode
+cells completed exactly once:
+
+| Mode     | Correct execution | Existing preflight gaps | Unexpected regressions |
+| -------- | ----------------: | ----------------------: | ---------------------: |
+| NVRTC O3 |                61 |                       0 |                      0 |
+| NVVM O0  |                53 |                       8 |                      0 |
+| NVVM O3  |                53 |                       8 |                      0 |
+
+Every correct cell executed and passed exactly one test without skips. All 165 previously correct
+cells are preserved. The only transitions are `wave-prefix-count-bits.slang#cuda-1` from preflight
+to correct at NVVM O0 and O3. The eight remaining identities are quad-control functionality, five
+wave-multi workloads, and two wave-rotation workloads; their exact IDs and diagnostics are retained
+in the manifest. No wrong-output, provider, infrastructure, or missing-result cell remains in this
+wave replay.
+
+The exact comparison uses the checked-in slice-195 per-identity rows. Slice 200's manifest records
+preservation of those direct results, but its raw per-row files are unavailable on the replacement
+host. No synthetic slice-200 inventory or fresh full-corpus count is claimed. The other 391 frozen
+and all 82 discovery identities retain historical evidence. The next loop should establish a full
+current-host baseline before changing compiler behavior.
+
+Additional fresh checks passed: both prefix-count shaders' six CUDA lanes (four disabled/non-CUDA
+lanes explicitly ignored), the four-fixture runtime gate without skips, 473 selected backend units
+with one Windows-only skip, and eight compile/assembly commands covering both shaders at O0/O3.
+The 473 count describes the exact current named prefix selection, not a claim to reproduce the old
+474-test selection. Post-run `nvidia-smi` reported a responsive L4 at 37 C and 4 MiB usage; this does
+not diagnose or resolve the earlier A6000 fault.
+
+Reproduce the accepted wave selection from the repository root using a fresh output directory:
+
+```bash
+source build/nvvm-setup/env.sh
+python3 issue-nvvm-backend/run-compute-census.py --config Debug \
+    --bin-dir build/Debug/bin --provider build/Debug/bin --architecture 80 \
+    --workload-ids-from issue-nvvm-backend/census.slice-201-wave.tsv \
+    --jobs 2 --output build/nvvm-slice201-replay/wave
+build/Debug/bin/slang-test -disable-retries -api cuda \
+    tests/hlsl-intrinsic/wave-prefix-count-bits
+```
+
+The [acceptance manifest](runtime-validation.slice-201.json) records the actual invocation,
+compiler/provider/toolkit hashes, comparison, explicit remaining gaps, all focused evidence, and
+the entire interrupted attempt under `historical_interrupted_attempt`. Raw results remain under
+`build/nvvm-slice201-reconcile`. The checked-in [wave census](census.slice-201-wave.tsv) keeps the
+per-identity outcomes available after that directory is gone.
+
+Final self-review: reconciliation adds evidence and documentation only, with no new compiler
+helper, fallback, special case, or representation change. The original typed-producer audit above
+still applies. Shared shuffle transport, rotation, and complex-material descriptor construction
+remain candidates for later slices; none was started here.
