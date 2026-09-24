@@ -1883,7 +1883,12 @@ struct PeepholeContext : InstPassBase
         case kIROp_IsVector:
         case kIROp_IsBindlessTextureNVEncodable:
             {
-                auto type = inst->getOperand(0)->getDataType();
+                // `__isVector<T>()` asks about the composite type itself, so it must inspect
+                // the original operand type (a scalar and a matrix both classify as not-a-vector),
+                // whereas the scalar element predicates (`__isFloat`/`__isInt`/...) describe the
+                // element type of a vector/matrix.
+                auto originalType = inst->getOperand(0)->getDataType();
+                auto type = originalType;
                 if (auto vectorType = as<IRVectorType>(type))
                     type = vectorType->getElementType();
                 if (auto matType = as<IRMatrixType>(type))
@@ -1916,7 +1921,7 @@ struct PeepholeContext : InstPassBase
                         result = isIntegralType(type) && getIntTypeSigned(type);
                         break;
                     case kIROp_IsVector:
-                        result = as<IRVectorType>(type);
+                        result = as<IRVectorType>(originalType) != nullptr;
                         break;
                     case kIROp_IsBindlessTextureNVEncodable:
                         result = isBindlessTextureNVEncodableResourceType(type);
