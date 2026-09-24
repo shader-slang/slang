@@ -7887,3 +7887,21 @@ This normalization makes the generic vector isnan/isinf result-building loop exe
 changing provider ABI 35, Boolean physical resource storage, helper signatures or the material
 source. All registered eval/sample cells compile and assemble in slice206; material runtime proof
 still requires its application binding/input/output contract.
+
+### Slice 207: Rotation composition and scalar indexed transport
+
+At CUDA SM7+, WaveRotate and WaveClusteredRotate compute the source lane in the standard library
+and call the established tagged scalar WaveMaskReadLaneAt with the original full-wave mask.
+Vector overloads compose the scalar operation componentwise. Rotation retains its SM5 public
+capability and its existing lower-target prelude branches because the shared lane-query and
+indexed-shuffle APIs declare SM7; no capability policy or provider ABI changes.
+
+The existing scalar indexed-shuffle semantic admits bool, signed/unsigned 8/16/32/64-bit integers,
+half, float and double through exact catalog signatures. The provider preserves 32-bit emission,
+transports narrow low bits through a 32-bit word, and splits 64-bit values into two words with the
+same mask/index/clamp before reconstructing them. Floating values bitcast to bits without numeric
+conversion. Actual operand types and availability are validated before mutation. Rotation adds no
+semantic operation or source-text recognition; malformed mask/lane/payload signatures remain
+preflight failures. Per-lane runtime oracles cover every vector component, high 64-bit payloads,
+Boolean patterns, wraparound and valid partial masks; bit oracles preserve floating signed zero
+and quiet-NaN payloads.

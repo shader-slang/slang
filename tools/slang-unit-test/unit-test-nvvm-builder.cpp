@@ -3011,6 +3011,92 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveLaneCountKernel)
     }
 }
 
+// Rejected typed shuffles must leave the module identical to an empty control module, even
+// when the semantic descriptor is valid but the actual LLVM values have the wrong types.
+SLANG_UNIT_TEST(nvvmIRBuilderRejectsShuffleOperandsWithoutMutation)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    ComPtr<ISlangBlob> assemblies[2];
+    for (int testInvalidOperands = 0; testInvalidOperands < 2; ++testInvalidOperands)
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.createModule(toSlice("shuffle-operand-validation"), scope.module)));
+        SlangNVVMTypeHandle voidType = nullptr;
+        SlangNVVMTypeHandle i32Type = nullptr;
+        SlangNVVMTypeHandle i64Type = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, i32Type)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 64, i64Type)));
+        const SlangNVVMTypeHandle parameterTypes[] = {i32Type, i64Type};
+        SlangNVVMTypeHandle functionType = nullptr;
+        SlangNVVMValueHandle function = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionType(scope.module, voidType, parameterTypes, 2, functionType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("validateShuffle"),
+            function)));
+        SlangNVVMValueHandle word = nullptr;
+        SlangNVVMValueHandle wide = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 0, word)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 1, wide)));
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+        if (testInvalidOperands)
+        {
+            for (const auto& entry : NVVMSemantics::kCatalog)
+            {
+                if (entry.operation != SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT ||
+                    entry.resultType.bitWidth == 32)
+                    continue;
+                const SlangNVVMValueHandle wrongPayload[] = {word, word, word};
+                SlangNVVMValueHandle rejected =
+                    reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+                SLANG_CHECK(
+                    builder.emitValueOperation(
+                        scope.module,
+                        NVVMSemantics::getOperationDesc(entry),
+                        wrongPayload,
+                        3,
+                        rejected) == SLANG_E_INVALID_ARG);
+                SLANG_CHECK(rejected == nullptr);
+                if (!NVVMSemantics::areSameType(entry.resultType, NVVMSemantics::kUnsignedI64))
+                    continue;
+                const SlangNVVMValueHandle wrongMask[] = {wide, wide, word};
+                const SlangNVVMValueHandle wrongLane[] = {word, wide, wide};
+                for (const auto* operands : {wrongMask, wrongLane})
+                {
+                    rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+                    SLANG_CHECK(
+                        builder.emitValueOperation(
+                            scope.module,
+                            NVVMSemantics::getOperationDesc(entry),
+                            operands,
+                            3,
+                            rejected) == SLANG_E_INVALID_ARG);
+                    SLANG_CHECK(rejected == nullptr);
+                }
+            }
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+            scope.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+            assemblies[testInvalidOperands])));
+    }
+    SLANG_CHECK(_getBlobText(assemblies[0]) == _getBlobText(assemblies[1]));
+}
+
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveReadLaneAtUIntKernel)
 {
     NVVMIRBuilder builder;

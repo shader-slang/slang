@@ -1932,6 +1932,70 @@ static SlangResult _emitIntrinsic(
     return SLANG_OK;
 }
 
+// Transports a scalar through indexed 32-bit shuffles without changing its payload bits.
+// Consider WaveMaskReadLaneAt(mask, uint64_t(value), lane): both halves must come from the
+// same source invocation. Each shuffle therefore uses the original mask, lane and full-warp
+// clamp. Narrow integers and Boolean values retain their low bits; floating-point values are
+// bitcast rather than converted so signed zero and NaN payloads survive the transport.
+static SlangResult _emitWaveReadLaneAt(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMValueOperationDesc& operation,
+    const SlangNVVMValueHandle* operands,
+    SlangNVVMValueHandle* outValue)
+{
+    if (operation.resultType.bitWidth == 32)
+        return _emitIntrinsic(module, operation, operands, operation.operandCount, outValue);
+
+    ModuleState* state = _getModule(module);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!state || !insertionBlock || !operands || !outValue)
+        return SLANG_E_INVALID_ARG;
+
+    const uint32_t bitWidth = operation.resultType.bitWidth;
+    llvm::Type* integerType = llvm::IntegerType::get(state->context, bitWidth);
+    llvm::Type* valueType = integerType;
+    if (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
+        valueType = bitWidth == 16 ? llvm::Type::getHalfTy(state->context)
+                                   : llvm::Type::getDoubleTy(state->context);
+    llvm::Type* wordType = llvm::Type::getInt32Ty(state->context);
+    llvm::Type* expectedTypes[] = {wordType, valueType, wordType};
+    llvm::Value* arguments[3] = {};
+    for (size_t i = 0; i < SLANG_COUNT_OF(arguments); ++i)
+    {
+        arguments[i] = _getValue(operands[i]);
+        if (!arguments[i] || arguments[i]->getType() != expectedTypes[i] ||
+            !_isValueUsableAtInsertionPoint(state, insertionBlock, arguments[i]))
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+    }
+
+    llvm::Value* bits = state->builder.CreateBitCast(arguments[1], integerType);
+    llvm::Value* low = state->builder.CreateZExtOrTrunc(bits, wordType);
+    llvm::Function* shuffle = llvm::Intrinsic::getDeclaration(
+        state->module.get(),
+        llvm::Intrinsic::nvvm_shfl_sync_idx_i32);
+    llvm::Value* clamp = llvm::ConstantInt::get(wordType, 31);
+    llvm::Value* shuffledLow =
+        state->builder.CreateCall(shuffle, {arguments[0], low, arguments[2], clamp});
+    llvm::Value* result = state->builder.CreateZExtOrTrunc(shuffledLow, integerType);
+    if (bitWidth == 64)
+    {
+        llvm::Value* high = state->builder.CreateTrunc(
+            state->builder.CreateLShr(bits, llvm::ConstantInt::get(integerType, 32)),
+            wordType);
+        llvm::Value* shuffledHigh =
+            state->builder.CreateCall(shuffle, {arguments[0], high, arguments[2], clamp});
+        llvm::Value* highBits = state->builder.CreateShl(
+            state->builder.CreateZExt(shuffledHigh, integerType),
+            llvm::ConstantInt::get(integerType, 32));
+        result = state->builder.CreateOr(result, highBits);
+    }
+    *outValue =
+        reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateBitCast(result, valueType));
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitPointerOffset(
     SlangNVVMModuleHandle module,
     SlangNVVMValueHandle basePointer,
@@ -3531,6 +3595,8 @@ static SlangResult _emitCatalogOperation(
     SlangNVVMValueHandle* outValue)
 {
     const SlangNVVMValueOperationDesc operation = Slang::NVVMSemantics::getOperationDesc(entry);
+    if (entry.operation == SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT)
+        return _emitWaveReadLaneAt(module, operation, operands, outValue);
     if (entry.operation == SLANG_NVVM_VALUE_OP_FREXP_FRACTION ||
         entry.operation == SLANG_NVVM_VALUE_OP_FREXP_EXPONENT)
     {
@@ -3572,7 +3638,6 @@ static SlangResult _emitCatalogOperation(
         return _emitBarrier(module, llvm::Intrinsic::nvvm_membar_cta, outValue);
     case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX:
     case SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT:
-    case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT:
     case SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT:
     case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST:
     case SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE:

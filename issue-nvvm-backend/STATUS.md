@@ -4,89 +4,96 @@ Updated 2026-09-24. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
-**Slice 206 is accepted with a full checkpoint.** Parent review verified the implementation,
-exact preservation evidence and final source/binary identity. The
-[completed plan](plan.slice-206-boolean-lanes.md),
-[five-part report](report.slice-206-boolean-lanes.md), and
-[result manifest](runtime-validation.slice-206.json) retain final evidence. No next feature has started.
+**Slice 207 is accepted with a full checkpoint.** Parent review verified the implementation,
+exact corpus transitions, lower-target compatibility evidence and final source/binary identity. Read the
+[completed plan](plan.slice-207-wave-rotation.md),
+[five-part report](report.slice-207-wave-rotation.md), and
+[result manifest](runtime-validation.slice-207.json).
 
-Slice 206 legalizes nonescaping scalar lane reads/writes rooted in a private bool2/3/4 Var into
-whole-vector value operations before direct NVVM preflight. Packed LLVM i1 vectors, physical
-resource storage, address-space rules and provider ABI 35 remain unchanged. Two runnable fixtures
-cover dynamic lane mutation/complete initialization and vector NaN/Inf classification with exact
-independent output oracles; both fail before and pass after at NVVM O0/O3 with NVRTC O3 reference.
-Shared/external and escaping lane addresses retain explicit negative coverage.
+Both unchanged frozen rotation sources now execute correctly at NVVM O0/O3. At CUDA SM7+, scalar
+rotation composes the existing tagged indexed shuffle; vector rotation applies it componentwise.
+The provider transports bool, narrow integers, half and 64-bit scalar payloads through native
+32-bit shuffle words, preserving exact bits. Existing 32-bit emission, operation IDs and ABI 35
+remain unchanged. Original lower-target CUDA branches preserve the public SM5 capability.
 
-**Every registered complex cell now compiles and assembles**: eval_buffer and sample_buffer at
-NVRTC O3 and NVVM O0/O3. No next complex compiler blocker was exposed. Material sources are
-unchanged. Material bindings, texture/LUT/input and expected-output contracts are still absent, so
-this establishes no material runtime correctness or performance claim.
+Two independent per-lane fixtures pass NVRTC O3/NVVM O0/O3. They cover every vector component,
+wraparound/cluster boundaries, signed and unsigned widths, Boolean patterns, high 64-bit words,
+floating signed zero/NaN payloads and valid partial masks. Three malformed semantic signatures
+reject before provider discovery. Wrong actual LLVM operands leave a real provider module
+byte-identical to its clean control.
 
-Next, re-rank independent wave transport against other measured gaps.
-Do not begin material execution without its application semantics. The authorized loop continues.
+All six registered material cells still compile and assemble. Material bindings, texture/LUT/input
+and expected-output contracts remain absent, so this establishes no material runtime correctness
+or performance claim. Next, re-rank the six remaining wave/quad identities
+against the other measured gaps. No next independent feature has started; the authorized loop continues.
 
 ## Checkpoints and evidence
 
-Latest accepted implementation and full checkpoint are 206 (RelWithDebInfo). Implementation slices
+Latest accepted implementation and full checkpoint: 207 (RelWithDebInfo). Implementation slices
 since the full checkpoint: 0.
 
-| Area                                           | Authoritative record                                                                                                                                                                      | Interpretation                                                                                                                                 |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Slice 206 accepted full checkpoint             | [Manifest](runtime-validation.slice-206.json), [frozen outcomes](census.slice-206.tsv), [discovery outcomes](discovery-census.slice-206.tsv), [report](report.slice-206-boolean-lanes.md) | 1623 fresh runtime cells:1562 correct and 61 known failures. All 1617 previous exact outcomes/diagnostics preserved, plus 6 correct additions. |
-| Slice 205 accepted full checkpoint             | [Manifest](runtime-validation.slice-205.json), [report](report.slice-205-reference-forwarding.md)                                                                                         | 1617 cells:1556 correct and 61 failures; baseline for 206.                                                                                     |
-| Optimized transition, accepted full checkpoint | [Manifest](runtime-validation.optimized-checkpoint.json), [report](report.optimized-checkpoint.md)                                                                                        | Historical full baseline:1605 cells,1544 correct and 61 failures.                                                                              |
-| Complex support                                | `complex_corpus` in [slice 206 manifest](runtime-validation.slice-206.json), [source manifest](complex-corpus.manifest.json)                                                              | All 6 compile/assemble cells pass. Compile-only.                                                                                               |
+| Area                                           | Authoritative record                                                                                                                                                                      | Interpretation                                                                                                                                           |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Slice 207 accepted full checkpoint             | [Manifest](runtime-validation.slice-207.json), [frozen outcomes](census.slice-207.tsv), [discovery outcomes](discovery-census.slice-207.tsv), [report](report.slice-207-wave-rotation.md) | 1629 fresh runtime cells: 1572 correct, 57 retained known failures. Four expected old-cell fixes and six correct additions; no other exact-field deltas. |
+| Slice 206 accepted full checkpoint             | [Manifest](runtime-validation.slice-206.json), [report](report.slice-206-boolean-lanes.md)                                                                                                | 1623 cells: 1562 correct and 61 failures; exact baseline for 207.                                                                                        |
+| Optimized transition, accepted full checkpoint | [Manifest](runtime-validation.optimized-checkpoint.json), [report](report.optimized-checkpoint.md)                                                                                        | Historical baseline: 1605 cells, 1544 correct and 61 failures.                                                                                           |
+| Complex support                                | `complex_corpus` in [slice 207 manifest](runtime-validation.slice-207.json), [source manifest](complex-corpus.manifest.json)                                                              | All 6 compile/assemble cells pass. Compile-only.                                                                                                         |
 
-Slice 206 frozen counts are 449/438/438 correct over 452 identities; discovery counts are 79/79/79
-correct over 89 identities, for NVRTC O3/NVVM O0/NVVM O3. No missing/duplicate/extra keys,
-outcome/diagnostic/count deltas or inherited runtime cells. All 1556 old correct cells remain correct
-and 6 additions pass. Historical healthy denominators remain 427 frozen and 72 discovery. No frozen
-overlap or previous discovery contract changed.
+Slice 207 frozen counts are 449/440/440 correct over 452 identities; discovery counts are 81/81/81
+correct over 91 identities, for NVRTC O3/NVVM O0/NVVM O3. All 1562 previous correct cells remain
+correct. Exact keys, classifications, return codes, full execution counts, diagnostics and canonical
+shapes match accepted 206 except the four expected rotation fixes. No missing/duplicate/extra old
+keys or inherited runtime cells. Six additions pass separately. Historical healthy denominators
+remain 427 frozen and 72 discovery. No frozen source or old discovery contract changed.
 
 ## Unresolved failures and next candidates
 
-The slice 206 manifest retains all 61 unresolved runtime failures with exact modes, diagnostics,
-execution counts, log hashes, reproduction and prior failure history. Previous checkpoints remain
-linked as provenance; no baseline reset.
+The slice 207 manifest retains all 57 unresolved runtime failures with exact modes, diagnostics,
+execution counts, log hashes, reproduction and prior failure history. The four resolved rotation
+cells remain linked through baseline and exact transition records; no baseline reset.
 
-- **Wave/quad coverage:** eight identities still reject in both direct modes: quad-control, five
-  wave-multi workloads and two wave-rotation workloads. Shared shuffle transport remains a candidate.
+- **Wave/quad coverage:** six identities still reject in both direct modes: quad-control and five
+  wave-multi workloads. Reconvergence and partitioned reductions remain separate features.
 - **Other gaps:** frozen FP8/prelude/BF16 and reference/harness limitations, plus discovery
   infrastructure/output failures remain measured. Historical multisample NVRTC differences between
   Debug and optimized builds remain documented by the optimized checkpoint.
-- **Material runtime/performance:** application bindings and output oracle remain absent. Both
-  entry points now have complete registered compile/assembly support.
+- **Legacy lower-target probes:** integer scalar64/vector4 rotation and clustered rotation pass
+  four source-call-site tests and four actual SM50/SM60 NVRTC/PTX assembly probes. The adapter's
+  established SM75 clamp requires an explicit downstream architecture override. A broader frozen
+  source probe at explicit SM50 exposes unavailable half-math declarations in the unchanged CUDA
+  prelude; this exploratory limitation is retained separately in the manifest, not counted as a
+  pass or mixed into the registered SM80 runtime ledger.
+- **Material runtime/performance:** application bindings and output oracle remain absent.
 
-Rolling accepted history is 204 dimension queries, 205 mutable forwarding, 206 Boolean lanes;
-all are complex-driven with independent runnable fixtures.
+Rolling accepted history is 205 mutable forwarding, 206 Boolean lanes and 207 wave rotation.
+Slices 205/206 are complex-driven and 207 is wave-driven, satisfying the complex-workload cadence.
 
 ## Current working environment
 
 - Repository `/home/skallweit/codex/agent-sandbox/slang`, branch `nvvm-backend`, native Ubuntu 24.04.
-- NVIDIA L4 SM89, driver 580.126.09; tests target SM80. No device loss occurred during this slice.
+- NVIDIA L4 SM89, driver 580.126.09; runtime tests target SM80. No device loss occurred.
 - CUDA root `/usr/local/cuda-12.9`, vendor 12.9.2; NVCC/NVRTC 12.9.86.
 - Matching tools `build/RelWithDebInfo/bin`, libraries `build/RelWithDebInfo/lib`.
 - Provider `build/RelWithDebInfo/bin/libslang-llvm-nvvm.so`, pinned LLVM 14, unchanged ABI 35.
 - `build/nvvm-setup/env.sh` selects Debug; use optimized overrides from
-  `build/nvvm-loop/slice-203-env.sh`. This also selects installed formatter tools.
-  Set `CMAKE_BUILD_PARALLEL_LEVEL=1` with outer `--parallel 4`.
+  `build/nvvm-loop/slice-203-env.sh`. Set `CMAKE_BUILD_PARALLEL_LEVEL=1` with outer `--parallel 4`.
   Four corpus workers, two unit servers, sequential suites and no concurrent performance runs.
 - Build skill `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`.
-- Local commits use `git -c user.name='Simon Kallweit'
+- Parent local commits use `git -c user.name='Simon Kallweit'
 -c user.email='skallweit@x11-0090.cl1c1.colossus.nvidia.com'`; no push is authorized.
 
-Slice 206 gates pass: focused 16/16 plus escaping negatives 2/2, runtime 4/4, units 473/473 with one
-Windows-only skip and 18/18 toolkit cells. Tested base is
-`c17c9c92e63f55e959cf2b32504215f190b81e9e` plus exact source hashes in the manifest.
-Final compiler library SHA256:
-`f22b30cc8732d1794dc9ce33a8c5f7901892949dfae6c8eba574bfae30ade933`.
-Provider SHA256: `1f3ef9bd03de64838dc039a97ec30f4fe00cd33682d0d95b06abac895446124f`.
-Raw final evidence is under `build/nvvm-loop/slice-206-before` and `slice-206-after`.
-The interrupted preformat replay is historical only under `slice-206-preformat`; the completed
-final replay uses the exact formatted source and rebuilt binaries. The plan records that avoidable
-interruption and a corrected diagnostic-harness annotation. No positive test contract changed.
+Slice 207 gates pass: focused 8/8, runtime 4/4, units 474/474 with one Windows-only skip,
+18/18 toolkit cells, all six complex cells, full frozen/discovery, four legacy source checks and
+four actual lower-target compile/assembly probes. Tested base is
+`1214f6b4d969ee0a5395dce748a5d460899eac92` plus exact source hashes in the manifest.
+Compiler library SHA256: `a4ffa6b02d200436875e148cf87ee5e2553c4bad02e02951d322562e8314efd9`.
+Provider SHA256: `6da3abff11e6b67a1dcd5e3b12f341bc7cbfa356fd29c9d7b5dcad8e20efd676`.
+Raw evidence is under `build/nvvm-loop/slice-207-before` and `slice-207-after`.
+Both final runtime fixture hashes match the before runs; final source/artifact hashes match after
+the gates. The compile-only legacy fixture was added afterward and validated independently without
+changing compiler/provider binaries or the runtime selection.
 
-The old A6000 GPU-loss incident remains historical in slice201; no cause was established, and no
+The old A6000 GPU-loss incident remains historical in slice 201; no cause was established, and no
 driver change or reboot was performed here.
 
 ## Updating this handoff

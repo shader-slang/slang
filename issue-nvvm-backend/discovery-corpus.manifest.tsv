@@ -88,3 +88,5 @@ cuda/nvvm-mutable-parameter-forwarding.slang	0	aggregate-pointer,helper-generic,
 cuda/nvvm-mutable-pointer-payload-forwarding.slang	0	aggregate-pointer,helper-generic,mutable-forwarding	Pointer-bearing helper aggregate preserves exact local storage while mutable parameter roles forward.
 cuda/nvvm-local-boolean-lanes.slang	0	boolean-vector,local-pointer	Dynamic private bool2/3/4 lane updates and complete initialization preserve independent lane oracles.
 cuda/nvvm-vector-classification.slang	0	boolean-vector,intrinsic	Runtime vector isnan/isinf classification exercises local Boolean lane construction with edge-case expected output.
+cuda/nvvm-wave-rotation.slang	0	wave,rotation,scalar-widths	Per-lane full-wave and clustered rotation checks all vector lanes and independent boundary oracles.
+cuda/nvvm-wave-shuffle-widths.slang	0	wave,masked-shuffle,scalar-widths	Bit-exact narrow and 64-bit scalar indexed transport with distinct high words, signed zero, NaNs and partial participation.

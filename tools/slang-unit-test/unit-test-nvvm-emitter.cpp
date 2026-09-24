@@ -8566,6 +8566,46 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         const char* expectedConstruct;
     };
     static const UnsupportedCase kCases[] = {
+        // Additional scalar widths retain exact mask, lane and result/payload contracts.
+        {R"SLANG(
+            uint64_t malformedShuffle(uint64_t mask, uint64_t value, int lane)
+            {
+                __intrinsic_asm(nvvmWaveReadLaneAt) "__shfl_sync($0, $1, $2)";
+            }
+            RWStructuredBuffer<uint64_t> outputBuffer;
+            [numthreads(32, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[tid.x] = malformedShuffle(uint64_t(0xFFFFFFFFu), uint64_t(tid.x), 0);
+            }
+        )SLANG",
+         "'nvvmIntrinsic'"},
+        {R"SLANG(
+            uint64_t malformedShuffle(uint mask, uint value, int lane)
+            {
+                __intrinsic_asm(nvvmWaveReadLaneAt) "__shfl_sync($0, $1, $2)";
+            }
+            RWStructuredBuffer<uint64_t> outputBuffer;
+            [numthreads(32, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[tid.x] = malformedShuffle(0xFFFFFFFFu, tid.x, 0);
+            }
+        )SLANG",
+         "'nvvmIntrinsic'"},
+        {R"SLANG(
+            uint64_t malformedShuffle(uint mask, uint64_t value, float lane)
+            {
+                __intrinsic_asm(nvvmWaveReadLaneAt) "__shfl_sync($0, $1, $2)";
+            }
+            RWStructuredBuffer<uint64_t> outputBuffer;
+            [numthreads(32, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[tid.x] = malformedShuffle(0xFFFFFFFFu, uint64_t(tid.x), 0.0f);
+            }
+        )SLANG",
+         "'nvvmIntrinsic'"},
         // Local packed-vector legalization must not turn shared or external lane writes into
         // whole-vector read/modify/write operations: independent lanes may have different writers.
         {R"(

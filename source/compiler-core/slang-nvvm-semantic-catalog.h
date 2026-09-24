@@ -57,6 +57,21 @@ inline constexpr SlangNVVMValueTypeDesc kVoid = {
     0,
 };
 inline constexpr SlangNVVMValueTypeDesc kBool = {SLANG_NVVM_VALUE_TYPE_BOOL, 1, 1};
+inline constexpr SlangNVVMValueTypeDesc kSignedI8 = {
+    SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
+    8,
+    1,
+};
+inline constexpr SlangNVVMValueTypeDesc kUnsignedI8 = {
+    SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+    8,
+    1,
+};
+inline constexpr SlangNVVMValueTypeDesc kSignedI64 = {
+    SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
+    64,
+    1,
+};
 inline constexpr SlangNVVMValueTypeDesc kSignedI32 = {
     SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
     32,
@@ -487,6 +502,69 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kFloat32, kSignedI32},
         3,
         "Float wave read-lane-at intrinsic",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
+        kBool,
+        {kUnsignedI32, kBool, kSignedI32},
+        3,
+        "Bool wave read-lane-at intrinsic",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
+        kSignedI8,
+        {kUnsignedI32, kSignedI8, kSignedI32},
+        3,
+        "SignedI8 wave read-lane-at intrinsic",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
+        kUnsignedI8,
+        {kUnsignedI32, kUnsignedI8, kSignedI32},
+        3,
+        "UnsignedI8 wave read-lane-at intrinsic",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
+        kSignedI16,
+        {kUnsignedI32, kSignedI16, kSignedI32},
+        3,
+        "SignedI16 wave read-lane-at intrinsic",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
+        kUnsignedI16,
+        {kUnsignedI32, kUnsignedI16, kSignedI32},
+        3,
+        "UnsignedI16 wave read-lane-at intrinsic",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
+        kSignedI64,
+        {kUnsignedI32, kSignedI64, kSignedI32},
+        3,
+        "SignedI64 wave read-lane-at intrinsic",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
+        kUnsignedI64,
+        {kUnsignedI32, kUnsignedI64, kSignedI32},
+        3,
+        "UnsignedI64 wave read-lane-at intrinsic",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
+        kFloat16,
+        {kUnsignedI32, kFloat16, kSignedI32},
+        3,
+        "Float16 wave read-lane-at intrinsic",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
+        kFloat64,
+        {kUnsignedI32, kFloat64, kSignedI32},
+        3,
+        "Float64 wave read-lane-at intrinsic",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT,

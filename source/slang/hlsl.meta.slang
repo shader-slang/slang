@@ -18585,6 +18585,9 @@ void shader_subgroup_preamble()
 //
 // Wave Rotate intrinsics.
 // These are Slang specific intrinsics to rotate values within a subgroup.
+// Rotation retains its CUDA SM5 capability. WaveMaskReadLaneAt and WaveGetLaneIndex expose
+// the existing subgroup_shuffle/subgroup_basic SM7 contract, so only that target branch composes
+// those APIs; the lower-target branch keeps the established CUDA-prelude implementation.
 //
 
 __generic<T : __BuiltinType>
@@ -18599,6 +18602,10 @@ T WaveRotate(T value, uint delta)
         __intrinsic_asm "subgroupRotate";
     case cuda:
         __intrinsic_asm "__shfl_sync(0xFFFFFFFF, $0, (_getLaneId() + $1) % 32)";
+    case _cuda_sm_7_0:
+        // Preserve CUDA's full-wave participation contract while expressing rotation through
+        // the same typed indexed shuffle used by WaveMaskReadLaneAt.
+        return WaveMaskReadLaneAt(0xFFFFFFFFu, value, int((WaveGetLaneIndex() + delta) % 32));
     case metal:
         __intrinsic_asm "simd_shuffle_rotate_down";
     case spirv:
@@ -18623,6 +18630,12 @@ vector<T, N> WaveRotate(vector<T, N> value, uint delta)
         __intrinsic_asm "subgroupRotate";
     case cuda:
         __intrinsic_asm "_slang_waveRotate($0, $1)";
+    case _cuda_sm_7_0:
+        vector<T, N> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveRotate(value[i], delta);
+        return result;
     case metal:
         __intrinsic_asm "simd_shuffle_rotate_down";
     case spirv:
@@ -18647,6 +18660,11 @@ T WaveClusteredRotate(T value, uint delta, constexpr uint clusterSize)
         __intrinsic_asm "subgroupClusteredRotate";
     case cuda:
         __intrinsic_asm "_slang_waveClusteredRotate($0, $1, $2)";
+    case _cuda_sm_7_0:
+        uint lane = WaveGetLaneIndex();
+        uint clusterStart = (lane / clusterSize) * clusterSize;
+        uint sourceLane = clusterStart + ((lane - clusterStart + delta) % clusterSize);
+        return WaveMaskReadLaneAt(0xFFFFFFFFu, value, int(sourceLane));
     case spirv:
         return spirv_asm
         {
@@ -18669,6 +18687,12 @@ vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint 
         __intrinsic_asm "subgroupClusteredRotate";
     case cuda:
         __intrinsic_asm "_slang_waveClusteredRotate($0, $1, $2)";
+    case _cuda_sm_7_0:
+        vector<T, N> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveClusteredRotate(value[i], delta, clusterSize);
+        return result;
     case spirv:
         return spirv_asm
         {
