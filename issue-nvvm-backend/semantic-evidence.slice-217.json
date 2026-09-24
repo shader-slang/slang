@@ -1,0 +1,571 @@
+{
+  "schema": 1,
+  "slice": 217,
+  "status": "accepted-research",
+  "date_utc": "2026-09-24",
+  "source_commit": "195288be83128a19c4c699156a87bf4905e6bdd4",
+  "delegation": "Fresh-context spawn failed: agent thread limit reached. Parent used WORKFLOW local fallback.",
+  "production_changes": false,
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-216.json",
+    "sha256": "cb23c44abc8cc1adfeb5743b484d6803f7935c6401822a248954ec2450493aa2"
+  },
+  "provenance": {
+    "compiler_sha256": "fa55d1fdc41988e27e672d4a2ad92b93060293d101f4a7a076be3e68dd08298f",
+    "provider_sha256": "ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372",
+    "provider_abi": 36,
+    "gpu": "L4 SM89",
+    "target_sm": 80,
+    "driver": "580.126.09",
+    "cuda": "12.9.2",
+    "nvrtc": "12.9.86",
+    "llvm": 14
+  },
+  "identity_recheck": {
+    "sources": 17,
+    "artifacts": 12,
+    "runtime_inputs": 547,
+    "all_match": true
+  },
+  "oracle": "Integer-only IEEE classification/order; caller-seeded simultaneous XOR or ascending original-value scan per source helper. No NVRTC-derived expectations.",
+  "matrix": {
+    "masks": [
+      "00007fff",
+      "0000ffff",
+      "55555555",
+      "80000000",
+      "aaaaaaaa",
+      "ffff0000",
+      "ffff8000",
+      "ffffffff"
+    ],
+    "patterns": [
+      "finite",
+      "infinities",
+      "signed-zeros",
+      "all-qnan",
+      "all-snan",
+      "mixed-nan",
+      "one-qnan-first",
+      "one-qnan-middle",
+      "one-qnan-last",
+      "one-snan-first",
+      "one-snan-middle",
+      "one-snan-last"
+    ],
+    "shapes": ["scalar", "float2", "float2x2"],
+    "block_threads": 32,
+    "output_words_per_lane": 14,
+    "executions": 288,
+    "exact_executions": 192,
+    "mismatching_executions": 96,
+    "active_words": 65016,
+    "active_words_equal": 48104,
+    "active_words_different": 16912,
+    "inactive_sentinels_unchanged": 64008
+  },
+  "mode_summary": [
+    {
+      "mode": "nvrtc-o3",
+      "executions": 96,
+      "exact": 96,
+      "active_words": 21672,
+      "active_words_equal": 21672,
+      "active_words_different": 0,
+      "inactive_sentinels": 21336
+    },
+    {
+      "mode": "nvvm-o0",
+      "executions": 96,
+      "exact": 48,
+      "active_words": 21672,
+      "active_words_equal": 13216,
+      "active_words_different": 8456,
+      "inactive_sentinels": 21336
+    },
+    {
+      "mode": "nvvm-o3",
+      "executions": 96,
+      "exact": 48,
+      "active_words": 21672,
+      "active_words_equal": 13216,
+      "active_words_different": 8456,
+      "inactive_sentinels": 21336
+    }
+  ],
+  "family_summary": [
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "finite",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "infinities",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "signed-zeros",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "all-qnan",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "all-snan",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "mixed-nan",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "one-qnan-first",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "one-qnan-middle",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "one-qnan-last",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "one-snan-first",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "one-snan-middle",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvrtc-o3",
+      "pattern": "one-snan-last",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "finite",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "infinities",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "signed-zeros",
+      "executions": 8,
+      "exact": 3,
+      "different_words": 672,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "all-qnan",
+      "executions": 8,
+      "exact": 1,
+      "different_words": 1792,
+      "nan_to_number": 1792
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "all-snan",
+      "executions": 8,
+      "exact": 1,
+      "different_words": 1792,
+      "nan_to_number": 1792
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "mixed-nan",
+      "executions": 8,
+      "exact": 1,
+      "different_words": 1792,
+      "nan_to_number": 1792
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "one-qnan-first",
+      "executions": 8,
+      "exact": 6,
+      "different_words": 28,
+      "nan_to_number": 28
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "one-qnan-middle",
+      "executions": 8,
+      "exact": 6,
+      "different_words": 28,
+      "nan_to_number": 28
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "one-qnan-last",
+      "executions": 8,
+      "exact": 1,
+      "different_words": 1148,
+      "nan_to_number": 1148
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "one-snan-first",
+      "executions": 8,
+      "exact": 6,
+      "different_words": 28,
+      "nan_to_number": 28
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "one-snan-middle",
+      "executions": 8,
+      "exact": 6,
+      "different_words": 28,
+      "nan_to_number": 28
+    },
+    {
+      "mode": "nvvm-o0",
+      "pattern": "one-snan-last",
+      "executions": 8,
+      "exact": 1,
+      "different_words": 1148,
+      "nan_to_number": 1148
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "finite",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "infinities",
+      "executions": 8,
+      "exact": 8,
+      "different_words": 0,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "signed-zeros",
+      "executions": 8,
+      "exact": 3,
+      "different_words": 672,
+      "nan_to_number": 0
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "all-qnan",
+      "executions": 8,
+      "exact": 1,
+      "different_words": 1792,
+      "nan_to_number": 1792
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "all-snan",
+      "executions": 8,
+      "exact": 1,
+      "different_words": 1792,
+      "nan_to_number": 1792
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "mixed-nan",
+      "executions": 8,
+      "exact": 1,
+      "different_words": 1792,
+      "nan_to_number": 1792
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "one-qnan-first",
+      "executions": 8,
+      "exact": 6,
+      "different_words": 28,
+      "nan_to_number": 28
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "one-qnan-middle",
+      "executions": 8,
+      "exact": 6,
+      "different_words": 28,
+      "nan_to_number": 28
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "one-qnan-last",
+      "executions": 8,
+      "exact": 1,
+      "different_words": 1148,
+      "nan_to_number": 1148
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "one-snan-first",
+      "executions": 8,
+      "exact": 6,
+      "different_words": 28,
+      "nan_to_number": 28
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "one-snan-middle",
+      "executions": 8,
+      "exact": 6,
+      "different_words": 28,
+      "nan_to_number": 28
+    },
+    {
+      "mode": "nvvm-o3",
+      "pattern": "one-snan-last",
+      "executions": 8,
+      "exact": 1,
+      "different_words": 1148,
+      "nan_to_number": 1148
+    }
+  ],
+  "fresh_smoke": {
+    "executed": 4,
+    "correct": 4,
+    "result": {
+      "path": "build/nvvm-loop/slice-217-semantics/runtime/results.json",
+      "sha256": "5cace54fe0a26c288fc29379fc50a3ab8928972039609a743aa313d84baa9250"
+    }
+  },
+  "ptx_assemblies": 3,
+  "retained_baseline_replay": {
+    "executions": 6,
+    "correct": 2,
+    "mismatch": 4,
+    "ptx_generated_by_accepted_slice": 214,
+    "ptx_recorded_in_slice": 215,
+    "scalar_only": true,
+    "result": {
+      "path": "build/nvvm-loop/slice-217-semantics/retained-baseline-results.json",
+      "sha256": "da96e2c9a7dd2c5bc7ca73fd3a7c2a25157996bf181aaa04a75071eccafd065f"
+    }
+  },
+  "defect": {
+    "id": "research-217-fp32-nonsingleton-minmax-source-semantics",
+    "first_measured_slice": 217,
+    "scalar_predates_slice216": true,
+    "introducing_revision": "not bisected",
+    "responsible_layer": "masked scalar recipe reused by aggregate leaves",
+    "order_independent_finding": "All-NaN inputs produce injected infinities at NVVM O0/O3.",
+    "order_sensitive_findings": "Mixed-NaN and signed-zero results differ from exact CUDA source-helper algorithm; no universal cross-target payload/order guarantee claimed.",
+    "minimal_mask": "ffffffff",
+    "lane0_input": "7fc00001",
+    "lane0_expected_min_and_max": "ffc00020",
+    "actual_min": "7f800000",
+    "actual_max": "ff800000",
+    "separate_from_registered53": true
+  },
+  "deferred": [
+    "FP64 min/max GPU/oracle extension and admission",
+    "Other arithmetic and prefixes",
+    "Material runtime validation"
+  ],
+  "next_slice": {
+    "number": 218,
+    "scope": "Correct FP32 masked min/max source algorithm using caller seed, ordered comparisons and source butterfly/scan ordering, scalar and aggregate leaves.",
+    "non_goals": [
+      "FP64 admission",
+      "Provider numeric min/max change",
+      "Other arithmetic/prefixes",
+      "Batching optimization"
+    ]
+  },
+  "inherited_ledger": {
+    "latest_targeted": 216,
+    "latest_full": 214,
+    "implementation_slices_since_full": 1,
+    "total": 1653,
+    "correct": 1600,
+    "open_failures": 53,
+    "resolved_histories": 4,
+    "frozen_cells_still_inherited_from214": 1035,
+    "units": 478,
+    "unit_skip": 1,
+    "toolkit": 18,
+    "material_compile_assemble": 6,
+    "material_runtime_claim": false
+  },
+  "raw_evidence": [
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/identity.json",
+      "sha256": "3b8a6e32b1edf1101a6c015d70bd07ad3f42f3c194274788eab958e0a11dde51"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/minmax-nvrtc-o3.cubin",
+      "sha256": "d0f93a012a3946059f17de8ce9cf19092e5457878b48cd1410fd3447f0e6d3e3"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/minmax-nvrtc-o3.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/minmax-nvrtc-o3.ptx",
+      "sha256": "08241898ba7992678605db7bc01cef00c86eda4232df427ffff5f5f483fd2c0a"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/minmax-nvrtc-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/minmax-nvvm-o0.cubin",
+      "sha256": "0beb9d7816b05eca6848ee02a56e32a65c9f866a6172b3d07885889521f91d89"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/minmax-nvvm-o0.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/minmax-nvvm-o0.ptx",
+      "sha256": "30dbe3e87bc598c20f5cbf1defa8bad2728d85da2f883f3597e8abcb0dedebb6"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/minmax-nvvm-o0.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/minmax-nvvm-o3.cubin",
+      "sha256": "6b301456b01277385f3aeaa901d03d3b15d86e1bbff511fc4898b75d73c9e467"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/minmax-nvvm-o3.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/minmax-nvvm-o3.ptx",
+      "sha256": "9894274063ede2284c8a36c7ff228adc906237d1da651977006ccdf318248497"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/minmax-nvvm-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/minmax.slang",
+      "sha256": "db826f08e6b750dbb116210d07b3bf3a1a375e27d720bad72ebce01cc4ea2b3a"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/probe.log",
+      "sha256": "b0f65f4669beea73d59d0de68f10fa1e3218f1fd16248ff6a19df6c47d364dc8"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/probe.py",
+      "sha256": "1f36aae5466c75c5ddb27b16ea16fadd24b08ea8487fc1b04ec8216e31627c7d"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/results.json",
+      "sha256": "a7b4a69d34737bda432cf911e78c39d95ac46c97a8b3df6e7d7d836c1709e040"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/retained-baseline-results.json",
+      "sha256": "da96e2c9a7dd2c5bc7ca73fd3a7c2a25157996bf181aaa04a75071eccafd065f"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/retained-baseline.log",
+      "sha256": "dde67a706e52c91bc42d32a37f22a51a17c8e23762e5adbe6ee614f8c2e8b0c1"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/retained-baseline.py",
+      "sha256": "cb682453bde4cc403640e657e05c204883fe91ef1c1ecc0d6a4b24573fea1e18"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/runtime/nvvmSlangCUDAExecutionRuntimeMatchesNVRTC.log",
+      "sha256": "c772c17d00cf390d80ef179b044bcfe6a3db39dea4c14f05e91d8cdcc16748dc"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/runtime/nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC.log",
+      "sha256": "9a4ed4d880a590ff52bb198ef1d5ed71d349c28ec075e8ef7642ed42f20eb54d"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/runtime/nvvmSlangSharedMemoryRuntimeMatchesNVRTC.log",
+      "sha256": "d26ad2ce35442b66b0ce5cb4f7a7f497fed29343129f3087fdd7d426604f0d8f"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/runtime/nvvmSlangWaveReadLaneAtUIntRuntimeMatchesNVRTC.log",
+      "sha256": "f232f2e308e86d6d45d0198ba8e5c1f503dc9899234c3875be4d57337818b0f6"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/runtime/results.json",
+      "sha256": "5cace54fe0a26c288fc29379fc50a3ab8928972039609a743aa313d84baa9250"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/runtime.log",
+      "sha256": "911c4a790a85276fc4bf654c83046c78985d85b0c9c83437e4b28bd17f6282d7"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/summary.json",
+      "sha256": "bf14016b9d74c6f28d39210d2ec001bfbf297c018150c96688ce7d34709ef1e1"
+    },
+    {
+      "path": "build/nvvm-loop/slice-217-semantics/gpu-final.csv",
+      "sha256": "22420c3ef2f77ce7e95772fcdf47940effd9e12ad7e4e9a864968eaed24b6e8f"
+    }
+  ],
+  "reproduce": "source build/nvvm-loop/slice-203-env.sh; timeout --kill-after=10s 240s python3 build/nvvm-loop/slice-217-semantics/probe.py",
+  "system_changes": false,
+  "gpu_loss": false,
+  "push": false,
+  "post_validation_gpu": "NVIDIA L4, 580.126.09, 8.9"
+}

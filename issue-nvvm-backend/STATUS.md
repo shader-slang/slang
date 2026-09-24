@@ -17,10 +17,21 @@ from the registered53 failures. Exact original research source now preserves all
 across12 executions; the four previously mismatching executions are fixed. This is no claim about
 nonsingleton NaN/order semantics or portable payload guarantees.
 
-**Next action: resume the deferred slice215 min/max semantic research gate.** Nonsingleton FP32
-behavior remains explicitly unresolved, as do the deferred FP64, aggregate and order probes.
-The singleton correction does not establish readiness to admit FP64 min/max. Keep independent
-sum/product/prefix work and further batching optimization outside that research gate. No push authorized.
+**Slice 217 is accepted research: nonsingleton FP32 min/max differs from its CUDA helper.**
+Read the [report](report.slice-217-minmax-semantics.md), [plan](plan.slice-217-minmax-semantics.md)
+and [evidence](semantic-evidence.slice-217.json). The bounded 288-execution scalar/vector/matrix
+matrix agrees with the independent source oracle in all 96 NVRTC cases; each NVVM mode agrees in
+48/96. All-NaN nonsingletons become injected infinities; mixed-NaN and signed-zero differences are
+separately classified as order-sensitive source compatibility. Finite, infinity and singleton controls
+pass. Retained accepted-214 PTX reproduces the scalar all-NaN defect, proving it predates 216.
+Research findings remain separate from the registered 53 failures. Fresh-context delegation hit the
+agent thread limit; the parent used the workflow's local fallback. No production change occurred.
+
+**Next action: slice 218 corrects the FP32 masked min/max source algorithm.** Reuse typed caller
+values, ordered comparisons and selection with the source butterfly/ascending-scan distinction for
+scalar and aggregate leaves. Preserve singleton behavior. Do not patch only the final all-NaN result
+or change ordinary provider numeric min/max. FP64 admission, other arithmetic/prefixes and batching
+stay outside this bounded fix. Resume FP64 semantic research afterward. No push is authorized.
 
 Latest accepted targeted implementation is 216. The latest full checkpoint remains 214, with one
 accepted implementation slice since that checkpoint.
