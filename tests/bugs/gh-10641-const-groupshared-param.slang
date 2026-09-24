@@ -14,7 +14,7 @@
 //
 // `[noinline]` keeps the call boundary alive so the parameter survives to the IR dump.
 
-//TEST:SIMPLE(filecheck=CHECK):-target cuda -entry main -stage compute -o /dev/null -dump-ir
+//TEST:SIMPLE(filecheck=CHECK):-target cuda -entry main -stage compute -o - -dump-ir
 
 groupshared uint sh[8];
 

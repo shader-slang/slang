@@ -4,7 +4,7 @@
 // so each is a valid argument for a `groupshared` parameter and is passed by reference rather than
 // copied per invocation (shader-slang/slang#10641).
 
-//TEST:SIMPLE(filecheck=CHECK):-target cuda -entry main -stage compute -o /dev/null -dump-ir
+//TEST:SIMPLE(filecheck=CHECK):-target cuda -entry main -stage compute -o - -dump-ir
 
 struct Inner
 {
