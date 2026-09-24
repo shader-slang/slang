@@ -18,13 +18,15 @@
 struct GridCfg { uint dim; };
 struct VOut { float4 pos : SV_Position; float4 color : COLOR; };
 
-// Bind the original record (typed with the pre-lowering VOut return) and the wrapper record (typed
-// with the lifted result struct) to distinct ids, and require each id to be referenced by its own
-// DebugFunction decoration -- so the two functions cannot be sharing one record.
-//VSMAIN-DAG: [[ORIG:%[0-9]+]]{{.*}}= DebugFunction("vsMain",{{.*}}Func(%VOut,
-//VSMAIN-DAG: [DebugFunction([[ORIG]])]
-//VSMAIN-DAG: [DebugFunction([[WRAP:%[0-9]+]])]
-//VSMAIN-DAG: [[WRAP]]{{.*}}= DebugFunction("vsMain",{{.*}}Result
+// Walking the dump in order: the original record (pre-lowering VOut return) and the wrapper
+// record (lifted result struct) get distinct ids. Tie the original's id to a DebugFunction
+// decoration, then the wrapper's id to the decoration on the [entryPoint] function and to its
+// lifted signature -- a shared record, or a record on the wrong function, fails.
+//VSMAIN: [[ORIG:%[0-9]+]]{{.*}}= DebugFunction("vsMain",{{.*}}Func(%VOut,
+//VSMAIN: [DebugFunction([[ORIG]])]
+//VSMAIN: [DebugFunction([[WRAP:%[0-9]+]])]
+//VSMAIN: [entryPoint(
+//VSMAIN: [[WRAP]]{{.*}}= DebugFunction("vsMain",{{.*}}Func(%{{.*}}Result{{.*}}BorrowInParam(UInt
 [shader("vertex")]
 VOut vsMain(uint vid : SV_VertexID, uniform GridCfg* cfg)
 {
@@ -35,11 +37,12 @@ VOut vsMain(uint vid : SV_VertexID, uniform GridCfg* cfg)
 }
 
 // Same distinct-record binding for the `out`-parameter trigger: the original record is typed with
-// an OutParam, the wrapper record with the lifted result struct.
-//VSOUT-DAG: [[ORIG:%[0-9]+]]{{.*}}= DebugFunction("vsOut",{{.*}}OutParam
-//VSOUT-DAG: [DebugFunction([[ORIG]])]
-//VSOUT-DAG: [DebugFunction([[WRAP:%[0-9]+]])]
-//VSOUT-DAG: [[WRAP]]{{.*}}= DebugFunction("vsOut",{{.*}}Result
+// an OutParam; the wrapper record (on the [entryPoint] function) with the lifted result struct.
+//VSOUT: [[ORIG:%[0-9]+]]{{.*}}= DebugFunction("vsOut",{{.*}}OutParam
+//VSOUT: [DebugFunction([[ORIG]])]
+//VSOUT: [DebugFunction([[WRAP:%[0-9]+]])]
+//VSOUT: [entryPoint(
+//VSOUT: [[WRAP]]{{.*}}= DebugFunction("vsOut",{{.*}}Func(%{{.*}}Result{{.*}}BorrowInParam(UInt
 [shader("vertex")]
 void vsOut(uint vid : SV_VertexID, uniform GridCfg* cfg, out float4 pos : SV_Position)
 {
