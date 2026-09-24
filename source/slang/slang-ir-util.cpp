@@ -98,6 +98,27 @@ bool isAnnotation(IRInst* inst)
     return as<IRAnnotation>(inst);
 }
 
+bool isDebugInst(IRInst* inst)
+{
+    // See slang-ir-util.h for the contract. An opcode belongs here iff it can appear as one of a
+    // block's ordinary insts under `-g`; the module-level debug insts (DebugSource, DebugFunction,
+    // DebugBuildIdentifier, DebugCompilationUnit) and DebugLocationDecoration do not, so are
+    // omitted.
+    switch (inst->getOp())
+    {
+    case kIROp_DebugLine:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugVar:
+    case kIROp_DebugValue:
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugInlinedVariable:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool isPtrToClassType(IRInst* type)
 {
     return isPointerOfType(type, kIROp_ClassType);

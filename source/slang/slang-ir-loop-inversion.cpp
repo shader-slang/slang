@@ -11,11 +11,30 @@
 namespace Slang
 {
 
+// Return the first ordinary inst of `b` that the trivial-branch match treats as real content,
+// or null if there is none. A debug attribution inst is skipped only when it has no uses: an
+// unreferenced marker (e.g. DebugLine/DebugValue) is erased harmlessly with a matched block,
+// which is what lets inversion behave the same with and without `-g`. A debug inst that is
+// referenced elsewhere — a DebugVar used by a DebugValue, or a DebugInlinedAt used by a
+// DebugScope — is treated as significant, so a block holding one is not a trivial (erasable)
+// forwarding block and removeAndDeallocate never drops something still in use.
+static IRInst* getFirstSignificantInst(IRBlock* b)
+{
+    for (auto inst = b->getFirstOrdinaryInst(); inst; inst = inst->getNextInst())
+        if (!isDebugInst(inst) || inst->hasUses())
+            return inst;
+    return nullptr;
+}
+
+// True if `scrutinee` is `target` itself, or a block whose only significant content is an
+// unconditional branch to `target` (see getFirstSignificantInst for which debug insts are
+// skipped and why erasing such a block is safe). The single-use check keeps us from erasing a
+// block that is also reachable from elsewhere.
 static bool isSameBlockOrTrivialBranch(IRBlock* target, IRBlock* scrutinee)
 {
     if (target == scrutinee)
         return true;
-    const auto br = as<IRUnconditionalBranch>(scrutinee->getFirstOrdinaryInst());
+    const auto br = as<IRUnconditionalBranch>(getFirstSignificantInst(scrutinee));
     return br && br->getTargetBlock() == target && br->getArgCount() == 0 &&
            !scrutinee->hasMoreThanOneUse();
 };
@@ -27,9 +46,13 @@ static bool isSmallBlock(IRBlock* c)
     // - Comparison
     // - Negation
     // - Terminator
+    // Debug attribution insts (DebugLine/DebugValue/... under `-g`) carry no runtime or
+    // control-flow semantics and add no cost to duplicating this block, so we do not count
+    // them against the threshold; otherwise `-g` could push an otherwise-small block over the
+    // limit and defeat inversion.
     Int n = 0;
-    for ([[maybe_unused]] const auto i : c->getOrdinaryInsts())
-        if (++n > 4)
+    for (const auto i : c->getOrdinaryInsts())
+        if (!isDebugInst(i) && ++n > 4)
             return false;
     return true;
 }

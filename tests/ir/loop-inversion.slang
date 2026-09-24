@@ -1,9 +1,16 @@
 //TEST():SIMPLE(filecheck=CHECK):-entry computeMain -stage compute -line-directive-mode none -target hlsl -loop-inversion
+// Enabling debug info (`-g`) must not change loop-inversion eligibility: the debug
+// attribution insts it interleaves carry no runtime or control-flow semantics, so the
+// same loops still invert.
+//TEST():SIMPLE(filecheck=CHECKG):-entry computeMain -stage compute -line-directive-mode none -target hlsl -loop-inversion -g
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-dx12 -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-cpu -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-cpu -shaderobj -output-using-type
+// Guard runtime correctness of the debug-laden inverted IR (GPU-free): force
+// loop inversion and enable debug info in the slang compile via -Xslang.
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-cpu -shaderobj -output-using-type -Xslang -loop-inversion -Xslang -g
 
 // Check that all the backends cope with the slightly unusual IR the loop inversion generated
 
@@ -11,7 +18,8 @@
 
 // For all the below functions, verify that the body (adding to j and
 // incrementing i) comes before any break. This verifies that the `break` has
-// been moved to the end of the loop.
+// been moved to the end of the loop. The CHECKG (`-g`) checks mirror the CHECK
+// checks to confirm that enabling debug info does not change the inverted form.
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -24,6 +32,14 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK: if(
 // CHECK: break;
 // CHECK: return
+//
+// CHECKG-LABEL: int a_{{.*}}()
+// CHECKG-NOT: break;
+// CHECKG: int {{.*}} = j_{{.*}} + [[ga:i_[0-9]+]]
+// CHECKG: [[ga]] + int(1);
+// CHECKG: if(
+// CHECKG: break;
+// CHECKG: return
 int a()
 {
     int j = 0;
@@ -40,6 +56,14 @@ int a()
 // CHECK: if(
 // CHECK: break;
 // CHECK: return
+//
+// CHECKG-LABEL: int b_{{.*}}()
+// CHECKG-NOT: break;
+// CHECKG: int {{.*}} = j_{{.*}} + [[gb:i_[0-9]+]]
+// CHECKG: [[gb]] + int(1);
+// CHECKG: if(
+// CHECKG: break;
+// CHECKG: return
 int b()
 {
     int j = 0;
@@ -60,6 +84,14 @@ int b()
 // CHECK: if(
 // CHECK: break;
 // CHECK: return
+//
+// CHECKG-LABEL: int c_{{.*}}()
+// CHECKG-NOT: break;
+// CHECKG: int {{.*}} = j_{{.*}} + [[gc:i_[0-9]+]]
+// CHECKG: [[gc]] + int(1);
+// CHECKG: if(
+// CHECKG: break;
+// CHECKG: return
 int c()
 {
     int j = 0;
@@ -84,6 +116,14 @@ int c()
 // CHECK: if(
 // CHECK: break;
 // CHECK: return
+//
+// CHECKG-LABEL: int d_{{.*}}()
+// CHECKG-NOT: break;
+// CHECKG: int {{.*}} = j_{{.*}} + [[gd:i_[0-9]+]]
+// CHECKG: [[gd]] + int(1);
+// CHECKG: if(
+// CHECKG: break;
+// CHECKG: return
 int d()
 {
     int j = 0;
