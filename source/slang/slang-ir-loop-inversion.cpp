@@ -26,11 +26,10 @@ static IRInst* getFirstSignificantInst(IRBlock* b)
     return nullptr;
 }
 
-// True if `scrutinee` is `target` itself, or a block that does nothing but unconditionally
-// branch to `target` (ignoring unreferenced debug markers). The caller erases such a trivial
-// forwarding block; getFirstSignificantInst only looks past debug insts with no uses, so a
-// matched block holds only those plus the branch and removeAndDeallocate drops nothing still
-// referenced.
+// True if `scrutinee` is `target` itself, or a block whose only significant content is an
+// unconditional branch to `target` (see getFirstSignificantInst for which debug insts are
+// skipped and why erasing such a block is safe). The single-use check keeps us from erasing a
+// block that is also reachable from elsewhere.
 static bool isSameBlockOrTrivialBranch(IRBlock* target, IRBlock* scrutinee)
 {
     if (target == scrutinee)

@@ -18,7 +18,9 @@
 
 // For all the below functions, verify that the body (adding to j and
 // incrementing i) comes before any break. This verifies that the `break` has
-// been moved to the end of the loop.
+// been moved to the end of the loop. The CHECKG (`-g`) patterns are intentionally
+// looser than CHECK (they omit the `int {{.*}} =` prefix and trailing `;`) because
+// `-g` interleaves debug attribution that changes the exact declaration form.
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
