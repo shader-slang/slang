@@ -11,28 +11,31 @@
 namespace Slang
 {
 
-// Return the first ordinary inst of `b` that is not a debug attribution inst, or null if
-// there is none. When debug info is enabled, DebugLine/DebugValue/... insts are interleaved
-// among ordinary insts during lowering; because they carry no runtime semantics, the
-// structural predicates below look past them so that inversion behaves identically with and
-// without `-g`.
-static IRInst* getFirstNonDebugOrdinaryInst(IRBlock* b)
+// Return the first ordinary inst of `b` that the trivial-branch match treats as real content,
+// or null if there is none. Result-less debug markers (DebugLine/DebugScope/DebugNoScope/
+// DebugValue/DebugInlinedAt) are skipped: a matched block is erased, and since these markers
+// carry no result, dropping them is harmless and lets inversion behave the same with and
+// without `-g`. A value-defining DebugVar/DebugInlinedVariable is NOT skipped — its handle may
+// be referenced by a DebugValue elsewhere, so a block holding one is not a trivial (erasable)
+// forwarding block.
+static IRInst* getFirstSignificantInst(IRBlock* b)
 {
     for (auto inst = b->getFirstOrdinaryInst(); inst; inst = inst->getNextInst())
-        if (!isDebugInst(inst))
+        if (!isDebugInst(inst) || inst->getOp() == kIROp_DebugVar ||
+            inst->getOp() == kIROp_DebugInlinedVariable)
             return inst;
     return nullptr;
 }
 
 // True if `scrutinee` is `target` itself, or a block that does nothing but unconditionally
-// branch to `target` (ignoring debug markers). The caller erases such a trivial forwarding
-// block; apart from debug markers it holds only the branch — never a value-defining inst such
-// as DebugVar/DebugInlinedVariable, which live at a variable's scope — so the erase is safe.
+// branch to `target` (ignoring result-less debug markers). The caller erases such a trivial
+// forwarding block; getFirstSignificantInst guarantees it holds only those markers plus the
+// branch, so removeAndDeallocate drops nothing referenced elsewhere.
 static bool isSameBlockOrTrivialBranch(IRBlock* target, IRBlock* scrutinee)
 {
     if (target == scrutinee)
         return true;
-    const auto br = as<IRUnconditionalBranch>(getFirstNonDebugOrdinaryInst(scrutinee));
+    const auto br = as<IRUnconditionalBranch>(getFirstSignificantInst(scrutinee));
     return br && br->getTargetBlock() == target && br->getArgCount() == 0 &&
            !scrutinee->hasMoreThanOneUse();
 };
@@ -44,10 +47,10 @@ static bool isSmallBlock(IRBlock* c)
     // - Comparison
     // - Negation
     // - Terminator
-    // Debug attribution insts (DebugLine/DebugValue/... under `-g`) carry no runtime
-    // semantics and add no cost to duplicating this block, so we do not count them against
-    // the threshold; otherwise `-g` could push an otherwise-small block over the limit and
-    // defeat inversion.
+    // Debug attribution insts (DebugLine/DebugValue/... under `-g`) carry no runtime or
+    // control-flow semantics and add no cost to duplicating this block, so we do not count
+    // them against the threshold; otherwise `-g` could push an otherwise-small block over the
+    // limit and defeat inversion.
     Int n = 0;
     for (const auto i : c->getOrdinaryInsts())
         if (!isDebugInst(i) && ++n > 4)
