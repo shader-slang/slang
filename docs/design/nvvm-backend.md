@@ -7852,3 +7852,21 @@ The existing output store therefore handles either integer signedness without co
 helpers continue to store the CUDA prelude's explicit zero for the unavailable array count.
 Floating outputs, mip queries and multisample textures remain outside this contract. No shared
 texture representation, provider interface layout or ABI version changes.
+
+### Mutable local helper parameter forwarding
+
+The canonical local copyable/helper pointer classifiers admit `Ptr<T>`, `OutParam<T>` and
+`BorrowInOutParam<T>` with one operand and generic storage. Helper call admission uses that existing
+storage proof and exact pointee equality when forwarding an output or mutable borrow to another
+mutable parameter. For example, an `out Payload` can call a mutating `Payload` method, and an
+`inout Payload` can be passed to an `out Payload` initializer. `_lowerInfoFromFuncParameters` keeps
+the source direction wrapper; `addArg` forwards its existing address. Erasing that wrapper or
+copying the value is unnecessary.
+
+Both copyable aggregates and pointer-bearing helper aggregates retain their existing typed generic
+pointer ABI. A pointer field's address space does not change the local aggregate's own storage
+class. The direct-resource/thread-local classifiers, readonly reference rules, derived-pointer
+layouts, global-reference casts, exact element identity and provider ABI35 are unchanged.
+`nvvm-mutable-parameter-forwarding.slang` and `nvvm-mutable-pointer-payload-forwarding.slang` exercise
+both families with independent output oracles at NVRTC O3 and NVVM O0/O3. This proves the material's
+output-to-mutating-helper boundary, not the material's runtime behavior.

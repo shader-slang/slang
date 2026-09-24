@@ -84,3 +84,5 @@ compute/conditional-link-time-const.slang	0	control-flow,helper-generic	Link-tim
 cuda/nvvm-texture-descriptor-conversion.slang	0	mixed-resources,helper-generic	Real CUDA texture integer/descriptor conversions and 64-bit boundary transport across helpers.
 cuda/nvvm-undefined-sampler.slang	0	mixed-resources,helper-generic,control-flow	Undefined CUDA sampler placeholders across branch joins and helpers sample real gradient and zero textures.
 cuda/nvvm-texture-dimensions.slang	0	texture-query,integer-dimensions,descriptor-handle	Real geometry queries across numeric texel families and signed/unsigned outputs, including the material descriptor helper.
+cuda/nvvm-mutable-parameter-forwarding.slang	0	aggregate-pointer,helper-generic,mutable-forwarding	Initialized out aggregate calls mutating helpers; nested scalar and BorrowInOut-to-Out forwarding preserve storage.
+cuda/nvvm-mutable-pointer-payload-forwarding.slang	0	aggregate-pointer,helper-generic,mutable-forwarding	Pointer-bearing helper aggregate preserves exact local storage while mutable parameter roles forward.

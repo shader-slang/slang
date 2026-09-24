@@ -7665,8 +7665,13 @@ bool _isSupportedNVVMHelperArgument(IRInst* argument, IRType* parameterType)
         parameterCopyablePointer &&
         (parameterCopyablePointer->getOp() == kIROp_OutParamType ||
          parameterCopyablePointer->getOp() == kIROp_BorrowInOutParamType);
-    if (argumentCopyablePointer && argumentCopyablePointer->getOp() == kIROp_PtrType &&
-        isMutableCopyableParameter && isTypeEqual(argumentCopyableType, parameterCopyableType))
+    // Consider `void initialize(out Payload value) { value.setLayer(); }`. Parameter lowering
+    // preserves OutParam for value and BorrowInOutParam for the mutating method's this parameter.
+    // addArg forwards the existing address, so the direction wrappers differ while the pointee
+    // and generic pointer representation remain identical. The canonical local classifiers already
+    // accept both mutable parameter roles; keep their storage checks and exact pointee identity.
+    if (argumentCopyablePointer && isMutableCopyableParameter &&
+        isTypeEqual(argumentCopyableType, parameterCopyableType))
     {
         return true;
     }
@@ -7680,8 +7685,9 @@ bool _isSupportedNVVMHelperArgument(IRInst* argument, IRType* parameterType)
     const bool isMutableHelperParameter =
         parameterHelperPointer && (parameterHelperPointer->getOp() == kIROp_OutParamType ||
                                    parameterHelperPointer->getOp() == kIROp_BorrowInOutParamType);
-    if (argumentHelperPointer && argumentHelperPointer->getOp() == kIROp_PtrType &&
-        argumentHelperPointer->getOperandCount() == 1 && isMutableHelperParameter &&
+    // Pointer-bearing helper aggregates use the same forwarding rule. Their local classifier
+    // also requires one operand and generic storage, independently of any pointer-valued fields.
+    if (argumentHelperPointer && isMutableHelperParameter &&
         isTypeEqual(argumentHelperType, parameterHelperType))
     {
         return true;
