@@ -36,4 +36,5 @@ void rayGenShaderMakeQueryInvokeNOP()
 
 // SPIRV: OpMemberName %RayPayload 0 "_slang_dummy"
 
+// CUDA-NOT: _slang_dummy
 // CUDA: optixInvoke

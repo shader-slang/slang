@@ -10,6 +10,40 @@
 namespace Slang
 {
 
+// Test struct fields using the caller's notion of empty data. Keeping traversal shared lets
+// payload legalization include arrays without changing DCE's existing struct-only definition.
+static bool isStructEmpty(IRType* type, bool (*isEmptyFieldType)(IRType*))
+{
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return false;
+    for (auto field : structType->getFields())
+    {
+        if (as<IRVoidType>(field->getFieldType()))
+            continue;
+        if (!isEmptyFieldType(field->getFieldType()))
+            return false;
+    }
+    return true;
+}
+
+bool isStructEmpty(IRType* type)
+{
+    return isStructEmpty(type, isStructEmpty);
+}
+
+bool isEmptyType(IRType* type)
+{
+    if (type->findDecoration<IRTargetIntrinsicDecoration>())
+        return false;
+    if (as<IRVoidType>(type))
+        return true;
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+        return isEmptyType(arrayType->getElementType());
+
+    return isStructEmpty(type, isEmptyType);
+}
+
 bool isPointerOfType(IRInst* type, IROp opCode)
 {
     if (auto ptrType = as<IRPtrTypeBase>(type))

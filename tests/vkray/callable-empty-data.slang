@@ -1,12 +1,13 @@
-// Regression test for https://github.com/shader-slang/slang/issues/12718:
-// an empty callable-data struct must not be erased on the HLSL/D3D path, or DXC rejects the
-// resulting zero-parameter callable. The Vulkan targets (SPIR-V and GLSL) keep a valid callable
-// entry point without materializing the unused empty payload — no padding needed there.
+// Regression test for https://github.com/shader-slang/slang/issues/12718 and its CUDA counterpart,
+// #13106. D3D requires a physical carrier for an empty callable-data entry-point parameter;
+// CUDA/OptiX, SPIR-V, and GLSL all permit the logically empty payload to contribute no
+// physical entry-point parameter.
 
 //TEST:SIMPLE(filecheck=HLSL): -stage callable -entry callableMain -target hlsl -profile sm_6_7
 //TEST:SIMPLE(filecheck=DXIL): -stage callable -entry callableMain -target dxil -profile sm_6_7
 //TEST:SIMPLE(filecheck=SPIRV): -stage callable -entry callableMain -target spirv
 //TEST:SIMPLE(filecheck=GLSL): -stage callable -entry callableMain -target glsl
+//TEST:SIMPLE(filecheck=CUDA): -stage callable -entry callableMain -target cuda
 
 struct EmptyData
 {
@@ -25,11 +26,11 @@ void callableMain(inout EmptyData data)
 // so a successful compile confirms the parameter survived. This only checks a function is emitted.
 // DXIL: define void @
 
-// SPIR-V does not need the D3D dummy padding: an empty callable payload on a callable entry point
+// SPIR-V does not need the D3D carrier here: an empty callable payload on a callable entry point
 // compiles to a valid CallableKHR entry point without materializing the payload at all. The
 // negative checks pin that — no incoming callable-data variable and no dummy field are emitted —
-// so the Vulkan padding pass (which does match the incoming decoration) leaves this entry point
-// untouched, because no such global exists for it to find.
+// so the Khronos boundary collector (which matches incoming decorations too) leaves this entry
+// point untouched, because no such global exists for it to find.
 // SPIRV: OpEntryPoint CallableKHR
 // SPIRV-NOT: IncomingCallableData
 // SPIRV-NOT: _slang_dummy
@@ -41,3 +42,8 @@ void callableMain(inout EmptyData data)
 // GLSL-NOT: callableDataInEXT
 // GLSL-NOT: _slang_dummy
 // GLSL: void main(
+
+// The OptiX callable ABI is variadic, so the empty logical parameter is erased and no artificial
+// dummy storage is emitted. A non-empty control is covered by callable-nonempty-data.slang.
+// CUDA-NOT: _slang_dummy
+// CUDA: void __direct_callable__callableMain()
