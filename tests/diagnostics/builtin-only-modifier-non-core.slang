@@ -74,6 +74,13 @@ interface IMyInterface
     void f();
 }
 
+__hlsl_matrix_type_alias
+/*CHECK:
+^^^^^^^^^^^^^^^^^^^^^^^^ error E31229
+^^^^^^^^^^^^^^^^^^^^^^^^ '__hlsl_matrix_type_alias' can only be applied to declarations in the core module
+*/
+typedef float2x3 MyMatrixAlias;
+
 // Negative control: `__intrinsic_type` is valid user syntax and must be accepted
 // (see tests/language-feature/enums/strongly-typed-id.slang).
 __intrinsic_type(UInt)
@@ -91,4 +98,5 @@ void main()
     MyEnum e;
     MyBuiltin f;
     MyIntrinsic g;
+    MyMatrixAlias h;
 }

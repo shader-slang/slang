@@ -400,6 +400,7 @@ struct PreprocessedSegment
 
     /// The first source-language directive found in this segment, if any.
     SourceLanguageDirective sourceLanguageDirective;
+    RefPtr<MatrixLayoutPragmaInfo> matrixLayoutPragmaInfo;
 };
 
 /// Split a physical source file into the source segments represented by a literate input.

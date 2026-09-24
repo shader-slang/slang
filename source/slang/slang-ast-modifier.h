@@ -587,6 +587,14 @@ class BuiltinTypeModifier : public Modifier
     FIDDLE() BaseType tag;
 };
 
+/// Marks a generated HLSL shorthand matrix type such as `float2x3`.
+/// Unlike user typedefs, these spellings take the matrix-layout default at each use.
+FIDDLE()
+class HLSLMatrixTypeAliasModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 // A modifier that indicates a built-in type that isn't a base type (e.g., `vector`)
 //
 // TODO(tfoley): This deserves a better name than "magic"

@@ -13,6 +13,8 @@ void parseSourceFile(
     TranslationUnitRequest* translationUnit,
     SourceLanguage sourceLanguage,
     TokenSpan const& tokens,
+    MatrixLayoutPragmaInfo* matrixLayoutPragmaInfo,
+    Index matrixLayoutTokenOffsetBase,
     DiagnosticSink* sink,
     Scope* outerScope,
     ContainerDecl* parentDecl);
@@ -33,6 +35,8 @@ Stmt* parseUnparsedStmt(
     TranslationUnitRequest* translationUnit,
     SourceLanguage sourceLanguage,
     TokenSpan const& tokens,
+    MatrixLayoutPragmaInfo* matrixLayoutPragmaInfo,
+    Index matrixLayoutTokenOffsetBase,
     DiagnosticSink* sink,
     Scope* currentScope,
     Scope* outerScope);

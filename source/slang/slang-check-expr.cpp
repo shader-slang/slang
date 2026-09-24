@@ -2243,7 +2243,16 @@ Expr* SemanticsVisitor::CheckTerm(Expr* term)
         return term;
     }
 
+    // Consume the matrix-layout default captured by the parser around `_CheckTerm`. Lookup or
+    // generic application may replace the source expression, so apply it to the checked result.
+    const auto matrixLayoutMode = term->getPendingMatrixLayoutMode();
+    if (matrixLayoutMode != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+        term->setPendingMatrixLayoutMode(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN);
+
     auto checkedTerm = _CheckTerm(term);
+    if (matrixLayoutMode != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+        checkedTerm = applyMatrixLayoutDefault(checkedTerm, matrixLayoutMode);
+
     checkedTerm->checked = true;
 
     // Differentiable type checking.
@@ -9551,6 +9560,76 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
     }
 
     return expr;
+}
+
+/// Finds the underlying matrix when this type's aliasing rules permit a use-site default.
+/// Direct matrix types and generated HLSL aliases such as `float2x3` are eligible. A user alias
+/// such as `typedef float2x3 Saved;` is not: its layout was fixed when the alias was declared, so a
+/// later pragma must not change `Saved`. The caller separately preserves explicit layouts.
+static MatrixExpressionType* _findMatrixTypeForLayoutDefault(Type* type)
+{
+    if (auto matrixType = dynamicCast<MatrixExpressionType>(type))
+        return matrixType;
+
+    auto namedType = dynamicCast<NamedExpressionType>(type);
+    if (!namedType)
+        return nullptr;
+
+    auto typeDefDecl = namedType->getDeclRef().getDecl();
+    if (!typeDefDecl->hasModifier<HLSLMatrixTypeAliasModifier>())
+        return nullptr;
+
+    auto matrixType = as<MatrixExpressionType>(namedType);
+    SLANG_RELEASE_ASSERT(matrixType);
+    return matrixType;
+}
+
+Expr* SemanticsVisitor::applyMatrixLayoutDefault(Expr* expr, SlangMatrixLayoutMode mode)
+{
+    SLANG_RELEASE_ASSERT(
+        mode == SLANG_MATRIX_LAYOUT_ROW_MAJOR || mode == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
+
+    auto typeType = expr->type ? dynamicCast<TypeType>(expr->type.type) : nullptr;
+    if (!typeType)
+        return expr;
+
+    Type* type = typeType->getType();
+    if (auto genericType = dynamicCast<GenericDeclRefType>(type))
+    {
+        // In `matrix value;`, default generic arguments have not produced a matrix type yet.
+        // Coerce only the registered matrix generic to a proper type; other generics retain their
+        // normal inference behavior.
+        if (genericType->getDeclRef().getDecl() !=
+            m_astBuilder->getSharedASTBuilder()->findMagicDecl("MatrixExpressionType"))
+            return expr;
+        type = CoerceToProperType(TypeExp(expr, type)).type;
+    }
+
+    auto matrixType = _findMatrixTypeForLayoutDefault(type);
+    if (!matrixType)
+        return expr;
+
+    auto layout = as<ConstantIntVal>(matrixType->getLayout());
+    // Preserve explicit concrete layouts and symbolic arguments such as `matrix<float,2,3,L>`.
+    // Only an omitted/default Unknown layout takes the source pragma's value.
+    if (!layout || layout->getValue() != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+        return expr;
+
+    auto concreteMatrixType = m_astBuilder->getMatrixType(
+        matrixType->getElementType(),
+        matrixType->getRowCount(),
+        matrixType->getColumnCount(),
+        m_astBuilder->getIntVal(matrixType->getLayout()->getType(), mode));
+
+    // In `float2x3(0)`, a DeclRefExpr makes AddOverloadCandidates resolve the typedef again and
+    // discard this occurrence's concrete layout. Represent the callee by its computed type while
+    // retaining the original syntax in `base` for tooling.
+    auto result = m_astBuilder->create<SharedTypeExpr>();
+    result->loc = expr->loc;
+    result->base = TypeExp(expr, concreteMatrixType);
+    result->type = m_astBuilder->getTypeType(concreteMatrixType);
+    result->checked = expr->checked;
+    return result;
 }
 
 Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)

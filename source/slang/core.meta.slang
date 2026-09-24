@@ -2616,7 +2616,8 @@ for (int tt = 0; tt < kTypeCount; ++tt)
     for (int rr = 1; rr <= 4; ++rr)
     for (int cc = 1; cc <= 4; ++cc)
     {
-        sb << "typedef matrix<" << kTypes[tt].name << "," << rr << "," << cc << "> " << kTypes[tt].name << rr << "x" << cc << ";\n";
+        sb << "__hlsl_matrix_type_alias typedef matrix<" << kTypes[tt].name << "," << rr << ","
+           << cc << "> " << kTypes[tt].name << rr << "x" << cc << ";\n";
     }
 }
 

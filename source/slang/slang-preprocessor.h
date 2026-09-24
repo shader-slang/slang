@@ -32,6 +32,30 @@ struct PreprocessorHandler
     virtual void handleFileDependency(SourceFile* sourceFile);
 };
 
+/// Records where a `#pragma pack_matrix` state change takes effect in a preprocessed token stream.
+/// The offset indexes the emitted token list.
+/// The new mode applies to the token at that offset and all following tokens until another event.
+struct MatrixLayoutPragmaEvent
+{
+    Index tokenOffset;
+    SlangMatrixLayoutMode mode;
+};
+
+/// Stores the matrix-layout state before, during, and after one preprocessed token stream.
+/// Events have strictly increasing offsets. Directives before the same output token coalesce.
+/// A directive at EOF changes `finalMode` without adding an event. An Unknown initial or final mode
+/// means that the target's matrix-layout default still applies. The timeline becomes immutable once
+/// preprocessing completes, so parsers for deferred token ranges can share it.
+struct MatrixLayoutPragmaInfo : RefObject
+{
+    SlangMatrixLayoutMode initialMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
+    List<MatrixLayoutPragmaEvent> events;
+    SlangMatrixLayoutMode finalMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
+
+    /// Locations of valid `#pragma pack_matrix` directives in this token stream.
+    List<SourceLoc> directiveLocations;
+};
+
 /// Description of a preprocessor options/dependencies
 struct PreprocessorDesc
 {
@@ -58,6 +82,12 @@ struct PreprocessorDesc
 
     /// Optional: additional information for code assist.
     PreprocessorContentAssistInfo* contentAssistInfo = nullptr;
+
+    /// Matrix-layout state inherited from an earlier segment of the same source file.
+    SlangMatrixLayoutMode initialMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
+
+    /// Optional: receives matrix-layout state changes produced during preprocessing.
+    MatrixLayoutPragmaInfo* matrixLayoutPragmaInfo = nullptr;
 };
 
 /// The first source-language selection discovered while preprocessing one source segment.
@@ -101,7 +131,9 @@ TokenList preprocessSource(
     Linkage* linkage,
     SourceLanguageDirective& outSourceLanguageDirective,
     SlangLanguageVersion& outLanguageVersion,
-    PreprocessorHandler* handler = nullptr);
+    PreprocessorHandler* handler = nullptr,
+    SlangMatrixLayoutMode initialMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN,
+    MatrixLayoutPragmaInfo* matrixLayoutPragmaInfo = nullptr);
 
 // The following functions are intended to be used inside of implementations
 // of the `PreprocessorHandler` interface, in order to query the current
