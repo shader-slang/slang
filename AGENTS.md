@@ -59,6 +59,12 @@ For the NVVM backend slice loop, the maintainer explicitly requires completed pl
 to be committed with each slice. This is an exception to the working-log rule above; generated
 binaries and raw validation logs remain under ignored `build/`.
 
+For NVVM development, read `issue-nvvm-backend/WORKFLOW.md` and
+`issue-nvvm-backend/STATUS.md` before selecting or resuming a slice. They define the agreed loop,
+current acceptance evidence, and next action. A request to prepare the loop does not start it;
+an explicit start/resume request authorizes continuing through accepted local commits until a
+recorded stopping condition requires human input.
+
 ## WSL and Windows Tooling
 
 When working in this repository from WSL on Windows, use Windows-native developer tools by

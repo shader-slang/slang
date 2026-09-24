@@ -1,5 +1,9 @@
 # Direct NVVM Backend
 
+For ongoing development, start with the [slice workflow](../../issue-nvvm-backend/WORKFLOW.md)
+and [current handoff](../../issue-nvvm-backend/STATUS.md). They identify the latest accepted
+evidence and next action; the sections below retain architecture and historical slice results.
+
 ## Purpose
 
 Slang currently produces PTX by emitting CUDA C++ and compiling that source with NVRTC. This
