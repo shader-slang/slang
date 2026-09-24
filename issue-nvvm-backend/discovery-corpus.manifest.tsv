@@ -95,3 +95,4 @@ cuda/nvvm-fp64-wave-aggregate.slang	0	wave,aggregate,float64	FP64 matrix reducti
 cuda/nvvm-fp64-wave-edges.slang	0	wave,float64,edge-cases	Signed-zero sum seeds, product signs, infinity/NaN classification, and bit-exact scalar/vector/matrix singleton payload preservation.
 cuda/nvvm-hardware-active-mask.slang	0	wave,active-mask,divergence	Hardware scalar and multi mask self/subset/singleton invariants under converged and divergent execution.
 cuda/nvvm-implicit-aggregate-mask.slang	0	wave,active-mask,aggregate-pointer	Existing integer matrix implicit shuffle with scheduling-independent own-lane oracle and divergent callers.
+cuda/nvvm-double-literal-roundtrip.slang	0	float64,literal,roundtrip	Runtime-loaded IEEE binary64 words independently validate source literals across formatting boundaries and tiny normal/subnormal magnitudes.

@@ -7953,3 +7953,18 @@ The distinct logical `WaveGetActiveMask` IR still uses the existing active-mask 
 The prelude's TODO about logical participation tracking remains: a hardware snapshot may contain
 only a subset of lanes taking the same source branch. Runtime tests therefore use caller membership,
 excluded-lane invariants and own-lane aggregate transport rather than assuming source reconvergence.
+
+### Exact double literals in differential source references (slice 210)
+
+Direct NVVM consumes binary64 IR constants directly; CUDA source references first serialize them
+through `SourceWriter::emit(double)`. That shared boundary also serves HLSL, GLSL and C++.
+Finite values must survive decimal serialization bit-for-bit before downstream compilation, or a
+CUDA/NVVM differential comparison can mistake a corrupted reference for a backend defect.
+
+Fixed stream precision counts fractional digits, so leading fractional zeros can consume the
+roundtrip precision budget. The writer keeps fixed format for zero and moderate magnitudes at
+least 0.5, where `max_digits10` fractional digits suffice, and scientific format below that binary
+boundary and above the existing large-value threshold. Classic locale, signed-zero spelling and
+decimal mantissa trimming remain unchanged. This is source serialization, not an IR legalization
+rule. Tests use hexadecimal input patterns and runtime integer-word oracles independent of emitted
+decimal values; comparing two source constants could fold away the defect.

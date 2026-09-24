@@ -253,9 +253,13 @@ void SourceWriter::emit(double value)
 
     int expBase2;
     std::frexp(value, &expBase2);
-    // 2^17 = 131072 which is close to 10^5, so in that case we will
-    // change to use scientific representation.
-    std::ios::fmtflags flags = (std::abs(expBase2) >= 17) ? std::ios::scientific : std::ios::fixed;
+    // Fixed precision counts fractional digits. For magnitudes at least 0.5
+    // (expBase2 >= 0), max_digits10 fractional digits guarantee enough significant digits.
+    // Consider (1 + 2^-30) / 65536: fixed precision would discard low significand
+    // bits after its leading fractional zeros. Scientific notation preserves those bits.
+    // Keep zero in fixed format and the existing large-value scientific threshold.
+    std::ios::fmtflags flags =
+        (expBase2 < 0 || expBase2 >= 17) ? std::ios::scientific : std::ios::fixed;
 
     stream.setf(flags, std::ios::floatfield);
     stream.precision(std::numeric_limits<double>::max_digits10);
