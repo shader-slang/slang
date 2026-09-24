@@ -18,9 +18,8 @@
 
 // For all the below functions, verify that the body (adding to j and
 // incrementing i) comes before any break. This verifies that the `break` has
-// been moved to the end of the loop. The CHECKG (`-g`) patterns are intentionally
-// looser than CHECK (they omit the `int {{.*}} =` prefix and trailing `;`) because
-// `-g` interleaves debug attribution that changes the exact declaration form.
+// been moved to the end of the loop. The CHECKG (`-g`) checks mirror the CHECK
+// checks to confirm that enabling debug info does not change the inverted form.
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -36,8 +35,8 @@ RWStructuredBuffer<int> outputBuffer;
 //
 // CHECKG-LABEL: int a_{{.*}}()
 // CHECKG-NOT: break;
-// CHECKG: = j_{{.*}} + [[ga:i_[0-9]+]]
-// CHECKG: [[ga]] + int(1)
+// CHECKG: int {{.*}} = j_{{.*}} + [[ga:i_[0-9]+]]
+// CHECKG: [[ga]] + int(1);
 // CHECKG: if(
 // CHECKG: break;
 // CHECKG: return
@@ -60,8 +59,8 @@ int a()
 //
 // CHECKG-LABEL: int b_{{.*}}()
 // CHECKG-NOT: break;
-// CHECKG: = j_{{.*}} + [[gb:i_[0-9]+]]
-// CHECKG: [[gb]] + int(1)
+// CHECKG: int {{.*}} = j_{{.*}} + [[gb:i_[0-9]+]]
+// CHECKG: [[gb]] + int(1);
 // CHECKG: if(
 // CHECKG: break;
 // CHECKG: return
@@ -88,8 +87,8 @@ int b()
 //
 // CHECKG-LABEL: int c_{{.*}}()
 // CHECKG-NOT: break;
-// CHECKG: = j_{{.*}} + [[gc:i_[0-9]+]]
-// CHECKG: [[gc]] + int(1)
+// CHECKG: int {{.*}} = j_{{.*}} + [[gc:i_[0-9]+]]
+// CHECKG: [[gc]] + int(1);
 // CHECKG: if(
 // CHECKG: break;
 // CHECKG: return
@@ -120,8 +119,8 @@ int c()
 //
 // CHECKG-LABEL: int d_{{.*}}()
 // CHECKG-NOT: break;
-// CHECKG: = j_{{.*}} + [[gd:i_[0-9]+]]
-// CHECKG: [[gd]] + int(1)
+// CHECKG: int {{.*}} = j_{{.*}} + [[gd:i_[0-9]+]]
+// CHECKG: [[gd]] + int(1);
 // CHECKG: if(
 // CHECKG: break;
 // CHECKG: return
