@@ -9,6 +9,7 @@ Exit 0 requires every compile and assembly to pass; 1 preserves shader/compiler 
 """
 
 import argparse
+import copy
 from datetime import datetime, timezone
 import importlib.util
 import json
@@ -18,6 +19,7 @@ import platform
 import re
 import statistics
 import subprocess
+import time
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -67,17 +69,22 @@ def read_workloads(path, toolkit):
     return manifest
 
 
-def assess_cell(cell, workload, args, toolkit, environment):
-    """Record every attempt and require fresh PTX plus assembly for a passing cell."""
-    directory = args.output / cell["id"]
-    directory.mkdir(parents=True, exist_ok=True)
-    command = [
+def compile_command(cell, workload, args):
+    """Keep identical compiler options in the fresh and shared request paths."""
+    return [
         str(args.slangc), str(REPO / workload["source"]),
         "-entry", cell["entry"], "-stage", workload["stage"], "-target", "ptx",
         "-capability", f"cuda_sm_{cell['architecture'] // 10}_{cell['architecture'] % 10}",
         f"-O{cell['optimization']}", f"-emit-cuda-via-{cell['backend']}",
         "-report-perf-benchmark",
     ]
+
+
+def assess_cell(cell, workload, args, toolkit, environment):
+    """Record every attempt and require fresh PTX plus assembly for a passing cell."""
+    directory = args.output / cell["id"]
+    directory.mkdir(parents=True, exist_ok=True)
+    command = compile_command(cell, workload, args)
     cell["attempts"] = []
     cell["successful_compile_median_seconds"] = None
     cell["phase_median_ms"] = None
@@ -132,9 +139,150 @@ def assess_cell(cell, workload, args, toolkit, environment):
                 cubin_sha256=toolkit.sha256(cubin))
 
 
+def load_batch_helpers():
+    path = Path(__file__).with_name("complex-test-server.py")
+    spec = importlib.util.spec_from_file_location("complex_test_server", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def validate_shared_artifact(cell, attempt, ptx, reference, toolkit):
+    """Validate the actual output and require exact agreement with its fresh reference."""
+    toolkit.require_file(ptx)
+    data = ptx.read_bytes()
+    text = data.decode("utf-8")
+    if not re.search(r"^\s*\.target\s+sm_" + str(cell["architecture"]) + r"\b", text, re.M):
+        raise ValueError("PTX target mismatch: " + str(ptx))
+    if not re.search(r"\.entry\s+" + re.escape(cell["entry"]) + r"\s*\(", text):
+        raise ValueError("PTX entry point missing: " + str(ptx))
+    attempt.update(ptx=str(ptx), ptx_sha256=toolkit.sha256(ptx), ptx_bytes=len(data),
+                   reference_ptx=reference["ptx"], matches_fresh_reference=False)
+    if data != Path(reference["ptx"]).read_bytes():
+        raise ValueError("PTX differs from fresh-process reference")
+    attempt["matches_fresh_reference"] = True
+
+
+def assess_shared(report, workloads, args, toolkit, environment, save):
+    """Retain fresh-process coverage and supervise finite batches without retries."""
+    batch_tool = load_batch_helpers()
+    report.update(schema=2, execution_policy="bounded-shared-test-server",
+                  test_server=str(args.test_server), batches=[], fresh_references=[])
+    report["artifact_sha256"][str(args.test_server)] = toolkit.sha256(args.test_server)
+    reference_args = copy.copy(args)
+    reference_args.output = args.output / "fresh-reference"
+    reference_args.warmup, reference_args.samples = 0, 1
+    reference_start = time.perf_counter()
+    for cell in report["cells"]:
+        reference = {key: value for key, value in cell.items()}
+        try:
+            assess_cell(reference, workloads[cell["workload"]], reference_args, toolkit, environment)
+        except (OSError, ValueError) as error:
+            reference.update(status="infrastructure-failed", error=str(error))
+        report["fresh_references"].append(reference)
+        save()
+    report["fresh_reference_seconds"] = time.perf_counter() - reference_start
+    report["fresh_reference_counts"] = {
+        "requested": len(report["cells"]),
+        "passed": sum(row["status"] == "passed" for row in report["fresh_references"]),
+        "attempted": sum(len(row["attempts"]) for row in report["fresh_references"]),
+    }
+    references = {row["id"]: row for row in report["fresh_references"]}
+    for cell in report["cells"]:
+        cell.update(attempts=[], successful_compile_median_seconds=None, phase_median_ms=None,
+                    successful_service_median_seconds=None, status="incomplete")
+    if report["fresh_reference_counts"]["passed"] != len(report["cells"]):
+        for cell in report["cells"]:
+            cell["error"] = "fresh reference pass failed; shared work not dispatched"
+        report["batch_validation_status"] = "reference-failed"
+        return
+    report["batch_validation_status"] = "passed"
+    stop = False
+    for index in range(args.warmup + args.samples):
+        for offset in range(0, len(report["cells"]), batch_tool.MAX_CELLS):
+            group = report["cells"][offset:offset + batch_tool.MAX_CELLS]
+            commands, outputs = [], []
+            for cell in group:
+                directory = args.output / cell["id"]
+                directory.mkdir(parents=True, exist_ok=True)
+                ptx = directory / f"attempt-{index}.ptx"
+                ptx.unlink(missing_ok=True)
+                outputs.append(ptx)
+                commands.append(compile_command(cell, workloads[cell["workload"]], args)[1:]
+                                + ["-o", str(ptx)])
+            batch = batch_tool.run_batch(
+                [str(args.test_server)], commands, args.output / f"batch-{index}-{offset}",
+                environment, args.timeout,
+            )
+            batch.update(sample_index=index, warmup=index < args.warmup, cell_ids=[cell["id"] for cell in group])
+            report["batches"].append(batch)
+            for cell, attempt, ptx in zip(group, batch["cells"], outputs):
+                attempt["warmup"] = index < args.warmup
+                cell["attempts"].append(attempt)
+                if attempt["status"] != "completed":
+                    cell["status"] = ("incomplete" if attempt["status"] == "incomplete"
+                                      else "infrastructure-failed")
+                    continue
+                response = attempt["response"]
+                log = ptx.with_suffix(".log")
+                log.write_text(response["stdOut"] + response["stdError"] + response["debugLayer"],
+                               encoding="utf-8")
+                attempt["log"] = str(log)
+                if attempt["return_code"] != 0:
+                    text = log.read_text(encoding="utf-8")
+                    cell["status"] = ("preflight-rejected" if "error[E52017]" in text else "compile-failed")
+                    cell["diagnostics"] = [line for line in text.splitlines()
+                                           if "error[" in line or "error :" in line or "error:" in line]
+                    stop = True
+                    continue
+                try:
+                    validate_shared_artifact(cell, attempt, ptx, references[cell["id"]], toolkit)
+                except (OSError, ValueError) as error:
+                    cell.update(status="artifact-failed", error=str(error))
+                    stop = True
+            if batch["status"] != "completed" or stop:
+                report["batch_validation_status"] = "failed"
+                stop = True
+            save()
+            if stop:
+                break
+        if stop:
+            break
+    for cell in report["cells"]:
+        attempts = cell["attempts"]
+        if (len(attempts) != args.warmup + args.samples or
+                not all(row.get("matches_fresh_reference") for row in attempts)):
+            continue
+        ptx = Path(attempts[-1]["ptx"])
+        cubin = ptx.parent / "out.cubin"
+        cubin.unlink(missing_ok=True)
+        assembly = toolkit.run(
+            [str(args.ptxas), "-v", f"-arch=sm_{cell['architecture']}", str(ptx), "-o", str(cubin)],
+            ptx.parent / "ptxas.log", environment, args.timeout,
+        )
+        cell["assembly"] = assembly
+        if assembly["return_code"] != 0 or not cubin.is_file():
+            cell["status"] = "assembly-failed"
+            continue
+        cell.update(status="passed", ptx=str(ptx), ptx_bytes=ptx.stat().st_size,
+                    cubin=str(cubin), cubin_bytes=cubin.stat().st_size,
+                    cubin_sha256=toolkit.sha256(cubin))
+        if report["batch_validation_status"] == "passed":
+            cell["successful_service_median_seconds"] = statistics.median(
+                row["elapsed_seconds"] for row in attempts if not row["warmup"])
+    report["sample_compile_lifecycle_median_seconds"] = (
+        statistics.median(
+            sum(batch["elapsed_seconds"] for batch in report["batches"]
+                if batch["sample_index"] == index)
+            for index in range(args.warmup, args.warmup + args.samples))
+        if report["batch_validation_status"] == "passed" else None)
+
+
 def main():
+    command_start = time.perf_counter()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--slangc", type=Path, required=True)
+    parser.add_argument("--test-server", type=Path, help="opt in to batches of at most six cells; requires fresh CLI references")
     parser.add_argument("--build-label", required=True, help="e.g. Debug; required timing provenance")
     parser.add_argument("--provider", type=Path, required=True)
     parser.add_argument("--cuda-root", type=Path, required=True)
@@ -148,6 +296,8 @@ def main():
         parser.error("samples and timeout must be positive; warmup must be nonnegative")
     for name in ("slangc", "provider", "cuda_root", "manifest", "output"):
         setattr(args, name, getattr(args, name).resolve())
+    if args.test_server is not None:
+        args.test_server = args.test_server.resolve()
     args.output.mkdir(parents=True, exist_ok=True)
     results = args.output / "results.json"
     report = {"schema": 1, "status": "infrastructure-failed", "gpu_execution": False,
@@ -160,6 +310,8 @@ def main():
     save()
     try:
         toolkit = load_toolkit_helpers()
+        if args.test_server is not None:
+            toolkit.require_file(args.test_server)
         manifest = read_workloads(args.manifest, toolkit)
         args.ptxas = args.cuda_root / "bin" / ("ptxas.exe" if os.name == "nt" else "ptxas")
         nvcc = args.cuda_root / "bin" / ("nvcc.exe" if os.name == "nt" else "nvcc")
@@ -200,14 +352,21 @@ def main():
         report["status"] = "running"
         save()
         workloads = {workload["name"]: workload for workload in manifest["workloads"]}
-        for cell in report["cells"]:
-            try:
-                assess_cell(cell, workloads[cell["workload"]], args, toolkit, environment)
-            except (OSError, ValueError) as error:
-                cell.update(status="infrastructure-failed", error=str(error))
-            print(f"{cell['id']}: {cell['status']}", flush=True)
-            save()
-        report["status"] = "passed" if all(cell["status"] == "passed" for cell in report["cells"]) else "incomplete"
+        if args.test_server is not None:
+            assess_shared(report, workloads, args, toolkit, environment, save)
+            report["runner_work_seconds"] = time.perf_counter() - command_start
+            report["runner_work_timing_scope"] = "main entry through validation; excludes Python startup and final report serialization"
+        else:
+            for cell in report["cells"]:
+                try:
+                    assess_cell(cell, workloads[cell["workload"]], args, toolkit, environment)
+                except (OSError, ValueError) as error:
+                    cell.update(status="infrastructure-failed", error=str(error))
+                print(f"{cell['id']}: {cell['status']}", flush=True)
+                save()
+        report["status"] = "passed" if (
+            all(cell["status"] == "passed" for cell in report["cells"])
+            and report.get("batch_validation_status", "passed") == "passed") else "incomplete"
         save()
         return 0 if report["status"] == "passed" else 1
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:

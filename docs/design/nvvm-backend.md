@@ -7980,3 +7980,37 @@ sparse and singleton branches. The latter remains defined even when hardware coh
 than source branches; it does not establish arbitrary sparse cross-lane convergence. This admission
 does not alter the CUDA prelude's logical-mask-tracking limitation or the separate vector-by-value
 compound resolver.
+
+### Slice 214: bounded complex compilation sessions
+
+The complex runner has an explicit `--test-server` option for the existing JSON-RPC test server.
+The default continues to launch a fresh `slangc` process per attempt. The optional path first runs
+one fresh compile and assembly per identity, then sends the same compiler arguments to at most
+six serial requests in one server process. `TestServer::_executeTool` owns the global session;
+`SlangCTool::innerMain` creates a fresh command-line compile request for each cell. The session
+cannot cross a batch boundary because the supervisor sends `quit` and waits for process exit.
+No compiler, provider, ABI or material-source change is involved.
+
+The primary report still has one cell per workload/entry/backend/optimization identity. Schema 2
+adds auxiliary fresh references and batch records. Each shared output must have the expected PTX
+entry and target, equal its successful fresh reference byte-for-byte, and assemble. Reference work
+and costs stay separate from primary coverage. Missing material bindings, inputs and output oracle
+still prevent kernel runtime claims.
+
+`complex-test-server.py` implements the existing Content-Length JSON-RPC framing with capped
+headers/bodies, exact response IDs and typed ExecutionResult fields. A first-request deadline starts
+before launching the process. Independent stdout reading and file-backed stderr capture avoid pipe
+deadlock; shutdown and cleanup are bounded. A fault preserves the completed prefix, active failure,
+unexecuted suffix and raw logs, without fallback or automatic retry. Even six completed replies do
+not establish a successful batch if quit/exit fails. POSIX cleanup owns a process group, including
+children retaining pipes after their leader exits; Windows supervision targets the server process.
+
+Per-request service latency and complete process lifecycle are different measurements. The first
+shared response includes process/global startup; final teardown belongs to the batch total.
+`phase_median_ms` remains null because global profiler totals can accumulate across requests.
+`sample_compile_lifecycle_median_seconds` sums all bounded batches in each complete sample before
+taking a median, preserving meaning for corpora with an unequal final batch. `runner_work_seconds`
+measures main-entry through validation and excludes Python startup/final report serialization.
+The [slice report](../../issue-nvvm-backend/report.slice-214-complex-batching.md) records external
+whole-command costs separately from paired compilation lifecycle measurements and fresh-reference
+costs. A measured batch improvement is not an overall runner speedup.
