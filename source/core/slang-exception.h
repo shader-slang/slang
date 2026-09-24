@@ -5,8 +5,11 @@
 #include "slang-string.h"
 
 // Macroizes the opening `try` of an exception-guarded block. The matching `catch` clauses must
-// still be wrapped in `#if SLANG_HAS_EXCEPTIONS` directly: they name exception types, bind the
-// caught object, and rethrow, none of which is valid syntax under -fno-exceptions.
+// still be wrapped in `#if SLANG_HAS_EXCEPTIONS` directly: once the `try` is elided under
+// -fno-exceptions a `catch` is ill-formed, so the whole clause has to be removed by the
+// preprocessor (this applies even to an empty `catch (...) {}`). Dropping the handlers loses
+// nothing: with exceptions disabled an internal abort routes through handleSignal → exit(-1), so no
+// guarded catch body would have run anyway.
 #if SLANG_HAS_EXCEPTIONS
 #define SLANG_EXCEPTION_TRY try
 #else
