@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "scope": "compile-and-assemble-only",
+  "architecture": 80,
+  "workloads": [
+    {
+      "name": "tiled-brass-material",
+      "source": "tests/cuda/complex/tiled_brass_material.slang",
+      "source_sha256": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92",
+      "entry_points": ["eval_buffer", "sample_buffer"],
+      "stage": "compute",
+      "provenance": {
+        "original_filename": "tiled_brass_material.slang",
+        "original_sha256": "924b39e55a521540518d99e6465c7d765600fd6bee752c1326c20231550eb73c",
+        "license": "Apache-2.0",
+        "adaptations": [
+          "Normalize CRLF to LF.",
+          "Add user-approved __TARGET_CUDA__=1 definition and explanatory comment."
+        ]
+      },
+      "features": [
+        "layered-material",
+        "generic-interfaces",
+        "aggregate-arrays",
+        "bindless-textures",
+        "lookup-buffers",
+        "floating-point-math"
+      ],
+      "runtime_status": "not-assessed: material/texture/LUT inputs and expected outputs are not supplied"
+    }
+  ]
+}

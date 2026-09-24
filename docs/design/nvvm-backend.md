@@ -7774,6 +7774,20 @@ snapshots. See the [slice 200 report](../../issue-nvvm-backend/report.slice-200-
 for the memory-space audit, recovery history, and exact validation commands. The GPU fault's cause
 is not established; physical SM70/SM90 validation remains separate.
 
+## Complex material compile corpus
+
+The [complex compile corpus](../../tests/cuda/complex/README.md) preserves application-sized inputs
+separately from the frozen and discovery runtime corpora. Its initial tiled-brass material has two
+entry points, `eval_buffer` and `sample_buffer`, with the confirmed `__TARGET_CUDA__=1` source branch.
+Both compile and assemble through NVRTC O3 at SM80; NVVM O0/O3 currently reject the canonical
+`CastUInt64ToDescriptorHandle` operation. This is the first observed blocker, not a complete gap list.
+
+The [assessment report](../../issue-nvvm-backend/report.tiled-brass-assessment.md) and
+[measurement summary](../../issue-nvvm-backend/assessment.tiled-brass.json) record reproducible
+commands, Debug-only exploratory timing, and assembly resources. Runtime correctness, optimized
+compile-speed comparison, and kernel code-quality assessment remain separate future gates.
+Historical corpus denominators and slice-201 acceptance are unchanged.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)
