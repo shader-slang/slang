@@ -11215,6 +11215,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         auto subBuilder = subContext->irBuilder;
 
+        // Front-end conformance checking must have filled the witness table before
+        // lowering reaches it, the loop below dereferences it. Assert that invariant.
+        SLANG_RELEASE_ASSERT(astWitnessTable);
+
         SubstitutionSet witnessTableSubstitution(witnessTableBaseDeclRef);
 
         for (auto entry : astWitnessTable->getRequirementDictionary())
