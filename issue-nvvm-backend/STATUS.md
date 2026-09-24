@@ -4,7 +4,15 @@ Updated 2026-09-24. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
-**Slice 210 is accepted as the latest full checkpoint.** Read the
+**Slice 211 research is accepted.** Read its
+[plan](plan.slice-211-material-compile-profile.md),
+[five-part report](report.slice-211-material-compile-profile.md), and
+[compile-time measurements](compile-time.slice-211.json). All six unchanged material cells compile
+and assemble; repeated profiling identifies session-lifetime amortization as one harness-level
+candidate, with no backend-local optimization justified yet. No compiler/provider/runner/shader
+changes or material runtime claims.
+
+**Slice 210 remains accepted as the latest full checkpoint.** Read the
 [completed worker plan](plan.slice-210-double-roundtrip.md),
 [five-part report](report.slice-210-double-roundtrip.md), and
 [result manifest](runtime-validation.slice-210.json). Parent completed independent acceptance
@@ -16,9 +24,18 @@ motivating `(1 + 2^-30) / 65536` roundtrips in CUDA, HLSL, GLSL and C++. Classic
 and existing trimming remain. No NVVM semantic, provider or ABI change occurred.
 
 Latest accepted implementation and full checkpoint: 210. Implementation slices since it: 0.
-Next: establish repeated compile-time measurements for the two unchanged material entries and
-identify a measured optimization opportunity before implementation. Six material cells compile,
-but application runtime contracts remain absent; do not infer runtime semantics.
+Next: run the bounded six-cell API lifetime experiment before any session-amortization
+implementation. One eval/NVVM O3 probe shows 11.90% lower steady-state
+request lifecycle median with identical PTX; it excludes shared startup/teardown and is not a
+corpus-runner speedup. Require finite-batch startup/teardown, order/lifetime evidence and >=10%
+median batch improvement without >5% per-cell compile-call regression. Any production runner
+change must preserve fresh-session coverage and requires a full checkpoint. Application runtime
+contracts remain absent; do not infer runtime semantics.
+
+Research 211 does not advance implementation cadence or reset checkpoint obligations. Primary
+2-warmup/7-sample process medians span 1.617–1.817 s with approximately 50 ms timeout-wait
+quantization. Separate precise attribution samples, assembly timings and API lifecycle evidence
+are distinguished in the report. All accepted 210 recorded source/artifact hashes still match.
 
 ## Checkpoints and evidence
 

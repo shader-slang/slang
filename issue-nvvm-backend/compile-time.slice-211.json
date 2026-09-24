@@ -1,0 +1,1926 @@
+{
+  "schema": 1,
+  "slice": 211,
+  "status": "accepted-research",
+  "kind": "research-only-successful-compilation-baseline",
+  "date_utc": "2026-09-24",
+  "source_revision": "0270fd7b555feb0447da1fb3b2df0bca4a92b604",
+  "branch": "nvvm-backend",
+  "compiler_changes": false,
+  "gpu_execution": false,
+  "latest_implementation_slice": 210,
+  "last_full_checkpoint": 210,
+  "implementation_slices_since_full": 0,
+  "provenance": {
+    "configuration": "RelWithDebInfo",
+    "compiler_library": {
+      "path": "build/RelWithDebInfo/lib/libslang.so",
+      "sha256": "f8dc709857e70fbf7e4c0bbe2d94f9c1528f789ddf609a4c0db6f5bb90b776c7"
+    },
+    "runner": {
+      "path": "issue-nvvm-backend/run-complex-corpus.py",
+      "sha256": "17b776ae5d734393c84466d78b8bfb68d3021d709e03d2cb1884db294edbe876"
+    },
+    "runner_helpers": {
+      "path": "extras/validate-nvvm-toolkit.py",
+      "sha256": "308db6031660aeda9af5e57237cc932ba7739e6707b9ed98457340f9e33b535e"
+    },
+    "material_manifest": {
+      "path": "issue-nvvm-backend/complex-corpus.manifest.json",
+      "sha256": "7a6d151ed8e23066ec3b81e35b3f3bd606b3c37a0aea82da6953d47d2ebf4173"
+    },
+    "material_source": {
+      "path": "tests/cuda/complex/tiled_brass_material.slang",
+      "sha256": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92"
+    },
+    "environment_helper": {
+      "path": "build/nvvm-loop/slice-203-env.sh",
+      "sha256": "66a522690924ad14057c923e515ad1fbaf81d626fa75c299ebb2fe3f3d03e9a5"
+    },
+    "provider_abi": 36,
+    "artifact_sha256": {
+      "build/RelWithDebInfo/bin/slangc": "79f46ef0dba116bdfdce8a03b40f7d3bb2c7b481529b452b483d650cf0958e43",
+      "build/RelWithDebInfo/bin/slang-test": "9c83731b05689bbdbd15956198ad10759e4e9142bd663fe2452fda4954d96a69",
+      "build/RelWithDebInfo/bin/test-server": "fd964f03c3c57b4352ce75f720706fdc852e3a0cd231b90cb0c89068190b827e",
+      "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372",
+      "build/RelWithDebInfo/lib/libslang-compiler.so": "f8dc709857e70fbf7e4c0bbe2d94f9c1528f789ddf609a4c0db6f5bb90b776c7",
+      "build/RelWithDebInfo/lib/slang-core-module.bin": "d865fe73df7dde762c180cc3030afd1762768ffec33cafd0226403d5d9424fde",
+      "build/RelWithDebInfo/lib/librender-test-tool.so": "96baec31673b6f33a619eb7cc8fd7a518942da12d9374718f475b84cc94ccbc4",
+      "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "7963ad56c7c02deac8173d8d9d62e95e1d80a965d2be55d955118fb7440a29e7",
+      "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "/usr/local/cuda-12.9/lib64/libnvrtc.so": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a",
+      "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+      "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461"
+    },
+    "all_210_recorded_artifact_hashes_match": {
+      "build/RelWithDebInfo/bin/slangc": true,
+      "build/RelWithDebInfo/bin/slang-test": true,
+      "build/RelWithDebInfo/bin/test-server": true,
+      "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": true,
+      "build/RelWithDebInfo/lib/libslang-compiler.so": true,
+      "build/RelWithDebInfo/lib/slang-core-module.bin": true,
+      "build/RelWithDebInfo/lib/librender-test-tool.so": true,
+      "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": true,
+      "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so": true,
+      "/usr/local/cuda-12.9/lib64/libnvrtc.so": true,
+      "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": true,
+      "/usr/local/cuda-12.9/bin/ptxas": true
+    },
+    "all_210_recorded_source_hashes_match": {
+      "source/compiler-core/slang-nvvm-ir-builder-api.h": true,
+      "source/compiler-core/slang-nvvm-semantic-catalog.h": true,
+      "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": true,
+      "source/slang/slang-emit-nvvm.cpp": true,
+      "tools/slang-unit-test/unit-test-nvvm-builder.cpp": true,
+      "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": true,
+      "tools/slang-unit-test/unit-test-nvvm-support.h": true,
+      "tests/cuda/nvvm-hardware-active-mask.slang": true,
+      "tests/cuda/nvvm-implicit-aggregate-mask.slang": true,
+      "source/slang/hlsl.meta.slang": true,
+      "prelude/slang-cuda-prelude.h": true,
+      "issue-nvvm-backend/run-compute-census.py": true,
+      "issue-nvvm-backend/run-compute-discovery.py": true,
+      "issue-nvvm-backend/run-complex-corpus.py": true,
+      "issue-nvvm-backend/discovery-corpus.manifest.tsv": true,
+      "source/slang/slang-emit-source-writer.cpp": true,
+      "tools/slang-unit-test/unit-test-double-source-literals.cpp": true,
+      "tests/cuda/nvvm-double-literal-roundtrip.slang": true
+    },
+    "toolkit": {
+      "path": "/usr/local/cuda-12.9",
+      "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_May_27_02:21:03_PDT_2025\nCuda compilation tools, release 12.9, V12.9.86\nBuild cuda_12.9.r12.9/compiler.36037853_0"
+    },
+    "device": {
+      "name": "NVIDIA L4",
+      "compute_capability": 89,
+      "driver": "580.126.09",
+      "target": 80
+    },
+    "submodule_pins": [
+      " 9dc178a86fcbbf13c94b4cd4cb046f238d26c8da external/WindowsToolchain (v0.12.0-9-g9dc178a)",
+      " 924936d0427cb25a61169739a7660230bffa6ea6 external/cmark (swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-09-15-a)",
+      " e0b53eaf63c6d00e0725788ef1dbb759aa321d79 external/fast_float (v6.1.0-352-ge0b53ea)",
+      " efec5db081e3aad807d0731e172ac597f6a39447 external/glm (0.9.5.3-2723-gefec5db0)",
+      " d1f52c8993a501bd52d4fbd044bfeb9ecdceb9f4 external/glslang (11.1.0-1385-gd1f52c89)",
+      " 8936b58fe26e8c3da834b8f60b06511d537b4c63 external/imgui (v1.62-5420-g8936b58fe)",
+      " 3fe7be956f23385aa1950dc31e2f25127ccfc0ea external/lua (v5.4-beta-333-g3fe7be95)",
+      " 7f71be01f2c6f6b2c3cddb67eef8c38eab12ffd4 external/lz4 (v1.9.2-1351-g7f71be01)",
+      " a63bd172ddcba73a3d87ca32032b66ad41ddb9a6 external/metal-cpp (remotes/origin/metal-cpp_macOS14.2_iOS17.2)",
+      " 8c532c32c3c96e5ba1f2283e032f69ead8add00f external/mimalloc (v2.1.7)",
+      " 6ef6c68f4fcbb8287aa8edf9c6670804932f41c6 external/miniz (3.0.2-68-g6ef6c68)",
+      " a1280c1863ff19d87f8e827468a4cc906ba9032a external/optix-dev (v9.0.0-1-ga1280c1)",
+      " d6d31411a3ab5417945daa6b1d8811cfc340cb66 external/slang-rhi (d6d31411)",
+      " 29981f65241605e08b0ede4cfeb999fe3b723c6a external/spirv-headers (1.5.4.raytracing.fixed-498-g29981f6)",
+      " 0d6fd73ca73830ccab5fa1f00ed5ed40124e2c55 external/spirv-tools (v2022.4-1300-g0d6fd73c)",
+      " d541711a794343de4ef5ea76f037c9fb9c127a55 external/tinyobjloader (v1.0.6-85-gd541711)",
+      " 73f3cbb237e84d483afafc743f1f14ec53e12314 external/unordered_dense (v4.5.0)",
+      " 387259ecf4b0fe0cfac161b1d0b0a74e42796710 external/vulkan (v1.4.347)"
+    ],
+    "identity_capture": {
+      "path": "build/nvvm-loop/slice-211-profile/identity.json",
+      "sha256": "e628b384010aafc87a96514d39d08fc1ef66d9f14a74a0d807a921bd7baba186"
+    },
+    "execution_policy": "Sequential benchmarks, no competing builds/benchmarks; no GPU kernels dispatched; only ignored API probe built between timing suites."
+  },
+  "sampling": {
+    "baseline": {
+      "warmups_per_cell": 2,
+      "measured_per_cell": 7,
+      "fresh_process_per_attempt": true,
+      "flags": ["-report-perf-benchmark"],
+      "wall_time_limit": "Python subprocess timeout wait polls up to 50ms on Linux; stored at 1ms resolution. Primary times are successful process elapsed observations, unsuitable for small mode differences. Warmup warms OS caches, not session state."
+    },
+    "supplement": {
+      "warmups_per_cell": 1,
+      "measured_per_cell": 3,
+      "flags_added": [
+        "-report-detailed-perf-benchmark",
+        "-report-downstream-time"
+      ],
+      "wall_time": "perf_counter around subprocess.run with PIPE/communicate timeout; separate dataset because flags/output capture differ; prefer for small timing comparisons but only three samples",
+      "downstream_resolution_seconds": 0.01,
+      "assembly_warmups_per_cell": 2,
+      "assembly_measured_per_cell": 7,
+      "assembly_scope": "Separate ptxas process elapsed; fixed final supplemental PTX, no Slang compile included."
+    },
+    "api_session": {
+      "entry": "eval_buffer",
+      "mode": "nvvm-o3",
+      "warmups_per_policy": 2,
+      "measured_per_policy": 7,
+      "scope": "Two persistent processes, one per fresh/shared global-session policy. Fresh compile request each iteration, CLI mode and enableGLSL=true. No material-module cache introduced. Same PTX bytes as baseline. Destructor and lifecycle times use steady_clock; API phase counters truncate to whole ms. Global creation within a warmed process differs from fresh-process startup.",
+      "discarded_probe": "Initial default-GLSL API runs retained locally as initial-default-glsl-session-*; excluded because setup differed from CLI."
+    }
+  },
+  "inventory": {
+    "expected_cells": 6,
+    "observed_cells": 6,
+    "missing": [],
+    "duplicates": 0,
+    "baseline_compile_attempts": 54,
+    "baseline_measured_compiles": 42,
+    "baseline_assemblies": 6,
+    "supplement_compile_attempts": 24,
+    "supplement_assembly_attempts": 54,
+    "final_api_compile_attempts": 18,
+    "all_successful": true
+  },
+  "cells": [
+    {
+      "id": "tiled-brass-material-eval_buffer-nvrtc-o3",
+      "entry": "eval_buffer",
+      "backend": "nvrtc",
+      "optimization": 3,
+      "architecture": 80,
+      "status": "compile-and-assemble-passed",
+      "baseline_warmup_seconds": [1.617, 1.717],
+      "baseline_measured_seconds": [
+        1.667, 1.667, 1.617, 1.667, 1.667, 1.617, 1.717
+      ],
+      "baseline_process_seconds": {
+        "median": 1.667,
+        "min": 1.617,
+        "q1": 1.642,
+        "q3": 1.667,
+        "max": 1.717
+      },
+      "baseline_phase_ms": {
+        "SemanticChecking": {
+          "median": 650.79,
+          "min": 643.0,
+          "q1": 649.485,
+          "q3": 661.08,
+          "max": 672.19
+        },
+        "checkAllTranslationUnits": {
+          "median": 650.79,
+          "min": 643.0,
+          "q1": 649.485,
+          "q3": 661.08,
+          "max": 672.18
+        },
+        "compileInner": {
+          "median": 1348.17,
+          "min": 1325.01,
+          "q1": 1337.885,
+          "q3": 1356.41,
+          "max": 1368.43
+        },
+        "emitEntryPointsSourceFromIR": {
+          "median": 335.32,
+          "min": 332.35,
+          "q1": 334.32,
+          "q3": 340.255,
+          "max": 355.7
+        },
+        "endToEndActions": {
+          "median": 1348.17,
+          "min": 1325.01,
+          "q1": 1337.885,
+          "q3": 1356.41,
+          "max": 1368.43
+        },
+        "frontEndExecute": {
+          "median": 857.61,
+          "min": 846.48,
+          "q1": 855.84,
+          "q3": 867.51,
+          "max": 888.45
+        },
+        "generateIR": {
+          "median": 186.12,
+          "min": 183.06,
+          "q1": 185.355,
+          "q3": 186.36,
+          "max": 195.64
+        },
+        "generateIRForTranslationUnit": {
+          "median": 186.12,
+          "min": 183.06,
+          "q1": 185.35,
+          "q3": 186.355,
+          "max": 195.64
+        },
+        "generateOutput": {
+          "median": 477.7,
+          "min": 476.09,
+          "q1": 477.19,
+          "q3": 483.52,
+          "max": 498.71
+        },
+        "linkAndOptimizeIR": {
+          "median": 327.57,
+          "min": 324.9,
+          "q1": 326.73,
+          "q3": 332.715,
+          "max": 348.08
+        },
+        "linkIR": {
+          "median": 21.27,
+          "min": 20.56,
+          "q1": 20.985,
+          "q3": 21.87,
+          "max": 22.43
+        },
+        "loadBuiltinModule": {
+          "median": 208.28,
+          "min": 203.52,
+          "q1": 204.565,
+          "q3": 210.255,
+          "max": 238.36
+        },
+        "parseTranslationUnit": {
+          "median": 17.68,
+          "min": 17.48,
+          "q1": 17.605,
+          "q3": 17.69,
+          "max": 17.73
+        },
+        "performForceInlining": {
+          "median": 1.27,
+          "min": 1.26,
+          "q1": 1.265,
+          "q3": 1.29,
+          "max": 1.33
+        },
+        "performMandatoryEarlyInlining": {
+          "median": 6.32,
+          "min": 6.25,
+          "q1": 6.28,
+          "q3": 6.36,
+          "max": 6.58
+        },
+        "readSerializedModuleAST": {
+          "median": 51.78,
+          "min": 51.26,
+          "q1": 51.445,
+          "q3": 52.84,
+          "max": 56.06
+        },
+        "readSerializedModuleIR": {
+          "median": 113.39,
+          "min": 112.5,
+          "q1": 112.99,
+          "q3": 113.865,
+          "max": 141.51
+        },
+        "simplifyIR": {
+          "median": 121.23,
+          "min": 120.67,
+          "q1": 120.975,
+          "q3": 121.615,
+          "max": 132.84
+        },
+        "specializeModule": {
+          "median": 138.89,
+          "min": 137.97,
+          "q1": 138.46,
+          "q3": 141.48,
+          "max": 147.25
+        },
+        "unrollLoopsInModule": {
+          "median": 4.49,
+          "min": 4.4,
+          "q1": 4.465,
+          "q3": 4.515,
+          "max": 5.76
+        }
+      },
+      "ptx_sha256": [
+        "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65"
+      ],
+      "ptx_bytes": 72360,
+      "command": [
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
+        "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+        "-entry",
+        "eval_buffer",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvrtc",
+        "-report-perf-benchmark",
+        "-o",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-211-profile/complex/tiled-brass-material-eval_buffer-nvrtc-o3/attempt-0.ptx"
+      ],
+      "raw_directory": "build/nvvm-loop/slice-211-profile/complex/tiled-brass-material-eval_buffer-nvrtc-o3",
+      "supplement_process_seconds": {
+        "median": 1.620214,
+        "min": 1.612187,
+        "q1": 1.616201,
+        "q3": 1.620602,
+        "max": 1.62099
+      },
+      "supplement_process_samples_seconds": [
+        1.6209904551506042, 1.6202142890542746, 1.6121871620416641
+      ],
+      "supplement_downstream_seconds": {
+        "median": 0.13,
+        "min": 0.13,
+        "q1": 0.13,
+        "q3": 0.13,
+        "max": 0.13
+      },
+      "supplement_downstream_samples_seconds": [0.13, 0.13, 0.13],
+      "assembly_process_seconds": {
+        "median": 0.176472,
+        "min": 0.171154,
+        "q1": 0.174544,
+        "q3": 0.176668,
+        "max": 0.17708
+      },
+      "assembly_measured_seconds": [
+        0.172785434871912, 0.17647232860326767, 0.1763029545545578,
+        0.1770796123892069, 0.17667111195623875, 0.17115388065576553,
+        0.1766640916466713
+      ]
+    },
+    {
+      "id": "tiled-brass-material-eval_buffer-nvvm-o0",
+      "entry": "eval_buffer",
+      "backend": "nvvm",
+      "optimization": 0,
+      "architecture": 80,
+      "status": "compile-and-assemble-passed",
+      "baseline_warmup_seconds": [1.617, 1.617],
+      "baseline_measured_seconds": [
+        1.617, 1.617, 1.617, 1.617, 1.617, 1.668, 1.619
+      ],
+      "baseline_process_seconds": {
+        "median": 1.617,
+        "min": 1.617,
+        "q1": 1.617,
+        "q3": 1.618,
+        "max": 1.668
+      },
+      "baseline_phase_ms": {
+        "SemanticChecking": {
+          "median": 651.93,
+          "min": 648.33,
+          "q1": 651.15,
+          "q3": 662.355,
+          "max": 695.59
+        },
+        "checkAllTranslationUnits": {
+          "median": 651.93,
+          "min": 648.33,
+          "q1": 651.15,
+          "q3": 662.355,
+          "max": 695.59
+        },
+        "compileInner": {
+          "median": 1312.14,
+          "min": 1305.51,
+          "q1": 1309.87,
+          "q3": 1323.895,
+          "max": 1354.93
+        },
+        "endToEndActions": {
+          "median": 1312.14,
+          "min": 1305.51,
+          "q1": 1309.87,
+          "q3": 1323.895,
+          "max": 1354.93
+        },
+        "frontEndExecute": {
+          "median": 858.52,
+          "min": 853.91,
+          "q1": 856.86,
+          "q3": 870.725,
+          "max": 901.95
+        },
+        "generateIR": {
+          "median": 185.6,
+          "min": 184.89,
+          "q1": 185.12,
+          "q3": 186.055,
+          "max": 190.56
+        },
+        "generateIRForTranslationUnit": {
+          "median": 185.6,
+          "min": 184.88,
+          "q1": 185.115,
+          "q3": 186.05,
+          "max": 190.55
+        },
+        "generateOutput": {
+          "median": 450.59,
+          "min": 446.28,
+          "q1": 449.835,
+          "q3": 451.01,
+          "max": 455.28
+        },
+        "linkAndOptimizeIR": {
+          "median": 321.33,
+          "min": 318.95,
+          "q1": 320.62,
+          "q3": 322.565,
+          "max": 324.98
+        },
+        "linkIR": {
+          "median": 20.38,
+          "min": 19.79,
+          "q1": 20.085,
+          "q3": 20.67,
+          "max": 20.76
+        },
+        "loadBuiltinModule": {
+          "median": 208.82,
+          "min": 208.6,
+          "q1": 208.66,
+          "q3": 210.615,
+          "max": 213.21
+        },
+        "parseTranslationUnit": {
+          "median": 17.64,
+          "min": 17.41,
+          "q1": 17.45,
+          "q3": 17.695,
+          "max": 17.82
+        },
+        "performForceInlining": {
+          "median": 1.26,
+          "min": 1.25,
+          "q1": 1.255,
+          "q3": 1.27,
+          "max": 1.38
+        },
+        "performMandatoryEarlyInlining": {
+          "median": 6.28,
+          "min": 6.2,
+          "q1": 6.24,
+          "q3": 6.285,
+          "max": 6.32
+        },
+        "readSerializedModuleAST": {
+          "median": 52.16,
+          "min": 51.59,
+          "q1": 51.885,
+          "q3": 52.22,
+          "max": 52.89
+        },
+        "readSerializedModuleIR": {
+          "median": 115.82,
+          "min": 113.71,
+          "q1": 114.395,
+          "q3": 116.545,
+          "max": 119.12
+        },
+        "simplifyIR": {
+          "median": 120.91,
+          "min": 119.8,
+          "q1": 120.62,
+          "q3": 121.315,
+          "max": 122.83
+        },
+        "specializeModule": {
+          "median": 139.21,
+          "min": 137.66,
+          "q1": 139.04,
+          "q3": 139.505,
+          "max": 140.14
+        },
+        "unrollLoopsInModule": {
+          "median": 4.38,
+          "min": 4.34,
+          "q1": 4.35,
+          "q3": 4.4,
+          "max": 4.54
+        }
+      },
+      "ptx_sha256": [
+        "91a3f87feea0d115f827f4fc7145671a841e9652ecd1c355e80b27c665f2c47a"
+      ],
+      "ptx_bytes": 733879,
+      "command": [
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
+        "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+        "-entry",
+        "eval_buffer",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O0",
+        "-emit-cuda-via-nvvm",
+        "-report-perf-benchmark",
+        "-o",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-211-profile/complex/tiled-brass-material-eval_buffer-nvvm-o0/attempt-0.ptx"
+      ],
+      "raw_directory": "build/nvvm-loop/slice-211-profile/complex/tiled-brass-material-eval_buffer-nvvm-o0",
+      "supplement_process_seconds": {
+        "median": 1.59191,
+        "min": 1.590824,
+        "q1": 1.591367,
+        "q3": 1.593586,
+        "max": 1.595261
+      },
+      "supplement_process_samples_seconds": [
+        1.5952612981200218, 1.590824356302619, 1.591910433024168
+      ],
+      "supplement_downstream_seconds": {
+        "median": 0.09,
+        "min": 0.09,
+        "q1": 0.09,
+        "q3": 0.09,
+        "max": 0.09
+      },
+      "supplement_downstream_samples_seconds": [0.09, 0.09, 0.09],
+      "assembly_process_seconds": {
+        "median": 0.699395,
+        "min": 0.690779,
+        "q1": 0.699079,
+        "q3": 0.702353,
+        "max": 0.704486
+      },
+      "assembly_measured_seconds": [
+        0.6907791495323181, 0.6993948146700859, 0.7044352348893881,
+        0.6991024352610111, 0.699054965749383, 0.7002715524286032,
+        0.7044856064021587
+      ]
+    },
+    {
+      "id": "tiled-brass-material-eval_buffer-nvvm-o3",
+      "entry": "eval_buffer",
+      "backend": "nvvm",
+      "optimization": 3,
+      "architecture": 80,
+      "status": "compile-and-assemble-passed",
+      "baseline_warmup_seconds": [1.718, 1.717],
+      "baseline_measured_seconds": [
+        1.717, 1.717, 1.718, 1.718, 1.717, 1.717, 1.717
+      ],
+      "baseline_process_seconds": {
+        "median": 1.717,
+        "min": 1.717,
+        "q1": 1.717,
+        "q3": 1.7175,
+        "max": 1.718
+      },
+      "baseline_phase_ms": {
+        "SemanticChecking": {
+          "median": 651.35,
+          "min": 647.92,
+          "q1": 649.215,
+          "q3": 651.635,
+          "max": 652.29
+        },
+        "checkAllTranslationUnits": {
+          "median": 651.35,
+          "min": 647.92,
+          "q1": 649.215,
+          "q3": 651.635,
+          "max": 652.28
+        },
+        "compileInner": {
+          "median": 1411.01,
+          "min": 1404.15,
+          "q1": 1410.185,
+          "q3": 1411.805,
+          "max": 1412.72
+        },
+        "endToEndActions": {
+          "median": 1411.01,
+          "min": 1404.15,
+          "q1": 1410.185,
+          "q3": 1411.805,
+          "max": 1412.72
+        },
+        "frontEndExecute": {
+          "median": 856.5,
+          "min": 853.18,
+          "q1": 853.965,
+          "q3": 857.435,
+          "max": 859.19
+        },
+        "generateIR": {
+          "median": 185.0,
+          "min": 183.94,
+          "q1": 184.245,
+          "q3": 185.475,
+          "max": 186.49
+        },
+        "generateIRForTranslationUnit": {
+          "median": 185.0,
+          "min": 183.94,
+          "q1": 184.24,
+          "q3": 185.47,
+          "max": 186.49
+        },
+        "generateOutput": {
+          "median": 552.08,
+          "min": 548.6,
+          "q1": 549.345,
+          "q3": 554.25,
+          "max": 555.47
+        },
+        "linkAndOptimizeIR": {
+          "median": 321.01,
+          "min": 320.12,
+          "q1": 320.225,
+          "q3": 322.02,
+          "max": 323.32
+        },
+        "linkIR": {
+          "median": 20.05,
+          "min": 19.73,
+          "q1": 19.92,
+          "q3": 20.87,
+          "max": 21.13
+        },
+        "loadBuiltinModule": {
+          "median": 207.51,
+          "min": 204.88,
+          "q1": 206.13,
+          "q3": 208.02,
+          "max": 214.75
+        },
+        "parseTranslationUnit": {
+          "median": 17.51,
+          "min": 17.43,
+          "q1": 17.48,
+          "q3": 17.735,
+          "max": 17.89
+        },
+        "performForceInlining": {
+          "median": 1.27,
+          "min": 1.25,
+          "q1": 1.26,
+          "q3": 1.27,
+          "max": 1.28
+        },
+        "performMandatoryEarlyInlining": {
+          "median": 6.25,
+          "min": 6.2,
+          "q1": 6.235,
+          "q3": 6.285,
+          "max": 6.37
+        },
+        "readSerializedModuleAST": {
+          "median": 51.98,
+          "min": 50.11,
+          "q1": 51.695,
+          "q3": 52.14,
+          "max": 52.52
+        },
+        "readSerializedModuleIR": {
+          "median": 114.73,
+          "min": 112.03,
+          "q1": 112.405,
+          "q3": 115.565,
+          "max": 120.08
+        },
+        "simplifyIR": {
+          "median": 120.67,
+          "min": 120.22,
+          "q1": 120.43,
+          "q3": 121.16,
+          "max": 121.63
+        },
+        "specializeModule": {
+          "median": 139.33,
+          "min": 138.28,
+          "q1": 139.245,
+          "q3": 139.46,
+          "max": 139.59
+        },
+        "unrollLoopsInModule": {
+          "median": 4.41,
+          "min": 4.33,
+          "q1": 4.39,
+          "q3": 4.435,
+          "max": 4.59
+        }
+      },
+      "ptx_sha256": [
+        "9ef3444ab015be99299f49f2e416474780d7985f6662a38d8d058cca58e810ac"
+      ],
+      "ptx_bytes": 82632,
+      "command": [
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
+        "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+        "-entry",
+        "eval_buffer",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvvm",
+        "-report-perf-benchmark",
+        "-o",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-211-profile/complex/tiled-brass-material-eval_buffer-nvvm-o3/attempt-0.ptx"
+      ],
+      "raw_directory": "build/nvvm-loop/slice-211-profile/complex/tiled-brass-material-eval_buffer-nvvm-o3",
+      "supplement_process_seconds": {
+        "median": 1.688468,
+        "min": 1.670435,
+        "q1": 1.679451,
+        "q3": 1.690389,
+        "max": 1.69231
+      },
+      "supplement_process_samples_seconds": [
+        1.670434644445777, 1.6923101656138897, 1.6884678322821856
+      ],
+      "supplement_downstream_seconds": {
+        "median": 0.19,
+        "min": 0.19,
+        "q1": 0.19,
+        "q3": 0.19,
+        "max": 0.19
+      },
+      "supplement_downstream_samples_seconds": [0.19, 0.19, 0.19],
+      "assembly_process_seconds": {
+        "median": 0.208629,
+        "min": 0.206877,
+        "q1": 0.207624,
+        "q3": 0.211911,
+        "max": 0.217863
+      },
+      "assembly_measured_seconds": [
+        0.20753728784620762, 0.21090426482260227, 0.21786308661103249,
+        0.20862945914268494, 0.2129181157797575, 0.20687700808048248,
+        0.20771034434437752
+      ]
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvrtc-o3",
+      "entry": "sample_buffer",
+      "backend": "nvrtc",
+      "optimization": 3,
+      "architecture": 80,
+      "status": "compile-and-assemble-passed",
+      "baseline_warmup_seconds": [1.722, 1.667],
+      "baseline_measured_seconds": [
+        1.667, 1.667, 1.667, 1.667, 1.668, 1.667, 1.667
+      ],
+      "baseline_process_seconds": {
+        "median": 1.667,
+        "min": 1.667,
+        "q1": 1.667,
+        "q3": 1.667,
+        "max": 1.668
+      },
+      "baseline_phase_ms": {
+        "SemanticChecking": {
+          "median": 649.49,
+          "min": 646.7,
+          "q1": 649.235,
+          "q3": 651.675,
+          "max": 653.64
+        },
+        "checkAllTranslationUnits": {
+          "median": 649.49,
+          "min": 646.7,
+          "q1": 649.235,
+          "q3": 651.675,
+          "max": 653.62
+        },
+        "compileInner": {
+          "median": 1359.28,
+          "min": 1354.91,
+          "q1": 1357.46,
+          "q3": 1366.55,
+          "max": 1370.01
+        },
+        "emitEntryPointsSourceFromIR": {
+          "median": 351.83,
+          "min": 349.63,
+          "q1": 350.165,
+          "q3": 354.685,
+          "max": 365.85
+        },
+        "endToEndActions": {
+          "median": 1359.28,
+          "min": 1354.91,
+          "q1": 1357.455,
+          "q3": 1366.55,
+          "max": 1370.01
+        },
+        "frontEndExecute": {
+          "median": 855.67,
+          "min": 854.48,
+          "q1": 854.635,
+          "q3": 858.54,
+          "max": 858.89
+        },
+        "generateIR": {
+          "median": 185.58,
+          "min": 184.74,
+          "q1": 184.91,
+          "q3": 186.37,
+          "max": 187.49
+        },
+        "generateIRForTranslationUnit": {
+          "median": 185.57,
+          "min": 184.73,
+          "q1": 184.91,
+          "q3": 186.37,
+          "max": 187.48
+        },
+        "generateOutput": {
+          "median": 501.23,
+          "min": 497.45,
+          "q1": 498.665,
+          "q3": 505.625,
+          "max": 512.87
+        },
+        "linkAndOptimizeIR": {
+          "median": 342.94,
+          "min": 340.4,
+          "q1": 340.88,
+          "q3": 345.745,
+          "max": 356.85
+        },
+        "linkIR": {
+          "median": 20.86,
+          "min": 20.3,
+          "q1": 20.71,
+          "q3": 21.13,
+          "max": 22.08
+        },
+        "loadBuiltinModule": {
+          "median": 210.74,
+          "min": 205.94,
+          "q1": 207.67,
+          "q3": 211.03,
+          "max": 212.05
+        },
+        "parseTranslationUnit": {
+          "median": 17.66,
+          "min": 17.41,
+          "q1": 17.63,
+          "q3": 17.675,
+          "max": 17.71
+        },
+        "performForceInlining": {
+          "median": 1.49,
+          "min": 1.47,
+          "q1": 1.475,
+          "q3": 1.515,
+          "max": 1.53
+        },
+        "performMandatoryEarlyInlining": {
+          "median": 6.34,
+          "min": 6.33,
+          "q1": 6.335,
+          "q3": 6.36,
+          "max": 6.37
+        },
+        "readSerializedModuleAST": {
+          "median": 54.07,
+          "min": 52.13,
+          "q1": 53.02,
+          "q3": 54.105,
+          "max": 55.25
+        },
+        "readSerializedModuleIR": {
+          "median": 114.31,
+          "min": 112.03,
+          "q1": 113.69,
+          "q3": 116.13,
+          "max": 116.64
+        },
+        "simplifyIR": {
+          "median": 127.49,
+          "min": 126.99,
+          "q1": 127.405,
+          "q3": 128.725,
+          "max": 135.73
+        },
+        "specializeModule": {
+          "median": 143.09,
+          "min": 141.99,
+          "q1": 142.755,
+          "q3": 144.3,
+          "max": 148.57
+        },
+        "unrollLoopsInModule": {
+          "median": 4.34,
+          "min": 4.3,
+          "q1": 4.33,
+          "q3": 4.38,
+          "max": 4.4
+        }
+      },
+      "ptx_sha256": [
+        "214dd03be9f4d7635d26cba874c1b4f3913c43c7e7e2ea4bb62355cf6857fd25"
+      ],
+      "ptx_bytes": 103321,
+      "command": [
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
+        "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+        "-entry",
+        "sample_buffer",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvrtc",
+        "-report-perf-benchmark",
+        "-o",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-211-profile/complex/tiled-brass-material-sample_buffer-nvrtc-o3/attempt-0.ptx"
+      ],
+      "raw_directory": "build/nvvm-loop/slice-211-profile/complex/tiled-brass-material-sample_buffer-nvrtc-o3",
+      "supplement_process_seconds": {
+        "median": 1.655151,
+        "min": 1.640684,
+        "q1": 1.647918,
+        "q3": 1.655664,
+        "max": 1.656178
+      },
+      "supplement_process_samples_seconds": [
+        1.6561778094619513, 1.6551511269062757, 1.6406840607523918
+      ],
+      "supplement_downstream_seconds": {
+        "median": 0.14,
+        "min": 0.14,
+        "q1": 0.14,
+        "q3": 0.14,
+        "max": 0.14
+      },
+      "supplement_downstream_samples_seconds": [0.14, 0.14, 0.14],
+      "assembly_process_seconds": {
+        "median": 0.254951,
+        "min": 0.251889,
+        "q1": 0.253218,
+        "q3": 0.256278,
+        "max": 0.262044
+      },
+      "assembly_measured_seconds": [
+        0.25188850425183773, 0.25533270090818405, 0.25261558406054974,
+        0.25495087169110775, 0.25381985679268837, 0.26204405538737774,
+        0.25722357630729675
+      ]
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvvm-o0",
+      "entry": "sample_buffer",
+      "backend": "nvvm",
+      "optimization": 0,
+      "architecture": 80,
+      "status": "compile-and-assemble-passed",
+      "baseline_warmup_seconds": [1.668, 1.618],
+      "baseline_measured_seconds": [
+        1.667, 1.617, 1.667, 1.717, 1.667, 1.667, 1.667
+      ],
+      "baseline_process_seconds": {
+        "median": 1.667,
+        "min": 1.617,
+        "q1": 1.667,
+        "q3": 1.667,
+        "max": 1.717
+      },
+      "baseline_phase_ms": {
+        "SemanticChecking": {
+          "median": 650.61,
+          "min": 646.14,
+          "q1": 648.71,
+          "q3": 654.16,
+          "max": 655.71
+        },
+        "checkAllTranslationUnits": {
+          "median": 650.61,
+          "min": 646.14,
+          "q1": 648.71,
+          "q3": 654.16,
+          "max": 655.71
+        },
+        "compileInner": {
+          "median": 1348.58,
+          "min": 1334.9,
+          "q1": 1346.135,
+          "q3": 1352.13,
+          "max": 1393.11
+        },
+        "endToEndActions": {
+          "median": 1348.58,
+          "min": 1334.9,
+          "q1": 1346.135,
+          "q3": 1352.13,
+          "max": 1393.11
+        },
+        "frontEndExecute": {
+          "median": 856.98,
+          "min": 849.52,
+          "q1": 854.385,
+          "q3": 860.54,
+          "max": 862.23
+        },
+        "generateIR": {
+          "median": 185.38,
+          "min": 183.2,
+          "q1": 184.105,
+          "q3": 186.435,
+          "max": 187.94
+        },
+        "generateIRForTranslationUnit": {
+          "median": 185.37,
+          "min": 183.2,
+          "q1": 184.1,
+          "q3": 186.435,
+          "max": 187.94
+        },
+        "generateOutput": {
+          "median": 488.07,
+          "min": 482.96,
+          "q1": 487.475,
+          "q3": 489.945,
+          "max": 531.85
+        },
+        "linkAndOptimizeIR": {
+          "median": 338.47,
+          "min": 333.86,
+          "q1": 337.57,
+          "q3": 339.79,
+          "max": 369.56
+        },
+        "linkIR": {
+          "median": 20.4,
+          "min": 19.52,
+          "q1": 20.22,
+          "q3": 20.53,
+          "max": 20.6
+        },
+        "loadBuiltinModule": {
+          "median": 205.25,
+          "min": 203.25,
+          "q1": 203.71,
+          "q3": 208.09,
+          "max": 216.34
+        },
+        "parseTranslationUnit": {
+          "median": 17.49,
+          "min": 17.29,
+          "q1": 17.345,
+          "q3": 17.565,
+          "max": 17.92
+        },
+        "performForceInlining": {
+          "median": 1.48,
+          "min": 1.46,
+          "q1": 1.465,
+          "q3": 1.49,
+          "max": 1.53
+        },
+        "performMandatoryEarlyInlining": {
+          "median": 6.37,
+          "min": 6.31,
+          "q1": 6.35,
+          "q3": 6.38,
+          "max": 6.69
+        },
+        "readSerializedModuleAST": {
+          "median": 51.03,
+          "min": 50.55,
+          "q1": 50.885,
+          "q3": 51.645,
+          "max": 52.63
+        },
+        "readSerializedModuleIR": {
+          "median": 113.15,
+          "min": 111.78,
+          "q1": 112.63,
+          "q3": 114.01,
+          "max": 114.52
+        },
+        "simplifyIR": {
+          "median": 127.72,
+          "min": 126.9,
+          "q1": 127.28,
+          "q3": 127.84,
+          "max": 135.74
+        },
+        "specializeModule": {
+          "median": 145.0,
+          "min": 142.93,
+          "q1": 144.69,
+          "q3": 146.865,
+          "max": 159.7
+        },
+        "unrollLoopsInModule": {
+          "median": 4.41,
+          "min": 4.37,
+          "q1": 4.4,
+          "q3": 4.425,
+          "max": 4.48
+        }
+      },
+      "ptx_sha256": [
+        "f58eb3229d66efc3c77bb013c9f0853891f0174d44f757677b5a45acec240c95"
+      ],
+      "ptx_bytes": 906830,
+      "command": [
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
+        "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+        "-entry",
+        "sample_buffer",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O0",
+        "-emit-cuda-via-nvvm",
+        "-report-perf-benchmark",
+        "-o",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-211-profile/complex/tiled-brass-material-sample_buffer-nvvm-o0/attempt-0.ptx"
+      ],
+      "raw_directory": "build/nvvm-loop/slice-211-profile/complex/tiled-brass-material-sample_buffer-nvvm-o0",
+      "supplement_process_seconds": {
+        "median": 1.656594,
+        "min": 1.6153,
+        "q1": 1.635947,
+        "q3": 1.660117,
+        "max": 1.66364
+      },
+      "supplement_process_samples_seconds": [
+        1.6565940529108047, 1.615300277248025, 1.663639698177576
+      ],
+      "supplement_downstream_seconds": {
+        "median": 0.11,
+        "min": 0.1,
+        "q1": 0.105,
+        "q3": 0.12,
+        "max": 0.13
+      },
+      "supplement_downstream_samples_seconds": [0.11, 0.1, 0.13],
+      "assembly_process_seconds": {
+        "median": 0.879404,
+        "min": 0.876099,
+        "q1": 0.877089,
+        "q3": 0.884119,
+        "max": 0.885537
+      },
+      "assembly_measured_seconds": [
+        0.8764648772776127, 0.8777137752622366, 0.8794039450585842,
+        0.88547776453197, 0.8855374865233898, 0.8827597629278898,
+        0.876098869368434
+      ]
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvvm-o3",
+      "entry": "sample_buffer",
+      "backend": "nvvm",
+      "optimization": 3,
+      "architecture": 80,
+      "status": "compile-and-assemble-passed",
+      "baseline_warmup_seconds": [1.817, 1.817],
+      "baseline_measured_seconds": [
+        1.817, 1.817, 1.817, 1.869, 1.817, 1.818, 1.817
+      ],
+      "baseline_process_seconds": {
+        "median": 1.817,
+        "min": 1.817,
+        "q1": 1.817,
+        "q3": 1.8175,
+        "max": 1.869
+      },
+      "baseline_phase_ms": {
+        "SemanticChecking": {
+          "median": 652.82,
+          "min": 646.97,
+          "q1": 650.395,
+          "q3": 656.94,
+          "max": 659.82
+        },
+        "checkAllTranslationUnits": {
+          "median": 652.82,
+          "min": 646.97,
+          "q1": 650.395,
+          "q3": 656.94,
+          "max": 659.82
+        },
+        "compileInner": {
+          "median": 1519.29,
+          "min": 1503.76,
+          "q1": 1507.98,
+          "q3": 1524.27,
+          "max": 1552.74
+        },
+        "endToEndActions": {
+          "median": 1519.29,
+          "min": 1503.76,
+          "q1": 1507.98,
+          "q3": 1524.27,
+          "max": 1552.74
+        },
+        "frontEndExecute": {
+          "median": 859.63,
+          "min": 852.89,
+          "q1": 855.34,
+          "q3": 863.55,
+          "max": 869.21
+        },
+        "generateIR": {
+          "median": 185.68,
+          "min": 183.63,
+          "q1": 184.685,
+          "q3": 186.965,
+          "max": 188.96
+        },
+        "generateIRForTranslationUnit": {
+          "median": 185.67,
+          "min": 183.63,
+          "q1": 184.675,
+          "q3": 186.96,
+          "max": 188.96
+        },
+        "generateOutput": {
+          "median": 651.4,
+          "min": 648.45,
+          "q1": 650.245,
+          "q3": 656.42,
+          "max": 690.62
+        },
+        "linkAndOptimizeIR": {
+          "median": 338.1,
+          "min": 334.79,
+          "q1": 336.355,
+          "q3": 339.29,
+          "max": 343.27
+        },
+        "linkIR": {
+          "median": 20.42,
+          "min": 19.7,
+          "q1": 19.825,
+          "q3": 20.755,
+          "max": 20.98
+        },
+        "loadBuiltinModule": {
+          "median": 205.3,
+          "min": 202.69,
+          "q1": 204.5,
+          "q3": 207.615,
+          "max": 210.89
+        },
+        "parseTranslationUnit": {
+          "median": 17.62,
+          "min": 17.44,
+          "q1": 17.605,
+          "q3": 17.74,
+          "max": 17.85
+        },
+        "performForceInlining": {
+          "median": 1.47,
+          "min": 1.46,
+          "q1": 1.465,
+          "q3": 1.495,
+          "max": 1.65
+        },
+        "performMandatoryEarlyInlining": {
+          "median": 6.37,
+          "min": 6.28,
+          "q1": 6.31,
+          "q3": 6.385,
+          "max": 6.41
+        },
+        "readSerializedModuleAST": {
+          "median": 51.15,
+          "min": 50.59,
+          "q1": 51.0,
+          "q3": 51.9,
+          "max": 52.73
+        },
+        "readSerializedModuleIR": {
+          "median": 112.52,
+          "min": 111.51,
+          "q1": 112.14,
+          "q3": 115.53,
+          "max": 117.94
+        },
+        "simplifyIR": {
+          "median": 127.79,
+          "min": 126.8,
+          "q1": 127.15,
+          "q3": 128.625,
+          "max": 130.28
+        },
+        "specializeModule": {
+          "median": 144.03,
+          "min": 143.7,
+          "q1": 143.985,
+          "q3": 144.65,
+          "max": 145.23
+        },
+        "unrollLoopsInModule": {
+          "median": 4.4,
+          "min": 4.33,
+          "q1": 4.355,
+          "q3": 4.455,
+          "max": 4.5
+        }
+      },
+      "ptx_sha256": [
+        "5315e6101f95beacf4ed8b251d0b3c3a7fe49f340b24dfecf3fc1021a23d6148"
+      ],
+      "ptx_bytes": 117109,
+      "command": [
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
+        "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang",
+        "-entry",
+        "sample_buffer",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvvm",
+        "-report-perf-benchmark",
+        "-o",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-211-profile/complex/tiled-brass-material-sample_buffer-nvvm-o3/attempt-0.ptx"
+      ],
+      "raw_directory": "build/nvvm-loop/slice-211-profile/complex/tiled-brass-material-sample_buffer-nvvm-o3",
+      "supplement_process_seconds": {
+        "median": 1.790938,
+        "min": 1.782968,
+        "q1": 1.786953,
+        "q3": 1.796483,
+        "max": 1.802028
+      },
+      "supplement_process_samples_seconds": [
+        1.7909384667873383, 1.7829676382243633, 1.8020279482007027
+      ],
+      "supplement_downstream_seconds": {
+        "median": 0.27,
+        "min": 0.27,
+        "q1": 0.27,
+        "q3": 0.27,
+        "max": 0.27
+      },
+      "supplement_downstream_samples_seconds": [0.27, 0.27, 0.27],
+      "assembly_process_seconds": {
+        "median": 0.296686,
+        "min": 0.29365,
+        "q1": 0.295814,
+        "q3": 0.297136,
+        "max": 0.297574
+      },
+      "assembly_measured_seconds": [
+        0.296686377376318, 0.29733509570360184, 0.2975738923996687,
+        0.293650483712554, 0.2960939295589924, 0.2955343406647444,
+        0.2969360612332821
+      ]
+    }
+  ],
+  "session_probe": {
+    "fresh": {
+      "raw": {
+        "path": "build/nvvm-loop/slice-211-profile/session-fresh.jsonl",
+        "sha256": "1938b3dbe9831259c19cc65d6b0ff16d216400f9b2c493764d21f52777cf42c1"
+      },
+      "first_global_creation_ms": 233.903339,
+      "measured_ms": {
+        "create_global_ms": {
+          "median": 111.372529,
+          "min": 110.39876,
+          "q1": 110.532569,
+          "q3": 111.922436,
+          "max": 113.626396
+        },
+        "setup_request_ms": {
+          "median": 0.117794,
+          "min": 0.113993,
+          "q1": 0.117134,
+          "q3": 0.126399,
+          "max": 0.141234
+        },
+        "compile_ms": {
+          "median": 1352.091066,
+          "min": 1344.652696,
+          "q1": 1347.384142,
+          "q3": 1358.591283,
+          "max": 1366.45999
+        },
+        "downstream_ms": {
+          "median": 187.358014,
+          "min": 185.17739,
+          "q1": 186.320323,
+          "q3": 188.089371,
+          "max": 189.310042
+        },
+        "destroy_request_ms": {
+          "median": 7.482791,
+          "min": 6.520983,
+          "q1": 6.635766,
+          "q3": 7.511752,
+          "max": 7.610464
+        },
+        "destroy_global_ms": {
+          "median": 26.939985,
+          "min": 24.329149,
+          "q1": 24.620497,
+          "q3": 27.291926,
+          "max": 27.807781
+        },
+        "iteration_ms": {
+          "median": 1499.047665,
+          "min": 1487.311619,
+          "q1": 1491.228535,
+          "q3": 1506.361401,
+          "max": 1508.215907
+        }
+      },
+      "semantic_checking_ms": {
+        "median": 617,
+        "min": 609,
+        "q1": 611.5,
+        "q3": 620.5,
+        "max": 623
+      },
+      "frontend_ms": {
+        "median": 811,
+        "min": 803,
+        "q1": 806.0,
+        "q3": 813.5,
+        "max": 824
+      },
+      "iteration_samples_ms": [
+        1507.099033, 1491.179724, 1491.277346, 1508.215907, 1487.311619,
+        1505.62377, 1499.047665
+      ],
+      "ptx_byte_identical_to_baseline": true
+    },
+    "shared": {
+      "raw": {
+        "path": "build/nvvm-loop/slice-211-profile/session-shared.jsonl",
+        "sha256": "189ad5006c2fa25e6c6a0ba7e7a5cce4d55d2af059e61f854facbb7ed621c1bc"
+      },
+      "first_global_creation_ms": 225.862631,
+      "measured_ms": {
+        "create_global_ms": {
+          "median": 0.0,
+          "min": 0.0,
+          "q1": 0.0,
+          "q3": 0.0,
+          "max": 0.0
+        },
+        "setup_request_ms": {
+          "median": 0.487434,
+          "min": 0.459333,
+          "q1": 0.466039,
+          "q3": 0.530446,
+          "max": 0.625489
+        },
+        "compile_ms": {
+          "median": 1313.185739,
+          "min": 1307.654947,
+          "q1": 1310.280284,
+          "q3": 1314.773451,
+          "max": 1323.344939
+        },
+        "downstream_ms": {
+          "median": 185.648634,
+          "min": 184.49646,
+          "q1": 185.073822,
+          "q3": 186.807683,
+          "max": 197.655488
+        },
+        "destroy_request_ms": {
+          "median": 6.79994,
+          "min": 6.715348,
+          "q1": 6.75857,
+          "q3": 7.1081,
+          "max": 7.942474
+        },
+        "destroy_global_ms": {
+          "median": 3e-5,
+          "min": 2e-5,
+          "q1": 3e-5,
+          "q3": 3.5e-5,
+          "max": 4e-5
+        },
+        "iteration_ms": {
+          "median": 1320.69539,
+          "min": 1315.164478,
+          "q1": 1317.862933,
+          "q3": 1322.661464,
+          "max": 1330.735407
+        }
+      },
+      "semantic_checking_ms": {
+        "median": 591,
+        "min": 587,
+        "q1": 589.5,
+        "q3": 593.5,
+        "max": 596
+      },
+      "frontend_ms": {
+        "median": 777,
+        "min": 772,
+        "q1": 775.5,
+        "q3": 779.0,
+        "max": 784
+      },
+      "iteration_samples_ms": [
+        1318.857007, 1316.868858, 1324.420731, 1320.69539, 1320.902197,
+        1315.164478, 1330.735407
+      ],
+      "ptx_byte_identical_to_baseline": true
+    }
+  },
+  "session_probe_lifecycle_median_reduction_percent": 11.898,
+  "interpretation": {
+    "no_backend_local_optimization_justified": true,
+    "main_measured_work": "Shared frontend semantic checking ~650ms; builtin load ~205\u2013211ms in fresh CLI processes; shared link/optimization ~321\u2013343ms. These are inclusive scopes, not additive exclusive samples.",
+    "one_candidate": {
+      "name": "Amortize global-session lifetime across a bounded serial compilation batch",
+      "layer": "Host harness/session ownership, not NVVM IR semantics, provider, or downstream optimizer",
+      "evidence": "Ignored API probe reduces warmed in-process request lifecycle median by 11.898%, with byte-identical eval_buffer NVVM O3 PTX and explicit fresh requests. This is a feasibility signal, not measured corpus-runner speedup.",
+      "next_gate": "Before production change, repeat equivalent API experiment over all six cells with request-order permutations and bounded-batch memory/lifetime checks; retain fresh-process results. Do not broaden compiler pipeline design from these measurements.",
+      "acceptance_metric": "On identical optimized binaries and fixed material flags, two warmup batches and at least seven measured serial six-cell batches: >=10% reduction in median total batch lifecycle wall time: fresh global per request versus one global per six-cell batch, including global creation and destruction at every bounded batch boundary, no >5% per-cell compile-call median regression, identical PTX and successful assembly for all six identities. Preserve per-cell timeouts/crash isolation/output oracles and a fresh-session lane; require full frozen/discovery checkpoint before adopting any runner change.",
+      "status": "Candidate only; no implementation in this slice."
+    },
+    "timer_cautions": [
+      "SemanticChecking equals checkAllTranslationUnits; both included in frontEndExecute.",
+      "generateIRForTranslationUnit is included in generateIR, which is included in frontEndExecute.",
+      "compileInner/endToEndActions encompass frontend and output; generateOutput includes linking, code generation and downstream work.",
+      "Baseline specializeModule and simplifyIR are inclusive shared-pass totals. Detailed wrapper timers reuse their names and add overlapping durations: two specializeModule counts and ten simplifyIR counts do not indicate doubled work.",
+      "-report-downstream-time clears profiler at compile entry, so supplemental logs intentionally omit global builtin creation.",
+      "Whole-process minus nested phase timers cannot be interpreted as backend exclusive time."
+    ],
+    "perf": "perf stat -e task-clock -- true denied at perf_event_paranoid=4; no settings/packages changed."
+  },
+  "inherited_runtime_preservation": {
+    "manifest": {
+      "path": "issue-nvvm-backend/runtime-validation.slice-210.json",
+      "sha256": "c64d77e9929e27ce33be505e2531ebab9ea4d428dc5ef39cb78a443bc1bfa632"
+    },
+    "fresh_runtime_cells": 0,
+    "inherited_cells": 1647,
+    "correct": 1594,
+    "retained_failures": 53,
+    "resolved_histories": 4,
+    "unresolved_failure_keys": [
+      {
+        "corpus": "frozen",
+        "id": "compute/byte-address-buffer-atomic-mixed-width-12265.slang#cuda-1",
+        "mode": "nvrtc-o3"
+      },
+      {
+        "corpus": "frozen",
+        "id": "compute/byte-address-buffer-atomic-mixed-width-12265.slang#cuda-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "frozen",
+        "id": "compute/byte-address-buffer-atomic-mixed-width-12265.slang#cuda-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "frozen",
+        "id": "compute/dynamic-dispatch-substandard-float.slang#cuda-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "frozen",
+        "id": "compute/dynamic-dispatch-substandard-float.slang#cuda-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "frozen",
+        "id": "compute/half-vector-calc.slang#cuda-1",
+        "mode": "nvrtc-o3"
+      },
+      {
+        "corpus": "frozen",
+        "id": "compute/texture-subscript.slang#cuda-1",
+        "mode": "nvrtc-o3"
+      },
+      {
+        "corpus": "frozen",
+        "id": "cuda/require-prelude.slang#cuda-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "frozen",
+        "id": "cuda/require-prelude.slang#cuda-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "frozen",
+        "id": "hlsl-intrinsic/quad-control/quad-control-comp-functionality.slang#cuda-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "frozen",
+        "id": "hlsl-intrinsic/quad-control/quad-control-comp-functionality.slang#cuda-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "frozen",
+        "id": "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "frozen",
+        "id": "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "frozen",
+        "id": "hlsl-intrinsic/substandard-fp-folding.slang#cuda-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "frozen",
+        "id": "hlsl-intrinsic/substandard-fp-folding.slang#cuda-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "frozen",
+        "id": "hlsl-intrinsic/wave-multi/wave-multi-min-max.slang#cuda-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "frozen",
+        "id": "hlsl-intrinsic/wave-multi/wave-multi-min-max.slang#cuda-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "frozen",
+        "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-max.slang#cuda-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "frozen",
+        "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-max.slang#cuda-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "frozen",
+        "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang#cuda-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "frozen",
+        "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang#cuda-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "frozen",
+        "id": "slang-extension/realtime-clock.slang#cuda-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "frozen",
+        "id": "slang-extension/realtime-clock.slang#cuda-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+        "mode": "nvrtc-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "discovery",
+        "id": "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/atomics-buffer.slang#discovery-1",
+        "mode": "nvrtc-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/atomics-buffer.slang#discovery-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/atomics-buffer.slang#discovery-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/constexpr.slang#discovery-1",
+        "mode": "nvrtc-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/constexpr.slang#discovery-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/constexpr.slang#discovery-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/non-square-column-major.slang#discovery-1",
+        "mode": "nvrtc-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/non-square-column-major.slang#discovery-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/non-square-column-major.slang#discovery-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/texture-get-dimensions.slang#discovery-1",
+        "mode": "nvrtc-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/texture-get-dimensions.slang#discovery-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/texture-get-dimensions.slang#discovery-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/texture-subscript-multisample.slang#discovery-1",
+        "mode": "nvrtc-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/texture-subscript-multisample.slang#discovery-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "discovery",
+        "id": "compute/texture-subscript-multisample.slang#discovery-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+        "mode": "nvrtc-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "discovery",
+        "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "language-feature/pointer/coherent-load-store-physical-storage-buffer.slang#discovery-1",
+        "mode": "nvrtc-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "language-feature/pointer/coherent-load-store-physical-storage-buffer.slang#discovery-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "discovery",
+        "id": "language-feature/pointer/coherent-load-store-physical-storage-buffer.slang#discovery-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "language-feature/pointer/data-layouts.slang#discovery-1",
+        "mode": "nvrtc-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "language-feature/pointer/data-layouts.slang#discovery-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "discovery",
+        "id": "language-feature/pointer/data-layouts.slang#discovery-1",
+        "mode": "nvvm-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "language-feature/pointer/redundant-coherent-load.slang#discovery-1",
+        "mode": "nvrtc-o3"
+      },
+      {
+        "corpus": "discovery",
+        "id": "language-feature/pointer/redundant-coherent-load.slang#discovery-1",
+        "mode": "nvvm-o0"
+      },
+      {
+        "corpus": "discovery",
+        "id": "language-feature/pointer/redundant-coherent-load.slang#discovery-1",
+        "mode": "nvvm-o3"
+      }
+    ],
+    "ledger_policy": "All first-known history, reproduction, evidence, diagnostics and resolved records remain in unchanged accepted 210 manifest; no classifications or denominators reset."
+  },
+  "limitations": [
+    "No material runtime bindings, textures/LUT inputs, output oracle, GPU runtime, GPU speed or register-count performance claims.",
+    "Seven baseline process observations have timeout-wait quantization; precise supplementary attribution has only three measured samples per cell.",
+    "API experiment is one entry/mode and separate lifecycle setup, not a measured improvement in existing corpus runners.",
+    "OS file and allocator/library warmth affect repeat measurements; no CPU pinning, frequency lock or thermal model."
+  ],
+  "raw_evidence": {
+    "complex/results.json": {
+      "path": "build/nvvm-loop/slice-211-profile/complex/results.json",
+      "sha256": "4c557e672f9b1d4c1bafa0b824598e2e4c78148ba6827e4155c5f30c4ea527cd"
+    },
+    "supplement.json": {
+      "path": "build/nvvm-loop/slice-211-profile/supplement.json",
+      "sha256": "2dd4b54aa339f74ef26854a132bade2dc8db34c6f07dce3c0dae840b397d0438"
+    },
+    "commands.sh": {
+      "path": "build/nvvm-loop/slice-211-profile/commands.sh",
+      "sha256": "2a7dfca402205146e82e3685632a4ffb96daf37a36bd4ce5bafd979cbbe37d5c"
+    },
+    "supplement.py": {
+      "path": "build/nvvm-loop/slice-211-profile/supplement.py",
+      "sha256": "85fa308b45e3f06b81e105e1e61d0455eacd7190f84eb42c1be6a7c21a22f622"
+    },
+    "session-probe.cpp": {
+      "path": "build/nvvm-loop/slice-211-profile/session-probe.cpp",
+      "sha256": "0041e0071b0b92190a8e64686e6543b394aa2787b13e21c149993e647f4fffb3"
+    },
+    "session-probe": {
+      "path": "build/nvvm-loop/slice-211-profile/session-probe",
+      "sha256": "f71882ba413491652f74e68a29a39cdcc77fa9f3eda421c81c8702e41a188dc0"
+    },
+    "summarize.py": {
+      "path": "build/nvvm-loop/slice-211-profile/summarize.py",
+      "sha256": "8d1bfa7f54af092fb78d4c4db4888988664991a47b246304e9b8c6c9dda08342"
+    },
+    "raw-index.json": {
+      "path": "build/nvvm-loop/slice-211-profile/raw-index.json",
+      "sha256": "c700bd9ea2be01226440f3580921e194ac71bd9aaed6b490a0cff6afb631ac7d"
+    }
+  },
+  "parent_acceptance": {
+    "date_utc": "2026-09-24",
+    "decision": "accepted-research",
+    "independent_review": "Recomputed six-cell primary 54-attempt counts/medians/spreads; all six assemblies pass. Recomputed fresh/shared API medians and 11.8977% reduction, verified all18 API PTX hashes against baseline. All18 structured references and12 artifact hashes match. Reviewed probe scope and inclusive timing limits.",
+    "latest_implementation_slice": 210,
+    "last_full_checkpoint": 210,
+    "implementation_slices_since_full": 0,
+    "next_gate": "Six-cell bounded-batch global-session experiment, including creation/destruction and order/memory evidence, before production adoption."
+  }
+}
