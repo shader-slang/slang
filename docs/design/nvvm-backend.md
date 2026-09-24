@@ -7920,7 +7920,12 @@ caller values. The sequential recipe uses negative zero for its sum identity on 
 retaining all-negative-zero results, and positive zero for other masks as the CUDA sparse loop
 does. Singleton sum/product selects the original caller value without altering payload bits,
 including signaling NaNs. Prefix sum and product identities remain positive zero and one. These
-rules are confined to newly admitted FP64 reductions; existing 32-bit recipes are unchanged.
+seed rules remain confined to FP64 reductions. Slice 216 shares the existing singleton predicate
+and original-value selection with FP32 min/max reductions: the CUDA helper returns the sole operand
+without arithmetic, whereas combining a NaN with an injected infinity through numeric min/max
+returns infinity. The FP64 signed-zero seed calculation stays separate; nonsingleton FP32 behavior,
+other 32-bit reductions and all prefixes retain their existing recipes. Dynamic raw-bit scalar,
+vector and matrix coverage checks every singleton lane and preserves NaN payloads/signaling bits.
 
 Explicit-mask matrix indexed shuffles reuse the same homogeneous leaf transport. Slice 208 retained
 an FP64 implicit-matrix guard because the old full-mask ballot did not establish a divergent active

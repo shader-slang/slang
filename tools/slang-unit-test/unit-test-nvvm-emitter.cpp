@@ -8421,6 +8421,107 @@ SLANG_UNIT_TEST(nvvmSlangMaskedWaveScalarHelpersUseGenericLoops)
 #endif
 }
 
+SLANG_UNIT_TEST(nvvmSlangSingletonReductionsPreserveTypedOperands)
+{
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    _resetDirectNVVMFakes();
+    TempDirectory toolkit;
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(_configureFakeDirectNVVMLibdevice(globalSession, toolkit)));
+
+        const char source[] = R"(
+            [CUDAKernel]
+            void computeMain(
+                uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+                uniform uint mask)
+            {
+                uint lane = WaveGetLaneIndex();
+                float f = float(lane);
+                double d = double(lane);
+                uint4 members = uint4(mask, 0, 0, 0);
+                destination[0] = int(WaveMultiMin(f, members));
+                destination[1] = int(WaveMultiMax(f, members));
+                destination[2] = int(WaveMultiSum(d, members));
+                destination[3] = int(WaveMultiProduct(d, members));
+            }
+        )";
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result =
+            _compileSlangWithDirectNVVM(globalSession, source, code, diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+
+        // A singleton selects the original helper parameter, without arithmetic on its payload.
+        // The separate Float64 sum seed selection must never appear in the Float32 recipes.
+        uint32_t float32PassthroughCount = 0;
+        uint32_t float64PassthroughCount = 0;
+        uint32_t float64SeedCount = 0;
+        for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            if (operation.key.operation != SLANG_NVVM_VALUE_OP_SELECT ||
+                operation.resultType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
+                continue;
+            if (operation.operands[1].kind == FakeNVVMBuilderValueKind::Parameter)
+            {
+                SLANG_CHECK(operation.operands[2].kind == FakeNVVMBuilderValueKind::ScalarPhi);
+                SLANG_CHECK_ABORT(
+                    operation.operands[0].kind == FakeNVVMBuilderValueKind::ScalarOperation);
+                SLANG_CHECK_ABORT(operation.operands[0].index >= 0);
+                SLANG_CHECK_ABORT(
+                    operation.operands[0].index < gFakeNVVMBuilder.scalarOperations.getCount());
+                const auto& predicate =
+                    gFakeNVVMBuilder.scalarOperations[operation.operands[0].index];
+                SLANG_CHECK(predicate.key.operation == SLANG_NVVM_VALUE_OP_EQUAL);
+                SLANG_CHECK(
+                    predicate.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
+                SLANG_CHECK(predicate.operandTypes[0].bitWidth == 32);
+                float32PassthroughCount += operation.resultType.bitWidth == 32;
+                float64PassthroughCount += operation.resultType.bitWidth == 64;
+            }
+            else
+            {
+                SLANG_CHECK(operation.resultType.bitWidth == 64);
+                ++float64SeedCount;
+            }
+        }
+        SLANG_CHECK(float32PassthroughCount == 2);
+        SLANG_CHECK(float64PassthroughCount == 2);
+        SLANG_CHECK(float64SeedCount == 1);
+        bool sawFloat64NegativeZero = false;
+        for (Index i = 0; i < gFakeNVVMBuilder.floatingPointConstantBitPatterns.getCount(); ++i)
+        {
+            if (gFakeNVVMBuilder.floatingPointConstantBitWidths[i] == 32)
+            {
+                SLANG_CHECK(gFakeNVVMBuilder.floatingPointConstantBitPatterns[i] != 0x80000000u);
+            }
+            else
+            {
+                sawFloat64NegativeZero |=
+                    gFakeNVVMBuilder.floatingPointConstantBitPatterns[i] == 0x8000000000000000ull;
+            }
+        }
+        SLANG_CHECK(sawFloat64NegativeZero);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
 SLANG_UNIT_TEST(nvvmSlangAggregateWaveHelpersUseRecursiveScalarRecipes)
 {
 #if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY

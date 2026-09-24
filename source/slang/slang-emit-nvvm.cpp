@@ -4650,7 +4650,7 @@ struct NVVMMaskedWaveScalarOperation
     NVVMValueRecipeStep waveReadLaneAt;
     NVVMValueRecipeStep combine;
     NVVMValueRecipeStep select;
-    bool preservesFloat64Reduction = false;
+    bool preservesSingletonReduction = false;
     bool usesFloat64SumIdentity = false;
     NVVMValueRecipeStep reductionMaskEqual;
     NVVMValueRecipeStep reductionMaskAdd;
@@ -5048,18 +5048,24 @@ bool _initializeNVVMMaskedWaveScalarOperation(
         return false;
     }
 
-    outOperation.preservesFloat64Reduction =
-        valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && valueType.bitWidth == 64 &&
-        spelling.mode == NVVMMaskedWaveScalarMode::Reduction;
-    outOperation.usesFloat64SumIdentity = outOperation.preservesFloat64Reduction &&
+    const bool isFloat64 =
+        valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && valueType.bitWidth == 64;
+    const bool isFloat32MinMax = valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                                 valueType.bitWidth == 32 &&
+                                 (spelling.combineOperation == SLANG_NVVM_VALUE_OP_MIN ||
+                                  spelling.combineOperation == SLANG_NVVM_VALUE_OP_MAX);
+    outOperation.preservesSingletonReduction =
+        spelling.mode == NVVMMaskedWaveScalarMode::Reduction && (isFloat64 || isFloat32MinMax);
+    outOperation.usesFloat64SumIdentity = spelling.mode == NVVMMaskedWaveScalarMode::Reduction &&
+                                          isFloat64 &&
                                           spelling.combineOperation == SLANG_NVVM_VALUE_OP_ADD;
-    if (outOperation.preservesFloat64Reduction && !_setNVVMSupportedValueRecipeStep(
-                                                      outOperation.reductionMaskEqual,
-                                                      SLANG_NVVM_VALUE_OP_EQUAL,
-                                                      NVVMSemantics::kBool,
-                                                      unsignedBinary,
-                                                      2,
-                                                      "Float64 reduction mask equality"))
+    if (outOperation.preservesSingletonReduction && !_setNVVMSupportedValueRecipeStep(
+                                                        outOperation.reductionMaskEqual,
+                                                        SLANG_NVVM_VALUE_OP_EQUAL,
+                                                        NVVMSemantics::kBool,
+                                                        unsignedBinary,
+                                                        2,
+                                                        "reduction mask equality"))
     {
         return false;
     }
@@ -6584,7 +6590,7 @@ void _requireNVVMMaskedWaveScalarOperations(
     for (auto step : commonSteps)
         _requireValueOperation(requirements, step->getDesc(), step->diagnosticName);
 
-    if (operation.preservesFloat64Reduction)
+    if (operation.preservesSingletonReduction)
     {
         _requireValueOperation(
             requirements,
@@ -12525,25 +12531,20 @@ SlangResult _finishNVVMMaskedWavePhi(
             pending.bodyBlock));
 }
 
-// Preserves CUDA's Float64 reduction seed and singleton passthrough semantics. Consider
-// WaveMultiSum(bit_cast<double>(uint64_t(1) << 63), uint4(0xffffffff, 0, 0, 0)):
-// every input is negative zero. The prelude's power-of-two butterfly starts from a caller value,
-// so it returns negative zero. Starting our sequential reduction at negative zero preserves that
-// result without counting a caller twice. Other masks use the prelude's positive-zero seed.
-// The predicate below is the same contiguous low-bit run and power-of-two population condition
-// used by _waveCalcPow2Offset. Singleton reductions instead return the untouched caller value,
-// including signaling NaN payloads, because the prelude performs no arithmetic for those masks.
-SlangResult _emitNVVMFloat64WaveReductionIdentity(
+// Identifies singleton masks whose reduction must preserve the original operand. Consider
+// WaveMultiMin(asfloat(0x7fc12345u), uint4(1u << 31, 0, 0, 0)) called by lane 31:
+// CUDA's helper performs no arithmetic, so the NaN payload survives. Combining it with an
+// infinity seed instead returns infinity. The final typed select uses this predicate to return
+// the untouched caller value for both scalar helpers and each leaf of an aggregate helper.
+SlangResult _emitNVVMWaveReductionIsSingleton(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
     const NVVMMaskedWaveScalarOperation& operation,
-    SlangNVVMTypeHandle valueType,
     SlangNVVMValueHandle mask,
-    SlangNVVMValueHandle& identity,
     SlangNVVMValueHandle& outIsSingleton)
 {
-    SLANG_RELEASE_ASSERT(operation.preservesFloat64Reduction);
+    SLANG_RELEASE_ASSERT(operation.preservesSingletonReduction);
     const SlangNVVMValueHandle negativeMaskOperands[] = {mask};
     SlangNVVMValueHandle negativeMask = nullptr;
     SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
@@ -12573,9 +12574,25 @@ SlangResult _emitNVVMFloat64WaveReductionIdentity(
         singletonOperands,
         SLANG_COUNT_OF(singletonOperands),
         outIsSingleton));
-    if (!operation.usesFloat64SumIdentity)
-        return SLANG_OK;
+    return SLANG_OK;
+}
 
+// Preserves CUDA's Float64 sum seed. Consider
+// WaveMultiSum(bit_cast<double>(uint64_t(1) << 63), uint4(0xffffffff, 0, 0, 0)):
+// every input is negative zero. The prelude's power-of-two butterfly starts from a caller value,
+// so it returns negative zero. Starting our sequential reduction at negative zero preserves that
+// result without counting a caller twice. Other masks use the prelude's positive-zero seed.
+// The predicate below matches _waveCalcPow2Offset's contiguous low-bit run and power-of-two count.
+SlangResult _emitNVVMFloat64WaveSumIdentity(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMMaskedWaveScalarOperation& operation,
+    SlangNVVMTypeHandle valueType,
+    SlangNVVMValueHandle mask,
+    SlangNVVMValueHandle& identity)
+{
+    SLANG_RELEASE_ASSERT(operation.usesFloat64SumIdentity);
     SlangNVVMValueHandle zero = nullptr;
     SlangNVVMValueHandle one = nullptr;
     SLANG_RETURN_ON_FAIL(
@@ -12745,17 +12762,26 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
     }
 
     SlangNVVMValueHandle isSingleton = nullptr;
-    if (operation.preservesFloat64Reduction)
+    if (operation.preservesSingletonReduction)
     {
-        SLANG_RETURN_ON_FAIL(_emitNVVMFloat64WaveReductionIdentity(
+        SLANG_RETURN_ON_FAIL(_emitNVVMWaveReductionIsSingleton(
+            codeGenContext,
+            builder,
+            module,
+            operation,
+            loweredMask,
+            isSingleton));
+    }
+    if (operation.usesFloat64SumIdentity)
+    {
+        SLANG_RETURN_ON_FAIL(_emitNVVMFloat64WaveSumIdentity(
             codeGenContext,
             builder,
             module,
             operation,
             valueType,
             loweredMask,
-            result,
-            isSingleton));
+            result));
     }
 
     SlangNVVMValueHandle currentLane = nullptr;
@@ -12943,7 +12969,7 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
         builder.setInsertBlock(module, exitBlock)));
 
     outValue = accumulated;
-    if (operation.preservesFloat64Reduction)
+    if (operation.preservesSingletonReduction)
     {
         const SlangNVVMValueHandle singletonOperands[] = {isSingleton, loweredValue, accumulated};
         SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(

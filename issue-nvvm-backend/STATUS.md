@@ -4,95 +4,75 @@ Updated 2026-09-24. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
-**Slice 215 is accepted research: a supported FP32 singleton min/max defect.** Read the
-[completed research plan](plan.slice-215-fp64-minmax-semantics.md),
-[five-part report](report.slice-215-fp64-minmax-semantics.md), and
-[semantic evidence](semantic-evidence.slice-215.json). On exact accepted 214 binaries, dynamic
-singleton quiet/signaling NaNs return +infinity for min and -infinity for max at NVVM O0/O3;
-CUDA helper semantics and NVRTC preserve the original bits. Finite and negative-zero controls pass.
-The predeclared supported-defect stop intentionally prevented the broader FP64/aggregate/order
-probe matrix. This is a separate research observation, not a change to the registered 1,650-cell / 53-failure ledger.
+**Slice 216 is accepted: FP32 singleton masked min/max preserves original bits.**
+Read the [completed plan](plan.slice-216-fp32-singleton-minmax.md),
+[five-part report](report.slice-216-fp32-singleton-minmax.md), and
+[result manifest](runtime-validation.slice-216.json). The typed singleton predicate and original-value
+selection are shared with FP32 min/max; FP64 sum signed-zero seed behavior remains separate.
+Dynamic scalar/float4/float2x2 coverage checks all32 singleton lanes, both zero signs, finite values,
+infinities and signed payload-distinct quiet/signaling NaNs. Finite nonsingleton neighbors remain correct.
 
-**Slice 214 is accepted with a full checkpoint.** Read the
-[completed worker plan](plan.slice-214-complex-batching.md),
-[five-part report](report.slice-214-complex-batching.md), and
-[result manifest](runtime-validation.slice-214.json). Parent completed independent acceptance review;
-no push is authorized.
+The defect first measured by [research215](semantic-evidence.slice-215.json) is resolved separately
+from the registered53 failures. Exact original research source now preserves all24 output words
+across12 executions; the four previously mismatching executions are fixed. This is no claim about
+nonsingleton NaN/order semantics or portable payload guarantees.
 
-The complex runner now has an explicit `--test-server` option for bounded batches of at most six
-requests through the existing shared global session. The default fresh CLI path is unchanged.
-Mandatory fresh references, exact PTX equality, entry/target checks, independent assembly, per-cell
-deadlines and bounded process shutdown remain required. Failures preserve the completed prefix,
-active failure, incomplete suffix and logs without retries or fallback. No compiler/provider/ABI
-or shader/oracle change occurred.
+**Next action: resume the deferred slice215 min/max semantic research gate.** Nonsingleton FP32
+behavior remains explicitly unresolved, as do the deferred FP64, aggregate and order probes.
+The singleton correction does not establish readiness to admit FP64 min/max. Keep independent
+sum/product/prefix work and further batching optimization outside that research gate. No push authorized.
 
-**This is not a routine checkpoint accelerator.** The paired six-cell compilation lifecycle improves
-18.02355% (9.991360 to 8.190561 seconds), but mandatory reference work makes both observed complete
-invocations slower: one sample takes 13.40 seconds fresh versus 24.08 shared; actual default counts
-(warmup 1, samples 3) take 43.87 versus 48.83 seconds. These whole-command values are single
-observations, not repeated benchmark estimates. Keep the existing default and explicit opt-in.
-
-Next action: slice 216 fixes the proven FP32 singleton min/max reduction contract, reusing existing
-typed singleton-preservation machinery where appropriate. Require scalar/vector/matrix raw-bit
-coverage plus unchanged non-singleton neighbors. Keep FP64 min/max admission, nonsingleton
-NaN/order semantics, unrelated arithmetic, prefixes and provider numeric-min contracts outside
-that slice. Resume the deferred FP64 semantic gate only after this correctness work. No further
-batching optimization belongs to either slice. Latest accepted implementation and full checkpoint: 214. Implementation
-slices since the full checkpoint: 0. Rolling 210/213/214 covers shared literal correctness, FP64 implicit shuffle admission,
-and complex-driven process-lifetime work; research 211/212/215 does not advance implementation cadence.
+Latest accepted targeted implementation is 216. The latest full checkpoint remains 214, with one
+accepted implementation slice since that checkpoint.
+Rolling213/214/216 covers FP64 implicit shuffle admission, complex-driven process lifetime and proven
+singleton correctness; research215 does not advance implementation cadence. Correctness took priority
+in216; reconsider material-driven opportunities without inventing missing runtime contracts.
 
 ## Checkpoints and evidence
 
-| Area                        | Record                                                                                                                     | Interpretation                                                                           |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Slice 214 accepted full     | [Manifest](runtime-validation.slice-214.json), [frozen](census.slice-214.tsv), [discovery](discovery-census.slice-214.tsv) | All 1,650 fresh cells exactly preserve 210+213; 1,597 correct and 53 unchanged failures. |
-| Slice 213 accepted targeted | [Manifest](runtime-validation.slice-213.json)                                                                              | Added three FP64 implicit aggregate-shuffle cells; all retained in accepted 214.         |
-| Slice 210 accepted full     | [Manifest](runtime-validation.slice-210.json)                                                                              | Previous full preservation baseline, combined with 213's additions/fixes.                |
+| Area                        | Record                                                                                                                     | Interpretation                                                                              |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Slice 216 accepted targeted | [Manifest](runtime-validation.slice-216.json), [frozen](census.slice-216.tsv), [discovery](discovery-census.slice-216.tsv) | 618 fresh cells:580 correct,38 unchanged failures. 1035 frozen cells explicitly inherit214. |
+| Slice214 accepted full      | [Manifest](runtime-validation.slice-214.json), [frozen](census.slice-214.tsv), [discovery](discovery-census.slice-214.tsv) | All1650 cells fresh:1597 correct,53 known failures. Latest full checkpoint.                 |
+| Slice215 accepted research  | [Evidence](semantic-evidence.slice-215.json)                                                                               | Separate singleton defect discovered on exact214 binaries; broader semantic matrix stopped. |
 
-Frozen 452 × 3 gives 1,333 correct, five infrastructure and 18 preflight cells. Discovery 98 × 3
-gives 264 correct, 22 infrastructure, four runtime mismatch and four preflight cells. All five
-stable fields match exactly: classification, return code, complete execution counts, diagnostic
-and canonical shape. There are no missing, extra or duplicate cells, source/selection/oracle
-changes, or additions. All 546 distinct runtime sources match accepted base 786a2452. Historical
-healthy denominators remain 427 frozen and 72 discovery. Both full runners return 2 for retained
-failures; their exit codes alone do not decide acceptance.
+Frozen remains452identities/1356cells. Discovery adds one identity, reaching99/297cells.
+Cumulative1653cells contain1600 correct and53 unchanged failures; four resolved histories remain.
+Every fresh old cell exactly matches classification, return code, complete execution counts,
+diagnostic and canonical shape. No missing/extra/duplicate cells. The original546 runtime source
+contracts are unchanged; the new fixture adds one. Historical healthy denominators427/72 stay fixed.
+Fresh321 selected frozen cells cover all wave/quad and double/helper/value/vector/matrix neighbors;
+full discovery297cells is fresh. Other1035 frozen results are inherited214, not passes on216 source.
 
-All 53 open failure records and four resolved histories retain their original first-known evidence
-and reproduction. Every runtime row is fresh in 214; no runtime outcome is inherited. Compiler
-units 477/477 plus one existing Windows-only skip and toolkit 18/18 explicitly inherit 213 because
-their source/binary/toolkit hashes are unchanged. Fresh gates cover GPU smoke 4/4, routing/reporter
-32/32, discovery contracts 4/4 and protocol/default/shared contracts 15/15. Six primary complex
-cells compile/assemble in both paths; references and repeated timing work are auxiliary coverage.
+Fresh gates: focused10/10, smoke4/4, units478/478 plus the existing Windows-only skip, toolkit18/18,
+and all6 material compile/assembly cells. No material runtime bindings/oracle exist. Frozen diagnostic
+subset returns0 with eight known preflight stops; discovery returns2 for retained failures. Exact
+structured comparison decides acceptance. Broad/uncertain impact would require full checkpoint;
+none occurred. Full checkpoint required after three accepted implementation slices or before publishing.
 
 ## Unresolved failures and limitations
 
-- Quad reconvergence, FP64 min/max, prefix-min/max KernelContext pointers and ordinary FP64
-  vector-by-value compound shuffles remain separate support work.
+- All53 open failure records and four resolved histories retain first-known evidence and reproduction.
+- FP64 min/max, nonsingleton FP32 min/max NaN/order behavior, quad reconvergence, prefix-min/max
+  KernelContext pointers and ordinary FP64 vector-by-value compound shuffles remain separate work.
 - Hardware masks remain scheduling-dependent; logical active-mask synthesis is unchanged.
 - FP8/BF16/prelude and existing discovery infrastructure/output gaps remain visible.
-- The material has no application bindings, texture/LUT/input contract or runtime output oracle.
-  Six complex cells compile/assemble; no material kernel correctness or speed claim.
-- The batching evidence covers one native Linux host and finite sessions. Windows supervision is
-  untested; POSIX process-group cleanup and pipe-holding descendants are tested.
+- The material lacks application bindings, texture/LUT/input contract and runtime output oracle.
+  Six cells compile/assemble; no material kernel correctness or speed claim.
+- Slice214 batching remains explicit opt-in. Mandatory fresh reference work made complete invocations
+  slower despite18.02355% paired compilation-lifecycle improvement; it is no routine accelerator.
 
 ## Environment and final evidence
 
-Native Ubuntu 24.04, branch `nvvm-backend`, repository `/home/skallweit/codex/agent-sandbox/slang`.
-L4 SM89, driver 580.126.09, target SM80, CUDA 12.9.2/NVRTC 86, LLVM 14, provider ABI 36. Use matching
-optimized `build/RelWithDebInfo/{bin,lib}`, source `build/nvvm-loop/slice-203-env.sh`, and consult
-local `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`. Suites are sequential with four
-corpus workers, two routing/reporter servers and `CMAKE_BUILD_PARALLEL_LEVEL=1`.
+Native Ubuntu24.04, branch `nvvm-backend`, repository `/home/skallweit/codex/agent-sandbox/slang`.
+L4 SM89, driver580.126.09, targetSM80, CUDA12.9.2/NVRTC12.9.86, LLVM14, providerABI36. Use matching
+optimized `build/RelWithDebInfo/{bin,lib}`, source `build/nvvm-loop/slice-203-env.sh`, and local
+`build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`. Sequential suites, four corpus/build
+workers maximum, two unit servers; `CMAKE_BUILD_PARALLEL_LEVEL=1`.
 
-The performance run has two paired warmups and twelve measured pairs with alternating policy order
-and balanced forward/reverse rotations. All 28 batches / 168 outputs are exact and all six distinct
-PTX hashes assemble. Startup and final process exit are included. Shared per-cell phase medians
-remain null; service latency is not an isolated compiler-call timing. A later parser-exception-only
-correction is recorded with the exact timed source snapshot; final protocol and material checks use
-final sources. Parent independently recomputed the timing and full preservation results.
-
-Compiler library SHA256: `2775a5783a7dd1310ab9773d259bf1bdafc464a4f55a376c1fc22c472a6b1bf0`.
-Provider SHA256: `ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372`.
-Tested base: `786a2452f576fc620c9eeb4019bb277a20f394cd`, plus final Python source hashes in the manifest.
-Raw evidence: `build/nvvm-loop/slice-214-after`, `slice-214-performance`, `slice-214-shared-smoke`
-and adjacent protocol logs. No GPU loss, driver change, reboot or worker commit occurred. The old
-A6000 history remains in 201 without an established cause.
+Tested base `230c3e0eae73be3b2ff01e26e3d346e12fe9b86c` plus final emitter/unit/fixture changes.
+Compiler SHA256 `fa55d1fdc41988e27e672d4a2ad92b93060293d101f4a7a076be3e68dd08298f`.
+Provider unchanged `ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372`.
+Raw evidence: `build/nvvm-loop/slice-216-before`, `slice-216-after`, and its `research-replay`.
+Before/after fixture SHA256 `d838cc70fe2e4d88bb2b127be48304fce74219bfd6319d25122a8e84815fe381`.
+No GPU loss, driver change, reboot, worker commit or push. Parent owns acceptance/local commit.
