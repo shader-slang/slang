@@ -98,6 +98,26 @@ bool isAnnotation(IRInst* inst)
     return as<IRAnnotation>(inst);
 }
 
+bool isDebugInst(IRInst* inst)
+{
+    // The debug-instruction ops that lowering interleaves among the ordinary insts of a
+    // function body under `-g`. This mirrors the instruction entries recognized by
+    // slang-ir-strip-debug-info.cpp (excluding its decoration and module-level entries,
+    // which never appear as a block's ordinary insts).
+    switch (inst->getOp())
+    {
+    case kIROp_DebugLine:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugVar:
+    case kIROp_DebugValue:
+    case kIROp_DebugInlinedAt:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool isPtrToClassType(IRInst* type)
 {
     return isPointerOfType(type, kIROp_ClassType);
