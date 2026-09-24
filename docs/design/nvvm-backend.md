@@ -7905,3 +7905,34 @@ semantic operation or source-text recognition; malformed mask/lane/payload signa
 preflight failures. Per-lane runtime oracles cover every vector component, high 64-bit payloads,
 Boolean patterns, wraparound and valid partial masks; bit oracles preserve floating signed zero
 and quiet-NaN payloads.
+
+### Slice 208: FP64 masked arithmetic and explicit matrix transport
+
+The exact masked-wave helper algebra admits Float64 sum/product reductions and inclusive/exclusive
+prefixes through existing scalar arithmetic and indexed-shuffle operations. Vector helpers apply
+the scalar recipe componentwise; lowered matrix helpers use homogeneous arrays of vectors. The
+scalar type and complete mask/result signature remain canonical semantic inputs; no source-text
+parsing, provider operation, catalog or ABI change is involved.
+
+FP64 reduction identities preserve observable CUDA prelude behavior. `_waveCalcPow2Offset`
+recognizes a contiguous low-bit run with a power-of-two population; that reduction starts from
+caller values. The sequential recipe uses negative zero for its sum identity on those masks,
+retaining all-negative-zero results, and positive zero for other masks as the CUDA sparse loop
+does. Singleton sum/product selects the original caller value without altering payload bits,
+including signaling NaNs. Prefix sum and product identities remain positive zero and one. These
+rules are confined to newly admitted FP64 reductions; existing 32-bit recipes are unchanged.
+
+Explicit-mask matrix indexed shuffles reuse the same homogeneous leaf transport. FP64 implicit
+matrix shuffle remains rejected because the existing implicit-mask recipe uses a full-mask ballot,
+which does not establish a divergent active mask. NVIDIA's [PTX vote.sync contract](https://docs.nvidia.com/cuda/pdf/ptx_isa_8.8.pdf)
+requires participation from all non-exited lanes named by the mask. A provisional divergent test
+passing on one GPU is insufficient evidence for that contract. Existing 32-bit behavior is
+unchanged and this active-mask issue remains a separate correctness candidate. Return-by-value
+FP64 vector shuffles still use a separate restricted compound resolver. FP64 masked min/max is
+also deferred until its comparison/select versus numeric min/max edge semantics are reconciled.
+
+Independent runtime fixtures cover all scalar/vector components, FP64 precision beyond float32,
+full/sparse/partial/singleton masks, matrix reductions and explicit partial transport, signed-zero
+seeds, NaN/infinity classification and exact singleton payloads. The slice's targeted acceptance
+replays all wave/quad frozen identities and double/helper neighbors plus the full discovery corpus;
+unselected frozen cells retain explicitly inherited slice-207 full-checkpoint evidence.

@@ -8650,6 +8650,108 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedAggregateWaveSignatureSource,
          "assembly=_waveShuffleMultiple($0, $1, $2)"},
         {kDirectNVVMUnsupportedMaskedWaveScalarSignatureSource, "assembly=_waveSum($1.x, $0)"},
+        {R"SLANG(
+            double unsupportedWave(double value, uint mask)
+            {
+                __target_switch
+                {
+                case cuda: __intrinsic_asm "_waveSum($1.x, $0)";
+                default: return value;
+                }
+            }
+            [CUDAKernel]
+            void computeMain(
+                uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+                uniform uint mask)
+            {
+                *destination = int(unsupportedWave(double(1), uint(mask)));
+            }
+        )SLANG",
+         "assembly=_waveSum($1.x, $0)"},
+        {R"SLANG(
+            double2 unsupportedWave(double2 value, uint2 mask)
+            {
+                __target_switch
+                {
+                case cuda: __intrinsic_asm "_waveSumMultiple($1.x, $0)";
+                default: return value;
+                }
+            }
+            [CUDAKernel]
+            void computeMain(
+                uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+                uniform uint mask)
+            {
+                *destination = int(unsupportedWave(double2(1), uint2(mask)).x);
+            }
+        )SLANG",
+         "assembly=_waveSumMultiple($1.x, $0)"},
+        {R"SLANG(
+            double unsupportedWave(double value, uint4 mask)
+            {
+                __target_switch
+                {
+                case cuda: __intrinsic_asm "_waveAnd($1.x, $0)";
+                default: return value;
+                }
+            }
+            [CUDAKernel]
+            void computeMain(
+                uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+                uniform uint mask)
+            {
+                *destination = int(unsupportedWave(double(1), uint4(mask)));
+            }
+        )SLANG",
+         "assembly=_waveAnd($1.x, $0)"},
+        {R"SLANG(
+            double unsupportedWave(double value, uint4 mask)
+            {
+                __target_switch
+                {
+                case cuda: __intrinsic_asm "_waveMin($1.x, $0)";
+                default: return value;
+                }
+            }
+            [CUDAKernel]
+            void computeMain(
+                uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+                uniform uint mask)
+            {
+                *destination = int(unsupportedWave(double(1), uint4(mask)));
+            }
+        )SLANG",
+         "assembly=_waveMin($1.x, $0)"},
+        {R"SLANG(
+            double2 unsupportedWave(double2 value, uint4 mask)
+            {
+                __target_switch
+                {
+                case cuda: __intrinsic_asm "_waveMinMultiple($1.x, $0)";
+                default: return value;
+                }
+            }
+            [CUDAKernel]
+            void computeMain(
+                uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+                uniform uint mask)
+            {
+                *destination = int(unsupportedWave(double2(1), uint4(mask)).x);
+            }
+        )SLANG",
+         "assembly=_waveMinMultiple($1.x, $0)"},
+        {R"SLANG(
+            [CUDAKernel]
+            void computeMain(
+                uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+                uniform uint lane)
+            {
+                double2x2 value = double2x2(1.0l, 2.0l, 3.0l, 4.0l);
+                double2x2 shuffled = WaveReadLaneAt(value, int(lane));
+                *destination = int(shuffled[0][0]);
+            }
+        )SLANG",
+         "assembly=_waveShuffleMultiple(_getActiveMask(), $0, $1)"},
         {kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMUnsupportedSurfaceSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},

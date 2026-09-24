@@ -4650,6 +4650,12 @@ struct NVVMMaskedWaveScalarOperation
     NVVMValueRecipeStep waveReadLaneAt;
     NVVMValueRecipeStep combine;
     NVVMValueRecipeStep select;
+    bool preservesFloat64Reduction = false;
+    bool usesFloat64SumIdentity = false;
+    NVVMValueRecipeStep reductionMaskEqual;
+    NVVMValueRecipeStep reductionMaskAdd;
+    NVVMValueRecipeStep reductionMaskCountBits;
+    NVVMValueRecipeStep reductionMaskConjunction;
 };
 
 struct NVVMMaskedWaveSpelling
@@ -4862,16 +4868,26 @@ bool _resolveNVVMUInt64WordConstruction(
 }
 
 // Returns the exact identity used by one scalar masked reduction or prefix. The bit pattern is
-// interpreted through the already-validated scalar type, so integer signedness and Float32
-// infinities remain explicit properties of the recipe rather than host-language conversions.
+// interpreted through the already-validated scalar type, so integer signedness and floating-point
+// identities remain explicit properties of the recipe rather than host-language conversions.
 bool _getNVVMMaskedWaveScalarIdentity(
     SlangNVVMValueOperation operation,
     const SlangNVVMValueTypeDesc& type,
     uint64_t& outIdentityBits)
 {
     outIdentityBits = 0;
-    if (type.bitWidth != 32 || type.laneCount != 1)
+    const bool isFloat64 = type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && type.bitWidth == 64;
+    if ((type.bitWidth != 32 && !isFloat64) || type.laneCount != 1)
         return false;
+
+    // Admit Float64 arithmetic without extending the existing min/max contract. CUDA's wave
+    // min/max helpers use comparison and selection, while the numeric min/max recipe has
+    // different NaN and signed-zero behavior that needs its own semantic audit.
+    if (isFloat64 && operation != SLANG_NVVM_VALUE_OP_ADD &&
+        operation != SLANG_NVVM_VALUE_OP_MULTIPLY)
+    {
+        return false;
+    }
 
     const bool isInteger = type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
                            type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER;
@@ -4892,7 +4908,7 @@ bool _getNVVMMaskedWaveScalarIdentity(
     case SLANG_NVVM_VALUE_OP_MULTIPLY:
         if (!isInteger && !isFloating)
             return false;
-        outIdentityBits = isFloating ? 0x3f800000u : 1u;
+        outIdentityBits = isFloat64 ? 0x3ff0000000000000ull : isFloating ? 0x3f800000u : 1u;
         return true;
     case SLANG_NVVM_VALUE_OP_BIT_AND:
         if (!isInteger)
@@ -5032,6 +5048,47 @@ bool _initializeNVVMMaskedWaveScalarOperation(
         return false;
     }
 
+    outOperation.preservesFloat64Reduction =
+        valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && valueType.bitWidth == 64 &&
+        spelling.mode == NVVMMaskedWaveScalarMode::Reduction;
+    outOperation.usesFloat64SumIdentity = outOperation.preservesFloat64Reduction &&
+                                          spelling.combineOperation == SLANG_NVVM_VALUE_OP_ADD;
+    if (outOperation.preservesFloat64Reduction && !_setNVVMSupportedValueRecipeStep(
+                                                      outOperation.reductionMaskEqual,
+                                                      SLANG_NVVM_VALUE_OP_EQUAL,
+                                                      NVVMSemantics::kBool,
+                                                      unsignedBinary,
+                                                      2,
+                                                      "Float64 reduction mask equality"))
+    {
+        return false;
+    }
+    const SlangNVVMValueTypeDesc booleanBinary[] = {NVVMSemantics::kBool, NVVMSemantics::kBool};
+    if (outOperation.usesFloat64SumIdentity && (!_setNVVMSupportedValueRecipeStep(
+                                                    outOperation.reductionMaskAdd,
+                                                    SLANG_NVVM_VALUE_OP_ADD,
+                                                    NVVMSemantics::kUnsignedI32,
+                                                    unsignedBinary,
+                                                    2,
+                                                    "Float64 sum contiguous-mask increment") ||
+                                                !_setNVVMSupportedValueRecipeStep(
+                                                    outOperation.reductionMaskCountBits,
+                                                    SLANG_NVVM_VALUE_OP_COUNT_BITS,
+                                                    NVVMSemantics::kUnsignedI32,
+                                                    unsignedUnary,
+                                                    1,
+                                                    "Float64 sum partition size") ||
+                                                !_setNVVMSupportedValueRecipeStep(
+                                                    outOperation.reductionMaskConjunction,
+                                                    SLANG_NVVM_VALUE_OP_BIT_AND,
+                                                    NVVMSemantics::kBool,
+                                                    booleanBinary,
+                                                    2,
+                                                    "Float64 sum caller-seeded mask predicate")))
+    {
+        return false;
+    }
+
     const SlangNVVMValueOperationDesc combineDesc = outOperation.combine.getDesc();
     if (const auto semantic = NVVMSemantics::find(combineDesc))
     {
@@ -5112,9 +5169,9 @@ struct NVVMAggregateWaveOperation
     NVVMMaskedWaveScalarOperation maskedScan;
 };
 
-// Returns the one homogeneous 32-bit numeric leaf of an aggregate represented as vectors and
-// fixed arrays. This is the exact structural algebra used by lowered matrices and vector wave
-// overloads; heterogeneous structs and arbitrary storage graphs are intentionally absent.
+// Returns the homogeneous 32-bit numeric or Float64 leaf of vectors and fixed arrays. This is the
+// exact structural algebra used by lowered matrices and vector wave overloads; heterogeneous
+// structs and arbitrary storage graphs are intentionally absent.
 bool _getNVVMHomogeneousWaveAggregateLeafType(IRType* type, IRType*& outLeafType)
 {
     outLeafType = nullptr;
@@ -5144,7 +5201,9 @@ bool _getNVVMHomogeneousWaveAggregateLeafType(IRType* type, IRType*& outLeafType
             elementSemantic.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
         if (elementSemantic.laneCount == 1)
         {
-            if (!isSelectedNumeric || elementSemantic.bitWidth != 32)
+            const bool isFloat64 = elementSemantic.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                                   elementSemantic.bitWidth == 64;
+            if (!isSelectedNumeric || (elementSemantic.bitWidth != 32 && !isFloat64))
                 return false;
             outLeafType = elementType;
             return true;
@@ -5254,6 +5313,14 @@ bool _resolveNVVMAggregateWaveOperation(
         SlangNVVMValueTypeDesc leafSemantic = {};
         if (!_getNVVMSemanticType(leafType, leafSemantic))
             return false;
+        // Float64 aggregate transport requires an explicit participation mask. The existing
+        // implicit-mask recipe uses a full-mask ballot, which cannot represent a divergent
+        // active mask. Do not extend that incomplete contract to newly admitted Float64 leaves.
+        if (isImplicitMaskShuffle && leafSemantic.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+            leafSemantic.bitWidth == 64)
+        {
+            return false;
+        }
         const SlangNVVMValueTypeDesc operands[] = {
             NVVMSemantics::kUnsignedI32,
             leafSemantic,
@@ -6510,6 +6577,28 @@ void _requireNVVMMaskedWaveScalarOperations(
     };
     for (auto step : commonSteps)
         _requireValueOperation(requirements, step->getDesc(), step->diagnosticName);
+
+    if (operation.preservesFloat64Reduction)
+    {
+        _requireValueOperation(
+            requirements,
+            operation.reductionMaskEqual.getDesc(),
+            operation.reductionMaskEqual.diagnosticName);
+        _requireValueOperation(
+            requirements,
+            operation.select.getDesc(),
+            operation.select.diagnosticName);
+    }
+    if (operation.usesFloat64SumIdentity)
+    {
+        const NVVMValueRecipeStep* identitySteps[] = {
+            &operation.reductionMaskAdd,
+            &operation.reductionMaskCountBits,
+            &operation.reductionMaskConjunction,
+        };
+        for (auto step : identitySteps)
+            _requireValueOperation(requirements, step->getDesc(), step->diagnosticName);
+    }
 
     if (operation.mode != NVVMMaskedWaveScalarMode::Reduction)
     {
@@ -12426,6 +12515,160 @@ SlangResult _finishNVVMMaskedWavePhi(
             pending.bodyBlock));
 }
 
+// Preserves CUDA's Float64 reduction seed and singleton passthrough semantics. Consider
+// WaveMultiSum(bit_cast<double>(uint64_t(1) << 63), uint4(0xffffffff, 0, 0, 0)):
+// every input is negative zero. The prelude's power-of-two butterfly starts from a caller value,
+// so it returns negative zero. Starting our sequential reduction at negative zero preserves that
+// result without counting a caller twice. Other masks use the prelude's positive-zero seed.
+// The predicate below is the same contiguous low-bit run and power-of-two population condition
+// used by _waveCalcPow2Offset. Singleton reductions instead return the untouched caller value,
+// including signaling NaN payloads, because the prelude performs no arithmetic for those masks.
+SlangResult _emitNVVMFloat64WaveReductionIdentity(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMMaskedWaveScalarOperation& operation,
+    SlangNVVMTypeHandle valueType,
+    SlangNVVMValueHandle mask,
+    SlangNVVMValueHandle& identity,
+    SlangNVVMValueHandle& outIsSingleton)
+{
+    SLANG_RELEASE_ASSERT(operation.preservesFloat64Reduction);
+    const SlangNVVMValueHandle negativeMaskOperands[] = {mask};
+    SlangNVVMValueHandle negativeMask = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.remainingNegate,
+        negativeMaskOperands,
+        SLANG_COUNT_OF(negativeMaskOperands),
+        negativeMask));
+    const SlangNVVMValueHandle lowestBitOperands[] = {mask, negativeMask};
+    SlangNVVMValueHandle lowestBit = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.isolateLaneBit,
+        lowestBitOperands,
+        SLANG_COUNT_OF(lowestBitOperands),
+        lowestBit));
+    const SlangNVVMValueHandle singletonOperands[] = {mask, lowestBit};
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.reductionMaskEqual,
+        singletonOperands,
+        SLANG_COUNT_OF(singletonOperands),
+        outIsSingleton));
+    if (!operation.usesFloat64SumIdentity)
+        return SLANG_OK;
+
+    SlangNVVMValueHandle zero = nullptr;
+    SlangNVVMValueHandle one = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 32, 0, zero));
+    SLANG_RETURN_ON_FAIL(
+        _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 32, 1, one));
+    const SlangNVVMValueHandle maskPlusOneOperands[] = {mask, one};
+    SlangNVVMValueHandle maskPlusOne = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.reductionMaskAdd,
+        maskPlusOneOperands,
+        SLANG_COUNT_OF(maskPlusOneOperands),
+        maskPlusOne));
+    const SlangNVVMValueHandle contiguousBitsOperands[] = {mask, maskPlusOne};
+    SlangNVVMValueHandle contiguousBits = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.isolateLaneBit,
+        contiguousBitsOperands,
+        SLANG_COUNT_OF(contiguousBitsOperands),
+        contiguousBits));
+    const SlangNVVMValueHandle isContiguousOperands[] = {contiguousBits, zero};
+    SlangNVVMValueHandle isContiguous = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.reductionMaskEqual,
+        isContiguousOperands,
+        SLANG_COUNT_OF(isContiguousOperands),
+        isContiguous));
+    const SlangNVVMValueHandle countOperands[] = {mask};
+    SlangNVVMValueHandle count = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.reductionMaskCountBits,
+        countOperands,
+        SLANG_COUNT_OF(countOperands),
+        count));
+    const SlangNVVMValueHandle negativeCountOperands[] = {count};
+    SlangNVVMValueHandle negativeCount = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.remainingNegate,
+        negativeCountOperands,
+        SLANG_COUNT_OF(negativeCountOperands),
+        negativeCount));
+    const SlangNVVMValueHandle lowestCountBitOperands[] = {count, negativeCount};
+    SlangNVVMValueHandle lowestCountBit = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.isolateLaneBit,
+        lowestCountBitOperands,
+        SLANG_COUNT_OF(lowestCountBitOperands),
+        lowestCountBit));
+    const SlangNVVMValueHandle isPowerOfTwoOperands[] = {count, lowestCountBit};
+    SlangNVVMValueHandle isPowerOfTwo = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.reductionMaskEqual,
+        isPowerOfTwoOperands,
+        SLANG_COUNT_OF(isPowerOfTwoOperands),
+        isPowerOfTwo));
+    const SlangNVVMValueHandle usesCallerSeedOperands[] = {isContiguous, isPowerOfTwo};
+    SlangNVVMValueHandle usesCallerSeed = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.reductionMaskConjunction,
+        usesCallerSeedOperands,
+        SLANG_COUNT_OF(usesCallerSeedOperands),
+        usesCallerSeed));
+    SlangNVVMValueHandle negativeZero = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "Float64 sum negative-zero identity",
+        builder
+            .getFloatingPointConstant(module, valueType, 64, 0x8000000000000000ull, negativeZero)));
+    const SlangNVVMValueHandle identityOperands[] = {usesCallerSeed, negativeZero, identity};
+    return _emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.select,
+        identityOperands,
+        SLANG_COUNT_OF(identityOperands),
+        identity);
+}
+
 // Emits one scalar result for a validated masked-wave recipe. Returning the value, exit block, and
 // deferred phi edges lets the same control-flow graph serve scalar helpers and each leaf of a
 // canonical aggregate helper. The caller adds the phi edges only after every block is terminated.
@@ -12489,6 +12732,20 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
             codeGenContext,
             "masked-wave integer identity",
             builder.getIntegerConstant(module, valueType, signedIdentity, result)));
+    }
+
+    SlangNVVMValueHandle isSingleton = nullptr;
+    if (operation.preservesFloat64Reduction)
+    {
+        SLANG_RETURN_ON_FAIL(_emitNVVMFloat64WaveReductionIdentity(
+            codeGenContext,
+            builder,
+            module,
+            operation,
+            valueType,
+            loweredMask,
+            result,
+            isSingleton));
     }
 
     SlangNVVMValueHandle currentLane = nullptr;
@@ -12676,6 +12933,18 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
         builder.setInsertBlock(module, exitBlock)));
 
     outValue = accumulated;
+    if (operation.preservesFloat64Reduction)
+    {
+        const SlangNVVMValueHandle singletonOperands[] = {isSingleton, loweredValue, accumulated};
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            operation.select,
+            singletonOperands,
+            SLANG_COUNT_OF(singletonOperands),
+            outValue));
+    }
     outExitBlock = exitBlock;
     outPendingPhi = {
         remaining,

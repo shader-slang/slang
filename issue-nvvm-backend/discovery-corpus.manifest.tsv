@@ -90,3 +90,6 @@ cuda/nvvm-local-boolean-lanes.slang	0	boolean-vector,local-pointer	Dynamic priva
 cuda/nvvm-vector-classification.slang	0	boolean-vector,intrinsic	Runtime vector isnan/isinf classification exercises local Boolean lane construction with edge-case expected output.
 cuda/nvvm-wave-rotation.slang	0	wave,rotation,scalar-widths	Per-lane full-wave and clustered rotation checks all vector lanes and independent boundary oracles.
 cuda/nvvm-wave-shuffle-widths.slang	0	wave,masked-shuffle,scalar-widths	Bit-exact narrow and 64-bit scalar indexed transport with distinct high words, signed zero, NaNs and partial participation.
+cuda/nvvm-fp64-masked-wave.slang	0	wave,masked-arithmetic,float64	Independent scalar and vector FP64 sum/product reduction and inclusive/exclusive prefix oracles on full, sparse, partial and singleton partitions.
+cuda/nvvm-fp64-wave-aggregate.slang	0	wave,aggregate,float64	FP64 matrix reductions and every-component explicit-mask matrix indexed transport, including partial active masks.
+cuda/nvvm-fp64-wave-edges.slang	0	wave,float64,edge-cases	Signed-zero sum seeds, product signs, infinity/NaN classification, and bit-exact scalar/vector/matrix singleton payload preservation.
