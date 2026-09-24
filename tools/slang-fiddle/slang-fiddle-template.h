@@ -35,6 +35,7 @@ class TextTemplateSpliceStmt : public TextTemplateStmt
 {
 public:
     UnownedStringSlice scriptExprSource;
+    bool hasTrailingNewline = false;
 };
 
 class TextTemplateSeqStmt : public TextTemplateStmt
