@@ -2748,6 +2748,16 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         wsFolder.uri = rootUri;
         initParams.workspaceFolders.add(wsFolder);
     }
+    // `-init-options-array` sends a non-object (array) `initializationOptions`, which LSP `LSPAny`
+    // permits a client to send. It exercises that the server handles an out-of-shape payload
+    // gracefully rather than asserting; unlike an object payload it applies no setting, so it emits
+    // no server->client refresh and does not desync this reused connection.
+    if (input.testOptions->args.indexOf(String("-init-options-array")) >= 0)
+    {
+        auto* container = connection->getContainer();
+        JSONValue element = JSONValue::makeInt(1);
+        initParams.initializationOptions = container->createArray(&element, 1);
+    }
     if (SLANG_FAILED(connection->sendCall(
             LanguageServerProtocol::InitializeParams::methodName,
             &initParams,

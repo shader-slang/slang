@@ -3103,7 +3103,11 @@ void LanguageServer::update()
 
 void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
 {
-    if (!jsonVal.isObjectLike())
+    // Only an object carries the `slang.*` settings, and getObject() below asserts `type == Object`
+    // (an assertion that degrades to undefined behavior in release builds). A client may send a
+    // non-object `initializationOptions` (LSP types it as `LSPAny`), so reject anything that is not
+    // an object here rather than using isObjectLike(), which is also true for arrays.
+    if (jsonVal.getKind() != JSONValue::Kind::Object)
         return;
     auto obj = m_connection->getContainer()->getObject(jsonVal);
     if (obj.getCount() == 1 &&
