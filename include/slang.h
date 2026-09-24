@@ -6074,12 +6074,16 @@ SLANG_EXTERN_C SLANG_API const char* slang_getCurrentReplayPath();
    Switches to playback mode on success.
    @param folderPath Path to the replay folder.
    @return SLANG_OK on success, SLANG_E_NOT_FOUND if stream.bin doesn't exist.
+   Returns SLANG_E_NOT_AVAILABLE when Slang is built with the record-replay layer excluded
+   (SLANG_ENABLE_RECORD_REPLAY=OFF).
  */
 SLANG_EXTERN_C SLANG_API SlangResult slang_loadReplay(const char* folderPath);
 
 /* Load the most recent replay from the replay directory.
    Switches to playback mode on success.
    @return SLANG_OK on success, SLANG_E_NOT_FOUND if no replays exist.
+   Returns SLANG_E_NOT_AVAILABLE when Slang is built with the record-replay layer excluded
+   (SLANG_ENABLE_RECORD_REPLAY=OFF).
  */
 SLANG_EXTERN_C SLANG_API SlangResult slang_loadLatestReplay();
 

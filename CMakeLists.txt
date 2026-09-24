@@ -227,6 +227,22 @@ option(
     ON
 )
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
+option(
+    SLANG_ENABLE_RECORD_REPLAY
+    "Build the API record-replay layer and its slang_*RecordLayer/*Replay C API. When OFF, the record-replay sources are excluded and that C API is compiled as exported disabled stubs (ABI preserved)."
+    ON
+)
+
+# The slang-replay tool links the record-replay subsystem, so it cannot be built once that
+# subsystem is excluded. Force it off (rather than erroring) so an existing SLANG_ENABLE_REPLAYER=ON
+# cache entry does not make the two options contradict each other.
+if(NOT SLANG_ENABLE_RECORD_REPLAY AND SLANG_ENABLE_REPLAYER)
+    message(
+        STATUS
+        "SLANG_ENABLE_RECORD_REPLAY is OFF; forcing SLANG_ENABLE_REPLAYER OFF (the slang-replay tool depends on the record-replay subsystem)."
+    )
+    set(SLANG_ENABLE_REPLAYER OFF CACHE BOOL "Enable slang-replay tool" FORCE)
+endif()
 
 advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
