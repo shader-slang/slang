@@ -1,6 +1,7 @@
 // Test for empty ray payload struct with HitObject.Invoke
 // GitHub Issue: https://github.com/shader-slang/slang/issues/8590
-// The compiler should add a dummy field to empty ray payload structs for HLSL/DXIL/SPIRV targets.
+// HLSL/DXIL require a one-int payload object; direct SPIR-V accepts a zero-member struct.
+// CUDA/OptiX needs no artificial payload storage. The logical RayPayload type stays unchanged.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -profile sm_6_5 -entry rayGenShaderMakeQueryInvokeNOP -stage raygeneration -capability hlsl_nvapi
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry rayGenShaderMakeQueryInvokeNOP -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
@@ -9,7 +10,6 @@
 [raypayload]
 struct RayPayload
 {
-    // Empty payload - should get a dummy field added for HLSL/DXIL
 };
 
 uniform RaytracingAccelerationStructure sceneBVH;
@@ -30,10 +30,17 @@ void rayGenShaderMakeQueryInvokeNOP()
     HitObject.Invoke(sceneBVH, hitObjectNOP, payload);
 }
 
-// HLSL: struct RayPayload
-// HLSL: _slang_dummy
+// HLSL: struct EmptyRayPayload{{[A-Za-z0-9_]*}}
+// HLSL-NEXT: {
+// HLSL-NEXT: int _slang_dummy{{.*}};
+// HLSL-NEXT: };
 // HLSL: NvInvokeHitObject
 
-// SPIRV: OpMemberName %RayPayload 0 "_slang_dummy"
+// SPIRV-NOT: _slang_dummy
+// SPIRV: %[[payloadType:[A-Za-z0-9_]+]] = OpTypeStruct{{$}}
+// SPIRV: %[[pointer:[A-Za-z0-9_]+]] = OpTypePointer RayPayloadKHR %[[payloadType]]
+// SPIRV: %[[payload:[A-Za-z0-9_]+]] = OpVariable %[[pointer]] RayPayloadKHR
+// SPIRV: OpHitObjectExecuteShaderNV {{.*}} %[[payload]]
 
+// CUDA-NOT: _slang_dummy
 // CUDA: optixInvoke

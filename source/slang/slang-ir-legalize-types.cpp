@@ -15,11 +15,14 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-ray-tracing-legalize.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-target-program.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -107,6 +110,99 @@ IRTypeLegalizationContext::IRTypeLegalizationContext(
     builder = &builderStorage;
 
     m_sink = sink;
+
+    // Reuse physical types created by an earlier legalization pass. In particular, a direct
+    // SPIR-V payload stays physically present even though its struct has no members.
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto decor = inst->findDecoration<IREmptyRayTracingPayloadDecoration>())
+        {
+            auto& type = decor->getIsRayPayload()->getValue() ? emptyRayPayloadType
+                                                              : emptyCallablePayloadType;
+            type = cast<IRStructType>(inst);
+        }
+    }
+}
+
+// Return the target's physical empty payload type without changing the legalization result of
+// any source type. Ray and callable types differ because D3D ray fields carry access qualifiers.
+static IRStructType* getEmptyRayTracingPayloadType(
+    IRTypeLegalizationContext* context,
+    bool isRayPayload)
+{
+    auto& type = isRayPayload ? context->emptyRayPayloadType : context->emptyCallablePayloadType;
+    if (!type)
+        type =
+            createEmptyRayTracingPayloadType(context->module, context->targetProgram, isRayPayload);
+    return type;
+}
+
+// Return the physical pointer type for an erased D3D boundary parameter, or nullptr when ordinary
+// type legalization applies. The decoration belongs to the parameter, never its shared source type.
+static IRType* getEmptyRayTracingParamType(
+    IRTypeLegalizationContext* context,
+    IRParam* param,
+    LegalType legalType)
+{
+    if (legalType.flavor != LegalType::Flavor::none)
+        return nullptr;
+    auto decor = param->findDecoration<IRRequiredRayTracingPayloadDecoration>();
+    if (!decor)
+        return nullptr;
+    auto ptrType = cast<IRPtrTypeBase>(param->getDataType());
+    auto type = getEmptyRayTracingPayloadType(context, decor->getIsRayPayload()->getValue() != 0);
+    return context->builder->getPtrTypeWithAddressSpace(type, ptrType);
+}
+
+// Preserve a decorated global's ABI identity while its logical value disappears. Location-based
+// dispatches resolve these decorations later, so a fresh variable with an unrelated location is
+// not an equivalent replacement. Ordinary uses still receive LegalVal::none from the caller.
+static void materializeEmptyRayTracingGlobal(
+    IRTypeLegalizationContext* context,
+    IRGlobalVar* original)
+{
+    if (!isKhronosTarget(context->targetProgram->getTargetReq()))
+        return;
+    bool isRayPayload = original->findDecoration<IRVulkanRayPayloadDecoration>() ||
+                        original->findDecoration<IRVulkanRayPayloadInDecoration>();
+    if (!isRayPayload && !original->findDecoration<IRVulkanCallablePayloadDecoration>() &&
+        !original->findDecoration<IRVulkanCallablePayloadInDecoration>())
+        return;
+
+    auto type = getEmptyRayTracingPayloadType(context, isRayPayload);
+    IRBuilder builder(context->module);
+    builder.setInsertBefore(original);
+    auto physical = builder.createGlobalVar(type);
+    physical->setFullType(builder.getPtrTypeWithAddressSpace(type, original->getDataType()));
+    for (auto decor : original->getDecorations())
+        cloneDecoration(decor, physical);
+    context->emptyRayTracingGlobals.add(original, physical);
+}
+
+// Use the original payload global when available. An empty formal inside an arbitrary helper has
+// no data to transport, so its actual dispatch can instead use a fresh outgoing ABI variable.
+// This does not require the helper or any of its callers to be inlined or to take a dummy argument.
+static IRGlobalVar* getEmptyRayTracingGlobal(
+    IRTypeLegalizationContext* context,
+    IRInst* original,
+    bool isRayPayload)
+{
+    IRGlobalVar* physical = nullptr;
+    if (auto global = as<IRGlobalVar>(original))
+    {
+        if (context->emptyRayTracingGlobals.tryGetValue(global, physical))
+            return physical;
+    }
+
+    auto type = getEmptyRayTracingPayloadType(context, isRayPayload);
+    IRBuilder builder(context->module);
+    builder.setInsertInto(context->module);
+    physical = builder.createGlobalVar(type);
+    if (isRayPayload)
+        builder.addVulkanRayPayloadDecoration(physical, -1);
+    else
+        builder.addVulkanCallablePayloadDecoration(physical, -1);
+    return physical;
 }
 
 static void registerLegalizedValue(
@@ -477,10 +573,27 @@ static LegalVal legalizeCall(IRTypeLegalizationContext* context, IRCall* callIns
 {
     LegalCallBuilder builder(context, callInst);
 
+    // The callee's signature may already have changed. Its map is indexed by the original call
+    // slots, so erased parameters before a required payload cannot shift the slot we repair.
+    List<IRType*>* physicalParamTypes = nullptr;
+    if (auto func = as<IRFunc>(callInst->getCallee()))
+        physicalParamTypes = context->emptyRayTracingParamTypes.tryGetValue(func);
+
     auto argCount = callInst->getArgCount();
+    SLANG_RELEASE_ASSERT(!physicalParamTypes || physicalParamTypes->getCount() == argCount);
     for (UInt i = 0; i < argCount; i++)
     {
         auto legalArg = legalizeOperand(context, callInst->getArg(i));
+        if (physicalParamTypes && (*physicalParamTypes)[i])
+        {
+            SLANG_RELEASE_ASSERT(legalArg.flavor == LegalVal::Flavor::none);
+            auto type = cast<IRPtrTypeBase>((*physicalParamTypes)[i])->getValueType();
+            auto irBuilder = context->builder;
+            irBuilder->setInsertBefore(callInst);
+            auto physical = irBuilder->emitVar(type);
+            irBuilder->emitStore(physical, irBuilder->emitDefaultConstruct(type));
+            legalArg = LegalVal::simple(physical);
+        }
         builder.addArg(legalArg);
     }
 
@@ -2103,6 +2216,49 @@ static LegalVal legalizeInst(
     LegalVal result = LegalVal();
     switch (inst->getOp())
     {
+    case kIROp_SPIRVAsmInst:
+        {
+            // An asm operand of empty pointer type has already become none. Only the dispatch's
+            // mandatory payload slot gets a physical replacement; other empty operands are not
+            // interchangeable with payloads. For example, a helper can keep all its control flow
+            // while `OpTraceRayKHR ... &emptyParameter` uses a module-scope empty payload instead.
+            auto asmInst = cast<IRSPIRVAsmInst>(inst);
+            bool isRayPayload = false;
+            auto payloadIndex = getSPIRVRayTracingPayloadOperandIndex(asmInst, isRayPayload);
+            List<IRInst*> operands;
+            for (Index i = 1; i < args.getCount(); ++i)
+            {
+                if (args[i].flavor == LegalVal::Flavor::simple)
+                {
+                    operands.add(args[i].getSimple());
+                    continue;
+                }
+                auto originalOperand = as<IRSPIRVAsmOperandInst>(inst->getOperand(i));
+                SLANG_RELEASE_ASSERT(
+                    i == payloadIndex && originalOperand &&
+                    legalizeType(context, originalOperand->getFullType()).flavor ==
+                        LegalType::Flavor::none);
+                auto physical =
+                    getEmptyRayTracingGlobal(context, originalOperand->getValue(), isRayPayload);
+                context->builder->setInsertBefore(inst);
+                operands.add(context->builder->emitSPIRVAsmOperandInst(physical));
+            }
+            return LegalVal::simple(
+                context->builder->emitSPIRVAsmInst(args[0].getSimple(), operands));
+        }
+
+    case kIROp_GetVulkanRayTracingPayloadLocation:
+        {
+            // Unlike ordinary reads of this source-empty global, its location is still meaningful.
+            // The physical mapping preserves the original ray/callable decoration and location.
+            auto original = cast<IRGlobalVar>(inst->getOperand(0));
+            auto physical = context->emptyRayTracingGlobals.tryGetValue(original);
+            SLANG_RELEASE_ASSERT(physical);
+            IRInst* args[] = {*physical};
+            return LegalVal::simple(
+                context->builder->emitIntrinsicInst(type.getSimple(), inst->getOp(), 1, args));
+        }
+
     case kIROp_Load:
         result = legalizeLoad(context, args[0]);
         break;
@@ -2288,6 +2444,18 @@ static LegalVal legalizeLocalVar(IRTypeLegalizationContext* context, IRVar* irLo
 static LegalVal legalizeParam(IRTypeLegalizationContext* context, IRParam* originalParam)
 {
     auto legalParamType = legalizeType(context, originalParam->getFullType());
+    if (auto physicalType = getEmptyRayTracingParamType(context, originalParam, legalParamType))
+    {
+        // Keep a physical parameter in the same signature slot, but erase the source parameter's
+        // uses. Mapping those uses to the dummy would leak ABI padding into ordinary user code.
+        auto physical = context->builder->createParam(physicalType);
+        physical->insertBefore(originalParam);
+        for (auto decor : originalParam->getDecorations())
+            cloneDecoration(decor, physical);
+        originalParam->removeFromParent();
+        context->replacedInstructions.add(originalParam);
+        return LegalVal();
+    }
     if (legalParamType.flavor == LegalType::Flavor::simple)
     {
         // Simple case: things were legalized to a simple type,
@@ -2557,11 +2725,31 @@ struct LegalFuncBuilder
         // zero or more parameters in the legalized function signature.
         //
         UInt oldParamCount = oldFuncType->getParamCount();
+        auto originalParam = oldFunc->getFirstParam();
+        List<IRType*> physicalParamTypes;
         for (UInt pp = 0; pp < oldParamCount; ++pp)
         {
             auto legalParamType = legalizeType(m_context, oldFuncType->getParamType(pp));
+            if (originalParam)
+            {
+                if (auto physicalType =
+                        getEmptyRayTracingParamType(m_context, originalParam, legalParamType))
+                {
+                    if (physicalParamTypes.getCount() == 0)
+                    {
+                        physicalParamTypes.setCount(oldParamCount);
+                        for (auto& type : physicalParamTypes)
+                            type = nullptr;
+                    }
+                    physicalParamTypes[pp] = physicalType;
+                    legalParamType = LegalType::simple(physicalType);
+                }
+                originalParam = originalParam->getNextParam();
+            }
             _addParam(legalParamType);
         }
+        if (physicalParamTypes.getCount())
+            m_context->emptyRayTracingParamTypes.add(oldFunc, _Move(physicalParamTypes));
 
         // We will record how many parameters resulted from
         // legalization of the original / "base" parameter list.
@@ -3601,6 +3789,8 @@ static LegalVal legalizeGlobalVar(IRTypeLegalizationContext* context, IRGlobalVa
     // Legalize the type for the variable's value
     auto originalValueType = irGlobalVar->getDataType()->getValueType();
     auto legalValueType = legalizeType(context, originalValueType);
+    if (legalValueType.flavor == LegalType::Flavor::none)
+        materializeEmptyRayTracingGlobal(context, irGlobalVar);
     auto varPtrType = as<IRPtrTypeBase>(irGlobalVar->getDataType());
     switch (legalValueType.flavor)
     {
