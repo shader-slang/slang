@@ -175,3 +175,54 @@ The [slice246 report](../../issue-nvvm-backend/report.slice-246-ast-subtype.md) 
 acceptance, serialized-AST/semantic/compiler-unit coverage, exact preserved corpus outcomes, original
 failure histories and inherited independent controls. Material runtime still requires its missing
 application bindings, texture/LUT inputs and expected-output contract.
+
+## Slice251: refresh the profile after predicate inlining
+
+[Research251](../../issue-nvvm-backend/report.slice-251-material-profile.md) and its
+[compact evidence](../../issue-nvvm-backend/timing-evidence.slice-251.json) measure accepted250 without
+compiler changes. The same two opposite-order rounds retain132 compiles (108 measured,24 warmups),
+followed by66 independent assemblies (54 measured,12 warmups). Every output matches accepted250;
+119 source,12 artifact and563 runtime-input hashes remain exact. All samples survive without retries
+or exclusions. Fresh wall medians are1407.13–1601.66ms and SemanticChecking484.74–488.73ms. Historical
+246 is not a paired baseline for this session; no new speedup is established.
+
+Semantic checking remains the largest localized front-end interval. Some inclusive `generateOutput`
+medians are larger, but include322.88–346.06ms linking/optimization and130.17–315.59ms unattributed
+output residual. Neither those rows nor other nested timers are additive. No material runtime or
+kernel-speed claim follows from these measurements.
+
+Fresh separate GDB seeds251/252/253 complete with exact PTX and89/91/93 snapshots. getClass leaves
+are6/6/4; the SyntaxClassBase constructor3/3/9; the already-inlined predicate1/5/3. Allocation leaves
+6/10/4 have heterogeneous consumers. These qualitative observations nominate a narrow repeated
+metadata path, not a unique dominant function or CPU fraction. The breakpoint window runs from
+checkAllTranslationUnits to generateIR, also spanning intervening component construction.268 stacks
+contain the checker;16 hit the100-frame cap, five before that frame. No fully captured stack is
+outside the checker. Debugger timings are excluded entirely; perf remains denied at paranoia4.
+
+The concrete helper shown above exercises ordinary call checking. The parser creates InvokeExpr
+through ASTBuilder; visitInvokeExpr and ResolveInvoke select candidates. Fresh seed253 stack81 reaches
+`inferGenericArguments -> as<CallableDecl> -> NodeBase::getClass -> SyntaxClassBase(ASTNodeType)`
+when classifying the generic declaration's inner node. These samples establish the compiler path,
+not attribution of all work to that helper. `_initAndAdd -> NodeBase::init` already installed its
+canonical generated tag. The constructor maps it to the existing class metadata, which consumers
+use for subtype ranges and other reflection. No malformed representation or producer repair appears.
+
+The bounded next hypothesis is making this existing constructor visible for inlining. Its table is
+currently translation-unit static, so this needs one internal shared declaration and one generated
+definition, with compile-time agreement against ASTNodeType::CountOf. A private static table member
+is one possible arrangement. This is more than246's body-only relocation; linkage, pointer identity,
+count/order and assertion policy must be proved. Preserve the same metadata factories/destructors,
+node initialization, casts and predicate. Do not add a second hierarchy or public ABI change.
+Direct-tag casts/dispatch changes and dispersed allocation work remain separate deferred candidates.
+
+A future prototype must preserve exhaustive tag/class/cast behavior, metadata pointer identity and
+serialization, and run shared-AST units/semantic regressions plus a full frozen/discovery checkpoint.
+Its paired optimized before/after study must reverse identity and build order, retain all samples and
+exact artifacts, lower every pooled semantic median at least5%, lower the sum of six pooled wall
+medians at least2%, and avoid wall regressions above2% in either round. These are proposed gates,
+not predicted savings. Discard on failed gates or unwanted semantic/ABI expansion; record a negative
+result rather than bundling another optimization. No constructor prototype is implemented in251.
+
+The existing `source/slang/slang.natvis` NodeBase visualization also names `kAllSyntaxClasses` in
+six conditions. The linkage choice must preserve those lookups or explicitly adapt and validate
+them; retaining the existing name/scope avoids an unnecessary debugger-consumer change.

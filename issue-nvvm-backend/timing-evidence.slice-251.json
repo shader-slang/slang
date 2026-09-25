@@ -1,0 +1,4115 @@
+{
+  "schema": 1,
+  "slice": 251,
+  "status": "accepted-research",
+  "scope": "Unchanged material compile-time measurements and bounded hypothesis; no implementation or runtime claim",
+  "source_base_revision": "5916b57fb1ed95c33b1f7b1730b099a05496add4",
+  "baseline": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/runtime-validation.slice-250.json",
+    "sha256": "1461b9c473b394bd25ac0d57cb41e942ee22a893a97380d0e1a77d927aa58cb7"
+  },
+  "historical_timing_245": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/timing-evidence.slice-245.json",
+    "sha256": "3789e443750acad5d058d64a0101bb50f22b60875e5d6cbcf568b784acd67cc9"
+  },
+  "historical_timing_246": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/timing-evidence.slice-246.json",
+    "sha256": "af20d2391e7ffa33f38bc8120b5afa8018c964e5dd74f5553e6da4bddfc562e7"
+  },
+  "configuration": "RelWithDebInfo",
+  "provider_abi": 41,
+  "target_architecture": 80,
+  "device": "NVIDIA L4 SM89; driver580.126.09",
+  "toolkit": {
+    "path": "/usr/local/cuda-12.9",
+    "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_May_27_02:21:03_PDT_2025\nCuda compilation tools, release 12.9, V12.9.86\nBuild cuda_12.9.r12.9/compiler.36037853_0"
+  },
+  "artifact_sha256": {
+    "build/RelWithDebInfo/bin/slangc": "b9e87811c263f131cf1372b307bd60acdcc51993aaab2af91a0cfd03462d10a1",
+    "build/RelWithDebInfo/bin/slang-test": "5d989413655c34643ae55ae927bd8600e00b2dce8e813e658ea0534bb795c412",
+    "build/RelWithDebInfo/bin/test-server": "81f5a3865e1184c8d6be46e5efcfd9ba4a1f79b54e60f5100410fadcc985ec8f",
+    "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "5fe0b977e22b80acc5ee39147c69510a01c09563354a1a67bd9573d1cda1aeab",
+    "build/RelWithDebInfo/lib/libslang-compiler.so": "ae6fe92965ed066a02ff9eab550093294b916c6b29f122f02e8a3f2ab8b74f60",
+    "build/RelWithDebInfo/lib/slang-core-module.bin": "7d2cf2cedbd7ae997cdf6efe27803519fc71e79b82cd789eed8065d1c00026d0",
+    "build/RelWithDebInfo/lib/librender-test-tool.so": "1a0cce46ed47795bba3e1c7efe8f9c590734b909d60d18ff8e9beda9ef59118e",
+    "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "e308685bc0636a5d505c3809e41ec4bf69a88c055d0caad695371e97e6c6d912",
+    "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+    "/usr/local/cuda-12.9/lib64/libnvrtc.so": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a",
+    "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+    "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461"
+  },
+  "protocol": {
+    "rounds": 2,
+    "orders": ["manifest order", "reverse manifest order"],
+    "warmups_per_cell_per_round": 2,
+    "samples_per_cell_per_round": 9,
+    "serial": true,
+    "competing_owned_benchmarks_or_builds": false,
+    "child_timeout_seconds": 180,
+    "suite_timeout_seconds": 1800,
+    "timing_clock": "time.perf_counter Popen.communicate with piped output through process exit; write logs outside timer",
+    "dispersion": "inclusive quartiles and min/max; all samples retained",
+    "assembly": "independent two warmups plus nine samples per identity after both compile rounds",
+    "phase_caution": "inclusive aggregate timers; aliases and nested intervals cannot be summed",
+    "comparison": "Fresh accepted250 observation only; historical246 is not a paired new baseline and no new speedup is claimed"
+  },
+  "preservation": {
+    "sources": 119,
+    "artifacts": 12,
+    "runtime_inputs": 563,
+    "before": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/identity-before.json",
+      "sha256": "80179ebd8056ee1871312c36b24d3ace8e0cf8785392aeb3c14fd56a52643790"
+    },
+    "after": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/identity-after.json",
+      "sha256": "80179ebd8056ee1871312c36b24d3ace8e0cf8785392aeb3c14fd56a52643790"
+    },
+    "final": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/identity-final.json",
+      "sha256": "80179ebd8056ee1871312c36b24d3ace8e0cf8785392aeb3c14fd56a52643790"
+    },
+    "all_exact_250": true
+  },
+  "counts": {
+    "canonical_cells": 6,
+    "compile_attempts": 132,
+    "measured_compiles": 108,
+    "compile_warmups": 24,
+    "assembly_attempts": 66,
+    "measured_assemblies": 54,
+    "assembly_warmups": 12,
+    "missing_cells": [],
+    "extra_cells": [],
+    "duplicate_sample_keys": 0,
+    "failed_attempts": 0,
+    "timeouts": 0,
+    "excluded_benchmark_attempts": 0,
+    "all_ptx_exact_250": true,
+    "all_cubins_exact_250": true
+  },
+  "cells": [
+    {
+      "id": "tiled-brass-material-eval_buffer-nvrtc-o3",
+      "status": "passed",
+      "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+      "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+      "wall_ms": {
+        "n": 18,
+        "median": 1430.762579664588,
+        "q1": 1429.5757454819977,
+        "q3": 1435.8555194921792,
+        "minimum": 1419.8140781372786,
+        "maximum": 1452.964574098587
+      },
+      "round_wall_ms": [
+        {
+          "n": 9,
+          "median": 1431.240076199174,
+          "q1": 1429.744217544794,
+          "q3": 1447.543527930975,
+          "minimum": 1419.8140781372786,
+          "maximum": 1452.964574098587
+        },
+        {
+          "n": 9,
+          "median": 1430.6010901927948,
+          "q1": 1429.451959207654,
+          "q3": 1435.3676717728376,
+          "minimum": 1421.7426721006632,
+          "maximum": 1435.970913618803
+        }
+      ],
+      "assembly_ms": {
+        "n": 9,
+        "median": 174.89071004092693,
+        "q1": 173.62819239497185,
+        "q3": 179.10882458090782,
+        "minimum": 171.8929335474968,
+        "maximum": 187.40188889205456
+      },
+      "phase_ms": {
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 207.66,
+          "q1": 205.9825,
+          "q3": 209.96249999999998,
+          "minimum": 202.12,
+          "maximum": 219.23
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 52.095,
+          "q1": 50.735,
+          "q3": 53.355,
+          "minimum": 50.04,
+          "maximum": 58.62
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 114.795,
+          "q1": 113.3675,
+          "q3": 115.6675,
+          "minimum": 111.8,
+          "maximum": 118.47
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1146.125,
+          "q1": 1142.8474999999999,
+          "q3": 1152.8175,
+          "minimum": 1134.08,
+          "maximum": 1170.11
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1146.12,
+          "q1": 1142.8474999999999,
+          "q3": 1152.8175,
+          "minimum": 1134.08,
+          "maximum": 1170.11
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 664.155,
+          "q1": 661.0550000000001,
+          "q3": 669.6175000000001,
+          "minimum": 653.62,
+          "maximum": 693.3
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 13.71,
+          "q1": 13.68,
+          "q3": 13.8275,
+          "minimum": 13.54,
+          "maximum": 15.64
+        },
+        "SemanticChecking": {
+          "n": 18,
+          "median": 484.74,
+          "q1": 482.42999999999995,
+          "q3": 487.4075,
+          "minimum": 476.07,
+          "maximum": 513.48
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 484.74,
+          "q1": 482.42999999999995,
+          "q3": 487.405,
+          "minimum": 476.07,
+          "maximum": 513.48
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 162.41500000000002,
+          "q1": 161.2325,
+          "q3": 164.0975,
+          "minimum": 158.31,
+          "maximum": 181.7
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 162.40499999999997,
+          "q1": 161.2325,
+          "q3": 164.09,
+          "minimum": 158.31,
+          "maximum": 181.7
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 6.26,
+          "q1": 6.244999999999999,
+          "q3": 6.2775,
+          "minimum": 6.2,
+          "maximum": 6.52
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 477.78499999999997,
+          "q1": 476.36249999999995,
+          "q3": 480.6325,
+          "minimum": 474.55,
+          "maximum": 500.73
+        },
+        "emitEntryPointsSourceFromIR": {
+          "n": 18,
+          "median": 335.76,
+          "q1": 335.2125,
+          "q3": 337.11249999999995,
+          "minimum": 333.24,
+          "maximum": 338.09
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 328.015,
+          "q1": 327.54249999999996,
+          "q3": 329.3825,
+          "minimum": 325.73,
+          "maximum": 330.45
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 20.835,
+          "q1": 20.7125,
+          "q3": 21.1475,
+          "minimum": 20.38,
+          "maximum": 21.48
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 121.82,
+          "q1": 121.6025,
+          "q3": 122.495,
+          "minimum": 121.16,
+          "maximum": 123.11
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 139.095,
+          "q1": 138.835,
+          "q3": 139.685,
+          "minimum": 138.59,
+          "maximum": 140.45
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.39,
+          "q1": 4.38,
+          "q3": 4.4,
+          "minimum": 4.34,
+          "maximum": 4.53
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.31,
+          "q1": 1.3025000000000002,
+          "q3": 1.32,
+          "minimum": 1.28,
+          "maximum": 1.55
+        }
+      },
+      "round_phase_ms": [
+        {
+          "loadBuiltinModule": {
+            "n": 9,
+            "median": 206.81,
+            "q1": 205.72,
+            "q3": 207.59,
+            "minimum": 202.12,
+            "maximum": 219.23
+          },
+          "readSerializedModuleAST": {
+            "n": 9,
+            "median": 50.78,
+            "q1": 50.72,
+            "q3": 52.23,
+            "minimum": 50.04,
+            "maximum": 58.62
+          },
+          "readSerializedModuleIR": {
+            "n": 9,
+            "median": 114.6,
+            "q1": 113.29,
+            "q3": 115.12,
+            "minimum": 111.8,
+            "maximum": 116.1
+          },
+          "compileInner": {
+            "n": 9,
+            "median": 1151.13,
+            "q1": 1144.73,
+            "q3": 1156.61,
+            "minimum": 1135.07,
+            "maximum": 1170.11
+          },
+          "endToEndActions": {
+            "n": 9,
+            "median": 1151.13,
+            "q1": 1144.73,
+            "q3": 1156.61,
+            "minimum": 1135.07,
+            "maximum": 1170.11
+          },
+          "frontEndExecute": {
+            "n": 9,
+            "median": 666.54,
+            "q1": 657.82,
+            "q3": 671.41,
+            "minimum": 653.62,
+            "maximum": 693.3
+          },
+          "parseTranslationUnit": {
+            "n": 9,
+            "median": 13.69,
+            "q1": 13.66,
+            "q3": 13.83,
+            "minimum": 13.54,
+            "maximum": 13.88
+          },
+          "SemanticChecking": {
+            "n": 9,
+            "median": 485.23,
+            "q1": 482.88,
+            "q3": 490.93,
+            "minimum": 476.07,
+            "maximum": 513.48
+          },
+          "checkAllTranslationUnits": {
+            "n": 9,
+            "median": 485.23,
+            "q1": 482.88,
+            "q3": 490.93,
+            "minimum": 476.07,
+            "maximum": 513.48
+          },
+          "generateIR": {
+            "n": 9,
+            "median": 162.97,
+            "q1": 161.72,
+            "q3": 164.69,
+            "minimum": 158.49,
+            "maximum": 181.7
+          },
+          "generateIRForTranslationUnit": {
+            "n": 9,
+            "median": 162.97,
+            "q1": 161.72,
+            "q3": 164.69,
+            "minimum": 158.49,
+            "maximum": 181.7
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 9,
+            "median": 6.26,
+            "q1": 6.24,
+            "q3": 6.28,
+            "minimum": 6.2,
+            "maximum": 6.52
+          },
+          "generateOutput": {
+            "n": 9,
+            "median": 477.83,
+            "q1": 477.33,
+            "q3": 481.01,
+            "minimum": 474.55,
+            "maximum": 500.73
+          },
+          "emitEntryPointsSourceFromIR": {
+            "n": 9,
+            "median": 335.28,
+            "q1": 335.2,
+            "q3": 337.83,
+            "minimum": 333.24,
+            "maximum": 338.09
+          },
+          "linkAndOptimizeIR": {
+            "n": 9,
+            "median": 327.72,
+            "q1": 327.53,
+            "q3": 330.25,
+            "minimum": 325.73,
+            "maximum": 330.45
+          },
+          "linkIR": {
+            "n": 9,
+            "median": 20.94,
+            "q1": 20.83,
+            "q3": 21.11,
+            "minimum": 20.38,
+            "maximum": 21.48
+          },
+          "simplifyIR": {
+            "n": 9,
+            "median": 121.81,
+            "q1": 121.58,
+            "q3": 122.59,
+            "minimum": 121.16,
+            "maximum": 123.11
+          },
+          "specializeModule": {
+            "n": 9,
+            "median": 138.89,
+            "q1": 138.83,
+            "q3": 139.18,
+            "minimum": 138.67,
+            "maximum": 140.27
+          },
+          "unrollLoopsInModule": {
+            "n": 9,
+            "median": 4.39,
+            "q1": 4.38,
+            "q3": 4.48,
+            "minimum": 4.34,
+            "maximum": 4.53
+          },
+          "performForceInlining": {
+            "n": 9,
+            "median": 1.31,
+            "q1": 1.29,
+            "q3": 1.31,
+            "minimum": 1.28,
+            "maximum": 1.55
+          }
+        },
+        {
+          "loadBuiltinModule": {
+            "n": 9,
+            "median": 209.55,
+            "q1": 209.25,
+            "q3": 210.18,
+            "minimum": 203.06,
+            "maximum": 210.51
+          },
+          "readSerializedModuleAST": {
+            "n": 9,
+            "median": 52.35,
+            "q1": 51.96,
+            "q3": 53.38,
+            "minimum": 50.61,
+            "maximum": 54.57
+          },
+          "readSerializedModuleIR": {
+            "n": 9,
+            "median": 115.33,
+            "q1": 114.72,
+            "q3": 115.95,
+            "minimum": 112.45,
+            "maximum": 118.47
+          },
+          "compileInner": {
+            "n": 9,
+            "median": 1144.78,
+            "q1": 1142.59,
+            "q3": 1146.76,
+            "minimum": 1134.08,
+            "maximum": 1153.38
+          },
+          "endToEndActions": {
+            "n": 9,
+            "median": 1144.78,
+            "q1": 1142.59,
+            "q3": 1146.75,
+            "minimum": 1134.08,
+            "maximum": 1153.38
+          },
+          "frontEndExecute": {
+            "n": 9,
+            "median": 663.94,
+            "q1": 661.7,
+            "q3": 665.03,
+            "minimum": 655.73,
+            "maximum": 671.75
+          },
+          "parseTranslationUnit": {
+            "n": 9,
+            "median": 13.71,
+            "q1": 13.71,
+            "q3": 13.79,
+            "minimum": 13.63,
+            "maximum": 15.64
+          },
+          "SemanticChecking": {
+            "n": 9,
+            "median": 484.25,
+            "q1": 482.28,
+            "q3": 486.18,
+            "minimum": 481.0,
+            "maximum": 491.41
+          },
+          "checkAllTranslationUnits": {
+            "n": 9,
+            "median": 484.25,
+            "q1": 482.28,
+            "q3": 486.18,
+            "minimum": 481.0,
+            "maximum": 491.41
+          },
+          "generateIR": {
+            "n": 9,
+            "median": 162.18,
+            "q1": 161.07,
+            "q3": 163.88,
+            "minimum": 158.31,
+            "maximum": 166.24
+          },
+          "generateIRForTranslationUnit": {
+            "n": 9,
+            "median": 162.17,
+            "q1": 161.07,
+            "q3": 163.88,
+            "minimum": 158.31,
+            "maximum": 166.23
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 9,
+            "median": 6.26,
+            "q1": 6.26,
+            "q3": 6.27,
+            "minimum": 6.21,
+            "maximum": 6.3
+          },
+          "generateOutput": {
+            "n": 9,
+            "median": 477.74,
+            "q1": 476.36,
+            "q3": 479.37,
+            "minimum": 475.82,
+            "maximum": 487.27
+          },
+          "emitEntryPointsSourceFromIR": {
+            "n": 9,
+            "median": 336.05,
+            "q1": 335.25,
+            "q3": 336.61,
+            "minimum": 334.79,
+            "maximum": 337.7
+          },
+          "linkAndOptimizeIR": {
+            "n": 9,
+            "median": 328.29,
+            "q1": 327.58,
+            "q3": 329.06,
+            "minimum": 326.87,
+            "maximum": 329.95
+          },
+          "linkIR": {
+            "n": 9,
+            "median": 20.77,
+            "q1": 20.6,
+            "q3": 21.16,
+            "minimum": 20.43,
+            "maximum": 21.46
+          },
+          "simplifyIR": {
+            "n": 9,
+            "median": 121.83,
+            "q1": 121.67,
+            "q3": 122.43,
+            "minimum": 121.3,
+            "maximum": 122.8
+          },
+          "specializeModule": {
+            "n": 9,
+            "median": 139.45,
+            "q1": 139.01,
+            "q3": 139.78,
+            "minimum": 138.59,
+            "maximum": 140.45
+          },
+          "unrollLoopsInModule": {
+            "n": 9,
+            "median": 4.39,
+            "q1": 4.38,
+            "q3": 4.4,
+            "minimum": 4.37,
+            "maximum": 4.48
+          },
+          "performForceInlining": {
+            "n": 9,
+            "median": 1.32,
+            "q1": 1.31,
+            "q3": 1.32,
+            "minimum": 1.29,
+            "maximum": 1.43
+          }
+        }
+      ],
+      "semantic_fraction_of_wall": {
+        "n": 18,
+        "median": 0.33840564006393026,
+        "q1": 0.3374889836407551,
+        "q3": 0.33979490536207535,
+        "minimum": 0.3284821309928335,
+        "maximum": 0.3547250843184903
+      },
+      "unattributed_output_residual_ms": {
+        "n": 18,
+        "median": 149.49999999999997,
+        "q1": 148.91249999999997,
+        "q3": 150.5675,
+        "minimum": 147.73000000000002,
+        "maximum": 173.01
+      },
+      "unattributed_fresh_lifecycle_residual_ms": {
+        "n": 18,
+        "median": 76.58939582169047,
+        "q1": 75.51898845553404,
+        "q3": 78.2698014561832,
+        "minimum": 71.50352793097505,
+        "maximum": 86.97258020758639
+      }
+    },
+    {
+      "id": "tiled-brass-material-eval_buffer-nvvm-o0",
+      "status": "passed",
+      "ptx_sha256": "91a3f87feea0d115f827f4fc7145671a841e9652ecd1c355e80b27c665f2c47a",
+      "cubin_sha256": "1ffa90ab6384ef98f55836343681842baa4fc639737f257cb349024426823f92",
+      "wall_ms": {
+        "n": 18,
+        "median": 1407.133205793798,
+        "q1": 1400.0705536454916,
+        "q3": 1414.6558362990618,
+        "minimum": 1392.5577122718096,
+        "maximum": 1454.322125762701
+      },
+      "round_wall_ms": [
+        {
+          "n": 9,
+          "median": 1414.5890213549137,
+          "q1": 1402.6934076100588,
+          "q3": 1424.711912870407,
+          "minimum": 1396.140355616808,
+          "maximum": 1454.322125762701
+        },
+        {
+          "n": 9,
+          "median": 1404.1693024337292,
+          "q1": 1399.064416065812,
+          "q3": 1410.3674702346325,
+          "minimum": 1392.5577122718096,
+          "maximum": 1414.6781079471111
+        }
+      ],
+      "assembly_ms": {
+        "n": 9,
+        "median": 701.2186627835035,
+        "q1": 699.7642554342747,
+        "q3": 703.8748599588871,
+        "minimum": 699.5982732623816,
+        "maximum": 708.2500364631414
+      },
+      "phase_ms": {
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 207.09,
+          "q1": 206.26999999999998,
+          "q3": 209.1975,
+          "minimum": 204.39,
+          "maximum": 213.4
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 51.724999999999994,
+          "q1": 51.26,
+          "q3": 52.245000000000005,
+          "minimum": 50.16,
+          "maximum": 53.35
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 114.72,
+          "q1": 114.0525,
+          "q3": 115.89250000000001,
+          "minimum": 110.74,
+          "maximum": 118.14
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1123.285,
+          "q1": 1120.815,
+          "q3": 1126.0875,
+          "minimum": 1116.29,
+          "maximum": 1176.32
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1123.285,
+          "q1": 1120.8125,
+          "q3": 1126.0875,
+          "minimum": 1116.29,
+          "maximum": 1176.32
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 666.605,
+          "q1": 665.1574999999999,
+          "q3": 668.94,
+          "minimum": 663.38,
+          "maximum": 722.89
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 13.815000000000001,
+          "q1": 13.715,
+          "q3": 13.92,
+          "minimum": 13.59,
+          "maximum": 13.99
+        },
+        "SemanticChecking": {
+          "n": 18,
+          "median": 486.85,
+          "q1": 485.04999999999995,
+          "q3": 488.89,
+          "minimum": 483.37,
+          "maximum": 541.09
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 486.85,
+          "q1": 485.04999999999995,
+          "q3": 488.89,
+          "minimum": 483.37,
+          "maximum": 541.08
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 163.60500000000002,
+          "q1": 163.11,
+          "q3": 164.5825,
+          "minimum": 161.88,
+          "maximum": 175.39
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 163.60500000000002,
+          "q1": 163.1,
+          "q3": 164.5825,
+          "minimum": 161.88,
+          "maximum": 175.39
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 6.28,
+          "q1": 6.26,
+          "q3": 6.297499999999999,
+          "minimum": 6.22,
+          "maximum": 6.34
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 453.78999999999996,
+          "q1": 452.7575,
+          "q3": 454.7475,
+          "minimum": 450.05,
+          "maximum": 466.27
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 323.79,
+          "q1": 322.47999999999996,
+          "q3": 324.605,
+          "minimum": 321.4,
+          "maximum": 335.45
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 20.52,
+          "q1": 20.3425,
+          "q3": 20.7,
+          "minimum": 19.97,
+          "maximum": 21.27
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 121.85,
+          "q1": 121.625,
+          "q3": 122.085,
+          "minimum": 120.91,
+          "maximum": 123.63
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 139.60500000000002,
+          "q1": 139.13500000000002,
+          "q3": 140.415,
+          "minimum": 138.55,
+          "maximum": 150.41
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.355,
+          "q1": 4.3225,
+          "q3": 4.3950000000000005,
+          "minimum": 4.28,
+          "maximum": 4.47
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.29,
+          "q1": 1.28,
+          "q3": 1.3,
+          "minimum": 1.27,
+          "maximum": 1.31
+        }
+      },
+      "round_phase_ms": [
+        {
+          "loadBuiltinModule": {
+            "n": 9,
+            "median": 207.0,
+            "q1": 206.08,
+            "q3": 208.7,
+            "minimum": 204.39,
+            "maximum": 209.23
+          },
+          "readSerializedModuleAST": {
+            "n": 9,
+            "median": 51.72,
+            "q1": 51.47,
+            "q3": 52.17,
+            "minimum": 50.4,
+            "maximum": 52.49
+          },
+          "readSerializedModuleIR": {
+            "n": 9,
+            "median": 114.46,
+            "q1": 114.05,
+            "q3": 114.93,
+            "minimum": 110.74,
+            "maximum": 118.14
+          },
+          "compileInner": {
+            "n": 9,
+            "median": 1125.93,
+            "q1": 1122.29,
+            "q3": 1143.8,
+            "minimum": 1119.41,
+            "maximum": 1176.32
+          },
+          "endToEndActions": {
+            "n": 9,
+            "median": 1125.93,
+            "q1": 1122.29,
+            "q3": 1143.8,
+            "minimum": 1119.41,
+            "maximum": 1176.32
+          },
+          "frontEndExecute": {
+            "n": 9,
+            "median": 667.89,
+            "q1": 665.47,
+            "q3": 675.18,
+            "minimum": 664.14,
+            "maximum": 722.89
+          },
+          "parseTranslationUnit": {
+            "n": 9,
+            "median": 13.74,
+            "q1": 13.73,
+            "q3": 13.92,
+            "minimum": 13.6,
+            "maximum": 13.99
+          },
+          "SemanticChecking": {
+            "n": 9,
+            "median": 487.87,
+            "q1": 485.11,
+            "q3": 492.78,
+            "minimum": 483.37,
+            "maximum": 541.09
+          },
+          "checkAllTranslationUnits": {
+            "n": 9,
+            "median": 487.87,
+            "q1": 485.11,
+            "q3": 492.77,
+            "minimum": 483.37,
+            "maximum": 541.08
+          },
+          "generateIR": {
+            "n": 9,
+            "median": 164.75,
+            "q1": 163.7,
+            "q3": 165.37,
+            "minimum": 163.6,
+            "maximum": 175.39
+          },
+          "generateIRForTranslationUnit": {
+            "n": 9,
+            "median": 164.75,
+            "q1": 163.69,
+            "q3": 165.37,
+            "minimum": 163.6,
+            "maximum": 175.39
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 9,
+            "median": 6.28,
+            "q1": 6.26,
+            "q3": 6.3,
+            "minimum": 6.25,
+            "maximum": 6.34
+          },
+          "generateOutput": {
+            "n": 9,
+            "median": 454.01,
+            "q1": 453.0,
+            "q3": 454.56,
+            "minimum": 451.0,
+            "maximum": 466.27
+          },
+          "linkAndOptimizeIR": {
+            "n": 9,
+            "median": 323.98,
+            "q1": 323.28,
+            "q3": 324.61,
+            "minimum": 321.92,
+            "maximum": 335.45
+          },
+          "linkIR": {
+            "n": 9,
+            "median": 20.61,
+            "q1": 20.34,
+            "q3": 20.95,
+            "minimum": 19.97,
+            "maximum": 21.27
+          },
+          "simplifyIR": {
+            "n": 9,
+            "median": 122.01,
+            "q1": 121.91,
+            "q3": 122.23,
+            "minimum": 121.62,
+            "maximum": 123.63
+          },
+          "specializeModule": {
+            "n": 9,
+            "median": 139.74,
+            "q1": 139.41,
+            "q3": 140.02,
+            "minimum": 138.76,
+            "maximum": 150.41
+          },
+          "unrollLoopsInModule": {
+            "n": 9,
+            "median": 4.37,
+            "q1": 4.32,
+            "q3": 4.4,
+            "minimum": 4.3,
+            "maximum": 4.4
+          },
+          "performForceInlining": {
+            "n": 9,
+            "median": 1.3,
+            "q1": 1.29,
+            "q3": 1.3,
+            "minimum": 1.28,
+            "maximum": 1.31
+          }
+        },
+        {
+          "loadBuiltinModule": {
+            "n": 9,
+            "median": 207.18,
+            "q1": 206.3,
+            "q3": 209.99,
+            "minimum": 205.91,
+            "maximum": 213.4
+          },
+          "readSerializedModuleAST": {
+            "n": 9,
+            "median": 51.73,
+            "q1": 51.19,
+            "q3": 52.62,
+            "minimum": 50.16,
+            "maximum": 53.35
+          },
+          "readSerializedModuleIR": {
+            "n": 9,
+            "median": 115.36,
+            "q1": 114.34,
+            "q3": 115.93,
+            "minimum": 113.13,
+            "maximum": 116.58
+          },
+          "compileInner": {
+            "n": 9,
+            "median": 1122.51,
+            "q1": 1117.57,
+            "q3": 1123.38,
+            "minimum": 1116.29,
+            "maximum": 1126.14
+          },
+          "endToEndActions": {
+            "n": 9,
+            "median": 1122.51,
+            "q1": 1117.57,
+            "q3": 1123.38,
+            "minimum": 1116.29,
+            "maximum": 1126.14
+          },
+          "frontEndExecute": {
+            "n": 9,
+            "median": 665.4,
+            "q1": 664.98,
+            "q3": 667.31,
+            "minimum": 663.38,
+            "maximum": 669.12
+          },
+          "parseTranslationUnit": {
+            "n": 9,
+            "median": 13.82,
+            "q1": 13.71,
+            "q3": 13.92,
+            "minimum": 13.59,
+            "maximum": 13.93
+          },
+          "SemanticChecking": {
+            "n": 9,
+            "median": 486.73,
+            "q1": 485.03,
+            "q3": 487.38,
+            "minimum": 484.75,
+            "maximum": 488.99
+          },
+          "checkAllTranslationUnits": {
+            "n": 9,
+            "median": 486.73,
+            "q1": 485.03,
+            "q3": 487.38,
+            "minimum": 484.75,
+            "maximum": 488.99
+          },
+          "generateIR": {
+            "n": 9,
+            "median": 163.08,
+            "q1": 162.15,
+            "q3": 163.47,
+            "minimum": 161.88,
+            "maximum": 163.81
+          },
+          "generateIRForTranslationUnit": {
+            "n": 9,
+            "median": 163.07,
+            "q1": 162.15,
+            "q3": 163.47,
+            "minimum": 161.88,
+            "maximum": 163.8
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 9,
+            "median": 6.28,
+            "q1": 6.26,
+            "q3": 6.28,
+            "minimum": 6.22,
+            "maximum": 6.3
+          },
+          "generateOutput": {
+            "n": 9,
+            "median": 453.56,
+            "q1": 451.82,
+            "q3": 454.81,
+            "minimum": 450.05,
+            "maximum": 455.44
+          },
+          "linkAndOptimizeIR": {
+            "n": 9,
+            "median": 323.06,
+            "q1": 322.04,
+            "q3": 324.59,
+            "minimum": 321.4,
+            "maximum": 325.13
+          },
+          "linkIR": {
+            "n": 9,
+            "median": 20.47,
+            "q1": 20.35,
+            "q3": 20.57,
+            "minimum": 20.02,
+            "maximum": 21.08
+          },
+          "simplifyIR": {
+            "n": 9,
+            "median": 121.64,
+            "q1": 121.58,
+            "q3": 121.79,
+            "minimum": 120.91,
+            "maximum": 122.37
+          },
+          "specializeModule": {
+            "n": 9,
+            "median": 139.21,
+            "q1": 138.74,
+            "q3": 141.47,
+            "minimum": 138.55,
+            "maximum": 141.62
+          },
+          "unrollLoopsInModule": {
+            "n": 9,
+            "median": 4.35,
+            "q1": 4.33,
+            "q3": 4.38,
+            "minimum": 4.28,
+            "maximum": 4.47
+          },
+          "performForceInlining": {
+            "n": 9,
+            "median": 1.28,
+            "q1": 1.27,
+            "q3": 1.28,
+            "minimum": 1.27,
+            "maximum": 1.3
+          }
+        }
+      ],
+      "semantic_fraction_of_wall": {
+        "n": 18,
+        "median": 0.34670113488581633,
+        "q1": 0.3457900443162649,
+        "q3": 0.34808000541424017,
+        "minimum": 0.33755882152726024,
+        "maximum": 0.37205650001111834
+      },
+      "unattributed_output_residual_ms": {
+        "n": 18,
+        "median": 130.17,
+        "q1": 129.39,
+        "q3": 130.70999999999998,
+        "minimum": 128.54000000000002,
+        "maximum": 132.16999999999996
+      },
+      "unattributed_fresh_lifecycle_residual_ms": {
+        "n": 18,
+        "median": 72.73177948147062,
+        "q1": 69.44379026696083,
+        "q3": 77.89781837999823,
+        "minimum": 67.190355616808,
+        "maximum": 104.08783719420424
+      }
+    },
+    {
+      "id": "tiled-brass-material-eval_buffer-nvvm-o3",
+      "status": "passed",
+      "ptx_sha256": "9ef3444ab015be99299f49f2e416474780d7985f6662a38d8d058cca58e810ac",
+      "cubin_sha256": "bfac2f15a1097116ac7c988b7bc7c8bf4d82a66867670a1465c123a0aa19d151",
+      "wall_ms": {
+        "n": 18,
+        "median": 1499.7072825208306,
+        "q1": 1494.2095973528922,
+        "q3": 1505.714500322938,
+        "minimum": 1481.372732669115,
+        "maximum": 1528.9387591183186
+      },
+      "round_wall_ms": [
+        {
+          "n": 9,
+          "median": 1501.6747619956732,
+          "q1": 1497.5813422352076,
+          "q3": 1506.0616806149483,
+          "minimum": 1493.4921208769083,
+          "maximum": 1509.8847448825836
+        },
+        {
+          "n": 9,
+          "median": 1495.860891416669,
+          "q1": 1489.558031782508,
+          "q3": 1501.9920244812965,
+          "minimum": 1481.372732669115,
+          "maximum": 1528.9387591183186
+        }
+      ],
+      "assembly_ms": {
+        "n": 9,
+        "median": 209.22251231968403,
+        "q1": 208.7615355849266,
+        "q3": 210.98638139665127,
+        "minimum": 207.6291535049677,
+        "maximum": 214.04951252043247
+      },
+      "phase_ms": {
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 206.775,
+          "q1": 205.1325,
+          "q3": 208.425,
+          "minimum": 202.55,
+          "maximum": 211.2
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 51.385,
+          "q1": 50.9775,
+          "q3": 51.86750000000001,
+          "minimum": 50.15,
+          "maximum": 52.64
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 114.43,
+          "q1": 113.345,
+          "q3": 114.7575,
+          "minimum": 112.67,
+          "maximum": 117.17
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1222.17,
+          "q1": 1217.785,
+          "q3": 1227.8899999999999,
+          "minimum": 1212.19,
+          "maximum": 1249.05
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1222.17,
+          "q1": 1217.785,
+          "q3": 1227.8899999999999,
+          "minimum": 1212.19,
+          "maximum": 1249.05
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 666.69,
+          "q1": 661.965,
+          "q3": 670.0675,
+          "minimum": 656.23,
+          "maximum": 692.99
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 13.79,
+          "q1": 13.7325,
+          "q3": 13.8775,
+          "minimum": 13.65,
+          "maximum": 14.35
+        },
+        "SemanticChecking": {
+          "n": 18,
+          "median": 486.99,
+          "q1": 484.135,
+          "q3": 488.6825,
+          "minimum": 479.32,
+          "maximum": 511.75
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 486.99,
+          "q1": 484.135,
+          "q3": 488.6825,
+          "minimum": 479.32,
+          "maximum": 511.75
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 162.87,
+          "q1": 162.07750000000001,
+          "q3": 164.14249999999998,
+          "minimum": 160.28,
+          "maximum": 170.28
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 162.87,
+          "q1": 162.07750000000001,
+          "q3": 164.14249999999998,
+          "minimum": 160.28,
+          "maximum": 170.28
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 6.26,
+          "q1": 6.25,
+          "q3": 6.2775,
+          "minimum": 6.22,
+          "maximum": 6.36
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 553.715,
+          "q1": 552.5274999999999,
+          "q3": 554.6424999999999,
+          "minimum": 550.86,
+          "maximum": 570.44
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 322.88,
+          "q1": 322.21500000000003,
+          "q3": 323.8,
+          "minimum": 320.51,
+          "maximum": 337.64
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 20.369999999999997,
+          "q1": 20.252499999999998,
+          "q3": 20.5775,
+          "minimum": 19.94,
+          "maximum": 21.34
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 121.86,
+          "q1": 121.58500000000001,
+          "q3": 122.01500000000001,
+          "minimum": 121.23,
+          "maximum": 128.09
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 139.70499999999998,
+          "q1": 139.4075,
+          "q3": 140.07999999999998,
+          "minimum": 137.93,
+          "maximum": 144.05
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.36,
+          "q1": 4.34,
+          "q3": 4.37,
+          "minimum": 4.29,
+          "maximum": 4.56
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.29,
+          "q1": 1.28,
+          "q3": 1.29,
+          "minimum": 1.27,
+          "maximum": 1.32
+        }
+      },
+      "round_phase_ms": [
+        {
+          "loadBuiltinModule": {
+            "n": 9,
+            "median": 205.51,
+            "q1": 205.17,
+            "q3": 207.81,
+            "minimum": 205.11,
+            "maximum": 209.39
+          },
+          "readSerializedModuleAST": {
+            "n": 9,
+            "median": 51.17,
+            "q1": 50.97,
+            "q3": 51.89,
+            "minimum": 50.15,
+            "maximum": 52.64
+          },
+          "readSerializedModuleIR": {
+            "n": 9,
+            "median": 113.72,
+            "q1": 113.1,
+            "q3": 114.72,
+            "minimum": 112.69,
+            "maximum": 117.17
+          },
+          "compileInner": {
+            "n": 9,
+            "median": 1223.04,
+            "q1": 1221.72,
+            "q3": 1226.0,
+            "minimum": 1218.13,
+            "maximum": 1234.06
+          },
+          "endToEndActions": {
+            "n": 9,
+            "median": 1223.04,
+            "q1": 1221.72,
+            "q3": 1226.0,
+            "minimum": 1218.13,
+            "maximum": 1234.05
+          },
+          "frontEndExecute": {
+            "n": 9,
+            "median": 667.59,
+            "q1": 665.99,
+            "q3": 670.36,
+            "minimum": 662.34,
+            "maximum": 674.9
+          },
+          "parseTranslationUnit": {
+            "n": 9,
+            "median": 13.85,
+            "q1": 13.73,
+            "q3": 13.88,
+            "minimum": 13.65,
+            "maximum": 14.35
+          },
+          "SemanticChecking": {
+            "n": 9,
+            "median": 487.35,
+            "q1": 486.99,
+            "q3": 490.21,
+            "minimum": 484.09,
+            "maximum": 493.44
+          },
+          "checkAllTranslationUnits": {
+            "n": 9,
+            "median": 487.35,
+            "q1": 486.99,
+            "q3": 490.2,
+            "minimum": 484.09,
+            "maximum": 493.44
+          },
+          "generateIR": {
+            "n": 9,
+            "median": 163.18,
+            "q1": 162.38,
+            "q3": 163.97,
+            "minimum": 161.66,
+            "maximum": 165.62
+          },
+          "generateIRForTranslationUnit": {
+            "n": 9,
+            "median": 163.18,
+            "q1": 162.38,
+            "q3": 163.97,
+            "minimum": 161.66,
+            "maximum": 165.62
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 9,
+            "median": 6.26,
+            "q1": 6.25,
+            "q3": 6.28,
+            "minimum": 6.22,
+            "maximum": 6.34
+          },
+          "generateOutput": {
+            "n": 9,
+            "median": 553.47,
+            "q1": 552.09,
+            "q3": 555.19,
+            "minimum": 550.86,
+            "maximum": 556.88
+          },
+          "linkAndOptimizeIR": {
+            "n": 9,
+            "median": 322.72,
+            "q1": 322.13,
+            "q3": 324.76,
+            "minimum": 320.51,
+            "maximum": 327.41
+          },
+          "linkIR": {
+            "n": 9,
+            "median": 20.43,
+            "q1": 20.38,
+            "q3": 20.66,
+            "minimum": 19.94,
+            "maximum": 21.34
+          },
+          "simplifyIR": {
+            "n": 9,
+            "median": 121.74,
+            "q1": 121.56,
+            "q3": 121.88,
+            "minimum": 121.23,
+            "maximum": 122.1
+          },
+          "specializeModule": {
+            "n": 9,
+            "median": 139.75,
+            "q1": 139.39,
+            "q3": 140.41,
+            "minimum": 137.93,
+            "maximum": 144.05
+          },
+          "unrollLoopsInModule": {
+            "n": 9,
+            "median": 4.36,
+            "q1": 4.35,
+            "q3": 4.36,
+            "minimum": 4.29,
+            "maximum": 4.56
+          },
+          "performForceInlining": {
+            "n": 9,
+            "median": 1.29,
+            "q1": 1.28,
+            "q3": 1.29,
+            "minimum": 1.27,
+            "maximum": 1.32
+          }
+        },
+        {
+          "loadBuiltinModule": {
+            "n": 9,
+            "median": 206.82,
+            "q1": 205.06,
+            "q3": 208.85,
+            "minimum": 202.55,
+            "maximum": 211.2
+          },
+          "readSerializedModuleAST": {
+            "n": 9,
+            "median": 51.44,
+            "q1": 51.14,
+            "q3": 51.8,
+            "minimum": 50.58,
+            "maximum": 52.58
+          },
+          "readSerializedModuleIR": {
+            "n": 9,
+            "median": 114.43,
+            "q1": 113.75,
+            "q3": 114.77,
+            "minimum": 112.67,
+            "maximum": 116.72
+          },
+          "compileInner": {
+            "n": 9,
+            "median": 1217.67,
+            "q1": 1217.45,
+            "q3": 1228.52,
+            "minimum": 1212.19,
+            "maximum": 1249.05
+          },
+          "endToEndActions": {
+            "n": 9,
+            "median": 1217.67,
+            "q1": 1217.44,
+            "q3": 1228.52,
+            "minimum": 1212.19,
+            "maximum": 1249.05
+          },
+          "frontEndExecute": {
+            "n": 9,
+            "median": 661.84,
+            "q1": 660.66,
+            "q3": 669.19,
+            "minimum": 656.23,
+            "maximum": 692.99
+          },
+          "parseTranslationUnit": {
+            "n": 9,
+            "median": 13.75,
+            "q1": 13.74,
+            "q3": 13.87,
+            "minimum": 13.7,
+            "maximum": 14.04
+          },
+          "SemanticChecking": {
+            "n": 9,
+            "median": 484.27,
+            "q1": 481.63,
+            "q3": 486.99,
+            "minimum": 479.32,
+            "maximum": 511.75
+          },
+          "checkAllTranslationUnits": {
+            "n": 9,
+            "median": 484.27,
+            "q1": 481.63,
+            "q3": 486.99,
+            "minimum": 479.32,
+            "maximum": 511.75
+          },
+          "generateIR": {
+            "n": 9,
+            "median": 162.47,
+            "q1": 161.83,
+            "q3": 164.2,
+            "minimum": 160.28,
+            "maximum": 170.28
+          },
+          "generateIRForTranslationUnit": {
+            "n": 9,
+            "median": 162.47,
+            "q1": 161.83,
+            "q3": 164.2,
+            "minimum": 160.28,
+            "maximum": 170.28
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 9,
+            "median": 6.26,
+            "q1": 6.25,
+            "q3": 6.27,
+            "minimum": 6.23,
+            "maximum": 6.36
+          },
+          "generateOutput": {
+            "n": 9,
+            "median": 553.72,
+            "q1": 553.37,
+            "q3": 554.2,
+            "minimum": 552.25,
+            "maximum": 570.44
+          },
+          "linkAndOptimizeIR": {
+            "n": 9,
+            "median": 323.04,
+            "q1": 322.47,
+            "q3": 323.62,
+            "minimum": 321.55,
+            "maximum": 337.64
+          },
+          "linkIR": {
+            "n": 9,
+            "median": 20.3,
+            "q1": 20.19,
+            "q3": 20.36,
+            "minimum": 20.12,
+            "maximum": 20.63
+          },
+          "simplifyIR": {
+            "n": 9,
+            "median": 121.93,
+            "q1": 121.84,
+            "q3": 122.03,
+            "minimum": 121.33,
+            "maximum": 128.09
+          },
+          "specializeModule": {
+            "n": 9,
+            "median": 139.66,
+            "q1": 139.6,
+            "q3": 140.02,
+            "minimum": 139.12,
+            "maximum": 140.81
+          },
+          "unrollLoopsInModule": {
+            "n": 9,
+            "median": 4.36,
+            "q1": 4.33,
+            "q3": 4.39,
+            "minimum": 4.29,
+            "maximum": 4.4
+          },
+          "performForceInlining": {
+            "n": 9,
+            "median": 1.29,
+            "q1": 1.28,
+            "q3": 1.3,
+            "minimum": 1.27,
+            "maximum": 1.32
+          }
+        }
+      ],
+      "semantic_fraction_of_wall": {
+        "n": 18,
+        "median": 0.3241811816966229,
+        "q1": 0.32353651340136896,
+        "q3": 0.32549699647559965,
+        "minimum": 0.3217451150554368,
+        "maximum": 0.3347092857369297
+      },
+      "unattributed_output_residual_ms": {
+        "n": 18,
+        "median": 230.425,
+        "q1": 229.92999999999998,
+        "q3": 231.1425,
+        "minimum": 229.46999999999997,
+        "maximum": 232.80000000000007
+      },
+      "unattributed_fresh_lifecycle_residual_ms": {
+        "n": 18,
+        "median": 70.25843287974594,
+        "q1": 67.93283428579569,
+        "q3": 71.02948949247602,
+        "minimum": 66.632732669115,
+        "maximum": 73.16295944690705
+      }
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvrtc-o3",
+      "status": "passed",
+      "ptx_sha256": "214dd03be9f4d7635d26cba874c1b4f3913c43c7e7e2ea4bb62355cf6857fd25",
+      "cubin_sha256": "26e250e48bf3acfe639495cd04a899e78e4e9e370d80ad9749fd3e5ec69b7666",
+      "wall_ms": {
+        "n": 18,
+        "median": 1460.2113468572497,
+        "q1": 1454.9126285128295,
+        "q3": 1464.2020561732352,
+        "minimum": 1447.3683014512062,
+        "maximum": 1502.5369971990585
+      },
+      "round_wall_ms": [
+        {
+          "n": 9,
+          "median": 1455.8795597404242,
+          "q1": 1454.6450935304165,
+          "q3": 1462.0052501559258,
+          "minimum": 1449.2940921336412,
+          "maximum": 1480.2534319460392
+        },
+        {
+          "n": 9,
+          "median": 1463.9043025672436,
+          "q1": 1458.4174435585737,
+          "q3": 1472.8390909731388,
+          "minimum": 1447.3683014512062,
+          "maximum": 1502.5369971990585
+        }
+      ],
+      "assembly_ms": {
+        "n": 9,
+        "median": 253.14588099718094,
+        "q1": 252.7097873389721,
+        "q3": 253.9472710341215,
+        "minimum": 252.33636423945427,
+        "maximum": 254.01575677096844
+      },
+      "phase_ms": {
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 209.91500000000002,
+          "q1": 207.72499999999997,
+          "q3": 210.425,
+          "minimum": 205.01,
+          "maximum": 218.96
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 53.019999999999996,
+          "q1": 52.0125,
+          "q3": 53.4725,
+          "minimum": 50.93,
+          "maximum": 60.88
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 116.505,
+          "q1": 114.7375,
+          "q3": 117.3025,
+          "minimum": 112.01,
+          "maximum": 118.75
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1173.1750000000002,
+          "q1": 1167.8175,
+          "q3": 1180.935,
+          "minimum": 1163.58,
+          "maximum": 1202.73
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1173.1750000000002,
+          "q1": 1167.8175,
+          "q3": 1180.935,
+          "minimum": 1163.58,
+          "maximum": 1202.73
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 667.355,
+          "q1": 664.24,
+          "q3": 672.3625000000001,
+          "minimum": 659.07,
+          "maximum": 681.51
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 13.89,
+          "q1": 13.844999999999999,
+          "q3": 13.9725,
+          "minimum": 13.73,
+          "maximum": 14.6
+        },
+        "SemanticChecking": {
+          "n": 18,
+          "median": 488.0,
+          "q1": 484.73749999999995,
+          "q3": 492.7225,
+          "minimum": 478.97,
+          "maximum": 501.26
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 488.0,
+          "q1": 484.73749999999995,
+          "q3": 492.7225,
+          "minimum": 478.96,
+          "maximum": 501.26
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 162.64,
+          "q1": 162.05749999999998,
+          "q3": 163.2775,
+          "minimum": 160.73,
+          "maximum": 164.63
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 162.64,
+          "q1": 162.05749999999998,
+          "q3": 163.2775,
+          "minimum": 160.73,
+          "maximum": 164.63
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 6.37,
+          "q1": 6.342499999999999,
+          "q3": 6.4375,
+          "minimum": 6.31,
+          "maximum": 6.47
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 503.205,
+          "q1": 502.3425,
+          "q3": 504.045,
+          "minimum": 499.22,
+          "maximum": 527.36
+        },
+        "emitEntryPointsSourceFromIR": {
+          "n": 18,
+          "median": 354.91,
+          "q1": 354.35,
+          "q3": 355.68499999999995,
+          "minimum": 352.52,
+          "maximum": 359.55
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 346.06,
+          "q1": 345.48749999999995,
+          "q3": 346.75,
+          "minimum": 343.65,
+          "maximum": 350.44
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 21.049999999999997,
+          "q1": 20.89,
+          "q3": 21.2875,
+          "minimum": 20.42,
+          "maximum": 22.52
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 128.57,
+          "q1": 128.45999999999998,
+          "q3": 128.7475,
+          "minimum": 128.23,
+          "maximum": 133.55
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 144.995,
+          "q1": 144.63,
+          "q3": 145.58999999999997,
+          "minimum": 143.4,
+          "maximum": 146.51
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.35,
+          "q1": 4.33,
+          "q3": 4.4175,
+          "minimum": 4.31,
+          "maximum": 4.55
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.5150000000000001,
+          "q1": 1.51,
+          "q3": 1.53,
+          "minimum": 1.49,
+          "maximum": 1.69
+        }
+      },
+      "round_phase_ms": [
+        {
+          "loadBuiltinModule": {
+            "n": 9,
+            "median": 209.87,
+            "q1": 207.8,
+            "q3": 210.32,
+            "minimum": 207.43,
+            "maximum": 212.07
+          },
+          "readSerializedModuleAST": {
+            "n": 9,
+            "median": 53.03,
+            "q1": 51.58,
+            "q3": 53.42,
+            "minimum": 50.93,
+            "maximum": 53.53
+          },
+          "readSerializedModuleIR": {
+            "n": 9,
+            "median": 116.74,
+            "q1": 116.23,
+            "q3": 116.77,
+            "minimum": 113.34,
+            "maximum": 118.75
+          },
+          "compileInner": {
+            "n": 9,
+            "median": 1169.76,
+            "q1": 1166.44,
+            "q3": 1173.65,
+            "minimum": 1164.81,
+            "maximum": 1189.42
+          },
+          "endToEndActions": {
+            "n": 9,
+            "median": 1169.76,
+            "q1": 1166.44,
+            "q3": 1173.65,
+            "minimum": 1164.81,
+            "maximum": 1189.42
+          },
+          "frontEndExecute": {
+            "n": 9,
+            "median": 664.91,
+            "q1": 663.52,
+            "q3": 667.28,
+            "minimum": 660.21,
+            "maximum": 681.51
+          },
+          "parseTranslationUnit": {
+            "n": 9,
+            "median": 13.89,
+            "q1": 13.86,
+            "q3": 13.95,
+            "minimum": 13.73,
+            "maximum": 14.02
+          },
+          "SemanticChecking": {
+            "n": 9,
+            "median": 485.89,
+            "q1": 483.45,
+            "q3": 487.69,
+            "minimum": 478.97,
+            "maximum": 501.26
+          },
+          "checkAllTranslationUnits": {
+            "n": 9,
+            "median": 485.89,
+            "q1": 483.45,
+            "q3": 487.69,
+            "minimum": 478.96,
+            "maximum": 501.26
+          },
+          "generateIR": {
+            "n": 9,
+            "median": 163.17,
+            "q1": 162.48,
+            "q3": 163.3,
+            "minimum": 161.98,
+            "maximum": 164.63
+          },
+          "generateIRForTranslationUnit": {
+            "n": 9,
+            "median": 163.17,
+            "q1": 162.48,
+            "q3": 163.3,
+            "minimum": 161.98,
+            "maximum": 164.63
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 9,
+            "median": 6.42,
+            "q1": 6.36,
+            "q3": 6.44,
+            "minimum": 6.34,
+            "maximum": 6.45
+          },
+          "generateOutput": {
+            "n": 9,
+            "median": 502.88,
+            "q1": 500.78,
+            "q3": 504.0,
+            "minimum": 499.22,
+            "maximum": 509.65
+          },
+          "emitEntryPointsSourceFromIR": {
+            "n": 9,
+            "median": 354.82,
+            "q1": 353.57,
+            "q3": 356.12,
+            "minimum": 352.52,
+            "maximum": 359.55
+          },
+          "linkAndOptimizeIR": {
+            "n": 9,
+            "median": 346.04,
+            "q1": 344.72,
+            "q3": 347.22,
+            "minimum": 343.65,
+            "maximum": 350.44
+          },
+          "linkIR": {
+            "n": 9,
+            "median": 21.14,
+            "q1": 21.0,
+            "q3": 21.32,
+            "minimum": 20.42,
+            "maximum": 21.56
+          },
+          "simplifyIR": {
+            "n": 9,
+            "median": 128.56,
+            "q1": 128.45,
+            "q3": 128.62,
+            "minimum": 128.23,
+            "maximum": 131.23
+          },
+          "specializeModule": {
+            "n": 9,
+            "median": 145.56,
+            "q1": 144.62,
+            "q3": 145.69,
+            "minimum": 144.13,
+            "maximum": 146.21
+          },
+          "unrollLoopsInModule": {
+            "n": 9,
+            "median": 4.34,
+            "q1": 4.33,
+            "q3": 4.36,
+            "minimum": 4.32,
+            "maximum": 4.55
+          },
+          "performForceInlining": {
+            "n": 9,
+            "median": 1.51,
+            "q1": 1.51,
+            "q3": 1.52,
+            "minimum": 1.5,
+            "maximum": 1.58
+          }
+        },
+        {
+          "loadBuiltinModule": {
+            "n": 9,
+            "median": 210.19,
+            "q1": 207.7,
+            "q3": 210.46,
+            "minimum": 205.01,
+            "maximum": 218.96
+          },
+          "readSerializedModuleAST": {
+            "n": 9,
+            "median": 53.01,
+            "q1": 52.08,
+            "q3": 53.77,
+            "minimum": 51.8,
+            "maximum": 60.88
+          },
+          "readSerializedModuleIR": {
+            "n": 9,
+            "median": 115.51,
+            "q1": 114.02,
+            "q3": 117.53,
+            "minimum": 112.01,
+            "maximum": 118.19
+          },
+          "compileInner": {
+            "n": 9,
+            "median": 1177.41,
+            "q1": 1172.7,
+            "q3": 1183.22,
+            "minimum": 1163.58,
+            "maximum": 1202.73
+          },
+          "endToEndActions": {
+            "n": 9,
+            "median": 1177.4,
+            "q1": 1172.7,
+            "q3": 1183.22,
+            "minimum": 1163.58,
+            "maximum": 1202.73
+          },
+          "frontEndExecute": {
+            "n": 9,
+            "median": 670.09,
+            "q1": 667.43,
+            "q3": 673.59,
+            "minimum": 659.07,
+            "maximum": 678.6
+          },
+          "parseTranslationUnit": {
+            "n": 9,
+            "median": 13.89,
+            "q1": 13.84,
+            "q3": 13.98,
+            "minimum": 13.74,
+            "maximum": 14.6
+          },
+          "SemanticChecking": {
+            "n": 9,
+            "median": 492.49,
+            "q1": 489.26,
+            "q3": 495.06,
+            "minimum": 481.06,
+            "maximum": 498.8
+          },
+          "checkAllTranslationUnits": {
+            "n": 9,
+            "median": 492.49,
+            "q1": 489.26,
+            "q3": 495.06,
+            "minimum": 481.06,
+            "maximum": 498.8
+          },
+          "generateIR": {
+            "n": 9,
+            "median": 162.62,
+            "q1": 161.43,
+            "q3": 163.21,
+            "minimum": 160.73,
+            "maximum": 164.61
+          },
+          "generateIRForTranslationUnit": {
+            "n": 9,
+            "median": 162.62,
+            "q1": 161.43,
+            "q3": 163.21,
+            "minimum": 160.73,
+            "maximum": 164.61
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 9,
+            "median": 6.36,
+            "q1": 6.34,
+            "q3": 6.43,
+            "minimum": 6.31,
+            "maximum": 6.47
+          },
+          "generateOutput": {
+            "n": 9,
+            "median": 503.21,
+            "q1": 503.04,
+            "q3": 504.06,
+            "minimum": 501.55,
+            "maximum": 527.36
+          },
+          "emitEntryPointsSourceFromIR": {
+            "n": 9,
+            "median": 354.91,
+            "q1": 354.78,
+            "q3": 355.64,
+            "minimum": 353.11,
+            "maximum": 358.77
+          },
+          "linkAndOptimizeIR": {
+            "n": 9,
+            "median": 346.08,
+            "q1": 345.95,
+            "q3": 346.63,
+            "minimum": 344.26,
+            "maximum": 349.79
+          },
+          "linkIR": {
+            "n": 9,
+            "median": 20.99,
+            "q1": 20.86,
+            "q3": 21.12,
+            "minimum": 20.75,
+            "maximum": 22.52
+          },
+          "simplifyIR": {
+            "n": 9,
+            "median": 128.59,
+            "q1": 128.54,
+            "q3": 128.79,
+            "minimum": 128.24,
+            "maximum": 133.55
+          },
+          "specializeModule": {
+            "n": 9,
+            "median": 144.99,
+            "q1": 144.66,
+            "q3": 145.09,
+            "minimum": 143.4,
+            "maximum": 146.51
+          },
+          "unrollLoopsInModule": {
+            "n": 9,
+            "median": 4.35,
+            "q1": 4.33,
+            "q3": 4.44,
+            "minimum": 4.31,
+            "maximum": 4.49
+          },
+          "performForceInlining": {
+            "n": 9,
+            "median": 1.52,
+            "q1": 1.51,
+            "q3": 1.53,
+            "minimum": 1.49,
+            "maximum": 1.69
+          }
+        }
+      ],
+      "semantic_fraction_of_wall": {
+        "n": 18,
+        "median": 0.3343067769721453,
+        "q1": 0.33231610026428016,
+        "q3": 0.33671370219496777,
+        "minimum": 0.32761168261804596,
+        "maximum": 0.33863120272655634
+      },
+      "unattributed_output_residual_ms": {
+        "n": 18,
+        "median": 157.01999999999998,
+        "q1": 156.3475,
+        "q3": 158.46500000000003,
+        "minimum": 154.92000000000002,
+        "maximum": 181.28000000000003
+      },
+      "unattributed_fresh_lifecycle_residual_ms": {
+        "n": 18,
+        "median": 77.50488713711505,
+        "q1": 75.22262851282953,
+        "q3": 79.00324544712899,
+        "minimum": 72.98219578683376,
+        "maximum": 86.5369971990585
+      }
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvvm-o0",
+      "status": "passed",
+      "ptx_sha256": "f58eb3229d66efc3c77bb013c9f0853891f0174d44f757677b5a45acec240c95",
+      "cubin_sha256": "0260602dcc875ad5ec02b384847b41cab7b65ccd4c49691b6357a8253b7bed53",
+      "wall_ms": {
+        "n": 18,
+        "median": 1445.7609839737415,
+        "q1": 1439.163482747972,
+        "q3": 1447.8490608744323,
+        "minimum": 1429.3972365558147,
+        "maximum": 1491.9687174260616
+      },
+      "round_wall_ms": [
+        {
+          "n": 9,
+          "median": 1442.014729604125,
+          "q1": 1437.4000020325184,
+          "q3": 1447.4640917032957,
+          "minimum": 1429.3972365558147,
+          "maximum": 1491.9687174260616
+        },
+        {
+          "n": 9,
+          "median": 1447.421584278345,
+          "q1": 1441.5061585605145,
+          "q3": 1447.960939258337,
+          "minimum": 1438.516840338707,
+          "maximum": 1449.5683051645756
+        }
+      ],
+      "assembly_ms": {
+        "n": 9,
+        "median": 880.9409160166979,
+        "q1": 880.3575374186039,
+        "q3": 881.5552555024624,
+        "minimum": 877.7374606579542,
+        "maximum": 881.6833402961493
+      },
+      "phase_ms": {
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 208.25,
+          "q1": 206.54,
+          "q3": 209.8875,
+          "minimum": 204.8,
+          "maximum": 211.33
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 51.54,
+          "q1": 51.2575,
+          "q3": 51.7275,
+          "minimum": 50.5,
+          "maximum": 52.59
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 115.345,
+          "q1": 113.6575,
+          "q3": 116.79249999999999,
+          "minimum": 112.75,
+          "maximum": 119.17
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1164.59,
+          "q1": 1157.745,
+          "q3": 1169.02,
+          "minimum": 1152.8,
+          "maximum": 1219.68
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1164.59,
+          "q1": 1157.7375,
+          "q3": 1169.0100000000002,
+          "minimum": 1152.79,
+          "maximum": 1219.68
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 669.2449999999999,
+          "q1": 663.84,
+          "q3": 674.6375,
+          "minimum": 661.28,
+          "maximum": 714.72
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 13.870000000000001,
+          "q1": 13.7925,
+          "q3": 13.95,
+          "minimum": 13.65,
+          "maximum": 14.38
+        },
+        "SemanticChecking": {
+          "n": 18,
+          "median": 488.73,
+          "q1": 484.445,
+          "q3": 493.69250000000005,
+          "minimum": 483.9,
+          "maximum": 524.04
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 488.73,
+          "q1": 484.445,
+          "q3": 493.69250000000005,
+          "minimum": 483.9,
+          "maximum": 524.04
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 163.38,
+          "q1": 162.74249999999998,
+          "q3": 164.0325,
+          "minimum": 159.72,
+          "maximum": 177.2
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 163.38,
+          "q1": 162.74249999999998,
+          "q3": 164.025,
+          "minimum": 159.72,
+          "maximum": 177.2
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 6.36,
+          "q1": 6.342499999999999,
+          "q3": 6.409999999999999,
+          "minimum": 6.33,
+          "maximum": 6.92
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 491.01,
+          "q1": 490.295,
+          "q3": 492.24499999999995,
+          "minimum": 488.19,
+          "maximum": 502.66
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 339.47,
+          "q1": 338.6875,
+          "q3": 340.1275,
+          "minimum": 336.94,
+          "maximum": 351.0
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 20.42,
+          "q1": 20.2575,
+          "q3": 20.9175,
+          "minimum": 20.0,
+          "maximum": 23.35
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 128.315,
+          "q1": 128.085,
+          "q3": 128.7525,
+          "minimum": 127.92,
+          "maximum": 129.42
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 145.29500000000002,
+          "q1": 144.56,
+          "q3": 146.05,
+          "minimum": 143.7,
+          "maximum": 153.25
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.385,
+          "q1": 4.362500000000001,
+          "q3": 4.42,
+          "minimum": 4.3,
+          "maximum": 5.88
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.5,
+          "q1": 1.49,
+          "q3": 1.5175,
+          "minimum": 1.48,
+          "maximum": 1.59
+        }
+      },
+      "round_phase_ms": [
+        {
+          "loadBuiltinModule": {
+            "n": 9,
+            "median": 208.62,
+            "q1": 206.29,
+            "q3": 209.07,
+            "minimum": 204.8,
+            "maximum": 210.77
+          },
+          "readSerializedModuleAST": {
+            "n": 9,
+            "median": 51.58,
+            "q1": 51.46,
+            "q3": 52.3,
+            "minimum": 50.5,
+            "maximum": 52.59
+          },
+          "readSerializedModuleIR": {
+            "n": 9,
+            "median": 113.92,
+            "q1": 113.27,
+            "q3": 116.8,
+            "minimum": 112.75,
+            "maximum": 119.17
+          },
+          "compileInner": {
+            "n": 9,
+            "median": 1160.59,
+            "q1": 1157.59,
+            "q3": 1174.69,
+            "minimum": 1152.8,
+            "maximum": 1219.68
+          },
+          "endToEndActions": {
+            "n": 9,
+            "median": 1160.59,
+            "q1": 1157.59,
+            "q3": 1174.69,
+            "minimum": 1152.79,
+            "maximum": 1219.68
+          },
+          "frontEndExecute": {
+            "n": 9,
+            "median": 667.45,
+            "q1": 663.69,
+            "q3": 681.25,
+            "minimum": 662.33,
+            "maximum": 714.72
+          },
+          "parseTranslationUnit": {
+            "n": 9,
+            "median": 13.95,
+            "q1": 13.83,
+            "q3": 14.0,
+            "minimum": 13.65,
+            "maximum": 14.38
+          },
+          "SemanticChecking": {
+            "n": 9,
+            "median": 487.3,
+            "q1": 484.46,
+            "q3": 493.87,
+            "minimum": 484.35,
+            "maximum": 524.04
+          },
+          "checkAllTranslationUnits": {
+            "n": 9,
+            "median": 487.3,
+            "q1": 484.46,
+            "q3": 493.87,
+            "minimum": 484.35,
+            "maximum": 524.04
+          },
+          "generateIR": {
+            "n": 9,
+            "median": 163.04,
+            "q1": 161.42,
+            "q3": 167.16,
+            "minimum": 159.72,
+            "maximum": 177.2
+          },
+          "generateIRForTranslationUnit": {
+            "n": 9,
+            "median": 163.04,
+            "q1": 161.42,
+            "q3": 167.16,
+            "minimum": 159.72,
+            "maximum": 177.2
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 9,
+            "median": 6.34,
+            "q1": 6.33,
+            "q3": 6.38,
+            "minimum": 6.33,
+            "maximum": 6.92
+          },
+          "generateOutput": {
+            "n": 9,
+            "median": 490.53,
+            "q1": 490.23,
+            "q3": 491.78,
+            "minimum": 488.19,
+            "maximum": 502.66
+          },
+          "linkAndOptimizeIR": {
+            "n": 9,
+            "median": 338.98,
+            "q1": 338.31,
+            "q3": 339.48,
+            "minimum": 337.59,
+            "maximum": 351.0
+          },
+          "linkIR": {
+            "n": 9,
+            "median": 20.36,
+            "q1": 20.24,
+            "q3": 21.01,
+            "minimum": 20.0,
+            "maximum": 23.35
+          },
+          "simplifyIR": {
+            "n": 9,
+            "median": 128.31,
+            "q1": 128.0,
+            "q3": 129.07,
+            "minimum": 127.92,
+            "maximum": 129.42
+          },
+          "specializeModule": {
+            "n": 9,
+            "median": 144.77,
+            "q1": 144.43,
+            "q3": 145.99,
+            "minimum": 143.7,
+            "maximum": 153.25
+          },
+          "unrollLoopsInModule": {
+            "n": 9,
+            "median": 4.38,
+            "q1": 4.37,
+            "q3": 4.42,
+            "minimum": 4.35,
+            "maximum": 4.58
+          },
+          "performForceInlining": {
+            "n": 9,
+            "median": 1.5,
+            "q1": 1.49,
+            "q3": 1.51,
+            "minimum": 1.49,
+            "maximum": 1.52
+          }
+        },
+        {
+          "loadBuiltinModule": {
+            "n": 9,
+            "median": 208.06,
+            "q1": 207.14,
+            "q3": 210.16,
+            "minimum": 206.43,
+            "maximum": 211.33
+          },
+          "readSerializedModuleAST": {
+            "n": 9,
+            "median": 51.53,
+            "q1": 51.24,
+            "q3": 51.56,
+            "minimum": 50.84,
+            "maximum": 52.06
+          },
+          "readSerializedModuleIR": {
+            "n": 9,
+            "median": 115.59,
+            "q1": 115.31,
+            "q3": 116.77,
+            "minimum": 113.33,
+            "maximum": 118.75
+          },
+          "compileInner": {
+            "n": 9,
+            "median": 1164.87,
+            "q1": 1160.26,
+            "q3": 1167.47,
+            "minimum": 1153.88,
+            "maximum": 1169.46
+          },
+          "endToEndActions": {
+            "n": 9,
+            "median": 1164.87,
+            "q1": 1160.26,
+            "q3": 1167.47,
+            "minimum": 1153.88,
+            "maximum": 1169.45
+          },
+          "frontEndExecute": {
+            "n": 9,
+            "median": 670.18,
+            "q1": 664.29,
+            "q3": 673.91,
+            "minimum": 661.28,
+            "maximum": 674.72
+          },
+          "parseTranslationUnit": {
+            "n": 9,
+            "median": 13.84,
+            "q1": 13.79,
+            "q3": 13.89,
+            "minimum": 13.76,
+            "maximum": 14.33
+          },
+          "SemanticChecking": {
+            "n": 9,
+            "median": 489.66,
+            "q1": 484.3,
+            "q3": 493.16,
+            "minimum": 483.9,
+            "maximum": 495.06
+          },
+          "checkAllTranslationUnits": {
+            "n": 9,
+            "median": 489.66,
+            "q1": 484.3,
+            "q3": 493.16,
+            "minimum": 483.9,
+            "maximum": 495.06
+          },
+          "generateIR": {
+            "n": 9,
+            "median": 163.39,
+            "q1": 162.92,
+            "q3": 163.95,
+            "minimum": 160.72,
+            "maximum": 164.2
+          },
+          "generateIRForTranslationUnit": {
+            "n": 9,
+            "median": 163.39,
+            "q1": 162.92,
+            "q3": 163.95,
+            "minimum": 160.72,
+            "maximum": 164.19
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 9,
+            "median": 6.38,
+            "q1": 6.36,
+            "q3": 6.43,
+            "minimum": 6.35,
+            "maximum": 6.77
+          },
+          "generateOutput": {
+            "n": 9,
+            "median": 491.51,
+            "q1": 490.82,
+            "q3": 492.4,
+            "minimum": 488.33,
+            "maximum": 501.59
+          },
+          "linkAndOptimizeIR": {
+            "n": 9,
+            "median": 339.82,
+            "q1": 339.46,
+            "q3": 340.19,
+            "minimum": 336.94,
+            "maximum": 341.36
+          },
+          "linkIR": {
+            "n": 9,
+            "median": 20.48,
+            "q1": 20.32,
+            "q3": 20.76,
+            "minimum": 20.06,
+            "maximum": 21.03
+          },
+          "simplifyIR": {
+            "n": 9,
+            "median": 128.32,
+            "q1": 128.23,
+            "q3": 128.64,
+            "minimum": 127.93,
+            "maximum": 128.81
+          },
+          "specializeModule": {
+            "n": 9,
+            "median": 145.49,
+            "q1": 145.02,
+            "q3": 146.07,
+            "minimum": 144.25,
+            "maximum": 147.39
+          },
+          "unrollLoopsInModule": {
+            "n": 9,
+            "median": 4.39,
+            "q1": 4.35,
+            "q3": 4.42,
+            "minimum": 4.3,
+            "maximum": 5.88
+          },
+          "performForceInlining": {
+            "n": 9,
+            "median": 1.49,
+            "q1": 1.49,
+            "q3": 1.53,
+            "minimum": 1.48,
+            "maximum": 1.59
+          }
+        }
+      ],
+      "semantic_fraction_of_wall": {
+        "n": 18,
+        "median": 0.3388859228573008,
+        "q1": 0.33722580139877945,
+        "q3": 0.3407887920049474,
+        "minimum": 0.33414219377287724,
+        "maximum": 0.3512406083849209
+      },
+      "unattributed_output_residual_ms": {
+        "n": 18,
+        "median": 151.62,
+        "q1": 151.34500000000003,
+        "q3": 151.97750000000002,
+        "minimum": 150.5,
+        "maximum": 160.22999999999996
+      },
+      "unattributed_fresh_lifecycle_residual_ms": {
+        "n": 18,
+        "median": 71.06086544364688,
+        "q1": 66.949890563488,
+        "q3": 71.98570495188235,
+        "minimum": 64.16491653025145,
+        "maximum": 80.03615856051434
+      }
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvvm-o3",
+      "status": "passed",
+      "ptx_sha256": "5315e6101f95beacf4ed8b251d0b3c3a7fe49f340b24dfecf3fc1021a23d6148",
+      "cubin_sha256": "a1d6d4f034e343ee75b4a52fc43bbb8df10b264e7073558c0ec616648b78069c",
+      "wall_ms": {
+        "n": 18,
+        "median": 1601.658744737506,
+        "q1": 1597.128703724593,
+        "q3": 1609.386570751667,
+        "minimum": 1590.3745889663696,
+        "maximum": 1657.6115619391203
+      },
+      "round_wall_ms": [
+        {
+          "n": 9,
+          "median": 1599.839672446251,
+          "q1": 1596.3779091835022,
+          "q3": 1607.5150147080421,
+          "minimum": 1590.3745889663696,
+          "maximum": 1613.3566107600927
+        },
+        {
+          "n": 9,
+          "median": 1603.7375070154667,
+          "q1": 1599.381087347865,
+          "q3": 1610.0104227662086,
+          "minimum": 1591.4050713181496,
+          "maximum": 1657.6115619391203
+        }
+      ],
+      "assembly_ms": {
+        "n": 9,
+        "median": 294.0333504229784,
+        "q1": 293.19547675549984,
+        "q3": 295.767642557621,
+        "minimum": 292.5466950982809,
+        "maximum": 296.46593146026134
+      },
+      "phase_ms": {
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 207.27499999999998,
+          "q1": 205.7575,
+          "q3": 208.805,
+          "minimum": 203.68,
+          "maximum": 213.79
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 51.56,
+          "q1": 51.302499999999995,
+          "q3": 52.305,
+          "minimum": 50.76,
+          "maximum": 53.31
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 115.53999999999999,
+          "q1": 114.06,
+          "q3": 116.10749999999999,
+          "minimum": 112.03,
+          "maximum": 117.73
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1326.0149999999999,
+          "q1": 1318.5325,
+          "q3": 1329.3275,
+          "minimum": 1313.19,
+          "maximum": 1374.15
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1326.0149999999999,
+          "q1": 1318.5325,
+          "q3": 1329.3275,
+          "minimum": 1313.19,
+          "maximum": 1374.15
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 666.64,
+          "q1": 663.48,
+          "q3": 670.0899999999999,
+          "minimum": 658.49,
+          "maximum": 720.84
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 13.745000000000001,
+          "q1": 13.704999999999998,
+          "q3": 13.86,
+          "minimum": 13.63,
+          "maximum": 14.02
+        },
+        "SemanticChecking": {
+          "n": 18,
+          "median": 486.255,
+          "q1": 484.5775,
+          "q3": 488.95500000000004,
+          "minimum": 480.96,
+          "maximum": 539.89
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 486.255,
+          "q1": 484.5775,
+          "q3": 488.95500000000004,
+          "minimum": 480.96,
+          "maximum": 539.89
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 162.83999999999997,
+          "q1": 161.605,
+          "q3": 164.1825,
+          "minimum": 160.31,
+          "maximum": 170.51
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 162.83999999999997,
+          "q1": 161.605,
+          "q3": 164.1825,
+          "minimum": 160.31,
+          "maximum": 170.51
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 6.36,
+          "q1": 6.34,
+          "q3": 6.39,
+          "minimum": 6.3,
+          "maximum": 6.49
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 654.51,
+          "q1": 653.42,
+          "q3": 656.5450000000001,
+          "minimum": 651.05,
+          "maximum": 662.21
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 339.065,
+          "q1": 337.82,
+          "q3": 340.215,
+          "minimum": 336.14,
+          "maximum": 345.42
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 20.61,
+          "q1": 20.354999999999997,
+          "q3": 20.77,
+          "minimum": 19.59,
+          "maximum": 21.06
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 128.37,
+          "q1": 128.14749999999998,
+          "q3": 128.835,
+          "minimum": 127.68,
+          "maximum": 129.48
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 144.905,
+          "q1": 144.0075,
+          "q3": 145.725,
+          "minimum": 143.35,
+          "maximum": 150.34
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.385,
+          "q1": 4.335,
+          "q3": 4.4175,
+          "minimum": 4.31,
+          "maximum": 4.47
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.5,
+          "q1": 1.49,
+          "q3": 1.5075,
+          "minimum": 1.48,
+          "maximum": 1.61
+        }
+      },
+      "round_phase_ms": [
+        {
+          "loadBuiltinModule": {
+            "n": 9,
+            "median": 206.39,
+            "q1": 205.69,
+            "q3": 207.87,
+            "minimum": 205.38,
+            "maximum": 213.79
+          },
+          "readSerializedModuleAST": {
+            "n": 9,
+            "median": 51.57,
+            "q1": 51.07,
+            "q3": 52.66,
+            "minimum": 50.76,
+            "maximum": 53.31
+          },
+          "readSerializedModuleIR": {
+            "n": 9,
+            "median": 115.56,
+            "q1": 115.38,
+            "q3": 116.0,
+            "minimum": 112.8,
+            "maximum": 117.73
+          },
+          "compileInner": {
+            "n": 9,
+            "median": 1325.48,
+            "q1": 1318.11,
+            "q3": 1328.42,
+            "minimum": 1313.19,
+            "maximum": 1333.26
+          },
+          "endToEndActions": {
+            "n": 9,
+            "median": 1325.48,
+            "q1": 1318.11,
+            "q3": 1328.42,
+            "minimum": 1313.19,
+            "maximum": 1333.26
+          },
+          "frontEndExecute": {
+            "n": 9,
+            "median": 669.38,
+            "q1": 662.03,
+            "q3": 669.85,
+            "minimum": 658.49,
+            "maximum": 673.83
+          },
+          "parseTranslationUnit": {
+            "n": 9,
+            "median": 13.75,
+            "q1": 13.7,
+            "q3": 13.86,
+            "minimum": 13.63,
+            "maximum": 13.98
+          },
+          "SemanticChecking": {
+            "n": 9,
+            "median": 486.91,
+            "q1": 484.78,
+            "q3": 489.48,
+            "minimum": 480.96,
+            "maximum": 490.44
+          },
+          "checkAllTranslationUnits": {
+            "n": 9,
+            "median": 486.91,
+            "q1": 484.78,
+            "q3": 489.48,
+            "minimum": 480.96,
+            "maximum": 490.44
+          },
+          "generateIR": {
+            "n": 9,
+            "median": 162.4,
+            "q1": 161.14,
+            "q3": 164.16,
+            "minimum": 160.31,
+            "maximum": 170.51
+          },
+          "generateIRForTranslationUnit": {
+            "n": 9,
+            "median": 162.4,
+            "q1": 161.14,
+            "q3": 164.16,
+            "minimum": 160.31,
+            "maximum": 170.51
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 9,
+            "median": 6.34,
+            "q1": 6.33,
+            "q3": 6.36,
+            "minimum": 6.3,
+            "maximum": 6.42
+          },
+          "generateOutput": {
+            "n": 9,
+            "median": 654.43,
+            "q1": 653.78,
+            "q3": 656.58,
+            "minimum": 651.05,
+            "maximum": 657.11
+          },
+          "linkAndOptimizeIR": {
+            "n": 9,
+            "median": 338.93,
+            "q1": 338.79,
+            "q3": 340.28,
+            "minimum": 336.72,
+            "maximum": 341.99
+          },
+          "linkIR": {
+            "n": 9,
+            "median": 20.59,
+            "q1": 20.47,
+            "q3": 20.76,
+            "minimum": 19.59,
+            "maximum": 20.89
+          },
+          "simplifyIR": {
+            "n": 9,
+            "median": 128.33,
+            "q1": 128.17,
+            "q3": 128.58,
+            "minimum": 127.86,
+            "maximum": 129.06
+          },
+          "specializeModule": {
+            "n": 9,
+            "median": 144.97,
+            "q1": 144.2,
+            "q3": 145.75,
+            "minimum": 143.35,
+            "maximum": 146.31
+          },
+          "unrollLoopsInModule": {
+            "n": 9,
+            "median": 4.37,
+            "q1": 4.32,
+            "q3": 4.39,
+            "minimum": 4.31,
+            "maximum": 4.47
+          },
+          "performForceInlining": {
+            "n": 9,
+            "median": 1.5,
+            "q1": 1.48,
+            "q3": 1.5,
+            "minimum": 1.48,
+            "maximum": 1.61
+          }
+        },
+        {
+          "loadBuiltinModule": {
+            "n": 9,
+            "median": 207.29,
+            "q1": 205.96,
+            "q3": 209.09,
+            "minimum": 203.68,
+            "maximum": 210.26
+          },
+          "readSerializedModuleAST": {
+            "n": 9,
+            "median": 51.55,
+            "q1": 51.31,
+            "q3": 51.73,
+            "minimum": 51.17,
+            "maximum": 52.81
+          },
+          "readSerializedModuleIR": {
+            "n": 9,
+            "median": 114.51,
+            "q1": 113.97,
+            "q3": 116.39,
+            "minimum": 112.03,
+            "maximum": 117.16
+          },
+          "compileInner": {
+            "n": 9,
+            "median": 1327.72,
+            "q1": 1321.99,
+            "q3": 1329.62,
+            "minimum": 1316.44,
+            "maximum": 1374.15
+          },
+          "endToEndActions": {
+            "n": 9,
+            "median": 1327.72,
+            "q1": 1321.99,
+            "q3": 1329.62,
+            "minimum": 1316.44,
+            "maximum": 1374.15
+          },
+          "frontEndExecute": {
+            "n": 9,
+            "median": 666.38,
+            "q1": 663.58,
+            "q3": 671.21,
+            "minimum": 661.45,
+            "maximum": 720.84
+          },
+          "parseTranslationUnit": {
+            "n": 9,
+            "median": 13.74,
+            "q1": 13.73,
+            "q3": 13.86,
+            "minimum": 13.64,
+            "maximum": 14.02
+          },
+          "SemanticChecking": {
+            "n": 9,
+            "median": 486.18,
+            "q1": 484.51,
+            "q3": 487.38,
+            "minimum": 482.14,
+            "maximum": 539.89
+          },
+          "checkAllTranslationUnits": {
+            "n": 9,
+            "median": 486.18,
+            "q1": 484.51,
+            "q3": 487.38,
+            "minimum": 482.14,
+            "maximum": 539.89
+          },
+          "generateIR": {
+            "n": 9,
+            "median": 163.14,
+            "q1": 162.52,
+            "q3": 164.19,
+            "minimum": 161.35,
+            "maximum": 168.59
+          },
+          "generateIRForTranslationUnit": {
+            "n": 9,
+            "median": 163.14,
+            "q1": 162.52,
+            "q3": 164.19,
+            "minimum": 161.35,
+            "maximum": 168.59
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 9,
+            "median": 6.39,
+            "q1": 6.36,
+            "q3": 6.42,
+            "minimum": 6.34,
+            "maximum": 6.49
+          },
+          "generateOutput": {
+            "n": 9,
+            "median": 654.59,
+            "q1": 653.3,
+            "q3": 656.44,
+            "minimum": 651.05,
+            "maximum": 662.21
+          },
+          "linkAndOptimizeIR": {
+            "n": 9,
+            "median": 339.2,
+            "q1": 337.19,
+            "q3": 340.02,
+            "minimum": 336.14,
+            "maximum": 345.42
+          },
+          "linkIR": {
+            "n": 9,
+            "median": 20.72,
+            "q1": 20.27,
+            "q3": 20.77,
+            "minimum": 19.8,
+            "maximum": 21.06
+          },
+          "simplifyIR": {
+            "n": 9,
+            "median": 128.62,
+            "q1": 127.8,
+            "q3": 128.93,
+            "minimum": 127.68,
+            "maximum": 129.48
+          },
+          "specializeModule": {
+            "n": 9,
+            "median": 144.42,
+            "q1": 143.98,
+            "q3": 145.65,
+            "minimum": 143.88,
+            "maximum": 150.34
+          },
+          "unrollLoopsInModule": {
+            "n": 9,
+            "median": 4.39,
+            "q1": 4.36,
+            "q3": 4.42,
+            "minimum": 4.33,
+            "maximum": 4.46
+          },
+          "performForceInlining": {
+            "n": 9,
+            "median": 1.5,
+            "q1": 1.49,
+            "q3": 1.51,
+            "minimum": 1.48,
+            "maximum": 1.53
+          }
+        }
+      ],
+      "semantic_fraction_of_wall": {
+        "n": 18,
+        "median": 0.30364596822726175,
+        "q1": 0.30264793539213625,
+        "q3": 0.30476515329053877,
+        "minimum": 0.3017558881013543,
+        "maximum": 0.3257035679507578
+      },
+      "unattributed_output_residual_ms": {
+        "n": 18,
+        "median": 315.59499999999997,
+        "q1": 314.65500000000003,
+        "q3": 316.70750000000004,
+        "minimum": 312.86999999999995,
+        "maximum": 319.7300000000001
+      },
+      "unattributed_fresh_lifecycle_residual_ms": {
+        "n": 18,
+        "median": 70.83455971360205,
+        "q1": 67.59449513390665,
+        "q3": 72.98181116625665,
+        "minimum": 65.85967244625084,
+        "maximum": 74.99855639278883
+      }
+    }
+  ],
+  "raw_measurements": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/measurements.json",
+    "sha256": "3752dc34722c3141be630761d60364888e1d484eb00d646246487def1f0c781d"
+  },
+  "commands": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/run.sh",
+    "sha256": "f713ab04751536595c41a55b561bb9046dd60716ba25520ed235d756a84b2af3"
+  },
+  "driver": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/measure.py",
+    "sha256": "a29ab2653ca0848bd905cf6b51130418f910268c535c1a36ac4777b3ddb5c3cd"
+  },
+  "environment_before": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/environment-before.json",
+    "sha256": "d783ea0e5f7846c2629b450f7aeaa0999272b103a8c1b95ef2ebe09c9afa37cf"
+  },
+  "environment_final": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/environment-final.json",
+    "sha256": "ddb1ce6feafd2d61199ee7a5bf48ede05f1aa2bb869db9f706e3d79071fd117d"
+  },
+  "initial_capture_failure": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/capture-initial-failure.txt",
+    "sha256": "4c695e915cdb8ba9ce0a2c04c9381f433427e3cfc0600ae9fab84c9b5acafaa5"
+  },
+  "inherited_runtime": {
+    "full_checkpoint": 250,
+    "latest_implementation": 250,
+    "latest_targeted": 233,
+    "implementation_slices_since_full": 0,
+    "total_cells": 1701,
+    "correct": 1662,
+    "unresolved": 39,
+    "resolved_histories": 18,
+    "fresh_runtime_cells": 0
+  },
+  "timer_relationships": {
+    "compileInner": "wraps executeActions and endToEndActions; same approximate interval in these runs",
+    "frontEndExecute": "includes parseTranslationUnit, SemanticChecking and generateIR",
+    "SemanticChecking": "direct wrapper around checkAllTranslationUnits; do not sum",
+    "generateIR": "contains generateIRForTranslationUnit",
+    "loadBuiltinModule": "contains readSerializedModuleAST and readSerializedModuleIR; outside compileInner on fresh CLI",
+    "generateOutput": "contains linkAndOptimizeIR and backend/output work",
+    "linkAndOptimizeIR": "includes specialization, simplification and other passes",
+    "simplifyIR": "aggregates multiple invocations, including paths called by other passes; not an exclusive stage"
+  },
+  "limitations": [
+    "No GPU kernel execution or material bindings/textures/LUT/input/output contract.",
+    "Lifecycle/output residuals are not isolated startup/provider timings.",
+    "GDB interrupts perturb execution and provide qualitative stacks, not CPU fractions or speedup predictions.",
+    "Historical246 timings are not paired with this session."
+  ],
+  "qualitative_profile": {
+    "perf_event_paranoid": 4,
+    "perf_available": false,
+    "perf_probe": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/perf-availability.log",
+      "sha256": "3e16d8f851a488f8fd897a68f4b3bdf14c890916b53a59cf3456a56555dcb6bc"
+    },
+    "sampler": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/sample-gdb.py",
+      "sha256": "b3a60ac9f151ecb1bd471919bcfa9270dd3c4789dd75b6f58dc849bd4846c340"
+    },
+    "commands": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/profile.sh",
+      "sha256": "d2e5d98f2ed744a451164f2618c7f3c479ad6c60ff26654ccab9ff330ed73dc9"
+    },
+    "driver": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/profile.py",
+      "sha256": "be7e1778ffcb91af11c63cb8e61a3f0047859b1f370ee5eab5af13d190d2dc3d"
+    },
+    "runs_manifest": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/profile-runs.json",
+      "sha256": "8f0391597e585a0eedb3e0eb0ddb866400fc175eb9822b082f8af07920702081"
+    },
+    "window": "checkAllTranslationUnits entry to generateIR entry;3-9ms seeded SIGINT delays; pending interrupts drained through normal process exit",
+    "runs": [
+      {
+        "seed": 251,
+        "snapshots": 89,
+        "stacks_at_100_frame_cap": 7,
+        "stacks_containing_checker": 86,
+        "completed_compile": true,
+        "ptx_exact_250": true,
+        "raw": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/stacks-251.json",
+          "sha256": "bfba4081615c6cff149b66214f775c41c406387674d216446093cf180838f9c9"
+        },
+        "log": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/profile-251.log",
+          "sha256": "77b8d841e521a5e9a912810a0e46cf51d26ef10f9c118834aca5b96e2a015e3b"
+        },
+        "ptx": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/profile-251.ptx",
+          "sha256": "9ef3444ab015be99299f49f2e416474780d7985f6662a38d8d058cca58e810ac"
+        },
+        "selected_leaf_counts": {
+          "Slang::NodeBase::getClass": 6,
+          "Slang::SyntaxClassBase::SyntaxClassBase": 3,
+          "Slang::SyntaxClassBase::isSubClassOf": 1,
+          "_int_malloc": 6
+        },
+        "top_three_leaf_counts": [
+          ["Slang::NodeBase::getClass", 6],
+          ["_int_malloc", 6],
+          ["Slang::DeclRef<Slang::Decl>::init", 5]
+        ]
+      },
+      {
+        "seed": 252,
+        "snapshots": 91,
+        "stacks_at_100_frame_cap": 3,
+        "stacks_containing_checker": 91,
+        "completed_compile": true,
+        "ptx_exact_250": true,
+        "raw": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/stacks-252.json",
+          "sha256": "3c2ca3913f9d694abbb88abc30366d6de74bc70892ff9b192d44247fe45425f9"
+        },
+        "log": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/profile-252.log",
+          "sha256": "4aeb15508f94ed05c678a33aaf2cd182d1e72fcab7c13b9d2c80f4ddaee37c68"
+        },
+        "ptx": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/profile-252.ptx",
+          "sha256": "9ef3444ab015be99299f49f2e416474780d7985f6662a38d8d058cca58e810ac"
+        },
+        "selected_leaf_counts": {
+          "Slang::NodeBase::getClass": 6,
+          "Slang::SyntaxClassBase::SyntaxClassBase": 3,
+          "Slang::SyntaxClassBase::isSubClassOf": 5,
+          "_int_malloc": 10
+        },
+        "top_three_leaf_counts": [
+          ["_int_malloc", 10],
+          ["Slang::NodeBase::getClass", 6],
+          ["Slang::SyntaxClassBase::isSubClassOf", 5]
+        ]
+      },
+      {
+        "seed": 253,
+        "snapshots": 93,
+        "stacks_at_100_frame_cap": 6,
+        "stacks_containing_checker": 91,
+        "completed_compile": true,
+        "ptx_exact_250": true,
+        "raw": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/stacks-253.json",
+          "sha256": "b7ff3b2c2a0ab303291a2523e43db8807ccbdb8b3fea917a3a10b50a78d1d9b6"
+        },
+        "log": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/profile-253.log",
+          "sha256": "ff995b4d538d1b897030273511dcfa9fad6a125041212a04780d14804a17bd50"
+        },
+        "ptx": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/profile-253.ptx",
+          "sha256": "9ef3444ab015be99299f49f2e416474780d7985f6662a38d8d058cca58e810ac"
+        },
+        "selected_leaf_counts": {
+          "Slang::NodeBase::getClass": 4,
+          "Slang::SyntaxClassBase::SyntaxClassBase": 9,
+          "Slang::SyntaxClassBase::isSubClassOf": 3,
+          "_int_malloc": 4
+        },
+        "top_three_leaf_counts": [
+          ["Slang::SyntaxClassBase::SyntaxClassBase", 9],
+          [
+            "ankerl::unordered_dense::v4_5_0::detail::table<Slang::ValKey, Slang::Val*, Slang::Hash<Slang::ValKey>, Slang::ValKeyEqual, std::allocator<std::pair<Slang::ValKey, Slang::Val*> >, ankerl::unordered_dense::v4_5_0::bucket_type::standard, ankerl::unordered_dense::v4_5_0::detail::default_container_t, false>::do_find<Slang::ValNodeDesc>",
+            6
+          ],
+          ["Slang::Val::resolve", 4]
+        ]
+      }
+    ],
+    "debugger_timing_excluded_from_benchmark": true,
+    "boundary_caution": "Window includes post-check error checks and component construction before generateIR.268 stacks contain checker frame;16 hit100-frame cap,5 before checker frame. No fully captured stack is outside checker.",
+    "selected_stacks": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/selected-stacks.json",
+      "sha256": "115e361b8e5ff45140342b2c69ba1de0f6df68bba85654de6c9ce1e81024e4ee"
+    },
+    "constructor_disassembly": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/constructor-disassembly.txt",
+      "sha256": "30b899f1fdb2cf4dba7f91351e24b85a70e536f9424bb93539dadda6ed62370c"
+    },
+    "inspection_commands": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-inspection-commands.json",
+      "sha256": "397acf96c7c0bf774b32c4812bd862a8f8e6ce1376babeed34baa38b45274ff4"
+    },
+    "full_statistics": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/profile-statistics.json",
+      "sha256": "af0d59b0d69d371f462aa90ebd30d1070f3093e02e73cf7b950f2d8a43c1a03d"
+    }
+  },
+  "next_hypothesis": {
+    "boundary": "Existing ASTNodeType-to-SyntaxClassInfo constructor used by NodeBase::getClass",
+    "observation": "Completed seeds251/252/253 collect89/91/93 stacks. getClass leaves6/6/4 and constructor leaves3/3/9 repeatedly identify one metadata path. Predicate leaves1/5/3 no longer establish the old dominant predicate hotspot. malloc leaves6/10/4 have heterogeneous consumers; no unique dominant function or CPU fraction is claimed.",
+    "hypothesis": "Expose the existing SyntaxClassBase(ASTNodeType) tag-to-metadata constructor to inlining, keeping the generated metadata array as the sole mapping, all casts and the current predicate unchanged. Measure whether eliminating this call boundary improves semantic checking and fresh-process wall time.",
+    "minimal_future_intervention": "The constructor in slang-ast-boilerplate.cpp references TU-static kAllSyntaxClasses. A future prototype must move its declaration/linkage to one internal shared declaration (for example a private static member of SyntaxClassBase), retain exactly one generated definition, prove its element count equals ASTNodeType::CountOf, preserve exact valid-tag indexing and invalid-tag assertion policy, then expose the existing constructor in slang-ast-support-types.h. This is more than the body-only relocation in246. No duplicate table, changed public ABI or per-material path is permitted.",
+    "not_yet_proven": "No implementation, paired comparison or speedup claim. Qualitative interrupts identify a plausible bounded candidate, not a ranked CPU profile. Linkage/code-size tradeoffs and actual optimizer decisions require the future prototype.",
+    "selected_fresh_trace": {
+      "path": "build/nvvm-loop/slice-251-material-profile/selected-stacks.json",
+      "seed": 253,
+      "zero_based_stack_index": 81,
+      "chain": "ResolveInvoke -> AddOverloadCandidates -> AddDeclRefOverloadCandidates -> addOverloadCandidatesForCallToGeneric -> inferGenericArguments -> as<CallableDecl> -> NodeBase::getClass -> SyntaxClass<NodeBase>(tag) -> SyntaxClassBase(tag)"
+    },
+    "input_shape_audit": {
+      "exact_shape_and_producer": "A non-null ASTBuilder-created Decl/Val node with generated T::kType installed by ASTBuilder::_initAndAdd -> NodeBase::init; for seed253 stack81 the inner declaration of a generic is cast to CallableDecl in inferGenericArguments. Material calls such as normalize(wi_ws) and dot(si.wi_ws, si.normal_ws) motivate this ordinary generic path; samples do not attribute all work to that helper.",
+      "canonical_and_valid": "The ASTNodeType tag and corresponding generated SyntaxClassInfo::firstTag are intentionally canonical. No malformed or alternate semantic representation was found.",
+      "producer_repair": "No producer repair is indicated. Parser/ASTBuilder initialization, semantic generic substitution and resolution stay unchanged.",
+      "semantic_source_of_truth": "Existing generated class hierarchy/table and node tag remain the sole source of truth. No checked data is converted back to syntax or given custom equivalence.",
+      "test_and_layer": "This research introduces no implementation to revert. The next prototype must pass the paired material performance gate and exhaustive mapping/cast proof; revert it if those gates fail. The observed out-of-line metadata constructor owns the selected boundary.",
+      "reuse_or_assertion": "Reuse the existing constructor, generated table and range predicate. Preserve invalid/default policies, adding only an appropriate compile-time count agreement when making the sole table visible. Do not introduce a runtime fallback or second classification."
+    },
+    "alternatives_deferred": [
+      "Direct canonical-tag casts or ASTNodeDispatcher changes remove metadata roundtrips but change more consumers; defer until a separately justified slice, do not bundle after a failed minimal experiment.",
+      "Allocation/Val/solver caching spans unrelated consumers and correctness contracts. Current qualitative leaves do not isolate one narrow allocation fix.",
+      "Backend shader optimization/assembly settings change the six workload identities and are not this compiler boundary."
+    ],
+    "future_acceptance": {
+      "declaration_before_edits": "Start a separate bounded implementation plan, record exact before/candidate source and binaries and preserve accepted250 outcomes/additions/histories.",
+      "semantic_proof": "Run check-ast-subtype.py after matching builds: all702 tags x702 classes (492804 pairs),66 abstract classes,636 typed objects, all four null/const casts and strict DeclRefBase restrictions. Extend checks for tag-to-metadata pointer identity and single table/count/linkage. Verify construction/destruction metadata, exact invalid-tag assertions (-1 andCountOf) in matching Debug/assertion configuration only, and default/null policy. Never mix AST layouts or execute invalid tags in optimized objects.",
+      "shared_scope": "Full compiler unit suite; non-NVVM generics, overloads, operator-overloads, diagnostics and serialized AST regression inventory against before; runtime smoke4; relevant NVVM/routing/reporter units; toolkit18; runner contracts6; full frozen452/1356 plus discovery115/345 in all three modes, retain1701 cells/1662 correct/39 unresolved/18 resolved histories unless separately authorized additions; all six material compile/assembly outputs byte-identical. Shared AST metadata makes full checkpoint mandatory.",
+      "paired_timing": "Use isolated verified optimized before/after binaries, opposite identity AND build order rounds, two warmups and nine measured fresh processes per build/cell/round. Same exact source/options/PTX/cubin oracles; serial,180-second child/30-minute suite bounds, all samples retained. At least5% lower pooled SemanticChecking median in every identity, at least2% reduction in sum of six pooled wall medians, no identity wall regression above2% in either order round. Review per-round phase dispersion and library/text size. These are future gates, not predicted savings.",
+      "discard": "Discard the prototype if any correctness/identity/policy gate fails, if robust predeclared timing thresholds fail, or if it requires duplicate hierarchy/table, public ABI changes, semantic cache, material-specific logic or reconstructed syntax. Retain negative evidence and re-rank in a separate slice."
+    },
+    "primary_source_paths": [
+      "source/slang/slang-parser.cpp",
+      "source/slang/slang-check-expr.cpp",
+      "source/slang/slang-ast-dispatch.h",
+      "source/slang/slang-ast-forward-declarations.h",
+      "issue-nvvm-backend/check-ast-subtype.py",
+      "issue-nvvm-backend/ast-subtype-proof.cpp.in"
+    ]
+  },
+  "primary_source_snapshots": {
+    "build/nvvm-provider/llvm-build/lib/cmake/llvm/LLVMConfig.cmake": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/nvvm-provider/llvm-build/lib/cmake/llvm/LLVMConfig.cmake",
+      "sha256": "f2169609988fea986122da975619574df16eca1102807487c56d109f641d7bb2"
+    },
+    "build/source/slang/fiddle/slang-ast-all.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-all.h.fiddle",
+      "sha256": "97ba0defa4da08ca5ed0d0bf0a360d2d0780807280893a5a6e0af79d51fd4026"
+    },
+    "build/source/slang/fiddle/slang-ast-base.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-base.cpp.fiddle",
+      "sha256": "cec282353bcfe236fdcb065c01b6ca7d8c77eb7363a4c7d88f9bfeaa7d60566c"
+    },
+    "build/source/slang/fiddle/slang-ast-base.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-base.h.fiddle",
+      "sha256": "269dfd8957d1ca90a3f57e3e5823db2d8c49d8467822f6e0692447a3dd50a9cb"
+    },
+    "build/source/slang/fiddle/slang-ast-boilerplate.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-boilerplate.cpp.fiddle",
+      "sha256": "997abbf1f349ecb2882cef2d8365744c8b3c1d1af99ba081de56e0ab10c74475"
+    },
+    "build/source/slang/fiddle/slang-ast-builder.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-builder.cpp.fiddle",
+      "sha256": "9154773a53a41e8554d9a6d4e47d56c302705d068f26512551c1e4ff84630dd9"
+    },
+    "build/source/slang/fiddle/slang-ast-builder.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-builder.h.fiddle",
+      "sha256": "500f0539603573addc0427c46d23c5868743eea9986093b4c91666a09be57cf4"
+    },
+    "build/source/slang/fiddle/slang-ast-clone.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-clone.cpp.fiddle",
+      "sha256": "794ce09b2c3395407f40f23d9ee0b2faa1b64ffd8dccb0cc46a296498b4a62da"
+    },
+    "build/source/slang/fiddle/slang-ast-clone.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-clone.h.fiddle",
+      "sha256": "db27eee856f5fdd30ffc3353e0429c99f5e13b83b6278a08796a9760d640a652"
+    },
+    "build/source/slang/fiddle/slang-ast-decl-ref.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-decl-ref.cpp.fiddle",
+      "sha256": "061915ab0c5e20b1d9500cdc81bc5de89bb47c46ea94da6005c34c421949bac1"
+    },
+    "build/source/slang/fiddle/slang-ast-decl.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-decl.cpp.fiddle",
+      "sha256": "6588d6f70a5d2db86eb780fdf9b057a684704f7a971363248398f0e91b251f13"
+    },
+    "build/source/slang/fiddle/slang-ast-decl.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-decl.h.fiddle",
+      "sha256": "af6b305ba0c1ba2d76bfe8e161153fcef7895d6a374e7f2da6e135b94832e34b"
+    },
+    "build/source/slang/fiddle/slang-ast-dispatch.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-dispatch.h.fiddle",
+      "sha256": "54b2b4a67c9fbc24656534da7162687c03299dae0532ac64b4d527b5f03b7f29"
+    },
+    "build/source/slang/fiddle/slang-ast-dump.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-dump.cpp.fiddle",
+      "sha256": "bd3023a3a019bd876d6cc0a34c2c1fa3d648d68467d7f7428591a28b5d8df917"
+    },
+    "build/source/slang/fiddle/slang-ast-dump.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-dump.h.fiddle",
+      "sha256": "d5a109358daa6b82514453d564e20fd75521ee96930561960cd928f01674b757"
+    },
+    "build/source/slang/fiddle/slang-ast-expr.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-expr.h.fiddle",
+      "sha256": "f0018cd7db7c17c9de977dada0dd7bd25dcb4106f9f6b577fad8e5b31c3bc8e1"
+    },
+    "build/source/slang/fiddle/slang-ast-forward-declarations.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-forward-declarations.h.fiddle",
+      "sha256": "53eed9c48c91e50c31b8e316616a5db935a513589762829b93087253fa5662d3"
+    },
+    "build/source/slang/fiddle/slang-ast-iterator.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-iterator.h.fiddle",
+      "sha256": "9c8db0595c9b5f5f7e2de6bff708eaefc8563f4344b408e490c7f23efc2ce01f"
+    },
+    "build/source/slang/fiddle/slang-ast-modifier.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-modifier.cpp.fiddle",
+      "sha256": "91cb425d1bbfa0cb4b238a4b8c05a97c5741270f765a7c9ebe5d8663259c473c"
+    },
+    "build/source/slang/fiddle/slang-ast-modifier.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-modifier.h.fiddle",
+      "sha256": "b7cf3c74c5a1df84635fa09e6a6d46b870518fe5366b9b08d2bc0770064335a3"
+    },
+    "build/source/slang/fiddle/slang-ast-natural-layout.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-natural-layout.cpp.fiddle",
+      "sha256": "8217514bfbba5ffd0007a0ba31a1649768649a686df112d65e879d8410b14e46"
+    },
+    "build/source/slang/fiddle/slang-ast-natural-layout.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-natural-layout.h.fiddle",
+      "sha256": "3e2202695b5026f646c0d671c695d36e732c5c0df58d8683325886514d3bb485"
+    },
+    "build/source/slang/fiddle/slang-ast-print.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-print.cpp.fiddle",
+      "sha256": "d6b7a5e2d5c8dc87ff0a986afc2c6d81b842b1bb768bca93c74508248788ca30"
+    },
+    "build/source/slang/fiddle/slang-ast-print.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-print.h.fiddle",
+      "sha256": "0f162d964091edebdbad6b4c91fb65f5747f9e54f3d0ac8efdbc112933665194"
+    },
+    "build/source/slang/fiddle/slang-ast-stmt.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-stmt.h.fiddle",
+      "sha256": "d55200ff472c3e077d11d8056cc92258e65753f31de5ac20ce9f7ef49f130dbb"
+    },
+    "build/source/slang/fiddle/slang-ast-substitution.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-substitution.h.fiddle",
+      "sha256": "dc5f21f31f09f8c3a61cc038b17273f87118d5c8c3f6f2a47894288498ecace6"
+    },
+    "build/source/slang/fiddle/slang-ast-support-types.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-support-types.cpp.fiddle",
+      "sha256": "8fc7341c697873f86d72f2d166376b4252a7677d86156a5b724d16aaceb4daa3"
+    },
+    "build/source/slang/fiddle/slang-ast-support-types.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-support-types.h.fiddle",
+      "sha256": "31e6721859888fb0897824efdcf804d7a6d8a7e460281d0771073f067a3d8e0b"
+    },
+    "build/source/slang/fiddle/slang-ast-synthesis.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-synthesis.cpp.fiddle",
+      "sha256": "c1161e4d67141ff187ec9bb1fffd27312273cabdb349bbee4e18522ad86f4f25"
+    },
+    "build/source/slang/fiddle/slang-ast-synthesis.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-synthesis.h.fiddle",
+      "sha256": "63f83bd6053a94915d6dc950eec9aca508c9c14a512bd9299f54004894ee6b51"
+    },
+    "build/source/slang/fiddle/slang-ast-type.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-type.cpp.fiddle",
+      "sha256": "4a3b691e79a17eac887e2cd69eb6d43f00904a71bda94fc5c5ad0a25f34cd0b0"
+    },
+    "build/source/slang/fiddle/slang-ast-type.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-type.h.fiddle",
+      "sha256": "66839925fba2a599472194ae84eba0896992a99e2fd098b8623c2fb77f420cb3"
+    },
+    "build/source/slang/fiddle/slang-ast-val.cpp.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-val.cpp.fiddle",
+      "sha256": "0f701f96d26ad390d9431b324beefb70e6227c1be3b904958ff10fd3d1318792"
+    },
+    "build/source/slang/fiddle/slang-ast-val.h.fiddle": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/build/source/slang/fiddle/slang-ast-val.h.fiddle",
+      "sha256": "4eebde0a398b2f940afbd82c28ae31cf43b15afd5893e65130154f01c414f7d2"
+    },
+    "issue-nvvm-backend/ast-subtype-proof.cpp.in": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/issue-nvvm-backend/ast-subtype-proof.cpp.in",
+      "sha256": "856f53b281e4396a5ad36ce5d281db9af0215b4244212d6204530999e1e81e8e"
+    },
+    "issue-nvvm-backend/census.slice-195.tsv": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/issue-nvvm-backend/census.slice-195.tsv",
+      "sha256": "77d335cdb66a54b83cefba9cca90c209ee29ec5d801294a169a244acc0398690"
+    },
+    "issue-nvvm-backend/check-ast-subtype.py": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/issue-nvvm-backend/check-ast-subtype.py",
+      "sha256": "8c79b976a80e136cdfb3fd3b86c579f4d610cf820de0158ea1352141f87c829b"
+    },
+    "issue-nvvm-backend/complex-corpus.manifest.json": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/issue-nvvm-backend/complex-corpus.manifest.json",
+      "sha256": "7a6d151ed8e23066ec3b81e35b3f3bd606b3c37a0aea82da6953d47d2ebf4173"
+    },
+    "issue-nvvm-backend/complex-test-server.py": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/issue-nvvm-backend/complex-test-server.py",
+      "sha256": "b173839cb958fdcf26c3b57ea3dec09cf26868e3e397f12cf04e5c21c01781e8"
+    },
+    "issue-nvvm-backend/discovery-corpus.manifest.tsv": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/issue-nvvm-backend/discovery-corpus.manifest.tsv",
+      "sha256": "5632207fb442be17d8a8e36ec4682943ac6ee05d963d01fd1d8b269d2641053c"
+    },
+    "issue-nvvm-backend/run-complex-corpus.py": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/issue-nvvm-backend/run-complex-corpus.py",
+      "sha256": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed"
+    },
+    "issue-nvvm-backend/run-compute-census.py": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/issue-nvvm-backend/run-compute-census.py",
+      "sha256": "d464fab86c35e23b38dca664d722a4e79a664ee544da190c669ca51645491113"
+    },
+    "issue-nvvm-backend/run-compute-discovery.py": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/issue-nvvm-backend/run-compute-discovery.py",
+      "sha256": "6bdefee0b8001f4fbb12d89bb20f10912694ed24daa37ba1b4305a4154e75cb9"
+    },
+    "issue-nvvm-backend/selection.slice-208-frozen.tsv": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/issue-nvvm-backend/selection.slice-208-frozen.tsv",
+      "sha256": "f6d4ac7a1b3a9f982512287d87dcd77a4f75cfb0e2f819b343da312d8006ffd0"
+    },
+    "issue-nvvm-backend/test-run-complex-corpus.py": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/issue-nvvm-backend/test-run-complex-corpus.py",
+      "sha256": "6e2c88094334856c66c4d56bce50d17b553d4dea2858351808d2c911e0d58972"
+    },
+    "issue-nvvm-backend/test-run-compute-discovery.py": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/issue-nvvm-backend/test-run-compute-discovery.py",
+      "sha256": "ae59e7775eb77b00e286389a4c3ef34450fbe1f1ee988f500b0a55626d15b1d5"
+    },
+    "prelude/slang-cuda-prelude.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/prelude/slang-cuda-prelude.h",
+      "sha256": "35234d28dc1a168b5956c50ef4ea56c33aad1cc0fe398b796335156bcc665f1b"
+    },
+    "source/compiler-core/slang-nvvm-ir-builder-api.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/compiler-core/slang-nvvm-ir-builder-api.h",
+      "sha256": "5cac3270b4d7c97bd75ec7a7ae4bbc58afdf6c91d7f789c4a75a80f18fbe336f"
+    },
+    "source/compiler-core/slang-nvvm-semantic-catalog.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/compiler-core/slang-nvvm-semantic-catalog.h",
+      "sha256": "eac9d18e810f471305e931060d82151f7c47cda66ec709fac16b321cc3921af8"
+    },
+    "source/compiler-core/slang-test-server-protocol.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/compiler-core/slang-test-server-protocol.cpp",
+      "sha256": "27e4679da25f4ff5fd245dc027d0b19c167a0bb4781c218ab7031303f5542855"
+    },
+    "source/compiler-core/slang-test-server-protocol.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/compiler-core/slang-test-server-protocol.h",
+      "sha256": "c0ff0e415c4106b9ca799d5ee19f43023e22bc576674de8ef7eab43e17fbbb23"
+    },
+    "source/core/slang-common.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/core/slang-common.h",
+      "sha256": "6ad98d56d4ca68c4a3310b40a8338ec0e9f382e17b613dc2d49a6de48353984f"
+    },
+    "source/core/slang-math.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/core/slang-math.h",
+      "sha256": "686f416cf1407526ac86e4fe4c04e4f43d74eee12507dd3e114155f85fb39a1f"
+    },
+    "source/core/slang-performance-profiler.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/core/slang-performance-profiler.cpp",
+      "sha256": "df62d584a8c53af966aed0cecad60cab5187c74f3e25f52bbd58bedce7e6f148"
+    },
+    "source/core/slang-type-traits.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/core/slang-type-traits.h",
+      "sha256": "48364bca404df844094f1712645e2293d7df9534554ac40c696589f7af7cf579"
+    },
+    "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang-llvm-nvvm/slang-llvm-nvvm.cpp",
+      "sha256": "ab11921e4e83b38e6d2843acc96d7b99d35fa334e2e5173f2f7f12624b360d01"
+    },
+    "source/slang/hlsl.meta.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/hlsl.meta.slang",
+      "sha256": "3ab28ee36df1e5d5bd42d0d3b9ca414e74477e1d33f498bf16e59ac4061ce92e"
+    },
+    "source/slang/slang-ast-all.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-all.h",
+      "sha256": "d502b696b1ab7e3649aef27c28942bf82865d30d6cbaeb8590a0c522d37871a3"
+    },
+    "source/slang/slang-ast-base.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-base.cpp",
+      "sha256": "37c9a9da2a052b7a71d4646336c7a94d85a997efac0bf096d6025c296e839e44"
+    },
+    "source/slang/slang-ast-base.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-base.h",
+      "sha256": "e0a4cb294dd645269a4f9ec43cf615ae5ebdd71117b6eefa205173a77f342813"
+    },
+    "source/slang/slang-ast-boilerplate.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-boilerplate.cpp",
+      "sha256": "d828299a20850b2bd35161a269aa5a941089e11ef5cc0b070c28d2e407ceafa7"
+    },
+    "source/slang/slang-ast-builder.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-builder.cpp",
+      "sha256": "f1e422e27769f053313fad612008173e52595ec6650dd809473783c79dff02de"
+    },
+    "source/slang/slang-ast-builder.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-builder.h",
+      "sha256": "6747d977a29fb9d6d30c3e949ef713ba27347cdd1627d097974204eb10fddabc"
+    },
+    "source/slang/slang-ast-clone.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-clone.cpp",
+      "sha256": "8211c52270e762a5acec4db80457e542f70146cd25e27770c89a0772ed3bd3aa"
+    },
+    "source/slang/slang-ast-clone.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-clone.h",
+      "sha256": "ee138a213b4520ee653e76266e8d34d91167b0ac20fa298df282ad11fd174913"
+    },
+    "source/slang/slang-ast-decl-ref.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-decl-ref.cpp",
+      "sha256": "c9ab4d073866529cd273461c8ac9efe2d3c29e59933157129bc5813b2706ff61"
+    },
+    "source/slang/slang-ast-decl.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-decl.cpp",
+      "sha256": "ad96d80a01dafcaa926750289728968d4e10cafc6332a11aa585a69768142540"
+    },
+    "source/slang/slang-ast-decl.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-decl.h",
+      "sha256": "97e0ceabd153db8a426342854845ed8630d33451ef10843fb7f2fb58108aa09c"
+    },
+    "source/slang/slang-ast-dispatch.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-dispatch.h",
+      "sha256": "7009ba9f253d73b340898e18cf05458931d67b9e4ef13bc2c524b4ec35ffe42b"
+    },
+    "source/slang/slang-ast-dump.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-dump.cpp",
+      "sha256": "403d4836d362601d6135729c5f0c9b04d8c270f569aeca51e7cebc0089450466"
+    },
+    "source/slang/slang-ast-dump.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-dump.h",
+      "sha256": "58bf17f30fcd83b03dc41022eabd46a9fc314a2e2928b750b4fa0c396a5f6ea9"
+    },
+    "source/slang/slang-ast-expr.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-expr.h",
+      "sha256": "e1c66399b89f26a0019a4864edce07537829f533c33d5f4fcd40b22437690a08"
+    },
+    "source/slang/slang-ast-forward-declarations.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-forward-declarations.h",
+      "sha256": "ce29124f4ef0b97bd76d03ee55fb620da62bb40db9dad9a3d915e263e432336d"
+    },
+    "source/slang/slang-ast-iterator.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-iterator.h",
+      "sha256": "13d8a166c1abd05dbc716adad01ec3be37128435fd4cbb9bbc40e757b610e145"
+    },
+    "source/slang/slang-ast-modifier.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-modifier.cpp",
+      "sha256": "8f621bf30709e055777db5b7a3df13a6b0943ea54c273ae56412ee492ff2dd7c"
+    },
+    "source/slang/slang-ast-modifier.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-modifier.h",
+      "sha256": "4e3a0ccf857fc730f7195181cb8452a7e08b0c88a6c70591a9e98893890af7db"
+    },
+    "source/slang/slang-ast-natural-layout.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-natural-layout.cpp",
+      "sha256": "b2d1aab110936cc5c69aefb7ac9be3b7fc00d3c959048443b89deab038e9504a"
+    },
+    "source/slang/slang-ast-natural-layout.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-natural-layout.h",
+      "sha256": "68d26e53e46854cf043a3e7fb4d462e0543f3b36c830794074a978ba9c2f9cb7"
+    },
+    "source/slang/slang-ast-print.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-print.cpp",
+      "sha256": "56e7f3c652a0781b58cc9b6ad2b34f62b41f267e72bf183306656494880c2a76"
+    },
+    "source/slang/slang-ast-print.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-print.h",
+      "sha256": "d21bb6f595643aa856380f9b4b7258e861bfee38151062123c75a5f5777d5dee"
+    },
+    "source/slang/slang-ast-stmt.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-stmt.h",
+      "sha256": "f5e0b1e1e3b3fca00bf8b0e74ff0a58880073eecb635d95a66dd65f262b7d874"
+    },
+    "source/slang/slang-ast-substitution.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-substitution.h",
+      "sha256": "574b87215083a433a3534d0d46a20c4cd611e3851ef96a44ba8ba66511ed334d"
+    },
+    "source/slang/slang-ast-support-types.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-support-types.cpp",
+      "sha256": "49dbf612b8e801917820efc688e9bfedb57ef52bed45ddcfc505e46a08a4f24c"
+    },
+    "source/slang/slang-ast-support-types.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-support-types.h",
+      "sha256": "69d6811bbdd74d3bc54b8cb069f4508cfc104d7ded1f66332476ec5fe9dc38b5"
+    },
+    "source/slang/slang-ast-synthesis.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-synthesis.cpp",
+      "sha256": "7ae624f6331fc3d0fdeb75d054133d2e17bcad52918f2590054f26cf64fed76f"
+    },
+    "source/slang/slang-ast-synthesis.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-synthesis.h",
+      "sha256": "ff3e66435fb32dfc8abb92ba9836ba4123fe673ccc0a2d30e01c917ec2339aa9"
+    },
+    "source/slang/slang-ast-type.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-type.cpp",
+      "sha256": "b57183c0adc79b28c564d14aadd5ab6a2f3bdfc20e8de5d9f7db171da6eec81c"
+    },
+    "source/slang/slang-ast-type.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-type.h",
+      "sha256": "d9871e9453934a5fb54bbfefb39ab8331eb4dee8ad9feaa12fb68424a1be29ce"
+    },
+    "source/slang/slang-ast-val.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-val.cpp",
+      "sha256": "b4e68186f79cfb76faa3474f32d52014738a5fd15aebcec53baf04e4f805d8c3"
+    },
+    "source/slang/slang-ast-val.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-ast-val.h",
+      "sha256": "7dcd8f85748a6da86026062b4b9a3c164afb5c0ea963c2c20418b1c4d8f82096"
+    },
+    "source/slang/slang-check-constraint.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-check-constraint.cpp",
+      "sha256": "4271ef63729d7250c5e1ba531f3751c0c4a7d4647d47f12f2a5464c996d6c228"
+    },
+    "source/slang/slang-check-decl.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-check-decl.cpp",
+      "sha256": "57f305ce386015894f835d112309bf701d8af2eebab136b36928077bb10c3057"
+    },
+    "source/slang/slang-check-expr.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-check-expr.cpp",
+      "sha256": "23faffe2c5c2b55dcde2f28b0faab754fd49772361a3dfce33ecd0d470ae1920"
+    },
+    "source/slang/slang-check-inheritance.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-check-inheritance.cpp",
+      "sha256": "c50fb15d8fb0f04fbb7d3a29f734b169e121fc054a6d18ea161c6e8da785b58e"
+    },
+    "source/slang/slang-check-overload.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-check-overload.cpp",
+      "sha256": "ce3b85bf7e607b7fce78faa5ddf8b454e55a33fc9ae59ce4a46efc45138f9b13"
+    },
+    "source/slang/slang-check.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-check.cpp",
+      "sha256": "b234466bd6af5a59c975df3dad1136e4ab4a4a9178ff702c077c68e2c6214bac"
+    },
+    "source/slang/slang-compile-request.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-compile-request.cpp",
+      "sha256": "86583d1eab38374977b94dac519164918e3d3b9e9e382914f25f65d89c1caeb0"
+    },
+    "source/slang/slang-emit-nvvm-type-lowering.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-emit-nvvm-type-lowering.cpp",
+      "sha256": "1b11bf507a206401b45134206d5298fda75e46bd28d10abea521c84970e75d16"
+    },
+    "source/slang/slang-emit-nvvm-type-lowering.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-emit-nvvm-type-lowering.h",
+      "sha256": "67e2d75fc5ee8d95632b61ce0d3b89683d97023fe78b1bd9bb58bb54b3a8afef"
+    },
+    "source/slang/slang-emit-nvvm.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-emit-nvvm.cpp",
+      "sha256": "96f4d29c344e247b7d81d80c71eac46307cff17ef41e780870bc1dfc8bd9aac0"
+    },
+    "source/slang/slang-emit.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-emit.cpp",
+      "sha256": "fe0b51897dce56e7a96e032c7cdcfd7498a949bd71a9b0c724c5ea726bd27bb6"
+    },
+    "source/slang/slang-end-to-end-request.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-end-to-end-request.cpp",
+      "sha256": "4eb00015b6d6e49d82be09c95a6f3486aca237317f81121b404502fac1ef6230"
+    },
+    "source/slang/slang-global-session.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-global-session.cpp",
+      "sha256": "ef74f0f46a0c904607a2f9da4bd2c9e35db66cbed37b1db58975f6d09d20c65b"
+    },
+    "source/slang/slang-parser.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-parser.cpp",
+      "sha256": "355509ebd0c817c456b89fa94ce4e474429b78ed33167e2c4205a1693f9cde80"
+    },
+    "source/slang/slang-syntax.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/source/slang/slang-syntax.cpp",
+      "sha256": "121aed043cf4b2504250b6cb81a04912f477dd9383bb09eaa074196078ab4cbf"
+    },
+    "tests/cuda/complex/tiled_brass_material.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/complex/tiled_brass_material.slang",
+      "sha256": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92"
+    },
+    "tests/cuda/noinline.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/noinline.slang",
+      "sha256": "283b0f76ecb2fe6f2df62eb6ead2ca9a5431b97e98661cccd174a88ea2fe03bb"
+    },
+    "tests/cuda/nvvm-bf16-dot.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-bf16-dot.slang",
+      "sha256": "1a2cdfd31e8c5e8d9db820417776988977ea3e404fb1d27576f3b390c6f89a2d"
+    },
+    "tests/cuda/nvvm-bf16-scalar.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-bf16-scalar.slang",
+      "sha256": "83cb3bd0c32279bb18d199030c0cb1f1baa49d1a75b77f884738c6b31c74a82a"
+    },
+    "tests/cuda/nvvm-bf16-signed-literals.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-bf16-signed-literals.slang",
+      "sha256": "be632f429272cec7c033436ee27d304197b8051a811da1854dcdcff10919fcbd"
+    },
+    "tests/cuda/nvvm-bf16-vector-values.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-bf16-vector-values.slang",
+      "sha256": "72ddebefacdce9c4cb4f4e930e3a57aa43f73a51191578688007bd144529ee19"
+    },
+    "tests/cuda/nvvm-clock-observations.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-clock-observations.slang",
+      "sha256": "123dbc900d0388f465fb3a765da2c6a59d47da93997e6d99fa4cf70a2b94078b"
+    },
+    "tests/cuda/nvvm-copyable-kernel-context.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-copyable-kernel-context.slang",
+      "sha256": "60d1c5d9e4655c13dd63b8074d190eb7f1ec9078dc683f8c060403a8edabd641"
+    },
+    "tests/cuda/nvvm-firstbithigh-signedness.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-firstbithigh-signedness.slang",
+      "sha256": "a583484d66ab55583d6a71fe4dc056ec3eb2208cfe12c6046db25cd66c033d1b"
+    },
+    "tests/cuda/nvvm-fp16-masked-minmax.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-fp16-masked-minmax.slang",
+      "sha256": "1b177d1a9e246fb44d94015dca2df0e81f81f05a62ce0ff98a51a78879b48f3e"
+    },
+    "tests/cuda/nvvm-fp32-minmax-order.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-fp32-minmax-order.slang",
+      "sha256": "a4c91ebc19acbafcf8f6e21ef10eb314c5df7525de1f969e78cd0b52fac976e6"
+    },
+    "tests/cuda/nvvm-fp32-singleton-minmax.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-fp32-singleton-minmax.slang",
+      "sha256": "d838cc70fe2e4d88bb2b127be48304fce74219bfd6319d25122a8e84815fe381"
+    },
+    "tests/cuda/nvvm-fp64-implicit-shuffle.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-fp64-implicit-shuffle.slang",
+      "sha256": "e6ed61a825021727de23baf36b6b360c1fbb329ca4b7987b39a8c071d3448616"
+    },
+    "tests/cuda/nvvm-fp64-minmax-order.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-fp64-minmax-order.slang",
+      "sha256": "53264fe384c92fdf42261565f4b08049a565d2a1e0c8946c0b7424192da321c1"
+    },
+    "tests/cuda/nvvm-fp64-prefix-minmax-order.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-fp64-prefix-minmax-order.slang",
+      "sha256": "40b2dd221653c28f3cfb39de69705994ebc275d545baa5d48c6ae5087c6bd740"
+    },
+    "tests/cuda/nvvm-fp64-wave-edges.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-fp64-wave-edges.slang",
+      "sha256": "2df2ac1b0f7d50111154cea0f0c0a2752e125c5f117a1d97cdcb1ddf410fd0e2"
+    },
+    "tests/cuda/nvvm-fp8-finite-literals.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-fp8-finite-literals.slang",
+      "sha256": "96ec3491de1ce244be273b5271ae1f9abeb64dc47c1f0349e40722ea3256d52a"
+    },
+    "tests/cuda/nvvm-fp8-scalar-transport.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-fp8-scalar-transport.slang",
+      "sha256": "3b350d50968b3f99d2d152ee01405cec8f7a7cf316768466fba0939edeea02a1"
+    },
+    "tests/cuda/nvvm-i64-masked-minmax.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-i64-masked-minmax.slang",
+      "sha256": "1f477c49033415ba8f069d7a216c9207170c9bbf8ea1d9dc1d0be3174dc8eab2"
+    },
+    "tests/cuda/nvvm-narrow-masked-minmax.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-narrow-masked-minmax.slang",
+      "sha256": "a58e2734299fcaf8dad0c7189ec2f903204f6be85161245a10439e38aa9a0526"
+    },
+    "tests/cuda/nvvm-quad-votes.slang": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tests/cuda/nvvm-quad-votes.slang",
+      "sha256": "9afe51ece0ca9c767ab7305655955be89365416c2df9d2f01206f7ff801b4aa5"
+    },
+    "tools/slang-fiddle/slang-fiddle-lua.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tools/slang-fiddle/slang-fiddle-lua.cpp",
+      "sha256": "a332f6b97e45577b7d2a1f69d1705934b08e72a6fa48c01e0bba056283d4976a"
+    },
+    "tools/slang-fiddle/slang-fiddle-scrape.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tools/slang-fiddle/slang-fiddle-scrape.cpp",
+      "sha256": "ddd1e8a09742804231499692119f551c1f3171931c30a7f8e8c8ecc80a3970f2"
+    },
+    "tools/slang-fiddle/slang-fiddle-script.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tools/slang-fiddle/slang-fiddle-script.cpp",
+      "sha256": "198651713cdbc64f2c585a4fb5ee510b438f6f95a2a977f43bad4fff833b8f66"
+    },
+    "tools/slang-unit-test/unit-test-math.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tools/slang-unit-test/unit-test-math.cpp",
+      "sha256": "305cd1779663997dd2335bbfa61f2c98659a29d6fb35853ddb7aefcd92f2aa19"
+    },
+    "tools/slang-unit-test/unit-test-nvvm-builder.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tools/slang-unit-test/unit-test-nvvm-builder.cpp",
+      "sha256": "27847687fff1ae68d3ab1aea6d0aac046a6c341e74dc5bf176fa2afe2f3e4ca3"
+    },
+    "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tools/slang-unit-test/unit-test-nvvm-emitter.cpp",
+      "sha256": "adecdedf13308986fce95ecceaf4d123f292716749fefecff985056c0b2ee1ed"
+    },
+    "tools/slang-unit-test/unit-test-nvvm-support.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tools/slang-unit-test/unit-test-nvvm-support.h",
+      "sha256": "0e53a270ea7200bc451362bb6f0d2f072ba08dedd430a64631458c9b2312425c"
+    },
+    "tools/test-server/test-server-main.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/source-snapshots/tools/test-server/test-server-main.cpp",
+      "sha256": "b82d0f813a560837b008de72fdaaf011b428396ec78800f4e0bb43cb4feef7de"
+    }
+  },
+  "raw_artifact_index": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/artifact-index.json",
+    "sha256": "8a4dc8be720c04b9c5a32efe8cfe9e66f5c18ad7b013cd656bb15671dee90ab5"
+  },
+  "raw_artifact_count": 579,
+  "parent_acceptance": {
+    "status": "passed",
+    "summary": "Independently verified132 compiles/66 assemblies,exact commands/output hashes/sample ordering,all reported distributions,all3 qualitative profiles and selected source trace,119/12/563 identities,579 raw artifacts and134 worker snapshots. Added one independent debugger-consumer snapshot.",
+    "evidence": [
+      {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/parent-audit.py",
+        "sha256": "647254b0348948670d815ce816fdc1434abed46efe5fd591c2323154a681e72e"
+      },
+      {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/parent-audit.json",
+        "sha256": "9ee64efe69da81836f9097ef8f5e3ed9e14b226742711bc0f6f6c1ac6c8cb5e4"
+      },
+      {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/parent-metadata.py",
+        "sha256": "211ca16891c36db6136d339f37e56bbe2009963c8af6b7f0ebbfa49a9eaccb29"
+      },
+      {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/parent-metadata.json",
+        "sha256": "cad4cd9223e773cbe40baadeffea346e6bfc5dc91b82bebfa255e53ed35b42c2"
+      }
+    ],
+    "additional_consumer": {
+      "source": "source/slang/slang.natvis",
+      "snapshot": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-251-material-profile/parent-slang.natvis",
+        "sha256": "18d84a48169a4ccfdd63f57837df662f151f3e568e4335611229ad3a75878739"
+      },
+      "requirement": "Six NodeBase visualization conditions reference kAllSyntaxClasses[astNodeType]. Preserve that existing name/scope when exposing the sole table, or explicitly adapt and validate these consumers. Prefer preserving it; a private static member is only a possible arrangement, not a chosen implementation."
+    }
+  }
+}

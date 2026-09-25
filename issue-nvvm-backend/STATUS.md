@@ -3,6 +3,30 @@
 Read [WORKFLOW.md](WORKFLOW.md) before resuming. The autonomous loop is authorized; the parent owns
 independent acceptance and local commits. No push is authorized.
 
+## Research251 is accepted
+
+Fresh accepted250 material measurements preserve all132 PTX and66 cubin outputs, with108 measured
+compiles/24 warmups and54 measured assemblies/12 warmups. SemanticChecking medians484.74–488.73ms
+and fresh wall1407.13–1601.66ms are current observations, not a paired speedup over246. Three separate
+completed profiles preserve PTX and collect273 qualitative snapshots. Read
+[plan251](plan.slice-251-material-profile.md), [report251](report.slice-251-material-profile.md) and
+[timing251](timing-evidence.slice-251.json).
+
+The repeated class-metadata path supports one future prototype: make the existing
+SyntaxClassBase(ASTNodeType) constructor visible for inlining, preserving one generated table and
+all cast semantics. The table's current translation-unit linkage requires a deliberate internal
+shared declaration and count/pointer/assertion proof. Preserve the existing `slang.natvis` table
+references when selecting linkage. No optimization is implemented in251; the old
+predicate is not consistently the dominant leaf, and allocation samples have heterogeneous consumers.
+119 source/generated/test,12 artifacts and563 runtime inputs remain exact250. No fresh GPU runtime
+cells; material bindings/textures/LUT/input/output contracts remain unavailable.
+
+Latest accepted implementation/full checkpoint250, targeted233 and implementation cadence0 remain
+unchanged. Rolling implementation history remains246 material compile-time,249 FP8 scalar transport,
+250 BF16 correctness. Independent parent acceptance verifies all sample inventories, statistics,
+profiles, identities,579 raw artifacts and134 primary snapshots; an additional parent snapshot
+records the debugger consumer. Raw research lives under `build/nvvm-loop/slice-251-material-profile`.
+
 ## Slice250 is accepted
 
 The bounded BF16 negative canonical literal correction passed independent acceptance on provider
@@ -40,11 +64,13 @@ indexed artifacts. Correctness priority explains this slice; reconsider material
 
 ## Next bounded action
 
-Start a bounded research slice to refresh material compile-time profiling. Slice246 improved the AST
-predicate; obtain a fresh profile before selecting another optimization. Do not infer the next
-bottleneck from the old profile. All6 complex cells compile/assemble; absent material runtime contracts remain a limit on
-performance/runtime claims. Do not expand BF16 vector storage, dynamic-object/aggregate ABI or FP8
-runtime conversion merely to move an unsupported diagnostic.
+Start one bounded constructor-visibility prototype using
+the report's semantic/performance gates. Preserve one existing generated metadata mapping; do not
+bundle direct-tag casts/dispatch changes or allocation work. Shared AST impact requires exhaustive
+metadata/cast proof, non-NVVM semantic/serialization regressions and a full checkpoint. Benchmark
+paired isolated optimized before/after builds with both identity/build order reversals; reject on
+failed gates and retain negative evidence. All6 material cells already compile/assemble. Absent
+runtime contracts remain a limit on material correctness and kernel-performance claims.
 
 The pre-existing BF16 constant failure recorded by249 is resolved by250. No next independent blocker
 was exposed by the focused literal tests. Shared FP8 overflow still differs from CUDA SATFINITE;
