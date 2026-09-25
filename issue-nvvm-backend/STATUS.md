@@ -4,6 +4,23 @@ Updated 2026-09-25. Read [WORKFLOW.md](WORKFLOW.md) before resuming the loop.
 
 ## Current state and next action
 
+**Research247 is independently accepted.** Read
+[plan247](plan.slice-247-column-major.md), [report247](report.slice-247-column-major.md) and
+[evidence247](semantic-evidence.slice-247.json). The original column-major discovery ID still has
+three runtime mismatches (`11,1` actual versus `11,22` graphics oracle); all are retained. Eighteen
+independent CUDA controls prove column stride12 and row stride8 in NVRTC O3/NVVM O0/O3, with six
+PTX assemblies and runtime4 passing. The fixture's ignored-major comment is stale for this shape:
+the mismatch comes from graphics column stride16 input packing. No compiler/runner/fixture change,
+new registered ID, support unlock, full checkpoint or implementation-cadence increment.
+
+After the local commit, re-rank remaining boundaries. The texture-dimension mismatch is the
+remaining unqualified wrong-output case; narrow FP8 admission and arbitrary RequirePrelude remain
+separate support candidates. A future explicit packed CUDA matrix contract must preserve the original ID/oracle and
+complete a full checkpoint for corpus/runner changes. No general host-byte repacking is proposed.
+Latest implementation/full remains246, targeted233, implementation slices since full zero. All41
+unresolved and16 resolved histories remain exact246 records. Tested HEAD for247 is
+`739ead0d725f1075b4d382ec531ebe9070e60ea1`;117 source,12 artifact and561 input hashes match246.
+
 **Implementation246 and its full checkpoint are independently accepted.** Read
 [plan246](plan.slice-246-ast-subtype.md), [report246](report.slice-246-ast-subtype.md),
 [validation246](runtime-validation.slice-246.json), [timing246](timing-evidence.slice-246.json)
@@ -15,14 +32,14 @@ admission remain unchanged. No new production helper or fallback. The direct-tag
 deferred because this minimal change meets the predeclared gate.
 
 Latest accepted implementation/full checkpoint:246. Latest targeted acceptance:233. Implementation
-slices since full:zero. Tested source base `c29b9b7158ab069141476761f5585c26d3cf7460`. Parent owns the
-authorized local commit; no push is authorized. Rolling history:242dot/244FP8producerfix/246materialcompiletime.
+slices since full:zero. Tested source base `c29b9b7158ab069141476761f5585c26d3cf7460`. Accepted commit `739ead0d725f1075b4d382ec531ebe9070e60ea1`; no push is authorized. Rolling history:242dot/244FP8producerfix/246materialcompiletime.
 
-After committing, re-rank the measured remaining correctness and support boundaries. Known column-major
-and texture-dimension runtime mismatches merit consideration alongside narrow FP8 admission and
-arbitrary RequirePrelude. This slice investigated no next blocker. Material runtime still lacks
-bindings, textures/LUTs, inputs and an output oracle; the accepted compile-time improvement makes
-no kernel-performance claim. Shared FP8 overflow policy and BF vector storage remain separate decisions.
+Material runtime still lacks bindings, textures/LUTs, inputs and an output oracle. The accepted
+compile-time improvement makes no kernel-performance claim. Shared FP8 overflow policy and BF
+vector storage remain separate decisions. Parent247 independently verified all144 control values,
+18 executions, six trace/assembly pairs, three exact old outcomes, 158 indexed artifacts, 12 primary
+source snapshots and166 compact references before its own two audit references. See parent-audit
+under `build/nvvm-loop/slice-247-research`.
 
 ## Accepted performance and correctness evidence
 

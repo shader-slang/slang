@@ -8301,3 +8301,29 @@ positive-zero accumulator and separately rounded BF16 products/sums using two SM
 instructions per lane. It does not widen arithmetic, type-role, storage or export admissions.
 See [the BF16 vector contract](nvvm-bf16-vector-contract.md#source-ordered-dot-slice242) for the
 concrete cancellation example, prototype gate, signed-zero recipe and remaining exclusions.
+
+### Slice 247: Qualify non-square column-major target packing
+
+The historical slice111 non-square diagnostic above is superseded by fresh247 evidence. Existing
+physical storage support now executes `ConstantBuffer<float3x2>` with compact column stride12 in
+NVRTC O3 and NVVM O0/O3. Its original discovery graphics oracle still fails unchanged: supplied
+Float32 words `[1,0,10,0,0,1,20,0]` produce `11,1`, while graphics columns spaced16 bytes apart
+produce the expected `11,22`. This is an incompatible adapted host-data contract, not evidence of
+incorrect matrix multiplication. The original ID, bytes, oracle and all three mismatches remain.
+
+CUDA reflection reports extent24/alignment4 for column-major and extent24/alignment8 for row-major.
+HLSL reports extent28/alignment16, omitting final tail padding from the two columns; the fixture
+supplies32 bytes. Matrix stride is not exposed by reflection JSON's elementStride field. Canonical
+IR explicitly records `[PhysicalType]` and `Array(Vec(Float,3),2,12)`, and emitted PTX loads the six
+scalar offsets0..20, grouped by column. CUDA source uses `FixedArray<float3,2>` plus an unpack into
+logical rows. The default storage-lowering policy's native row-major value representation does not
+mean external column-major packing is ignored. The fixture/user-guide statements to that effect
+are stale for this qualified shape.
+
+Eighteen research controls check all six logical elements and two multiply outputs across three
+payloads, both layout flags and all three modes. Six packed words `[1,0,10,0,1,20]` produce `11,22`
+in column-major; the original eight words produce `21,1` with the row-major flag. Distinct-value
+controls disambiguate every lane. No production, source fixture, runner or corpus change was made.
+A separate explicit CUDA contract can be proposed with a full checkpoint if corpus selection changes;
+do not rewrite the old oracle or reinterpret arbitrary host bytes to hide a portability mismatch.
+See `issue-nvvm-backend/report.slice-247-column-major.md` and `semantic-evidence.slice-247.json`.
