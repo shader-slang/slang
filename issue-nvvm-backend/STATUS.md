@@ -16,18 +16,26 @@ raw-word oracle, fixing its 96 mismatching executions. All 65,016 active output 
 sentinels match. The earlier [singleton finding](semantic-evidence.slice-215.json), fixed in 216, remains
 covered. Both research findings are separate from the 53 registered failure histories.
 
-**Next action: resume the deferred FP64 min/max semantic/admission gate.** Establish its independent
-64-bit oracle and CUDA behavior before admitting scalar or aggregate helpers. Keep unrelated prefixes,
-sum/product, vector-by-value shuffles and batching outside that slice. The discovery manifest is now
-at its declared 100-identity maximum: before adding another registered source, make a separate bounded
-capacity change with the required full checkpoint; do not bypass loader bounds or silently drop entries.
-No push is authorized. Fresh-context delegation reached the app's agent-thread limit, so slices 217/218
-used WORKFLOW's local fallback; no independent worker review is implied.
+**Slice 219 is accepted research: the FP64 CUDA-helper contract is established.** Read the
+[report](report.slice-219-fp64-minmax.md), [plan](plan.slice-219-fp64-minmax.md) and
+[evidence](semantic-evidence.slice-219.json). All 112 NVRTC scalar/double2/double2x2 cases match an
+independent raw-word oracle, including adjacent finite values, subnormals and both halves of NaN
+payloads. Direct NVVM O0/O3 still rejects the canonical double min helper before PTX output. No
+FP64 NVVM runtime support is claimed, and no production or registered corpus change occurred.
+
+**Next action: slice 220 raises discovery capacity from 100 to 128 in a separate bounded change.**
+Preserve the minimum of 50, all 100 current identities/oracles, duplicate and frozen-overlap checks,
+and explicit selection. Add capacity boundary tests and complete a full checkpoint because the runner
+contract changes. Then register the dedicated FP64 min/max regression and perform bounded typed
+reduction admission, keeping prefixes and provider numeric min/max unchanged. Do not bypass bounds
+or drop old workloads. Material runtime still needs its application bindings and expected output.
+No push is authorized. Fresh-context delegation remains at the app's agent-thread limit; local work
+uses WORKFLOW's fallback and does not imply an independent worker review.
 
 Latest accepted targeted implementation: 218. Latest full checkpoint: 214. Implementation slices since
 that checkpoint: two (216 and 218). A third implementation requires a full checkpoint before a fourth;
 broad/shared lowering, provider/library/ABI or runner contract changes trigger it sooner. Rolling
-214/216/218 covers complex process lifetime and two proven correctness fixes; research 215/217 does
+214/216/218 covers complex process lifetime and two proven correctness fixes; research 215/217/219 does
 not advance cadence. Material runtime still needs its application bindings and output oracle.
 
 ## Checkpoints and evidence
