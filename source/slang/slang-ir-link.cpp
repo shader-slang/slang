@@ -2509,9 +2509,18 @@ struct IRPrelinkContext : IRSpecContext
                     mangledName = exportDecor->getMangledName();
                     decorsToRemove.add(exportDecor);
                 }
-                else if (as<IRImportDecoration>(decor))
+                else if (auto importDecor = as<IRImportDecoration>(decor))
                 {
                     hasImportDecor = true;
+                    // A clone that arrives already marked [Import] still occupies a mangled
+                    // name in this module and must be registered below, so a later reference to
+                    // that name -- reached through a different external symbol's transitive
+                    // closure during prelink -- reuses this clone rather than producing a second
+                    // linkage-bearing global for one name (which `checkIRDuplicate` rejects).
+                    // Prefer the export name when both are present; they agree, and the export
+                    // branch is the definition we are importing.
+                    if (!mangledName.getLength())
+                        mangledName = importDecor->getMangledName();
                 }
             }
             if (mangledName.getLength() && !hasImportDecor)
