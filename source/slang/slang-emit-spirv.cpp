@@ -1168,8 +1168,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return SpvLiteralBits::from64(uint64_t(val->getValue()));
                 break;
             }
+        // A signed IntPtr shares this path with PtrType/UIntPtr because the literal is selected
+        // purely by pointer width; the two's-complement bits are identical regardless of signedness.
         case kIROp_PtrType:
         case kIROp_UIntPtrType:
+        case kIROp_IntPtrType:
             {
                 if (auto val = as<IRIntLit>(inst))
                 {
@@ -1209,8 +1212,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 result = emitOpConstant(inst, type, SpvLiteralBits::from64(uint64_t(val)));
                 break;
             }
+        // A signed IntPtr shares this path with PtrType/UIntPtr because the literal is selected
+        // purely by pointer width; the two's-complement bits are identical regardless of signedness.
         case kIROp_PtrType:
         case kIROp_UIntPtrType:
+        case kIROp_IntPtrType:
             {
                 if (getPointerSize(m_targetRequest) == sizeof(uint64_t))
                     result = emitOpConstant(inst, type, SpvLiteralBits::from64(uint64_t(val)));
@@ -2471,6 +2477,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Int8Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
+        // Pointer-sized ints share this arm with the fixed-width integer types: `getIntTypeInfo`
+        // resolves their target-dependent (`getPointerSize`-derived) width and signedness, so no
+        // width special-casing is needed here.
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
             {
                 const IntInfo i = getIntTypeInfo(m_targetRequest, as<IRType>(inst));
                 if (i.width == 16)

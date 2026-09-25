@@ -3177,6 +3177,7 @@ IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type)
     case kIROp_Int16Type:
     case kIROp_Int64Type:
     case kIROp_Int8Type:
+    case kIROp_IntPtrType:
         return builder->getType(getOppositeSignIntTypeOp(elementType->getOp()));
     default:
         return type;
@@ -3193,10 +3194,13 @@ bool isSignedType(IRType* type)
     case kIROp_FloatE5M2Type:
     case kIROp_BFloat16Type:
         return true;
+    // These signed cases must stay in sync with the canonical getIntTypeSigned (slang-ir.cpp);
+    // intptr_t is signed there, so classifying it unsigned here would desync the two classifiers.
     case kIROp_IntType:
     case kIROp_Int16Type:
     case kIROp_Int64Type:
     case kIROp_Int8Type:
+    case kIROp_IntPtrType:
         return true;
     case kIROp_VectorType:
         return isSignedType(as<IRVectorType>(type)->getElementType());
