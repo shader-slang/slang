@@ -4881,12 +4881,17 @@ bool _getNVVMMaskedWaveScalarIdentity(
     uint64_t& outIdentityBits)
 {
     outIdentityBits = 0;
-    const bool isFloat64 = type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && type.bitWidth == 64;
-    if ((type.bitWidth != 32 && !isFloat64) || type.laneCount != 1)
-        return false;
-
     const bool isInteger = type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
                            type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER;
+    const bool isFloat64 = type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && type.bitWidth == 64;
+    // Narrow min/max only selects representable operands, so reductions and prefixes share the
+    // same exact integer algebra. Arithmetic and bitwise operations retain their existing widths.
+    const bool isNarrowIntegerMinMax =
+        isInteger && (type.bitWidth == 8 || type.bitWidth == 16) &&
+        (operation == SLANG_NVVM_VALUE_OP_MIN || operation == SLANG_NVVM_VALUE_OP_MAX);
+    if ((type.bitWidth != 32 && !isFloat64 && !isNarrowIntegerMinMax) || type.laneCount != 1)
+        return false;
+
     const bool isFloating = type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
     switch (operation)
     {
@@ -4916,16 +4921,18 @@ bool _getNVVMMaskedWaveScalarIdentity(
             return false;
         outIdentityBits = isFloat64    ? 0x7ff0000000000000ull
                           : isFloating ? 0x7f800000u
-                          : type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ? 0x7fffffffu
-                                                                              : 0xffffffffu;
+                          : type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                              ? (uint64_t(1) << (type.bitWidth - 1)) - 1
+                              : (uint64_t(1) << type.bitWidth) - 1;
         return true;
     case SLANG_NVVM_VALUE_OP_MAX:
         if (!isInteger && !isFloating)
             return false;
         outIdentityBits = isFloat64    ? 0xfff0000000000000ull
                           : isFloating ? 0xff800000u
-                          : type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ? 0x80000000u
-                                                                              : 0u;
+                          : type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                              ? uint64_t(1) << (type.bitWidth - 1)
+                              : 0u;
         return true;
     default:
         return false;
@@ -5218,9 +5225,9 @@ struct NVVMAggregateWaveOperation
     NVVMMaskedWaveScalarOperation maskedScan;
 };
 
-// Returns the homogeneous 32-bit numeric or Float64 leaf of vectors and fixed arrays. This is the
-// exact structural algebra used by lowered matrices and vector wave overloads; heterogeneous
-// structs and arbitrary storage graphs are intentionally absent.
+// Returns the homogeneous numeric leaf of vectors and fixed arrays. This is the exact structural
+// algebra used by lowered matrices and vector wave overloads; each operation resolver owns its
+// supported scalar widths. Heterogeneous structs and arbitrary storage graphs are absent.
 bool _getNVVMHomogeneousWaveAggregateLeafType(IRType* type, IRType*& outLeafType)
 {
     outLeafType = nullptr;
@@ -5250,9 +5257,7 @@ bool _getNVVMHomogeneousWaveAggregateLeafType(IRType* type, IRType*& outLeafType
             elementSemantic.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
         if (elementSemantic.laneCount == 1)
         {
-            const bool isFloat64 = elementSemantic.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-                                   elementSemantic.bitWidth == 64;
-            if (!isSelectedNumeric || (elementSemantic.bitWidth != 32 && !isFloat64))
+            if (!isSelectedNumeric)
                 return false;
             outLeafType = elementType;
             return true;
@@ -5358,6 +5363,12 @@ bool _resolveNVVMAggregateWaveOperation(
 
         SlangNVVMValueTypeDesc leafSemantic = {};
         if (!_getNVVMSemanticType(leafType, leafSemantic))
+            return false;
+        // Aggregate shuffles retain their established 32-bit numeric and Float64 domain.
+        // Masked arithmetic has its own admission policy in the shared scalar recipe.
+        const bool isFloat64 = leafSemantic.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                               leafSemantic.bitWidth == 64;
+        if (leafSemantic.bitWidth != 32 && !isFloat64)
             return false;
         const SlangNVVMValueTypeDesc operands[] = {
             NVVMSemantics::kUnsignedI32,
@@ -12895,7 +12906,11 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
     }
     else
     {
-        const int64_t signedIdentity = int64_t(int32_t(uint32_t(operation.identityBits)));
+        // The provider accepts a signed value in the destination width, even for unsigned
+        // semantic types. For example, UInt8 identity bits 255 must be passed as -1, not 255.
+        int64_t signedIdentity = int64_t(operation.identityBits);
+        if (operation.identityBits & (uint64_t(1) << (operation.valueType.bitWidth - 1)))
+            signedIdentity -= int64_t(1) << operation.valueType.bitWidth;
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,
             "masked-wave integer identity",

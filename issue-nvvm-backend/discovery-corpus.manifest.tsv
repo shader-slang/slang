@@ -103,3 +103,4 @@ cuda/nvvm-fp64-minmax-order.slang	0	wave,vector-matrix,helper-generic	Dynamic FP
 cuda/nvvm-firstbithigh-signedness.slang	0	helper-generic,vector-matrix	Runtime signed/unsigned32/64 firstbithigh scalar/vector boundaries with independent expected indices.
 cuda/nvvm-copyable-kernel-context.slang	0	helper-generic,vector-matrix,aggregate-pointer	Per-invocation Boolean and nested copyable context state through explicit helper pointers.
 cuda/nvvm-fp64-prefix-minmax-order.slang	0	wave,vector-matrix,helper-generic	FP64 inclusive/exclusive masked min/max preserves source tree/scan order and infinity seeds for raw NaNs, zeros and finite/subnormal values.
+cuda/nvvm-narrow-masked-minmax.slang	0	wave,vector-matrix,helper-generic	Signed/unsigned 8/16-bit masked min/max prefixes and reductions with exact extrema, wide-input truncation and existing aggregate leaves.

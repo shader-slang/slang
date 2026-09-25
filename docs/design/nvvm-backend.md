@@ -8089,3 +8089,27 @@ a universal ascending scan would select the opposite final payload. The register
 fixture and exact research226 replay retain independent integer/closed-form output oracles.
 FP32 prefixes, arithmetic recipes, numeric provider min/max and ABI36 remain unchanged. Matrix
 prefix capability rejection occurs before CUDA emission and remains a separate limitation.
+
+### Narrow integer masked min/max identities (slice 229)
+
+The shared scalar masked-wave recipe admits signed/unsigned 8-bit and 16-bit MIN/MAX for
+reductions and inclusive/exclusive prefixes. `_getNVVMMaskedWaveScalarIdentity` owns that bounded
+admission and derives exact extrema from semantic width: signed MIN identity is `2^(width-1)-1`,
+unsigned MIN identity is `2^width-1`, signed MAX identity bits are `2^(width-1)`, and unsigned MAX
+identity is zero. The host shifts use uint64_t at admitted integer widths 8, 16 or 32.
+Arithmetic/bitwise operations, 64-bit integers and FP16 retain their earlier admission boundaries.
+
+Integer min/max selects original representable operands. CUDA promotion, butterfly versus scan
+order, and idempotent singleton initialization cannot change the extrema. Existing typed read-lane
+transport and signed/unsigned MIN/MAX descriptors therefore suffice; there is no provider/ABI change.
+The scalar scan remains shared by vector leaves and already-supported matrix reduction leaves.
+Matrix prefix capability remains separate. Research228 prefix inputs/expectations and independent
+mask-set reduction expectations establish the contract; raw launch checks include wide-input
+truncation, sign/zero extension and inactive sentinels. See the slice229 report and result manifest.
+
+The existing homogeneous aggregate helper classifies numeric structure; the masked scalar identity
+recipe and the aggregate shuffle resolver own their respective supported widths. Shuffles retain
+the prior 32-bit numeric/Float64 domain. Identity bit patterns must be interpreted as signed values
+at their destination width before calling the provider's signed-N-bit integer constant API: UInt8
+bits 255 travel as -1, and Int8 minimum bits 128 travel as -128. The emitter subtracts `2^width`
+when the identity sign bit is set; the provider remains unchanged.
