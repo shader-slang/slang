@@ -238,3 +238,23 @@ validation strict. Broader device-pointer/resource/parameter-group admission, FP
 matrix orientation require their own contracts. Read
 [report255](../../issue-nvvm-backend/report.slice-255-bf16-physical-storage.md) and
 [semantic255](../../issue-nvvm-backend/semantic-evidence.slice-255.json).
+
+## Bare local vector storage (slice256)
+
+Internal mutable BF2/BF3/BF4 references and local variables use an explicit physical Storage role.
+BF2 remains `<2 x i16>` with alignment4; BF3/BF4 use `[3 x i16]`/`[4 x i16]` with alignment2.
+Register and internal by-value helper roles retain `<N x i16>`. Whole-value loads/stores convert
+symmetrically by extracting and constructing lane bits, without numeric conversion or NaN changes.
+
+The exact one-operand Generic Ptr/OutParam/BorrowInOutParam classifier owns this local admission.
+Recursive helper/copyable/aggregate classifiers remain closed for BF vectors. Storage cache entries
+cannot authorize another role: admission precedes lookup, and helper pointer cache keys include the
+pointee use. CUDA-exported BF vector references remain rejected. Research255's qualified physical
+record layouts do not yet imply production record, array, resource or device-pointer support.
+
+Validation uses a432-word three-mode fixture and exhaustive all-encoding local/reference controls,
+including reverse cache visitation order. Optimized PTX can scalarize read-only helper arguments or
+raise local frame alignment; caller memory operations and full byte output are checked separately.
+Frame extents and external helper ABI remain distinct from this local storage contract. See
+[plan256](../../issue-nvvm-backend/plan.slice-256-bf16-local-vectors.md) and
+[report256](../../issue-nvvm-backend/report.slice-256-bf16-local-vectors.md) for current acceptance.

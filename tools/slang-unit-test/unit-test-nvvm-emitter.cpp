@@ -8872,6 +8872,69 @@ SLANG_UNIT_TEST(nvvmSlangCanonicalEphemeralValuesUseDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+// The same canonical vector must retain distinct local-memory and by-value helper roles.
+SLANG_UNIT_TEST(nvvmSlangBFloat16LocalVectorsUseQualifiedStorage)
+{
+    for (uint32_t width = 2; width <= 4; ++width)
+    {
+        _resetDirectNVVMFakes();
+        {
+            StringBuilder source;
+            source << "typealias V = vector<BFloat16," << width << ">;"
+                   << R"SLANG(
+                [noinline] V replace(inout V x, V y) { let old = x; x = y; return old; }
+                [noinline] void initialize(out V x, V y) { x = y; }
+                RWStructuredBuffer<uint> outputBuffer;
+                [numthreads(32, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+                {
+                    let v = V(BFloat16(1.0f));
+                    V local = v;
+                    let old = replace(local, v);
+                    V copied;
+                    initialize(copied, old);
+                    outputBuffer[tid.x] = uint(bit_cast<uint16_t>(local.x)) +
+                                          uint(bit_cast<uint16_t>(copied.x));
+                }
+            )SLANG";
+            ComPtr<slang::IGlobalSession> globalSession;
+            SLANG_CHECK_ABORT(
+                slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            globalSession->setSharedLibraryLoader(loader);
+            ComPtr<slang::IBlob> code;
+            ComPtr<slang::IBlob> diagnostics;
+            const SlangResult result =
+                _compileSlangWithDirectNVVM(globalSession, source.getBuffer(), code, diagnostics);
+            if (SLANG_FAILED(result))
+                getTestReporter()->message(
+                    TestMessageType::Info,
+                    _getBlobText(diagnostics).getBuffer());
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+            SLANG_CHECK_ABORT(code != nullptr);
+            SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+            SLANG_CHECK(gFakeNVVMBuilder.localStorageValueTypes.getCount() == 2);
+            for (Index i = 0; i < gFakeNVVMBuilder.localStorageValueTypes.getCount(); ++i)
+            {
+                SLANG_CHECK(
+                    gFakeNVVMBuilder.localStorageValueTypes[i] ==
+                    (width == 2 ? _getFakeNVVMBuilderVectorType(2)
+                                : _getFakeNVVMBuilderArrayType()));
+                SLANG_CHECK(gFakeNVVMBuilder.localStorageAlignments[i] == (width == 2 ? 4u : 2u));
+            }
+            SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
+            if (width > 2)
+            {
+                SLANG_CHECK(gFakeNVVMBuilder.arrayElementCount == width);
+                SLANG_CHECK(gFakeNVVMBuilder.emitAggregateConstructCallCount >= 2);
+                SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount >= width);
+                SLANG_CHECK(gFakeNVVMBuilder.emitVectorConstructCallCount >= 2);
+            }
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+        SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+    }
+}
+
 SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
 {
     struct UnsupportedCase
@@ -8880,7 +8943,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         const char* expectedConstruct;
     };
     static const UnsupportedCase kCases[] = {
-        // BF16 value transport does not qualify vector pointers, numeric casts or aggregates.
+        // Local BF16 references do not qualify external helpers, numeric casts or aggregates.
         {R"SLANG(
             [CudaDeviceExport]
             [noinline]
@@ -8912,12 +8975,12 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         )SLANG",
          "exported BF16 vector helper parameter"},
         {R"SLANG(
-            [noinline] void replace(inout vector<BFloat16,2> x, vector<BFloat16,2> y) { x = y; }
+            [CudaDeviceExport] [noinline] void replace(inout vector<BFloat16,2> x, vector<BFloat16,2> y) { x = y; }
             RWStructuredBuffer<uint> outputBuffer;
             [numthreads(32, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
             { let v = vector<BFloat16,2>(bit_cast<BFloat16>(uint16_t(tid.x))); vector<BFloat16,2> local = v; replace(local, v); outputBuffer[tid.x] = bit_cast<uint>(local); }
         )SLANG",
-         "helper function parameter"},
+         "exported BF16 vector helper reference"},
         {R"SLANG(
             struct Payload { vector<BFloat16,3> value; }
             [noinline] Payload copy(Payload x) { return x; }

@@ -3,6 +3,32 @@
 Read [WORKFLOW.md](WORKFLOW.md) before resuming. The autonomous loop is authorized; the parent owns
 independent acceptance and local commits. No push is authorized.
 
+## Slice256 is accepted
+
+Bare BF2/BF3/BF4 local vectors and internal inout/out references preserve exact lane bits. BF2 uses
+native vector storage; BF3/BF4 use component arrays while by-value boundaries keep register vectors.
+Recursive aggregate/resource/device-pointer gates and external helper ABI remain closed. Read
+[plan256](plan.slice-256-bf16-local-vectors.md), [report256](report.slice-256-bf16-local-vectors.md)
+and [validation256](runtime-validation.slice-256.json).
+
+The unchanged fixture passes432 words at each mode. Both cache visitation orders pass all-encoding
+GPU controls:18 launches/75498048 words, including both permutation flags and all untouched bytes.
+PTX proves actual memory paths; optimized frame alignment/scalarized reads are not ABI claims.
+All6 original research255 Ptr<H> source rejections remain exact. Runtime4/focused26, units1049pass/
+13skip, semantics1052pass/77skip, toolkit18/contracts6 and material6 compile/assembly checks pass.
+Every1061 previous unit and1129 semantic identity/outcome is preserved, with one new unit.
+
+Full frozen1356/discovery351 preserves all1704 previous five-field outcomes and adds3 correct:
+1707total/1668correct/39unresolved, retaining18 resolved histories. All564 prior runtime inputs are
+unchanged; final identity covers133source/12artifact/565input hashes and18 submodule pins.
+Compiler SHA256 `1fc2311e9e0c332f2bff54d65dedb1a225218f740042a2c23c5210e76245c85f`;
+provider ABI41 remains `5fe0b977e22b80acc5ee39147c69510a01c09563354a1a67bd9573d1cda1aeab`.
+Full256/targeted233/cadence0; rolling implementations252 material compile-time,254 CUDA layout
+correctness,256 local BF16 vector capability. Material runtime contracts remain unavailable.
+Local fallback used separate oracle/mechanical audits without fresh independent-agent review.
+Closure verifies3753 indexed raw artifacts,133 final source snapshots and347 final compact references.
+Raw roots `build/nvvm-loop/slice-256-before` and `slice-256-after`. No push or system/driver change.
+
 ## Research255 is accepted
 
 Native `<2 x i16>` storage for BF2 and component arrays for BF3/BF4 match CUDA record/holder layouts.
@@ -183,18 +209,18 @@ indexed artifacts. Correctness priority explains this slice; reconsider material
 
 ## Next bounded action
 
-Implement one bounded local/reference BF16 vector role using research255's qualified representation:
-native width2 storage and component arrays for widths3/4, preserving register vectors at by-value
-boundaries. Start with a focused local inout-vector source regression and trace the existing role
-checks, representation maps and memory/value conversions before editing. Keep format identity and
-aggregate layout validation strict. Require independently expected output at all3 modes and a full
-checkpoint for the shared role/type-lowering change.
+Reprofile the accepted compiler on the fixed material corpus before selecting another feature slice.
+Reuse251's qualified optimized timing/profile methodology, preserve identical sources/options and
+compile/assembly outputs, and separate compile phase measurements from GPU runtime claims. Compare
+bounded candidates from actual current samples; do not optimize a previously hot path by assumption.
+The upcoming rolling implementation window would otherwise contain no material-driven slice.
 
-Do not broaden device-pointer, resource, parameter-group, FP8 aggregate or matrix support in the
-same slice. The Ptr<H> research control is a qualified representation boundary, not a demand to
-admit every role at once. Reconsider material-driven work in the rolling implementation cadence;
-its bindings/textures/LUT/input/output contract remains unavailable. Preserve every existing
-fixture/oracle and all original texture/column-major failure histories.
+Local BF16 vector lane addressing, recursive aggregate storage and FP8 aggregate/conversion roles
+remain separate candidates. Keep those support gates strict until each has its own motivating
+regression, representation contract and independent output evidence. Research255's physical record
+qualification remains inherited, not production support. Preserve original texture/column-major
+failure histories and every existing fixture/oracle. Material runtime binding/texture/LUT/input/output
+contracts remain unavailable; do not repeat the optional request or claim kernel performance.
 
 ## Accepted historical evidence
 
@@ -212,8 +238,8 @@ Native Ubuntu24.04, branch nvvm-backend, L4SM89 driver580.126.09, targetSM80, CU
 LLVM14, providerABI41, matching RelWithDebInfo. Inspect/source `build/nvvm-loop/slice-203-env.sh` and
 follow the local slang-build skill. At most4 CPU workers, sequential GPU suites and 30-minute bounds.
 
-Latest raw roots `build/nvvm-loop/slice-254-before` and `slice-254-after` retain the unchanged
-before fixture, qualified CUDA-device matrix ABI, focused reflection/IR/GPU controls, full checkpoint,
-final source snapshots and acceptance/closure audits. Historical252 roots retain matched baseline/
-candidate layouts, timing attempts and AST metadata proofs with their original identities.
-No GPU loss, driver/system change, reboot, push or worker commit occurred.
+Latest raw roots `build/nvvm-loop/slice-256-before` and `slice-256-after` retain the unchanged
+before fixture, exact local storage tests, both all-encoding cache-order controls, full checkpoint,
+final source snapshots and acceptance/closure audits. Historical254/255 roots retain layout and
+physical-record qualification with their original identities. No GPU loss, driver/system change,
+reboot, push or worker commit occurred.

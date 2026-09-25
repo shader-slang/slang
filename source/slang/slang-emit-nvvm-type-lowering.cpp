@@ -922,7 +922,8 @@ IRPtrTypeBase* asNVVMSupportedLocalHelperValuePointerType(IRInst* type, IRType**
                                      pointerType->getOp() == kIROp_BorrowInOutParamType) &&
                                     pointerType->getOperandCount() == 1;
     if (!pointerType || isNVVMSupportedCopyableValueType(valueType) ||
-        (!isNVVMSupportedHelperValueType(valueType) && !isNVVMBFloat16Type(valueType)) ||
+        (!isNVVMSupportedHelperValueType(valueType) && !isNVVMBFloat16Type(valueType) &&
+         !asNVVMBFloat16VectorType(valueType)) ||
         (!isPlainLocalPointer && !isMutableParameter) ||
         pointerType->getAddressSpace() != AddressSpace::Generic)
     {
@@ -2296,12 +2297,13 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
                use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult ||
                use == NVVMTypeUse::Storage;
 
-    // A BF16 vector is an internal by-value contract only. For example, BF3's LLVM
-    // register allocation is eight bytes, while CUDA storage is six bytes/alignment two.
-    // The ordinary recursive helper/copyable predicates must not inherit this admission.
+    // BF16 vectors have separate register and local storage representations. For example,
+    // BF3 uses <3 x i16> in registers and [3 x i16] in memory (six bytes/alignment two).
+    // Recursive helper/copyable predicates must not inherit this local storage admission.
     if (valueVectorType && isNVVMBFloat16Type(valueVectorType->getElementType()))
         return use == NVVMTypeUse::Value || use == NVVMTypeUse::HelperValue ||
-               use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult;
+               use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult ||
+               use == NVVMTypeUse::Storage;
 
     switch (use)
     {
@@ -2681,7 +2683,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             localHelperPointerValueType,
             SLANG_NVVM_ADDRESS_SPACE_GENERIC,
             outType,
-            NVVMTypeUse::HelperValue,
+            asNVVMBFloat16VectorType(localHelperPointerValueType) ? NVVMTypeUse::Storage
+                                                                  : NVVMTypeUse::HelperValue,
             false));
         m_helperABIRepresentationMap[type] = outType;
         return SLANG_OK;
@@ -2806,6 +2809,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             use == NVVMTypeUse::StructuredBufferStorage ? NVVMTypeUse::StructuredBufferStorage
                                                         : NVVMTypeUse::Value,
             elementType));
+        const bool useBFloat16StorageArray = use == NVVMTypeUse::Storage &&
+                                             asNVVMBFloat16VectorType(type) &&
+                                             valueVectorElementCount > 2;
         const bool useStructuredBufferArray =
             use == NVVMTypeUse::StructuredBufferStorage && valueVectorElementCount == 3;
         const bool useCompactHalfChunks =
@@ -2820,14 +2826,15 @@ SlangResult NVVMTypeLoweringContext::lowerType(
                 m_builder.getVectorType(m_module, elementType, 2, compactHalfChunkType)));
         }
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            useStructuredBufferArray ? "structured-buffer vector storage type"
+            useBFloat16StorageArray    ? "local BF16 component-array storage type"
+            : useStructuredBufferArray ? "structured-buffer vector storage type"
             : compactParameterGroupVectorType &&
                     (use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage)
                 ? "compact aggregate vector storage type"
                 : "selected value vector type",
             useCompactHalfChunks
                 ? m_builder.getArrayType(m_module, compactHalfChunkType, 2, outType)
-            : useStructuredBufferArray
+            : useStructuredBufferArray || useBFloat16StorageArray
                 ? m_builder.getArrayType(m_module, elementType, valueVectorElementCount, outType)
             : compactParameterGroupVectorType &&
                     (use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage)

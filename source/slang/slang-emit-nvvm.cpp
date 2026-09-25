@@ -52,6 +52,25 @@ static const SlangNVVMValueOperationDesc kNVVMStructuredBoolStoreOperation = {
     SLANG_COUNT_OF(kNVVMStructuredBoolStoreOperands),
 };
 
+// Identifies the qualified local BF16 memory boundary. Aggregate fields, device pointers and
+// resources have different admission rules and cannot acquire this representation by pointee alone.
+IRVectorType* _getNVVMLocalBFloat16VectorPointer(IRInst* pointer)
+{
+    IRType* valueType = nullptr;
+    return pointer && asNVVMSupportedLocalHelperValuePointerType(pointer->getDataType(), &valueType)
+               ? asNVVMBFloat16VectorType(valueType)
+               : nullptr;
+}
+
+// Matches the prelude's native BF2 and component-struct BF3/BF4 storage. This alignment describes
+// memory only; BF3/BF4 register vectors have stronger LLVM allocation alignment.
+uint32_t _getNVVMBFloat16VectorStorageAlignment(IRType* type)
+{
+    uint32_t count = 0;
+    SLANG_RELEASE_ASSERT(asNVVMBFloat16VectorType(type, &count));
+    return count == 2 ? 4 : 2;
+}
+
 // Returns the natural alignment of every first-class value admitted by the direct backend.
 uint32_t _getNVVMExecutableValueAlignment(IRInst* type)
 {
@@ -8161,6 +8180,18 @@ SlangResult _validateNVVMHelperTarget(
                 codeGenContext,
                 "exported BF16 vector helper parameter",
                 helper->getParamType(parameterIndex));
+        IRType* localValueType = nullptr;
+        if (isCUDAExport &&
+            asNVVMSupportedLocalHelperValuePointerType(
+                helper->getParamType(parameterIndex),
+                &localValueType) &&
+            asNVVMBFloat16VectorType(localValueType))
+        {
+            return _diagnoseUnsupportedIRType(
+                codeGenContext,
+                "exported BF16 vector helper reference",
+                helper->getParamType(parameterIndex));
+        }
         if (!_isSupportedNVVMHelperParameterType(helper->getParamType(parameterIndex)))
         {
             return _diagnoseUnsupportedIRType(
@@ -8528,7 +8559,28 @@ SlangResult _validateNVVMFunction(
                             inst->getDataType(),
                             &helperValueType))
                     {
-                        if (!_hasNVVMCompatibleHelperValueLayout(codeGenContext, helperValueType))
+                        if (asNVVMBFloat16VectorType(helperValueType))
+                        {
+                            uint32_t count = 0;
+                            asNVVMBFloat16VectorType(helperValueType, &count);
+                            IRSizeAndAlignment cudaLayout;
+                            if (SLANG_FAILED(getSizeAndAlignment(
+                                    codeGenContext->getTargetReq(),
+                                    IRTypeLayoutRules::getCUDA(),
+                                    helperValueType,
+                                    &cudaLayout)) ||
+                                cudaLayout.size != count * 2 ||
+                                cudaLayout.alignment !=
+                                    _getNVVMBFloat16VectorStorageAlignment(helperValueType))
+                            {
+                                return _diagnoseUnsupportedIR(
+                                    codeGenContext,
+                                    toSlice("local BF16 vector storage layout"));
+                            }
+                        }
+                        else if (!_hasNVVMCompatibleHelperValueLayout(
+                                     codeGenContext,
+                                     helperValueType))
                         {
                             return _diagnoseUnsupportedIR(
                                 codeGenContext,
@@ -8577,7 +8629,7 @@ SlangResult _validateNVVMFunction(
                             codeGenContext,
                             toSlice("structured-buffer load type"));
                     }
-                    if (!storageType &&
+                    if (!storageType && !_getNVVMLocalBFloat16VectorPointer(inst->getOperand(0)) &&
                         !_getNVVMPhysicalAggregateStorageAlignment(
                             codeGenContext,
                             inst->getDataType()) &&
@@ -10943,6 +10995,64 @@ SlangResult _emitNVVMFloatingRemainderOperation(
             results.getBuffer(),
             size_t(results.getCount()),
             outValue));
+}
+
+// Converts whole local BF16 vectors without interpreting the lane bits. Consider this example:
+//
+//     void replace(inout vector<BFloat16, 3> x, vector<BFloat16, 3> y) { x = y; }
+//
+// The canonical IR keeps both values as Vec(BFloat16Type,3). The helper parameter points to
+// [3 x i16] storage, while y is a <3 x i16> register value. Stores extract the vector lanes into
+// the array; loads perform the inverse. BF2 already has the same physical type in both roles.
+SlangResult _emitNVVMBFloat16LocalStorageConversion(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    NVVMTypeLoweringContext& typeContext,
+    IRVectorType* type,
+    bool storageToValue,
+    SlangNVVMValueHandle input,
+    SlangNVVMValueHandle& outValue)
+{
+    uint32_t count = 0;
+    SLANG_RELEASE_ASSERT(asNVVMBFloat16VectorType(type, &count));
+    if (count == 2)
+    {
+        outValue = input;
+        return SLANG_OK;
+    }
+    SlangNVVMValueHandle elements[4] = {};
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        if (storageToValue)
+        {
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "local BF16 component extraction",
+                builder.emitAggregateElementExtract(module, input, i, elements[i])));
+        }
+        else
+        {
+            SLANG_RETURN_ON_FAIL(_emitNVVMSequentialElementExtract(
+                codeGenContext,
+                builder,
+                module,
+                input,
+                i,
+                elements[i]));
+        }
+    }
+    SlangNVVMTypeHandle targetType = nullptr;
+    SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+        type,
+        storageToValue ? NVVMTypeUse::Value : NVVMTypeUse::Storage,
+        targetType));
+    return _requireBuilderOperation(
+        codeGenContext,
+        "local BF16 storage conversion",
+        storageToValue
+            ? builder.emitVectorConstruct(module, targetType, elements, count, outValue)
+            : builder.emitAggregateConstruct(module, targetType, elements, count, outValue));
 }
 
 // Crosses one selected external structured-buffer boundary without changing the canonical IR
@@ -14968,10 +15078,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 valueType = structValueType;
                             }
                         }
+                        if (asNVVMBFloat16VectorType(valueType))
+                            valueUse = NVVMTypeUse::Storage;
                         SlangNVVMTypeHandle loweredValueType = nullptr;
                         SLANG_RETURN_ON_FAIL(
                             typeContext.lowerType(valueType, valueUse, loweredValueType));
-                        uint32_t alignment = _getNVVMExecutableValueAlignment(valueType);
+                        uint32_t alignment = asNVVMBFloat16VectorType(valueType)
+                                                 ? _getNVVMBFloat16VectorStorageAlignment(valueType)
+                                                 : _getNVVMExecutableValueAlignment(valueType);
                         if (valueUse == NVVMTypeUse::ParameterGroupStorage)
                         {
                             IRSizeAndAlignment physicalLayout;
@@ -15065,6 +15179,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                             _getNVVMStructuredBufferStoragePointerValueType(load->getPtr());
                         IRVectorType* compactStorageVector =
                             _getNVVMCompactParameterGroupVectorPointer(load->getPtr());
+                        IRVectorType* localBFloat16Vector =
+                            _getNVVMLocalBFloat16VectorPointer(load->getPtr());
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
@@ -15081,6 +15197,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                                                  : _getNVVMPhysicalAggregateStorageAlignment(
                                                        codeGenContext,
                                                        load->getDataType());
+                        if (localBFloat16Vector)
+                            alignment = _getNVVMBFloat16VectorStorageAlignment(localBFloat16Vector);
                         if (!alignment)
                             alignment = _getNVVMExecutableValueAlignment(load->getDataType());
                         if (structuredStorageType)
@@ -15127,6 +15245,20 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 moduleScope.module,
                                 typeContext,
                                 structuredStorageType,
+                                true,
+                                loweredValue,
+                                semanticValue));
+                            loweredValue = semanticValue;
+                        }
+                        if (localBFloat16Vector)
+                        {
+                            SlangNVVMValueHandle semanticValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_emitNVVMBFloat16LocalStorageConversion(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                typeContext,
+                                localBFloat16Vector,
                                 true,
                                 loweredValue,
                                 semanticValue));
@@ -15216,6 +15348,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                         auto store = cast<IRStore>(inst);
                         IRType* structuredStorageType =
                             _getNVVMStructuredBufferStoragePointerValueType(store->getPtr());
+                        IRVectorType* localBFloat16Vector =
+                            _getNVVMLocalBFloat16VectorPointer(store->getPtr());
                         SlangNVVMValueHandle loweredValue = nullptr;
                         IRInst* rootAddress = getRootAddr(store->getPtr());
                         if (asNVVMSupportedDeviceCopyableValuePointerType(
@@ -15268,9 +15402,26 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredPointer));
-                        uint32_t alignment = _getNVVMPhysicalAggregateStorageAlignment(
-                            codeGenContext,
-                            store->getVal()->getDataType());
+                        if (localBFloat16Vector)
+                        {
+                            SlangNVVMValueHandle storageValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_emitNVVMBFloat16LocalStorageConversion(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                typeContext,
+                                localBFloat16Vector,
+                                false,
+                                loweredValue,
+                                storageValue));
+                            loweredValue = storageValue;
+                        }
+                        uint32_t alignment =
+                            localBFloat16Vector
+                                ? _getNVVMBFloat16VectorStorageAlignment(localBFloat16Vector)
+                                : _getNVVMPhysicalAggregateStorageAlignment(
+                                      codeGenContext,
+                                      store->getVal()->getDataType());
                         if (!alignment)
                         {
                             alignment =

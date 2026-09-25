@@ -115,3 +115,4 @@ cuda/nvvm-fp8-finite-literals.slang	0	helper-generic	Fully folded finite FP8 lit
 cuda/nvvm-fp8-scalar-transport.slang	0	fp8,scalar,helper,bitcast,control-flow	All byte encodings across internal FP8 helper/branch/select transport and finite canonical literals.
 cuda/nvvm-bf16-signed-literals.slang	0	bf16,scalar,helper,bitcast	Canonical BF16 literals through a noinline helper with exact signed zero, subnormal, normal and finite maximum encodings.
 cuda/nvvm-bf16-cuda-layout.slang	0	bf16,vector-matrix,layout	Explicit CUDA layout queries for BF16 vectors, wrapped records, arrays and row-major matrices, preserving Half and ordinary vector neighbors.
+cuda/nvvm-bf16-local-vectors.slang	0	bf16,vector-matrix,helper-generic,local	Exact raw BF16 local inout/out roundtrips for widths2/3/4, preserving signed zeros, subnormals, infinities and NaN payloads.

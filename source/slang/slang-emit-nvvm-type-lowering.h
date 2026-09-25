@@ -36,7 +36,8 @@ bool isNVVMBFloat16Type(IRInst* type);
 /// Returns whether a canonical type is one of the scalar FP8 formats.
 bool isNVVMFloat8Type(IRInst* type);
 
-/// Returns an exact two- through four-lane BF16 register vector, without admitting storage.
+/// Returns an exact two- through four-lane BF16 vector; callers select its value or local storage
+/// role.
 IRVectorType* asNVVMBFloat16VectorType(IRInst* type, uint32_t* outElementCount = nullptr);
 
 /// Returns a vector qualified for register construction, extraction, and semantic operations.
