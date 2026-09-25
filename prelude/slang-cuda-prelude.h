@@ -2458,9 +2458,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbitlow(uint32_t v)
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbithigh(uint32_t v)
 {
-    // maps to hlsl firstbithigh
-    if ((int32_t)v < 0)
-        v = ~v;
+    // Find the highest set bit without interpreting the unsigned input's sign bit.
     if (v == 0)
         return ~0u;
     return 31 - __clz(v);
@@ -2518,6 +2516,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbitlow(int32_t v)
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbithigh(int32_t v)
 {
+    // Negative signed inputs search for the highest zero bit, so complement before counting.
+    if (v < 0)
+        v = ~v;
     return U32_firstbithigh(uint32_t(v));
 }
 

@@ -8043,3 +8043,11 @@ caller value and retain CUDA's ordered comparison/selection and butterfly/scan o
 needs no numeric identity and preserves singleton payloads directly. FP64 arithmetic reductions
 retain their existing singleton passthrough and sum seed; FP64 min/max prefixes remain unsupported.
 Provider numeric min/max and ABI 36 are unchanged.
+
+### CUDA firstbithigh signedness (slice 223)
+
+CUDA's unsigned32 highest-bit helper preserves the original unsigned word, including bit31. The
+signed32 helper complements negative values before delegating, matching the existing CPU32 and
+CUDA64 split. Direct NVVM already uses the operand's signedness descriptor for this operation and
+needs no change. Dynamic scalar/vector32/64 coverage checks independent bit-index expectations;
+source-backend agreement alone is not the correctness oracle.

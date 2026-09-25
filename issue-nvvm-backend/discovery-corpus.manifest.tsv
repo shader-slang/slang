@@ -100,3 +100,4 @@ cuda/nvvm-fp64-implicit-shuffle.slang	0	fp64,wave,aggregate,shuffle	Exact-bit im
 cuda/nvvm-fp32-singleton-minmax.slang	0	wave,float32,edge-cases	Dynamic raw-bit scalar/vector/matrix singleton min/max preserves signed zeros and NaN payloads across all lanes, with finite nonsingleton neighbors.
 cuda/nvvm-fp32-minmax-order.slang	0	wave,float32,edge-cases	Dynamic scalar/vector/matrix min/max preserves CUDA butterfly and scan selections for NaNs and signed zeros.
 cuda/nvvm-fp64-minmax-order.slang	0	wave,vector-matrix,helper-generic	Dynamic FP64 min/max NaN payloads, signed zeros, adjacent finite values and subnormals across scalar/vector/matrix masks.
+cuda/nvvm-firstbithigh-signedness.slang	0	helper-generic,vector-matrix	Runtime signed/unsigned32/64 firstbithigh scalar/vector boundaries with independent expected indices.
