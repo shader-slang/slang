@@ -260,6 +260,49 @@ Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
     return expr;
 }
 
+bool SemanticsVisitor::tryGetExistentialInterfaceBoundForIsAs(
+    Type* valueType,
+    Type* targetType,
+    Type*& outBoundType,
+    DeclRef<InterfaceDecl>& outBoundDeclRef)
+{
+    // Only an associated type or a `ThisType` names a runtime existential whose concrete type is
+    // not statically known. Other type-parametric spellings (in particular generic type
+    // parameters) are excluded: they are not backed by an existential value at runtime.
+    bool isOpenableExistential = as<ThisType>(valueType) != nullptr;
+    if (auto declRefType = as<DeclRefType>(valueType))
+    {
+        auto decl = declRefType->getDeclRef().getDecl();
+        if (as<AssocTypeDecl>(decl) || as<ThisTypeDecl>(decl))
+            isOpenableExistential = true;
+    }
+    if (!isOpenableExistential)
+        return false;
+
+    // Pick the interface bound that `targetType` conforms to, so the extracted runtime witness
+    // proves `targetType` is a possible concrete type behind the existential.
+    auto inheritanceInfo = getShared()->getInheritanceInfo(valueType);
+    for (auto facet : inheritanceInfo.facets)
+    {
+        auto facetType = facet->getType();
+        if (!facetType)
+            continue;
+        auto interfaceDeclRefType = as<DeclRefType>(facetType);
+        if (!interfaceDeclRefType)
+            continue;
+        auto interfaceDeclRef = interfaceDeclRefType->getDeclRef().as<InterfaceDecl>();
+        if (!interfaceDeclRef)
+            continue;
+        if (tryGetSubtypeWitness(targetType, facetType))
+        {
+            outBoundType = facetType;
+            outBoundDeclRef = interfaceDeclRef;
+            return true;
+        }
+    }
+    return false;
+}
+
 Expr* SemanticsVisitor::maybeOpenRef(Expr* expr)
 {
     auto exprType = expr->type.type;
@@ -7862,7 +7905,28 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     if (auto typeType = as<TypeType>(valueType))
         valueType = typeType->getType();
     auto unwrappedValueType = unwrapModifiedType(valueType);
-    auto valueInterfaceType = isInterfaceType(unwrappedValueType) ? unwrappedValueType : valueType;
+
+    // The value is an existential we can open either when its static type is literally an interface
+    // or when it is an associated-type/`ThisType` existential whose interface bound the target
+    // conforms to (#13261). In the latter case `existentialBoundToOpen` names the bound to open as.
+    DeclRef<InterfaceDecl> existentialBoundToOpen;
+    Type* valueInterfaceType = valueType;
+    if (isInterfaceType(unwrappedValueType))
+    {
+        valueInterfaceType = unwrappedValueType;
+    }
+    else
+    {
+        Type* boundType = nullptr;
+        if (tryGetExistentialInterfaceBoundForIsAs(
+                unwrappedValueType,
+                expr->typeExpr.type,
+                boundType,
+                existentialBoundToOpen))
+        {
+            valueInterfaceType = boundType;
+        }
+    }
 
     // If value is a subtype of `type`, then this expr is always true.
     auto witness = isSubtype(valueType, expr->typeExpr.type, IsSubTypeOptions::None);
@@ -7892,7 +7956,8 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // Otherwise, if the target type is a subtype of value->type, we need to grab the
     // subtype witness for runtime checks.
 
-    expr->value = maybeOpenExistential(originalVal);
+    expr->value = existentialBoundToOpen ? openExistential(originalVal, existentialBoundToOpen)
+                                         : maybeOpenExistential(originalVal);
     expr->witnessArg =
         witness ? witness : tryGetSubtypeWitness(expr->typeExpr.type, valueInterfaceType);
     if (expr->witnessArg)
@@ -7937,7 +8002,27 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     expr->value = CheckTerm(expr->value);
     auto valueType = expr->value->type.type;
     auto unwrappedValueType = unwrapModifiedType(valueType);
-    auto valueInterfaceType = isInterfaceType(unwrappedValueType) ? unwrappedValueType : valueType;
+
+    // As in `visitIsTypeExpr`: open either a literal interface or an associated-type/`ThisType`
+    // existential whose interface bound the target conforms to (#13261).
+    DeclRef<InterfaceDecl> existentialBoundToOpen;
+    Type* valueInterfaceType = valueType;
+    if (isInterfaceType(unwrappedValueType))
+    {
+        valueInterfaceType = unwrappedValueType;
+    }
+    else
+    {
+        Type* boundType = nullptr;
+        if (tryGetExistentialInterfaceBoundForIsAs(
+                unwrappedValueType,
+                typeExpr.type,
+                boundType,
+                existentialBoundToOpen))
+        {
+            valueInterfaceType = boundType;
+        }
+    }
 
     // Reject `expr as OpaqueType` (and structs containing opaque fields) because
     // Optional<T> cannot wrap resource/opaque types.
@@ -7975,7 +8060,8 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
         {
             getSink()->diagnose(Diagnostics::IsOperatorValueMustBeInterfaceType{.expr = expr});
         }
-        expr->value = maybeOpenExistential(expr->value);
+        expr->value = existentialBoundToOpen ? openExistential(expr->value, existentialBoundToOpen)
+                                             : maybeOpenExistential(expr->value);
         return expr;
     }
 

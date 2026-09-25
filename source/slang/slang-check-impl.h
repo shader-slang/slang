@@ -1895,6 +1895,31 @@ public:
     ///
     Expr* maybeOpenExistential(Expr* expr);
 
+    /// For the `is`/`as` open path: decide whether `valueType` names a runtime existential whose
+    /// concrete type is not statically known — an associated type or a `ThisType` — and, if so,
+    /// return the interface bound that `targetType` conforms to.
+    ///
+    /// A value of associated type (e.g. the inferred result of a dynamically-dispatched
+    /// `IFactory.make`, whose static type is `IFactory.Result`) or of `ThisType` is lowered to the
+    /// same existential tuple (RTTI, witness table, value) as an interface-typed value, so it
+    /// carries a runtime witness for its interface bound. Recognizing it here lets `is`/`as` open
+    /// the existential and extract that witness for a runtime type check, instead of falling back
+    /// to a static `TypeEquals` that folds to a constant. See issue #13261.
+    ///
+    /// A literal interface type is intentionally not handled here; it keeps the existing
+    /// `maybeOpenExistential` path. Arbitrary generic type parameters are excluded because they are
+    /// not backed by an existential value. When more than one bound admits `targetType`, the first
+    /// in linearized inheritance order is returned; the runtime result compares concrete-type
+    /// identity and so does not depend on which admitting bound is used.
+    ///
+    /// Returns false (leaving the out parameters untouched) when `valueType` is not such an
+    /// existential or when no interface bound admits `targetType`.
+    bool tryGetExistentialInterfaceBoundForIsAs(
+        Type* valueType,
+        Type* targetType,
+        Type*& outBoundType,
+        DeclRef<InterfaceDecl>& outBoundDeclRef);
+
     /// If `expr` has Ref<T> Type, convert it into an l-value expr that has T type.
     Expr* maybeOpenRef(Expr* expr);
 
