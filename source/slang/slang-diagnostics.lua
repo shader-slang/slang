@@ -1466,7 +1466,7 @@ err(
     "argument-has-more-memory-qualifiers-than-param",
     30048,
     "memory qualifier mismatch",
-    span { loc = "arg:Expr", message = "argument passed in to parameter has a memory qualifier the parameter type is missing: '~qualifier'" }
+    span { loc = "arg:Expr", message = "cannot implicitly drop memory qualifier '~qualifier' by copying to a destination that does not have it" }
 )
 
 standalone_note(
