@@ -9,9 +9,9 @@ __generic<T : __BuiltinLogicalType>
 bool test1Logical()
 {
     return true
-        & WaveClusteredBitAnd(T(1), 1) == T(1)
-        & WaveClusteredBitOr(T(1), 1) == T(1)
-        & WaveClusteredBitXor(T(1), 1) == T(1)
+        & WaveClusteredBitAnd(T(1), 4) == T(1)
+        & WaveClusteredBitOr(T(1), 4) == T(1)
+        & WaveClusteredBitXor(T(1), 4) == T(0)
         ;
 }
 
@@ -21,9 +21,9 @@ bool testVLogical()
     typealias gvec = vector<T, N>;
 
     return true
-        & all(WaveClusteredBitAnd(gvec(T(1)), 1) == gvec(T(1)))
-        & all(WaveClusteredBitOr(gvec(T(1)), 1) == gvec(T(1)))
-        & all(WaveClusteredBitXor(gvec(T(1)), 1) == gvec(T(1)))
+        & all(WaveClusteredBitAnd(gvec(T(1)), 4) == gvec(T(1)))
+        & all(WaveClusteredBitOr(gvec(T(1)), 4) == gvec(T(1)))
+        & all(WaveClusteredBitXor(gvec(T(1)), 4) == gvec(T(0)))
         ;
 }
 
@@ -73,10 +73,10 @@ __generic<T : __BuiltinArithmeticType>
 bool test1Arithmetic()
 {
     return true
-        & WaveClusteredSum(T(1), 1) == T(1)
-        & WaveClusteredProduct(T(1), 1) == T(1)
-        & WaveClusteredMin(T(1), 1) == T(1)
-        & WaveClusteredMax(T(1), 1) == T(1)
+        & WaveClusteredSum(T(1), 4) == T(4)
+        & WaveClusteredProduct(T(1), 4) == T(1)
+        & WaveClusteredMin(T(1), 4) == T(1)
+        & WaveClusteredMax(T(1), 4) == T(1)
         ;
 }
 
@@ -86,10 +86,10 @@ bool testVArithmetic()
     typealias gvec = vector<T, N>;
 
     return true
-        & all(WaveClusteredSum(gvec(T(1)), 1) == gvec(T(1)))
-        & all(WaveClusteredProduct(gvec(T(1)), 1) == gvec(T(1)))
-        & all(WaveClusteredMin(gvec(T(1)), 1) == gvec(T(1)))
-        & all(WaveClusteredMax(gvec(T(1)), 1) == gvec(T(1)))
+        & all(WaveClusteredSum(gvec(T(1)), 4) == gvec(T(4)))
+        & all(WaveClusteredProduct(gvec(T(1)), 4) == gvec(T(1)))
+        & all(WaveClusteredMin(gvec(T(1)), 4) == gvec(T(1)))
+        & all(WaveClusteredMax(gvec(T(1)), 4) == gvec(T(1)))
         ;
 }
 
