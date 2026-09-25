@@ -4884,12 +4884,12 @@ bool _getNVVMMaskedWaveScalarIdentity(
     const bool isInteger = type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
                            type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER;
     const bool isFloat64 = type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && type.bitWidth == 64;
-    // Narrow min/max only selects representable operands, so reductions and prefixes share the
+    // Integer min/max only selects representable operands, so reductions and prefixes share the
     // same exact integer algebra. Arithmetic and bitwise operations retain their existing widths.
-    const bool isNarrowIntegerMinMax =
-        isInteger && (type.bitWidth == 8 || type.bitWidth == 16) &&
+    const bool isIntegerMinMax =
+        isInteger && (type.bitWidth == 8 || type.bitWidth == 16 || type.bitWidth == 64) &&
         (operation == SLANG_NVVM_VALUE_OP_MIN || operation == SLANG_NVVM_VALUE_OP_MAX);
-    if ((type.bitWidth != 32 && !isFloat64 && !isNarrowIntegerMinMax) || type.laneCount != 1)
+    if ((type.bitWidth != 32 && !isFloat64 && !isIntegerMinMax) || type.laneCount != 1)
         return false;
 
     const bool isFloating = type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
@@ -4923,7 +4923,7 @@ bool _getNVVMMaskedWaveScalarIdentity(
                           : isFloating ? 0x7f800000u
                           : type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
                               ? (uint64_t(1) << (type.bitWidth - 1)) - 1
-                              : (uint64_t(1) << type.bitWidth) - 1;
+                              : ~uint64_t(0) >> (64 - type.bitWidth);
         return true;
     case SLANG_NVVM_VALUE_OP_MAX:
         if (!isInteger && !isFloating)
@@ -12908,8 +12908,12 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
     {
         // The provider accepts a signed value in the destination width, even for unsigned
         // semantic types. For example, UInt8 identity bits 255 must be passed as -1, not 255.
-        int64_t signedIdentity = int64_t(operation.identityBits);
-        if (operation.identityBits & (uint64_t(1) << (operation.valueType.bitWidth - 1)))
+        // A 64-bit identity already fills the argument width. Preserve its bits without an
+        // out-of-range signed conversion or shifting by 64; narrower identities need sign
+        // extension.
+        int64_t signedIdentity = bitCast<int64_t>(operation.identityBits);
+        if (operation.valueType.bitWidth < 64 &&
+            (operation.identityBits & (uint64_t(1) << (operation.valueType.bitWidth - 1))))
             signedIdentity -= int64_t(1) << operation.valueType.bitWidth;
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,

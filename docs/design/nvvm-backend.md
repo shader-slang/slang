@@ -8130,3 +8130,17 @@ still reject at `_getNVVMMaskedWaveScalarIdentity`. An extension must avoid shif
 constructing unsigned maximum and when converting identity bits to the provider's signed 64-bit argument.
 The existing `Slang::bitCast` can preserve a complete 64-bit payload; the narrow identity subtraction
 is valid only in its current admitted widths. No provider/ABI or producer-shape repair is indicated.
+
+### 64-bit integer masked min/max recipes (slice 231)
+
+Slice 231 admits signed/unsigned 64-bit MIN/MAX through the existing scalar identity authority.
+Scalar/vector prefixes and scalar/vector/matrix reductions share the established leaf recipe;
+aggregate classification, typed lane transport and provider ABI 36 do not change. The research 230
+member-set oracle is replayed in source and both direct modes with unchanged input and expected bits.
+
+Unsigned maximum is formed as an all-ones right shift by `64 - width`, preserving narrow masks
+without a shift by 64. Signed extrema still use `width - 1`. The provider constant API takes a
+signed argument in the destination width: Slang::bitCast preserves full 64-bit identity bits,
+while the existing sign-bit subtraction applies only below width 64. This is identity argument
+materialization, not a change to ordinary literal lowering. Floating identities remain bit-exact.
+Arithmetic/bitwise/FP16, matrix-prefix capability and ordinary aggregate shuffle policies stay separate.
