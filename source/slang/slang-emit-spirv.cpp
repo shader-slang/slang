@@ -2471,6 +2471,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Int8Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
+        // UIntPtr (usize_t/uintptr_t) is a pointer-sized integer, emitted at the target's pointer width.
+        // The signed sibling IntPtr (intptr_t) is intentionally not handled here and is deferred to #13200.
+        case kIROp_UIntPtrType:
             {
                 const IntInfo i = getIntTypeInfo(m_targetRequest, as<IRType>(inst));
                 if (i.width == 16)
