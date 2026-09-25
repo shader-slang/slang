@@ -258,3 +258,31 @@ raise local frame alignment; caller memory operations and full byte output are c
 Frame extents and external helper ABI remain distinct from this local storage contract. See
 [plan256](../../issue-nvvm-backend/plan.slice-256-bf16-local-vectors.md) and
 [report256](../../issue-nvvm-backend/report.slice-256-bf16-local-vectors.md) for current acceptance.
+
+## Flat local BF16 record fields (slice259)
+
+A local record can contain integer scalars and BF16 scalar/vector2/3/4 fields, with at least one BF16
+field. Exact Generic one-operand Ptr/OutParam/BorrowInOutParam roots select the existing Storage role.
+The same canonical IRStructType and keyed fields remain authoritative. BF2 storage is native
+`<2 x i16>`; BF3/BF4 fields use component arrays and reuse256's leaf vector/array conversion when
+loaded or stored. Whole-record make/extract/load/store/phi and by-value helper roles remain gated.
+
+IRBuilder::emitFieldAddress intentionally produces an explicit pointer with access, address-space
+and layout operands. The emitter qualifies a BF vector field through its actual FieldAddress and
+admitted local-record root; pointee type alone cannot confer this permission. The local flag does
+not propagate through nested records, which the finite root classifier rejects. Default aggregate,
+resource, shared, device and parameter-group classifications remain unchanged. Exported CUDA record
+references and readonly references remain unqualified.
+
+The existing aggregate-layout walk receives an explicit local permission and composes the qualified
+leaves, comparing local record size/alignment against CUDA layout before allocation. Guarded
+`{uint16, BF, uint16}` scalar/2/3/4 records have sizes6/12/10/12 and alignments2/4/2/2; value/suffix
+offsets are2/4,4/8,2/8,2/10. Mixed `{uint8,BF16,uint32,uint64,BF3,uint16}` is24/8 with offsets
+0/2/4/8/16/22. Provider storage/value caches remain separate, and role checks precede lookup.
+
+Both type visitation orders preserve all65536 raw encodings per scalar/vector lane under both
+control flags, integer guards and untouched buffer bytes. O3 can scalarize read helper arguments;
+caller local accesses are inspected separately. Original255 device Ptr<H> controls and the frozen
+FP8 record A result remain unsupported. This local contract does not establish external helper ABI,
+resource storage, record arrays or material runtime behavior. See
+[report259](../../issue-nvvm-backend/report.slice-259-bf16-local-records.md).

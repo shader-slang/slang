@@ -52,15 +52,9 @@ static const SlangNVVMValueOperationDesc kNVVMStructuredBoolStoreOperation = {
     SLANG_COUNT_OF(kNVVMStructuredBoolStoreOperands),
 };
 
-// Identifies the qualified local BF16 memory boundary. Aggregate fields, device pointers and
-// resources have different admission rules and cannot acquire this representation by pointee alone.
-IRVectorType* _getNVVMLocalBFloat16VectorPointer(IRInst* pointer)
-{
-    IRType* valueType = nullptr;
-    return pointer && asNVVMSupportedLocalHelperValuePointerType(pointer->getDataType(), &valueType)
-               ? asNVVMBFloat16VectorType(valueType)
-               : nullptr;
-}
+// Identifies a bare local BF16 vector or a field in a qualified local BF16 record. A field must
+// retain its admitted producer; a device/resource pointer cannot acquire storage by pointee alone.
+IRVectorType* _getNVVMLocalBFloat16VectorPointer(IRInst* pointer);
 
 // Matches the prelude's native BF2 and component-struct BF3/BF4 storage. This alignment describes
 // memory only; BF3/BF4 register vectors have stronger LLVM allocation alignment.
@@ -201,6 +195,7 @@ struct NVVMStructField
     bool isConventionalGlobal = false;
     bool isMutable = false;
     bool isPhysicalStorage = false;
+    bool isLocalBFloat16RecordStorage = false;
 };
 
 struct NVVMSequentialElementPointer
@@ -377,6 +372,11 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
             {
                 structType = asNVVMSupportedHelperStructType(helperValueType);
                 if (!structType)
+                {
+                    structType = asNVVMSupportedLocalBFloat16RecordType(helperValueType);
+                    outAddress.isLocalBFloat16RecordStorage = structType != nullptr;
+                }
+                if (!structType)
                     return false;
                 outAddress.isMutable = true;
             }
@@ -450,10 +450,27 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
 
     if (outAddress.isMutable)
     {
-        return _getNVVMExecutableValueAlignment(fieldType) != 0;
+        return _getNVVMExecutableValueAlignment(fieldType) != 0 ||
+               (outAddress.isLocalBFloat16RecordStorage && asNVVMBFloat16VectorType(fieldType));
     }
 
     return isNVVMSupportedAggregateStorageType(fieldType);
+}
+
+IRVectorType* _getNVVMLocalBFloat16VectorPointer(IRInst* pointer)
+{
+    IRType* valueType = nullptr;
+    if (pointer && asNVVMSupportedLocalHelperValuePointerType(pointer->getDataType(), &valueType))
+        return asNVVMBFloat16VectorType(valueType);
+
+    // FieldAddress retains the exact record and key. For example, `record.value` in an inout
+    // Record helper has an explicit pointer spelling, so its producer proves the local role.
+    NVVMStructField field;
+    auto fieldAddress = as<IRFieldAddress>(pointer);
+    return fieldAddress && _getNVVMStructFieldAddress(fieldAddress, field) &&
+                   field.isLocalBFloat16RecordStorage
+               ? asNVVMBFloat16VectorType(field.field->getFieldType())
+               : nullptr;
 }
 
 bool _getNVVMStructFieldValue(IRFieldExtract* fieldExtract, NVVMStructField& outField);
@@ -1418,17 +1435,32 @@ IRVarLayout* _findNVVMCanonicalFieldLayout(IRStructTypeLayout* structLayout, IRS
 // exact CUDA size and alignment, raw-buffer views are pointer/count pairs, and every other leaf
 // keeps its ordinary LLVM representation. When target layout has already produced canonical
 // metadata, the recursive walk proves provider offsets and strides against that metadata instead
-// of trying to reconstruct the layout of opaque resource fields.
+// of trying to reconstruct the layout of opaque resource fields. Local BF16 records explicitly
+// enable their qualified leaves here; the default global/resource storage proof stays unchanged.
 bool _getNVVMAggregateStorageLayout(
     CodeGenContext* codeGenContext,
     IRType* type,
     IRSizeAndAlignment& outLayout,
     IRTypeLayout* canonicalTypeLayout = nullptr,
-    bool allowZeroStateStructs = false)
+    bool allowZeroStateStructs = false,
+    bool allowLocalBFloat16Records = false)
 {
     outLayout = {};
     if (!codeGenContext || !type)
         return false;
+
+    if (allowLocalBFloat16Records && asNVVMBFloat16VectorType(type))
+    {
+        uint32_t count = 0;
+        asNVVMBFloat16VectorType(type, &count);
+        outLayout.size = count * 2;
+        outLayout.alignment = int(_getNVVMBFloat16VectorStorageAlignment(type));
+        IRSizeAndAlignment canonicalLayout;
+        return !canonicalTypeLayout ||
+               (_getNVVMCanonicalByteLayout(canonicalTypeLayout, canonicalLayout) &&
+                canonicalLayout.size == outLayout.size &&
+                canonicalLayout.alignment == outLayout.alignment);
+    }
 
     if (asNVVMSupportedCompactParameterGroupVectorType(type))
     {
@@ -1476,7 +1508,8 @@ bool _getNVVMAggregateStorageLayout(
                     arrayType->getElementType(),
                     elementLayout,
                     canonicalArrayLayout ? canonicalArrayLayout->getElementTypeLayout() : nullptr,
-                    allowZeroStateStructs))
+                    allowZeroStateStructs,
+                    allowLocalBFloat16Records))
             {
                 return false;
             }
@@ -1500,7 +1533,8 @@ bool _getNVVMAggregateStorageLayout(
                 arrayType->getElementType(),
                 elementLayout,
                 canonicalArrayLayout ? canonicalArrayLayout->getElementTypeLayout() : nullptr,
-                allowZeroStateStructs) ||
+                allowZeroStateStructs,
+                allowLocalBFloat16Records) ||
             (elementLayout.size <= 0 && !(allowZeroStateStructs && elementLayout.size == 0)) ||
             elementLayout.alignment <= 0)
         {
@@ -1531,6 +1565,8 @@ bool _getNVVMAggregateStorageLayout(
         allowZeroStateStructs && isNVVMSupportedParameterGroupElementStorageType(type)
             ? as<IRStructType>(type)
             : asNVVMSupportedAggregateStorageStructType(type);
+    if (!structType && allowLocalBFloat16Records)
+        structType = asNVVMSupportedLocalBFloat16RecordType(type);
     if (structType)
     {
         auto canonicalStructLayout = as<IRStructTypeLayout>(canonicalTypeLayout);
@@ -1553,7 +1589,8 @@ bool _getNVVMAggregateStorageLayout(
                     field->getFieldType(),
                     fieldLayout,
                     canonicalFieldLayout ? canonicalFieldLayout->getTypeLayout() : nullptr,
-                    allowZeroStateStructs) ||
+                    allowZeroStateStructs,
+                    allowLocalBFloat16Records) ||
                 (fieldLayout.size <= 0 && !(allowZeroStateStructs && fieldLayout.size == 0)) ||
                 fieldLayout.alignment <= 0)
             {
@@ -1618,7 +1655,8 @@ bool _getNVVMAggregateStorageLayout(
 
     if (!isNVVMSupportedIntegerScalarType(type) && !isNVVMBoolType(type) &&
         !isNVVMFloat16Type(type) && !isNVVMFloat32Type(type) &&
-        !asNVVMSupported32BitNumericVectorType(type))
+        !asNVVMSupported32BitNumericVectorType(type) &&
+        !(allowLocalBFloat16Records && isNVVMBFloat16Type(type)))
     {
         return false;
     }
@@ -1633,7 +1671,8 @@ bool _hasNVVMCompatibleAggregateStorageLayout(
     CodeGenContext* codeGenContext,
     IRType* type,
     IRTypeLayout* canonicalTypeLayout = nullptr,
-    bool allowZeroStateStructs = false)
+    bool allowZeroStateStructs = false,
+    bool allowLocalBFloat16Records = false)
 {
     IRSizeAndAlignment providerLayout;
     if (canonicalTypeLayout)
@@ -1642,7 +1681,8 @@ bool _hasNVVMCompatibleAggregateStorageLayout(
             type,
             providerLayout,
             canonicalTypeLayout,
-            allowZeroStateStructs);
+            allowZeroStateStructs,
+            allowLocalBFloat16Records);
 
     IRSizeAndAlignment cudaLayout;
     return _getNVVMAggregateStorageLayout(
@@ -1650,7 +1690,8 @@ bool _hasNVVMCompatibleAggregateStorageLayout(
                type,
                providerLayout,
                nullptr,
-               allowZeroStateStructs) &&
+               allowZeroStateStructs,
+               allowLocalBFloat16Records) &&
            SLANG_SUCCEEDED(getSizeAndAlignment(
                codeGenContext->getTargetReq(),
                IRTypeLayoutRules::getCUDA(),
@@ -1710,6 +1751,7 @@ void _addNVVMReachableStructTypes(
         (!asNVVMSupportedHelperStructType(structType) &&
          !asNVVMSupportedResourceStructType(structType) &&
          !asNVVMSupportedAggregateStorageStructType(structType) &&
+         !asNVVMSupportedLocalBFloat16RecordType(structType) &&
          !(allowZeroStateStructs && isNVVMSupportedParameterGroupElementStorageType(structType)) &&
          !isNVVMSupportedStructuredBufferStorageType(structType)) ||
         reachableTypes.contains(structType))
@@ -8185,11 +8227,13 @@ SlangResult _validateNVVMHelperTarget(
             asNVVMSupportedLocalHelperValuePointerType(
                 helper->getParamType(parameterIndex),
                 &localValueType) &&
-            asNVVMBFloat16VectorType(localValueType))
+            (asNVVMBFloat16VectorType(localValueType) ||
+             asNVVMSupportedLocalBFloat16RecordType(localValueType)))
         {
             return _diagnoseUnsupportedIRType(
                 codeGenContext,
-                "exported BF16 vector helper reference",
+                asNVVMBFloat16VectorType(localValueType) ? "exported BF16 vector helper reference"
+                                                         : "exported BF16 record helper reference",
                 helper->getParamType(parameterIndex));
         }
         if (!_isSupportedNVVMHelperParameterType(helper->getParamType(parameterIndex)))
@@ -8576,6 +8620,20 @@ SlangResult _validateNVVMFunction(
                                 return _diagnoseUnsupportedIR(
                                     codeGenContext,
                                     toSlice("local BF16 vector storage layout"));
+                            }
+                        }
+                        else if (asNVVMSupportedLocalBFloat16RecordType(helperValueType))
+                        {
+                            if (!_hasNVVMCompatibleAggregateStorageLayout(
+                                    codeGenContext,
+                                    helperValueType,
+                                    nullptr,
+                                    false,
+                                    true))
+                            {
+                                return _diagnoseUnsupportedIR(
+                                    codeGenContext,
+                                    toSlice("local BF16 record storage layout"));
                             }
                         }
                         else if (!_hasNVVMCompatibleHelperValueLayout(
@@ -15078,7 +15136,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 valueType = structValueType;
                             }
                         }
-                        if (asNVVMBFloat16VectorType(valueType))
+                        const bool isLocalBFloat16Record =
+                            asNVVMSupportedLocalBFloat16RecordType(valueType) != nullptr;
+                        if (asNVVMBFloat16VectorType(valueType) || isLocalBFloat16Record)
                             valueUse = NVVMTypeUse::Storage;
                         SlangNVVMTypeHandle loweredValueType = nullptr;
                         SLANG_RETURN_ON_FAIL(
@@ -15086,13 +15146,16 @@ SlangResult emitNVVMIRFromLinkedIR(
                         uint32_t alignment = asNVVMBFloat16VectorType(valueType)
                                                  ? _getNVVMBFloat16VectorStorageAlignment(valueType)
                                                  : _getNVVMExecutableValueAlignment(valueType);
-                        if (valueUse == NVVMTypeUse::ParameterGroupStorage)
+                        if (valueUse == NVVMTypeUse::ParameterGroupStorage || isLocalBFloat16Record)
                         {
                             IRSizeAndAlignment physicalLayout;
                             SLANG_RELEASE_ASSERT(_getNVVMAggregateStorageLayout(
                                 codeGenContext,
                                 valueType,
-                                physicalLayout));
+                                physicalLayout,
+                                nullptr,
+                                false,
+                                isLocalBFloat16Record));
                             SLANG_RELEASE_ASSERT(
                                 physicalLayout.alignment > 0 &&
                                 physicalLayout.alignment <= UINT32_MAX);

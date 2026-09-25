@@ -909,6 +909,27 @@ IRPtrTypeBase* asNVVMSupportedSharedHelperPointerType(IRInst* type, IRType** out
     return pointerType;
 }
 
+IRStructType* asNVVMSupportedLocalBFloat16RecordType(IRInst* type)
+{
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return nullptr;
+
+    // Consider `struct Record { uint16_t tag; vector<BFloat16, 3> value; };`.
+    // Checking preserves one canonical struct; only its local storage role is qualified here.
+    // Each field has an established storage leaf, so no recursive record/value ABI is inferred.
+    bool hasBFloat16Field = false;
+    for (auto field : structType->getFields())
+    {
+        IRType* fieldType = field->getFieldType();
+        if (isNVVMBFloat16Type(fieldType) || asNVVMBFloat16VectorType(fieldType))
+            hasBFloat16Field = true;
+        else if (!isNVVMSupportedIntegerScalarType(fieldType))
+            return nullptr;
+    }
+    return hasBFloat16Field ? structType : nullptr;
+}
+
 IRPtrTypeBase* asNVVMSupportedLocalHelperValuePointerType(IRInst* type, IRType** outValueType)
 {
     if (outValueType)
@@ -923,7 +944,8 @@ IRPtrTypeBase* asNVVMSupportedLocalHelperValuePointerType(IRInst* type, IRType**
                                     pointerType->getOperandCount() == 1;
     if (!pointerType || isNVVMSupportedCopyableValueType(valueType) ||
         (!isNVVMSupportedHelperValueType(valueType) && !isNVVMBFloat16Type(valueType) &&
-         !asNVVMBFloat16VectorType(valueType)) ||
+         !asNVVMBFloat16VectorType(valueType) &&
+         !asNVVMSupportedLocalBFloat16RecordType(valueType)) ||
         (!isPlainLocalPointer && !isMutableParameter) ||
         pointerType->getAddressSpace() != AddressSpace::Generic)
     {
@@ -2683,8 +2705,10 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             localHelperPointerValueType,
             SLANG_NVVM_ADDRESS_SPACE_GENERIC,
             outType,
-            asNVVMBFloat16VectorType(localHelperPointerValueType) ? NVVMTypeUse::Storage
-                                                                  : NVVMTypeUse::HelperValue,
+            asNVVMBFloat16VectorType(localHelperPointerValueType) ||
+                    asNVVMSupportedLocalBFloat16RecordType(localHelperPointerValueType)
+                ? NVVMTypeUse::Storage
+                : NVVMTypeUse::HelperValue,
             false));
         m_helperABIRepresentationMap[type] = outType;
         return SLANG_OK;

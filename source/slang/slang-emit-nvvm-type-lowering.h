@@ -180,7 +180,12 @@ IRPtrTypeBase* asNVVMSupportedSharedHelperPointerType(
     IRInst* type,
     IRType** outValueType = nullptr);
 
-/// Returns an exact local or mutable-parameter pointer to a finite helper value.
+/// Returns a flat local-storage record with integer and BF16 scalar/vector fields.
+/// At least one field must be BF16; this does not admit the record as a by-value helper or
+/// resource.
+IRStructType* asNVVMSupportedLocalBFloat16RecordType(IRInst* type);
+
+/// Returns an exact local or mutable-parameter pointer to a helper value or qualified BF16 storage.
 IRPtrTypeBase* asNVVMSupportedLocalHelperValuePointerType(
     IRInst* type,
     IRType** outValueType = nullptr);

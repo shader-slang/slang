@@ -3,6 +3,36 @@
 Read [WORKFLOW.md](WORKFLOW.md) before resuming. The autonomous loop is authorized; the parent owns
 independent acceptance and local commits. No push is authorized.
 
+## Slice259 is accepted
+
+Flat local records containing integer and BF16 scalar/vector fields now support internal inout/out
+references and keyed field reads/writes. Storage remains nativeBF2/component-arrayBF3/BF4; whole-record
+values, nested records, readonly references, device/resources and external ABI remain gated. Read
+[plan259](plan.slice-259-bf16-local-records.md), [report259](report.slice-259-bf16-local-records.md) and
+[validation259](runtime-validation.slice-259.json).
+
+The unchanged672-word fixture passes all3 modes. Both lowering orders pass24 exhaustive GPU controls:
+100664064 words/402656256 bytes, including all65536 encodings per lane under both flags and all guards/
+untouched bytes. Separate PTX and LLVM layout audits pass; the field-route revert reproduces the
+BF3 load rejection at O0/O3. Original6 research255 device Ptr<H> rejections remain exact.
+
+Full frozen1356/discovery354 preserves all1707 prior five-field outcomes and adds3 correct:
+1710total/1671correct/39unresolved, retaining18 resolved histories. Runtime4/focused30, units1050pass/
+13skip, semantics1052pass/77skip, toolkit18/contracts6 and material6 compile/assembly checks pass.
+Every1062 prior unit and1129 semantic identity/outcome is retained. Material PTX/cubins remain exact256;
+no material runtime/performance claim is made. All565 prior inputs remain unchanged; final identity
+covers136 source snapshots,12 artifacts,566 inputs and18 pins. Compiler SHA256
+`638db4d1cbbfb6c9a3ccca2f6058a89c45071e94ab1ba51a710fee5b8a3bf5f9`; provider ABI41 remains
+`5fe0b977e22b80acc5ee39147c69510a01c09563354a1a67bd9573d1cda1aeab`.
+
+Full259/targeted233/cadence0; rolling implementations254 CUDA layout correctness,256 local BF vector
+capability,259 local BF record capability. Research258's failed/discarded material experiment explains
+the cadence exception; reconsider material work next. Fresh delegation remains unavailable at the
+agent limit; one local writer uses separate audits without a fresh independent-agent review claim.
+Closure verifies3885 raw artifacts,136 final source snapshots and358 compact references. Raw roots
+slice-259-before and slice-259-after under build/nvvm-loop retain all evidence. No push or system/
+driver change occurred.
+
 ## Research258 is accepted; getter prototype discarded
 
 The paired getter-visibility experiment preserves 264 PTX outputs and 24 cubins, but semantic median
@@ -252,19 +282,19 @@ indexed artifacts. Correctness priority explains this slice; reconsider material
 
 ## Next bounded action
 
-Revisit the existing BF16 aggregate/reference rejections using research255's original Ptr<H> source
-controls and implementation256's qualified local-vector storage. Compare their canonical producer,
-layout and pointer roles against the remaining BF16 aggregate corpus failure before choosing one
-bounded slice. Write its ExecPlan before editing; do not make a blanket recursive/storage admission
-or change external/device/resource ABI gates without a demonstrated contract and exact GPU oracle.
+Compare scalar FP8-to-Float32 widening against broader FP8/BF16 record transport before selecting
+slice260. Research243 qualified every FP8 encoding and exact finite widening;244 repaired finite
+shared producers, and249 admitted distinct scalar transport. A bounded widening operation can use
+that evidence without deciding Float32 narrowing/overflow policy. Dynamic-dispatch-substandard-float
+still stops at record A and additionally needs aggregate/any-value and BF2 record value contracts;
+do not claim scalar widening alone resolves it. Read the FP8 scalar design contract and write the
+ExecPlan before editing. Preserve every original fixture, output oracle and failure history.
 
-Research258's material-driven prototype failed its predeclared gates and is fully discarded. Do not
-repeat that getter experiment without new evidence or force another speculative optimization to
-satisfy cadence. A narrowly justified capability slice may proceed with this documented material
-review; reconsider material work after it. Local BF lane and FP8 roles remain separate candidates.
-Preserve texture/column-major histories, every fixture/oracle and the immutable frozen inventory.
-Material runtime bindings/textures/LUT/input/output remain unavailable; do not repeat the optional
-request or infer kernel performance from compilation.
+Reconsider material-driven work using257/258's current evidence. The getter prototype was fully
+discarded after missing its thresholds; do not repeat it or force a speculative optimization without
+new evidence. Material runtime bindings/textures/LUT/input/output remain unavailable; do not repeat
+the optional request or infer kernel speed from compilation. Texture and column-major histories
+remain unchanged. A newly demonstrated regression still takes priority over these candidates.
 
 ## Accepted historical evidence
 
@@ -283,8 +313,8 @@ LLVM14, providerABI41, matching RelWithDebInfo. Inspect/source `build/nvvm-loop/
 follow the local slang-build skill. At most4 CPU workers, sequential GPU suites and 30-minute bounds.
 
 Latest research roots `build/nvvm-loop/slice-258-before`, `slice-258-prototype` and `slice-258-restored`
-retain the discarded experiment and exact restoration. Full-checkpoint roots `slice-256-before` and
-`slice-256-after` retain the unchanged
+retain the discarded experiment and exact restoration. Full-checkpoint roots `slice-259-before` and
+`slice-259-after` retain the unchanged
 before fixture, exact local storage tests, both all-encoding cache-order controls, full checkpoint,
 final source snapshots and acceptance/closure audits. Historical254/255 roots retain layout and
 physical-record qualification with their original identities. No GPU loss, driver/system change,

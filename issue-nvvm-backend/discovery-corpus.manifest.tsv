@@ -116,3 +116,4 @@ cuda/nvvm-fp8-scalar-transport.slang	0	fp8,scalar,helper,bitcast,control-flow	Al
 cuda/nvvm-bf16-signed-literals.slang	0	bf16,scalar,helper,bitcast	Canonical BF16 literals through a noinline helper with exact signed zero, subnormal, normal and finite maximum encodings.
 cuda/nvvm-bf16-cuda-layout.slang	0	bf16,vector-matrix,layout	Explicit CUDA layout queries for BF16 vectors, wrapped records, arrays and row-major matrices, preserving Half and ordinary vector neighbors.
 cuda/nvvm-bf16-local-vectors.slang	0	bf16,vector-matrix,helper-generic,local	Exact raw BF16 local inout/out roundtrips for widths2/3/4, preserving signed zeros, subnormals, infinities and NaN payloads.
+cuda/nvvm-bf16-local-records.slang	0	bf16,local,aggregate-pointer,helper-generic	Exact guarded local BF16 record fields through internal inout/out references, including scalar and vector storage with integer-width neighbors.
