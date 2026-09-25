@@ -636,7 +636,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         reflection_json=True,
-        primary_timers=["compileInner", "frontEndExecute", "generateOutput"],
+        primary_timers=["compileInner", "frontEndExecute", "generateOutput", "downstreamCompile"],
         sweep_sizes=[30, 60, 120, 240],
     ),
     WorkloadSpec(
@@ -646,7 +646,7 @@ WORKLOADS = [
         default_size=400,
         mode="target",
         extra_flags=SPIRV,
-        primary_timers=["generateOutput", "compileInner"],
+        primary_timers=["generateOutput", "compileInner", "downstreamCompile"],
         sweep_sizes=[100, 200, 400, 800],
     ),
     # ---- source-target emission (the text backends spirv-directly skips) --
@@ -888,9 +888,14 @@ WORKLOADS = [
     # ---- downstream compilers (Windows perf runner only) -------------------
     # These measure the full pipeline INCLUDING the downstream compiler (dxc
     # for DXIL, nvrtc for PTX) — an internal application benchmark showed
-    # downstream time is ~60% of a real app's combined compile time, and the
-    # suite had no signal for it. generateOutput spans slang emit + the
-    # downstream invocation; wall_ms is the end-to-end number.
+    # downstream time is ~60% of a real app's combined compile time. generateOutput
+    # spans slang emit + the downstream invocation; wall_ms is the end-to-end
+    # number. downstreamCompile (added once emitSPIRVForEntryPointsDirectly /
+    # CodeGenContext::emitWithDownstreamForEntryPoints / ArtifactOutputUtil::
+    # dissassembleWithDownstream started wrapping their existing timed span in
+    # SLANG_PROFILE_SECTION) is generateOutput's own downstream-compiler child,
+    # so these two workloads finally get a same-report split of that ~60%
+    # instead of only the opaque combined generateOutput/wall_ms number.
     WorkloadSpec(
         name="codegen_dxil",
         bucket="codegen_downstream",
@@ -898,7 +903,7 @@ WORKLOADS = [
         default_size=400,
         mode="target",
         extra_flags=["-target", "dxil", "-profile", "sm_6_6"],
-        primary_timers=["generateOutput", "compileInner"],
+        primary_timers=["generateOutput", "compileInner", "downstreamCompile"],
         platforms=["win32"],
         downstream_required=True,
         sweep_sizes=[100, 200, 400, 800],
@@ -910,7 +915,7 @@ WORKLOADS = [
         default_size=400,
         mode="target",
         extra_flags=["-target", "ptx"],
-        primary_timers=["generateOutput", "compileInner"],
+        primary_timers=["generateOutput", "compileInner", "downstreamCompile"],
         platforms=["win32"],
         downstream_required=True,
         sweep_sizes=[100, 200, 400, 800],
