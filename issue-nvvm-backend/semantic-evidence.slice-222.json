@@ -1,0 +1,535 @@
+{
+  "schema": 1,
+  "slice": 222,
+  "status": "accepted-research",
+  "date_utc": "2026-09-25",
+  "source_revision": "c10071446b77cb53a47a1518c839422bac024f45",
+  "scope": "Research unsigned firstbithigh signedness without changing compiler/provider/prelude/corpus",
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-221.json",
+    "sha256": "982d57282af6438427032bf401cdfb44d05f920003ed3f09c9158389b771e81d"
+  },
+  "contract": {
+    "local_source": {
+      "path": "source/slang/hlsl.meta.slang",
+      "sha256": "3ab28ee36df1e5d5bd42d0d3b9ca414e74477e1d33f498bf16e59ac4061ce92e"
+    },
+    "official_reference": "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/firstbithigh",
+    "unsigned": "Highest1 index, zero returns0xffffffff.",
+    "signed": "For negative input complement within operand width, then highest1 index; zero/allones return0xffffffff.",
+    "oracle": "Python integer bit_length after explicit width-bounded signed complement, no floating arithmetic or backend-derived expected values."
+  },
+  "fixture": {
+    "path": "build/nvvm-loop/slice-222-semantics/firstbithigh.slang",
+    "sha256": "f5b8334b9cfcfbce30675859b12af81442446879915188e79abcbf7d6492a51c"
+  },
+  "probe": {
+    "path": "build/nvvm-loop/slice-222-semantics/probe.py",
+    "sha256": "c05acd8287dfbdd06df0e57ecd90a5f9ce1cf2337eefd546330c9ba0c0f7b83a"
+  },
+  "raw_results": {
+    "path": "build/nvvm-loop/slice-222-semantics/results.json",
+    "sha256": "3d5c800d5b3c0b96d9d2c9150ab7db24e87039deadc883cab6d6580cb81648ef"
+  },
+  "summary": {
+    "nvrtc-o3": {
+      "executions": 6,
+      "correct_executions": 4,
+      "mismatching_executions": 2,
+      "checked_words": 2304,
+      "equal_words": 2280,
+      "different_words": 24
+    },
+    "nvvm-o0": {
+      "executions": 6,
+      "correct_executions": 6,
+      "mismatching_executions": 0,
+      "checked_words": 2304,
+      "equal_words": 2304,
+      "different_words": 0
+    },
+    "nvvm-o3": {
+      "executions": 6,
+      "correct_executions": 6,
+      "mismatching_executions": 0,
+      "checked_words": 2304,
+      "equal_words": 2304,
+      "different_words": 0
+    }
+  },
+  "unique_input_values": {
+    "uint32": 96,
+    "uint64": 192,
+    "coverage": "Every power-of-two and adjacent values, zero, allones, alternating bits;32bitset repeats twice across six32lane batches."
+  },
+  "checked_output_words": 6912,
+  "equal_output_words": 6888,
+  "mismatching_output_words": 24,
+  "mismatches": [
+    {
+      "mode": "nvrtc-o3",
+      "batch": 2,
+      "slot": "scalar-u32",
+      "lane": 28,
+      "input": "80000000",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 2,
+      "slot": "scalar-u32",
+      "lane": 29,
+      "input": "80000001",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 2,
+      "slot": "scalar-u32",
+      "lane": 30,
+      "input": "aaaaaaaa",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 2,
+      "slot": "scalar-u32",
+      "lane": 31,
+      "input": "ffffffff",
+      "expected": 31,
+      "actual": 4294967295
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 2,
+      "slot": "vector-u32-x",
+      "lane": 28,
+      "input": "80000000",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 2,
+      "slot": "vector-u32-x",
+      "lane": 29,
+      "input": "80000001",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 2,
+      "slot": "vector-u32-x",
+      "lane": 30,
+      "input": "aaaaaaaa",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 2,
+      "slot": "vector-u32-x",
+      "lane": 31,
+      "input": "ffffffff",
+      "expected": 31,
+      "actual": 4294967295
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 2,
+      "slot": "vector-u32-y",
+      "lane": 28,
+      "input": "80000001",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 2,
+      "slot": "vector-u32-y",
+      "lane": 29,
+      "input": "80000000",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 2,
+      "slot": "vector-u32-y",
+      "lane": 30,
+      "input": "ffffffff",
+      "expected": 31,
+      "actual": 4294967295
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 2,
+      "slot": "vector-u32-y",
+      "lane": 31,
+      "input": "aaaaaaaa",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 5,
+      "slot": "scalar-u32",
+      "lane": 28,
+      "input": "80000000",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 5,
+      "slot": "scalar-u32",
+      "lane": 29,
+      "input": "80000001",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 5,
+      "slot": "scalar-u32",
+      "lane": 30,
+      "input": "aaaaaaaa",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 5,
+      "slot": "scalar-u32",
+      "lane": 31,
+      "input": "ffffffff",
+      "expected": 31,
+      "actual": 4294967295
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 5,
+      "slot": "vector-u32-x",
+      "lane": 28,
+      "input": "80000000",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 5,
+      "slot": "vector-u32-x",
+      "lane": 29,
+      "input": "80000001",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 5,
+      "slot": "vector-u32-x",
+      "lane": 30,
+      "input": "aaaaaaaa",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 5,
+      "slot": "vector-u32-x",
+      "lane": 31,
+      "input": "ffffffff",
+      "expected": 31,
+      "actual": 4294967295
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 5,
+      "slot": "vector-u32-y",
+      "lane": 28,
+      "input": "80000001",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 5,
+      "slot": "vector-u32-y",
+      "lane": 29,
+      "input": "80000000",
+      "expected": 31,
+      "actual": 30
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 5,
+      "slot": "vector-u32-y",
+      "lane": 30,
+      "input": "ffffffff",
+      "expected": 31,
+      "actual": 4294967295
+    },
+    {
+      "mode": "nvrtc-o3",
+      "batch": 5,
+      "slot": "vector-u32-y",
+      "lane": 31,
+      "input": "aaaaaaaa",
+      "expected": 31,
+      "actual": 30
+    }
+  ],
+  "input_words_unchanged": true,
+  "ptx_assemblies": 3,
+  "artifacts": [
+    {
+      "path": "build/nvvm-loop/slice-222-semantics/firstbithigh-nvrtc-o3.ptx",
+      "sha256": "a599e8a556d9450fa9519516fa0edff03178669c0c53fc7cedb7bd050bda0a2f"
+    },
+    {
+      "path": "build/nvvm-loop/slice-222-semantics/firstbithigh-nvrtc-o3.cubin",
+      "sha256": "b7686e78480bf844a9e4a63b34f69f433f2da518fc8ace60d7b87def1c0d068a"
+    },
+    {
+      "path": "build/nvvm-loop/slice-222-semantics/firstbithigh-nvrtc-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-222-semantics/firstbithigh-nvvm-o0.ptx",
+      "sha256": "083118941190cd38baacd6fdb227766329abd49b705859b7aa32d84feef68072"
+    },
+    {
+      "path": "build/nvvm-loop/slice-222-semantics/firstbithigh-nvvm-o0.cubin",
+      "sha256": "a8cf123d5cf32dc5b1eb9f0ae8c3002ab1b459abbfe23beab3bafdb6327b2f49"
+    },
+    {
+      "path": "build/nvvm-loop/slice-222-semantics/firstbithigh-nvvm-o0.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-222-semantics/firstbithigh-nvvm-o3.ptx",
+      "sha256": "50f8d4975b2bd078abe2361c40ccf1e035cdf659d8227d4b84f86b87d0b89c3c"
+    },
+    {
+      "path": "build/nvvm-loop/slice-222-semantics/firstbithigh-nvvm-o3.cubin",
+      "sha256": "c97ec40afb29caf77947ba4d76679321336bfed13ad0b7ec67213b96ad00d7ae"
+    },
+    {
+      "path": "build/nvvm-loop/slice-222-semantics/firstbithigh-nvvm-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "smoke": {
+    "passed": 4,
+    "executed": 4,
+    "evidence": {
+      "path": "build/nvvm-loop/slice-222-semantics/runtime/results.json",
+      "sha256": "99d2dada5f9def84cb1fb506ec770ca8bce62fa6e8c343f7730dfaefbe29002a"
+    }
+  },
+  "finding": {
+    "id": "research222-cuda-unsigned32-firstbithigh",
+    "separate_from_registered51": true,
+    "affected": "NVRTC CUDA U32 scalar and component-wise vector inputs with bit31set",
+    "minimal": {
+      "input": "0x80000000u",
+      "expected": 31,
+      "observed_nvrtc": 30,
+      "observed_nvvm_o0": 31,
+      "observed_nvvm_o3": 31
+    },
+    "additional": "0xffffffffu expected31, NVRTC returns0xffffffff.",
+    "responsible_layer": "CUDA prelude U32_firstbithigh complements after casting to int32; I32 currently delegates to it. U64/I64 and direct typed provider already separate signedness correctly.",
+    "canonical_shape": "Valid integer scalar/vector intrinsic with correct signedness in its type; no producer representation defect.",
+    "predates221": {
+      "path": "build/nvvm-loop/slice-222-semantics/predates-221.json",
+      "sha256": "88de5d23ca13ad426692c0a4b6586a5a11c52648616e71df250f68d0cd003846"
+    },
+    "prior_runtime_evidence": {
+      "path": "build/nvvm-loop/slice-221-before/fixture-diagnostic.log",
+      "sha256": "adcb32d02833071bd1856327bc84cf35b7ee39cb154904633becf6d74f723a38"
+    },
+    "introducing_revision_bisected": false,
+    "next_fix": "Move negative-input complement from CUDA U32 helper to I32 helper, preserve unsigned zero sentinel/CLZ. Register independent dynamic regression and replay exact research cases. Shared prelude change requires full checkpoint."
+  },
+  "preservation": {
+    "production_sources_unchanged": true,
+    "tested_sources_verified": 23,
+    "artifacts_verified": 12,
+    "runtime_inputs_verified": 549,
+    "registered_cells": 1659,
+    "registered_correct": 1608,
+    "registered_failures": 51,
+    "resolved_histories": 6,
+    "runtime_evidence": "Inherited221 targeted and220 full; no registered corpus rerun or new fresh pass claim.",
+    "last_full_checkpoint": 220,
+    "implementation_slices_since_full": 1
+  },
+  "provenance": {
+    "configuration": "RelWithDebInfo",
+    "target_architecture": 80,
+    "submodule_pins": [
+      " 9dc178a86fcbbf13c94b4cd4cb046f238d26c8da external/WindowsToolchain (v0.12.0-9-g9dc178a)",
+      " 924936d0427cb25a61169739a7660230bffa6ea6 external/cmark (swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-09-15-a)",
+      " e0b53eaf63c6d00e0725788ef1dbb759aa321d79 external/fast_float (v6.1.0-352-ge0b53ea)",
+      " efec5db081e3aad807d0731e172ac597f6a39447 external/glm (0.9.5.3-2723-gefec5db0)",
+      " d1f52c8993a501bd52d4fbd044bfeb9ecdceb9f4 external/glslang (11.1.0-1385-gd1f52c89)",
+      " 8936b58fe26e8c3da834b8f60b06511d537b4c63 external/imgui (v1.62-5420-g8936b58fe)",
+      " 3fe7be956f23385aa1950dc31e2f25127ccfc0ea external/lua (v5.4-beta-333-g3fe7be95)",
+      " 7f71be01f2c6f6b2c3cddb67eef8c38eab12ffd4 external/lz4 (v1.9.2-1351-g7f71be01)",
+      " a63bd172ddcba73a3d87ca32032b66ad41ddb9a6 external/metal-cpp (remotes/origin/metal-cpp_macOS14.2_iOS17.2)",
+      " 8c532c32c3c96e5ba1f2283e032f69ead8add00f external/mimalloc (v2.1.7)",
+      " 6ef6c68f4fcbb8287aa8edf9c6670804932f41c6 external/miniz (3.0.2-68-g6ef6c68)",
+      " a1280c1863ff19d87f8e827468a4cc906ba9032a external/optix-dev (v9.0.0-1-ga1280c1)",
+      " d6d31411a3ab5417945daa6b1d8811cfc340cb66 external/slang-rhi (d6d31411)",
+      " 29981f65241605e08b0ede4cfeb999fe3b723c6a external/spirv-headers (1.5.4.raytracing.fixed-498-g29981f6)",
+      " 0d6fd73ca73830ccab5fa1f00ed5ed40124e2c55 external/spirv-tools (v2022.4-1300-g0d6fd73c)",
+      " d541711a794343de4ef5ea76f037c9fb9c127a55 external/tinyobjloader (v1.0.6-85-gd541711)",
+      " 73f3cbb237e84d483afafc743f1f14ec53e12314 external/unordered_dense (v4.5.0)",
+      " 387259ecf4b0fe0cfac161b1d0b0a74e42796710 external/vulkan (v1.4.347)"
+    ],
+    "source_commit": "c10071446b77cb53a47a1518c839422bac024f45",
+    "source_changes": "None; research-only probe and documentation.",
+    "concurrency": "Sequential suites; four CPU build/corpus workers maximum, two unit servers; CMAKE_BUILD_PARALLEL_LEVEL=1.",
+    "validation_commands": [
+      [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-222-semantics/firstbithigh.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvrtc",
+        "-o",
+        "build/nvvm-loop/slice-222-semantics/firstbithigh-nvrtc-o3.ptx"
+      ],
+      [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-222-semantics/firstbithigh.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O0",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-222-semantics/firstbithigh-nvvm-o0.ptx"
+      ],
+      [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-222-semantics/firstbithigh.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-222-semantics/firstbithigh-nvvm-o3.ptx"
+      ]
+    ],
+    "compiler_version": "2026.16-228-g74f227e10",
+    "toolkit": {
+      "path": "/usr/local/cuda-12.9",
+      "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_May_27_02:21:03_PDT_2025\nCuda compilation tools, release 12.9, V12.9.86\nBuild cuda_12.9.r12.9/compiler.36037853_0"
+    },
+    "toolkit_libraries": {
+      "required_libnvvm": "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0",
+      "required_nvrtc": "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86",
+      "libnvvm_sha256": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "nvrtc_sha256": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+    },
+    "device": {
+      "name": "NVIDIA L4",
+      "ordinal": 0,
+      "visible_device_count": 1,
+      "compute_capability": 89,
+      "driver_api_version": 13000,
+      "cuda_visible_devices": null
+    },
+    "branch": "nvvm-backend",
+    "formatting_scope": "Explicit changed paths only; unrelated unit/document formatter hunks restored precisely.",
+    "source_revision": "c10071446b77cb53a47a1518c839422bac024f45",
+    "provider_abi": 36,
+    "tested_source_sha256": {
+      "source/slang/slang-emit-nvvm.cpp": "c3714364dc97334a0e63a31fcf6aecdace3011319a04c681a3b3157b665d6286",
+      "source/slang/hlsl.meta.slang": "3ab28ee36df1e5d5bd42d0d3b9ca414e74477e1d33f498bf16e59ac4061ce92e",
+      "prelude/slang-cuda-prelude.h": "d53e06145891329771b56ce41f44de757b675deed52cdd51ae031d6f149b8e5c",
+      "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "90ed3600a329edcc060e3da49cafcbc1a87a0135061fdd1460928bc256d427b5",
+      "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "75ba7ddd41ebd4947cf9e3eeb37326bb5c1083d8d83b6a9e4d5b95cf26f9facf",
+      "tools/slang-unit-test/unit-test-nvvm-support.h": "f648d6239a40a4d1cdb307264557bed72662f5b32a950d3b3ad0c483e2c3d7aa",
+      "tests/cuda/nvvm-fp64-implicit-shuffle.slang": "e6ed61a825021727de23baf36b6b360c1fbb329ca4b7987b39a8c071d3448616",
+      "issue-nvvm-backend/discovery-corpus.manifest.tsv": "6fc763240ec97344338d8830535098e5dd5580d2210a7f10a1954ac6e5c66345",
+      "issue-nvvm-backend/selection.slice-208-frozen.tsv": "f6d4ac7a1b3a9f982512287d87dcd77a4f75cfb0e2f819b343da312d8006ffd0",
+      "issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+      "issue-nvvm-backend/complex-test-server.py": "b173839cb958fdcf26c3b57ea3dec09cf26868e3e397f12cf04e5c21c01781e8",
+      "issue-nvvm-backend/test-run-complex-corpus.py": "6e2c88094334856c66c4d56bce50d17b553d4dea2858351808d2c911e0d58972",
+      "tools/test-server/test-server-main.cpp": "b82d0f813a560837b008de72fdaaf011b428396ec78800f4e0bb43cb4feef7de",
+      "source/compiler-core/slang-test-server-protocol.h": "c0ff0e415c4106b9ca799d5ee19f43023e22bc576674de8ef7eab43e17fbbb23",
+      "source/compiler-core/slang-test-server-protocol.cpp": "27e4679da25f4ff5fd245dc027d0b19c167a0bb4781c218ab7031303f5542855",
+      "tests/cuda/nvvm-fp32-singleton-minmax.slang": "d838cc70fe2e4d88bb2b127be48304fce74219bfd6319d25122a8e84815fe381",
+      "tests/cuda/nvvm-fp64-wave-edges.slang": "2df2ac1b0f7d50111154cea0f0c0a2752e125c5f117a1d97cdcb1ddf410fd0e2",
+      "tests/cuda/nvvm-fp32-minmax-order.slang": "a4c91ebc19acbafcf8f6e21ef10eb314c5df7525de1f969e78cd0b52fac976e6",
+      "issue-nvvm-backend/run-compute-census.py": "d464fab86c35e23b38dca664d722a4e79a664ee544da190c669ca51645491113",
+      "issue-nvvm-backend/run-compute-discovery.py": "6bdefee0b8001f4fbb12d89bb20f10912694ed24daa37ba1b4305a4154e75cb9",
+      "issue-nvvm-backend/test-run-compute-discovery.py": "ae59e7775eb77b00e286389a4c3ef34450fbe1f1ee988f500b0a55626d15b1d5",
+      "issue-nvvm-backend/census.slice-195.tsv": "77d335cdb66a54b83cefba9cca90c209ee29ec5d801294a169a244acc0398690",
+      "tests/cuda/nvvm-fp64-minmax-order.slang": "53264fe384c92fdf42261565f4b08049a565d2a1e0c8946c0b7424192da321c1"
+    },
+    "artifact_sha256": {
+      "build/RelWithDebInfo/bin/slangc": "79f46ef0dba116bdfdce8a03b40f7d3bb2c7b481529b452b483d650cf0958e43",
+      "build/RelWithDebInfo/bin/slang-test": "9c83731b05689bbdbd15956198ad10759e4e9142bd663fe2452fda4954d96a69",
+      "build/RelWithDebInfo/bin/test-server": "fd964f03c3c57b4352ce75f720706fdc852e3a0cd231b90cb0c89068190b827e",
+      "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372",
+      "build/RelWithDebInfo/lib/libslang-compiler.so": "55bd12f280ee51def87219c767557e198cbd07b9b99f06d118a20209dfb46598",
+      "build/RelWithDebInfo/lib/slang-core-module.bin": "8e76c8111cbc22b3a55d83f1c61439d89b9cec1be87a77e9bd47e8fbd847ad0f",
+      "build/RelWithDebInfo/lib/librender-test-tool.so": "96baec31673b6f33a619eb7cc8fd7a518942da12d9374718f475b84cc94ccbc4",
+      "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "c726e3f1eea7bb387178b9d5904a63dae1d07971ff65ff87ce771eb0f6ec4d7d",
+      "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "/usr/local/cuda-12.9/lib64/libnvrtc.so": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a",
+      "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+      "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461"
+    },
+    "assembly_commands": [
+      [
+        "/usr/local/cuda-12.9/bin/ptxas",
+        "-arch=sm_80",
+        "build/nvvm-loop/slice-222-semantics/firstbithigh-nvrtc-o3.ptx",
+        "-o",
+        "build/nvvm-loop/slice-222-semantics/firstbithigh-nvrtc-o3.cubin"
+      ],
+      [
+        "/usr/local/cuda-12.9/bin/ptxas",
+        "-arch=sm_80",
+        "build/nvvm-loop/slice-222-semantics/firstbithigh-nvvm-o0.ptx",
+        "-o",
+        "build/nvvm-loop/slice-222-semantics/firstbithigh-nvvm-o0.cubin"
+      ],
+      [
+        "/usr/local/cuda-12.9/bin/ptxas",
+        "-arch=sm_80",
+        "build/nvvm-loop/slice-222-semantics/firstbithigh-nvvm-o3.ptx",
+        "-o",
+        "build/nvvm-loop/slice-222-semantics/firstbithigh-nvvm-o3.cubin"
+      ]
+    ]
+  },
+  "delegation": "Fresh-context thread limit; local parent fallback, no independent worker review."
+}

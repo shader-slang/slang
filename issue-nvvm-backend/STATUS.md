@@ -15,12 +15,20 @@ All 336 cases replayed from [research 219](semantic-evidence.slice-219.json) mat
 independent integer oracle: 112 per mode, 75, 852 active doubles and 74, 676 inactive double sentinels.
 The earlier FP32 findings from research 215/217 remain covered by their accepted216/218 fixes.
 
-**Next action: bounded research 222 checks the observed unsigned firstbithigh behavior.** The first
-new-fixture draft showed CUDA `U32_firstbithigh` complements words with bit31 set, producing unexpected
-partition endpoints. Isolate scalar/vector uint and uint64 boundary cases with independent expected
-indices, compare NVRTC/NVVM and inspect source helpers before selecting a fix. Retain the initial
-221 fixture/diagnostic evidence; no established corpus oracle was changed. Do not fold prefix, quad
-or vector-by-value support into this investigation. Material runtime still needs its input contract.
+**Research 222 is accepted: CUDA unsigned32 firstbithigh applies signed behavior.** Read the
+[report](report.slice-222-firstbithigh-research.md), [plan](plan.slice-222-firstbithigh-research.md) and
+[evidence](semantic-evidence.slice-222.json). Across 96 unique 32-bit and 192 unique 64-bit inputs,
+NVRTC has 24 wrong unsigned32 scalar/vector words; all signed32/64 and unsigned64 cases and both direct
+modes pass. The CUDA prelude is byte-identical to full 220, so the behavior predates 221. This finding
+is separate from the 51 registered failures. Research changes no production code or corpus contracts.
+
+**Next action: slice 223 fixes the CUDA32 helper signedness split.** Move the negative-input complement
+from U32_firstbithigh into I32_firstbithigh, preserving the unsigned zero sentinel and CLZ calculation.
+Add a dynamic signed/unsigned scalar/vector regression with independent expected indices, prove its
+NVRTC failure before the change, and replay the exact research 222 inputs/oracles. The shared prelude
+change requires a full frozen 452/discovery/material checkpoint before acceptance, regardless of cadence.
+Do not weaken any old oracle or change the direct provider, which already passes these cases.
+Material runtime still needs its input contract.
 No push is authorized. Fresh-context delegation remains at the app's agent-thread limit; local work
 uses WORKFLOW's fallback and does not imply independent worker review.
 
@@ -44,7 +52,7 @@ shape fields match220 exactly. There are no missing/extra/duplicate cells. All 5
 and100 old manifest rows are unchanged. Historical healthy denominators 427/72 stay fixed.
 All 53 prior first-known records survive: 51 open and2 newly resolved; four earlier resolved histories remain.
 
-Fresh221 gates: focused16/16, GPU smoke4/4, units478/478 plus one existing Windows-only skip, toolkit18/18,
+Fresh221 gates: focused16/16, GPU smoke 4/4, units478/478 plus one existing Windows-only skip, toolkit18/18,
 discovery contracts6/6, research 336/336 and material compile/assembly6/6. Frozen diagnostic mode returns
 zero for six retained preflight stops; discovery returns two for known failures. Structured outcomes
 decide acceptance. No material runtime correctness or performance claim is made.
@@ -74,6 +82,6 @@ Compiler SHA256 `55bd12f280ee51def87219c767557e198cbd07b9b99f06d118a20209dfb4659
 Provider unchanged `ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372`.
 Raw evidence: `build/nvvm-loop/slice-221-before` and `slice-221-after`, including unchanged-source
 research replay and the initial fixture/structural apparatus corrections. Parent verified 132 evidence
-references, 23 tested source hashes, 12artifact hashes and549 runtime input hashes.
+references, 23 tested source hashes, 12artifact hashes and 549 runtime input hashes.
 No GPU loss, driver change, reboot or push. Local parent review/acceptance follows the recorded
 fresh-context delegation limitation.
