@@ -19544,7 +19544,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T WaveClusteredSum(T value, uint clusterSize)
+public T WaveClusteredSum(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -19565,7 +19565,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T WaveClusteredProduct(T value, uint clusterSize)
+public T WaveClusteredProduct(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -19586,7 +19586,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T WaveClusteredMin(T value, uint clusterSize)
+public T WaveClusteredMin(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -19609,7 +19609,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T WaveClusteredMax(T value, uint clusterSize)
+public T WaveClusteredMax(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -19632,7 +19632,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T WaveClusteredBitAnd(T value, uint clusterSize)
+public T WaveClusteredBitAnd(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -19650,7 +19650,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T WaveClusteredBitOr(T value, uint clusterSize)
+public T WaveClusteredBitOr(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -19668,7 +19668,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T WaveClusteredBitXor(T value, uint clusterSize)
+public T WaveClusteredBitXor(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -19686,7 +19686,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> WaveClusteredSum(vector<T,N> value, uint clusterSize)
+public vector<T,N> WaveClusteredSum(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -19708,7 +19708,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> WaveClusteredProduct(vector<T,N> value, uint clusterSize)
+public vector<T,N> WaveClusteredProduct(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -19729,7 +19729,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> WaveClusteredMin(vector<T,N> value, uint clusterSize)
+public vector<T,N> WaveClusteredMin(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -19752,7 +19752,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> WaveClusteredMax(vector<T,N> value, uint clusterSize)
+public vector<T,N> WaveClusteredMax(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -19775,7 +19775,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> WaveClusteredBitAnd(vector<T,N> value, uint clusterSize)
+public vector<T,N> WaveClusteredBitAnd(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -19793,7 +19793,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> WaveClusteredBitOr(vector<T,N> value, uint clusterSize)
+public vector<T,N> WaveClusteredBitOr(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -19811,7 +19811,7 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> WaveClusteredBitXor(vector<T,N> value, uint clusterSize)
+public vector<T,N> WaveClusteredBitXor(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch

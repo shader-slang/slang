@@ -8708,7 +8708,7 @@ public vector<T,N> subgroupShuffleDown(vector<T,N> value, uint delta)
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredAdd(T value, uint clusterSize)
+public T subgroupClusteredAdd(T value, constexpr uint clusterSize)
 {
     return WaveClusteredSum(value, clusterSize);
 }
@@ -8716,7 +8716,7 @@ public T subgroupClusteredAdd(T value, uint clusterSize)
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredMul(T value, uint clusterSize)
+public T subgroupClusteredMul(T value, constexpr uint clusterSize)
 {
     return WaveClusteredProduct(value, clusterSize);
 }
@@ -8724,7 +8724,7 @@ public T subgroupClusteredMul(T value, uint clusterSize)
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredMin(T value, uint clusterSize)
+public T subgroupClusteredMin(T value, constexpr uint clusterSize)
 {
     return WaveClusteredMin(value, clusterSize);
 }
@@ -8732,7 +8732,7 @@ public T subgroupClusteredMin(T value, uint clusterSize)
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredMax(T value, uint clusterSize)
+public T subgroupClusteredMax(T value, constexpr uint clusterSize)
 {
     return WaveClusteredMax(value, clusterSize);
 }
@@ -8740,7 +8740,7 @@ public T subgroupClusteredMax(T value, uint clusterSize)
 __generic<T : __BuiltinLogicalType>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredAnd(T value, uint clusterSize)
+public T subgroupClusteredAnd(T value, constexpr uint clusterSize)
 {
     return WaveClusteredBitAnd(value, clusterSize);
 }
@@ -8748,7 +8748,7 @@ public T subgroupClusteredAnd(T value, uint clusterSize)
 __generic<T : __BuiltinLogicalType>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredOr(T value, uint clusterSize)
+public T subgroupClusteredOr(T value, constexpr uint clusterSize)
 {
     return WaveClusteredBitOr(value, clusterSize);
 }
@@ -8758,7 +8758,7 @@ public T subgroupClusteredOr(T value, uint clusterSize)
 __generic<T : __BuiltinLogicalType>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredXor(T value, uint clusterSize)
+public T subgroupClusteredXor(T value, constexpr uint clusterSize)
 {
     return WaveClusteredBitXor(value, clusterSize);
 }
@@ -8768,7 +8768,7 @@ public T subgroupClusteredXor(T value, uint clusterSize)
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredAdd(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredAdd(vector<T,N> value, constexpr uint clusterSize)
 {
     return WaveClusteredSum(value, clusterSize);
 }
@@ -8776,7 +8776,7 @@ public vector<T,N> subgroupClusteredAdd(vector<T,N> value, uint clusterSize)
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredMul(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredMul(vector<T,N> value, constexpr uint clusterSize)
 {
     return WaveClusteredProduct(value, clusterSize);
 }
@@ -8784,7 +8784,7 @@ public vector<T,N> subgroupClusteredMul(vector<T,N> value, uint clusterSize)
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredMin(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredMin(vector<T,N> value, constexpr uint clusterSize)
 {
     return WaveClusteredMin(value, clusterSize);
 }
@@ -8792,7 +8792,7 @@ public vector<T,N> subgroupClusteredMin(vector<T,N> value, uint clusterSize)
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredMax(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredMax(vector<T,N> value, constexpr uint clusterSize)
 {
     return WaveClusteredMax(value, clusterSize);
 }
@@ -8800,7 +8800,7 @@ public vector<T,N> subgroupClusteredMax(vector<T,N> value, uint clusterSize)
 __generic<T : __BuiltinLogicalType, let N : int>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredAnd(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredAnd(vector<T,N> value, constexpr uint clusterSize)
 {
     return WaveClusteredBitAnd(value, clusterSize);
 }
@@ -8808,7 +8808,7 @@ public vector<T,N> subgroupClusteredAnd(vector<T,N> value, uint clusterSize)
 __generic<T : __BuiltinLogicalType, let N : int>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredOr(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredOr(vector<T,N> value, constexpr uint clusterSize)
 {
     return WaveClusteredBitOr(value, clusterSize);
 }
@@ -8816,7 +8816,7 @@ public vector<T,N> subgroupClusteredOr(vector<T,N> value, uint clusterSize)
 __generic<T : __BuiltinLogicalType, let N : int>
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredXor(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredXor(vector<T,N> value, constexpr uint clusterSize)
 {
     return WaveClusteredBitXor(value, clusterSize);
 }
