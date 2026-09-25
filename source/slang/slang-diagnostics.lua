@@ -1909,6 +1909,20 @@ warning(
     span { loc = "expr:Expr", message = "casting literal 0 to a struct type becomes a conversion in Slang 202c. To keep the current semantics, switch to a constructor with no parameters." }
 )
 
+warning(
+    "precision-loss-in-conversion",
+    30088,
+    "implicit conversion not recommended: precision loss",
+    span { loc = "expr:Expr", message = "precision loss in converting value '~value' to '~toType:Type'" }
+)
+
+warning(
+    "out-of-range-in-conversion",
+    30089,
+    "implicit conversion not recommended: value out of range",
+    span { loc = "expr:Expr", message = "value '~value' out of range in conversion to '~toType:Type'" }
+)
+
 -- try/throw diagnostics
 
 err(

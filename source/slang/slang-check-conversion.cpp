@@ -3,6 +3,8 @@
 #include "slang-check-impl.h"
 #include "slang-rich-diagnostics.h"
 
+#include <optional>
+
 // This file contains semantic-checking logic for dealing
 // with conversion (both implicit and explicit) of expressions
 // from one type to another.
@@ -2841,66 +2843,123 @@ bool SemanticsVisitor::_coerce(
         //
         if (outToExpr && site != CoercionSite::ExplicitCoercion)
         {
-            bool overflowWarningDetected = false;
-            bool isCoreModule = false;
-            if (auto module = getShared()->getModule())
-                if (auto moduleDecl = module->getModuleDecl())
-                    isCoreModule = moduleDecl->hasModifier<FromCoreModuleModifier>();
+            bool suppressGeneralWarning = false;
 
-            // Cache the constant-fold result so both the overflow check and
-            // the UnrecommendedImplicitConversion check can reuse it.
-            ConstantIntVal* cachedFoldedVal = nullptr;
-            bool hasFolded = false;
-            auto getFoldedIntVal = [&]() -> ConstantIntVal*
+            // Check integer -> integer and integer -> float constant value conversions
+            if (cost < kConversionCost_Explicit && (getMaximumTypeBitSize(fromType) > 0) &&
+                (isFloatingPointType(toType) || isScalarNonBoolIntegerType(toType)))
             {
-                if (!hasFolded)
-                {
-                    cachedFoldedVal = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
+                // Check if we have a known integer value
+                std::optional<TypedIntegerLiteralValue> val{};
+
+                if (auto litNode = as<IntegerLiteralExpr>(fromExpr))
+                    val = TypedIntegerLiteralValue(*litNode);
+                else if (
+                    auto valNode = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
                         fromExpr,
                         ConstantFoldingKind::CompileTime,
-                        nullptr));
-                    hasFolded = true;
-                }
-                return cachedFoldedVal;
-            };
+                        nullptr)))
+                    val = TypedIntegerLiteralValue(*valNode);
 
-            int maxBitSize = getMaximumTypeBitSize(toType);
-            if (!isCoreModule && maxBitSize > 0 && cost < kConversionCost_Explicit)
-            {
-                if (auto val = getFoldedIntVal())
+                if (val)
                 {
-                    IntegerLiteralValue v = val->getValue();
-                    bool overflow = false;
-                    if (v < 0)
+                    // if we have a known integer constant value, we're handling
+                    // all the implicit conversion checks here
+                    suppressGeneralWarning = true;
+
+                    // overflow check
+                    if (!isIntValueInRangeOfType(*val, toType))
                     {
-                        // Two's complement minimum for N bits is -(2^(N-1)).
-                        // For 64-bit targets, any int64_t value fits by definition.
-                        if (maxBitSize < 64)
+                        if (isScalarNonBoolIntegerType(toType))
                         {
-                            int64_t minValue = -(INT64_C(1) << (maxBitSize - 1));
-                            overflow = v < minValue;
+                            // We have a general integer overflow. However, we'll still allow an
+                            // implicit conversion without a warning for things like:
+                            //
+                            // int8_t x = 0xFF; // technically, 0xFF == 255 and it won't fit in
+                            // int8_t uint8_t y = ~3;  // technically, ~3 == 0xFFFFFFFC, but the
+                            // intention is clearly just 0xFC
+                            //
+                            // Also, we always allow -1 to be converted to an integer (all bits set
+                            // idiom)
+
+                            // special case: -1
+                            if (val->isSignedType() && (val->getSignedValue() == -1))
+                            {
+                                // intentionally empty
+                            }
+                            // overflow is still allowed if the value is from non-decimal-base
+                            // origin AND it fits within the type (ignoring signedness)
+                            else if (val->isBitwiseValue())
+                            {
+                                if (val->toSignedType().getMinimumBitWidth() >
+                                    getMaximumTypeBitSize(toType))
+                                {
+                                    // bin/oct/hex base, so we report the overflowing number in the
+                                    // target signedness
+                                    if (isSigned(toType))
+                                    {
+                                        if (sink)
+                                            sink->diagnose(Diagnostics::IntegerConstantOverflow{
+                                                .value =
+                                                    String(val->toSignedType().getSignedValue()),
+                                                .toType = toType,
+                                                .expr = fromExpr});
+                                    }
+                                    else
+                                    {
+                                        // Truncate the value based on the source type bit width
+                                        // for better diagnostics. Constant folding may set excess
+                                        // high bits in the value after expressions such as ~300U.
+                                        const int sourceTypeBitWidth{
+                                            getMaximumTypeBitSize(fromType)};
+
+                                        uint64_t mask = ~uint64_t{0};
+                                        if (sourceTypeBitWidth >= 1 && sourceTypeBitWidth <= 63)
+                                            mask = (uint64_t{1} << sourceTypeBitWidth) - 1U;
+
+                                        if (sink)
+                                            sink->diagnose(Diagnostics::IntegerConstantOverflow{
+                                                .value = String(
+                                                    val->toUnsignedType().getUnsignedValue() &
+                                                    mask),
+                                                .toType = toType,
+                                                .expr = fromExpr});
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // decimal base
+                                if (sink)
+                                    sink->diagnose(Diagnostics::IntegerConstantOverflow{
+                                        .value = val->isSignedType()
+                                                     ? String(val->getSignedValue())
+                                                     : String(val->getUnsignedValue()),
+                                        .toType = toType,
+                                        .expr = fromExpr});
+                            }
+                        }
+                        else
+                        {
+                            if (sink)
+                                sink->diagnose(Diagnostics::OutOfRangeInConversion{
+                                    .value = val->isSignedType() ? String(val->getSignedValue())
+                                                                 : String(val->getUnsignedValue()),
+                                    .toType = toType,
+                                    .expr = fromExpr});
                         }
                     }
-                    else
+                    // int -> float precision check
+                    else if (
+                        isFloatingPointType(toType) &&
+                        !isIntValuePreciselyRepresentableByFloatingPointType(*val, toType))
                     {
-                        // Positive: bit-width comparison to avoid false positives
-                        // on hex bit-pattern idioms like int x = 0xFF030206.
-                        overflow = getIntValueBitSize(v) > maxBitSize;
-                    }
-
-                    if (overflow)
-                    {
-                        // Set even when sink is null so that the
-                        // UnrecommendedImplicitConversion path below is
-                        // consistently suppressed for overflow cases.
-                        overflowWarningDetected = true;
                         if (sink)
-                        {
-                            sink->diagnose(Diagnostics::IntegerConstantOverflow{
-                                .value = String(val->getValue()),
+                            sink->diagnose(Diagnostics::PrecisionLossInConversion{
+                                .value = val->isSignedType() ? String(val->getSignedValue())
+                                                             : String(val->getUnsignedValue()),
                                 .toType = toType,
                                 .expr = fromExpr});
-                        }
                     }
                 }
             }
@@ -2937,22 +2996,11 @@ bool SemanticsVisitor::_coerce(
                 }
             }
             // For general implicit conversions with high cost, emit a warning
-            // unless the value is a known constant within the target type's
-            // range. Skip if the overflow check already covered this case.
-            else if (cost >= kConversionCost_Default && !overflowWarningDetected)
+            // unless the conversion has been previously determined acceptable
+            // or diagnosed.
+            else if (cost >= kConversionCost_Default && !suppressGeneralWarning)
             {
-                bool shouldEmitGeneralWarning = true;
-                if (isScalarIntegerType(toType) || isHalfType(toType))
-                {
-                    if (auto val = getFoldedIntVal())
-                    {
-                        if (isIntValueInRangeOfType(val->getValue(), toType))
-                        {
-                            shouldEmitGeneralWarning = false;
-                        }
-                    }
-                }
-                if (shouldEmitGeneralWarning && sink)
+                if (sink)
                 {
                     sink->diagnose(Diagnostics::UnrecommendedImplicitConversion{
                         .fromType = fromType.type,
