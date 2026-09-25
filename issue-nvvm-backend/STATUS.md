@@ -4,26 +4,35 @@ Updated 2026-09-25. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
-**Slice 231 is accepted.** Read the
-[completed plan](plan.slice-231-i64-minmax.md), [five-part report](report.slice-231-i64-minmax.md)
-and [targeted validation](runtime-validation.slice-231.json).
-The bounded emitter extension admits signed/unsigned 64-bit masked MIN/MAX reductions and
-inclusive/exclusive prefixes through the existing scalar and aggregate leaf recipes. Provider,
-ABI 36, aggregate classification, frontend and ordinary shuffle policies are unchanged.
+**Slice 232 research is accepted.** Read the
+[completed plan](plan.slice-232-fp16-minmax.md), [five-part report](report.slice-232-fp16-minmax.md)
+and [semantic evidence](semantic-evidence.slice-232.json). Production and registered results are
+unchanged. [Slice 231 targeted acceptance](runtime-validation.slice-231.json) remains authoritative.
 
-**Next action: research FP16 masked MIN/MAX semantics and contracts.** Four original direct O0/O3 cells now reject
-`_wavePrefixExclusiveMin/Max(($1).x, $0)` with signature `half(half, vector<uint,4>)` as E52017.
-Their classifications, return codes, execution counts and canonical_shape fields are unchanged;
-only diagnostics advance. They are not resolved runtime cells. No FP16 implementation begins here.
-Matrix prefixes still reject CUDA capability with E36100/E36107 before emission.
+**Next action: a bounded FP16 MIN/MAX emitter implementation based on this contract.** The source
+uses ordered raw half compare/select and finite exclusive seeds `0x7bff`/`0xfbff`, not infinities.
+Admit only FP16 reductions and inclusive/exclusive prefixes through existing scalar/aggregate leaf
+recipes. Half read/compare/SELECT/constants already pass source and direct controls; numeric half
+MIN/MAX descriptors remain excluded. Replay unchanged research inputs/expectations at direct O0/O3
+and preserve neighboring operation/capability boundaries. No implementation starts in slice 232.
+The four original frozen prefix cells remain E52017 failures; matrix prefixes remain E36100/E36107.
 
 Latest accepted implementation and targeted acceptance: 231. Latest full checkpoint: 229.
-Implementation slices since full: one. Accepted research 230 supplies this slice's mathematical
-source contract. Rolling feature history: 227 FP64 prefixes, 229 narrow integer MIN/MAX and
-231 64-bit integer MIN/MAX. Research-backed runtime support takes priority while the material
+Implementation slices since full: one. Research 232 does not advance cadence. Rolling feature
+history: 227 FP64 prefixes, 229 narrow integer MIN/MAX, 231 64-bit integer MIN/MAX; research232
+establishes the next FP16 contract. Research-backed correctness takes priority while the material
 application contract is absent; reconsider material work each slice. No push is authorized.
 
 ## Checkpoints and evidence
+
+- [Research 232](semantic-evidence.slice-232.json): 5,912 exact GPU launches (1,478 source family,
+  4,434 source/direct controls), 6,053,888 output words; 40 direct E52017 rejections, 12 matrix-prefix
+  capability rejections, four PTX assemblies and fresh smoke4. Each mode uses 69 structured patterns
+  under 14 masks plus 512 full-mask batches covering every binary16 encoding among lane/components.
+  This is not exhaustive tuples or mask/caller combinations. All 29 source, 12 artifact and 554
+  registered input hashes remain unchanged. Registered/unit/toolkit/material evidence below is
+  inherited explicitly. Source/diagnostic/IR/binary evidence lives under
+  `build/nvvm-loop/slice-232-fp16-minmax`; no provider/ABI or corpus changes.
 
 - [Full checkpoint 229](runtime-validation.slice-229.json): 1,671 cells, 1,620 correct and 51 known
   failures; six resolved histories. Frozen 452 identities/1,356 cells and discovery 105/315.
@@ -58,8 +67,8 @@ part of the result ledger; no baseline reset or expected-output reduction is per
 
 ## Unresolved failures and limitations
 
-- FP16 masked MIN/MAX prefixes now form the next frozen diagnostic boundary; separate semantics
-  and provider/recipe contracts are required before proposing another bounded implementation.
+- FP16 masked MIN/MAX prefixes remain the next frozen diagnostic boundary. Research232 establishes
+  the ordered source/finite-seed contract; implementation and direct family runtime proof remain.
 - Arithmetic/bitwise families, matrix prefix capability, quad reconvergence, ordinary FP64
   vector-by-value shuffles and resource-bearing contexts remain separate.
 - Hardware masks remain scheduling-dependent; logical active-mask synthesis is unchanged.
@@ -90,3 +99,13 @@ All final source/artifact/input hashes were rechecked after the gates. Raw evide
 Parent acceptance verified 525 unique evidence references, 29 source and 12 artifact hashes, all
 554 current inputs, exact fresh/inherited census outcomes, full failure histories and all 12,768
 semantic replay launches.
+
+Research232 tested unchanged accepted base `94209dfd6a3dc1a7ac729c0c0a928a598d570d58` in both
+source revision fields. No rebuild occurred. Fresh controls preserve all binary16 input encodings,
+including signaling NaNs. Smoke passed after the already-started sequential research suite; the
+workflow ordering deviation and one auxiliary Python extraction error are retained in the report.
+No shader fixture failure, existing-operation mismatch, device loss or system change occurred.
+
+Parent acceptance of research 232 verified 130 unique compact evidence references and all 17,736
+raw launch binaries. An independent integer-unit binary16 oracle reconstructed every input and
+expected output and matched all 5,912 GPU launches. Source/artifact/input identities remain unchanged.

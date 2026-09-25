@@ -1,0 +1,2337 @@
+{
+  "schema": 1,
+  "slice": 232,
+  "status": "accepted-research",
+  "date_utc": "2026-09-25",
+  "scope": "FP16 masked MIN/MAX reductions and inclusive/exclusive prefix source contract, with exact raw binary16 oracle and existing typed half controls. No compiler/provider/corpus changes.",
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-231.json",
+    "sha256": "007edbb7a267ebe57e7b4b65195cd1fcd03de792140bbef97f664d54748cfad2"
+  },
+  "provenance": {
+    "configuration": "RelWithDebInfo",
+    "target_architecture": 80,
+    "provider_abi": 36,
+    "toolkit": {
+      "path": "/usr/local/cuda-12.9",
+      "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_May_27_02:21:03_PDT_2025\nCuda compilation tools, release 12.9, V12.9.86\nBuild cuda_12.9.r12.9/compiler.36037853_0"
+    },
+    "toolkit_libraries": {
+      "required_libnvvm": "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0",
+      "required_nvrtc": "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86",
+      "libnvvm_sha256": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "nvrtc_sha256": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+    },
+    "device": {
+      "name": "NVIDIA L4",
+      "ordinal": 0,
+      "visible_device_count": 1,
+      "compute_capability": 89,
+      "driver_api_version": 13000,
+      "cuda_visible_devices": null
+    },
+    "submodule_pins": [
+      " 9dc178a86fcbbf13c94b4cd4cb046f238d26c8da external/WindowsToolchain (v0.12.0-9-g9dc178a)",
+      " 924936d0427cb25a61169739a7660230bffa6ea6 external/cmark (swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-09-15-a)",
+      " e0b53eaf63c6d00e0725788ef1dbb759aa321d79 external/fast_float (v6.1.0-352-ge0b53ea)",
+      " efec5db081e3aad807d0731e172ac597f6a39447 external/glm (0.9.5.3-2723-gefec5db0)",
+      " d1f52c8993a501bd52d4fbd044bfeb9ecdceb9f4 external/glslang (11.1.0-1385-gd1f52c89)",
+      " 8936b58fe26e8c3da834b8f60b06511d537b4c63 external/imgui (v1.62-5420-g8936b58fe)",
+      " 3fe7be956f23385aa1950dc31e2f25127ccfc0ea external/lua (v5.4-beta-333-g3fe7be95)",
+      " 7f71be01f2c6f6b2c3cddb67eef8c38eab12ffd4 external/lz4 (v1.9.2-1351-g7f71be01)",
+      " a63bd172ddcba73a3d87ca32032b66ad41ddb9a6 external/metal-cpp (remotes/origin/metal-cpp_macOS14.2_iOS17.2)",
+      " 8c532c32c3c96e5ba1f2283e032f69ead8add00f external/mimalloc (v2.1.7)",
+      " 6ef6c68f4fcbb8287aa8edf9c6670804932f41c6 external/miniz (3.0.2-68-g6ef6c68)",
+      " a1280c1863ff19d87f8e827468a4cc906ba9032a external/optix-dev (v9.0.0-1-ga1280c1)",
+      " d6d31411a3ab5417945daa6b1d8811cfc340cb66 external/slang-rhi (d6d31411)",
+      " 29981f65241605e08b0ede4cfeb999fe3b723c6a external/spirv-headers (1.5.4.raytracing.fixed-498-g29981f6)",
+      " 0d6fd73ca73830ccab5fa1f00ed5ed40124e2c55 external/spirv-tools (v2022.4-1300-g0d6fd73c)",
+      " d541711a794343de4ef5ea76f037c9fb9c127a55 external/tinyobjloader (v1.0.6-85-gd541711)",
+      " 73f3cbb237e84d483afafc743f1f14ec53e12314 external/unordered_dense (v4.5.0)",
+      " 387259ecf4b0fe0cfac161b1d0b0a74e42796710 external/vulkan (v1.4.347)"
+    ],
+    "tested_source_sha256": {
+      "source/slang/slang-emit-nvvm.cpp": "208c23ec22c680e2d026aad408fe192aa29952c8153fc3f99c902032fdfbd5c7",
+      "source/slang/hlsl.meta.slang": "3ab28ee36df1e5d5bd42d0d3b9ca414e74477e1d33f498bf16e59ac4061ce92e",
+      "prelude/slang-cuda-prelude.h": "35234d28dc1a168b5956c50ef4ea56c33aad1cc0fe398b796335156bcc665f1b",
+      "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "90ed3600a329edcc060e3da49cafcbc1a87a0135061fdd1460928bc256d427b5",
+      "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "acce3c9b3cf627ee8ad41ad8042e0907fad59538e46a74cb215c63a29328addf",
+      "tools/slang-unit-test/unit-test-nvvm-support.h": "0e53a270ea7200bc451362bb6f0d2f072ba08dedd430a64631458c9b2312425c",
+      "tests/cuda/nvvm-fp64-implicit-shuffle.slang": "e6ed61a825021727de23baf36b6b360c1fbb329ca4b7987b39a8c071d3448616",
+      "issue-nvvm-backend/discovery-corpus.manifest.tsv": "382604ab5fdc1acb045b892a930bf89d4baa6cd6541731de2e0aa3e7e83858ae",
+      "issue-nvvm-backend/selection.slice-208-frozen.tsv": "f6d4ac7a1b3a9f982512287d87dcd77a4f75cfb0e2f819b343da312d8006ffd0",
+      "issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+      "issue-nvvm-backend/complex-test-server.py": "b173839cb958fdcf26c3b57ea3dec09cf26868e3e397f12cf04e5c21c01781e8",
+      "issue-nvvm-backend/test-run-complex-corpus.py": "6e2c88094334856c66c4d56bce50d17b553d4dea2858351808d2c911e0d58972",
+      "tools/test-server/test-server-main.cpp": "b82d0f813a560837b008de72fdaaf011b428396ec78800f4e0bb43cb4feef7de",
+      "source/compiler-core/slang-test-server-protocol.h": "c0ff0e415c4106b9ca799d5ee19f43023e22bc576674de8ef7eab43e17fbbb23",
+      "source/compiler-core/slang-test-server-protocol.cpp": "27e4679da25f4ff5fd245dc027d0b19c167a0bb4781c218ab7031303f5542855",
+      "tests/cuda/nvvm-fp32-singleton-minmax.slang": "d838cc70fe2e4d88bb2b127be48304fce74219bfd6319d25122a8e84815fe381",
+      "tests/cuda/nvvm-fp64-wave-edges.slang": "2df2ac1b0f7d50111154cea0f0c0a2752e125c5f117a1d97cdcb1ddf410fd0e2",
+      "tests/cuda/nvvm-fp32-minmax-order.slang": "a4c91ebc19acbafcf8f6e21ef10eb314c5df7525de1f969e78cd0b52fac976e6",
+      "issue-nvvm-backend/run-compute-census.py": "d464fab86c35e23b38dca664d722a4e79a664ee544da190c669ca51645491113",
+      "issue-nvvm-backend/run-compute-discovery.py": "6bdefee0b8001f4fbb12d89bb20f10912694ed24daa37ba1b4305a4154e75cb9",
+      "issue-nvvm-backend/test-run-compute-discovery.py": "ae59e7775eb77b00e286389a4c3ef34450fbe1f1ee988f500b0a55626d15b1d5",
+      "issue-nvvm-backend/census.slice-195.tsv": "77d335cdb66a54b83cefba9cca90c209ee29ec5d801294a169a244acc0398690",
+      "tests/cuda/nvvm-fp64-minmax-order.slang": "53264fe384c92fdf42261565f4b08049a565d2a1e0c8946c0b7424192da321c1",
+      "tests/cuda/nvvm-firstbithigh-signedness.slang": "a583484d66ab55583d6a71fe4dc056ec3eb2208cfe12c6046db25cd66c033d1b",
+      "source/slang/slang-emit-nvvm-type-lowering.cpp": "98224558c7b89eb56f2de3f1c32e54fe4b9794def404977286751a7e23319cd9",
+      "tests/cuda/nvvm-copyable-kernel-context.slang": "60d1c5d9e4655c13dd63b8074d190eb7f1ec9078dc683f8c060403a8edabd641",
+      "tests/cuda/nvvm-fp64-prefix-minmax-order.slang": "40b2dd221653c28f3cfb39de69705994ebc275d545baa5d48c6ae5087c6bd740",
+      "tests/cuda/nvvm-narrow-masked-minmax.slang": "a58e2734299fcaf8dad0c7189ec2f903204f6be85161245a10439e38aa9a0526",
+      "tests/cuda/nvvm-i64-masked-minmax.slang": "1f477c49033415ba8f069d7a216c9207170c9bbf8ea1d9dc1d0be3174dc8eab2"
+    },
+    "artifact_sha256": {
+      "build/RelWithDebInfo/bin/slangc": "79f46ef0dba116bdfdce8a03b40f7d3bb2c7b481529b452b483d650cf0958e43",
+      "build/RelWithDebInfo/bin/slang-test": "9c83731b05689bbdbd15956198ad10759e4e9142bd663fe2452fda4954d96a69",
+      "build/RelWithDebInfo/bin/test-server": "fd964f03c3c57b4352ce75f720706fdc852e3a0cd231b90cb0c89068190b827e",
+      "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372",
+      "build/RelWithDebInfo/lib/libslang-compiler.so": "948d300ec9f21f9000d242fcd83ee109a97ec63e1a768511553bc64c35b21c08",
+      "build/RelWithDebInfo/lib/slang-core-module.bin": "264e5d895e3cfd0ee34dedc84c9ea3e74a25e37e33bece7f877fbf53acd75708",
+      "build/RelWithDebInfo/lib/librender-test-tool.so": "96baec31673b6f33a619eb7cc8fd7a518942da12d9374718f475b84cc94ccbc4",
+      "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "e3083388dcdff0e879f480f80d2a2a5b6620bdca3a3fc4658ffa66de73664d71",
+      "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "/usr/local/cuda-12.9/lib64/libnvrtc.so": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a",
+      "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+      "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461"
+    },
+    "source_revision": "94209dfd6a3dc1a7ac729c0c0a928a598d570d58",
+    "source_commit": "94209dfd6a3dc1a7ac729c0c0a928a598d570d58",
+    "branch": "nvvm-backend",
+    "source_changes": "None; research documentation only; no rebuild",
+    "identity_before": {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/identity-before.json",
+      "sha256": "2d214e89d2832fdacae8d97eade2c275ed4c341cfa93002382a3eb80046220e7"
+    },
+    "identity_after": {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/identity-after.json",
+      "sha256": "2d214e89d2832fdacae8d97eade2c275ed4c341cfa93002382a3eb80046220e7"
+    },
+    "additional_inspected_source_sha256": {
+      "source/compiler-core/slang-nvvm-semantic-catalog.h": "195553feae05daf819a3a7043c3e8434340ee4f3dc6bc75439fcfe3cb4d579ef",
+      "/usr/local/cuda-12.9/include/cuda_fp16.hpp": "fde30e47cde30421a3513a2cf90c6d612e4f95a98dbf7a8e415ce3910f7f3d21",
+      "/usr/local/cuda-12.9/include/cuda_fp16.h": "75c55c11dda25cc4807266b7bb155a149cc22a6ede8a6c2594c1d268897dcb24"
+    }
+  },
+  "raw_results": {
+    "path": "build/nvvm-loop/slice-232-fp16-minmax/results.json",
+    "sha256": "5dd51ec744386b56b50c81988393d107ca48c6c86cb06c13346ff5f1fd2acc2e"
+  },
+  "raw_inputs": {
+    "path": "build/nvvm-loop/slice-232-fp16-minmax/inputs.json",
+    "sha256": "55ae45c00a997fb25e1d4dcc9a8c4602d70c19a6c143fc7a8390d38ecf12d74c"
+  },
+  "probe": {
+    "path": "build/nvvm-loop/slice-232-fp16-minmax/probe.py",
+    "sha256": "04ebb3b3b750b5b9e9188d3d005b9440b7cad5ee52b9c9d74db20c18770918e3"
+  },
+  "auxiliary_probe": {
+    "path": "build/nvvm-loop/slice-232-fp16-minmax/extra-probes.py",
+    "sha256": "8776882436be07e2d0ea6889db736dbe94e495a84162fda609cf7d9802f9d947"
+  },
+  "driver_scaffolding_dependencies": [
+    {
+      "path": "build/nvvm-loop/slice-230-i64-minmax/probe.py",
+      "sha256": "63bddf0a87d03c0ffa5418757e7bb480a067a665948eff4ba7ccbb71ada7f70d"
+    },
+    {
+      "path": "build/nvvm-loop/slice-226-prefix/probe.py",
+      "sha256": "a4896948c493c10d6771fdc9d15be1bd8e6d138c3a163b1be068ab1b65231b93"
+    }
+  ],
+  "raw_launch_artifacts": {
+    "path": "build/nvvm-loop/slice-232-fp16-minmax/raw-launch-artifacts.json",
+    "sha256": "161ecdb306fc526512f1a6e88b3e25fe51fef330e7a62ada54aedeb428fd2c91"
+  },
+  "raw_launch_layout": "launches/{id}.input.bin, .expected.bin, .output.bin; little-endian uint32 words. Input and full output contain 192 header/input words followed by 32 * component-count result words. expected contains only results. results.json per-launch actual_sha256 hashes output after 192 words; artifact manifest additionally hashes complete output files.",
+  "catalog": {
+    "path": "build/nvvm-loop/slice-232-fp16-minmax/catalog.json",
+    "sha256": "a9f93469a6dd60005c897536371b4f01db57d808d387fe8c7723045a776cf59e"
+  },
+  "fresh_research": {
+    "runtime_launches": 5912,
+    "correct_launches": 5912,
+    "minmax_source_launches": 1478,
+    "typed_control_launches": 4434,
+    "total_output_u32_words": 6053888,
+    "active_u32_words": 3395456,
+    "inactive_u32_sentinels": 2658432,
+    "input_buffers_unchanged": true,
+    "input_region_u32_words_per_launch": 192,
+    "raw_launch_binary_count": 17736,
+    "groups": [
+      {
+        "family": "control",
+        "mode": "nvrtc-o3",
+        "launches": 1478,
+        "correct": 1478,
+        "active_words": 689702,
+        "inactive_words": 539994
+      },
+      {
+        "family": "control",
+        "mode": "nvvm-o0",
+        "launches": 1478,
+        "correct": 1478,
+        "active_words": 689702,
+        "inactive_words": 539994
+      },
+      {
+        "family": "control",
+        "mode": "nvvm-o3",
+        "launches": 1478,
+        "correct": 1478,
+        "active_words": 689702,
+        "inactive_words": 539994
+      },
+      {
+        "family": "minmax",
+        "mode": "nvrtc-o3",
+        "launches": 1478,
+        "correct": 1478,
+        "active_words": 1326350,
+        "inactive_words": 1038450
+      }
+    ],
+    "missing_cases": [],
+    "duplicate_cases": [],
+    "extra_cases": [],
+    "masks": {
+      "full": 4294967295,
+      "low2": 3,
+      "low4": 15,
+      "low8": 255,
+      "low16": 65535,
+      "low15": 32767,
+      "high16": 4294901760,
+      "high17": 4294934528,
+      "even": 1431655765,
+      "odd": 2863311530,
+      "sparse-extremes": 2147483649,
+      "singleton0": 1,
+      "singleton7": 128,
+      "singleton31": 2147483648
+    },
+    "structured_patterns_per_mask": 69,
+    "full_mask_additional_batches": 512,
+    "coverage": "All 65,536 binary16 encodings occur once among 32 lane x 4 component slots of 512 full-mask batches per family/mode. Other 13 masks use 69 structured patterns only. Not exhaustive tuples, mask combinations, scalar caller placements or comparisons.",
+    "patterns": "25 constants, 25 permutations, 10 repeated patterns, distinct NaNs, alternating signed zeros, seven isolated NaN placements; raw words in inputs.json.",
+    "minmax_output_order": [
+      [
+        "Exclusive",
+        "Min",
+        0,
+        1
+      ],
+      [
+        "Exclusive",
+        "Min",
+        0,
+        2
+      ],
+      [
+        "Exclusive",
+        "Min",
+        1,
+        2
+      ],
+      [
+        "Exclusive",
+        "Min",
+        0,
+        4
+      ],
+      [
+        "Exclusive",
+        "Min",
+        1,
+        4
+      ],
+      [
+        "Exclusive",
+        "Min",
+        2,
+        4
+      ],
+      [
+        "Exclusive",
+        "Min",
+        3,
+        4
+      ],
+      [
+        "Exclusive",
+        "Max",
+        0,
+        1
+      ],
+      [
+        "Exclusive",
+        "Max",
+        0,
+        2
+      ],
+      [
+        "Exclusive",
+        "Max",
+        1,
+        2
+      ],
+      [
+        "Exclusive",
+        "Max",
+        0,
+        4
+      ],
+      [
+        "Exclusive",
+        "Max",
+        1,
+        4
+      ],
+      [
+        "Exclusive",
+        "Max",
+        2,
+        4
+      ],
+      [
+        "Exclusive",
+        "Max",
+        3,
+        4
+      ],
+      [
+        "Inclusive",
+        "Min",
+        0,
+        1
+      ],
+      [
+        "Inclusive",
+        "Min",
+        0,
+        2
+      ],
+      [
+        "Inclusive",
+        "Min",
+        1,
+        2
+      ],
+      [
+        "Inclusive",
+        "Min",
+        0,
+        4
+      ],
+      [
+        "Inclusive",
+        "Min",
+        1,
+        4
+      ],
+      [
+        "Inclusive",
+        "Min",
+        2,
+        4
+      ],
+      [
+        "Inclusive",
+        "Min",
+        3,
+        4
+      ],
+      [
+        "Inclusive",
+        "Max",
+        0,
+        1
+      ],
+      [
+        "Inclusive",
+        "Max",
+        0,
+        2
+      ],
+      [
+        "Inclusive",
+        "Max",
+        1,
+        2
+      ],
+      [
+        "Inclusive",
+        "Max",
+        0,
+        4
+      ],
+      [
+        "Inclusive",
+        "Max",
+        1,
+        4
+      ],
+      [
+        "Inclusive",
+        "Max",
+        2,
+        4
+      ],
+      [
+        "Inclusive",
+        "Max",
+        3,
+        4
+      ],
+      [
+        "Reduction",
+        "Min",
+        0,
+        1
+      ],
+      [
+        "Reduction",
+        "Min",
+        0,
+        2
+      ],
+      [
+        "Reduction",
+        "Min",
+        1,
+        2
+      ],
+      [
+        "Reduction",
+        "Min",
+        0,
+        4
+      ],
+      [
+        "Reduction",
+        "Min",
+        1,
+        4
+      ],
+      [
+        "Reduction",
+        "Min",
+        2,
+        4
+      ],
+      [
+        "Reduction",
+        "Min",
+        3,
+        4
+      ],
+      [
+        "Reduction",
+        "Min",
+        0,
+        "matrix2x2"
+      ],
+      [
+        "Reduction",
+        "Min",
+        1,
+        "matrix2x2"
+      ],
+      [
+        "Reduction",
+        "Min",
+        2,
+        "matrix2x2"
+      ],
+      [
+        "Reduction",
+        "Min",
+        3,
+        "matrix2x2"
+      ],
+      [
+        "Reduction",
+        "Max",
+        0,
+        1
+      ],
+      [
+        "Reduction",
+        "Max",
+        0,
+        2
+      ],
+      [
+        "Reduction",
+        "Max",
+        1,
+        2
+      ],
+      [
+        "Reduction",
+        "Max",
+        0,
+        4
+      ],
+      [
+        "Reduction",
+        "Max",
+        1,
+        4
+      ],
+      [
+        "Reduction",
+        "Max",
+        2,
+        4
+      ],
+      [
+        "Reduction",
+        "Max",
+        3,
+        4
+      ],
+      [
+        "Reduction",
+        "Max",
+        0,
+        "matrix2x2"
+      ],
+      [
+        "Reduction",
+        "Max",
+        1,
+        "matrix2x2"
+      ],
+      [
+        "Reduction",
+        "Max",
+        2,
+        "matrix2x2"
+      ],
+      [
+        "Reduction",
+        "Max",
+        3,
+        "matrix2x2"
+      ]
+    ],
+    "control_output_order": [
+      [
+        "Identity",
+        0
+      ],
+      [
+        "Read",
+        0
+      ],
+      [
+        "OrderedMin",
+        0
+      ],
+      [
+        "OrderedMax",
+        0
+      ],
+      [
+        "Select",
+        0
+      ],
+      [
+        "Identity",
+        1
+      ],
+      [
+        "Read",
+        1
+      ],
+      [
+        "OrderedMin",
+        1
+      ],
+      [
+        "OrderedMax",
+        1
+      ],
+      [
+        "Select",
+        1
+      ],
+      [
+        "Identity",
+        2
+      ],
+      [
+        "Read",
+        2
+      ],
+      [
+        "OrderedMin",
+        2
+      ],
+      [
+        "OrderedMax",
+        2
+      ],
+      [
+        "Select",
+        2
+      ],
+      [
+        "Identity",
+        3
+      ],
+      [
+        "Read",
+        3
+      ],
+      [
+        "OrderedMin",
+        3
+      ],
+      [
+        "OrderedMax",
+        3
+      ],
+      [
+        "Select",
+        3
+      ],
+      [
+        "Constant",
+        31743
+      ],
+      [
+        "Constant",
+        64511
+      ],
+      [
+        "Constant",
+        0
+      ],
+      [
+        "Constant",
+        32768
+      ],
+      [
+        "Constant",
+        15360
+      ],
+      [
+        "Constant",
+        1024
+      ]
+    ],
+    "oracle": "Independently derived integer binary16 classification and sign/magnitude ordering; both zero signs equal, NaN comparisons false; select unchanged second operand on tie/unordered. Model explicit source butterfly/ascending original-input scan and separate prefix transmitted state. No host floating arithmetic or source-output expectations.",
+    "exclusive_initial_accumulator_bits": {
+      "Min": "7bff",
+      "Max": "fbff"
+    },
+    "seed_warning": "Finite source seeds are not neutral mathematical extrema for infinities. Low2 all positive infinity exclusive MIN returns 7bff for both callers; all negative infinity exclusive MAX returns fbff.",
+    "half_data_path": "Actual CUDA half overloads use ordered f16 comparisons, raw half2 packing/shuffle/low extraction and original-operand selection. PTX contains no f16<->f32 conversion; signaling/quiet NaN payloads and signs preserved in exercised source/control operations.",
+    "countermodels": {
+      "ascending-scan": {
+        "cases": 197,
+        "words": 102116,
+        "first": {
+          "id": "minmax-nvrtc-o3-full-permutation-00",
+          "index": 4,
+          "source": "fbff",
+          "alternative": "7e00"
+        }
+      },
+      "infinity-identity": {
+        "cases": 1478,
+        "words": 22792,
+        "first": {
+          "id": "minmax-nvrtc-o3-full-constant-0000",
+          "index": 0,
+          "source": "7bff",
+          "alternative": "7c00"
+        }
+      }
+    },
+    "hand_checks": {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/hand-checks.json",
+      "sha256": "ed241b6c92732863392144dad907d3c852834d38759f08ae25f234d1d53b0e04"
+    },
+    "ptx_instructions": {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/ptx-instructions.json",
+      "sha256": "53ad2531e2622864dc2516fe1dc8ae004f9527ef10b4047bb2130499a8716043"
+    },
+    "catalog_admitted_descriptors": 4,
+    "catalog_excluded_numeric_minmax_descriptors": 2,
+    "ptx_assemblies": 4
+  },
+  "direct_preflight": {
+    "requested": 40,
+    "rejected": 40,
+    "unexpected_successes": 0,
+    "cases": [
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-1.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-1-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMin(($1).x, $0), signature=half(half, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-1-nvvm-o0.ptx.log",
+        "style": "Exclusive",
+        "operation": "Min",
+        "shape": 1,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-1.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-1-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMin(($1).x, $0), signature=half(half, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-1-nvvm-o3.ptx.log",
+        "style": "Exclusive",
+        "operation": "Min",
+        "shape": 1,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-2-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMinMultiple(($1).x, $0), signature=vector<half,2>(vector<half,2>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-2-nvvm-o0.ptx.log",
+        "style": "Exclusive",
+        "operation": "Min",
+        "shape": 2,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-2-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMinMultiple(($1).x, $0), signature=vector<half,2>(vector<half,2>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-2-nvvm-o3.ptx.log",
+        "style": "Exclusive",
+        "operation": "Min",
+        "shape": 2,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-4.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-4-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMinMultiple(($1).x, $0), signature=vector<half,4>(vector<half,4>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-4-nvvm-o0.ptx.log",
+        "style": "Exclusive",
+        "operation": "Min",
+        "shape": 4,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-4.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-4-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMinMultiple(($1).x, $0), signature=vector<half,4>(vector<half,4>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-4-nvvm-o3.ptx.log",
+        "style": "Exclusive",
+        "operation": "Min",
+        "shape": 4,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-1.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-1-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMax(($1).x, $0), signature=half(half, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-1-nvvm-o0.ptx.log",
+        "style": "Exclusive",
+        "operation": "Max",
+        "shape": 1,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-1.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-1-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMax(($1).x, $0), signature=half(half, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-1-nvvm-o3.ptx.log",
+        "style": "Exclusive",
+        "operation": "Max",
+        "shape": 1,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-2-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMaxMultiple(($1).x, $0), signature=vector<half,2>(vector<half,2>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-2-nvvm-o0.ptx.log",
+        "style": "Exclusive",
+        "operation": "Max",
+        "shape": 2,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-2-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMaxMultiple(($1).x, $0), signature=vector<half,2>(vector<half,2>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-2-nvvm-o3.ptx.log",
+        "style": "Exclusive",
+        "operation": "Max",
+        "shape": 2,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-4.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-4-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMaxMultiple(($1).x, $0), signature=vector<half,4>(vector<half,4>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-4-nvvm-o0.ptx.log",
+        "style": "Exclusive",
+        "operation": "Max",
+        "shape": 4,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-4.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-4-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMaxMultiple(($1).x, $0), signature=vector<half,4>(vector<half,4>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-4-nvvm-o3.ptx.log",
+        "style": "Exclusive",
+        "operation": "Max",
+        "shape": 4,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-1.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-1-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMin(($1).x, $0), signature=half(half, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-1-nvvm-o0.ptx.log",
+        "style": "Inclusive",
+        "operation": "Min",
+        "shape": 1,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-1.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-1-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMin(($1).x, $0), signature=half(half, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-1-nvvm-o3.ptx.log",
+        "style": "Inclusive",
+        "operation": "Min",
+        "shape": 1,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-2-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMinMultiple(($1).x, $0), signature=vector<half,2>(vector<half,2>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-2-nvvm-o0.ptx.log",
+        "style": "Inclusive",
+        "operation": "Min",
+        "shape": 2,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-2-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMinMultiple(($1).x, $0), signature=vector<half,2>(vector<half,2>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-2-nvvm-o3.ptx.log",
+        "style": "Inclusive",
+        "operation": "Min",
+        "shape": 2,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-4.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-4-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMinMultiple(($1).x, $0), signature=vector<half,4>(vector<half,4>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-4-nvvm-o0.ptx.log",
+        "style": "Inclusive",
+        "operation": "Min",
+        "shape": 4,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-4.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-4-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMinMultiple(($1).x, $0), signature=vector<half,4>(vector<half,4>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-4-nvvm-o3.ptx.log",
+        "style": "Inclusive",
+        "operation": "Min",
+        "shape": 4,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-1.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-1-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMax(($1).x, $0), signature=half(half, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-1-nvvm-o0.ptx.log",
+        "style": "Inclusive",
+        "operation": "Max",
+        "shape": 1,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-1.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-1-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMax(($1).x, $0), signature=half(half, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-1-nvvm-o3.ptx.log",
+        "style": "Inclusive",
+        "operation": "Max",
+        "shape": 1,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-2-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMaxMultiple(($1).x, $0), signature=vector<half,2>(vector<half,2>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-2-nvvm-o0.ptx.log",
+        "style": "Inclusive",
+        "operation": "Max",
+        "shape": 2,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-2-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMaxMultiple(($1).x, $0), signature=vector<half,2>(vector<half,2>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-2-nvvm-o3.ptx.log",
+        "style": "Inclusive",
+        "operation": "Max",
+        "shape": 2,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-4.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-4-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMaxMultiple(($1).x, $0), signature=vector<half,4>(vector<half,4>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-4-nvvm-o0.ptx.log",
+        "style": "Inclusive",
+        "operation": "Max",
+        "shape": 4,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-4.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-4-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMaxMultiple(($1).x, $0), signature=vector<half,4>(vector<half,4>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-4-nvvm-o3.ptx.log",
+        "style": "Inclusive",
+        "operation": "Max",
+        "shape": 4,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-1.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-1-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMin($1.x, $0), signature=half(half, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-1-nvvm-o0.ptx.log",
+        "style": "Reduction",
+        "operation": "Min",
+        "shape": 1,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-1.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-1-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMin($1.x, $0), signature=half(half, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-1-nvvm-o3.ptx.log",
+        "style": "Reduction",
+        "operation": "Min",
+        "shape": 1,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-2-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMinMultiple($1.x, $0), signature=vector<half,2>(vector<half,2>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-2-nvvm-o0.ptx.log",
+        "style": "Reduction",
+        "operation": "Min",
+        "shape": 2,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-2-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMinMultiple($1.x, $0), signature=vector<half,2>(vector<half,2>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-2-nvvm-o3.ptx.log",
+        "style": "Reduction",
+        "operation": "Min",
+        "shape": 2,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-4.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-4-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMinMultiple($1.x, $0), signature=vector<half,4>(vector<half,4>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-4-nvvm-o0.ptx.log",
+        "style": "Reduction",
+        "operation": "Min",
+        "shape": 4,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-4.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-4-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMinMultiple($1.x, $0), signature=vector<half,4>(vector<half,4>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-4-nvvm-o3.ptx.log",
+        "style": "Reduction",
+        "operation": "Min",
+        "shape": 4,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-matrix2x2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-matrix2x2-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMinMultiple($1.x, $0), signature=Void(Array<vector<half,2>, 2>, vector<uint,4>, OutParam<Array<vector<half,2>, 2>>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-matrix2x2-nvvm-o0.ptx.log",
+        "style": "Reduction",
+        "operation": "Min",
+        "shape": "matrix2x2",
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-matrix2x2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-matrix2x2-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMinMultiple($1.x, $0), signature=Void(Array<vector<half,2>, 2>, vector<uint,4>, OutParam<Array<vector<half,2>, 2>>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-matrix2x2-nvvm-o3.ptx.log",
+        "style": "Reduction",
+        "operation": "Min",
+        "shape": "matrix2x2",
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-1.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-1-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMax($1.x, $0), signature=half(half, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-1-nvvm-o0.ptx.log",
+        "style": "Reduction",
+        "operation": "Max",
+        "shape": 1,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-1.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-1-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMax($1.x, $0), signature=half(half, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-1-nvvm-o3.ptx.log",
+        "style": "Reduction",
+        "operation": "Max",
+        "shape": 1,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-2-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMaxMultiple($1.x, $0), signature=vector<half,2>(vector<half,2>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-2-nvvm-o0.ptx.log",
+        "style": "Reduction",
+        "operation": "Max",
+        "shape": 2,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-2-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMaxMultiple($1.x, $0), signature=vector<half,2>(vector<half,2>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-2-nvvm-o3.ptx.log",
+        "style": "Reduction",
+        "operation": "Max",
+        "shape": 2,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-4.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-4-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMaxMultiple($1.x, $0), signature=vector<half,4>(vector<half,4>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-4-nvvm-o0.ptx.log",
+        "style": "Reduction",
+        "operation": "Max",
+        "shape": 4,
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-4.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-4-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMaxMultiple($1.x, $0), signature=vector<half,4>(vector<half,4>, vector<uint,4>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-4-nvvm-o3.ptx.log",
+        "style": "Reduction",
+        "operation": "Max",
+        "shape": 4,
+        "mode": "nvvm-o3"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-matrix2x2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-matrix2x2-nvvm-o0.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMaxMultiple($1.x, $0), signature=Void(Array<vector<half,2>, 2>, vector<uint,4>, OutParam<Array<vector<half,2>, 2>>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-matrix2x2-nvvm-o0.ptx.log",
+        "style": "Reduction",
+        "operation": "Max",
+        "shape": "matrix2x2",
+        "mode": "nvvm-o0"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-matrix2x2.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-matrix2x2-nvvm-o3.ptx"
+        ],
+        "return_code": 255,
+        "output_exists": false,
+        "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_waveMaxMultiple($1.x, $0), signature=Void(Array<vector<half,2>, 2>, vector<uint,4>, OutParam<Array<vector<half,2>, 2>>)'\n",
+        "log": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-matrix2x2-nvvm-o3.ptx.log",
+        "style": "Reduction",
+        "operation": "Max",
+        "shape": "matrix2x2",
+        "mode": "nvvm-o3"
+      }
+    ],
+    "ir_dump": {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-1-nvvm-o0.ir.log",
+      "sha256": "72a1c0b941a6347a7c16378f02cbc2f1f33eb1e913446c1bb7ff643e651626a3"
+    },
+    "diagnostic_logs_separate": true
+  },
+  "matrix_prefix": {
+    "cells": 12,
+    "rejected": 12,
+    "diagnostics": [
+      "E36100",
+      "E36107"
+    ],
+    "evidence": {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/matrix-prefix-results.json",
+      "sha256": "2e51a313f76f44c6bffa9b00f220bddbf2b879d9d6401c3a107c4fa2854970f4"
+    },
+    "claim": "Source capability boundary remains separate; no fix or direct matrix-prefix runtime claim."
+  },
+  "smoke": {
+    "passed": 4,
+    "executed": 4,
+    "result": {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/runtime/results.json",
+      "sha256": "007ac10b1eb479329a01b6b49b2ea87e7bbad028b605b852aafdad75079179d3"
+    },
+    "chronology": "Executed immediately after the already-started sequential research suite. Recorded workflow-order deviation; no competing GPU work and no repeated successful research merely to change chronology."
+  },
+  "failed_initial_experiments": [
+    {
+      "category": "auxiliary research script extraction SyntaxError",
+      "script": {
+        "path": "build/nvvm-loop/slice-232-fp16-minmax/extra-probes.initial.py",
+        "sha256": "f990276c0d922b825ce490bcf65d073dc08e0b2bd24c01c1509572d8e1a31223"
+      },
+      "log": {
+        "path": "build/nvvm-loop/slice-232-fp16-minmax/extra-probes.initial.log",
+        "sha256": "6581c85fc8d5ff2c195ba1c93e03888cc0bf8d6a2994e2eefe516e8be9533c73"
+      },
+      "effect": "Failed before compiler/GPU invocation; corrected extraction run passed 12 capability probes. No source fixture failure or GPU mismatch."
+    }
+  ],
+  "producer_consumer_trace": [
+    "hlsl.meta.slang scalar/vector prefix and reduction overloads generate canonical GenericAsm; existing CUDA matrix reductions lower Array<vector<half,2>,2> with OutParam. Matrix prefixes lack CUDA capability.",
+    "Generated CUDA bitcasts ushort inputs into __half and calls WaveOpMin/Max templates; source half comparisons use __hlt/__hgt while shuffle overloads pack original bits. Finite exclusive seeds differ from FP64 infinity seeds.",
+    "_waveReduceScalar/Multiple use caller-seeded descending XOR stages on low contiguous power2 masks, ascending original-input scans otherwise; singletons preserve input. _wavePrefixScalar/Multiple maintain caller-seeded inclusive transmitted state separately from returned exclusive finite accumulator.",
+    "_getNVVMMaskedWaveScalarIdentity rejects half; _initializeNVVMMaskedWaveScalarOperation usesSourceMinMax currently admits FP32 reductions and FP64 reductions/prefixes. Both are emitter-owned bounded policy decisions; source shape is canonical.",
+    "Catalog half WAVE_READ_LANE_AT, ordered LESS_THAN/GREATER_THAN and SELECT are admitted; half numeric MIN/MAX are excluded. Provider uses raw i16<->i32 shuffle, FCmp OLT/OGT and raw SELECT; floating constants accept APFloat IEEEhalf bits. Existing source/direct controls pass."
+  ],
+  "responsible_boundaries": {
+    "frontend": "No change; valid checked scalar/vector/matrix-reduction shapes. Matrix-prefix capability separate.",
+    "emitter": "Extend only half MIN/MAX identity seed and existing source-order reduction/prefix admission; reuse scalar/aggregate emission.",
+    "provider": "No extension indicated. Numeric half MIN/MAX exclusion remains; ordered comparison/SELECT plus raw lane transport already suffice.",
+    "constants": "Use exact 7bff/fbff through existing semantic-width getFloatingPointConstant, not FP64 infinity seeds or numeric member-set extrema."
+  },
+  "next_slice": {
+    "proposal": "Bounded emitter-only FP16 masked MIN/MAX reductions and inclusive/exclusive prefixes for existing scalar/vector and matrix-reduction shapes.",
+    "required_acceptance": "Before-change focused fixture rejects direct O0/O3 and passes source. Replay unchanged232 inputs/expected hashes through source and both direct modes; register focused dynamic raw16 regression; preserve unrelated widths/operations, matrix-prefix capability and aggregate shuffle policies; units/smoke/toolkit as applicable and every material support cell, exact selected old-cell preservation. Full checkpoint if impact broadens.",
+    "no_next_feature_started": true
+  },
+  "preservation": {
+    "registered_runtime_cells": 1674,
+    "correct": 1623,
+    "known_failures": 51,
+    "resolved_failure_histories": 6,
+    "current_slice_fresh_registered_cells": 0,
+    "inherited_registered_cells": 1674,
+    "inherited231_fresh": 639,
+    "inherited231_from_full229": 1035,
+    "frozen_identities": 452,
+    "discovery_identities": 106,
+    "latest_implementation": 231,
+    "latest_targeted_acceptance": 231,
+    "last_full_checkpoint": 229,
+    "implementation_slices_since_full": 1,
+    "unchanged_source_hashes": 29,
+    "unchanged_artifact_hashes": 12,
+    "unchanged_runtime_input_hashes": 554,
+    "compiler_changes": false,
+    "provider_changes": false,
+    "manifest_changes": false,
+    "registered_results_changes": false,
+    "inherited_gates": "All 231 registered results and failure histories; units 479 + one Windows skip, toolkit 18, contracts 6, material compile/assembly 6 unchanged. Research launches and fresh smoke 4 are separate.",
+    "failure_ledger": {
+      "path": "issue-nvvm-backend/runtime-validation.slice-231.json",
+      "sha256": "007edbb7a267ebe57e7b4b65195cd1fcd03de792140bbef97f664d54748cfad2"
+    },
+    "runtime_input_hashes": "All 554 hashes inherited from baseline.runtime_input_sha256; independently rechecked in identity-before/after.json.",
+    "historical_healthy_denominators": {
+      "frozen": 427,
+      "discovery": 72
+    }
+  },
+  "limitations": [
+    "No direct half masked MIN/MAX runtime success:40 probes reject before PTX.",
+    "Payload-complete full-mask input batches do not establish exhaustive tuple,comparison,mask or caller coverage.",
+    "No matrix-prefix support, material runtime/performance claim, next blocker work, production edit, rebuild, commit, push, driver/system change or device loss."
+  ],
+  "gpu_after": {
+    "path": "build/nvvm-loop/slice-232-fp16-minmax/gpu-after.csv",
+    "sha256": "47548982c3e583059ec117d222966cd2510555aa87db7dd676a324cb1acc6fec"
+  },
+  "artifacts": [
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/catalog",
+      "sha256": "58f273e25cb1d65d5199abc4fccfbe4986fdfb00d759b1b813e3f9a097284b75"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/catalog-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/catalog.cpp",
+      "sha256": "8b9452bcd2da9b6fe2b2591d2589e5c90e41697a0a142da83ece50a1b3dd4a1e"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/catalog.json",
+      "sha256": "a9f93469a6dd60005c897536371b4f01db57d808d387fe8c7723045a776cf59e"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/design-pre-format.md",
+      "sha256": "e9f530647b7a29b275d8cf3e875694f57b812b62bf3b9d9b045f4d02b08164fa"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/extra-probes.initial.log",
+      "sha256": "6581c85fc8d5ff2c195ba1c93e03888cc0bf8d6a2994e2eefe516e8be9533c73"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/extra-probes.initial.py",
+      "sha256": "f990276c0d922b825ce490bcf65d073dc08e0b2bd24c01c1509572d8e1a31223"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/extra-probes.log",
+      "sha256": "315f100f3496ba6808d39189c772882a9cbb18bc206a9e1d40f91dad6841432b"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/extra-probes.py",
+      "sha256": "8776882436be07e2d0ea6889db736dbe94e495a84162fda609cf7d9802f9d947"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/gpu-after.csv",
+      "sha256": "47548982c3e583059ec117d222966cd2510555aa87db7dd676a324cb1acc6fec"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-1-nvvm-o0.ptx.log",
+      "sha256": "55a3f58453c6b9716ad3ed7b2f1e1c318288d5df77ffc26c8ff325e5426cbe13"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-1-nvvm-o3.ptx.log",
+      "sha256": "55a3f58453c6b9716ad3ed7b2f1e1c318288d5df77ffc26c8ff325e5426cbe13"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-1.slang",
+      "sha256": "c8e5a04be21a6f1748f079ef8fe2b8e3acc39570655ebd189693341e98a4f194"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-2-nvvm-o0.ptx.log",
+      "sha256": "ea0874b6cdf89d56feb739c418623a546b24305bb035ff6bfa7e2a8dec9b45ff"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-2-nvvm-o3.ptx.log",
+      "sha256": "ea0874b6cdf89d56feb739c418623a546b24305bb035ff6bfa7e2a8dec9b45ff"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-2.slang",
+      "sha256": "9890c9e6b566ca98accdae53380f1d18fe5effcca42d4c3ea4a2d928be67e109"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-4-nvvm-o0.ptx.log",
+      "sha256": "5baa2b8fcab68dd11160f4cb652c652c19faa67c0e5808d42a3626d884838ddb"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-4-nvvm-o3.ptx.log",
+      "sha256": "5baa2b8fcab68dd11160f4cb652c652c19faa67c0e5808d42a3626d884838ddb"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-4.slang",
+      "sha256": "ea4f8709135c1d10a7bde565677695e8aa132ce6134b85d0beeb5e76b9b61b39"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-matrix2x2-nvrtc-o3.ptx.log",
+      "sha256": "2ac46e19338a10f4ecf42b76c2b1785d670274ec8fbc63d3f8f739aab24f280f"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-matrix2x2-nvvm-o0.ptx.log",
+      "sha256": "2ac46e19338a10f4ecf42b76c2b1785d670274ec8fbc63d3f8f739aab24f280f"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-matrix2x2-nvvm-o3.ptx.log",
+      "sha256": "2ac46e19338a10f4ecf42b76c2b1785d670274ec8fbc63d3f8f739aab24f280f"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Max-matrix2x2.slang",
+      "sha256": "85a26f645a7ead35a894444631d01b4690f0ada8d588bf9671bfebe6ee4a0d77"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-1-nvvm-o0.ir.log",
+      "sha256": "72a1c0b941a6347a7c16378f02cbc2f1f33eb1e913446c1bb7ff643e651626a3"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-1-nvvm-o0.ptx.log",
+      "sha256": "6ec71fabc7f20f32fe6bf0e5a53e47a23b031e534b86ce9ebd82baad17818dc2"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-1-nvvm-o3.ptx.log",
+      "sha256": "6ec71fabc7f20f32fe6bf0e5a53e47a23b031e534b86ce9ebd82baad17818dc2"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-1.slang",
+      "sha256": "041696bc16109f691e5b45899e882ccf1bc814eaf878416c1c58598712a75275"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-2-nvvm-o0.ptx.log",
+      "sha256": "a87c13cdfc8b4d6ae69c942d59ab770511b6aa0b2cd4388431d04bd0dfeb5eed"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-2-nvvm-o3.ptx.log",
+      "sha256": "a87c13cdfc8b4d6ae69c942d59ab770511b6aa0b2cd4388431d04bd0dfeb5eed"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-2.slang",
+      "sha256": "06abd98ae3349ef0b6b967ed03189205c3db60e17c63b4f152698e81d6467067"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-4-nvvm-o0.ptx.log",
+      "sha256": "00c65417e2ea5ede8caffa89e5742790e590914ddfb9f71858693ec998927b69"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-4-nvvm-o3.ptx.log",
+      "sha256": "00c65417e2ea5ede8caffa89e5742790e590914ddfb9f71858693ec998927b69"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-4.slang",
+      "sha256": "6bfa01d8d831fdde5b89cddc739daaa2e08504a49ead8000f39543a3f9860b93"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-matrix2x2-nvrtc-o3.ptx.log",
+      "sha256": "78f88747ea583dcc103442e0f363ea5112b14f8fd32f4a4415dcb5e85abf4084"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-matrix2x2-nvvm-o0.ptx.log",
+      "sha256": "78f88747ea583dcc103442e0f363ea5112b14f8fd32f4a4415dcb5e85abf4084"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-matrix2x2-nvvm-o3.ptx.log",
+      "sha256": "78f88747ea583dcc103442e0f363ea5112b14f8fd32f4a4415dcb5e85abf4084"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Exclusive-Min-matrix2x2.slang",
+      "sha256": "32bf860fd10a489106cd9465f2af1a5b6ecd1ffc95579ce2747987a8f06fba2a"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-1-nvvm-o0.ptx.log",
+      "sha256": "14ff0bc3532438e94e0ac9d43b66c584e8569f4cd602a30742e81daa5bef93e8"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-1-nvvm-o3.ptx.log",
+      "sha256": "14ff0bc3532438e94e0ac9d43b66c584e8569f4cd602a30742e81daa5bef93e8"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-1.slang",
+      "sha256": "7bffd0a448741885877f624c3c4249d0dd80782b4de52f803743742a8a382226"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-2-nvvm-o0.ptx.log",
+      "sha256": "fa6712450dc3a1ae322bcca2205941f773f46df45942a90c664bd3b761004b14"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-2-nvvm-o3.ptx.log",
+      "sha256": "fa6712450dc3a1ae322bcca2205941f773f46df45942a90c664bd3b761004b14"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-2.slang",
+      "sha256": "e09d5495122f795cac2e139d05a9901e00bd8081442cb2c17b8818484440d7d2"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-4-nvvm-o0.ptx.log",
+      "sha256": "5b74a349c2c77016735e4fa4002be813a1b8859bd581efab7aa938dd6a855478"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-4-nvvm-o3.ptx.log",
+      "sha256": "5b74a349c2c77016735e4fa4002be813a1b8859bd581efab7aa938dd6a855478"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-4.slang",
+      "sha256": "bc552acb88890b8d2676ed01413f919627147594f3b42117bc14f3342529edd6"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-matrix2x2-nvrtc-o3.ptx.log",
+      "sha256": "b2e3ff26d5d116831ee79ad3609d44fc6120128bfd2924845f3768a81bb104db"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-matrix2x2-nvvm-o0.ptx.log",
+      "sha256": "b2e3ff26d5d116831ee79ad3609d44fc6120128bfd2924845f3768a81bb104db"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-matrix2x2-nvvm-o3.ptx.log",
+      "sha256": "b2e3ff26d5d116831ee79ad3609d44fc6120128bfd2924845f3768a81bb104db"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Max-matrix2x2.slang",
+      "sha256": "f6749433a424417a48084c56fe8acb378209e744ceb5f4c71877ebd2df1276e0"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-1-nvvm-o0.ptx.log",
+      "sha256": "5b529943012fbbc4b97c708a5b26b477bc2cfdef843be6c73572b5bc4c2384d9"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-1-nvvm-o3.ptx.log",
+      "sha256": "5b529943012fbbc4b97c708a5b26b477bc2cfdef843be6c73572b5bc4c2384d9"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-1.slang",
+      "sha256": "8db52a52b1a511645c3c0edc048552af90e39a03b61782552545c9569a40c4bb"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-2-nvvm-o0.ptx.log",
+      "sha256": "7f3e5860581d26acdf332dbc80bbead3aa56b91b7c8b08c3f967c378b739ec92"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-2-nvvm-o3.ptx.log",
+      "sha256": "7f3e5860581d26acdf332dbc80bbead3aa56b91b7c8b08c3f967c378b739ec92"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-2.slang",
+      "sha256": "3e3b751b057b0d53783a60099cf2d6a6edf0fa4a4dc1578660c5a78aca8ef92e"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-4-nvvm-o0.ptx.log",
+      "sha256": "1303f7fecfeb841c2f1a4eb27d71ff6f7dd0f7132672060f11d9a2e08822b4e4"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-4-nvvm-o3.ptx.log",
+      "sha256": "1303f7fecfeb841c2f1a4eb27d71ff6f7dd0f7132672060f11d9a2e08822b4e4"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-4.slang",
+      "sha256": "ee5fc9c6f105251bc8ad7c2bdd7d9f23232e86f85e00522af34fcd341fd6b8eb"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-matrix2x2-nvrtc-o3.ptx.log",
+      "sha256": "8c860f4f026d4c60670ea82cf04d69433c8882c049da76dc39c0cc17b15fa5a1"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-matrix2x2-nvvm-o0.ptx.log",
+      "sha256": "8c860f4f026d4c60670ea82cf04d69433c8882c049da76dc39c0cc17b15fa5a1"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-matrix2x2-nvvm-o3.ptx.log",
+      "sha256": "8c860f4f026d4c60670ea82cf04d69433c8882c049da76dc39c0cc17b15fa5a1"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Inclusive-Min-matrix2x2.slang",
+      "sha256": "e461eb4d0ad5161e0763b14db17ae3cba9662a75f3990866f99736ec88e5d09b"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-1-nvvm-o0.ptx.log",
+      "sha256": "4972e46a8e3f9068425247383492844af0d7e3c03a8e38cb2895d9deca8020a7"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-1-nvvm-o3.ptx.log",
+      "sha256": "4972e46a8e3f9068425247383492844af0d7e3c03a8e38cb2895d9deca8020a7"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-1.slang",
+      "sha256": "2455cd6fa22bcf8b55b258a084fe6cbff366fc22e1f317e8aa906f124e047745"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-2-nvvm-o0.ptx.log",
+      "sha256": "9549819e600e94aedd3fdcf1391595bbd087c82120d9faaa66a4e0f1bf8932e9"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-2-nvvm-o3.ptx.log",
+      "sha256": "9549819e600e94aedd3fdcf1391595bbd087c82120d9faaa66a4e0f1bf8932e9"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-2.slang",
+      "sha256": "b9403f09ef01d2685f0b5e9d74bcd9f70373bd2e565c6d06df96949578acaa3b"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-4-nvvm-o0.ptx.log",
+      "sha256": "a45e1d7f9cb5cb0b7de74ed2eeac9719771ea35acfc6283957cf6fa8c9e16fa6"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-4-nvvm-o3.ptx.log",
+      "sha256": "a45e1d7f9cb5cb0b7de74ed2eeac9719771ea35acfc6283957cf6fa8c9e16fa6"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-4.slang",
+      "sha256": "6334f59150664c760485af52e331c3c89157097d0c4cf9d2ec1b6d1be99f5301"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-matrix2x2-nvvm-o0.ptx.log",
+      "sha256": "feef1b7261739dd4665ec1308d75704237ae5ce60ff0e30b90d3cd758d89693d"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-matrix2x2-nvvm-o3.ptx.log",
+      "sha256": "feef1b7261739dd4665ec1308d75704237ae5ce60ff0e30b90d3cd758d89693d"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Max-matrix2x2.slang",
+      "sha256": "7a96f8e328acd269106ada01c02f8943a39b13ed5062e2b9c5736ef54b5b9a06"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-1-nvvm-o0.ptx.log",
+      "sha256": "969c6e59fe5c1e5baa5dc4323ba2308a1d54ed52eecc1340ed005364785f471b"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-1-nvvm-o3.ptx.log",
+      "sha256": "969c6e59fe5c1e5baa5dc4323ba2308a1d54ed52eecc1340ed005364785f471b"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-1.slang",
+      "sha256": "6bcd0d7110f46e4847b8e53f42bdb729b4cd05c8c17f9b449c1f0e0b172bfa08"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-2-nvvm-o0.ptx.log",
+      "sha256": "724884602d5d8b47caef6b341565c1db7fd221cdacf0718b2ec22c9633719a31"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-2-nvvm-o3.ptx.log",
+      "sha256": "724884602d5d8b47caef6b341565c1db7fd221cdacf0718b2ec22c9633719a31"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-2.slang",
+      "sha256": "28d5cd4d601e6b6724faa0cd93e50e38f49ff22510784d018cc583cb2d8b0abe"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-4-nvvm-o0.ptx.log",
+      "sha256": "eba8d7427f2a0b642ac526a6fbf07ef700c86c33483eb8d2ed9500ccc63775eb"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-4-nvvm-o3.ptx.log",
+      "sha256": "eba8d7427f2a0b642ac526a6fbf07ef700c86c33483eb8d2ed9500ccc63775eb"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-4.slang",
+      "sha256": "c6cce198362c407e3665f06fc362872e83aacb13750884c2cf0012617fac454f"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-matrix2x2-nvvm-o0.ptx.log",
+      "sha256": "ef630f6aced64807af3f46d2ed5ac4148ebfcb90d39b936bc01088887ef560c5"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-matrix2x2-nvvm-o3.ptx.log",
+      "sha256": "ef630f6aced64807af3f46d2ed5ac4148ebfcb90d39b936bc01088887ef560c5"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-Reduction-Min-matrix2x2.slang",
+      "sha256": "613992446ab0fa8bd481488fc0b827c853c749db99662d56cf40b20dd5b7800c"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvrtc-o3.cu",
+      "sha256": "eeb58245eb17f628c02756e21392868081e4c5a8613b559f8205c4872cd0b744"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvrtc-o3.cu.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvrtc-o3.cubin",
+      "sha256": "d48f014dc5d9d481671ba3fef3f55ae0b85eb7bc906938060a78b259d60b3245"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvrtc-o3.ptx",
+      "sha256": "e38de3adae268a20ef5775e9170d682c6382e9a086ab5c8a8db46bf398c9faa7"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvrtc-o3.ptx.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvrtc-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvvm-o0.cubin",
+      "sha256": "fd039ebd448be27e157e768090ca45d0804b9f55314ba5632b476dbe07902124"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvvm-o0.ptx",
+      "sha256": "80ce571e53e8cec7efa07b2820001052ccfaba5b87a1402e337dfd4c5cabb236"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvvm-o0.ptx.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvvm-o0.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvvm-o3.cubin",
+      "sha256": "325808f92dfaf7813539d9ae069a8d6e157539e029a78a7f3b44443d69c0b72c"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvvm-o3.ptx",
+      "sha256": "f9ea8db30277fa6ff466e5361d85aae6fd1f180fed8db0f6c36dcc46a9293cb0"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvvm-o3.ptx.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control-nvvm-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-control.slang",
+      "sha256": "eb5ce50aa92a3df372bc566c10b273e82d3fdfeb177cd69cf02cd0025bdfe12e"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-minmax-nvrtc-o3.cu",
+      "sha256": "3edca3fa84a1424bb2d21e29da996f89f6612dd9ff9c4e4dd76d289f82efea30"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-minmax-nvrtc-o3.cu.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-minmax-nvrtc-o3.cubin",
+      "sha256": "93ad453479750a5f27a495be34a7f6d6980b93a30e82f963d3dae0b926f318e1"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-minmax-nvrtc-o3.ptx",
+      "sha256": "d4806a41bcf248ece8eff87a31d0707a5cbff593dad43cdb9041251e636f1b9b"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-minmax-nvrtc-o3.ptx.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-minmax-nvrtc-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/half-minmax.slang",
+      "sha256": "e55ab4bcb85c4e73b95dc57a767c2dda3ba35cf0ea4dc5380725cec74a8d00bd"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/hand-checks.json",
+      "sha256": "ed241b6c92732863392144dad907d3c852834d38759f08ae25f234d1d53b0e04"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/identity-after.json",
+      "sha256": "2d214e89d2832fdacae8d97eade2c275ed4c341cfa93002382a3eb80046220e7"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/identity-before.json",
+      "sha256": "2d214e89d2832fdacae8d97eade2c275ed4c341cfa93002382a3eb80046220e7"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/inputs.json",
+      "sha256": "55ae45c00a997fb25e1d4dcc9a8c4602d70c19a6c143fc7a8390d38ecf12d74c"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/matrix-prefix-results.json",
+      "sha256": "2e51a313f76f44c6bffa9b00f220bddbf2b879d9d6401c3a107c4fa2854970f4"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/probe.log",
+      "sha256": "ee0f4629683cee91798d7efb29dc290ae9bcccfb99a5974c4768da7b57155150"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/probe.py",
+      "sha256": "04ebb3b3b750b5b9e9188d3d005b9440b7cad5ee52b9c9d74db20c18770918e3"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/ptx-instructions.json",
+      "sha256": "53ad2531e2622864dc2516fe1dc8ae004f9527ef10b4047bb2130499a8716043"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/raw-launch-artifacts.json",
+      "sha256": "161ecdb306fc526512f1a6e88b3e25fe51fef330e7a62ada54aedeb428fd2c91"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/results.json",
+      "sha256": "5dd51ec744386b56b50c81988393d107ca48c6c86cb06c13346ff5f1fd2acc2e"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/runtime/nvvmSlangCUDAExecutionRuntimeMatchesNVRTC.log",
+      "sha256": "c772c17d00cf390d80ef179b044bcfe6a3db39dea4c14f05e91d8cdcc16748dc"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/runtime/nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC.log",
+      "sha256": "9a4ed4d880a590ff52bb198ef1d5ed71d349c28ec075e8ef7642ed42f20eb54d"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/runtime/nvvmSlangSharedMemoryRuntimeMatchesNVRTC.log",
+      "sha256": "d26ad2ce35442b66b0ce5cb4f7a7f497fed29343129f3087fdd7d426604f0d8f"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/runtime/nvvmSlangWaveReadLaneAtUIntRuntimeMatchesNVRTC.log",
+      "sha256": "f232f2e308e86d6d45d0198ba8e5c1f503dc9899234c3875be4d57337818b0f6"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/runtime/results.json",
+      "sha256": "007ac10b1eb479329a01b6b49b2ea87e7bbad028b605b852aafdad75079179d3"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/runtime.log",
+      "sha256": "a01fa27257e41be364b6b3771033721aae81f34bd88de11025ba317e9f028c4a"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/summarize.py",
+      "sha256": "449d7398e30bc9758202dc569185858f05d81a9b8512bd8469bc099859000f0f"
+    },
+    {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/unrelated-design-formatting.patch",
+      "sha256": "75251123011bf39788eb0619126dda849564507d44af28fe53e37da3add9d05a"
+    }
+  ],
+  "parent_acceptance": {
+    "status": "passed",
+    "evidence": {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/parent-acceptance-audit.json",
+      "sha256": "935d08672627715a24a6611e4c540bd36ab62564fd7dcf3f65ea7af176c8fc2b"
+    },
+    "script": {
+      "path": "build/nvvm-loop/slice-232-fp16-minmax/parent-audit.py",
+      "sha256": "eb0edab6f74f9154621d6434b0b97d6ab3f1dcd672ad224acdafed28386e2d61"
+    }
+  }
+}

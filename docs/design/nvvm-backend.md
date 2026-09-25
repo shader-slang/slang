@@ -8144,3 +8144,25 @@ signed argument in the destination width: Slang::bitCast preserves full 64-bit i
 while the existing sign-bit subtraction applies only below width 64. This is identity argument
 materialization, not a change to ordinary literal lowering. Floating identities remain bit-exact.
 Arithmetic/bitwise/FP16, matrix-prefix capability and ordinary aggregate shuffle policies stay separate.
+
+### FP16 masked min/max source contract (slice 232 research)
+
+CUDA half masked MIN/MAX uses ordered half comparisons and selects an unchanged operand, including
+its NaN payload and signed-zero bits. CUDA 12.9 half shuffles pack raw half bits into a word and
+extract them after the shuffle; the researched SM80 source path performs no floating conversion.
+The same low-contiguous-power-of-two reduction butterfly and prefix transmitted-state algorithms
+used by the existing floating source recipes apply. Other masks scan original inputs in ascending
+lane order. Scalar and homogeneous aggregate leaves share this behavior.
+
+Half exclusive MIN starts at `0x7bff` (+65504), and exclusive MAX at `0xfbff` (-65504), unlike the
+infinity seeds used by FP64. These finite initial accumulators are not neutral extrema over all
+floating values: with low2 mask and both inputs positive infinity, exclusive MIN returns +65504
+for both callers. Inclusive prefixes and reductions remain caller-seeded and preserve singleton
+payloads. The seed, ordered comparison and source algorithm order must all be retained together.
+
+Catalog half lane-read, ordered comparison and SELECT operations and the provider's exact half
+floating constants already suffice for this recipe. Numeric half MIN/MAX descriptors are excluded
+and are not interchangeable with ordered WaveOp selection. Research232 establishes source behavior
+and existing-operation controls; direct half family admission still rejects E52017. A bounded
+follow-up belongs in the emitter's MIN/MAX identity and source-order admission policies, not a
+provider/ABI or frontend representation change. Matrix prefix capability remains separate.
