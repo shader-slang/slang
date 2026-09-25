@@ -4652,9 +4652,10 @@ struct NVVMMaskedWaveScalarOperation
     NVVMValueRecipeStep select;
     bool preservesSingletonReduction = false;
     bool usesFloat64SumIdentity = false;
-    bool usesSourceMinMaxReduction = false;
-    NVVMValueRecipeStep reductionOffsetShift;
-    NVVMValueRecipeStep reductionPartnerXor;
+    bool usesSourceMinMax = false;
+    bool usesSourceMinMaxPrefix = false;
+    NVVMValueRecipeStep treeOffsetShift;
+    NVVMValueRecipeStep treePartner;
     NVVMValueRecipeStep reductionStateSelect;
     NVVMValueRecipeStep reductionMaskEqual;
     NVVMValueRecipeStep reductionMaskAdd;
@@ -4884,14 +4885,6 @@ bool _getNVVMMaskedWaveScalarIdentity(
     if ((type.bitWidth != 32 && !isFloat64) || type.laneCount != 1)
         return false;
 
-    // Float64 sum/product have arithmetic identities. Source min/max reductions instead seed
-    // with the caller's operand and bypass this helper; Float64 min/max prefixes stay unsupported.
-    if (isFloat64 && operation != SLANG_NVVM_VALUE_OP_ADD &&
-        operation != SLANG_NVVM_VALUE_OP_MULTIPLY)
-    {
-        return false;
-    }
-
     const bool isInteger = type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
                            type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER;
     const bool isFloating = type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
@@ -4921,14 +4914,16 @@ bool _getNVVMMaskedWaveScalarIdentity(
     case SLANG_NVVM_VALUE_OP_MIN:
         if (!isInteger && !isFloating)
             return false;
-        outIdentityBits = isFloating                                          ? 0x7f800000u
+        outIdentityBits = isFloat64    ? 0x7ff0000000000000ull
+                          : isFloating ? 0x7f800000u
                           : type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ? 0x7fffffffu
                                                                               : 0xffffffffu;
         return true;
     case SLANG_NVVM_VALUE_OP_MAX:
         if (!isInteger && !isFloating)
             return false;
-        outIdentityBits = isFloating                                          ? 0xff800000u
+        outIdentityBits = isFloat64    ? 0xfff0000000000000ull
+                          : isFloating ? 0xff800000u
                           : type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ? 0x80000000u
                                                                               : 0u;
         return true;
@@ -4950,22 +4945,24 @@ bool _initializeNVVMMaskedWaveScalarOperation(
     outOperation.diagnosticName = spelling.diagnosticName;
     const bool isFloat64 =
         valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && valueType.bitWidth == 64;
-    outOperation.usesSourceMinMaxReduction =
-        spelling.mode == NVVMMaskedWaveScalarMode::Reduction &&
+    outOperation.usesSourceMinMax =
+        (spelling.mode == NVVMMaskedWaveScalarMode::Reduction || isFloat64) &&
         valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && valueType.laneCount == 1 &&
         (valueType.bitWidth == 32 || valueType.bitWidth == 64) &&
         (spelling.combineOperation == SLANG_NVVM_VALUE_OP_MIN ||
          spelling.combineOperation == SLANG_NVVM_VALUE_OP_MAX);
+    outOperation.usesSourceMinMaxPrefix =
+        outOperation.usesSourceMinMax && spelling.mode != NVVMMaskedWaveScalarMode::Reduction;
     const SlangNVVMValueOperation combineOperation =
-        outOperation.usesSourceMinMaxReduction
-            ? (spelling.combineOperation == SLANG_NVVM_VALUE_OP_MIN
-                   ? SLANG_NVVM_VALUE_OP_LESS_THAN
-                   : SLANG_NVVM_VALUE_OP_GREATER_THAN)
-            : spelling.combineOperation;
-    if (!outOperation.usesSourceMinMaxReduction && !_getNVVMMaskedWaveScalarIdentity(
-                                                       spelling.combineOperation,
-                                                       outOperation.valueType,
-                                                       outOperation.identityBits))
+        outOperation.usesSourceMinMax ? (spelling.combineOperation == SLANG_NVVM_VALUE_OP_MIN
+                                             ? SLANG_NVVM_VALUE_OP_LESS_THAN
+                                             : SLANG_NVVM_VALUE_OP_GREATER_THAN)
+                                      : spelling.combineOperation;
+    if ((!outOperation.usesSourceMinMax || outOperation.usesSourceMinMaxPrefix) &&
+        !_getNVVMMaskedWaveScalarIdentity(
+            spelling.combineOperation,
+            outOperation.valueType,
+            outOperation.identityBits))
     {
         return false;
     }
@@ -5033,7 +5030,8 @@ bool _initializeNVVMMaskedWaveScalarOperation(
             "masked-wave current lane") ||
         !_setNVVMSupportedValueRecipeStep(
             outOperation.prefixLanePredicate,
-            outOperation.mode == NVVMMaskedWaveScalarMode::InclusivePrefix
+            outOperation.mode == NVVMMaskedWaveScalarMode::InclusivePrefix &&
+                    !outOperation.usesSourceMinMaxPrefix
                 ? SLANG_NVVM_VALUE_OP_GREATER_EQUAL
                 : SLANG_NVVM_VALUE_OP_GREATER_THAN,
             NVVMSemantics::kBool,
@@ -5050,7 +5048,7 @@ bool _initializeNVVMMaskedWaveScalarOperation(
         !_setNVVMSupportedValueRecipeStep(
             outOperation.combine,
             combineOperation,
-            outOperation.usesSourceMinMaxReduction ? NVVMSemantics::kBool : outOperation.valueType,
+            outOperation.usesSourceMinMax ? NVVMSemantics::kBool : outOperation.valueType,
             combineOperands,
             2,
             spelling.diagnosticName) ||
@@ -5067,11 +5065,11 @@ bool _initializeNVVMMaskedWaveScalarOperation(
 
     outOperation.preservesSingletonReduction =
         spelling.mode == NVVMMaskedWaveScalarMode::Reduction && isFloat64 &&
-        !outOperation.usesSourceMinMaxReduction;
+        !outOperation.usesSourceMinMax;
     outOperation.usesFloat64SumIdentity = spelling.mode == NVVMMaskedWaveScalarMode::Reduction &&
                                           isFloat64 &&
                                           spelling.combineOperation == SLANG_NVVM_VALUE_OP_ADD;
-    if ((outOperation.preservesSingletonReduction || outOperation.usesSourceMinMaxReduction) &&
+    if ((outOperation.preservesSingletonReduction || outOperation.usesSourceMinMax) &&
         !_setNVVMSupportedValueRecipeStep(
             outOperation.reductionMaskEqual,
             SLANG_NVVM_VALUE_OP_EQUAL,
@@ -5083,7 +5081,7 @@ bool _initializeNVVMMaskedWaveScalarOperation(
         return false;
     }
     const SlangNVVMValueTypeDesc booleanBinary[] = {NVVMSemantics::kBool, NVVMSemantics::kBool};
-    if ((outOperation.usesFloat64SumIdentity || outOperation.usesSourceMinMaxReduction) &&
+    if ((outOperation.usesFloat64SumIdentity || outOperation.usesSourceMinMax) &&
         (!_setNVVMSupportedValueRecipeStep(
              outOperation.reductionMaskAdd,
              SLANG_NVVM_VALUE_OP_ADD,
@@ -5113,27 +5111,30 @@ bool _initializeNVVMMaskedWaveScalarOperation(
         NVVMSemantics::kBool,
         NVVMSemantics::kUnsignedI32,
         NVVMSemantics::kUnsignedI32};
-    if (outOperation.usesSourceMinMaxReduction && (!_setNVVMSupportedValueRecipeStep(
-                                                       outOperation.reductionOffsetShift,
-                                                       SLANG_NVVM_VALUE_OP_SHIFT_RIGHT,
-                                                       NVVMSemantics::kUnsignedI32,
-                                                       unsignedBinary,
-                                                       2,
-                                                       "reduction butterfly offset") ||
-                                                   !_setNVVMSupportedValueRecipeStep(
-                                                       outOperation.reductionPartnerXor,
-                                                       SLANG_NVVM_VALUE_OP_BIT_XOR,
-                                                       NVVMSemantics::kUnsignedI32,
-                                                       unsignedBinary,
-                                                       2,
-                                                       "reduction butterfly partner") ||
-                                                   !_setNVVMSupportedValueRecipeStep(
-                                                       outOperation.reductionStateSelect,
-                                                       SLANG_NVVM_VALUE_OP_SELECT,
-                                                       NVVMSemantics::kUnsignedI32,
-                                                       stateSelectOperands,
-                                                       3,
-                                                       "reduction loop state selection")))
+    if (outOperation.usesSourceMinMax &&
+        (!_setNVVMSupportedValueRecipeStep(
+             outOperation.treeOffsetShift,
+             outOperation.usesSourceMinMaxPrefix ? SLANG_NVVM_VALUE_OP_SHIFT_LEFT
+                                                 : SLANG_NVVM_VALUE_OP_SHIFT_RIGHT,
+             NVVMSemantics::kUnsignedI32,
+             unsignedBinary,
+             2,
+             "masked-wave tree offset") ||
+         !_setNVVMSupportedValueRecipeStep(
+             outOperation.treePartner,
+             outOperation.usesSourceMinMaxPrefix ? SLANG_NVVM_VALUE_OP_SUBTRACT
+                                                 : SLANG_NVVM_VALUE_OP_BIT_XOR,
+             NVVMSemantics::kUnsignedI32,
+             unsignedBinary,
+             2,
+             "masked-wave tree partner") ||
+         !_setNVVMSupportedValueRecipeStep(
+             outOperation.reductionStateSelect,
+             SLANG_NVVM_VALUE_OP_SELECT,
+             NVVMSemantics::kUnsignedI32,
+             stateSelectOperands,
+             3,
+             "reduction loop state selection")))
         return false;
 
     const SlangNVVMValueOperationDesc combineDesc = outOperation.combine.getDesc();
@@ -6632,7 +6633,7 @@ void _requireNVVMMaskedWaveScalarOperations(
     for (auto step : commonSteps)
         _requireValueOperation(requirements, step->getDesc(), step->diagnosticName);
 
-    if (operation.preservesSingletonReduction || operation.usesSourceMinMaxReduction)
+    if (operation.preservesSingletonReduction || operation.usesSourceMinMax)
     {
         _requireValueOperation(
             requirements,
@@ -6643,7 +6644,7 @@ void _requireNVVMMaskedWaveScalarOperations(
             operation.select.getDesc(),
             operation.select.diagnosticName);
     }
-    if (operation.usesFloat64SumIdentity || operation.usesSourceMinMaxReduction)
+    if (operation.usesFloat64SumIdentity || operation.usesSourceMinMax)
     {
         const NVVMValueRecipeStep* identitySteps[] = {
             &operation.reductionMaskAdd,
@@ -6654,12 +6655,12 @@ void _requireNVVMMaskedWaveScalarOperations(
             _requireValueOperation(requirements, step->getDesc(), step->diagnosticName);
     }
 
-    if (operation.usesSourceMinMaxReduction)
+    if (operation.usesSourceMinMax)
     {
         const NVVMValueRecipeStep* butterflySteps[] = {
             &operation.laneIndex,
-            &operation.reductionOffsetShift,
-            &operation.reductionPartnerXor,
+            &operation.treeOffsetShift,
+            &operation.treePartner,
             &operation.reductionStateSelect,
         };
         for (auto step : butterflySteps)
@@ -12549,6 +12550,9 @@ struct NVVMMaskedWavePendingPhi
     SlangNVVMValueHandle nextAccumulated = nullptr;
     SlangNVVMBlockHandle sourceBlock = nullptr;
     SlangNVVMBlockHandle bodyBlock = nullptr;
+    SlangNVVMValueHandle transmitted = nullptr;
+    SlangNVVMValueHandle initialTransmitted = nullptr;
+    SlangNVVMValueHandle nextTransmitted = nullptr;
 };
 
 SlangResult _finishNVVMMaskedWavePhi(
@@ -12575,14 +12579,34 @@ SlangResult _finishNVVMMaskedWavePhi(
         "masked-wave next remaining mask",
         builder
             .addPhiIncoming(module, pending.remaining, pending.nextRemaining, pending.bodyBlock)));
-    return _requireBuilderOperation(
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
         codeGenContext,
         "masked-wave next accumulated value",
         builder.addPhiIncoming(
             module,
             pending.accumulated,
             pending.nextAccumulated,
-            pending.bodyBlock));
+            pending.bodyBlock)));
+    if (pending.transmitted)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "masked-wave initial transmitted value",
+            builder.addPhiIncoming(
+                module,
+                pending.transmitted,
+                pending.initialTransmitted,
+                pending.sourceBlock)));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "masked-wave next transmitted value",
+            builder.addPhiIncoming(
+                module,
+                pending.transmitted,
+                pending.nextTransmitted,
+                pending.bodyBlock)));
+    }
+    return SLANG_OK;
 }
 
 // Identifies singleton Float64 reductions that must preserve the original operand. Consider
@@ -12643,7 +12667,7 @@ SlangResult _emitNVVMWaveButterflyMask(
     SlangNVVMValueHandle& outCount,
     SlangNVVMValueHandle& outUsesButterfly)
 {
-    SLANG_RELEASE_ASSERT(operation.usesFloat64SumIdentity || operation.usesSourceMinMaxReduction);
+    SLANG_RELEASE_ASSERT(operation.usesFloat64SumIdentity || operation.usesSourceMinMax);
     SlangNVVMValueHandle zero = nullptr;
     SlangNVVMValueHandle one = nullptr;
     SLANG_RETURN_ON_FAIL(
@@ -12771,6 +12795,44 @@ SlangResult _emitNVVMFloat64WaveSumIdentity(
         identity);
 }
 
+// Combines two values using the recipe's scalar algebra. Source min/max uses an ordered
+// comparison and selects the original second operand on ties or NaNs, preserving its raw bits.
+SlangResult _emitNVVMMaskedWaveCombine(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMMaskedWaveScalarOperation& operation,
+    SlangNVVMValueHandle accumulated,
+    SlangNVVMValueHandle sourceValue,
+    SlangNVVMValueHandle& nextAccumulated)
+{
+    const SlangNVVMValueHandle combineOperands[] = {accumulated, sourceValue};
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        operation.combine.diagnosticName,
+        builder.emitValueOperation(
+            module,
+            operation.combine.getDesc(),
+            combineOperands,
+            SLANG_COUNT_OF(combineOperands),
+            nextAccumulated)));
+    if (operation.usesSourceMinMax)
+    {
+        // The comparison is ordered: ties and unordered NaNs select the second operand,
+        // preserving its original bits just like WaveOpMin/Max, rather than numeric min/max.
+        const SlangNVVMValueHandle valueOperands[] = {nextAccumulated, accumulated, sourceValue};
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            operation.select,
+            valueOperands,
+            SLANG_COUNT_OF(valueOperands),
+            nextAccumulated));
+    }
+    return SLANG_OK;
+}
+
 // Emits one scalar result for a validated masked-wave recipe. Returning the value, exit block, and
 // deferred phi edges lets the same control-flow graph serve scalar helpers and each leaf of a
 // canonical aggregate helper. The caller adds the phi edges only after every block is terminated.
@@ -12815,7 +12877,7 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
         builder.emitSequentialElementExtract(module, loweredMaskVector, zero, loweredMask)));
 
     SlangNVVMValueHandle result = nullptr;
-    if (operation.usesSourceMinMaxReduction)
+    if (operation.usesSourceMinMax && operation.mode != NVVMMaskedWaveScalarMode::ExclusivePrefix)
     {
         result = loweredValue;
     }
@@ -12866,9 +12928,9 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
     SlangNVVMValueHandle initialRemaining = loweredMask;
     SlangNVVMValueHandle usesButterfly = nullptr;
     SlangNVVMValueHandle one = nullptr;
-    if (operation.usesSourceMinMaxReduction)
+    SlangNVVMValueHandle count = nullptr;
+    if (operation.usesSourceMinMax)
     {
-        SlangNVVMValueHandle count = nullptr;
         SLANG_RETURN_ON_FAIL(_emitNVVMWaveButterflyMask(
             codeGenContext,
             builder,
@@ -12881,14 +12943,36 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
             _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 32, 1, one));
         const SlangNVVMValueHandle offsetOperands[] = {count, one};
         SlangNVVMValueHandle initialOffset = nullptr;
-        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
-            codeGenContext,
-            builder,
-            module,
-            operation.reductionOffsetShift,
-            offsetOperands,
-            SLANG_COUNT_OF(offsetOperands),
-            initialOffset));
+        if (operation.usesSourceMinMaxPrefix)
+        {
+            SlangNVVMValueHandle hasPredecessor = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                operation.prefixLanePredicate,
+                offsetOperands,
+                SLANG_COUNT_OF(offsetOperands),
+                hasPredecessor));
+            const SlangNVVMValueHandle initialOperands[] = {hasPredecessor, one, zero};
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                operation.reductionStateSelect,
+                initialOperands,
+                SLANG_COUNT_OF(initialOperands),
+                initialOffset));
+        }
+        else
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                operation.treeOffsetShift,
+                offsetOperands,
+                SLANG_COUNT_OF(offsetOperands),
+                initialOffset));
         const SlangNVVMValueHandle stateOperands[] = {usesButterfly, initialOffset, loweredMask};
         SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
             codeGenContext,
@@ -12901,8 +12985,7 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
     }
 
     SlangNVVMValueHandle currentLane = nullptr;
-    if (operation.mode != NVVMMaskedWaveScalarMode::Reduction ||
-        operation.usesSourceMinMaxReduction)
+    if (operation.mode != NVVMMaskedWaveScalarMode::Reduction || operation.usesSourceMinMax)
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,
@@ -12949,6 +13032,15 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
         codeGenContext,
         "masked-wave accumulated-value phi",
         builder.emitPhi(module, loopBlock, valueType, accumulated)));
+
+    SlangNVVMValueHandle transmitted = nullptr;
+    if (operation.usesSourceMinMaxPrefix)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "masked-wave transmitted-value phi",
+            builder.emitPhi(module, loopBlock, valueType, transmitted)));
+    }
 
     const SlangNVVMValueHandle loopConditionOperands[] = {remaining, zero};
     SlangNVVMValueHandle hasRemainingLane = nullptr;
@@ -13003,20 +13095,44 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
             1,
             sourceLane)));
     SlangNVVMValueHandle shuffleInput = loweredValue;
-    if (operation.usesSourceMinMaxReduction)
+    if (operation.usesSourceMinMax)
     {
-        // Butterfly stages read the previous accumulated values from XOR partners. The scan
-        // instead reads original inputs from ascending named lanes, never a peer's partial result.
+        // Reduction trees read accumulated XOR partners; prefix trees read the previous
+        // inclusive transmitted state at lane-offset. Scans always read original inputs.
         const SlangNVVMValueHandle partnerOperands[] = {currentLane, remaining};
         SlangNVVMValueHandle partner = nullptr;
         SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
             codeGenContext,
             builder,
             module,
-            operation.reductionPartnerXor,
+            operation.treePartner,
             partnerOperands,
             SLANG_COUNT_OF(partnerOperands),
             partner));
+        if (operation.usesSourceMinMaxPrefix)
+        {
+            // For lane < offset, unsigned subtraction wraps. Read the caller instead, as
+            // CUDA shuffle-up does, so every named source remains a participating lane.
+            const SlangNVVMValueHandle validOperands[] = {currentLane, partner};
+            SlangNVVMValueHandle hasPredecessor = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                operation.prefixLanePredicate,
+                validOperands,
+                SLANG_COUNT_OF(validOperands),
+                hasPredecessor));
+            const SlangNVVMValueHandle safeOperands[] = {hasPredecessor, partner, currentLane};
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                operation.reductionStateSelect,
+                safeOperands,
+                SLANG_COUNT_OF(safeOperands),
+                partner));
+        }
         const SlangNVVMValueHandle laneOperands[] = {usesButterfly, partner, sourceLane};
         SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
             codeGenContext,
@@ -13026,7 +13142,10 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
             laneOperands,
             SLANG_COUNT_OF(laneOperands),
             sourceLane));
-        const SlangNVVMValueHandle valueOperands[] = {usesButterfly, accumulated, loweredValue};
+        const SlangNVVMValueHandle valueOperands[] = {
+            usesButterfly,
+            operation.usesSourceMinMaxPrefix ? transmitted : accumulated,
+            loweredValue};
         SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
             codeGenContext,
             builder,
@@ -13048,31 +13167,16 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
             SLANG_COUNT_OF(waveReadOperands),
             sourceValue)));
 
-    const SlangNVVMValueHandle combineOperands[] = {accumulated, sourceValue};
     SlangNVVMValueHandle nextAccumulated = nullptr;
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+    SLANG_RETURN_ON_FAIL(_emitNVVMMaskedWaveCombine(
         codeGenContext,
-        operation.combine.diagnosticName,
-        builder.emitValueOperation(
-            module,
-            operation.combine.getDesc(),
-            combineOperands,
-            SLANG_COUNT_OF(combineOperands),
-            nextAccumulated)));
-    if (operation.usesSourceMinMaxReduction)
-    {
-        // The comparison is ordered: ties and unordered NaNs select the second operand,
-        // preserving its original bits just like WaveOpMin/Max, rather than numeric min/max.
-        const SlangNVVMValueHandle valueOperands[] = {nextAccumulated, accumulated, sourceValue};
-        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
-            codeGenContext,
-            builder,
-            module,
-            operation.select,
-            valueOperands,
-            SLANG_COUNT_OF(valueOperands),
-            nextAccumulated));
-    }
+        builder,
+        module,
+        operation,
+        accumulated,
+        sourceValue,
+        nextAccumulated));
+    SlangNVVMValueHandle nextTransmitted = nullptr;
     if (operation.mode != NVVMMaskedWaveScalarMode::Reduction)
     {
         const SlangNVVMValueHandle lanePredicateOperands[] = {currentLane, sourceLane};
@@ -13086,6 +13190,33 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
                 lanePredicateOperands,
                 SLANG_COUNT_OF(lanePredicateOperands),
                 laneParticipates)));
+        if (operation.usesSourceMinMaxPrefix)
+        {
+            // Consider exclusive min with distinct NaNs in lanes 0 and 1 of mask 0xf.
+            // At lane 2, offset 1 returns lane 1's payload; offset 2 then returns lane 0's.
+            // Peers must receive an inclusive partial result, not the infinity-seeded return
+            // accumulator. Keep that transmitted state in its own loop phi.
+            SLANG_RETURN_ON_FAIL(_emitNVVMMaskedWaveCombine(
+                codeGenContext,
+                builder,
+                module,
+                operation,
+                transmitted,
+                sourceValue,
+                nextTransmitted));
+            const SlangNVVMValueHandle transmittedOperands[] = {
+                laneParticipates,
+                nextTransmitted,
+                transmitted};
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                operation.select,
+                transmittedOperands,
+                SLANG_COUNT_OF(transmittedOperands),
+                nextTransmitted));
+        }
         const SlangNVVMValueHandle selectOperands[] = {
             laneParticipates,
             nextAccumulated,
@@ -13123,7 +13254,7 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
             clearLaneOperands,
             SLANG_COUNT_OF(clearLaneOperands),
             nextRemaining)));
-    if (operation.usesSourceMinMaxReduction)
+    if (operation.usesSourceMinMax)
     {
         const SlangNVVMValueHandle offsetOperands[] = {remaining, one};
         SlangNVVMValueHandle nextOffset = nullptr;
@@ -13131,10 +13262,32 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
             codeGenContext,
             builder,
             module,
-            operation.reductionOffsetShift,
+            operation.treeOffsetShift,
             offsetOperands,
             SLANG_COUNT_OF(offsetOperands),
             nextOffset));
+        if (operation.usesSourceMinMaxPrefix)
+        {
+            const SlangNVVMValueHandle rangeOperands[] = {count, nextOffset};
+            SlangNVVMValueHandle offsetInRange = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                operation.prefixLanePredicate,
+                rangeOperands,
+                SLANG_COUNT_OF(rangeOperands),
+                offsetInRange));
+            const SlangNVVMValueHandle boundedOperands[] = {offsetInRange, nextOffset, zero};
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                operation.reductionStateSelect,
+                boundedOperands,
+                SLANG_COUNT_OF(boundedOperands),
+                nextOffset));
+        }
         const SlangNVVMValueHandle stateOperands[] = {usesButterfly, nextOffset, nextRemaining};
         SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
             codeGenContext,
@@ -13178,6 +13331,9 @@ SlangResult _emitNVVMMaskedWaveScalarValue(
         nextAccumulated,
         sourceBlock,
         bodyBlock,
+        transmitted,
+        operation.usesSourceMinMaxPrefix ? loweredValue : nullptr,
+        nextTransmitted,
     };
     return SLANG_OK;
 }

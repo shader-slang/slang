@@ -7937,8 +7937,8 @@ Explicit-mask matrix indexed shuffles reuse the same homogeneous leaf transport.
 an FP64 implicit-matrix guard because the old full-mask ballot did not establish a divergent active
 mask. Slice 209 corrected that composition, and slice 213 admits the Float64 helper after exact-bit
 runtime validation. Return-by-value FP64 vector shuffles still use a separate restricted compound
-resolver. FP64 masked min/max is also deferred until its comparison/select versus numeric min/max
-edge semantics are reconciled.
+resolver. Slices 221 and 227 subsequently establish FP64 source min/max reductions and prefixes,
+respectively, with their comparison/select and traversal-order contracts described below.
 
 Independent runtime fixtures cover all scalar/vector components, FP64 precision beyond float32,
 full/sparse/partial/singleton masks, matrix reductions and explicit partial transport, signed-zero
@@ -8041,7 +8041,8 @@ The typed source min/max reduction recipe accepts scalar Float32 and Float64 lea
 leaves reached through canonical vector/matrix helpers. Both widths seed the accumulator with the
 caller value and retain CUDA's ordered comparison/selection and butterfly/scan order. This path
 needs no numeric identity and preserves singleton payloads directly. FP64 arithmetic reductions
-retain their existing singleton passthrough and sum seed; FP64 min/max prefixes remain unsupported.
+retain their existing singleton passthrough and sum seed. Slice 227 adds FP64 min/max prefixes as
+described below.
 Provider numeric min/max and ABI 36 are unchanged.
 
 ### CUDA firstbithigh signedness (slice 223)
@@ -8066,3 +8067,25 @@ introduces no alternate context representation, provider global storage or ABI c
 bearing explicit contexts remain outside this copyable-only branch. The dynamic context fixture
 checks initialization, lane-specific helper mutation and subsequent reads against independently
 computed expectations; passing it does not establish support for unrelated masked-prefix operations.
+
+### FP64 masked min/max source prefixes (slice 227)
+
+Canonical scalar and vector FP64 inclusive/exclusive min/max helpers share the typed source
+comparison recipe with reductions. Inclusive prefixes seed the returned accumulator with the
+caller operand; exclusive minimum/maximum use binary64 positive/negative infinity. Ordered
+compare/select preserves the second operand's original bits on ties and unordered NaNs.
+
+The existing low-contiguous-power-of-two mask classifier selects ascending shuffle-up offsets
+1, 2, 4, ... below the population. Prefixes keep a separate caller-seeded inclusive transmitted
+state for subsequent shuffles, distinct from the exclusive returned accumulator. A lane below
+the current offset names itself as the shuffle source and skips combination, preserving the
+source CUDA shuffle-up boundary behavior and collective participation. All other masks scan
+original inputs in ascending order and combine only sources strictly earlier than the caller.
+Every mask participant executes the same shuffle sequence in either algorithm.
+
+The distinction is observable for raw NaN payloads and signed zeros. For exclusive minimum in
+mask 0xf with distinct NaNs in lanes 0 and 1, lane 2 reads lane 1 at offset 1 and lane 0 at offset 2;
+a universal ascending scan would select the opposite final payload. The registered dynamic
+fixture and exact research226 replay retain independent integer/closed-form output oracles.
+FP32 prefixes, arithmetic recipes, numeric provider min/max and ABI36 remain unchanged. Matrix
+prefix capability rejection occurs before CUDA emission and remains a separate limitation.
