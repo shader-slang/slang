@@ -265,3 +265,31 @@ Compiler sources, measured artifacts and inputs remain fixed through acceptance;
 only the proof-driver help example is corrected after timing, with its exact doc-only diff recorded.
 Material runtime still lacks its binding, texture/LUT input and output contract. Any next optimization
 needs fresh evidence on the accepted compiler; direct-tag casts and allocation changes remain separate.
+
+## Research257: current-builder getter visibility
+
+Fresh accepted256 measurements retain all132 PTX/66 cubin outputs. SemanticChecking medians are
+405.72–410.36 ms and fresh-process wall medians1305.41–1508.12 ms; historical timings are unpaired,
+so this is no new speedup claim. Three completed semantic-window debugger runs collect218 stacks.
+The current-builder getter path appears4/5/1 times;52 stacks reach100 frames, including all35 that
+omit the checker frame. Counts are qualitative observations, not CPU fractions.
+
+The selected future experiment exposes only getCurrentASTBuilder for inlining. The current optimized
+getter is a separate32-byte function calling __tls_get_addr and returning the one gCurrentASTBuilder
+pointer. Val::resolve calls it before comparing its cached epoch with the active builder's session.
+The active builder is canonical checking context; the reflection allocation builder is not a valid
+substitute. Scope restoration, null handling, epoch invalidation, recursion and Session lifecycle
+must remain exact. No new cache, TLS model, per-TU copy or lifetime policy is justified.
+
+Keep one shared constant-initialized thread-local definition. If header exposure needs an explicit
+C++20 constinit declaration to avoid introducing a dynamic TLS initialization guard, qualify that
+in the prototype. Preserve dynamic-library loading with existing/new threads and hidden linkage.
+Require paired reversed-order timings, exact outputs, thread/scope/epoch proofs in matching Debug
+and optimized builds, parallel generic compilation and full shared-AST correctness acceptance.
+Promotion gates remain5% semantic improvement per cell,2% summed wall improvement and no2% per-round
+cell wall regression. Discard a failed prototype without adding independent optimizations.
+
+See [plan257](../../issue-nvvm-backend/plan.slice-257-material-profile.md),
+[report257](../../issue-nvvm-backend/report.slice-257-material-profile.md) and
+[timing257](../../issue-nvvm-backend/timing-evidence.slice-257.json). No implementation, runtime
+support change or material GPU performance claim is part of this research.

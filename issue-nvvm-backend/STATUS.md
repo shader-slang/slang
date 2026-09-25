@@ -3,6 +3,26 @@
 Read [WORKFLOW.md](WORKFLOW.md) before resuming. The autonomous loop is authorized; the parent owns
 independent acceptance and local commits. No push is authorized.
 
+## Research257 is accepted
+
+Fresh material timing preserves132 compiler PTX outputs and66 cubins. SemanticChecking medians are
+405.72–410.36ms and wall1305.41–1508.12ms; historical sessions are unpaired, so no speedup is claimed.
+Three completed profiles retain PTX and collect218 stacks. The current-builder getter path appears
+4/5/1 times. Read [plan257](plan.slice-257-material-profile.md),
+[report257](report.slice-257-material-profile.md) and [timing257](timing-evidence.slice-257.json).
+
+One bounded future experiment exposes getCurrentASTBuilder for inlining while retaining the sole
+constant-initialized TLS pointer, scopes, null/lifetime policy, resolution epochs and dynamic loader
+model. Current assembly proves the separate32-byte getter/TLS call. Qualitative sampling is limited:
+52 stacks hit100 frames, including all35 without the checker; counts are not CPU fractions.
+No compiler, provider, fixture, manifest or runtime support changes. All133source/12artifact/565input
+hashes and18 submodule pins remain exact256;141 primary snapshots include8 additional dependencies.
+Full256/targeted233/cadence0 and rolling252/254/256 remain unchanged;1707cells/1668correct/39unresolved/
+18resolved histories are inherited, not freshly executed. Material runtime contracts remain unavailable.
+Local fallback used separate statistical/source/identity audits, not fresh independent-agent review.
+Closure verifies597 indexed raw artifacts,141 source snapshots and41 final compact references.
+Raw root `build/nvvm-loop/slice-257-material-profile`. No push or system/profiling-permission change.
+
 ## Slice256 is accepted
 
 Bare BF2/BF3/BF4 local vectors and internal inout/out references preserve exact lane bits. BF2 uses
@@ -209,18 +229,22 @@ indexed artifacts. Correctness priority explains this slice; reconsider material
 
 ## Next bounded action
 
-Reprofile the accepted compiler on the fixed material corpus before selecting another feature slice.
-Reuse251's qualified optimized timing/profile methodology, preserve identical sources/options and
-compile/assembly outputs, and separate compile phase measurements from GPU runtime claims. Compare
-bounded candidates from actual current samples; do not optimize a previously hot path by assumption.
-The upcoming rolling implementation window would otherwise contain no material-driven slice.
+Prepare one paired prototype for getCurrentASTBuilder visibility from research257. Preserve the
+single TLS definition and existing null, scoped restoration, Session lifecycle and epoch semantics.
+Keep the setter and platform TLS model unchanged; qualify explicit constant initialization if header
+exposure otherwise adds a TLS initialization guard. Do not introduce a second cache, per-TU TLS,
+reflection-builder substitution or assumptions about early shared-library loading.
 
-Local BF16 vector lane addressing, recursive aggregate storage and FP8 aggregate/conversion roles
-remain separate candidates. Keep those support gates strict until each has its own motivating
-regression, representation contract and independent output evidence. Research255's physical record
-qualification remains inherited, not production support. Preserve original texture/column-major
-failure histories and every existing fixture/oracle. Material runtime binding/texture/LUT/input/output
-contracts remain unavailable; do not repeat the optional request or claim kernel performance.
+Declare baseline/candidate reversed-order measurements before editing. Require5% lower pooled
+semantic median in every material identity,2% lower summed wall medians and no per-cell/per-round
+wall regression above2%, with exact outputs. Prove thread/cross-TU identity, nested/null scopes,
+epoch/no-context behavior and late library loading with matching Debug/optimized objects. Shared
+AST-context changes require full compiler/runtime/toolkit/frozen/discovery/material acceptance.
+Discard a prototype that misses its gates without adding another optimization or lowering thresholds.
+
+Local BF16 lane/aggregate and FP8 roles remain separate candidates. Preserve original texture/
+column-major histories and every fixture/oracle. Material runtime contracts remain unavailable;
+do not repeat the optional request or infer kernel performance from compilation.
 
 ## Accepted historical evidence
 
