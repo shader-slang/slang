@@ -622,9 +622,17 @@ if(_dxc_build_from_source)
         -DLLVM_INCLUDE_TESTS=OFF
         -DCLANG_INCLUDE_TESTS=OFF
         -DLLVM_ENABLE_WARNINGS=OFF
-        ${_dxc_forwarded_config_args}
-        -Wno-dev
     )
+    # We append the forwarded args as one quoted argument instead of expanding
+    # them inside the set() above. An unquoted expansion consumes the "\;"
+    # escapes that keep a list value in a single argument, so a universal
+    # CMAKE_OSX_ARCHITECTURES ("x86_64;arm64") would reach DXC as just
+    # "x86_64" and DXC would build x86_64-only binaries, including the
+    # clang-tblgen it must run during the build (#13077).
+    if(NOT _dxc_forwarded_config_args STREQUAL "")
+        list(APPEND _dxc_configure_args "${_dxc_forwarded_config_args}")
+    endif()
+    list(APPEND _dxc_configure_args -Wno-dev)
 
     # Apple Clang 21+ (Xcode 26+) ships a libc++ that marks
     # std::is_nothrow_constructible with [[_Clang::__no_specializations__]],
