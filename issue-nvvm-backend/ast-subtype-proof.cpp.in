@@ -1,0 +1,140 @@
+// SPDX-FileCopyrightText: The Khronos Group, Inc.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include "slang-com-ptr.h"
+#include "slang/slang-ast-all.h"
+#include "slang/slang-ast-builder.h"
+#include "slang/slang-global-session.h"
+
+#include <cstdio>
+#include <type_traits>
+
+using namespace Slang;
+
+static unsigned failures = 0;
+
+static void check(bool condition, int line)
+{
+    if (!condition)
+    {
+        if (++failures < 10)
+            std::printf("Failure at generated proof line %d\n", line);
+    }
+}
+
+#define CHECK(CONDITION) check((CONDITION), __LINE__)
+
+template<typename T>
+concept CanAsDeclRef = requires(DeclRefBase* value) { as<T>(value); };
+static_assert(!CanAsDeclRef<Decl>);
+static_assert(!CanAsDeclRef<Type>);
+static_assert(!CanAsDeclRef<NodeBase>);
+// The existing Slang IsBaseOf trait excludes the identical type; preserve that restriction too.
+static_assert(!CanAsDeclRef<DeclRefBase>);
+static_assert(CanAsDeclRef<DirectDeclRef>);
+
+// Preserve the pre-slice246 predicate as a compatibility reference. The independent inheritance
+// oracle below comes from the C++ compiler, so the proof does not merely compare two range tests.
+static bool oldPredicate(SyntaxClassBase self, SyntaxClassBase other)
+{
+    auto selfInfo = self.getInfo();
+    auto otherInfo = other.getInfo();
+    if (!selfInfo || !otherInfo)
+        return false;
+    return unsigned((int)selfInfo->firstTag - (int)otherInfo->firstTag) <
+           unsigned(otherInfo->tagCount);
+}
+
+// GENERATED:INDEX_ASSERTIONS
+
+// Preserve the concrete pointer type before converting to NodeBase. A void* to NodeBase* cast
+// would bypass the C++ base adjustment and assume a layout property that this test need not assume.
+template<typename T>
+static NodeBase* createNode(ASTBuilder* builder)
+{
+    return getSyntaxClass<T>().createInstance(builder);
+}
+
+static NodeBase* (*creators[])(ASTBuilder*) = {
+    // GENERATED:CREATORS
+};
+
+static const bool expected[][int(ASTNodeType::CountOf)] = {
+    // GENERATED:INHERITANCE
+};
+static_assert(sizeof(expected) / sizeof(expected[0]) == int(ASTNodeType::CountOf));
+static_assert(sizeof(creators) / sizeof(creators[0]) == int(ASTNodeType::CountOf));
+
+template<typename T>
+static void checkTarget(NodeBase* const* nodes)
+{
+    static_assert(std::is_same_v<decltype(as<T>((const NodeBase*)nullptr)), const T*>);
+    static_assert(std::is_same_v<decltype(dynamicCast<T>((const NodeBase*)nullptr)), const T*>);
+    CHECK(as<T>((NodeBase*)nullptr) == nullptr);
+    CHECK(as<T>((const NodeBase*)nullptr) == nullptr);
+    CHECK(dynamicCast<T>((NodeBase*)nullptr) == nullptr);
+    CHECK(dynamicCast<T>((const NodeBase*)nullptr) == nullptr);
+    for (int i = 0; i < int(ASTNodeType::CountOf); ++i)
+    {
+        if (!nodes[i])
+            continue;
+        NodeBase* expectedNode = expected[i][int(T::kType)] ? nodes[i] : nullptr;
+        CHECK(static_cast<NodeBase*>(as<T>(nodes[i])) == expectedNode);
+        CHECK(static_cast<const NodeBase*>(as<T>((const NodeBase*)nodes[i])) == expectedNode);
+        CHECK(static_cast<NodeBase*>(dynamicCast<T>(nodes[i])) == expectedNode);
+        CHECK(
+            static_cast<const NodeBase*>(dynamicCast<T>((const NodeBase*)nodes[i])) ==
+            expectedNode);
+    }
+}
+
+int main()
+{
+    ComPtr<slang::IGlobalSession> global;
+    CHECK(SLANG_SUCCEEDED(slang::createGlobalSession(global.writeRef())));
+    if (failures)
+        return 1;
+    auto builder = static_cast<Session*>(global.get())->getASTBuilder();
+    SetASTBuilderContextRAII context(builder);
+    NodeBase* nodes[int(ASTNodeType::CountOf)] = {};
+    unsigned concrete = 0, abstract = 0, pairs = 0;
+    SyntaxClassBase empty;
+    CHECK(!empty.isSubClassOf(empty));
+    CHECK(!oldPredicate(empty, empty));
+    for (int i = 0; i < int(ASTNodeType::CountOf); ++i)
+    {
+        SyntaxClassBase source{ASTNodeType(i)};
+        CHECK(int(source.getTag()) == i);
+        CHECK(!empty.isSubClassOf(source));
+        CHECK(!source.isSubClassOf(empty));
+        CHECK(!oldPredicate(empty, source));
+        CHECK(!oldPredicate(source, empty));
+        nodes[i] = creators[i](builder);
+        if (nodes[i])
+        {
+            ++concrete;
+            CHECK(nodes[i]->astNodeType == ASTNodeType(i));
+        }
+        else
+            ++abstract;
+        for (int j = 0; j < int(ASTNodeType::CountOf); ++j)
+        {
+            SyntaxClassBase target{ASTNodeType(j)};
+            CHECK(source.isSubClassOf(target) == expected[i][j]);
+            CHECK(oldPredicate(source, target) == expected[i][j]);
+            ++pairs;
+        }
+    }
+    // Establish metadata and object-tag consistency before exercising any downcast.
+    if (failures)
+        return 1;
+    // GENERATED:TARGET_CHECKS
+    std::printf(
+        "{\"tags\":%d,\"pairs\":%u,\"concrete\":%u,\"abstract\":%u,\"failures\":%u}\n",
+        int(ASTNodeType::CountOf),
+        pairs,
+        concrete,
+        abstract,
+        failures);
+    return failures ? 1 : 0;
+}

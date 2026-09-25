@@ -4,88 +4,82 @@ Updated 2026-09-25. Read [WORKFLOW.md](WORKFLOW.md) before resuming the loop.
 
 ## Current state and next action
 
-**Implementation244 and its full checkpoint are accepted after independent parent review.** Read
-[plan244](plan.slice-244-fp8-finite-producers.md), [report244](report.slice-244-fp8-finite-producers.md),
-[validation244](runtime-validation.slice-244.json) and the [FP8 contract](../docs/design/nvvm-fp8-scalar-contract.md).
+**Implementation246 and its full checkpoint are independently accepted.** Read
+[plan246](plan.slice-246-ast-subtype.md), [report246](report.slice-246-ast-subtype.md),
+[validation246](runtime-validation.slice-246.json), [timing246](timing-evidence.slice-246.json)
+and the [material compile-time design note](../docs/design/nvvm-material-compile-time.md).
 
-Four shared math helpers now correctly narrow and widen finite FP8 values, including subnormals and
-E4M3 values256..448. Existing E4 overflow-to-NaN and E5 rounded-overflow-to-infinity policies remain.
-The repair is at the canonical literal producer; no backend admission or provider ABI change.
+The exact existing `SyntaxClassBase::isSubClassOf` body now lives in its class definition, exposing
+it to compiler inlining. Generated hierarchy, canonical tags, cast policy, producer and backend
+admission remain unchanged. No new production helper or fallback. The direct-tag alternative was
+deferred because this minimal change meets the predeclared gate.
 
-Latest accepted implementation/full checkpoint:244. Latest targeted acceptance:233. Implementation
-slices since full:zero. Tested source base `41f070c689cb46e91b3939ca038654b91ef96944`; no push is authorized. Rolling implementation
-history:241vectors/242dot/244FP8producerfix.
+Latest accepted implementation/full checkpoint:246. Latest targeted acceptance:233. Implementation
+slices since full:zero. Tested source base `c29b9b7158ab069141476761f5585c26d3cf7460`. Parent owns the
+authorized local commit; no push is authorized. Rolling history:242dot/244FP8producerfix/246materialcompiletime.
 
-Implementation244 is locally committed at `8d53504112617efda0e3446f7b3117bcc2f77fd2`.
-Research245 below is independently accepted. After its local commit, prototype the measured shared
-AST subtype-check boundary under its explicit equivalence and performance gates. Material runtime
-still lacks bindings, textures/LUTs, inputs and an output oracle; compile-time work does not require
-that application contract. Narrow FP8 admission, texture GetDimensions and arbitrary RequirePrelude
-remain separate candidates. Shared FP8 overflow policy and BF vector storage remain separate decisions.
+After committing, re-rank the measured remaining correctness and support boundaries. Known column-major
+and texture-dimension runtime mismatches merit consideration alongside narrow FP8 admission and
+arbitrary RequirePrelude. This slice investigated no next blocker. Material runtime still lacks
+bindings, textures/LUTs, inputs and an output oracle; the accepted compile-time improvement makes
+no kernel-performance claim. Shared FP8 overflow policy and BF vector storage remain separate decisions.
 
-## Checkpoint and proof
+## Accepted performance and correctness evidence
 
-- Full244:452 frozen identities/1356 cells and113 discovery identities/339 cells. Total1695 fresh
-  cells,1654 correct,41 unresolved and16 retained resolved histories. All1692 old five-field outcomes
-  match accepted242 exactly; all1651 old correct cells survive. One new fixture adds3 correct cells.
-- The52-word literal fixture had32 incorrect words in each mode before repair. All156 final GPU
-  output words pass. Final linked IR contains ordinary32-bit outputs; it needs no FP8 admission.
-- Independent shared-helper proof checks3548 cases, changing220 mismatches to zero. Two actual Slang
-  NVRTC dynamic controls preserve24290 complete words:6072 active and18218 inactive words. Their
-  CUDA SATFINITE oracle is distinct from the preserved shared-helper overflow policy.
-- Smoke4, focused3, units511 plus one existing Windows skip, toolkit18 and runner contracts6 pass.
-  All6 material compile/assembly cells pass; these are support checks, not runtime or speed claims.
-- Parent separately verifies716 compact /1275 total evidence references before its seven own
-  references, all58 current indexed artifacts, exact corpus and failure-history preservation, and
-  all19 historical primary-source snapshots. Earlier indices238/240/241/242/243 remain immutable.
+Two opposite-order paired rounds retain264 compiles and24 assemblies, all byte-identical to244/245.
+Semantic medians fall18.43–25.56%; the sum of six wall medians falls9.43%. Five pooled wall medians
+improve11.38–11.83%; sample/NVVM O3 is0.066% slower pooled amid substantial dispersion, while both
+round medians improve. All predeclared gates pass. No timings were excluded or rerun; the cause of
+variation is not established. The compiler library shrinks320656 bytes and its ELF `.text`324816 bytes.
 
-Unresolved failures and their original reproduction/history remain in validation244. Historical
-BF16 vector/dot/export and research243 raw LLVM controls retain their original source/artifact
-identities; they are not claimed as fresh244 controls. Registered corpus results are entirely fresh.
+The exhaustive proof covers702 tags,492804 subtype pairs including abstract classes, and636 real
+ASTBuilder objects. It checks four cast overloads, nulls, const types, pointer roundtrips, default/null
+metadata and existing DeclRef restrictions. Invalid-tag assertion code is unchanged; no invalid tags
+were executed against optimized objects.
 
-## Accepted material profiling research245
+- Runtime4, full compiler units1045 passed/13 ignored, semantic regressions1052 passed/77 ignored,
+  toolkit18, runner contracts6 and material6 compile/assembly cells pass.
+- All1058 unit identities match before. All1044 original passes survive. The sole skip-to-pass comes
+  from a missing generator in the copied baseline layout; a focused old-binary control passes with
+  the unchanged generator restored. All1129 semantic identities/outcomes are exact.
+- Frozen452/1356 and discovery113/339 preserve all1695 old five-field outcomes:1654 correct,
+  41 known unresolved and16 resolved histories, with no additions or deltas. The original failure
+  histories and reproductions remain in validation246; no baseline reset.
+- Parent independently verifies paired statistics, exact production-body relocation, all final
+  identities,117 source snapshots,2830 indexed raw artifacts and918 references including historical245
+  before its six own audit references. Older research/checkpoint indices remain immutable.
 
-[Plan245](plan.slice-245-material-profile.md), [report245](report.slice-245-material-profile.md),
-[timing evidence245](timing-evidence.slice-245.json) and the
-[compile-time design note](../docs/design/nvvm-material-compile-time.md) are independently accepted.
-Accepted implementation/full244 and targeted233 remain authoritative; research245 changes no
-production source and does not advance implementation cadence0. Parent audit verifies all sample
-identities, every output, all distributions,36 compact references,528 indexed raw files and15 source
-snapshots before its four own artifact references.
+Historical244 literal/helper/dynamic replay/trace controls retain their original source and artifact
+identities. Earlier BF16/raw LLVM/export controls also remain historical. Registered runtime corpus,
+compiler units, semantic regressions, exhaustive proof and material support checks are fresh246.
 
-Two opposite-order optimized fresh-process rounds preserve132 exact PTX outputs and66 exact cubins
-across all6 identities;43 source/12 artifact/561 input hashes match244 before/after. Semantic checking
-medians651.5–654.9ms motivate the next bounded prototype: compare inlining the existing AST subtype
-predicate with avoiding the NodeBase tag-to-metadata roundtrip, retaining one generated hierarchy.
-Separate qualitative GDB stacks support that boundary but establish no speedup. The design note
-requires exhaustive cast equivalence, non-NVVM semantic tests, a full checkpoint and paired timing
-before any prototype can be accepted. Material runtime still requires the absent application contract.
-Raw evidence: `build/nvvm-loop/slice-245-material-profile`; the excluded polling pilot and incomplete
-auxiliary debugger trial remain explicitly recorded.
+## Prior qualifications and remaining boundaries
 
-## Research and remaining semantic boundaries
+[Research245](timing-evidence.slice-245.json), committed at
+`c29b9b7158ab069141476761f5585c26d3cf7460`, measured the hotspot and defined the accepted gates.
+All528 indexed artifacts,15 source snapshots and four parent audit artifacts remain intact.
+[Implementation244](runtime-validation.slice-244.json), committed at
+`8d53504112617efda0e3446f7b3117bcc2f77fd2`, repaired shared finite/subnormal FP8 producers.
+[Research243](semantic-evidence.slice-243.json) qualified scalar/internal-helper FP8 transport and
+CUDA RNE/SATFINITE casts; its19 primary-source snapshots remain intact. Literal overflow policy
+still differs from CUDA runtime SATFINITE. FP8 vectors/storage/aggregates/external ABI are separate.
+ABI40 BF16 source-ordered dot remains accepted. BF vector storage requires its recorded layout repair.
 
-[Research243](semantic-evidence.slice-243.json) qualified format-distinct i8 scalar/internal-helper
-transport and CUDA12.9 RNE/SATFINITE Float32 casts on SM80:14 launches and170030 complete words.
-That historical qualification remains intact. Its finite producer defects are repaired by244.
-Shared literal overflow policy still differs from CUDA runtime SATFINITE; resolving that policy is
-separate from finite correctness and from backend scalar admission. FP8 vectors, storage, aggregates,
-dynamic objects and external ABI remain separate. ABI40 BF16 source-ordered dot remains accepted.
-
-## Environment and evidence
+## Environment and raw evidence
 
 Native Ubuntu24.04, branch nvvm-backend, L4SM89 driver580.126.09, targetSM80, CUDA12.9.2/NVRTC12.9.86,
-LLVM14, providerABI40 and matching RelWithDebInfo. Use inspected slice-203-env.sh and local build
-skill. Four CPU workers maximum total, sequential GPU suites and30-minute bounds.
+LLVM14, providerABI40 and matching RelWithDebInfo. Inspect/source slice-203-env.sh and follow the local
+slang-build skill. At most4 CPU workers total, sequential GPU suites and30-minute bounds; timings
+run without competing builds/benchmarks.
 
-Compiler executable SHA256 `b9e87811c263f131cf1372b307bd60acdcc51993aaab2af91a0cfd03462d10a1`.
-Provider SHA256 `c0522674424c86dbc9444b2abc202c97146a6b41e3a9179d95d34ec9fe1b0773`.
-All43 source paths,12 artifacts and561 runtime inputs match before every final gate and afterward;
-all560 old input hashes are exact. Seven artifacts changed through the shared-header rebuild;
-the provider binary remains unchanged.
+All final gates capture identical117 source/generated/test paths,12 artifacts and561 unchanged runtime
+inputs. Compiler source/artifacts match the measured candidate; later standalone-test refinements do
+not rebuild the compiler. Compiler executable SHA256
+`b9e87811c263f131cf1372b307bd60acdcc51993aaab2af91a0cfd03462d10a1`;
+compiler-library SHA256 `36eeb7034dcdc8501b11f593f0e3a7af29ee977f574488018b6f0c1f0cc0dd57`;
+provider SHA256 `c0522674424c86dbc9444b2abc202c97146a6b41e3a9179d95d34ec9fe1b0773`.
 
-Raw roots `build/nvvm-loop/slice-244-before` and `slice-244-after` retain complete evidence.
-See `parent-acceptance-audit.json`, `parent-helper-audit.json`, `parent-runtime-audit.json`, their
-scripts, `fixture-output/results.json`, `trace/shape-proof.json`, `artifact-index.json` and compact
-validation244. Live historical math source hashes intentionally change; snapshot hashes do not.
-No GPU loss, driver/system change, reboot or push occurred.
+Raw roots: `build/nvvm-loop/slice-246-before`, `slice-246-prototype-inline`, `slice-246-after`.
+See parent-timing, parent-corpus and parent-metadata scripts/JSON, artifact-index.json, source-snapshots.json
+and the compact manifests. The corrected test-assumption compile failure and supplemental baseline
+generator control are retained explicitly. No GPU loss, driver/system change, reboot or push occurred.

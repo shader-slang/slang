@@ -8,16 +8,6 @@
 
 namespace Slang
 {
-bool SyntaxClassBase::isSubClassOf(SyntaxClassBase const& other) const
-{
-    auto selfInfo = getInfo();
-    auto otherInfo = other.getInfo();
-    if (!selfInfo || !otherInfo)
-        return false;
-    return unsigned((int)selfInfo->firstTag - (int)otherInfo->firstTag) <
-           unsigned(otherInfo->tagCount);
-}
-
 UnownedTerminatedStringSlice SyntaxClassBase::getName() const
 {
     return _info ? UnownedTerminatedStringSlice(_info->name) : UnownedTerminatedStringSlice();

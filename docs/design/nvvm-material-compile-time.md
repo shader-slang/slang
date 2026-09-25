@@ -130,3 +130,48 @@ medians (18 measured samples per identity), with no identity regressing more tha
 identity before timing acceptance. These are proposed future thresholds, not measured benefits.
 Reject the prototype if savings are not robust or semantic preservation fails. No optimization was
 implemented in245.
+
+## Slice246: retain exact predicate inlining
+
+The bounded prototype moves `SyntaxClassBase::isSubClassOf` from `slang-syntax.cpp` into its existing
+class definition in `slang-ast-support-types.h`. Its body is unchanged. Generated hierarchy metadata,
+tag-to-class lookup, ASTBuilder initialization and pointer cast overloads remain the only existing
+path. Once this minimal variant passed the predeclared gate, the direct-tag alternative was deferred;
+no second hierarchy, semantic cache, new production helper or producer repair was needed.
+
+The [paired evidence246](../../issue-nvvm-backend/timing-evidence.slice-246.json) compares isolated,
+verified before/after compiler layouts in two opposite identity/build orders. Each cell/build/round
+has2 warmups and9 measured fresh processes. All264 compiles and24 support assemblies preserve exact
+244/245 PTX and cubin bytes. Semantic medians improve18.43–25.56%; the sum of six wall medians improves
+9.43%. Five pooled wall medians improve11.38–11.83%. Sample/NVVM O3 instead has a0.066% slower pooled
+wall median despite per-round median improvements1.92% and9.85%; round1 has substantial variation
+across multiple phases in both builds. Its cause is not established. Retain all samples and this
+limitation; do not claim every pooled wall cell improves or infer a kernel speedup.
+
+All three thresholds from245 pass unchanged. No outliers, retries or favorable subsets are removed.
+The final compiler source and12 artifact identities remain the measured candidate through correctness
+acceptance. Later refinements to the standalone proof script require only another proof invocation.
+The compiler library decreases320656 bytes; its ELF `.text` section decreases324816 bytes. These are
+size observations, not instruction-count evidence.
+
+[The reproducible proof](../../issue-nvvm-backend/check-ast-subtype.py) links the configured native
+Linux Ninja compiler objects into a separate executable, avoiding exported test APIs. Registry names
+provide membership only;702 enum-position static assertions and the C++ compiler's independent
+inheritance relation cover all492804 pairs, including66 abstract classes.636 typed factory-created
+objects exercise all four cast overloads, nulls, const return types and pointer roundtrips. The original
+predicate remains a compatibility reference. Default/null metadata and unchanged invalid-tag assertions
+are separate contracts: never test invalid tags against optimized objects or mix Debug AST layouts
+with Release objects. The existing strict `Slang::IsBaseOf` restriction also keeps DeclRefBase self-as
+deleted; derived DeclRefBase casts retain their old policy.
+
+Run the proof only after a matching compiler build, with a new output directory:
+
+```bash
+python3 issue-nvvm-backend/check-ast-subtype.py --output build/ast-subtype-proof
+```
+
+The [slice246 report](../../issue-nvvm-backend/report.slice-246-ast-subtype.md) and
+[validation manifest](../../issue-nvvm-backend/runtime-validation.slice-246.json) record full shared-AST
+acceptance, serialized-AST/semantic/compiler-unit coverage, exact preserved corpus outcomes, original
+failure histories and inherited independent controls. Material runtime still requires its missing
+application bindings, texture/LUT inputs and expected-output contract.

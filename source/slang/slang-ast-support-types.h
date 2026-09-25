@@ -703,7 +703,15 @@ FIDDLE() namespace Slang
         void* createInstanceImpl(ASTBuilder* astBuilder) const;
         void destructInstanceImpl(void* instance) const;
 
-        bool isSubClassOf(SyntaxClassBase const& super) const;
+        bool isSubClassOf(SyntaxClassBase const& other) const
+        {
+            auto selfInfo = getInfo();
+            auto otherInfo = other.getInfo();
+            if (!selfInfo || !otherInfo)
+                return false;
+            return unsigned((int)selfInfo->firstTag - (int)otherInfo->firstTag) <
+                   unsigned(otherInfo->tagCount);
+        }
 
         typedef SyntaxClassInfo Info;
 
