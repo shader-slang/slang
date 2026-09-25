@@ -8163,6 +8163,8 @@ payloads. The seed, ordered comparison and source algorithm order must all be re
 Catalog half lane-read, ordered comparison and SELECT operations and the provider's exact half
 floating constants already suffice for this recipe. Numeric half MIN/MAX descriptors are excluded
 and are not interchangeable with ordered WaveOp selection. Research232 establishes source behavior
-and existing-operation controls; direct half family admission still rejects E52017. A bounded
-follow-up belongs in the emitter's MIN/MAX identity and source-order admission policies, not a
-provider/ABI or frontend representation change. Matrix prefix capability remains separate.
+and existing-operation controls. Slice 233 admits half reductions and inclusive/exclusive prefixes
+by extending only the emitter's existing seed and source-order admission policies. Scalar and
+vector2/vector4 recipes and existing matrix reduction leaves reuse the same algorithms and typed
+provider operations. The registered raw16 fixture has closed-form expectations; the unchanged
+research input/expectation replay verifies all three modes. Matrix prefix capability remains separate.

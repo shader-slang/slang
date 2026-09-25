@@ -4872,9 +4872,9 @@ bool _resolveNVVMUInt64WordConstruction(
     return true;
 }
 
-// Returns the exact identity used by one scalar masked reduction or prefix. The bit pattern is
-// interpreted through the already-validated scalar type, so integer signedness and floating-point
-// identities remain explicit properties of the recipe rather than host-language conversions.
+// Returns the exact initial accumulator used by one scalar masked reduction or prefix. The bit
+// pattern is interpreted through the already-validated scalar type, so integer signedness and
+// floating-point seeds remain explicit recipe properties rather than host-language conversions.
 bool _getNVVMMaskedWaveScalarIdentity(
     SlangNVVMValueOperation operation,
     const SlangNVVMValueTypeDesc& type,
@@ -4883,13 +4883,16 @@ bool _getNVVMMaskedWaveScalarIdentity(
     outIdentityBits = 0;
     const bool isInteger = type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
                            type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER;
+    const bool isFloat16 = type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && type.bitWidth == 16;
     const bool isFloat64 = type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && type.bitWidth == 64;
+    const bool isMinMax =
+        operation == SLANG_NVVM_VALUE_OP_MIN || operation == SLANG_NVVM_VALUE_OP_MAX;
     // Integer min/max only selects representable operands, so reductions and prefixes share the
     // same exact integer algebra. Arithmetic and bitwise operations retain their existing widths.
     const bool isIntegerMinMax =
-        isInteger && (type.bitWidth == 8 || type.bitWidth == 16 || type.bitWidth == 64) &&
-        (operation == SLANG_NVVM_VALUE_OP_MIN || operation == SLANG_NVVM_VALUE_OP_MAX);
-    if ((type.bitWidth != 32 && !isFloat64 && !isIntegerMinMax) || type.laneCount != 1)
+        isInteger && (type.bitWidth == 8 || type.bitWidth == 16 || type.bitWidth == 64) && isMinMax;
+    if ((type.bitWidth != 32 && !isFloat64 && !isIntegerMinMax && !(isFloat16 && isMinMax)) ||
+        type.laneCount != 1)
         return false;
 
     const bool isFloating = type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
@@ -4917,9 +4920,12 @@ bool _getNVVMMaskedWaveScalarIdentity(
         outIdentityBits = 0xffffffffu;
         return true;
     case SLANG_NVVM_VALUE_OP_MIN:
+        // WaveOpMin<__half> starts exclusive prefixes at +65504, not infinity. For example,
+        // two positive-infinity inputs return +65504 in both exclusive-prefix lanes.
         if (!isInteger && !isFloating)
             return false;
-        outIdentityBits = isFloat64    ? 0x7ff0000000000000ull
+        outIdentityBits = isFloat16    ? 0x7bffu
+                          : isFloat64  ? 0x7ff0000000000000ull
                           : isFloating ? 0x7f800000u
                           : type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
                               ? (uint64_t(1) << (type.bitWidth - 1)) - 1
@@ -4928,7 +4934,8 @@ bool _getNVVMMaskedWaveScalarIdentity(
     case SLANG_NVVM_VALUE_OP_MAX:
         if (!isInteger && !isFloating)
             return false;
-        outIdentityBits = isFloat64    ? 0xfff0000000000000ull
+        outIdentityBits = isFloat16    ? 0xfbffu
+                          : isFloat64  ? 0xfff0000000000000ull
                           : isFloating ? 0xff800000u
                           : type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
                               ? uint64_t(1) << (type.bitWidth - 1)
@@ -4950,12 +4957,14 @@ bool _initializeNVVMMaskedWaveScalarOperation(
     outOperation.valueType = valueType;
     outOperation.mode = spelling.mode;
     outOperation.diagnosticName = spelling.diagnosticName;
+    const bool isFloat16 =
+        valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && valueType.bitWidth == 16;
     const bool isFloat64 =
         valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && valueType.bitWidth == 64;
     outOperation.usesSourceMinMax =
-        (spelling.mode == NVVMMaskedWaveScalarMode::Reduction || isFloat64) &&
+        (spelling.mode == NVVMMaskedWaveScalarMode::Reduction || isFloat16 || isFloat64) &&
         valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && valueType.laneCount == 1 &&
-        (valueType.bitWidth == 32 || valueType.bitWidth == 64) &&
+        (valueType.bitWidth == 16 || valueType.bitWidth == 32 || valueType.bitWidth == 64) &&
         (spelling.combineOperation == SLANG_NVVM_VALUE_OP_MIN ||
          spelling.combineOperation == SLANG_NVVM_VALUE_OP_MAX);
     outOperation.usesSourceMinMaxPrefix =

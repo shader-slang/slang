@@ -1,0 +1,2 @@
+source	source_test_ordinal	selection_tags	rationale
+cuda/nvvm-fp16-masked-minmax.slang	0	wave,vector-matrix,helper-generic	Raw FP16 masked min/max reductions and prefixes preserve finite seeds, source NaN/tie order and existing aggregate leaves with closed-form expectations.

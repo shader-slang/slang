@@ -105,3 +105,4 @@ cuda/nvvm-copyable-kernel-context.slang	0	helper-generic,vector-matrix,aggregate
 cuda/nvvm-fp64-prefix-minmax-order.slang	0	wave,vector-matrix,helper-generic	FP64 inclusive/exclusive masked min/max preserves source tree/scan order and infinity seeds for raw NaNs, zeros and finite/subnormal values.
 cuda/nvvm-narrow-masked-minmax.slang	0	wave,vector-matrix,helper-generic	Signed/unsigned 8/16-bit masked min/max prefixes and reductions with exact extrema, wide-input truncation and existing aggregate leaves.
 cuda/nvvm-i64-masked-minmax.slang	0	wave,vector-matrix,helper-generic	Signed/unsigned 64-bit masked min/max prefixes and reductions with independent low/high-word extrema oracle and existing aggregate leaves.
+cuda/nvvm-fp16-masked-minmax.slang	0	wave,vector-matrix,helper-generic	Raw FP16 masked min/max reductions and prefixes preserve finite seeds, source NaN/tie order and existing aggregate leaves with closed-form expectations.
