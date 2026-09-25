@@ -3743,20 +3743,26 @@ struct TypeFlowSpecializationContext
             return makeElementOfSetType(tableSet);
         }
 
-        // An UntaggedUnionType has only a payload TypeSet and no witness-table set of its own (that
-        // set lives on a TaggedUnionType), so there is nothing for this analyzer to recover from
-        // it; return none(). That does not strand the ExtractExistentialWitnessTable.
-        // Specialization runs to a fixed point -- specializeModule reruns this pass until nothing
-        // changes -- and it rewrites the operand's type on the way there: getEffectiveFuncType
-        // lowers the operand's producing call (e.g. the unpack() whose result this existential is)
-        // return info through getLoweredType, which unwraps a singleton UntaggedUnionType to its
-        // element type, and specializeCall writes that onto the call. When that element is a
-        // TaggedUnionType, a later iteration's tryGetInfo reads the refined operand type directly,
-        // the tagged branch above yields a singleton element-of-set, and
-        // specializeExtractExistentialWitnessTable replaces the extraction with the sole concrete
-        // witness table -- all before lowerExistentials runs lowerExtractExistentialWitnessTable.
-        if (as<IRUntaggedUnionType>(operandInfo))
+        // The operand of an ExtractExistentialWitnessTable is always an existential value (a
+        // non-COM interface / associated / bound-interface value), whose refined type-flow info is
+        // a TaggedUnionType. The only UntaggedUnionType that can reach this arm is the singleton
+        // wrapper makeInfoForConcreteType() builds when such an existential -- already lowered to a
+        // tagged union -- crosses a merge point; its sole payload element is that TaggedUnionType,
+        // never a bare struct and never a multi-element set. getLoweredType() unwraps that
+        // singleton back to the inner TaggedUnionType, so a later fixpoint iteration re-reads the
+        // operand through tryGetInfo, takes the tagged branch above, and
+        // specializeExtractExistentialWitnessTable resolves the extraction to its concrete witness
+        // table before lowering. There is thus no witness-table set to recover here, and returning
+        // none() is safe. We rely on that as an emergent invariant, so we assert the shape we
+        // depend on: a violation then fails as a localized contract check here rather than as a
+        // masked SLANG_UNEXPECTED in lowerExtractExistentialWitnessTable.
+        if (auto untaggedUnion = as<IRUntaggedUnionType>(operandInfo))
+        {
+            SLANG_RELEASE_ASSERT(
+                untaggedUnion->getSet()->isSingleton() &&
+                as<IRTaggedUnionType>(untaggedUnion->getSet()->getElement(0)));
             return none();
+        }
 
         SLANG_UNEXPECTED("Unhandled info type in analyzeExtractExistentialWitnessTable");
     }
