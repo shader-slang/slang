@@ -293,3 +293,25 @@ See [plan257](../../issue-nvvm-backend/plan.slice-257-material-profile.md),
 [report257](../../issue-nvvm-backend/report.slice-257-material-profile.md) and
 [timing257](../../issue-nvvm-backend/timing-evidence.slice-257.json). No implementation, runtime
 support change or material GPU performance claim is part of this research.
+
+## Research258: getter visibility did not meet the promotion gates
+
+The bounded research257 prototype exposed getCurrentASTBuilder in the internal header, retaining
+one TLS definition and making its existing constant initialization explicit. Optimized assembly
+removed the wrapper call from Val::resolve without adding a TLS initialization guard or changing
+public exports. Both isolated layouts loaded their own compiler, builtin module and provider.
+
+Paired reversed-order measurements preserve all 264 PTX outputs and 24 cubins. Across six cells,
+pooled semantic medians improve 1.65–2.41%, below the predeclared 5% requirement; the sum of pooled
+wall medians improves 0.66549%, below 2%. The per-cell/per-round regression guard passes. These
+observations do not satisfy promotion, so the prototype is discarded without another optimization,
+a stronger TLS model, relaxed gates or additional favorable samples. The accepted getter stays intact.
+
+Conditional Debug/thread/epoch/late-loader proofs and full candidate correctness suites were not
+run after the performance gate failed. Exact compile outputs and symbol checks do not replace
+those semantic proofs. Full256 remains the runtime checkpoint; no material kernel claim is made.
+Do not select this same hypothesis again without new evidence that changes the experiment's premise.
+
+See [plan258](../../issue-nvvm-backend/plan.slice-258-ast-context-getter.md),
+[report258](../../issue-nvvm-backend/report.slice-258-ast-context-getter.md) and
+[timing258](../../issue-nvvm-backend/timing-evidence.slice-258.json).

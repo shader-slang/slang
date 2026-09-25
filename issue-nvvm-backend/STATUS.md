@@ -3,6 +3,29 @@
 Read [WORKFLOW.md](WORKFLOW.md) before resuming. The autonomous loop is authorized; the parent owns
 independent acceptance and local commits. No push is authorized.
 
+## Research258 is accepted; getter prototype discarded
+
+The paired getter-visibility experiment preserves 264 PTX outputs and 24 cubins, but semantic median
+improvements 1.65–2.41% miss the 5% gate and summed wall improvement 0.66549% misses 2%. No per-round
+cell regresses above 2%. All samples remain; no retries or relaxed thresholds. Read
+[plan258](plan.slice-258-ast-context-getter.md), [report258](report.slice-258-ast-context-getter.md)
+and [timing258](timing-evidence.slice-258.json).
+
+The candidate removed the getter wrapper call, retaining one local TLS symbol, no new initialization
+guard and exact public exports. Performance failure ends promotion: conditional Debug/thread/epoch/
+late-loader and full candidate correctness suites were not run. No optimization is retained.
+Exact source rollback and optimized rebuild restore accepted compiler/test libraries. The regenerated
+builtin cache differed in its timestamp and 8 payload bytes; restore the saved cache plus original
+identical compiler file timestamp. A fresh loader control consumes it unchanged and preserves PTX.
+Final 133 source/12 tested artifact/565 input hashes and 18 pins match256, with no production diff.
+
+Full256/targeted233/cadence0 and rolling252/254/256 remain unchanged:1707cells/1668correct/39unresolved/
+18resolved histories are inherited, with no fresh GPU runtime cells. Material runtime contracts remain
+unavailable. Local fallback uses separate audits, without a fresh independent-agent review claim.
+Closure verifies 1129 indexed artifacts, 286 primary snapshots and 39 final compact references.
+Raw roots slice-258-before, slice-258-prototype and slice-258-restored under build/nvvm-loop retain
+both isolated layouts, every sample, failed audit/cache attempts and restoration evidence. No push.
+
 ## Research257 is accepted
 
 Fresh material timing preserves132 compiler PTX outputs and66 cubins. SemanticChecking medians are
@@ -229,22 +252,19 @@ indexed artifacts. Correctness priority explains this slice; reconsider material
 
 ## Next bounded action
 
-Prepare one paired prototype for getCurrentASTBuilder visibility from research257. Preserve the
-single TLS definition and existing null, scoped restoration, Session lifecycle and epoch semantics.
-Keep the setter and platform TLS model unchanged; qualify explicit constant initialization if header
-exposure otherwise adds a TLS initialization guard. Do not introduce a second cache, per-TU TLS,
-reflection-builder substitution or assumptions about early shared-library loading.
+Revisit the existing BF16 aggregate/reference rejections using research255's original Ptr<H> source
+controls and implementation256's qualified local-vector storage. Compare their canonical producer,
+layout and pointer roles against the remaining BF16 aggregate corpus failure before choosing one
+bounded slice. Write its ExecPlan before editing; do not make a blanket recursive/storage admission
+or change external/device/resource ABI gates without a demonstrated contract and exact GPU oracle.
 
-Declare baseline/candidate reversed-order measurements before editing. Require5% lower pooled
-semantic median in every material identity,2% lower summed wall medians and no per-cell/per-round
-wall regression above2%, with exact outputs. Prove thread/cross-TU identity, nested/null scopes,
-epoch/no-context behavior and late library loading with matching Debug/optimized objects. Shared
-AST-context changes require full compiler/runtime/toolkit/frozen/discovery/material acceptance.
-Discard a prototype that misses its gates without adding another optimization or lowering thresholds.
-
-Local BF16 lane/aggregate and FP8 roles remain separate candidates. Preserve original texture/
-column-major histories and every fixture/oracle. Material runtime contracts remain unavailable;
-do not repeat the optional request or infer kernel performance from compilation.
+Research258's material-driven prototype failed its predeclared gates and is fully discarded. Do not
+repeat that getter experiment without new evidence or force another speculative optimization to
+satisfy cadence. A narrowly justified capability slice may proceed with this documented material
+review; reconsider material work after it. Local BF lane and FP8 roles remain separate candidates.
+Preserve texture/column-major histories, every fixture/oracle and the immutable frozen inventory.
+Material runtime bindings/textures/LUT/input/output remain unavailable; do not repeat the optional
+request or infer kernel performance from compilation.
 
 ## Accepted historical evidence
 
@@ -262,7 +282,9 @@ Native Ubuntu24.04, branch nvvm-backend, L4SM89 driver580.126.09, targetSM80, CU
 LLVM14, providerABI41, matching RelWithDebInfo. Inspect/source `build/nvvm-loop/slice-203-env.sh` and
 follow the local slang-build skill. At most4 CPU workers, sequential GPU suites and 30-minute bounds.
 
-Latest raw roots `build/nvvm-loop/slice-256-before` and `slice-256-after` retain the unchanged
+Latest research roots `build/nvvm-loop/slice-258-before`, `slice-258-prototype` and `slice-258-restored`
+retain the discarded experiment and exact restoration. Full-checkpoint roots `slice-256-before` and
+`slice-256-after` retain the unchanged
 before fixture, exact local storage tests, both all-encoding cache-order controls, full checkpoint,
 final source snapshots and acceptance/closure audits. Historical254/255 roots retain layout and
 physical-record qualification with their original identities. No GPU loss, driver/system change,
