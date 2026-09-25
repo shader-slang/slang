@@ -1,0 +1,312 @@
+{
+  "schema": 1,
+  "slice": 234,
+  "status": "accepted-research",
+  "date_utc": "2026-09-25",
+  "scope": "CUDA quad helper and target requirement contract; no production/provider/ABI/runner/test/corpus changes.",
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-233.json",
+    "sha256": "2c9a285312cab2941eee837b5033f97ac3b7c03dc90f1eb40b2126cec7f74911"
+  },
+  "last_full_checkpoint": 229,
+  "implementation_slices_since_full": 2,
+  "provenance": {
+    "tested_source_sha256": {
+      "source/slang/slang-emit-nvvm.cpp": "1271ba3ea68fc0b64acf5eeecb1391ca56e9a384aead6d98108ace335b0cb6fa",
+      "source/slang/hlsl.meta.slang": "3ab28ee36df1e5d5bd42d0d3b9ca414e74477e1d33f498bf16e59ac4061ce92e",
+      "prelude/slang-cuda-prelude.h": "35234d28dc1a168b5956c50ef4ea56c33aad1cc0fe398b796335156bcc665f1b",
+      "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "90ed3600a329edcc060e3da49cafcbc1a87a0135061fdd1460928bc256d427b5",
+      "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "acce3c9b3cf627ee8ad41ad8042e0907fad59538e46a74cb215c63a29328addf",
+      "tools/slang-unit-test/unit-test-nvvm-support.h": "0e53a270ea7200bc451362bb6f0d2f072ba08dedd430a64631458c9b2312425c",
+      "tests/cuda/nvvm-fp64-implicit-shuffle.slang": "e6ed61a825021727de23baf36b6b360c1fbb329ca4b7987b39a8c071d3448616",
+      "issue-nvvm-backend/discovery-corpus.manifest.tsv": "cca815afaa6e50122c113050bc97f18ce38010e33964e53a064990ca7e79fb4d",
+      "issue-nvvm-backend/selection.slice-208-frozen.tsv": "f6d4ac7a1b3a9f982512287d87dcd77a4f75cfb0e2f819b343da312d8006ffd0",
+      "issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+      "issue-nvvm-backend/complex-test-server.py": "b173839cb958fdcf26c3b57ea3dec09cf26868e3e397f12cf04e5c21c01781e8",
+      "issue-nvvm-backend/test-run-complex-corpus.py": "6e2c88094334856c66c4d56bce50d17b553d4dea2858351808d2c911e0d58972",
+      "tools/test-server/test-server-main.cpp": "b82d0f813a560837b008de72fdaaf011b428396ec78800f4e0bb43cb4feef7de",
+      "source/compiler-core/slang-test-server-protocol.h": "c0ff0e415c4106b9ca799d5ee19f43023e22bc576674de8ef7eab43e17fbbb23",
+      "source/compiler-core/slang-test-server-protocol.cpp": "27e4679da25f4ff5fd245dc027d0b19c167a0bb4781c218ab7031303f5542855",
+      "tests/cuda/nvvm-fp32-singleton-minmax.slang": "d838cc70fe2e4d88bb2b127be48304fce74219bfd6319d25122a8e84815fe381",
+      "tests/cuda/nvvm-fp64-wave-edges.slang": "2df2ac1b0f7d50111154cea0f0c0a2752e125c5f117a1d97cdcb1ddf410fd0e2",
+      "tests/cuda/nvvm-fp32-minmax-order.slang": "a4c91ebc19acbafcf8f6e21ef10eb314c5df7525de1f969e78cd0b52fac976e6",
+      "issue-nvvm-backend/run-compute-census.py": "d464fab86c35e23b38dca664d722a4e79a664ee544da190c669ca51645491113",
+      "issue-nvvm-backend/run-compute-discovery.py": "6bdefee0b8001f4fbb12d89bb20f10912694ed24daa37ba1b4305a4154e75cb9",
+      "issue-nvvm-backend/test-run-compute-discovery.py": "ae59e7775eb77b00e286389a4c3ef34450fbe1f1ee988f500b0a55626d15b1d5",
+      "issue-nvvm-backend/census.slice-195.tsv": "77d335cdb66a54b83cefba9cca90c209ee29ec5d801294a169a244acc0398690",
+      "tests/cuda/nvvm-fp64-minmax-order.slang": "53264fe384c92fdf42261565f4b08049a565d2a1e0c8946c0b7424192da321c1",
+      "tests/cuda/nvvm-firstbithigh-signedness.slang": "a583484d66ab55583d6a71fe4dc056ec3eb2208cfe12c6046db25cd66c033d1b",
+      "source/slang/slang-emit-nvvm-type-lowering.cpp": "98224558c7b89eb56f2de3f1c32e54fe4b9794def404977286751a7e23319cd9",
+      "tests/cuda/nvvm-copyable-kernel-context.slang": "60d1c5d9e4655c13dd63b8074d190eb7f1ec9078dc683f8c060403a8edabd641",
+      "tests/cuda/nvvm-fp64-prefix-minmax-order.slang": "40b2dd221653c28f3cfb39de69705994ebc275d545baa5d48c6ae5087c6bd740",
+      "tests/cuda/nvvm-narrow-masked-minmax.slang": "a58e2734299fcaf8dad0c7189ec2f903204f6be85161245a10439e38aa9a0526",
+      "tests/cuda/nvvm-i64-masked-minmax.slang": "1f477c49033415ba8f069d7a216c9207170c9bbf8ea1d9dc1d0be3174dc8eab2",
+      "tests/cuda/nvvm-fp16-masked-minmax.slang": "1b177d1a9e246fb44d94015dca2df0e81f81f05a62ce0ff98a51a78879b48f3e"
+    },
+    "artifact_sha256": {
+      "build/RelWithDebInfo/bin/slangc": "79f46ef0dba116bdfdce8a03b40f7d3bb2c7b481529b452b483d650cf0958e43",
+      "build/RelWithDebInfo/bin/slang-test": "9c83731b05689bbdbd15956198ad10759e4e9142bd663fe2452fda4954d96a69",
+      "build/RelWithDebInfo/bin/test-server": "fd964f03c3c57b4352ce75f720706fdc852e3a0cd231b90cb0c89068190b827e",
+      "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372",
+      "build/RelWithDebInfo/lib/libslang-compiler.so": "92ae81d069aeda9a6ff2a61edec43f572b2af02bb7ec677fc444490ea9a966f1",
+      "build/RelWithDebInfo/lib/slang-core-module.bin": "239776a8a1e28b1a1bf31431199d5da2be8afc0d97f084922a9ef0f1a14449e6",
+      "build/RelWithDebInfo/lib/librender-test-tool.so": "96baec31673b6f33a619eb7cc8fd7a518942da12d9374718f475b84cc94ccbc4",
+      "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "e3083388dcdff0e879f480f80d2a2a5b6620bdca3a3fc4658ffa66de73664d71",
+      "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "/usr/local/cuda-12.9/lib64/libnvrtc.so": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a",
+      "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+      "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461"
+    },
+    "configuration": "RelWithDebInfo",
+    "target_architecture": 80,
+    "submodule_pins": [
+      " 9dc178a86fcbbf13c94b4cd4cb046f238d26c8da external/WindowsToolchain (v0.12.0-9-g9dc178a)",
+      " 924936d0427cb25a61169739a7660230bffa6ea6 external/cmark (swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-09-15-a)",
+      " e0b53eaf63c6d00e0725788ef1dbb759aa321d79 external/fast_float (v6.1.0-352-ge0b53ea)",
+      " efec5db081e3aad807d0731e172ac597f6a39447 external/glm (0.9.5.3-2723-gefec5db0)",
+      " d1f52c8993a501bd52d4fbd044bfeb9ecdceb9f4 external/glslang (11.1.0-1385-gd1f52c89)",
+      " 8936b58fe26e8c3da834b8f60b06511d537b4c63 external/imgui (v1.62-5420-g8936b58fe)",
+      " 3fe7be956f23385aa1950dc31e2f25127ccfc0ea external/lua (v5.4-beta-333-g3fe7be95)",
+      " 7f71be01f2c6f6b2c3cddb67eef8c38eab12ffd4 external/lz4 (v1.9.2-1351-g7f71be01)",
+      " a63bd172ddcba73a3d87ca32032b66ad41ddb9a6 external/metal-cpp (remotes/origin/metal-cpp_macOS14.2_iOS17.2)",
+      " 8c532c32c3c96e5ba1f2283e032f69ead8add00f external/mimalloc (v2.1.7)",
+      " 6ef6c68f4fcbb8287aa8edf9c6670804932f41c6 external/miniz (3.0.2-68-g6ef6c68)",
+      " a1280c1863ff19d87f8e827468a4cc906ba9032a external/optix-dev (v9.0.0-1-ga1280c1)",
+      " d6d31411a3ab5417945daa6b1d8811cfc340cb66 external/slang-rhi (d6d31411)",
+      " 29981f65241605e08b0ede4cfeb999fe3b723c6a external/spirv-headers (1.5.4.raytracing.fixed-498-g29981f6)",
+      " 0d6fd73ca73830ccab5fa1f00ed5ed40124e2c55 external/spirv-tools (v2022.4-1300-g0d6fd73c)",
+      " d541711a794343de4ef5ea76f037c9fb9c127a55 external/tinyobjloader (v1.0.6-85-gd541711)",
+      " 73f3cbb237e84d483afafc743f1f14ec53e12314 external/unordered_dense (v4.5.0)",
+      " 387259ecf4b0fe0cfac161b1d0b0a74e42796710 external/vulkan (v1.4.347)"
+    ],
+    "compiler_version": "2026.16-228-g74f227e10",
+    "toolkit": {
+      "path": "/usr/local/cuda-12.9",
+      "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_May_27_02:21:03_PDT_2025\nCuda compilation tools, release 12.9, V12.9.86\nBuild cuda_12.9.r12.9/compiler.36037853_0"
+    },
+    "toolkit_libraries": {
+      "required_libnvvm": "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0",
+      "required_nvrtc": "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86",
+      "libnvvm_sha256": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "nvrtc_sha256": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+    },
+    "device": {
+      "name": "NVIDIA L4",
+      "ordinal": 0,
+      "visible_device_count": 1,
+      "compute_capability": 89,
+      "driver_api_version": 13000,
+      "cuda_visible_devices": null
+    },
+    "provider_abi": 36,
+    "source_revision": "f77142a2e8d54b66482dc85b4e99e2a6e28de777",
+    "source_commit": "f77142a2e8d54b66482dc85b4e99e2a6e28de777",
+    "branch": "nvvm-backend",
+    "post_research_gpu": "NVIDIA L4, 580.126.09, 8.9",
+    "additional_trace_source_sha256": {
+      "source/slang/core.meta.slang": "1f22b59c1b557ffe45aa528c70d536a30746d3519153a6710cafa9a7c546c993",
+      "source/slang/slang-ir.cpp": "8f802fc083ed9c59f44ad9ef1c4339d5dffa2b596d58f63c552451ee310cca23",
+      "source/slang/slang-ir-insts.h": "8fe5456f9b691039631ba7150c35a2d1bb1565bfcf14298ece3feda404c92020",
+      "source/slang/slang-ir-insts.lua": "026f69a13551d81b50cdaf3d34c9ac15817ca73e0e4100182c89ae5067155940",
+      "source/slang/slang-lower-to-ir.cpp": "e702e5e9502b84cb189f62c3cbbc74e34114b6ebfd0aba5bb41cf3724fe078bd",
+      "source/slang/slang-emit-c-like.cpp": "392dba66dda1e0892a029c9ddbcf07696750c1c832e59f500b0e8d564926d627",
+      "source/slang/slang-emit-cuda.cpp": "082c283d95eb860937bcb17601402aff52148997eb36d939e9a439b776b1ff45",
+      "source/slang/slang-emit-glsl.cpp": "24bdaed545fa2375e2e99b85e2b9f9c6ca059ec53955b85003f060e46cffcff4",
+      "source/slang/slang-emit-spirv.cpp": "b1e6590c3d3dad493751cff0642a437248f9e755d7fbbf2e872c837681da8b92",
+      "tests/hlsl-intrinsic/quad-control/quad-control-comp-functionality.slang": "5e7688fd50c9f085a9fa81e8ca33fba12e6c6751be87675cefb3ca100ceb2dd0"
+    }
+  },
+  "preservation": {
+    "registered_input_hashes": {
+      "path": "build/nvvm-loop/slice-234-quad/registered-input-hashes.json",
+      "sha256": "bd8ca7f7154d8d8cacb0c6abed6468f784907b246e423d902d7f91ebaf26a373"
+    },
+    "source_count": 30,
+    "artifact_count": 12,
+    "input_count": 555,
+    "cumulative_cells": 1677,
+    "correct": 1630,
+    "unresolved": 47,
+    "resolved_histories": 10,
+    "frozen_identities": 452,
+    "frozen_cells": 1356,
+    "discovery_identities": 107,
+    "discovery_cells": 321,
+    "latest_targeted": 233,
+    "targeted233_fresh": 642,
+    "targeted233_inherited_full229": 1035,
+    "full_corpus_not_rerun": true
+  },
+  "smoke": {
+    "results": {
+      "path": "build/nvvm-loop/slice-234-quad/runtime/results.json",
+      "sha256": "7f1e7cd6cd7f45b55a686a25f7eddbc3ed6c0f67499ac36d7b1d74296eb51d82"
+    },
+    "passed": 4
+  },
+  "frozen": {
+    "results": {
+      "path": "build/nvvm-loop/slice-234-quad/frozen/results.json",
+      "sha256": "56428c7ddf596e8d9353f665a5e7fe03e6c3aea1eb8194c7f249cb8506cbc9e1"
+    },
+    "cells": [
+      {
+        "id": "hlsl-intrinsic/quad-control/quad-control-comp-functionality.slang#cuda-1",
+        "mode": "nvrtc-o3",
+        "classification": "correct",
+        "return_code": 0,
+        "execution_counts": {
+          "passed": 1,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "diagnostic": "",
+        "canonical_shape": ""
+      },
+      {
+        "id": "hlsl-intrinsic/quad-control/quad-control-comp-functionality.slang#cuda-1",
+        "mode": "nvvm-o0",
+        "classification": "preflight",
+        "return_code": 1,
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'RequireMaximallyReconverges'",
+        "canonical_shape": "RequireMaximallyReconverges"
+      },
+      {
+        "id": "hlsl-intrinsic/quad-control/quad-control-comp-functionality.slang#cuda-1",
+        "mode": "nvvm-o3",
+        "classification": "preflight",
+        "return_code": 1,
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'RequireMaximallyReconverges'",
+        "canonical_shape": "RequireMaximallyReconverges"
+      }
+    ],
+    "five_field_changes": 0
+  },
+  "runtime": [
+    {
+      "name": "runtime-probes",
+      "results": {
+        "path": "build/nvvm-loop/slice-234-quad/runtime-probes/results.json",
+        "sha256": "b0655d04b3baad430502e6ea60117bf373b96810afae00a7116b45cb1560428d"
+      },
+      "input_expectation_pairs": 384,
+      "launches": 1536,
+      "passed": 1536,
+      "output_words": 98304,
+      "mode_counts": {
+        "public/nvrtc-o3": 384,
+        "shuffle-control/nvrtc-o3": 384,
+        "shuffle-control/nvvm-o0": 384,
+        "shuffle-control/nvvm-o3": 384
+      }
+    },
+    {
+      "name": "divergent-probes",
+      "results": {
+        "path": "build/nvvm-loop/slice-234-quad/divergent-probes/results.json",
+        "sha256": "de6de3d02aff78b45bef9dba5a15a8905ebdbdee8e7a97b8f4d0ef149051f99f"
+      },
+      "input_expectation_pairs": 128,
+      "launches": 512,
+      "passed": 512,
+      "output_words": 32768,
+      "mode_counts": {
+        "public/nvrtc-o3": 128,
+        "shuffle-control/nvrtc-o3": 128,
+        "shuffle-control/nvvm-o0": 128,
+        "shuffle-control/nvvm-o3": 128
+      }
+    }
+  ],
+  "compilation": {
+    "results": {
+      "path": "build/nvvm-loop/slice-234-quad/compile-classification.json",
+      "sha256": "ddfc880f474135dd8fa7f48d948a006f314b39b4cc9b1414dde113ddda90166b"
+    },
+    "attempts": 56,
+    "classifications": {
+      "direct-preflight-E52017": 20,
+      "source-internal-marker-E99999": 4,
+      "success": 24,
+      "initial-alias-construction-E45001": 8
+    },
+    "ptx_assembled": 14
+  },
+  "specifications": {
+    "path": "build/nvvm-loop/slice-234-quad/specs/index.json",
+    "sha256": "de4b38c8b3d9e41313a2d315eded3b0dd2e10f8a82ff38bf3414c7ce982edb2d"
+  },
+  "raw_artifact_index": {
+    "path": "build/nvvm-loop/slice-234-quad/artifact-index.json",
+    "sha256": "674c44e0c432244afe4eb313636e51f4850534a595c636906bc0f033fd6fb67b"
+  },
+  "audit": {
+    "path": "build/nvvm-loop/slice-234-quad/audit.json",
+    "sha256": "c9f224fb2e71d7565cbee5a0c0f233b26939a1c15fae7cd9f09e753fa40b5b07"
+  },
+  "summary": {
+    "status": "passed",
+    "source_revision": "f77142a2e8d54b66482dc85b4e99e2a6e28de777",
+    "tested_source_hashes": 30,
+    "artifact_hashes": 12,
+    "registered_inputs": 555,
+    "production_unchanged": true,
+    "frozen_cells": 3,
+    "frozen_five_field_changes": 0,
+    "smoke": 4,
+    "launches": 2048,
+    "independent_expected_output_words": 131072,
+    "input_expectation_pairs": 512,
+    "input_regions_unchanged": 2048,
+    "input_region_words": 96,
+    "retained_binary_files": 3072,
+    "compile_attempts": 56,
+    "compile_classifications": {
+      "direct-preflight-E52017": 20,
+      "source-internal-marker-E99999": 4,
+      "success": 24,
+      "initial-alias-construction-E45001": 8
+    },
+    "ptx_assembled": 14,
+    "raw_index_entries": 3243,
+    "missing_or_duplicate_runtime_cells": 0
+  },
+  "findings": [
+    "Markers are target requirements in a canonical intrinsic body; CUDA source replaces the whole body.",
+    "Standalone markers reject in direct preflight and hit existing source E99999; they are not global CUDA no-ops.",
+    "Marker-free bool(bool) GenericAsm quad helpers independently reject; typed whole-helper admission is the next boundary.",
+    "CUDA full-mask indexed shuffles use four complete source-quad lanes and matching rendezvous. SM80 supports divergent matching calls; missing source lanes remain undefined.",
+    "Existing direct provider operations execute the source-equivalent shuffle algebra at O0/O3.",
+    "LLVM convergent attributes do not implement SPIR-V whole-entry maximal reconvergence."
+  ],
+  "next_bounded_action": "Implement typed CUDA quad helper admission with both requirement markers accounted for only at that canonical boundary. Preserve standalone rejection and existing source participation; use dynamic oracle fixtures and exact replay. No implementation included.",
+  "limitations": [
+    "No partial-source-quad or mismatched-shuffle output oracle; no claim for SM6x.",
+    "No material runtime/performance contract; six inherited compile/assembly cells only.",
+    "Frozen/discovery cumulative acceptance remains233; research changes no outcomes or cadence.",
+    "Initial alias failures and standalone source ICE probes remain explicitly classified."
+  ],
+  "parent_acceptance": {
+    "audit": {
+      "path": "build/nvvm-loop/slice-234-quad/parent-acceptance-audit.json",
+      "sha256": "725008c8ef7ce727aef5bab3e47424391e61b627556ec609e99ca99511f89113"
+    },
+    "script": {
+      "path": "build/nvvm-loop/slice-234-quad/parent-audit.py",
+      "sha256": "7906336cb45bb893aa11e83a490a76a51373151d55cf52ba4f60542690e2d5d6"
+    }
+  }
+}

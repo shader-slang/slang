@@ -15,9 +15,14 @@ boundary in the selected frozen domain is
 `tests/hlsl-intrinsic/quad-control/quad-control-comp-functionality.slang`: both direct modes retain
 `direct NVVM lowering does not support Slang IR instruction or shape 'RequireMaximallyReconverges'`.
 The unchanged first-known record, full diagnostic and reproduction remain in the validation ledger.
-No quad investigation or implementation was started. Matrix prefix capability and other arithmetic
-families remain separate candidates. Next, re-rank the recorded correctness gaps and quad boundary
-for one bounded investigation, preserving the current compiler until its evidence supports a change.
+Research 234 is accepted; see the
+[quad contract report](report.slice-234-quad-reconvergence.md) and
+[semantic evidence](semantic-evidence.slice-234.json). The markers are target requirements inside
+a canonical CUDA GenericAsm helper, whose whole body source emission replaces. Standalone markers
+are not CUDA no-ops. The next bounded implementation candidate is typed `_slang_quadAny`/
+`_slang_quadAll` helper admission with both markers accounted for at that boundary, preserving
+standalone rejection and the full-mask shuffle source contract. No compiler change was made.
+Matrix prefix capability and other arithmetic families remain separate candidates.
 
 Latest accepted implementation and targeted acceptance: 233. Latest full checkpoint: 229.
 Implementation slices since full: two. A full checkpoint is required after the third implementation
@@ -101,3 +106,30 @@ Parent acceptance independently verified 669 unique compact evidence references,
 source/artifact/input hashes, exact cumulative census preservation and complete failure histories.
 All 8,868 raw GPU output buffers match accepted research expectations with unchanged input regions;
 all 17,736 accepted research binaries remain intact. See `parent-acceptance-audit.json`.
+
+## Research 234 handoff awaiting acceptance
+
+Fresh smoke 4 passes. Exactly three frozen quad cells preserve all five outcome fields: NVRTC correct,
+direct O0/O3 unchanged preflight. Dynamic research passes 2,048 launches/131,072 expected output
+words with 512 shared input/expectation pairs, unchanged 96-word input regions and inactive sentinels.
+Public NVRTC quad helpers and explicit-shuffle controls at NVRTC/direct O0/O3 cover all 16 Boolean
+quad truth tables, 4/16/32-thread blocks, complete-quad exits, divergent work before common calls,
+and divergent inline/noinline calls. Fourteen PTX artifacts assemble. Public direct probes still
+reject; marker-free helpers independently expose `_slang_quadAny/All, signature=bool(bool)`.
+
+SM80 synchronized shuffles support matching rendezvous across divergent branches. The frozen source
+has complete quads and four matching shuffles per branch, so its behavior has a documented basis.
+Partial-quad source reads remain undefined and were not launched or promoted to an oracle.
+No CUDA-wide maximal-reconvergence or active-only-vote promise is inferred. Raw evidence is under
+`build/nvvm-loop/slice-234-quad`; source revision/commit are actual
+`f77142a2e8d54b66482dc85b4e99e2a6e28de777`. All 555 registered inputs, 30 tested source paths and
+12 artifacts preserve 233. No rebuild, production/provider/ABI/runner/corpus changes or device loss.
+Cumulative 233 remains 1,677/1,630/47 with ten resolved histories; full 229/cadence two and rolling
+feature 229/231/233 are unchanged. Six material compile/assembly passes are inherited; its runtime
+contract remains absent. Research does not advance implementation cadence.
+
+Parent acceptance of research 234 verified 3,246 unique evidence files and unchanged source,
+artifact and registered input hashes. Independent Boolean reconstruction of all 512 input cases
+matched every saved expectation and all 2,048 complete GPU output buffers. The next bounded
+implementation is typed CUDA quad helper admission; its acceptance must include the full frozen
+and discovery checkpoint because it will be the third implementation since full 229.

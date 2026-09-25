@@ -8168,3 +8168,32 @@ by extending only the emitter's existing seed and source-order admission policie
 vector2/vector4 recipes and existing matrix reduction leaves reuse the same algorithms and typed
 provider operations. The registered raw16 fixture has closed-form expectations; the unchanged
 research input/expectation replay verifies all three modes. Matrix prefix capability remains separate.
+
+### CUDA quad helper requirements (slice 234 research)
+
+`QuadAny`/`QuadAll` produce canonical `bool(bool)` CUDA helpers with
+`RequireMaximallyReconverges`, `RequireQuadDerivatives`, and a GenericAsm terminator naming
+`_slang_quadAny`/`_slang_quadAll`. These bodies intentionally carry target requirements. SPIR-V
+and GLSL propagate the markers to entry-point execution modes/layouts. CUDA source emission uses
+`findTargetIntrinsicDefinition` to replace the whole helper call and omits its body, so the markers
+are not executable CUDA barriers. A standalone marker instead reaches an unsupported source opcode;
+absence from generated CUDA is not a general license to discard it in direct NVVM.
+
+The CUDA prelude reads four source lanes `(lane & ~3) | k` with full-mask synchronized indexed
+shuffles, then combines the Boolean values. On the researched SM80 path, matching shuffle modes
+and masks can rendezvous across divergent branches; no whole-kernel maximal-reconvergence mode is
+implied. Complete source quads and matching shuffle participation are required. Complete-quad exits
+before the operation are valid because no surviving quad reads an exited lane. Missing source lanes
+have undefined values; this implementation must not be reinterpreted as SPIR-V's active-only quad
+vote. A within-quad Any/All branch can communicate across the branch on CUDA when all lanes execute
+the corresponding shuffle sequence. Hardware active-mask reads are not a replacement contract.
+
+The existing provider lane-index, integer indexed shuffle and Boolean operations suffice for the
+four-lane source algebra. Its shuffle declarations preserve `convergent`, `inaccessiblememonly`
+and `nounwind`; LLVM convergent constrains optimization and is distinct from SPIR-V maximal
+reconvergence. Direct preflight currently scans the helper body and rejects its first requirement.
+Marker-free controls independently reject the typed GenericAsm helper. A future admission slice
+must therefore own the complete typed helper and both target requirements, preserving rejection of
+standalone markers; a global no-op-marker rule would be too broad. No such support is implemented
+by this research. See [report234](../../issue-nvvm-backend/report.slice-234-quad-reconvergence.md)
+and its hash-addressed specification/probe evidence for the exact source and participation limits.
