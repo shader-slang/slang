@@ -8207,3 +8207,25 @@ output buffers, adding direct public-helper modes for 3,072 launches. See
 contract and [report235](../../issue-nvvm-backend/report.slice-235-quad-helpers.md) for admission,
 negative boundaries and final-source validation. Partial source quads and unmatched shuffle
 sequences remain outside the defined test oracle.
+
+### CUDA clock observations (slice 236 research)
+
+CUDA `getRealtimeClockLow` produces GenericAsm `clock` with `uint()`, while
+`__cudaCppGetRealtimeClock` produces `clock64` with `int64_t()`. The public `uint2` wrapper
+preserves the 64-bit pattern with unsigned high-word shift. These source contracts read a per-SM
+cycle counter; their names do not authorize substituting `%globaltimer` or making cross-SM,
+wall-time, frequency or memory-fence promises. `%clock` is the low 32 bits of `%clock64`; both wrap.
+
+On CUDA12.9 libNVVM, direct LLVM clock intrinsic declarations common consecutive reads even with
+LLVM14's `inaccessiblememonly nounwind` attributes, and O3 hoists loop observations. Successful
+verification and PTX assembly do not establish the live-read contract. Side-effecting inline PTX
+`mov.u32`/`mov.u64` controls retain distinct observations through the tested pipeline. Future typed
+provider operations must preserve those effects; zero operands do not imply purity. No legacy
+attribute rewrite or source-library change was shown necessary.
+
+The original frozen clock expression cancels observed ticks, so use independent deterministic
+work, low-word bracketing, bounded modular ordering/progress and input/sentinel preservation. Do
+not compare exact ticks between launches. Research236 retains 36 successful source/control
+launches, 18 intrinsic counterexamples and separate signed/unsigned word-reconstruction coverage.
+See [the report](../../issue-nvvm-backend/report.slice-236-clock.md) for limitations and the precise
+implementation handoff. Provider implementation requires a full checkpoint.

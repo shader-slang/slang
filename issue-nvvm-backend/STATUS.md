@@ -18,9 +18,20 @@ passes all three modes. Latest accepted implementation and full checkpoint: 235.
 acceptance: 233. Implementation slices since full: zero. Rolling feature history is 231 I64 MIN/MAX,
 233 FP16 MIN/MAX and 235 quad helpers.
 
-Next action: select a bounded research slice from the remaining measured gaps, including the
-frozen clock helper rejection, substandard floats, and resource boundaries. Research-backed correctness remains the priority while the material runtime binding,
-texture/LUT/input and output-oracle contract is absent. No push is authorized.
+**Research 236 is accepted.** [Clock report](report.slice-236-clock.md),
+[plan](plan.slice-236-clock.md) and [semantic evidence](semantic-evidence.slice-236.json) establish
+exact `clock` uint() / `clock64` int64_t() contracts. Naive LLVM intrinsics common at O0/O3 and
+hoist at O3 through libNVVM12.9. All 36 source/side-effecting PTX control launches pass; 18 intrinsic
+counterexamples remain explicit research failures. Three reconstruction modes and 20 assemblies
+pass. All 31 source, 12 artifact and 556 input hashes preserve full235; the three original frozen
+clock cells preserve exact outcomes. No implementation, ledger or cadence change. Delegation was
+unavailable; the recorded local fallback uses a separate raw-buffer acceptance checker.
+
+Next action: implement narrowly typed side-effecting clock provider operations, strict admission
+and negative tests, and an independently expected runtime fixture. Preserve/replay research236
+inputs and relational predicates without comparing nondeterministic ticks. A provider contract
+change forces a full frozen/discovery/material support checkpoint. Material runtime bindings,
+textures/LUT/input and output oracle remain absent; no runtime/performance claim or push.
 
 ## Checkpoints and evidence
 
