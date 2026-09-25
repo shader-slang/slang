@@ -25,7 +25,8 @@ void main()
 
 // SPIRV-DAG: %[[hint:[A-Za-z0-9_]+]] = OpConstant %{{[A-Za-z0-9_]+}} 3
 // SPIRV-DAG: %[[bits:[A-Za-z0-9_]+]] = OpConstant %{{[A-Za-z0-9_]+}} 2
-// SPIRV-DAG: %[[empty:[A-Za-z0-9_]+]] = OpTypeStruct{{$}}
+// SPIRV-DAG: %[[uint:[A-Za-z0-9_]+]] = OpTypeInt 32 0
+// SPIRV-DAG: %[[empty:[A-Za-z0-9_]+]] = OpTypeStruct %[[uint]]{{$}}
 // SPIRV-DAG: %[[pointer:[A-Za-z0-9_]+]] = OpTypePointer RayPayloadKHR %[[empty]]
 // SPIRV-DAG: %[[payload:[A-Za-z0-9_]+]] = OpVariable %[[pointer]] RayPayloadKHR
 // SPIRV: OpHitObjectReorderExecuteShaderEXT %{{[A-Za-z0-9_]+}} %[[payload]] %[[hint]] %[[bits]]{{$}}

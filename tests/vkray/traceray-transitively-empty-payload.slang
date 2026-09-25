@@ -62,21 +62,21 @@ void rgen()
     TraceRay(scene, RAY_FLAG_NONE, 0xff, 0, 0, 0, ray, payload);
 }
 
-// The unchanged nested logical types disappear. D3D's required payload slots get one-int objects.
+// The unchanged nested logical types disappear. D3D's required payload slots get one-uint objects.
 // HLSL_CALLER: struct {{(\[raypayload\] )?}}[[carrier:[A-Za-z0-9_]+]]
 // HLSL_CALLER: {
-// HLSL_CALLER-NEXT: int _slang_dummy{{.*}};
+// HLSL_CALLER-NEXT: uint _slang_dummy{{.*}};
 // HLSL_CALLER-NEXT: };
 // HLSL_CALLER: [[carrier]] [[payload:[A-Za-z0-9_]+]];
 // HLSL_CALLER: TraceRay({{.*}}, [[payload]]);
 // HLSL_CALLEE: struct {{(\[raypayload\] )?}}[[carrier:[A-Za-z0-9_]+]]
 // HLSL_CALLEE: {
-// HLSL_CALLEE-NEXT: int _slang_dummy{{.*}};
+// HLSL_CALLEE-NEXT: uint _slang_dummy{{.*}};
 // HLSL_CALLEE-NEXT: };
 // HLSL_CALLEE: void missMain(inout [[carrier]] {{[A-Za-z0-9_]+}})
 // HLSL_HIT: struct {{(\[raypayload\] )?}}[[carrier:[A-Za-z0-9_]+]]
 // HLSL_HIT: {
-// HLSL_HIT-NEXT: int _slang_dummy{{.*}};
+// HLSL_HIT-NEXT: uint _slang_dummy{{.*}};
 // HLSL_HIT-NEXT: };
 // HLSL_HIT: struct HitAttributes
 // HLSL_HIT: {

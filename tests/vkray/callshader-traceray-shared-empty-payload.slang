@@ -25,11 +25,11 @@ void rgen()
 // Ray and callable ABI roles may use separate dummy types. Each must have exactly one field.
 // HLSL: struct {{.*}}
 // HLSL-NEXT: {
-// HLSL-NEXT: int _slang_dummy{{.*}};
+// HLSL-NEXT: uint _slang_dummy{{.*}};
 // HLSL-NEXT: };
 // HLSL: struct {{.*}}
 // HLSL-NEXT: {
-// HLSL-NEXT: int _slang_dummy{{.*}};
+// HLSL-NEXT: uint _slang_dummy{{.*}};
 // HLSL-NEXT: };
 // HLSL: TraceRay({{.*}}, {{[A-Za-z0-9_]+}});
 // HLSL: CallShader(0U, {{[A-Za-z0-9_]+}});

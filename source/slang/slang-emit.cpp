@@ -1952,10 +1952,9 @@ Result linkAndOptimizeIR(
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
-        // Record D3D's required payload parameters before general type legalization rewrites
-        // signatures. The legalizer then uses its actual none result to materialize boundary
-        // objects, without predicting emptiness or preserving ordinary helper arguments.
-        // CPU/CUDA do not require this preparation and skip the surrounding legalization block.
+        // Give empty ray/callable payloads physical storage at native interfaces before type
+        // legalization erases their logical values. Ordinary helper signatures/copies are left
+        // untouched. CPU/CUDA require no artificial payload and skip this legalization block.
         SLANG_PASS(legalizeRayTracingPayloads, targetProgram);
 
         if (isMetalTarget(targetRequest))

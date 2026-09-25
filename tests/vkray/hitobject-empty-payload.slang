@@ -39,10 +39,10 @@ void main()
     result[0] = hit.IsHit() ? 1 : 0;
 }
 
-// The logical payload disappears. The actual instruction still needs a global interface object;
-// direct SPIR-V accepts a zero-member struct and needs no artificial data field.
-// SPIRV-NOT: _slang_dummy
-// SPIRV: %[[carrier:[A-Za-z0-9_]+]] = OpTypeStruct{{$}}
+// The logical payload disappears. The actual instruction still needs a global interface object
+// with the same one-uint physical representation used by the other ray-tracing backends.
+// SPIRV: %[[uint:[A-Za-z0-9_]+]] = OpTypeInt 32 0
+// SPIRV: %[[carrier:[A-Za-z0-9_]+]] = OpTypeStruct %[[uint]]{{$}}
 // SPIRV: %[[pointer:[A-Za-z0-9_]+]] = OpTypePointer RayPayloadKHR %[[carrier]]
 // SPIRV: %[[payload:[A-Za-z0-9_]+]] = OpVariable %[[pointer]] RayPayloadKHR
 // SPIRV: OpHitObjectTraceRay{{(Motion)?(NV|EXT)}} {{.*}} %[[payload]]

@@ -1,5 +1,5 @@
 // An unannotated TraceRay payload is recognized through the D3D-only
-// ForceVarIntoRayPayloadStructTemporarily marker. After the logical value disappears, the required
+// ForceVarIntoRayPayloadStructTemporarily marker. Before the logical value disappears, the required
 // payload slot must receive a target-valid object. Otherwise the emitted TraceRay call has only
 // seven arguments. The original EmptyPayload type stays empty.
 
@@ -29,7 +29,7 @@ void main()
 
 // HLSL: struct {{(\[raypayload\] )?}}[[carrier:[A-Za-z0-9_]+]]
 // HLSL-NEXT: {
-// HLSL-NEXT: int _slang_dummy{{.*}};
+// HLSL-NEXT: uint _slang_dummy{{.*}};
 // HLSL-NEXT: };
 // HLSL: [[carrier]] [[payload:[A-Za-z0-9_]+]];
 // HLSL: TraceRay({{.*}}, [[payload]]);
@@ -39,8 +39,8 @@ void main()
 
 // Khronos ray tracing also carries the payload through a decorated module-scope object. It must
 // remain physical for both direct SPIR-V and GLSL emission.
-// SPIRV-NOT: _slang_dummy
-// SPIRV: %[[carrier:[A-Za-z0-9_]+]] = OpTypeStruct{{$}}
+// SPIRV: %[[uint:[A-Za-z0-9_]+]] = OpTypeInt 32 0
+// SPIRV: %[[carrier:[A-Za-z0-9_]+]] = OpTypeStruct %[[uint]]{{$}}
 // SPIRV: %[[pointer:[A-Za-z0-9_]+]] = OpTypePointer RayPayloadKHR %[[carrier]]
 // SPIRV: %[[payload:[0-9A-Za-z_]+]] = OpVariable %[[pointer]] RayPayloadKHR
 // SPIRV: OpTraceRayKHR {{.*}} %[[payload]]

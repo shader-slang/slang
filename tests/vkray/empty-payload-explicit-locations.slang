@@ -1,6 +1,6 @@
 // Ray payloads and callable data have separate location namespaces. Both empty objects below use
 // location 7 and are referenced only by late-resolved assembly operands, not ordinary pointers.
-// Type legalization must preserve their binding identity when replacing erased logical storage.
+// Ray-tracing legalization must preserve their binding identity when replacing empty storage.
 
 //TEST:SIMPLE(filecheck=SPIRV): -entry main -stage raygeneration -target spirv -O0 -validate-ir
 //TEST:SIMPLE(filecheck=SPIRV): -entry main -stage raygeneration -target spirv -O3 -validate-ir
@@ -43,7 +43,12 @@ void main()
 // SPIRV-DAG: OpName %[[callable:[A-Za-z0-9_]+]] "empty_callable_at_seven"
 // SPIRV-DAG: OpDecorate %[[ray]] Location 7
 // SPIRV-DAG: OpDecorate %[[callable]] Location 7
-// SPIRV-DAG: %[[ray]] = OpVariable %{{[A-Za-z0-9_]+}} RayPayloadKHR
-// SPIRV-DAG: %[[callable]] = OpVariable %{{[A-Za-z0-9_]+}} CallableDataKHR
+// SPIRV-DAG: %[[uint:[A-Za-z0-9_]+]] = OpTypeInt 32 0
+// SPIRV-DAG: %[[rayType:[A-Za-z0-9_]+]] = OpTypeStruct %[[uint]]{{$}}
+// SPIRV-DAG: %[[rayPointer:[A-Za-z0-9_]+]] = OpTypePointer RayPayloadKHR %[[rayType]]
+// SPIRV-DAG: %[[ray]] = OpVariable %[[rayPointer]] RayPayloadKHR
+// SPIRV-DAG: %[[callableType:[A-Za-z0-9_]+]] = OpTypeStruct %[[uint]]{{$}}
+// SPIRV-DAG: %[[callablePointer:[A-Za-z0-9_]+]] = OpTypePointer CallableDataKHR %[[callableType]]
+// SPIRV-DAG: %[[callable]] = OpVariable %[[callablePointer]] CallableDataKHR
 // SPIRV: OpTraceRayKHR {{.*}} %[[ray]]
 // SPIRV: OpExecuteCallableKHR %{{[A-Za-z0-9_]+}} %[[callable]]

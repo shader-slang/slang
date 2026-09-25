@@ -1,7 +1,7 @@
 // Arrays whose elements have no physical representation disappear during type legalization too.
 // A zero cast lowers directly to MakeStruct with a MakeArrayFromElement operand before payload
-// legalization. The early ray-tracing pass must leave this logical constructor and type unchanged;
-// type legalization removes the empty array before supplying the required target payload object.
+// legalization. The ray-tracing pass must leave this logical constructor and type unchanged;
+// it supplies the required physical payload object before type legalization removes the array.
 // Brace initialization in the callee also covers the ordinary aggregate constructor path.
 
 //TEST:SIMPLE(filecheck=HLSL_CALLER): -stage raygeneration -entry rgen -target hlsl -profile sm_6_7 -validate-ir
@@ -40,7 +40,7 @@ void rgen()
 // it, but the CallShader argument and callable entry-point parameter are required ABI slots.
 // Those slots receive target-valid dummy objects. The resulting HLSL has this shape:
 //
-//     struct EmptyArrayPayloadCarrier { int _slang_dummy; };
+//     struct EmptyArrayPayloadCarrier { uint _slang_dummy; };
 //     void rgen()
 //     {
 //         EmptyArrayPayloadCarrier carrier = { 0 };
@@ -52,12 +52,12 @@ void rgen()
 // depending on the compiler-generated type name. No nested empty logical type survives.
 // HLSL_CALLER: struct [[carrier:[A-Za-z0-9_]+]]
 // HLSL_CALLER: {
-// HLSL_CALLER-NEXT: int _slang_dummy{{.*}};
+// HLSL_CALLER-NEXT: uint _slang_dummy{{.*}};
 // HLSL_CALLER-NEXT: };
 // HLSL_CALLER: CallShader(0U, {{[A-Za-z0-9_]+}});
 // HLSL_CALLEE: struct [[carrier:[A-Za-z0-9_]+]]
 // HLSL_CALLEE: {
-// HLSL_CALLEE-NEXT: int _slang_dummy{{.*}};
+// HLSL_CALLEE-NEXT: uint _slang_dummy{{.*}};
 // HLSL_CALLEE-NEXT: };
 // HLSL_CALLEE: void callableMain(inout [[carrier]] {{[A-Za-z0-9_]+}})
 // DXIL: define void @

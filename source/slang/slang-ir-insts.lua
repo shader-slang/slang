@@ -2423,22 +2423,6 @@ local insts = {
 			{ vkStructOffset = { struct_name = "VkStructOffsetDecoration", operands = { { "offset", "IRIntLit" } } } },
 			{ raypayload = { struct_name = "RayPayloadDecoration" } },
 			{
-				requiredRayTracingPayload = {
-					-- A D3D intrinsic or entry-point parameter whose ABI requires a struct even
-					-- when its logical type legalizes to none. Other helper parameters may erase.
-					struct_name = "RequiredRayTracingPayloadDecoration",
-					operands = { { "isRayPayload", "IRIntLit" } },
-				},
-			},
-			{
-				emptyRayTracingPayload = {
-					-- A compiler-created physical payload type, not a source-language empty
-					-- aggregate. Its zero-member SPIR-V representation must survive legalization.
-					struct_name = "EmptyRayTracingPayloadDecoration",
-					operands = { { "isRayPayload", "IRIntLit" } },
-				},
-			},
-			{
 				MeshOutputDecoration = {
 					-- Mesh Shader outputs
 					{ vertices = { struct_name = "VerticesDecoration", min_operands = 1 } },

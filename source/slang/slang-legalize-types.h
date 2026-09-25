@@ -587,18 +587,6 @@ struct IRTypeLegalizationContext
 
     Dictionary<IRInst*, LegalVal> mapValToLegalVal;
 
-    // Physical ABI objects for payloads whose logical representation is still none. Keep these
-    // separate from mapValToLegalVal so ordinary loads, stores, and helper arguments erase.
-    Dictionary<IRGlobalVar*, IRGlobalVar*> emptyRayTracingGlobals;
-
-    // Original argument slots requiring a physical parameter after type legalization. Function
-    // signatures are rewritten before their calls; null slots use ordinary argument legalization.
-    Dictionary<IRFunc*, List<IRType*>> emptyRayTracingParamTypes;
-
-    // Canonical physical empty types, separated because only D3D ray payloads need ray qualifiers.
-    IRStructType* emptyRayPayloadType = nullptr;
-    IRStructType* emptyCallablePayloadType = nullptr;
-
     IRVar* insertBeforeLocalVar = nullptr;
 
     // store instructions that have been replaced here, so we can free them

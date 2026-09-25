@@ -1,6 +1,6 @@
 // Test for empty ray payload struct with HitObject.Invoke
 // GitHub Issue: https://github.com/shader-slang/slang/issues/8590
-// HLSL/DXIL require a one-int payload object; direct SPIR-V accepts a zero-member struct.
+// HLSL/DXIL and direct SPIR-V use the same one-uint physical payload representation.
 // CUDA/OptiX needs no artificial payload storage. The logical RayPayload type stays unchanged.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -profile sm_6_5 -entry rayGenShaderMakeQueryInvokeNOP -stage raygeneration -capability hlsl_nvapi
@@ -32,12 +32,12 @@ void rayGenShaderMakeQueryInvokeNOP()
 
 // HLSL: struct EmptyRayPayload{{[A-Za-z0-9_]*}}
 // HLSL-NEXT: {
-// HLSL-NEXT: int _slang_dummy{{.*}};
+// HLSL-NEXT: uint _slang_dummy{{.*}};
 // HLSL-NEXT: };
 // HLSL: NvInvokeHitObject
 
-// SPIRV-NOT: _slang_dummy
-// SPIRV: %[[payloadType:[A-Za-z0-9_]+]] = OpTypeStruct{{$}}
+// SPIRV: %[[uint:[A-Za-z0-9_]+]] = OpTypeInt 32 0
+// SPIRV: %[[payloadType:[A-Za-z0-9_]+]] = OpTypeStruct %[[uint]]{{$}}
 // SPIRV: %[[pointer:[A-Za-z0-9_]+]] = OpTypePointer RayPayloadKHR %[[payloadType]]
 // SPIRV: %[[payload:[A-Za-z0-9_]+]] = OpVariable %[[pointer]] RayPayloadKHR
 // SPIRV: OpHitObjectExecuteShaderNV {{.*}} %[[payload]]

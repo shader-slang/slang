@@ -877,7 +877,5 @@ return {
 	["Type.PtrTypeBase.SPIRVUntypedPtr"] = 900,
 	["Attr.TypeAlignment"] = 901,
 	["reportOptiXIntersection"] = 902,
-	["Decoration.postDepthCoverage"] = 903,
-	["Decoration.requiredRayTracingPayload"] = 905,
-	["Decoration.emptyRayTracingPayload"] = 906
+	["Decoration.postDepthCoverage"] = 903
 }

@@ -26,11 +26,11 @@ void rgen()
     CallShader(0, d);
 }
 
-// A separate one-int carrier is passed as CallShader's second argument. The logical EmptyData
+// A separate one-uint carrier is passed as CallShader's second argument. The logical EmptyData
 // type remains empty; only this ABI boundary requires storage. The bug emitted CallShader(0U).
 // HLSL: struct [[carrier:[A-Za-z0-9_]+]]
 // HLSL-NEXT: {
-// HLSL-NEXT: int _slang_dummy{{.*}};
+// HLSL-NEXT: uint _slang_dummy{{.*}};
 // HLSL-NEXT: };
 // HLSL: [[carrier]] [[payload:[A-Za-z0-9_]+]];
 // HLSL: CallShader(0U, [[payload]]);

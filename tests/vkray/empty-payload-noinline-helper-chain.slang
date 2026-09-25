@@ -102,7 +102,8 @@ void main()
 // SPIRV-DAG: %[[void:[A-Za-z0-9_]+]] = OpTypeVoid
 // SPIRV-DAG: %[[uint:[A-Za-z0-9_]+]] = OpTypeInt 32 0
 // SPIRV-DAG: %[[signature:[A-Za-z0-9_]+]] = OpTypeFunction %[[void]] %[[uint]]{{$}}
-// SPIRV-DAG: %[[payloadPointer:[A-Za-z0-9_]+]] = OpTypePointer {{RayPayloadKHR|CallableDataKHR}} %{{[A-Za-z0-9_]+}}
+// SPIRV-DAG: %[[payloadType:[A-Za-z0-9_]+]] = OpTypeStruct %[[uint]]{{$}}
+// SPIRV-DAG: %[[payloadPointer:[A-Za-z0-9_]+]] = OpTypePointer {{RayPayloadKHR|CallableDataKHR}} %[[payloadType]]
 // SPIRV-DAG: %[[payload:[A-Za-z0-9_]+]] = OpVariable %[[payloadPointer]] {{RayPayloadKHR|CallableDataKHR}}
 
 // SPIRV: OpFunctionCall %[[void]] %[[outer]] %{{[A-Za-z0-9_]+}}{{$}}

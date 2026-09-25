@@ -61,31 +61,30 @@ void traceNonEmpty()
     result[0] = payload[0] + payload[1];
 }
 
-// The logical array disappears, without padding its elements. GLSL requires a one-int object;
-// direct SPIR-V permits a zero-member struct but still requires a payload variable.
+// The logical array disappears, without padding its elements. Each backend uses the same
+// one-uint physical payload type at the dispatch boundary.
 // EMPTY_GLSL: struct [[carrier:[A-Za-z0-9_]+]]
 // EMPTY_GLSL-NEXT: {
-// EMPTY_GLSL-NEXT: int _slang_dummy{{[A-Za-z0-9_]*}};
+// EMPTY_GLSL-NEXT: uint _slang_dummy{{[A-Za-z0-9_]*}};
 // EMPTY_GLSL-NEXT: };
 // EMPTY_GLSL: {{callableDataEXT|rayPayloadEXT}}
 // EMPTY_GLSL-NEXT: [[carrier]] {{[A-Za-z0-9_]+}};
 // EMPTY_GLSL: {{executeCallableEXT|traceRayEXT}}(
-// EMPTY_SPIRV-NOT: _slang_dummy
-// EMPTY_SPIRV: %[[carrier:[A-Za-z0-9_]+]] = OpTypeStruct{{$}}
+// EMPTY_SPIRV: %[[uint:[A-Za-z0-9_]+]] = OpTypeInt 32 0
+// EMPTY_SPIRV: %[[carrier:[A-Za-z0-9_]+]] = OpTypeStruct %[[uint]]{{$}}
 // EMPTY_SPIRV: %[[pointer:[A-Za-z0-9_]+]] = OpTypePointer {{CallableDataKHR|RayPayloadKHR}} %[[carrier]]
 // EMPTY_SPIRV: %[[payload:[A-Za-z0-9_]+]] = OpVariable %[[pointer]] {{CallableDataKHR|RayPayloadKHR}}
 // EMPTY_SPIRV: Op{{ExecuteCallableKHR|TraceRayKHR}} {{.*}} %[[payload]]
 // EMPTY_HLSL: struct {{.*}}
 // EMPTY_HLSL-NEXT: {
-// EMPTY_HLSL-NEXT: int _slang_dummy{{.*}};
+// EMPTY_HLSL-NEXT: uint _slang_dummy{{.*}};
 // EMPTY_HLSL-NEXT: };
 // EMPTY_HLSL: TraceRay({{.*}}, {{[A-Za-z0-9_]+}});
 // DXIL: define void @
 
-// The via-GLSL route still needs a field because its intermediate source cannot declare an
-// empty struct, even though direct SPIR-V accepts one.
-// SPIRV_VIA_GLSL: %[[int:[A-Za-z0-9_]+]] = OpTypeInt 32 1
-// SPIRV_VIA_GLSL: %[[carrier:[A-Za-z0-9_]+]] = OpTypeStruct %[[int]]{{$}}
+// The via-GLSL route must agree with direct SPIR-V on the one-uint physical payload type.
+// SPIRV_VIA_GLSL: %[[uint:[A-Za-z0-9_]+]] = OpTypeInt 32 0
+// SPIRV_VIA_GLSL: %[[carrier:[A-Za-z0-9_]+]] = OpTypeStruct %[[uint]]{{$}}
 // SPIRV_VIA_GLSL: %[[pointer:[A-Za-z0-9_]+]] = OpTypePointer CallableDataKHR %[[carrier]]
 // SPIRV_VIA_GLSL: %[[payload:[A-Za-z0-9_]+]] = OpVariable %[[pointer]] CallableDataKHR
 // SPIRV_VIA_GLSL: OpExecuteCallableKHR %{{[A-Za-z0-9_]+}} %[[payload]]

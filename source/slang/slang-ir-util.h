@@ -16,6 +16,17 @@ constexpr IRIntegerValue kDefaultAnyValueSize = 16;
 constexpr SlangInt kRTTIHeaderSize = 16;
 constexpr SlangInt kRTTIHandleSize = 8;
 
+/// Return whether a struct contains only void fields or recursively empty structs. Other types,
+/// including arrays of empty elements, return false. This preserves DCE's existing structural
+/// query: type decorations do not affect its result.
+bool isStructEmpty(IRType* type);
+
+/// Return whether a type contains only empty data: void, structs of empty fields, or arrays of
+/// empty elements. Pointers, resources, opaque records, and target-intrinsic types are not empty.
+/// This structural query does not infer emptiness from byte size or predict all target-dependent
+/// type legalization decisions.
+bool isEmptyType(IRType* type);
+
 // A helper class to clone children insts to a different generic parent that has equivalent set of
 // generic parameters. The clone will take care of substitution of equivalent generic parameters and
 // intermediate values between the two generic parents.

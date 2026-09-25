@@ -1225,12 +1225,6 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
     if (type->findDecoration<IRTargetIntrinsicDecoration>())
         return LegalType::simple(type);
 
-    // A physical ray-tracing payload is created only after the source payload legalizes to
-    // none. SPIR-V permits its struct to have no fields, but the dispatch still requires an
-    // OpVariable of that type. Do not erase that ABI object in a subsequent legalization pass.
-    if (type->findDecoration<IREmptyRayTracingPayloadDecoration>())
-        return LegalType::simple(type);
-
     // Work-graph record types (DispatchNodeInputRecord<T>, NodeOutput<T>, etc.) are
     // opaque ABI objects. They must survive type legalization as-is even though they
     // have no IR fields — eliminating them breaks entry-point parameter handling.

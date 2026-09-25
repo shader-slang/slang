@@ -33,17 +33,17 @@ void rgen()
     CallShader(0, data);
 }
 
-// Type legalization removes the original nested logical types. Required D3D payload slots then
-// receive one-int objects in both independently compiled callers and callees.
+// Before type legalization, required D3D payload slots receive separate one-uint objects in
+// independently compiled callers and callees. Type legalization then removes the logical types.
 // HLSL_CALLER: struct [[carrier:[A-Za-z0-9_]+]]
 // HLSL_CALLER: {
-// HLSL_CALLER-NEXT: int _slang_dummy{{.*}};
+// HLSL_CALLER-NEXT: uint _slang_dummy{{.*}};
 // HLSL_CALLER-NEXT: };
 // HLSL_CALLER: [[carrier]] [[payload:[A-Za-z0-9_]+]];
 // HLSL_CALLER: CallShader(0U, [[payload]]);
 // HLSL_CALLEE: struct [[carrier:[A-Za-z0-9_]+]]
 // HLSL_CALLEE: {
-// HLSL_CALLEE-NEXT: int _slang_dummy{{.*}};
+// HLSL_CALLEE-NEXT: uint _slang_dummy{{.*}};
 // HLSL_CALLEE-NEXT: };
 // HLSL_CALLEE: void callableMain(inout [[carrier]] {{[A-Za-z0-9_]+}})
 // DXIL: define void @

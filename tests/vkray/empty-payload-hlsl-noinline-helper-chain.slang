@@ -74,7 +74,7 @@ void main()
 
 // HLSL: struct {{(\[raypayload\] )?}}[[payloadType:Empty(Ray|Callable)Payload[A-Za-z0-9_]*]]
 // HLSL-NEXT: {
-// HLSL-NEXT: int _slang_dummy{{.*}};
+// HLSL-NEXT: uint _slang_dummy{{.*}};
 // HLSL-NEXT: };
 // HLSL: void [[leaf:dispatchLeaf[A-Za-z0-9_]*]](uint {{[A-Za-z0-9_]+}})
 // HLSL: InterlockedAdd
