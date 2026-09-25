@@ -8025,3 +8025,12 @@ measures main-entry through validation and excludes Python startup/final report 
 The [slice report](../../issue-nvvm-backend/report.slice-214-complex-batching.md) records external
 whole-command costs separately from paired compilation lifecycle measurements and fresh-reference
 costs. A measured batch improvement is not an overall runner speedup.
+
+### Explicit discovery capacity (slice 220)
+
+The rolling discovery manifest is bounded to 50 through 128 explicitly selected unique sources.
+The size check occurs before source validation and filtering; duplicate identities, frozen-v1
+overlap, active directive selection, oracle argument preservation and required semantic tags retain
+their existing checks. Increasing capacity from 100 does not select new sources: the current 100
+entries and their three backend/optimization cells remain unchanged. Boundary tests cover 50, 100,
+101 and 128 valid entries, 49 and 129 invalid entries, and duplicate detection at a valid size.

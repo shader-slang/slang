@@ -92,6 +92,9 @@ if the needed shape is in an existing frozen source, keep its focused regression
 or add a distinct focused fixture. Do not defeat overlap checks or silently expand frozen v1.
 An explicitly selected source outside frozen v1 may already have a native CUDA directive; the
 discovery runner normalizes that target and preserves the selected inputs and output oracle.
+The explicit discovery manifest must contain 50 through 128 unique sources before filtering. Keep
+capacity changes separate from additions, preserve all old source identities/oracles, and validate
+runner-contract changes with a full checkpoint.
 If the discovery runner cannot faithfully express the required harness, add a documented runnable
 extension with explicit selection and expected results before counting it as corpus coverage.
 
@@ -139,7 +142,9 @@ and does not advance the slice cadence.
 ### Full-corpus checkpoints
 
 Run the complete frozen and discovery runtime corpora in all three modes and every registered
-complex cell after every three accepted implementation slices, before beginning a fourth. Also
+complex cell after every three accepted implementation slices, before beginning a fourth.
+For frozen checkpoints, pass `--workload-ids-from issue-nvvm-backend/census.slice-195.tsv`
+to `run-compute-census.py`. Its unfiltered discovery default is not the immutable frozen inventory. Also
 require a full checkpoint before accepting changes to broadly shared lowering/type handling, ABI,
 provider or library contracts, corpus selection/execution/reporting, or any change with uncertain
 impact.

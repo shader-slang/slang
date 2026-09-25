@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check discovery target normalization and frozen source preservation."""
+"""Check discovery capacity, target normalization and frozen source preservation."""
 
 import csv
 import importlib.util
@@ -18,6 +18,52 @@ MANIFEST = ROOT / "issue-nvvm-backend/discovery-corpus.manifest.tsv"
 
 
 class DiscoveryContractTests(unittest.TestCase):
+    def _write_synthetic_manifest(self, directory, count):
+        """Write real unique source contracts so capacity checks exercise the complete loader."""
+        tests = Path(directory) / "tests"
+        tests.mkdir()
+        manifest = Path(directory) / "manifest.tsv"
+        tags = ",".join(sorted(DISCOVERY.REQUIRED_SELECTION_TAGS))
+        with manifest.open("w", newline="") as stream:
+            writer = csv.DictWriter(
+                stream,
+                fieldnames=["source", "source_test_ordinal", "selection_tags", "rationale"],
+                delimiter="\t",
+            )
+            writer.writeheader()
+            for index in range(count):
+                source = f"case-{index}.slang"
+                (tests / source).write_text(
+                    "//TEST:COMPARE_COMPUTE(filecheck-buffer=EXPECTED):"
+                    "-cuda -output-using-type\n",
+                    encoding="utf-8",
+                )
+                writer.writerow(dict(source=source, source_test_ordinal=0,
+                                     selection_tags=tags, rationale="capacity boundary"))
+        return tests, manifest
+
+    def test_manifest_capacity_accepts_boundaries(self):
+        for count in (50, 100, 101, 128):
+            with self.subTest(count=count), tempfile.TemporaryDirectory() as directory:
+                tests, manifest = self._write_synthetic_manifest(directory, count)
+                workloads, tags = DISCOVERY._load_discovery_workloads(
+                    tests, manifest, set(), CENSUS
+                )
+                self.assertEqual(
+                    [row["id"] for row in workloads],
+                    [f"case-{index}.slang#discovery-1" for index in range(count)],
+                )
+                self.assertEqual(tags, {tag: count for tag in DISCOVERY.REQUIRED_SELECTION_TAGS})
+
+    def test_manifest_capacity_rejects_outside_bounds(self):
+        for count in (49, 129):
+            with self.subTest(count=count), tempfile.TemporaryDirectory() as directory:
+                tests, manifest = self._write_synthetic_manifest(directory, count)
+                with self.assertRaisesRegex(
+                    SystemExit, f"50--128 workloads, found {count}"
+                ):
+                    DISCOVERY._load_discovery_workloads(tests, manifest, set(), CENSUS)
+
     def test_native_cuda_contract_uses_each_requested_mode(self):
         arguments = DISCOVERY._adapt_arguments_to_cuda(
             "-cuda -output-using-type -dispatch-size 4,1,1 -capability cuda_sm_8_0 "
@@ -60,7 +106,7 @@ class DiscoveryContractTests(unittest.TestCase):
             with path.open("w", newline="") as stream:
                 writer = csv.DictWriter(stream, fieldnames=list(rows[0]), delimiter="\t")
                 writer.writeheader()
-                writer.writerows(rows + [rows[0]])
+                writer.writerows(rows[:-1] + [rows[0]])
             with self.assertRaisesRegex(SystemExit, "duplicate discovery source"):
                 DISCOVERY._load_discovery_workloads(ROOT / "tests", path, set(), CENSUS)
 

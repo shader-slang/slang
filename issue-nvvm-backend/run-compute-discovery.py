@@ -24,6 +24,10 @@ import sys
 from types import ModuleType
 
 
+MIN_DISCOVERY_WORKLOADS = 50
+MAX_DISCOVERY_WORKLOADS = 128
+
+
 COMPARE_DIRECTIVE_RE = re.compile(
     r"^(?P<indent>\s*)//TEST(?P<categories>\([^)]*\))?:"
     r"(?P<command>COMPARE_COMPUTE(?:_EX)?(?:\([^)]*\))?):(?P<arguments>.*)$",
@@ -214,9 +218,10 @@ def _load_discovery_workloads(
     census: ModuleType,
 ) -> tuple[list[dict[str, object]], dict[str, int]]:
     manifest_rows = _read_tsv(manifest_path)
-    if not 50 <= len(manifest_rows) <= 100:
+    if not MIN_DISCOVERY_WORKLOADS <= len(manifest_rows) <= MAX_DISCOVERY_WORKLOADS:
         raise SystemExit(
-            f"discovery manifest must contain 50--100 workloads, found {len(manifest_rows)}"
+            f"discovery manifest must contain {MIN_DISCOVERY_WORKLOADS}--"
+            f"{MAX_DISCOVERY_WORKLOADS} workloads, found {len(manifest_rows)}"
         )
 
     workloads: list[dict[str, object]] = []

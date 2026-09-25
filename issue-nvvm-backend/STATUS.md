@@ -4,6 +4,14 @@ Updated 2026-09-25. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
+**Slice 220 is accepted: discovery capacity is 50 through 128, with the current 100 entries unchanged.**
+Read the [completed plan](plan.slice-220-discovery-capacity.md),
+[five-part report](report.slice-220-discovery-capacity.md) and
+[full result manifest](runtime-validation.slice-220.json). All 1,656 runtime cells freshly preserve
+accepted outcomes: 1,603 correct and 53 registered failures. All six material compile/assembly cells
+pass. An initial unfrozen partial run is explicitly excluded; the accepted run selects all 452
+immutable frozen identities using `census.slice-195.tsv`.
+
 **Slice 218 is accepted: FP32 masked min/max preserves its CUDA source algorithm.** Read the
 [completed plan](plan.slice-218-minmax-algorithm.md), [five-part report](report.slice-218-minmax-algorithm.md)
 and [result manifest](runtime-validation.slice-218.json). Scalar and aggregate leaves use caller-seeded
@@ -23,41 +31,38 @@ independent raw-word oracle, including adjacent finite values, subnormals and bo
 payloads. Direct NVVM O0/O3 still rejects the canonical double min helper before PTX output. No
 FP64 NVVM runtime support is claimed, and no production or registered corpus change occurred.
 
-**Next action: slice 220 raises discovery capacity from 100 to 128 in a separate bounded change.**
-Preserve the minimum of 50, all 100 current identities/oracles, duplicate and frozen-overlap checks,
-and explicit selection. Add capacity boundary tests and complete a full checkpoint because the runner
-contract changes. Then register the dedicated FP64 min/max regression and perform bounded typed
-reduction admission, keeping prefixes and provider numeric min/max unchanged. Do not bypass bounds
-or drop old workloads. Material runtime still needs its application bindings and expected output.
-No push is authorized. Fresh-context delegation remains at the app's agent-thread limit; local work
-uses WORKFLOW's fallback and does not imply an independent worker review.
+**Next action: slice 221 admits FP64 masked min/max reductions with a dedicated discovery fixture.**
+Use the independent raw-word behavior established in 219 and the typed source algorithm from 218.
+Keep prefixes and provider numeric min/max unchanged. Prove the new fixture fails before admission,
+replay the unchanged research cases on all three modes, and preserve all old identities/oracles.
+Material runtime still needs its application bindings and expected output. No push is authorized.
+Fresh-context delegation remains at the app's agent-thread limit; local work uses WORKFLOW's fallback
+and does not imply an independent worker review.
 
-Latest accepted targeted implementation: 218. Latest full checkpoint: 214. Implementation slices since
-that checkpoint: two (216 and 218). A third implementation requires a full checkpoint before a fourth;
-broad/shared lowering, provider/library/ABI or runner contract changes trigger it sooner. Rolling
-214/216/218 covers complex process lifetime and two proven correctness fixes; research 215/217/219 does
-not advance cadence. Material runtime still needs its application bindings and output oracle.
+Latest accepted implementation and full checkpoint: 220. Latest targeted implementation: 218.
+Implementation slices since the full checkpoint: zero. Rolling implementation history 216/218/220
+covers two proven correctness fixes and the capacity prerequisite for explicit new coverage;
+research 215/217/219 does not advance cadence. Material execution remains blocked on its input contract.
 
 ## Checkpoints and evidence
 
-| Area                        | Record                                                                                                                     | Interpretation                                                                                 |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Slice 218 accepted targeted | [Manifest](runtime-validation.slice-218.json), [frozen](census.slice-218.tsv), [discovery](discovery-census.slice-218.tsv) | 621 fresh cells: 583 correct, 38 retained failures. 1,035 frozen cells explicitly inherit 214. |
-| Slice 216 accepted targeted | [Manifest](runtime-validation.slice-216.json)                                                                              | Singleton correction; all old fresh outcomes retained in 218.                                  |
-| Slice 214 accepted full     | [Manifest](runtime-validation.slice-214.json)                                                                              | All 1,650 cells fresh: 1,597 correct and 53 known failures. Latest full checkpoint.            |
+| Area                        | Record                                                                                                                     | Interpretation                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Slice 220 accepted full     | [Manifest](runtime-validation.slice-220.json), [frozen](census.slice-220.tsv), [discovery](discovery-census.slice-220.tsv) | All 1,656 cells fresh: 1,603 correct and 53 known failures. Latest full checkpoint. |
+| Slice 218 accepted targeted | [Manifest](runtime-validation.slice-218.json)                                                                              | FP32 min/max algorithm correction; all outcomes freshly preserved in 220.           |
+| Slice 214 accepted full     | [Manifest](runtime-validation.slice-214.json)                                                                              | Historical full checkpoint before singleton and source-algorithm fixes.             |
 
-Frozen remains 452 identities/1,356 cells. Discovery now has 100 identities/300 cells. Cumulative
-1,656 cells contain 1,603 correct and 53 unchanged failures; four resolved histories remain. All 618
-old fresh cells match classification, return code, complete execution counts, diagnostic and canonical
-shape exactly; three additions pass. No requested cell is missing, extra or duplicated. All 547 old
-runtime source contracts are unchanged; one new fixture is added. Historical healthy denominators
-427/72 stay fixed. All wave/quad and selected double/helper/value/vector/matrix neighbors run freshly;
-other frozen results remain inherited 214 and are not represented as fresh passes on 218.
+Frozen remains 452 identities/1,356 cells. Discovery remains 100 identities/300 cells. Every cell's
+classification, return code, complete execution counts, diagnostic and canonical shape matches the
+latest applicable accepted evidence. There are no additions, missing/extra/duplicate cells or inherited
+runtime cells. All 548 runtime input contracts are unchanged. Historical healthy denominators 427/72
+stay fixed; all 53 first-known failure records and four resolved histories remain intact.
 
-Fresh gates: focused 13/13, GPU smoke 4/4, units 478/478 plus one existing Windows-only skip,
-toolkit 18/18, research replay 288/288 and six material compile/assembly cells. Frozen diagnostic mode
-returns zero for eight retained preflight stops; discovery returns two for retained failures. Structured
-outcomes decide acceptance. No material runtime correctness or performance claim is made.
+Fresh 220 gates: discovery contracts 6/6, routing/reporter 32/32, protocol 15/15, GPU smoke 4/4 and
+material compile/assembly 6/6. Compiler units 478 plus one existing Windows-only skip and toolkit
+18 explicitly inherit 218 because their source, binaries and toolkit are unchanged. Both corpus
+runners return two for retained failures; structured outcomes decide acceptance. No material runtime
+correctness or performance claim is made.
 
 ## Unresolved failures and limitations
 
@@ -79,10 +84,11 @@ optimized `build/RelWithDebInfo/{bin,lib}`, source `build/nvvm-loop/slice-203-en
 `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`. Sequential suites, four corpus/build
 workers maximum, two unit servers; `CMAKE_BUILD_PARALLEL_LEVEL=1`.
 
-Tested base `5316e1b2516b9f9761a6386ed59296e5f758fa53` plus the final recipe/unit/fixture changes.
+Tested base `c66d533b5b030220abe6ca2411049b68b3365e26` plus the bounded discovery loader/test change.
 Compiler SHA256 `a13354a47acefc8684cbfb5ae52b84bcf0331a83e5310e9675f53a0e030107d7`.
 Provider unchanged `ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372`.
-Raw evidence: `build/nvvm-loop/slice-218-before`, `slice-218-after`, including `research-replay`.
-The new fixture's before/after SHA256 is `a4c91ebc19acbafcf8f6e21ef10eb314c5df7525de1f969e78cd0b52fac976e6`.
+Raw evidence: `build/nvvm-loop/slice-220-before` and `slice-220-after`, including the explicitly
+excluded initial partial run and both command snapshots. Parent verified 117 evidence references,
+22 tested source hashes, 12 artifact hashes and 548 runtime input hashes.
 No GPU loss, driver change, reboot or push. Local parent review/acceptance follows the recorded
 fresh-context delegation limitation.
