@@ -240,6 +240,7 @@ FIDDLE() namespace Slang
         OperatorAddressOf,
         WaveIsFirstLane,
         WaveReadLaneFirst,
+        CallShader,
         COUNT
     };
 

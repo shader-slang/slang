@@ -444,25 +444,6 @@ bool trimMakeStructOperands(IRStructField* field)
     return changed;
 }
 
-bool isStructEmpty(IRType* type)
-{
-    auto structType = as<IRStructType>(type);
-    if (!structType)
-        return false;
-
-    UCount nonEmptyFieldCount = 0;
-    for (auto field : structType->getFields())
-    {
-        if (as<IRVoidType>(field->getFieldType()))
-            continue;
-        if (isStructEmpty(field->getFieldType()))
-            continue;
-        nonEmptyFieldCount++;
-    }
-
-    return nonEmptyFieldCount == 0;
-}
-
 bool trimOptimizableType(IRStructType* type)
 {
     bool changed = false;
