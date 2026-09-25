@@ -13,17 +13,15 @@ E4M3 values256..448. Existing E4 overflow-to-NaN and E5 rounded-overflow-to-infi
 The repair is at the canonical literal producer; no backend admission or provider ABI change.
 
 Latest accepted implementation/full checkpoint:244. Latest targeted acceptance:233. Implementation
-slices since full:zero. Tested source base `41f070c689cb46e91b3939ca038654b91ef96944`. Parent has
-accepted the slice for the authorized local commit; no push is authorized. Rolling implementation
+slices since full:zero. Tested source base `41f070c689cb46e91b3939ca038654b91ef96944`; no push is authorized. Rolling implementation
 history:241vectors/242dot/244FP8producerfix.
 
-After the local commit, re-rank the measured remaining boundaries. Material runtime still lacks
-bindings, textures/LUTs, inputs and an output oracle. This producer-correctness slice overrides the
-complex-corpus cadence; reconsider measurable material compile-time work next, which does not need
-an application runtime contract. Narrow FP8 scalar admission, texture GetDimensions, arbitrary
-RequirePrelude and dynamic-object aggregates remain independent candidates. BF16 integer construction
-has a recorded double-rounding counterexample. BF vector storage needs the separate CUDA layout
-producer repair and BF3 representation decision described by the BF16 vector contract.
+Implementation244 is locally committed at `8d53504112617efda0e3446f7b3117bcc2f77fd2`.
+Research245 below is independently accepted. After its local commit, prototype the measured shared
+AST subtype-check boundary under its explicit equivalence and performance gates. Material runtime
+still lacks bindings, textures/LUTs, inputs and an output oracle; compile-time work does not require
+that application contract. Narrow FP8 admission, texture GetDimensions and arbitrary RequirePrelude
+remain separate candidates. Shared FP8 overflow policy and BF vector storage remain separate decisions.
 
 ## Checkpoint and proof
 
@@ -44,6 +42,26 @@ producer repair and BF3 representation decision described by the BF16 vector con
 Unresolved failures and their original reproduction/history remain in validation244. Historical
 BF16 vector/dot/export and research243 raw LLVM controls retain their original source/artifact
 identities; they are not claimed as fresh244 controls. Registered corpus results are entirely fresh.
+
+## Accepted material profiling research245
+
+[Plan245](plan.slice-245-material-profile.md), [report245](report.slice-245-material-profile.md),
+[timing evidence245](timing-evidence.slice-245.json) and the
+[compile-time design note](../docs/design/nvvm-material-compile-time.md) are independently accepted.
+Accepted implementation/full244 and targeted233 remain authoritative; research245 changes no
+production source and does not advance implementation cadence0. Parent audit verifies all sample
+identities, every output, all distributions,36 compact references,528 indexed raw files and15 source
+snapshots before its four own artifact references.
+
+Two opposite-order optimized fresh-process rounds preserve132 exact PTX outputs and66 exact cubins
+across all6 identities;43 source/12 artifact/561 input hashes match244 before/after. Semantic checking
+medians651.5–654.9ms motivate the next bounded prototype: compare inlining the existing AST subtype
+predicate with avoiding the NodeBase tag-to-metadata roundtrip, retaining one generated hierarchy.
+Separate qualitative GDB stacks support that boundary but establish no speedup. The design note
+requires exhaustive cast equivalence, non-NVVM semantic tests, a full checkpoint and paired timing
+before any prototype can be accepted. Material runtime still requires the absent application contract.
+Raw evidence: `build/nvvm-loop/slice-245-material-profile`; the excluded polling pilot and incomplete
+auxiliary debugger trial remain explicitly recorded.
 
 ## Research and remaining semantic boundaries
 

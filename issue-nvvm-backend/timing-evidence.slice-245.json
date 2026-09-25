@@ -1,0 +1,1741 @@
+{
+  "schema": 1,
+  "slice": 245,
+  "status": "accepted-research",
+  "scope": "unchanged-material compile-time profiling; no production changes or runtime claims",
+  "source_base_revision": "8d53504112617efda0e3446f7b3117bcc2f77fd2",
+  "baseline": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/runtime-validation.slice-244.json",
+    "sha256": "cd63a0f9c3fcd24212f0dfc7aad5673d9c2934f66f756cd9ada3806dbbd75fcc"
+  },
+  "configuration": "RelWithDebInfo",
+  "provider_abi": 40,
+  "target_architecture": 80,
+  "device": "NVIDIA L4 SM89; driver580.126.09",
+  "toolkit": {
+    "path": "/usr/local/cuda-12.9",
+    "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_May_27_02:21:03_PDT_2025\nCuda compilation tools, release 12.9, V12.9.86\nBuild cuda_12.9.r12.9/compiler.36037853_0"
+  },
+  "artifact_sha256": {
+    "build/RelWithDebInfo/bin/slangc": "b9e87811c263f131cf1372b307bd60acdcc51993aaab2af91a0cfd03462d10a1",
+    "build/RelWithDebInfo/bin/slang-test": "5d989413655c34643ae55ae927bd8600e00b2dce8e813e658ea0534bb795c412",
+    "build/RelWithDebInfo/bin/test-server": "81f5a3865e1184c8d6be46e5efcfd9ba4a1f79b54e60f5100410fadcc985ec8f",
+    "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "c0522674424c86dbc9444b2abc202c97146a6b41e3a9179d95d34ec9fe1b0773",
+    "build/RelWithDebInfo/lib/libslang-compiler.so": "4e2f4835009b7ac9c14384ecb078a9bdf44d3348bcd5f0ea3e32d567da7f3cbf",
+    "build/RelWithDebInfo/lib/slang-core-module.bin": "33ff2ec8ae2360324cf20d4fd535a04410ddf6aa0ce638a68264c6d9f3649562",
+    "build/RelWithDebInfo/lib/librender-test-tool.so": "1a0cce46ed47795bba3e1c7efe8f9c590734b909d60d18ff8e9beda9ef59118e",
+    "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "71583d49a0cffe40da3abb458cb11f9e2a5090bc3cd01635c175120a8004b2ba",
+    "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+    "/usr/local/cuda-12.9/lib64/libnvrtc.so": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a",
+    "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+    "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461"
+  },
+  "protocol": {
+    "rounds": 2,
+    "orders": [
+      "manifest order",
+      "reverse manifest order"
+    ],
+    "warmups_per_cell_per_round": 2,
+    "samples_per_cell_per_round": 9,
+    "serial": true,
+    "competing_benchmarks_or_builds": false,
+    "timeout_seconds": 180,
+    "timing_clock": "time.perf_counter Popen.communicate with piped output through process exit; write logs outside timer",
+    "dispersion": "inclusive quartiles, min/max; no timing exclusions in definitive study",
+    "assembly": "independent2warmups+9samples per identity after both compilation rounds",
+    "phase_caution": "inclusive timers aggregate calls by name; nested and alias-like scopes cannot be summed"
+  },
+  "preservation": {
+    "sources": 43,
+    "artifacts": 12,
+    "runtime_inputs": 561,
+    "before": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/identity-before.json",
+      "sha256": "fbf9b889147e6f62a5aac41e94e9a584067659203a47da6c902f5ca8e7369209"
+    },
+    "after": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/identity-after.json",
+      "sha256": "fbf9b889147e6f62a5aac41e94e9a584067659203a47da6c902f5ca8e7369209"
+    },
+    "all_exact_244": true
+  },
+  "counts": {
+    "canonical_cells": 6,
+    "compile_attempts": 132,
+    "measured_compiles": 108,
+    "compile_warmups": 24,
+    "assembly_attempts": 66,
+    "measured_assemblies": 54,
+    "assembly_warmups": 12,
+    "missing_cells": [],
+    "extra_cells": [],
+    "failed_attempts": 0,
+    "timeouts": 0,
+    "all_ptx_exact_244": true,
+    "all_cubins_exact_244": true
+  },
+  "cells": [
+    {
+      "id": "tiled-brass-material-eval_buffer-nvrtc-o3",
+      "status": "passed",
+      "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+      "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+      "wall_ms": {
+        "n": 18,
+        "median": 1624.7962601482868,
+        "q1": 1616.5155214257538,
+        "q3": 1629.3693529441953,
+        "minimum": 1603.4011133015156,
+        "maximum": 1643.4236820787191
+      },
+      "round_wall_ms": [
+        {
+          "n": 9,
+          "median": 1617.1800289303064,
+          "q1": 1616.186786442995,
+          "q3": 1624.774657189846,
+          "minimum": 1603.4011133015156,
+          "maximum": 1635.7320751994848
+        },
+        {
+          "n": 9,
+          "median": 1629.2817648500204,
+          "q1": 1625.6777495145798,
+          "q3": 1629.5861955732107,
+          "minimum": 1615.5683398246765,
+          "maximum": 1643.4236820787191
+        }
+      ],
+      "assembly_ms": {
+        "n": 9,
+        "median": 178.18507924675941,
+        "q1": 175.95191858708858,
+        "q3": 181.56353197991848,
+        "minimum": 172.12646268308163,
+        "maximum": 189.50628116726875
+      },
+      "phase_ms": {
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 206.70999999999998,
+          "q1": 204.82250000000002,
+          "q3": 208.57250000000002,
+          "minimum": 201.01,
+          "maximum": 210.38
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 51.955,
+          "q1": 51.44500000000001,
+          "q3": 52.754999999999995,
+          "minimum": 50.21,
+          "maximum": 53.46
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 114.00999999999999,
+          "q1": 112.6,
+          "q3": 115.35500000000002,
+          "minimum": 111.86,
+          "maximum": 116.97
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1339.875,
+          "q1": 1338.0500000000002,
+          "q3": 1342.67,
+          "minimum": 1325.89,
+          "maximum": 1356.91
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1339.875,
+          "q1": 1338.0500000000002,
+          "q3": 1342.67,
+          "minimum": 1325.89,
+          "maximum": 1356.91
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 858.0699999999999,
+          "q1": 855.9200000000001,
+          "q3": 862.7574999999999,
+          "minimum": 848.02,
+          "maximum": 879.55
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 18.395,
+          "q1": 18.3425,
+          "q3": 18.56,
+          "minimum": 18.21,
+          "maximum": 18.61
+        },
+        "SemanticChecking": {
+          "n": 18,
+          "median": 651.51,
+          "q1": 649.13,
+          "q3": 656.4549999999999,
+          "minimum": 642.92,
+          "maximum": 660.8
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 651.51,
+          "q1": 649.13,
+          "q3": 656.4525,
+          "minimum": 642.92,
+          "maximum": 660.8
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 184.67000000000002,
+          "q1": 184.07250000000002,
+          "q3": 185.63,
+          "minimum": 182.15,
+          "maximum": 201.9
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 184.67000000000002,
+          "q1": 184.06500000000003,
+          "q3": 185.63,
+          "minimum": 182.15,
+          "maximum": 201.9
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 6.285,
+          "q1": 6.2524999999999995,
+          "q3": 6.3175,
+          "minimum": 6.21,
+          "maximum": 6.49
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 477.28499999999997,
+          "q1": 475.0975,
+          "q3": 479.625,
+          "minimum": 473.75,
+          "maximum": 491.25
+        },
+        "emitEntryPointsSourceFromIR": {
+          "n": 18,
+          "median": 335.03,
+          "q1": 333.91499999999996,
+          "q3": 336.83000000000004,
+          "minimum": 332.67,
+          "maximum": 347.37
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 327.35,
+          "q1": 326.26,
+          "q3": 329.225,
+          "minimum": 325.07,
+          "maximum": 339.42
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 20.86,
+          "q1": 20.6875,
+          "q3": 21.2675,
+          "minimum": 20.54,
+          "maximum": 21.69
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 121.75999999999999,
+          "q1": 121.5375,
+          "q3": 122.7875,
+          "minimum": 121.29,
+          "maximum": 133.74
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 138.325,
+          "q1": 137.91250000000002,
+          "q3": 139.0825,
+          "minimum": 136.96,
+          "maximum": 140.26
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.4350000000000005,
+          "q1": 4.41,
+          "q3": 4.4875,
+          "minimum": 4.34,
+          "maximum": 4.59
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.31,
+          "q1": 1.3,
+          "q3": 1.33,
+          "minimum": 1.29,
+          "maximum": 1.38
+        }
+      },
+      "semantic_fraction_of_wall": {
+        "n": 18,
+        "median": 0.40208044251628394,
+        "q1": 0.40081367575607985,
+        "q3": 0.4030419447257847,
+        "minimum": 0.39757733546961804,
+        "maximum": 0.4056708041903882
+      },
+      "unattributed_output_residual_ms": {
+        "n": 18,
+        "median": 149.625,
+        "q1": 148.4925,
+        "q3": 150.86249999999995,
+        "minimum": 147.44,
+        "maximum": 156.7
+      },
+      "unattributed_fresh_lifecycle_residual_ms": {
+        "n": 18,
+        "median": 76.38929352939128,
+        "q1": 74.80236102923746,
+        "q3": 79.23595540568238,
+        "minimum": 72.65111330151547,
+        "maximum": 81.71772987425331
+      }
+    },
+    {
+      "id": "tiled-brass-material-eval_buffer-nvvm-o0",
+      "status": "passed",
+      "ptx_sha256": "91a3f87feea0d115f827f4fc7145671a841e9652ecd1c355e80b27c665f2c47a",
+      "cubin_sha256": "1ffa90ab6384ef98f55836343681842baa4fc639737f257cb349024426823f92",
+      "wall_ms": {
+        "n": 18,
+        "median": 1596.7689156532288,
+        "q1": 1592.2748437151313,
+        "q3": 1613.6827385053039,
+        "minimum": 1580.0722017884254,
+        "maximum": 1670.7082744687796
+      },
+      "round_wall_ms": [
+        {
+          "n": 9,
+          "median": 1595.4501274973154,
+          "q1": 1590.036852285266,
+          "q3": 1605.8451533317566,
+          "minimum": 1581.9057878106833,
+          "maximum": 1666.199792176485
+        },
+        {
+          "n": 9,
+          "median": 1598.2536636292934,
+          "q1": 1593.7939155846834,
+          "q3": 1616.2952668964863,
+          "minimum": 1580.0722017884254,
+          "maximum": 1670.7082744687796
+        }
+      ],
+      "assembly_ms": {
+        "n": 9,
+        "median": 703.8375288248062,
+        "q1": 700.7375303655863,
+        "q3": 714.3885251134634,
+        "minimum": 697.1699688583612,
+        "maximum": 742.9077532142401
+      },
+      "phase_ms": {
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 207.39999999999998,
+          "q1": 204.89499999999998,
+          "q3": 210.4525,
+          "minimum": 202.92,
+          "maximum": 211.81
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 51.57,
+          "q1": 50.9475,
+          "q3": 53.13,
+          "minimum": 50.05,
+          "maximum": 58.33
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 113.8,
+          "q1": 113.2125,
+          "q3": 114.71249999999999,
+          "minimum": 111.4,
+          "maximum": 117.24
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1313.37,
+          "q1": 1310.6675,
+          "q3": 1324.89,
+          "minimum": 1304.08,
+          "maximum": 1392.37
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1313.37,
+          "q1": 1310.6599999999999,
+          "q3": 1324.89,
+          "minimum": 1304.08,
+          "maximum": 1392.37
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 858.1600000000001,
+          "q1": 855.195,
+          "q3": 870.625,
+          "minimum": 850.38,
+          "maximum": 925.75
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 18.47,
+          "q1": 18.3675,
+          "q3": 18.7175,
+          "minimum": 18.27,
+          "maximum": 22.16
+        },
+        "SemanticChecking": {
+          "n": 18,
+          "median": 652.0,
+          "q1": 648.7225,
+          "q3": 661.8425,
+          "minimum": 646.64,
+          "maximum": 716.58
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 652.0,
+          "q1": 648.7225,
+          "q3": 661.8425,
+          "minimum": 646.64,
+          "maximum": 716.58
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 184.84500000000003,
+          "q1": 184.18,
+          "q3": 186.52,
+          "minimum": 180.79,
+          "maximum": 200.22
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 184.84500000000003,
+          "q1": 184.18,
+          "q3": 186.52,
+          "minimum": 180.78,
+          "maximum": 200.22
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 6.285,
+          "q1": 6.24,
+          "q3": 6.3075,
+          "minimum": 6.2,
+          "maximum": 6.37
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 451.57,
+          "q1": 450.6875,
+          "q3": 453.01,
+          "minimum": 449.08,
+          "maximum": 516.99
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 322.04999999999995,
+          "q1": 321.34749999999997,
+          "q3": 322.84000000000003,
+          "minimum": 320.33,
+          "maximum": 376.96
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 20.455,
+          "q1": 20.1025,
+          "q3": 20.6325,
+          "minimum": 19.78,
+          "maximum": 31.97
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 122.065,
+          "q1": 121.9325,
+          "q3": 122.39500000000001,
+          "minimum": 121.33,
+          "maximum": 148.0
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 138.82999999999998,
+          "q1": 138.5175,
+          "q3": 139.3025,
+          "minimum": 137.31,
+          "maximum": 149.01
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.38,
+          "q1": 4.37,
+          "q3": 4.4175,
+          "minimum": 4.3,
+          "maximum": 4.49
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.3,
+          "q1": 1.29,
+          "q3": 1.31,
+          "minimum": 1.28,
+          "maximum": 1.33
+        }
+      },
+      "semantic_fraction_of_wall": {
+        "n": 18,
+        "median": 0.40850444213125,
+        "q1": 0.40694564199709593,
+        "q3": 0.41064125368408466,
+        "minimum": 0.3972566666140628,
+        "maximum": 0.43006847279938887
+      },
+      "unattributed_output_residual_ms": {
+        "n": 18,
+        "median": 129.575,
+        "q1": 129.10500000000002,
+        "q3": 130.13,
+        "minimum": 128.35000000000002,
+        "maximum": 140.03000000000003
+      },
+      "unattributed_fresh_lifecycle_residual_ms": {
+        "n": 18,
+        "median": 76.12049406528476,
+        "q1": 69.33132775098089,
+        "q3": 78.93053750842802,
+        "minimum": 65.72220178842545,
+        "maximum": 83.03685228526601
+      }
+    },
+    {
+      "id": "tiled-brass-material-eval_buffer-nvvm-o3",
+      "status": "passed",
+      "ptx_sha256": "9ef3444ab015be99299f49f2e416474780d7985f6662a38d8d058cca58e810ac",
+      "cubin_sha256": "bfac2f15a1097116ac7c988b7bc7c8bf4d82a66867670a1465c123a0aa19d151",
+      "wall_ms": {
+        "n": 18,
+        "median": 1691.0475930199027,
+        "q1": 1690.0711129419506,
+        "q3": 1702.4820749647915,
+        "minimum": 1676.3570122420788,
+        "maximum": 1742.1598322689533
+      },
+      "round_wall_ms": [
+        {
+          "n": 9,
+          "median": 1690.2294997125864,
+          "q1": 1685.883468016982,
+          "q3": 1701.6240768134594,
+          "minimum": 1681.5139409154654,
+          "maximum": 1742.1598322689533
+        },
+        {
+          "n": 9,
+          "median": 1691.3236286491156,
+          "q1": 1690.6543131917715,
+          "q3": 1704.0022891014814,
+          "minimum": 1676.3570122420788,
+          "maximum": 1726.5432886779308
+        }
+      ],
+      "assembly_ms": {
+        "n": 9,
+        "median": 210.51728539168835,
+        "q1": 209.75087583065033,
+        "q3": 211.2301792949438,
+        "minimum": 208.11439864337444,
+        "maximum": 211.6918321698904
+      },
+      "phase_ms": {
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 206.1,
+          "q1": 204.1175,
+          "q3": 208.9125,
+          "minimum": 200.65,
+          "maximum": 212.2
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 51.595,
+          "q1": 50.879999999999995,
+          "q3": 52.245000000000005,
+          "minimum": 50.1,
+          "maximum": 54.4
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 113.855,
+          "q1": 112.02250000000001,
+          "q3": 114.65,
+          "minimum": 110.27,
+          "maximum": 117.25
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1414.4,
+          "q1": 1412.1125000000002,
+          "q3": 1423.3474999999999,
+          "minimum": 1403.02,
+          "maximum": 1454.55
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1414.4,
+          "q1": 1412.1125000000002,
+          "q3": 1423.3474999999999,
+          "minimum": 1403.02,
+          "maximum": 1454.55
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 859.3,
+          "q1": 857.6425,
+          "q3": 863.9649999999999,
+          "minimum": 851.6,
+          "maximum": 892.1
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 18.490000000000002,
+          "q1": 18.384999999999998,
+          "q3": 18.53,
+          "minimum": 18.27,
+          "maximum": 18.78
+        },
+        "SemanticChecking": {
+          "n": 18,
+          "median": 653.09,
+          "q1": 650.7175,
+          "q3": 657.655,
+          "minimum": 647.01,
+          "maximum": 687.11
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 653.09,
+          "q1": 650.7175,
+          "q3": 657.655,
+          "minimum": 647.01,
+          "maximum": 687.11
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 184.43,
+          "q1": 183.82750000000001,
+          "q3": 185.03500000000003,
+          "minimum": 181.3,
+          "maximum": 190.87
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 184.43,
+          "q1": 183.82750000000001,
+          "q3": 185.03500000000003,
+          "minimum": 181.3,
+          "maximum": 190.87
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 6.245,
+          "q1": 6.23,
+          "q3": 6.28,
+          "minimum": 6.2,
+          "maximum": 6.42
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 552.845,
+          "q1": 550.8675000000001,
+          "q3": 555.0725,
+          "minimum": 549.02,
+          "maximum": 587.58
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 322.03499999999997,
+          "q1": 320.78249999999997,
+          "q3": 323.54999999999995,
+          "minimum": 319.61,
+          "maximum": 352.05
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 20.009999999999998,
+          "q1": 19.722500000000004,
+          "q3": 20.330000000000002,
+          "minimum": 19.52,
+          "maximum": 20.78
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 122.61,
+          "q1": 121.7025,
+          "q3": 123.6075,
+          "minimum": 121.5,
+          "maximum": 136.27
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 138.57999999999998,
+          "q1": 137.6275,
+          "q3": 139.46249999999998,
+          "minimum": 137.13,
+          "maximum": 155.25
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.365,
+          "q1": 4.342499999999999,
+          "q3": 4.407500000000001,
+          "minimum": 4.32,
+          "maximum": 4.93
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.295,
+          "q1": 1.29,
+          "q3": 1.3,
+          "minimum": 1.28,
+          "maximum": 1.4
+        }
+      },
+      "semantic_fraction_of_wall": {
+        "n": 18,
+        "median": 0.38627052106097615,
+        "q1": 0.383555594146812,
+        "q3": 0.3873338836592403,
+        "minimum": 0.37824313693525125,
+        "maximum": 0.39796859106043153
+      },
+      "unattributed_output_residual_ms": {
+        "n": 18,
+        "median": 230.515,
+        "q1": 229.75750000000005,
+        "q3": 231.945,
+        "minimum": 227.95999999999998,
+        "maximum": 235.53000000000003
+      },
+      "unattributed_fresh_lifecycle_residual_ms": {
+        "n": 18,
+        "median": 71.36973115861419,
+        "q1": 67.4285081750155,
+        "q3": 73.63854480639094,
+        "minimum": 65.60185497760773,
+        "maximum": 78.21983226895338
+      }
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvrtc-o3",
+      "status": "passed",
+      "ptx_sha256": "214dd03be9f4d7635d26cba874c1b4f3913c43c7e7e2ea4bb62355cf6857fd25",
+      "cubin_sha256": "26e250e48bf3acfe639495cd04a899e78e4e9e370d80ad9749fd3e5ec69b7666",
+      "wall_ms": {
+        "n": 18,
+        "median": 1647.4667806178331,
+        "q1": 1642.2700891271234,
+        "q3": 1652.5365924462676,
+        "minimum": 1634.339764714241,
+        "maximum": 1721.3877122849226
+      },
+      "round_wall_ms": [
+        {
+          "n": 9,
+          "median": 1642.4359641969204,
+          "q1": 1642.0643590390682,
+          "q3": 1653.5420920699835,
+          "minimum": 1634.339764714241,
+          "maximum": 1663.4187381714582
+        },
+        {
+          "n": 9,
+          "median": 1647.8601787239313,
+          "q1": 1647.2836956381798,
+          "q3": 1649.52009357512,
+          "minimum": 1641.9687028974295,
+          "maximum": 1721.3877122849226
+        }
+      ],
+      "assembly_ms": {
+        "n": 9,
+        "median": 253.3735390752554,
+        "q1": 251.92870572209358,
+        "q3": 255.70706836879253,
+        "minimum": 250.4915241152048,
+        "maximum": 258.15433636307716
+      },
+      "phase_ms": {
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 208.04500000000002,
+          "q1": 206.20749999999998,
+          "q3": 209.47,
+          "minimum": 201.79,
+          "maximum": 211.48
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 52.6,
+          "q1": 51.489999999999995,
+          "q3": 53.38250000000001,
+          "minimum": 50.89,
+          "maximum": 53.56
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 114.955,
+          "q1": 113.28,
+          "q3": 115.6675,
+          "minimum": 111.54,
+          "maximum": 117.64
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1362.5,
+          "q1": 1358.695,
+          "q3": 1367.33,
+          "minimum": 1352.2,
+          "maximum": 1432.87
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1362.5,
+          "q1": 1358.695,
+          "q3": 1367.33,
+          "minimum": 1352.2,
+          "maximum": 1432.87
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 859.3050000000001,
+          "q1": 856.3825,
+          "q3": 863.51,
+          "minimum": 847.66,
+          "maximum": 929.67
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 18.45,
+          "q1": 18.3925,
+          "q3": 18.5,
+          "minimum": 18.31,
+          "maximum": 18.69
+        },
+        "SemanticChecking": {
+          "n": 18,
+          "median": 652.7349999999999,
+          "q1": 652.1725,
+          "q3": 657.1625,
+          "minimum": 645.84,
+          "maximum": 708.68
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 652.7349999999999,
+          "q1": 652.1725,
+          "q3": 657.1625,
+          "minimum": 645.84,
+          "maximum": 708.68
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 184.75,
+          "q1": 184.17749999999998,
+          "q3": 185.39749999999998,
+          "minimum": 180.65,
+          "maximum": 200.0
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 184.75,
+          "q1": 184.17749999999998,
+          "q3": 185.39749999999998,
+          "minimum": 180.64,
+          "maximum": 200.0
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 6.365,
+          "q1": 6.34,
+          "q3": 6.414999999999999,
+          "minimum": 6.32,
+          "maximum": 6.68
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 500.89,
+          "q1": 499.2525,
+          "q3": 501.99249999999995,
+          "minimum": 497.94,
+          "maximum": 503.41
+        },
+        "emitEntryPointsSourceFromIR": {
+          "n": 18,
+          "median": 352.99,
+          "q1": 352.255,
+          "q3": 354.0725,
+          "minimum": 351.55,
+          "maximum": 356.14
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 343.95500000000004,
+          "q1": 343.2775,
+          "q3": 344.9175,
+          "minimum": 342.69,
+          "maximum": 347.3
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 21.064999999999998,
+          "q1": 20.7075,
+          "q3": 21.32,
+          "minimum": 20.17,
+          "maximum": 21.68
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 128.725,
+          "q1": 128.4,
+          "q3": 129.265,
+          "minimum": 127.72,
+          "maximum": 131.65
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 143.375,
+          "q1": 143.155,
+          "q3": 143.96499999999997,
+          "minimum": 142.68,
+          "maximum": 144.81
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.359999999999999,
+          "q1": 4.33,
+          "q3": 4.41,
+          "minimum": 4.3,
+          "maximum": 4.48
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.52,
+          "q1": 1.5025,
+          "q3": 1.53,
+          "minimum": 1.5,
+          "maximum": 1.66
+        }
+      },
+      "semantic_fraction_of_wall": {
+        "n": 18,
+        "median": 0.39611420708423783,
+        "q1": 0.3955424807639944,
+        "q3": 0.39753524642436444,
+        "minimum": 0.39503763486564303,
+        "maximum": 0.41169109953696464
+      },
+      "unattributed_output_residual_ms": {
+        "n": 18,
+        "median": 156.345,
+        "q1": 155.2425,
+        "q3": 157.53250000000003,
+        "minimum": 154.01,
+        "maximum": 159.60000000000002
+      },
+      "unattributed_fresh_lifecycle_residual_ms": {
+        "n": 18,
+        "median": 76.48775885045532,
+        "q1": 75.30907702237371,
+        "q3": 77.91799291670323,
+        "minimum": 73.95596419692049,
+        "maximum": 82.34771228492272
+      }
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvvm-o0",
+      "status": "passed",
+      "ptx_sha256": "f58eb3229d66efc3c77bb013c9f0853891f0174d44f757677b5a45acec240c95",
+      "cubin_sha256": "0260602dcc875ad5ec02b384847b41cab7b65ccd4c49691b6357a8253b7bed53",
+      "wall_ms": {
+        "n": 18,
+        "median": 1640.2047500014305,
+        "q1": 1632.7853533439338,
+        "q3": 1651.9957068376243,
+        "minimum": 1629.131969064474,
+        "maximum": 1678.5725858062506
+      },
+      "round_wall_ms": [
+        {
+          "n": 9,
+          "median": 1639.4439581781626,
+          "q1": 1632.8891087323427,
+          "q3": 1647.3226603120565,
+          "minimum": 1629.4625885784626,
+          "maximum": 1663.3009314537048
+        },
+        {
+          "n": 9,
+          "median": 1640.9655418246984,
+          "q1": 1632.7507682144642,
+          "q3": 1653.5533890128136,
+          "minimum": 1629.131969064474,
+          "maximum": 1678.5725858062506
+        }
+      ],
+      "assembly_ms": {
+        "n": 9,
+        "median": 882.2369631379843,
+        "q1": 878.668524324894,
+        "q3": 883.9408718049526,
+        "minimum": 876.9347611814737,
+        "maximum": 887.4897845089436
+      },
+      "phase_ms": {
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 210.325,
+          "q1": 207.245,
+          "q3": 212.31,
+          "minimum": 204.62,
+          "maximum": 220.69
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 52.41,
+          "q1": 51.81,
+          "q3": 53.7675,
+          "minimum": 50.37,
+          "maximum": 56.51
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 114.595,
+          "q1": 113.075,
+          "q3": 115.9975,
+          "minimum": 111.54,
+          "maximum": 124.63
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1353.54,
+          "q1": 1350.1575,
+          "q3": 1362.9025,
+          "minimum": 1342.79,
+          "maximum": 1384.6
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1353.54,
+          "q1": 1350.1575,
+          "q3": 1362.8999999999999,
+          "minimum": 1342.79,
+          "maximum": 1384.6
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 861.205,
+          "q1": 857.2975,
+          "q3": 868.3050000000001,
+          "minimum": 849.69,
+          "maximum": 892.72
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 18.555,
+          "q1": 18.427500000000002,
+          "q3": 18.635,
+          "minimum": 18.24,
+          "maximum": 19.64
+        },
+        "SemanticChecking": {
+          "n": 18,
+          "median": 654.86,
+          "q1": 652.57,
+          "q3": 657.01,
+          "minimum": 643.03,
+          "maximum": 670.11
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 654.86,
+          "q1": 652.57,
+          "q3": 657.01,
+          "minimum": 643.03,
+          "maximum": 670.11
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 185.06,
+          "q1": 184.6225,
+          "q3": 186.0125,
+          "minimum": 182.99,
+          "maximum": 200.76
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 185.06,
+          "q1": 184.6225,
+          "q3": 186.0125,
+          "minimum": 182.99,
+          "maximum": 200.76
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 6.4,
+          "q1": 6.352499999999999,
+          "q3": 6.45,
+          "minimum": 6.32,
+          "maximum": 6.48
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 490.845,
+          "q1": 489.95750000000004,
+          "q3": 491.6025,
+          "minimum": 486.57,
+          "maximum": 498.25
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 338.955,
+          "q1": 338.145,
+          "q3": 340.0725,
+          "minimum": 336.0,
+          "maximum": 347.2
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 20.63,
+          "q1": 20.2775,
+          "q3": 20.939999999999998,
+          "minimum": 19.91,
+          "maximum": 26.75
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 128.48000000000002,
+          "q1": 128.3475,
+          "q3": 128.92249999999999,
+          "minimum": 128.08,
+          "maximum": 132.45
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 144.51,
+          "q1": 144.13,
+          "q3": 144.88500000000002,
+          "minimum": 143.26,
+          "maximum": 146.45
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.42,
+          "q1": 4.3925,
+          "q3": 4.4575,
+          "minimum": 4.29,
+          "maximum": 4.51
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.52,
+          "q1": 1.51,
+          "q3": 1.53,
+          "minimum": 1.5,
+          "maximum": 1.65
+        }
+      },
+      "semantic_fraction_of_wall": {
+        "n": 18,
+        "median": 0.3985214006386073,
+        "q1": 0.39677065256597244,
+        "q3": 0.4010062840906899,
+        "minimum": 0.3937989399042548,
+        "maximum": 0.40459106731866123
+      },
+      "unattributed_output_residual_ms": {
+        "n": 18,
+        "median": 151.55999999999997,
+        "q1": 151.065,
+        "q3": 152.04999999999995,
+        "minimum": 150.01000000000005,
+        "maximum": 159.09000000000003
+      },
+      "unattributed_fresh_lifecycle_residual_ms": {
+        "n": 18,
+        "median": 76.36116633802654,
+        "q1": 70.33764237865805,
+        "q3": 80.20813249722127,
+        "minimum": 66.53320507526396,
+        "maximum": 85.47910873234275
+      }
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvvm-o3",
+      "status": "passed",
+      "ptx_sha256": "5315e6101f95beacf4ed8b251d0b3c3a7fe49f340b24dfecf3fc1021a23d6148",
+      "cubin_sha256": "a1d6d4f034e343ee75b4a52fc43bbb8df10b264e7073558c0ec616648b78069c",
+      "wall_ms": {
+        "n": 18,
+        "median": 1792.7990201860666,
+        "q1": 1789.3136912025511,
+        "q3": 1798.3240033499897,
+        "minimum": 1783.8075887411833,
+        "maximum": 1828.945705667138
+      },
+      "round_wall_ms": [
+        {
+          "n": 9,
+          "median": 1789.924206212163,
+          "q1": 1784.4710480421782,
+          "q3": 1793.1819669902325,
+          "minimum": 1783.8075887411833,
+          "maximum": 1808.6232915520668
+        },
+        {
+          "n": 9,
+          "median": 1797.434912994504,
+          "q1": 1792.4160733819008,
+          "q3": 1798.542145639658,
+          "minimum": 1787.942225113511,
+          "maximum": 1828.945705667138
+        }
+      ],
+      "assembly_ms": {
+        "n": 9,
+        "median": 296.63001000881195,
+        "q1": 295.96539214253426,
+        "q3": 300.7866721600294,
+        "minimum": 294.4004572927952,
+        "maximum": 303.308691829443
+      },
+      "phase_ms": {
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 206.745,
+          "q1": 204.09750000000003,
+          "q3": 207.8825,
+          "minimum": 201.92,
+          "maximum": 208.94
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 51.665000000000006,
+          "q1": 51.165,
+          "q3": 52.39,
+          "minimum": 50.15,
+          "maximum": 52.75
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 114.13,
+          "q1": 112.9625,
+          "q3": 115.0575,
+          "minimum": 110.99,
+          "maximum": 116.37
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1516.455,
+          "q1": 1512.8725000000002,
+          "q3": 1523.0925,
+          "minimum": 1506.15,
+          "maximum": 1553.17
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1516.455,
+          "q1": 1512.8725000000002,
+          "q3": 1523.0925,
+          "minimum": 1506.14,
+          "maximum": 1553.17
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 859.175,
+          "q1": 856.6949999999999,
+          "q3": 863.235,
+          "minimum": 850.02,
+          "maximum": 873.27
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 18.450000000000003,
+          "q1": 18.3925,
+          "q3": 18.5275,
+          "minimum": 18.25,
+          "maximum": 18.65
+        },
+        "SemanticChecking": {
+          "n": 18,
+          "median": 652.665,
+          "q1": 650.7025,
+          "q3": 655.2325000000001,
+          "minimum": 645.66,
+          "maximum": 659.14
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 652.665,
+          "q1": 650.7025,
+          "q3": 655.23,
+          "minimum": 645.66,
+          "maximum": 659.14
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 184.8,
+          "q1": 183.59,
+          "q3": 186.37,
+          "minimum": 181.97,
+          "maximum": 201.22
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 184.8,
+          "q1": 183.5875,
+          "q3": 186.37,
+          "minimum": 181.96,
+          "maximum": 201.22
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 6.365,
+          "q1": 6.3325000000000005,
+          "q3": 6.38,
+          "minimum": 6.32,
+          "maximum": 6.56
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 654.345,
+          "q1": 652.72,
+          "q3": 657.58,
+          "minimum": 650.24,
+          "maximum": 687.22
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 337.805,
+          "q1": 336.87,
+          "q3": 339.655,
+          "minimum": 335.57,
+          "maximum": 343.54
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 20.439999999999998,
+          "q1": 19.9975,
+          "q3": 20.645,
+          "minimum": 19.83,
+          "maximum": 21.64
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 128.525,
+          "q1": 128.0025,
+          "q3": 129.0525,
+          "minimum": 127.69,
+          "maximum": 132.44
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 144.10500000000002,
+          "q1": 143.5575,
+          "q3": 144.675,
+          "minimum": 143.13,
+          "maximum": 145.7
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.41,
+          "q1": 4.3725,
+          "q3": 4.46,
+          "minimum": 4.3,
+          "maximum": 4.53
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.5,
+          "q1": 1.49,
+          "q3": 1.51,
+          "minimum": 1.48,
+          "maximum": 1.56
+        }
+      },
+      "semantic_fraction_of_wall": {
+        "n": 18,
+        "median": 0.364149579693793,
+        "q1": 0.3628037814475342,
+        "q3": 0.36494422280548466,
+        "minimum": 0.35894152366184495,
+        "maximum": 0.3667114704598015
+      },
+      "unattributed_output_residual_ms": {
+        "n": 18,
+        "median": 316.24,
+        "q1": 315.62,
+        "q3": 317.365,
+        "minimum": 314.27000000000004,
+        "maximum": 349.72
+      },
+      "unattributed_fresh_lifecycle_residual_ms": {
+        "n": 18,
+        "median": 68.86599944651127,
+        "q1": 68.00856602042919,
+        "q3": 70.71859078884115,
+        "minimum": 66.77076092541219,
+        "maximum": 76.17196699023256
+      }
+    }
+  ],
+  "raw_measurements": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/measurements.json",
+    "sha256": "93642df143a1fc42dfcb9469628f832d82fc48be9cdc8df3ac86808ea4c2e4a5"
+  },
+  "commands": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/run.sh",
+    "sha256": "2d83ec5a7941826148bcfdac9501cffcceb64a734f84527ccfe84161d9319d1b"
+  },
+  "driver": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/measure.py",
+    "sha256": "5de83b79330ba47487c7192a5e7f273c5ca1a5156239fc4906d4d601ecbb41cb"
+  },
+  "pilot": {
+    "evidence": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/excluded-polling-pilot/measurements.json",
+      "sha256": "0a653bc53735595397d52bfbef4dee1f9575ef2bd97a253c81bf7dfe09700f49"
+    },
+    "status": "interrupted-method-correction",
+    "recorded_completed": 43,
+    "unrecorded_interrupted_attempts": 1,
+    "all_excluded": true,
+    "reason": "file-redirection subprocess.run timeout polls completion; corrected to piped communicate before definitive measurements"
+  },
+  "inherited_runtime": {
+    "full_checkpoint": 244,
+    "latest_targeted": 233,
+    "implementation_slices_since_full": 0,
+    "total_cells": 1695,
+    "correct": 1654,
+    "unresolved": 41,
+    "resolved_histories": 16,
+    "fresh_runtime_cells": 0
+  },
+  "timer_relationships": {
+    "compileInner": "wraps executeActions and endToEndActions; same approximate interval in these runs",
+    "frontEndExecute": "includes parseTranslationUnit, SemanticChecking and generateIR",
+    "SemanticChecking": "direct wrapper around checkAllTranslationUnits; do not sum",
+    "generateIR": "contains generateIRForTranslationUnit",
+    "loadBuiltinModule": "contains readSerializedModuleAST and readSerializedModuleIR; outside compileInner on fresh CLI",
+    "generateOutput": "contains linkAndOptimizeIR and backend/output work",
+    "linkAndOptimizeIR": "includes specialization, simplification and other passes",
+    "simplifyIR": "aggregates multiple invocations, including paths called by other passes; not an exclusive stage"
+  },
+  "limitations": [
+    "No GPU kernel execution or material runtime oracle.",
+    "Fresh-process residual is not isolated process startup/session overhead.",
+    "Output minus link/optimize residual is not a direct NVVM/NVRTC time.",
+    "GDB samples are qualitative wall-interrupt observations with debugger perturbation, not CPU attribution or predicted speedup.",
+    "Historical214 session-reuse evidence is inherited, not remeasured."
+  ],
+  "qualitative_profile": {
+    "perf_probe": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/perf-availability.log",
+      "sha256": "3e16d8f851a488f8fd897a68f4b3bdf14c890916b53a59cf3456a56555dcb6bc"
+    },
+    "perf_event_paranoid": 4,
+    "perf_available": false,
+    "gdb_sampler": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/sample-gdb.py",
+      "sha256": "b3a60ac9f151ecb1bd471919bcfa9270dd3c4789dd75b6f58dc849bd4846c340"
+    },
+    "gdb_original_sampler": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/sample-gdb.initial.py",
+      "sha256": "d4fe0846a5deedd111a45983cc949fcef68e984a2a5f5e3f724e642aeeca6511"
+    },
+    "initial_commands": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/sample.sh",
+      "sha256": "a8b2f255be6d6382f84ac982de37b2a145b6794d0d0a34c09f15797237f03518"
+    },
+    "corrected_replacement_command": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/sample-replacement.sh",
+      "sha256": "ace1d239c5ba58a85725dccad4c78161fae73d36f2a5ed256d541efad94db50e"
+    },
+    "runs": [
+      {
+        "seed": 245,
+        "snapshots": 121,
+        "leaf_isSubClassOf": 19,
+        "leaf_getClass": 6,
+        "complete_compile": true,
+        "included_in_three_run_summary": true,
+        "ptx_exact_244": true,
+        "raw": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/stacks-245.json",
+          "sha256": "a6f10a98d7f53b3d06ca20c6d5fc81a26557a07f581c07d5a3f67d637f4faaa1"
+        },
+        "log": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/profile-245.log",
+          "sha256": "7c1a80f3c380e12f79a6e51ccea68f41e51885bc9565fbae41590e4598db5a23"
+        }
+      },
+      {
+        "seed": 246,
+        "snapshots": 118,
+        "leaf_isSubClassOf": 22,
+        "leaf_getClass": 6,
+        "complete_compile": true,
+        "included_in_three_run_summary": true,
+        "ptx_exact_244": true,
+        "raw": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/stacks-246.json",
+          "sha256": "5d94ff15ac7a4a93ae7b2b7ec9f8361f055570f474189c0414cdf3da10467766"
+        },
+        "log": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/profile-246.log",
+          "sha256": "1513d0f9d39aebc7e707ae46fc279fcf78386e7db9e40e1bb4bbec08afccf8ef"
+        }
+      },
+      {
+        "seed": 247,
+        "snapshots": 117,
+        "leaf_isSubClassOf": 20,
+        "leaf_getClass": 11,
+        "complete_compile": false,
+        "included_in_three_run_summary": false,
+        "ptx_exact_244": null,
+        "raw": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/stacks-247.json",
+          "sha256": "c7fce22548a046d789d2a4a4d76d926d5b5ed3dbb7c223fd3840355fe3ca242a"
+        },
+        "log": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/profile-247.log",
+          "sha256": "6fb8122b8adc43a86914b3f2ed0f639c62283c7385923f246865563975c63756"
+        }
+      },
+      {
+        "seed": 248,
+        "snapshots": 119,
+        "leaf_isSubClassOf": 22,
+        "leaf_getClass": 8,
+        "complete_compile": true,
+        "included_in_three_run_summary": true,
+        "ptx_exact_244": true,
+        "raw": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/stacks-248.json",
+          "sha256": "867635387ffaaaf722c9c20f1574b9d91b0f221a5c7b5b5ee7ac4381299ed94e"
+        },
+        "log": {
+          "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/profile-248.log",
+          "sha256": "3ffe6d7cc01b0318ee11a4af6fa7ebe887fc5a5b74c257c2de3bdd0984898d98"
+        }
+      }
+    ],
+    "completed_summary": {
+      "snapshots": 358,
+      "leaf_isSubClassOf": 63,
+      "leaf_getClass": 20
+    },
+    "incomplete_trial": "Seed247 collected semantic snapshots but a pending SIGINT stopped at generateIR after breakpoint removal; batch GDB exited before compilation completed. Retained; excluded from three completed-run summary. Corrected local final-continue cleanup and ran independent seed248."
+  },
+  "source_trace_snapshots": {
+    "source/slang/slang-ast-base.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/slang/slang-ast-base.h",
+      "sha256": "e0a4cb294dd645269a4f9ec43cf615ae5ebdd71117b6eefa205173a77f342813"
+    },
+    "source/slang/slang-ast-support-types.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/slang/slang-ast-support-types.h",
+      "sha256": "464e5e083453e95dcede12ce7835293e96e8135a8595ae91a9d204cb12f5bd0d"
+    },
+    "source/slang/slang-ast-boilerplate.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/slang/slang-ast-boilerplate.cpp",
+      "sha256": "d828299a20850b2bd35161a269aa5a941089e11ef5cc0b070c28d2e407ceafa7"
+    },
+    "source/slang/slang-ast-builder.h": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/slang/slang-ast-builder.h",
+      "sha256": "6747d977a29fb9d6d30c3e949ef713ba27347cdd1627d097974204eb10fddabc"
+    },
+    "source/slang/slang-syntax.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/slang/slang-syntax.cpp",
+      "sha256": "17586737f8000d5b051ef64cdbea708364b22a73c6d74b4230513d802f0ca0da"
+    },
+    "source/slang/slang-compile-request.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/slang/slang-compile-request.cpp",
+      "sha256": "86583d1eab38374977b94dac519164918e3d3b9e9e382914f25f65d89c1caeb0"
+    },
+    "source/slang/slang-check.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/slang/slang-check.cpp",
+      "sha256": "b234466bd6af5a59c975df3dad1136e4ab4a4a9178ff702c077c68e2c6214bac"
+    },
+    "source/slang/slang-check-decl.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/slang/slang-check-decl.cpp",
+      "sha256": "57f305ce386015894f835d112309bf701d8af2eebab136b36928077bb10c3057"
+    },
+    "source/slang/slang-check-constraint.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/slang/slang-check-constraint.cpp",
+      "sha256": "4271ef63729d7250c5e1ba531f3751c0c4a7d4647d47f12f2a5464c996d6c228"
+    },
+    "source/slang/slang-check-overload.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/slang/slang-check-overload.cpp",
+      "sha256": "ce3b85bf7e607b7fce78faa5ddf8b454e55a33fc9ae59ce4a46efc45138f9b13"
+    },
+    "source/core/slang-performance-profiler.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/core/slang-performance-profiler.cpp",
+      "sha256": "df62d584a8c53af966aed0cecad60cab5187c74f3e25f52bbd58bedce7e6f148"
+    },
+    "source/slang/slang-end-to-end-request.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/slang/slang-end-to-end-request.cpp",
+      "sha256": "4eb00015b6d6e49d82be09c95a6f3486aca237317f81121b404502fac1ef6230"
+    },
+    "source/slang/slang-emit.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/slang/slang-emit.cpp",
+      "sha256": "fe0b51897dce56e7a96e032c7cdcfd7498a949bd71a9b0c724c5ea726bd27bb6"
+    },
+    "source/slang/slang-global-session.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/source/slang/slang-global-session.cpp",
+      "sha256": "ef74f0f46a0c904607a2f9da4bd2c9e35db66cbed37b1db58975f6d09d20c65b"
+    },
+    "tools/slang-fiddle/slang-fiddle-scrape.cpp": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/source-snapshots/tools/slang-fiddle/slang-fiddle-scrape.cpp",
+      "sha256": "ddd1e8a09742804231499692119f551c1f3171931c30a7f8e8c8ecc80a3970f2"
+    }
+  },
+  "next_hypothesis": {
+    "boundary": "canonical NodeBase subtype tests in as<T>/dynamicCast<T>",
+    "observation": "isSubClassOf is the most frequent leaf in each of three completed semantic-only debugger runs (19/121,22/118,22/119); same generated tag range predicate reached through metadata conversion",
+    "hypothesis": "Avoid the out-of-line tag-to-SyntaxClassInfo roundtrip for NodeBase casts while reusing the existing generated firstTag/tagCount range as the sole hierarchy truth. Compare minimal inlining against direct canonical-tag predicate; do not introduce alternate hierarchy, per-material shortcuts or semantic caches.",
+    "not_yet_proven": "No speedup or implementation chosen; snapshot share is not a CPU-time percentage.",
+    "prototype_gate": "Exhaustive every registered source tag x every target class including abstract classes against generated hierarchy and original predicate; null pointers, const overloads, invalid/default policy, DeclRefBase cast restrictions, AST serialization and non-NVVM overload/generic/constraint diagnostics; exact six material PTX/cubin hashes; full compiler units and frozen/discovery checkpoint because shared AST casting is broad. Benchmark paired optimized before/after: at least5% SemanticChecking median reduction in each material identity, at least2% reduction in the sum of the six per-identity fresh-process medians (18 measured samples per identity), no greater than2% per-identity wall regression across both order rounds; reject if benefits not robust.",
+    "expected_metric": "SemanticChecking ms primary; fresh-process ms secondary; backend phase residual and assembly should stay stable. Thresholds are future acceptance choices, not observed improvements."
+  },
+  "raw_artifact_index": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-245-material-profile/artifact-index.json",
+    "sha256": "04410f745d66319eed9ab6f22adc2583d11a18480e79d2f8ad9f4bfa028d77e7"
+  },
+  "parent_acceptance": {
+    "status": "passed",
+    "measurements": {
+      "status": "passed",
+      "compiler_attempts": 132,
+      "measured_compiles": 108,
+      "warmups": 24,
+      "assemblies": 66,
+      "measured_assemblies": 54,
+      "assembly_warmups": 12,
+      "ptx_exact": 132,
+      "cubins_exact": 66,
+      "source_hashes": 43,
+      "artifact_hashes": 12,
+      "runtime_inputs": 561,
+      "cells": [
+        {
+          "id": "tiled-brass-material-eval_buffer-nvrtc-o3",
+          "wall_ms": 1624.7962601482868,
+          "semantic_ms": 651.51,
+          "assembly_ms": 178.18507924675941,
+          "round_wall_ms": [
+            1617.1800289303064,
+            1629.2817648500204
+          ]
+        },
+        {
+          "id": "tiled-brass-material-eval_buffer-nvvm-o0",
+          "wall_ms": 1596.7689156532288,
+          "semantic_ms": 652.0,
+          "assembly_ms": 703.8375288248062,
+          "round_wall_ms": [
+            1595.4501274973154,
+            1598.2536636292934
+          ]
+        },
+        {
+          "id": "tiled-brass-material-eval_buffer-nvvm-o3",
+          "wall_ms": 1691.0475930199027,
+          "semantic_ms": 653.09,
+          "assembly_ms": 210.51728539168835,
+          "round_wall_ms": [
+            1690.2294997125864,
+            1691.3236286491156
+          ]
+        },
+        {
+          "id": "tiled-brass-material-sample_buffer-nvrtc-o3",
+          "wall_ms": 1647.4667806178331,
+          "semantic_ms": 652.7349999999999,
+          "assembly_ms": 253.3735390752554,
+          "round_wall_ms": [
+            1642.4359641969204,
+            1647.8601787239313
+          ]
+        },
+        {
+          "id": "tiled-brass-material-sample_buffer-nvvm-o0",
+          "wall_ms": 1640.2047500014305,
+          "semantic_ms": 654.86,
+          "assembly_ms": 882.2369631379843,
+          "round_wall_ms": [
+            1639.4439581781626,
+            1640.9655418246984
+          ]
+        },
+        {
+          "id": "tiled-brass-material-sample_buffer-nvvm-o3",
+          "wall_ms": 1792.7990201860666,
+          "semantic_ms": 652.665,
+          "assembly_ms": 296.63001000881195,
+          "round_wall_ms": [
+            1789.924206212163,
+            1797.434912994504
+          ]
+        }
+      ]
+    },
+    "metadata": {
+      "status": "passed",
+      "compact_references": 36,
+      "indexed_artifacts": 528,
+      "source_snapshots": 15,
+      "statistics": "All six per-cell wall/round/phase/assembly/residual distributions independently recomputed",
+      "completed_qualitative_runs": [
+        245,
+        246,
+        248
+      ],
+      "incomplete_auxiliary_runs": [
+        247
+      ],
+      "excluded_pilot_completed_attempts": 43
+    },
+    "artifacts": [
+      {
+        "path": "build/nvvm-loop/slice-245-material-profile/parent-audit.json",
+        "sha256": "5d1a6ad462875bc070c8b71a41c50d6683a8efd5d51fcdbc7681141da064cb2f"
+      },
+      {
+        "path": "build/nvvm-loop/slice-245-material-profile/parent-audit.py",
+        "sha256": "15dc458c5cb2517385208d61f095ed3da95490cbee4976a25cd7a93a8c8d462d"
+      },
+      {
+        "path": "build/nvvm-loop/slice-245-material-profile/parent-metadata.json",
+        "sha256": "b07afabad8b8c1502414415aa59449bb1250c2bd62cf4f6f203b5af3dc94df0b"
+      },
+      {
+        "path": "build/nvvm-loop/slice-245-material-profile/parent-metadata.py",
+        "sha256": "6d3208d6bb59b38d654cfa641625c233636eeaa5331a309d89e4aa7e9fdf93c7"
+      }
+    ]
+  }
+}
