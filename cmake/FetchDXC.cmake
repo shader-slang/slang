@@ -623,12 +623,14 @@ if(_dxc_build_from_source)
         -DCLANG_INCLUDE_TESTS=OFF
         -DLLVM_ENABLE_WARNINGS=OFF
     )
-    # We append the forwarded args as one quoted argument instead of expanding
-    # them inside the set() above. An unquoted expansion consumes the "\;"
-    # escapes that keep a list value in a single argument, so a universal
-    # CMAKE_OSX_ARCHITECTURES ("x86_64;arm64") would reach DXC as just
-    # "x86_64" and DXC would build x86_64-only binaries, including the
-    # clang-tblgen it must run during the build (#13077).
+    # The "\;" escapes in _dxc_forwarded_config_args are consumed only by the
+    # unquoted expansion in the execute_process() below, so every step before it
+    # copies the list verbatim. We therefore append it quoted rather than
+    # expanding it inside the set() above, which would consume the escapes early
+    # and split a universal CMAKE_OSX_ARCHITECTURES into "x86_64" and a stray
+    # "arm64" argument, making DXC build x86_64-only binaries (#13077). The
+    # guard and the separate -Wno-dev append keep _dxc_configure_args, and so the
+    # configure stamp, unchanged for builds whose forwarded values have no ";".
     if(NOT _dxc_forwarded_config_args STREQUAL "")
         list(APPEND _dxc_configure_args "${_dxc_forwarded_config_args}")
     endif()
