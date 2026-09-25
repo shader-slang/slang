@@ -7654,19 +7654,35 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     {
         removeNonStaticLookupItems(baseOverloadedExpr->lookupResult2);
 
-        // If no static candidates remain, check if a non-static method can satisfy
-        // this static requirement when the first parameter type matches the conforming
-        // type (i.e. the 'This' type). In that case, we can synthesize a static wrapper
-        // that calls the non-static method on the first argument.
+        // If no static candidates remain, a non-static method can still satisfy this static
+        // requirement as a fallback: we treat the static requirement's first parameter as the
+        // implicit `this` and call the non-static method on it. For example:
         //
-        // E.g.:
         //      interface IFoo { static int method(This val, int x); }
         //      struct MyStruct : IFoo { int method(int x) { ... } }
         //
         // Synthesized:
         //      static int $__syn_method(MyStruct val, int x) { return val.method(x); }
         //
-        if (!baseOverloadedExpr->lookupResult2.isValid() && synArgs.getCount() > 0)
+        // For an ordinary method requirement this adaptation is only valid when the first parameter
+        // really is the receiver, i.e. its type is the conforming (`This`) type; otherwise binding
+        // that parameter as the callee's `this` produces a witness that calls the instance method on
+        // an unrelated value. In #13260 a static `value(Packed)` requirement was bound against an
+        // instance `value()`, passing the `Packed` argument as `Hit`'s `this` and emitting an
+        // invalid forwarder (invalid HLSL/CUDA, SPIR-V assert in `emitFieldAddress`).
+        //
+        // Associated-function requirements -- those declared with a direct function type, such as
+        // the autodiff `fwd_diff`/`bwd_diff` derivatives -- legitimately adapt a non-static method
+        // whose first parameter is not the receiver (it is a `DifferentialPair`), so we exempt them
+        // via `hasDirectFuncType`. For every other requirement we require the first parameter to be
+        // the conforming type; when it is not we decline, so an ordinary requirement with a default
+        // falls through to `findDefaultInterfaceImpl` and one without a default is reported as an
+        // unsatisfied requirement rather than miscompiled.
+        if (!baseOverloadedExpr->lookupResult2.isValid() && synArgs.getCount() > 0 &&
+            (hasDirectFuncType(requiredMemberDeclRef) ||
+             (synArgs[0]->type.type && context->conformingType &&
+              synArgs[0]->type.type->getCanonicalType()->equals(
+                  context->conformingType->getCanonicalType()))))
         {
             // Restore the full lookup result and keep only non-static items.
             baseOverloadedExpr->lookupResult2 = lookupResult;
