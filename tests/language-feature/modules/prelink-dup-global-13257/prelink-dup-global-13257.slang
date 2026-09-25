@@ -24,7 +24,9 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     BRDF brdf = {};
     float3 n = normalize(float3(3.0f, 0.0f, 4.0f)); // (0.6, 0, 0.8)
-    float3 r = brdf.shade(n);                       // dot(n,n) == 1, so r == n
+    float3 r = brdf.shade(n);                       // dot(n,n) == 1, so r == n == (0.6, 0, 0.8)
+    // Scale by 10 and round to nearest (`* 10 + 0.5` then truncating `uint(...)`) so the float
+    // components map to the small integers the CHECK lines match: 6, 0, 8.
     outputBuffer[0] = uint(r.x * 10.0f + 0.5f);
     // CHECK: 6
     outputBuffer[1] = uint(r.y * 10.0f + 0.5f);
