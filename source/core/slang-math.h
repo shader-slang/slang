@@ -284,9 +284,24 @@ inline unsigned int FloatToFloatE4M3(float val)
     // Max finite: 448.0f
     if (abs_val > 0x43E00000)
         return sign | 0x7F; // Saturate to NaN
-    // Underflow / Subnormal
-    if (abs_val < 0x38800000)
+    // Half the minimum subnormal (2^-10) ties to the even encoding zero.
+    if (abs_val <= 0x3A800000)
         return sign;
+
+    if (abs_val < 0x3C800000)
+    {
+        // Round on the subnormal grid of 2^-9. Consider 15 * 2^-10:
+        // it lies halfway between byte 7 and byte 8, so ties-to-even produces
+        // byte 8, the minimum normal. Keeping the carry preserves that transition.
+        unsigned int significand = (abs_val & 0x007FFFFF) | 0x00800000;
+        unsigned int shift = 141 - (abs_val >> 23); // 21 through 24.
+        unsigned int rounded = significand >> shift;
+        unsigned int remainder = significand & ((1u << shift) - 1);
+        unsigned int halfway = 1u << (shift - 1);
+        if (remainder > halfway || (remainder == halfway && (rounded & 1)))
+            rounded++;
+        return sign | rounded;
+    }
 
     // Extract FP32 components
     int exp = (abs_val >> 23) - 127;
@@ -308,8 +323,8 @@ inline unsigned int FloatToFloatE4M3(float val)
         }
     }
 
-    if (e8 >= 15)
-        return sign | 0x7E; // Clamp to max finite (448.0f, 0x43E00000)
+    // Exponent 15 also contains finite values, from 256 through 448.
+    // The input range check above already excludes values beyond 448.
     return sign | (e8 << 3) | m8;
 }
 
@@ -325,9 +340,24 @@ inline unsigned int FloatToFloatE5M2(float val)
         return sign | 0x7C | (abs_val > 0x7F800000 ? 1 : 0);
     }
 
-    // Underflow
-    if (abs_val < 0x35800000)
+    // Half the minimum subnormal (2^-17) ties to the even encoding zero.
+    if (abs_val <= 0x37000000)
         return sign;
+
+    if (abs_val < 0x38800000)
+    {
+        // Round on the subnormal grid of 2^-16. Consider 7 * 2^-17:
+        // it lies halfway between byte 3 and byte 4, so ties-to-even produces
+        // byte 4, the minimum normal. Keeping the carry preserves that transition.
+        unsigned int significand = (abs_val & 0x007FFFFF) | 0x00800000;
+        unsigned int shift = 134 - (abs_val >> 23); // 22 through 24.
+        unsigned int rounded = significand >> shift;
+        unsigned int remainder = significand & ((1u << shift) - 1);
+        unsigned int halfway = 1u << (shift - 1);
+        if (remainder > halfway || (remainder == halfway && (rounded & 1)))
+            rounded++;
+        return sign | rounded;
+    }
 
     int exp = (abs_val >> 23) - 127;
     unsigned int mant = abs_val & 0x007FFFFF;
@@ -367,8 +397,8 @@ inline float FloatE4M3ToFloat(unsigned int input)
     {
         if (mant == 0)
             return IntAsFloat(sign);
-        // Subnormal
-        float res = IntAsFloat(sign | 0x38800000) * (mant / 8.0f);
+        // The minimum normal is 2^-6; each subnormal step is one eighth of it.
+        float res = IntAsFloat(sign | 0x3C800000) * (mant / 8.0f);
         return res;
     }
 
@@ -387,7 +417,8 @@ inline float FloatE5M2ToFloat(unsigned int input)
     {
         if (mant == 0)
             return IntAsFloat(sign);
-        return IntAsFloat(sign | 0x35800000) * (mant / 4.0f);
+        // The minimum normal is 2^-14; each subnormal step is one quarter of it.
+        return IntAsFloat(sign | 0x38800000) * (mant / 4.0f);
     }
     if (exp == 31)
     {

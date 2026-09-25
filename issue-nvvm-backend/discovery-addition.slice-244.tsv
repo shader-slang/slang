@@ -1,0 +1,2 @@
+source	source_test_ordinal	selection_tags	rationale
+cuda/nvvm-fp8-finite-literals.slang	0	helper-generic	Fully folded finite FP8 literals with exact Float32 outputs: E4 exponent15, subnormals, signed zero and ties across normal boundaries; no backend FP8 values.

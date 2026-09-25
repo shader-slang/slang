@@ -55,9 +55,9 @@ uint literalBits = bit_cast<uint8_t>(FloatE4M3(256.0f));
 uint dynamicBits = bit_cast<uint8_t>(FloatE4M3(input));
 ```
 
-On the unchanged accepted compiler, literalBits is0x7e (448), while dynamicBits is0x78 (256).
+On the historical accepted242 compiler, literalBits is0x7e (448), while dynamicBits is0x78 (256).
 SCCP calls `IRBuilder::getFloatValue`, which calls `FloatToFloatE4M3` and then
-`FloatE4M3ToFloat` in `slang-math.h`. The narrowing helper clamps all exponent15 normal values to448.
+`FloatE4M3ToFloat` in `slang-math.h`. Before slice244, the narrowing helper clamps all exponent15 normal values to448.
 It also lacks correct subnormal rounding; both widening helpers scale subnormals incorrectly.
 Byte1 widens to Float32 bits0x37000000 for E4M3 and0x34800000 for E5M2 in these shared helpers,
 instead of0x3b000000 and0x37800000. These are producer defects, not shapes for NVVM to repair.
@@ -73,10 +73,27 @@ E5M2 byte0x3d. A later transport/literal/bitcast slice can remain narrowly bound
 canonical values only after the producer issues are addressed or explicitly scoped. General runtime
 casts require a separate semantic operation with the format and CUDA saturation policy intact.
 
+## Shared finite conversion repair
+
+Slice244 repairs the existing four `slang-math.h` helpers at the producer boundary. E4M3 normal
+exponent15 now covers256 through448. Narrowing handles subnormals on the2^-9/2^-16 grids using
+nearest/even rounding; the carry into the minimum normal is intentional. Widening uses minimum
+normal2^-6/2^-14 times the fraction divided by8/4, so each finite byte widens exactly. Signed zero
+is preserved. All256 encodings per format and every finite representable value/midpoint with its
+Float32 neighbors are covered by independently enumerated values, including both signs.
+
+This does not harmonize overflow with CUDA SATFINITE. E4M3 inputs strictly above448 still become
+signed NaN, even if rounding to448 would have been possible. E5M2 keeps its rounded overflow
+boundary61440, infinities and existing NaN mapping. Out-of-range policy needs a separate decision.
+The regression fixture performs `asuint(float(FloatE4M3(256.0f)))` and corresponding finite/boundary
+casts. FP8 is eliminated before backend preflight; only ordinary Float/UInt values reach NVVM.
+Consequently this producer correctness change admits no FP8 backend operation or storage role.
+See [report244](../../issue-nvvm-backend/report.slice-244-fp8-finite-producers.md).
+
 ## Boundaries and next action
 
-Repair and exhaustively test demonstrably incorrect finite/subnormal shared producers first,
-preserving the already-tested overflow policy unless a separate decision changes it. Then consider
+Slice244 repairs and exhaustively tests the finite/subnormal shared producers, preserving the
+already-tested overflow policy. Its full checkpoint remains subject to parent acceptance. Then consider
 scalar transport/literals/bitcasts and qualified Float32 casts at their owning backend boundary.
 Do not promote this research by moving a preflight diagnostic alone.
 
