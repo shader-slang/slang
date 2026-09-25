@@ -6124,6 +6124,28 @@ err(
     span { loc = "location", message = "'~inst:IRInst': use of pointer with inconsistent address space." }
 )
 
+-- SPIR-V address-space legalization (58004-)
+
+err(
+    "cannot-return-pointer-in-this-storage-class",
+    58004,
+    "cannot return a pointer in this storage class when targeting SPIR-V",
+    span {
+        loc = "location",
+        message = "only PhysicalStorageBuffer, StorageBuffer, and Workgroup pointers can be returned",
+    }
+)
+
+err(
+    "conflicting-return-pointer-storage-classes",
+    58005,
+    "function returns pointers in more than one address space",
+    span {
+        loc = "location",
+        message = "a returned pointer must have a single address space; this one would need more than one",
+    }
+)
+
 -- Autodiff checkpoint reporting notes (-1)
 
 standalone_note(
