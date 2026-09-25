@@ -8880,14 +8880,58 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         const char* expectedConstruct;
     };
     static const UnsupportedCase kCases[] = {
-        // Scalar BF16 does not qualify numeric casts, vectors or storage aggregates.
+        // BF16 value transport does not qualify vector pointers, numeric casts or aggregates.
         {R"SLANG(
-            [noinline] vector<BFloat16,2> pair(BFloat16 x) { return vector<BFloat16,2>(x,x); }
+            [CudaDeviceExport]
+            [noinline]
+            vector<BFloat16,3> exportedResult(BFloat16 x)
+            {
+                return vector<BFloat16,3>(x);
+            }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(32,1,1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[tid.x] = uint(bit_cast<uint16_t>(exportedResult(bit_cast<BFloat16>(uint16_t(tid.x))).x));
+            }
+        )SLANG",
+         "exported BF16 vector helper result"},
+        {R"SLANG(
+            [CudaDeviceExport]
+            [noinline]
+            BFloat16 exportedParameter(vector<BFloat16,3> x)
+            {
+                return x.y;
+            }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(32,1,1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[tid.x] = uint(bit_cast<uint16_t>(exportedParameter(vector<BFloat16,3>(bit_cast<BFloat16>(uint16_t(tid.x))))));
+            }
+        )SLANG",
+         "exported BF16 vector helper parameter"},
+        {R"SLANG(
+            [noinline] void replace(inout vector<BFloat16,2> x, vector<BFloat16,2> y) { x = y; }
             RWStructuredBuffer<uint> outputBuffer;
             [numthreads(32, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
-            { outputBuffer[tid.x] = bit_cast<uint>(pair(bit_cast<BFloat16>(uint16_t(tid.x)))); }
+            { let v = vector<BFloat16,2>(bit_cast<BFloat16>(uint16_t(tid.x))); vector<BFloat16,2> local = v; replace(local, v); outputBuffer[tid.x] = bit_cast<uint>(local); }
+        )SLANG",
+         "helper function parameter"},
+        {R"SLANG(
+            struct Payload { vector<BFloat16,3> value; }
+            [noinline] Payload copy(Payload x) { return x; }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(32, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            { Payload p = {vector<BFloat16,3>(bit_cast<BFloat16>(uint16_t(tid.x)))}; outputBuffer[tid.x] = uint(bit_cast<uint16_t>(copy(p).value.x)); }
         )SLANG",
          "helper function result type"},
+        {R"SLANG(
+            RWStructuredBuffer<vector<BFloat16,4>> outputBuffer;
+            [numthreads(32, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            { outputBuffer[tid.x] = vector<BFloat16,4>(bit_cast<BFloat16>(uint16_t(tid.x))); }
+        )SLANG",
+         "struct field address result"},
         {R"SLANG(
             struct Payload { BFloat16 value; }
             [noinline] Payload copy(Payload x) { return x; }

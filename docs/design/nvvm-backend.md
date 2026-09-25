@@ -8287,3 +8287,7 @@ Emission recovers these checked bits with that same helper, preserving producer-
 dynamic CUDA narrowing has a separate target operation and promises only NaN classification.
 [Implementation239](../../issue-nvvm-backend/report.slice-239-bf16-scalar.md) records the readable
 fixture, exhaustive accepted-research input replay, negative boundaries and full checkpoint.
+
+### BF16 register vectors and internal helper values (slice241)
+
+ABI39 extends the distinct BF16 descriptor to widths2/3/4 in explicit value and internal by-value helper roles. Physical i16 vectors reuse canonical construction/extraction and branch/phi transport; Float32 conversions require matching lanes and apply the scalar239 recipe once per lane. The recursive numeric, copyable, helper-storage and resource classifiers remain unchanged. Exported CUDA BF vector helper signatures reject at preflight because internal provider layout is not the external CUDA ABI. The storage/layout boundary, full source traces, exclusions and replay projection are documented in [the BF16 vector contract](nvvm-bf16-vector-contract.md). Explicit vector Select and source-ordered dot remain separate.

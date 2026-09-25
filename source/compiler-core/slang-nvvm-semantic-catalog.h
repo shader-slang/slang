@@ -1146,10 +1146,20 @@ inline bool resolveValueOperationFamily(
     // Float32. Integer construction cannot use this path because an intermediate Float32
     // rounding can change the BF16 result (for example, integer 16842753).
     if (desc.operation == SLANG_NVVM_VALUE_OP_FLOAT_CONVERT && desc.operandCount == 1 &&
-        ((areSameType(desc.resultType, kBFloat16) && areSameType(desc.operandTypes[0], kFloat32)) ||
-         (areSameType(desc.resultType, kFloat32) && areSameType(desc.operandTypes[0], kBFloat16))))
+        desc.resultType.laneCount >= 1 && desc.resultType.laneCount <= 4 &&
+        desc.resultType.laneCount == desc.operandTypes[0].laneCount &&
+        ((desc.resultType.kind == SLANG_NVVM_VALUE_TYPE_BFLOAT16 &&
+          desc.resultType.bitWidth == 16 &&
+          desc.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+          desc.operandTypes[0].bitWidth == 32) ||
+         (desc.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+          desc.resultType.bitWidth == 32 &&
+          desc.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_BFLOAT16 &&
+          desc.operandTypes[0].bitWidth == 16)))
     {
-        outResolution = {ValueOperationFamily::BFloat16Convert, "scalar BF16/Float32 conversion"};
+        outResolution = {
+            ValueOperationFamily::BFloat16Convert,
+            "component BF16/Float32 conversion"};
         return true;
     }
     if (desc.operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET && desc.operandCount == 1 &&

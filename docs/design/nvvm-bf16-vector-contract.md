@@ -1,6 +1,6 @@
 # BF16 vector value contract and storage boundary
 
-Research slice240 qualifies values; it adds no compiler support. The evidence is
+Research slice240 qualified the value contract; implementation slice241 now supports the register and internal-helper roles described below with builder ABI39. The research evidence is
 [semantic-evidence.slice-240.json](../../issue-nvvm-backend/semantic-evidence.slice-240.json), following
 scalar ABI38 in [the backend design](nvvm-backend.md). The tested platform is LLVM14/libNVVM12.9,
 SM80, with CUDA12.9.2/NVRTC12.9.86 on an L4. Requalify on target or dialect changes.
@@ -55,11 +55,11 @@ There is no external CUDA helper interoperability claim. The selection control q
 branch/phi behavior; it does not establish a canonical vector `Select` semantic-catalog contract.
 Any new explicit vector `Select` admission needs its own source/IR test in the implementation slice.
 
-A bounded next implementation should admit these value/by-value helper roles explicitly and use
+Slice241 admits these value/by-value helper roles explicitly using
 existing `NVVMTypeUse` caches, vector construction/extraction, helper signature validation and
-semantic operation planning. `_getNVVMSemanticType` must preserve BF16 as a distinct descriptor;
-`_getSemanticLLVMType` can use the qualified physical i16 vector. Matching-lane-count BF16/Float32 conversion
-must reuse the scalar `ValueOperationFamily::BFloat16Convert` semantics component by component,
+semantic operation planning. `_getNVVMSemanticType` preserves BF16 as a distinct descriptor;
+`_getSemanticLLVMType` uses the qualified physical i16 vector. Matching-lane-count BF16/Float32 conversion
+reuses the scalar `ValueOperationFamily::BFloat16Convert` semantics component by component,
 with exact lane-count preflight. Do not widen the IEEE floating classifier or ordinary numeric
 operations: BF16 arithmetic, comparisons, integer conversion, Half/double casts and dot remain
 unqualified by this vector research. Existing scalar conversion/bitcast behavior must stay exact.
@@ -105,3 +105,13 @@ and pointer evidence, including the producer fix above.
 The unchanged frozen scalar-bf16 workload additionally needs source-ordered dot. Exact integer
 construction remains separately gated by research238's double-rounding counterexample. Neither
 is implied by vector transport or component conversions.
+
+## Implemented value roles (slice241)
+
+`asNVVMBFloat16VectorType` checks canonical BF16 widths2/3/4. `asNVVMRegisterVectorType` combines that classification with established ordinary vectors only for construction, extraction, value availability and semantic descriptions. It does not widen recursive numeric/copyable/helper/storage algebras. `NVVMTypeInfo::supports` admits Value/HelperValue/HelperParameter/HelperResult and rejects every vector storage role before consulting provider-handle caches. Helper branch joins use ordinary phi emission with explicit register-only preflight admission. Mixed vector constructor operands, multi-lane swizzles and dynamic extraction retain canonical IR and use the existing vector builders. SwizzleSet remains outside this BF contract.
+
+The shared catalog requires matching lane counts1..4 and exact BF16/Float32 widths16/32. `_emitBFloat16ConvertLane` owns the scalar SM80 narrowing/expansion recipe; vector conversion extracts and reconstructs lanes through that same recipe. Explicit vector Select, arithmetic/comparison/dot and integer/Half/double casts remain rejected. Source whole-vector bit transport still uses canonical bitcast decomposition, not a new provider vector-bitcast operation.
+
+Reachable `[CudaDeviceExport]` helpers require a separate external CUDA ABI. `_validateNVVMHelperTarget` rejects BF vector result/parameter types there: BF3's provider eight-byte/alignment-eight signature differs from CUDA six-byte/alignment-two. Ordinary exported integer helpers remain supported. The input is canonical; the target ABI is unqualified, so this boundary belongs in helper preflight, not a producer repair or layout workaround.
+
+The registered `tests/cuda/nvvm-bf16-vector-values.slang` fixture combines independent boundary expectations with dynamic helper branches, bit transport and lane operations. Exhaustive value-only projections retain research240's73190 input records per width. They remove only pointer/local replacement and writes29..29+N-1, preserving those words as original sentinels. Nine production launches and six separate raw controls are checked against independent integer-oracle reconstruction. Neither this value evidence nor compiler diagnostic movement resolves frozen scalar-bf16's source-ordered dot.

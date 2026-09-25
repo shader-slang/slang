@@ -33,6 +33,13 @@ bool isNVVMFloat16Type(IRInst* type);
 /// Returns whether `type` is canonical scalar BF16, distinct from every IEEE format.
 bool isNVVMBFloat16Type(IRInst* type);
 
+/// Returns an exact two- through four-lane BF16 register vector, without admitting storage.
+IRVectorType* asNVVMBFloat16VectorType(IRInst* type, uint32_t* outElementCount = nullptr);
+
+/// Returns a vector qualified for register construction, extraction, and semantic operations.
+/// BF16 vectors are deliberately excluded from the recursive copyable and storage classifiers.
+IRVectorType* asNVVMRegisterVectorType(IRInst* type, uint32_t* outElementCount = nullptr);
+
 /// Returns whether `type` is the canonical IEEE 64-bit float accepted as a direct NVVM value.
 bool isNVVMFloat64Type(IRInst* type);
 

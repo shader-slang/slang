@@ -1,0 +1,2 @@
+source	source_test_ordinal	selection_tags	rationale
+cuda/nvvm-bf16-vector-values.slang	0	vector-matrix,helper-generic	BF16 register widths2/3/4, dynamic by-value helper branches, Float32 lane conversion, splats/extraction and canonical bit transport with independent boundary expectations.

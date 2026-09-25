@@ -4,64 +4,27 @@ Updated 2026-09-25. Read [WORKFLOW.md](WORKFLOW.md) before resuming the loop.
 
 ## Current state and next action
 
-**Research240 is accepted after independent parent review.** Read
-[plan240](plan.slice-240-bf16-vectors.md), [report240](report.slice-240-bf16-vectors.md),
-[semantic evidence240](semantic-evidence.slice-240.json) and the
-[vector contract](../docs/design/nvvm-bf16-vector-contract.md).
-No production source, binaries, providerABI38, corpus or input changes.
+**Implementation241 and its full checkpoint are accepted after independent parent review.** Read [plan241](plan.slice-241-bf16-vector-values.md), [report241](report.slice-241-bf16-vector-values.md), [validation241](runtime-validation.slice-241.json) and [the vector contract](../docs/design/nvvm-bf16-vector-contract.md).
 
-The next bounded implementation should admit BF16 vector widths2/3/4 as register values and
-by-value internal helper arguments/results, construction/splat/extraction and helper branch/phi selection and matching-lane-count
-Float32 component conversions. Existing bitcast lowering handles source uint32/BF2, uint64/BF4 and
-ushort3/BF3 transport. Preserve the distinct BF16 semantic descriptor; do not widen the IEEE float
-or generic numeric classifiers. A full checkpoint is required for shared type/provider changes.
+The slice adds canonical BF16 widths2/3/4 as register values and internal by-value helper arguments/results, construction/splats/extraction, helper branch/phi and matching-lane Float32 conversion. BuilderABI39 preserves BF16 identity and uses i16 vector values. Existing source bitcast lowering handles uint32/BF2, uint64/BF4 and ushort3/BF3. Recursive numeric/copyable/helper/storage classifiers remain unchanged. Explicit exported CUDA BF-vector helper parameters/results reject at preflight; internal signatures are not external CUDA ABI promises.
 
-Leave new local-pointer/storage admission separate. Raw component-array locals work, but CUDA BF3
-has6-byte size/alignment2 while LLVM BF3 vectors allocate8/alignment8; CUDA BF4 alignment2 differs
-from LLVM vector alignment8. BF2 arrays lose its native alignment4 unless explicitly aligned.
-The BF4 CUDA layout producers also currently compute alignment8, contrary to the prelude's2; fix
-that producer/model issue before external storage support, never bypass downstream layout checks.
-Dot and exact integer construction remain separate research238 contracts. Frozen scalar-bf16 is
-still unresolved; vector success alone cannot resolve its dot. Material6 compile/assembly evidence
-is inherited from239; missing binding/input/oracle semantics justify this research cadence override.
+The frozen scalar-bf16 workload still stops at `GenericAsm assembly=_slang_vector_dot, signature=BFloat16(vector<BFloat16,4>, vector<BFloat16,4>)` in both direct modes. No old failure resolves. Source-ordered dot is the next concrete BF16 boundary; consult accepted [research238](semantic-evidence.slice-238.json). Exact integer construction, vector Select, arithmetic/comparison and Half/double casts remain separate. New vector local pointers/storage, aggregates/resources/globals/parameter groups remain excluded. Before storage work, repair the BF4 CUDA AST/IR layout producers' alignment8 versus actual prelude2; BF3 CUDA6/2 also differs from LLVM allocation8/alignment8.
 
-Latest accepted implementation/full checkpoint:239; latest targeted acceptance:233. Implementation
-slices since full:zero. Accepted source base946f3f3b1dfb6ce2e468afdd707aced032843e2e.
-No push is authorized. Research240 is ready for its authorized local commit.
+Latest accepted implementation/full checkpoint:241. Latest targeted acceptance:233. Implementation slices since full:zero. Tested source base `3e218a92a6c3b3c2cdc02fdf854f03b9712e6dda`; no push is authorized. The slice is ready for the authorized local commit.
+
+Rolling implementation history:237 clock observations,239 scalar BF16,241 BF16 vector values. Material-driven runtime work remains deferred because bindings, textures/LUTs, inputs and an output oracle are absent; reconsider that contract before each next slice.
 
 ## Checkpoint and proof
 
-- Full239:452 frozen identities/1356cells,109 old discovery identities/327cells plus scalar fixture3.
-  Total1686cells/1643correct/43unresolved/14resolved histories. All1640 old correct cells preserved.
-  See [full validation239](runtime-validation.slice-239.json) for complete immutable failure histories.
-- Research240 freshly reruns smoke4 and exact frozen BF16 three-cell inventory. NVRTC is correct;
-  direct O0/O3 retain `helper function parameter: vector<BFloat16,4>` and all239 outcome fields.
-  Other1683 corpus cells, units482+existing Windows skip, toolkit18, contracts6, scalar fixture3 and
-  material6 are explicitly inherited. No support delta, corpus additions or cadence reset.
-- Three sourceNVRTC and six rawLLVM O0/O3 vector controls compile/assemble/run. Each run uses73190
-  accepted records; everyBF16 payload and all7654 additional Float32 boundary records appear in
-  each lane. Dynamic helpers and local roundtrip survive in IR/PTX. All13,613,340 active output words
-  and18,004,749 input/inactive/header words pass:31,618,089 total. RawLLVM success is not production
-  direct-Slang vector support. Six generated direct controls reject helper vector result types.
-- Exact LLVM14 type queries and seven CUDA assertions measure size/alignment/wrapped offsets.
-  Narrowing NaNs remain classification-only; SM80 widening is exact high-word transport.
-- All37 tested sources,12 artifacts and558 inputs match239 before/after; all117 indexed238 artifacts
-  remain unchanged. Worker independent audit and parent complete-buffer oracle agree.
+- Full241 is entirely fresh:452 frozen identities/1356cells and110 old discovery identities/330cells plus one new fixture/3cells. Total1689cells/1646correct/43unresolved;14resolved histories preserved. All1643 old correct cells survive. The only two deltas are the BF16 direct diagnostics/canonical shapes advancing from helper parameter to `_slang_vector_dot` GenericAsm. Full classification, return_code and execution_counts stay exact. Entire prior failure records remain in [validation241](runtime-validation.slice-241.json).
+- Final smoke4, fixture3, existing exported-integer helpers3, units483 plus one old Windows skip, toolkit18, runnercontracts6 and all6 material compile/assembly cells pass. Material runtime/performance remains blocked by absent bindings/textures/LUT/inputs/oracle; support/correctness work is the recorded cadence override.
+- Nine public value-only projections and six separate original raw controls pass all52,696,815 words. Each width carries73190 records: everyBF16 encoding plus7654 Float32 boundaries in every lane. Independent worker/parent integer oracles agree. NarrowingNaN is classification-only; SM80 widening preserves exact payload bits. Removed local-copy output columns retain original sentinels. Accepted240/238 artifacts remain unchanged.
+- Final linked IR retains mixed constructors, multi-lane swizzle and dynamic extraction; all three exhaustive helpers retain BF-vector merge parameters. Provider unit serialization covers both dialects. Export preflight negatives and neighboring ordinary export checks pass. Earlier provisional exported-ABI PTX has no captured provisional compiler hash due a capture-script error and is investigation evidence only; final gate identities are complete.
 
 ## Environment and evidence
 
-Native Ubuntu24.04, branch nvvm-backend, L4SM89 driver580.126.09, targetSM80, CUDA12.9.2,
-NVRTC12.9.86, LLVM14, providerABI38, matching RelWithDebInfo. Use inspected slice-203-env.sh and
-local build skill; its optimized path overrides the base environment's staleDebug selection.
-Four CPU workers maximum total, sequential GPU suites,30-minute bounds, no compiler build here.
-Compiler SHA256 a6cd5bd057defd8fc896ebd75813d8b7e5737fe33a095e20840fc73b72233412.
-Provider SHA256 cefb3cd3cb44fb0d2c6a201f210ea3c98e1913c2fcac554ea5ad912d6afbcfd7.
+Native Ubuntu24.04, branch nvvm-backend, L4SM89 driver580.126.09, targetSM80, CUDA12.9.2/NVRTC12.9.86, LLVM14, providerABI39 and matching RelWithDebInfo. Use inspected slice-203-env.sh and local build skill. Four CPU workers maximum total, sequential GPU suites and30-minute bounds.
 
-Raw root `build/nvvm-loop/slice-240-bf16-vectors` retains scripts, commands, source/IR/PTX,
-full buffers, layout attempts, identity captures, audit and artifact index. Slice239 and research238
-are immutable. Layout probe setup failures are retained and explained; no production workaround,
-weakened oracle, edited executing script, GPU loss, system change, reboot, worker commit or push.
+Compiler SHA256 `79f46ef0dba116bdfdce8a03b40f7d3bb2c7b481529b452b483d650cf0958e43`. Provider SHA256 `116df24297dddc55b9c8f2f4f45f30e614e3185dafc618b3b67caf6df14a2bfe`. All39 tested sources,12 artifacts and559 inputs match before every final gate and after; all558 old input hashes are preserved.
 
-Parent acceptance verifies252 unique evidence references, all132 indexed raw artifacts,12 primary
-source hashes, unchanged37 source/12 artifact/558 input identities, and all31,618,089 output words.
-See `slice-240-bf16-vectors/parent-acceptance-audit.json` and `parent-oracle-audit.json`.
+Raw roots `build/nvvm-loop/slice-241-before` and `slice-241-after` retain baseline proof, commands/source/IR/PTX/buffers, complete hashes and full-checkpoint logs. See final `audit.json`, `replay-audit.json`, `frozen-comparison.json`, `trace/shape-proof.json`, `value-replay/results.json`, `artifact-index.json` and compact validation. Attempts and accepted research remain intact. No frontend/library/runner edits, GPU loss, system change, reboot, worker commit or push occurred. Independent parent acceptance verifies703 compact and1,303 total evidence references before adding its six own references, all88 current indexed artifacts,117 research238 and132 research240 artifacts, exact corpus/history preservation and52,696,815 replay words. See `parent-acceptance-audit.json`, `parent-oracle-audit.json` and `parent-raw-oracle-audit.json`.

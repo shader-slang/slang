@@ -109,3 +109,4 @@ cuda/nvvm-fp16-masked-minmax.slang	0	wave,vector-matrix,helper-generic	Raw FP16 
 cuda/nvvm-quad-votes.slang	0	wave,helper-generic	Dynamic Boolean quad truth tables, divergent inline/noinline calls and complete-quad exits with independent expectations.
 cuda/nvvm-clock-observations.slang	0	helper-generic	Live clock low/full observations with dynamic bounds, modular order/bracket/progress predicates and independently evaluated affine work.
 cuda/nvvm-bf16-scalar.slang	0	helper-generic	Scalar BF16 raw bits, Float32 ties/extremes/NaN classification, noinline helpers and mutable local storage with independent expectations.
+cuda/nvvm-bf16-vector-values.slang	0	vector-matrix,helper-generic	BF16 register widths2/3/4, dynamic by-value helper branches, Float32 lane conversion, splats/extraction and canonical bit transport with independent boundary expectations.

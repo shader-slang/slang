@@ -144,6 +144,27 @@ IRVectorType* asNVVMSupportedValueVectorType(IRInst* type, uint32_t* outElementC
     return _asNVVMSupportedVectorType(type, true, outElementCount);
 }
 
+IRVectorType* asNVVMBFloat16VectorType(IRInst* type, uint32_t* outElementCount)
+{
+    if (outElementCount)
+        *outElementCount = 0;
+    auto vectorType = as<IRVectorType>(type);
+    auto count = vectorType ? as<IRIntLit>(vectorType->getElementCount()) : nullptr;
+    if (!vectorType || !isNVVMBFloat16Type(vectorType->getElementType()) || !count ||
+        count->getValue() < 2 || count->getValue() > 4)
+        return nullptr;
+    if (outElementCount)
+        *outElementCount = uint32_t(count->getValue());
+    return vectorType;
+}
+
+IRVectorType* asNVVMRegisterVectorType(IRInst* type, uint32_t* outElementCount)
+{
+    if (auto vectorType = asNVVMSupportedValueVectorType(type, outElementCount))
+        return vectorType;
+    return asNVVMBFloat16VectorType(type, outElementCount);
+}
+
 bool isNVVMSupportedValueType(IRInst* type)
 {
     return isNVVMSupportedIntegerScalarType(type) || isNVVMSupportedFloatingPointScalarType(type) ||
@@ -2262,6 +2283,13 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
                use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult ||
                use == NVVMTypeUse::Storage;
 
+    // A BF16 vector is an internal by-value contract only. For example, BF3's LLVM
+    // register allocation is eight bytes, while CUDA storage is six bytes/alignment two.
+    // The ordinary recursive helper/copyable predicates must not inherit this admission.
+    if (valueVectorType && isNVVMBFloat16Type(valueVectorType->getElementType()))
+        return use == NVVMTypeUse::Value || use == NVVMTypeUse::HelperValue ||
+               use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult;
+
     switch (use)
     {
     case NVVMTypeUse::EntryPointResult:
@@ -2315,8 +2343,7 @@ NVVMTypeInfo NVVMTypeLoweringContext::_getTypeInfo(IRType* type)
     info.isBFloat16 = isNVVMBFloat16Type(type);
     info.isFloat32 = info.floatingPointBitWidth == 32;
     info.isBool = isNVVMBoolType(type);
-    info.valueVectorType =
-        asNVVMSupportedValueVectorType(type, &info.valueVectorElementCount);
+    info.valueVectorType = asNVVMRegisterVectorType(type, &info.valueVectorElementCount);
     info.numeric32VectorType = asNVVMSupported32BitNumericVectorType(type);
     info.structType = as<IRStructType>(type);
     info.scalarStructType = asNVVMSupportedScalarStructType(type);

@@ -3690,6 +3690,33 @@ static SlangResult _emitCatalogOperation(
     }
 }
 
+// Converts one qualified BF16/Float32 lane using the scalar SM80 contract. Vector
+// conversion extracts each canonical lane and reuses this recipe, so widening preserves
+// signaling-NaN payloads and narrowing rounds exactly once, including subnormals.
+static llvm::Value* _emitBFloat16ConvertLane(
+    ModuleState* state,
+    llvm::Value* operand,
+    llvm::Type* resultType,
+    bool narrow)
+{
+    if (narrow)
+    {
+        // SM80 narrows once with round-to-nearest-even, including subnormals.
+        auto signature = llvm::FunctionType::get(resultType, {operand->getType()}, false);
+        auto assembly = llvm::InlineAsm::get(signature, "cvt.rn.bf16.f32 $0, $1;", "=h,f", false);
+        return state->builder.CreateCall(assembly, {operand});
+    }
+    else
+    {
+        // CUDA's SM80 BF16 expansion places every payload, including signaling NaNs,
+        // in the high word of Float32. It is bit transport, not integer conversion.
+        auto int32Type = llvm::Type::getInt32Ty(state->context);
+        auto bits = state->builder.CreateZExt(operand, int32Type);
+        bits = state->builder.CreateShl(bits, llvm::ConstantInt::get(int32Type, 16));
+        return state->builder.CreateBitCast(bits, resultType);
+    }
+}
+
 static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValueTypeDesc& type)
 {
     if (!state)
@@ -3710,7 +3737,7 @@ static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValue
         }
         break;
     case SLANG_NVVM_VALUE_TYPE_BFLOAT16:
-        if (type.bitWidth == 16 && type.laneCount == 1)
+        if (type.bitWidth == 16)
             scalarType = llvm::Type::getInt16Ty(state->context);
         break;
     case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT:
@@ -3731,7 +3758,8 @@ static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValue
     if ((type.kind == SLANG_NVVM_VALUE_TYPE_BOOL ||
          type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
          type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER ||
-         type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT) &&
+         type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
+         type.kind == SLANG_NVVM_VALUE_TYPE_BFLOAT16) &&
         type.laneCount >= 2 && type.laneCount <= 4)
     {
         return llvm::FixedVectorType::get(scalarType, type.laneCount);
@@ -4143,23 +4171,25 @@ static SlangResult _emitValueOperationFamily(
                      : state->builder.CreateFPToUI(llvmOperands[0], resultType);
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::BFloat16Convert:
-        if (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_BFLOAT16)
         {
-            // SM80 narrows once with round-to-nearest-even, including subnormals.
-            auto signature =
-                llvm::FunctionType::get(resultType, {llvmOperands[0]->getType()}, false);
-            auto assembly =
-                llvm::InlineAsm::get(signature, "cvt.rn.bf16.f32 $0, $1;", "=h,f", false);
-            result = state->builder.CreateCall(assembly, {llvmOperands[0]});
-        }
-        else
-        {
-            // CUDA's SM80 BF16 expansion places every payload, including signaling NaNs,
-            // in the high word of Float32. It is bit transport, not integer conversion.
-            auto int32Type = llvm::Type::getInt32Ty(state->context);
-            auto bits = state->builder.CreateZExt(llvmOperands[0], int32Type);
-            bits = state->builder.CreateShl(bits, llvm::ConstantInt::get(int32Type, 16));
-            result = state->builder.CreateBitCast(bits, resultType);
+            const bool narrow = operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_BFLOAT16;
+            if (operation.resultType.laneCount == 1)
+                result = _emitBFloat16ConvertLane(state, llvmOperands[0], resultType, narrow);
+            else
+            {
+                auto vectorType = llvm::cast<llvm::FixedVectorType>(resultType);
+                result = llvm::UndefValue::get(vectorType);
+                for (uint32_t lane = 0; lane < operation.resultType.laneCount; ++lane)
+                {
+                    auto operand = state->builder.CreateExtractElement(llvmOperands[0], lane);
+                    auto converted = _emitBFloat16ConvertLane(
+                        state,
+                        operand,
+                        vectorType->getElementType(),
+                        narrow);
+                    result = state->builder.CreateInsertElement(result, converted, lane);
+                }
+            }
         }
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::FloatConvert:

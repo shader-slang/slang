@@ -1792,7 +1792,7 @@ bool _getNVVMSequentialElement(IRInst* inst, NVVMSequentialElement& outElement)
     uint32_t baseElementCount = 0;
     IRType* baseElementType = nullptr;
     if (auto baseVectorType =
-            asNVVMSupportedValueVectorType(base ? base->getDataType() : nullptr, &baseElementCount))
+            asNVVMRegisterVectorType(base ? base->getDataType() : nullptr, &baseElementCount))
     {
         baseElementType = baseVectorType->getElementType();
     }
@@ -1863,7 +1863,7 @@ bool _appendNVVMVectorConstructOperand(
     }
 
     uint32_t operandElementCount = 0;
-    auto operandType = asNVVMSupportedValueVectorType(operand->getDataType(), &operandElementCount);
+    auto operandType = asNVVMRegisterVectorType(operand->getDataType(), &operandElementCount);
     if (!operandType || !isTypeEqual(operandType->getElementType(), resultElementType) ||
         operandElementCount > resultElementCount - ioElementCount)
     {
@@ -1884,8 +1884,7 @@ bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstru
 {
     outConstruction = {};
     uint32_t elementCount = 0;
-    auto resultType =
-        asNVVMSupportedValueVectorType(inst ? inst->getDataType() : nullptr, &elementCount);
+    auto resultType = asNVVMRegisterVectorType(inst ? inst->getDataType() : nullptr, &elementCount);
     if (!resultType)
         return false;
 
@@ -1922,7 +1921,7 @@ bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstru
         IRInst* base = swizzle->getBase();
         uint32_t baseElementCount = 0;
         auto baseType =
-            asNVVMSupportedValueVectorType(base ? base->getDataType() : nullptr, &baseElementCount);
+            asNVVMRegisterVectorType(base ? base->getDataType() : nullptr, &baseElementCount);
         if (!baseType || swizzle->getElementCount() != elementCount ||
             !isTypeEqual(baseType->getElementType(), resultType->getElementType()))
         {
@@ -3419,13 +3418,13 @@ bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc& outType)
 {
     if (as<IRVoidType>(type))
         outType = NVVMSemantics::kVoid;
-    else if (auto vectorType = asNVVMSupportedValueVectorType(type))
+    else if (auto vectorType = asNVVMRegisterVectorType(type))
     {
         IRType* elementType = vectorType->getElementType();
         uint32_t bitWidth = 0;
         bool isSigned = false;
         uint32_t elementCount = 0;
-        SLANG_RELEASE_ASSERT(asNVVMSupportedValueVectorType(type, &elementCount));
+        SLANG_RELEASE_ASSERT(asNVVMRegisterVectorType(type, &elementCount));
         if (isNVVMSupportedIntegerScalarType(elementType, &bitWidth, &isSigned))
             outType = {
                 isSigned ? SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
@@ -3436,6 +3435,8 @@ bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc& outType)
         else if (uint32_t floatingPointBitWidth = 0;
                  isNVVMSupportedFloatingPointScalarType(elementType, &floatingPointBitWidth))
             outType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, floatingPointBitWidth, elementCount};
+        else if (isNVVMBFloat16Type(elementType))
+            outType = {SLANG_NVVM_VALUE_TYPE_BFLOAT16, 16, elementCount};
         else
         {
             SLANG_RELEASE_ASSERT(isNVVMBoolType(elementType));
@@ -7523,7 +7524,7 @@ SlangResult _validateSelectedValue(
         return SLANG_OK;
     IRType* valueType = value ? value->getDataType() : nullptr;
     const bool requiresAvailability =
-        valueType && (asNVVMSupportedValueVectorType(valueType) ||
+        valueType && (asNVVMRegisterVectorType(valueType) ||
                       ((as<IRArrayType>(valueType) || as<IRStructType>(valueType)) &&
                        isNVVMSupportedStructuredBufferStorageType(valueType)) ||
                       (_getNVVMExecutableValueAlignment(valueType) &&
@@ -7841,7 +7842,7 @@ bool _isSupportedNVVMHelperResultType(IRInst* type)
 {
     NVVMRawBufferType rawBufferType;
     NVVMReadOnlyTextureType sampledTextureType;
-    return as<IRVoidType>(type) || isNVVMBFloat16Type(type) ||
+    return as<IRVoidType>(type) || isNVVMBFloat16Type(type) || asNVVMBFloat16VectorType(type) ||
            isNVVMSupportedHelperValueType(type) || asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedLocalCopyableValuePointerType(type) ||
            asNVVMSupportedLocalHelperValuePointerType(type) ||
@@ -7856,8 +7857,8 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
     NVVMRawBufferType rawBufferType;
     NVVMSurfaceType surfaceType;
     NVVMReadOnlyTextureType sampledTextureType;
-    return isNVVMBFloat16Type(type) || isNVVMSupportedHelperValueType(type) ||
-           asNVVMSupportedResourceStructType(type) ||
+    return isNVVMBFloat16Type(type) || asNVVMBFloat16VectorType(type) ||
+           isNVVMSupportedHelperValueType(type) || asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedLocalResourceStructPointerType(type) ||
            asNVVMSupportedLocalCopyableValuePointerType(type) ||
            asNVVMSupportedLocalHelperValuePointerType(type) ||
@@ -8116,6 +8117,16 @@ SlangResult _validateNVVMHelperTarget(
     }
     if (helper->getParent() != linkedIR.module->getModuleInst() || !helper->isDefinition())
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("call"));
+    // Internal callers and callees agree on the qualified LLVM register ABI. An exported
+    // CUDA helper instead promises an external ABI: for example, BF3 is six bytes/alignment
+    // two in CUDA but eight bytes/alignment eight in the provider. Keep that contract closed.
+    const bool isCUDAExport =
+        helper->findDecorationImpl(kIROp_CudaDeviceExportDecoration) != nullptr;
+    if (isCUDAExport && asNVVMBFloat16VectorType(helper->getResultType()))
+        return _diagnoseUnsupportedIRType(
+            codeGenContext,
+            "exported BF16 vector helper result",
+            helper->getResultType());
     if (!_isSupportedNVVMHelperResultType(helper->getResultType()))
         return _diagnoseUnsupportedIRType(
             codeGenContext,
@@ -8123,6 +8134,11 @@ SlangResult _validateNVVMHelperTarget(
             helper->getResultType());
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
+        if (isCUDAExport && asNVVMBFloat16VectorType(helper->getParamType(parameterIndex)))
+            return _diagnoseUnsupportedIRType(
+                codeGenContext,
+                "exported BF16 vector helper parameter",
+                helper->getParamType(parameterIndex));
         if (!_isSupportedNVVMHelperParameterType(helper->getParamType(parameterIndex)))
         {
             return _diagnoseUnsupportedIRType(
@@ -8441,7 +8457,8 @@ SlangResult _validateNVVMFunction(
                 // `Texture2D textures[2]` passes one texture handle to the merge block. Admit the
                 // complete established executable-value algebra here; generic LLVM phi emission
                 // already preserves each selected provider representation.
-                if (!_getNVVMExecutableValueAlignment(param->getDataType()))
+                if (!_getNVVMExecutableValueAlignment(param->getDataType()) &&
+                    !asNVVMBFloat16VectorType(param->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("basic-block parameter"));
                 }
