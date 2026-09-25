@@ -2201,73 +2201,89 @@ bool SemanticsVisitor::_coerce(
     // A enum type can be converted into its underlying tag type.
     if (auto enumDecl = isEnumType(fromType))
     {
-        Type* tagType = enumDecl->tagType;
-        if (tagType == toType)
-        {
-            if (outCost)
-            {
-                *outCost = kConversionCost_RankPromotion;
-            }
-            if (outToExpr)
-            {
-                auto rsExpr = getASTBuilder()->create<BuiltinCastExpr>();
-                rsExpr->type = toType;
-                rsExpr->loc = fromExpr->loc;
-                rsExpr->base = fromExpr;
-                *outToExpr = rsExpr;
-            }
-            return true;
-        }
+        // `tagType` is only assigned when the `EnumDecl` reaches `ReadyForLookup`, so a conversion
+        // checked before that (e.g. an array bound preceding any other use of the enum) needs the
+        // enum driven there first -- but only when it is not already being checked. An enum reached
+        // during its own base resolution (`enum E : IHas<int(E.a)>`) is mid-check; forcing
+        // `ReadyForLookup` then makes `ensureDecl` emit the cyclic-reference diagnostic on the enum
+        // instead of leaving that to the checking machinery, and at the int -> enum site below it
+        // aborts compilation outright (see enum-self-referential-base-conversion.slang).
+        // `_calcInheritanceInfo` guards the enum-inheritance path the same way.
+        if (!enumDecl->checkState.isBeingChecked())
+            ensureDecl(enumDecl, DeclCheckState::ReadyForLookup);
 
-        // HLSL compatibility: an unscoped enum in an
-        // HLSL-dialect translation unit may also convert implicitly to any
-        // builtin scalar its tag type can reach, performed as two implicit
-        // rounds that mirror the reverse composite below: first enum -> tag,
-        // then tag -> destination. Consider `enum Color { Red, Green, Blue };
-        // float f = Color.Green;` in a `.hlsl` file compiled with
-        // `-unscoped-enum`: `Color` coerces to `int` (its tag), then `int` to
-        // `float`. This fires only at implicit sites; explicit casts such as
-        // `float(Color.Green)` already succeed through the target's initializer path.
-        if (site != CoercionSite::ExplicitCoercion &&
-            isEnumToBuiltinScalarConversionEnabled(enumDecl, toType))
+        // Offer the tag conversions only once `tagType` is known; it is null when the enum was
+        // skipped above because it is mid-check. Fall through to the other conversion paths in that
+        // case rather than dereferencing it.
+        if (Type* tagType = enumDecl->tagType)
         {
-            Expr* tagExpr = nullptr;
-            if (fromExpr)
+            if (tagType == toType)
             {
-                auto castToTag = getASTBuilder()->create<BuiltinCastExpr>();
-                castToTag->type = tagType;
-                castToTag->loc = fromExpr->loc;
-                castToTag->base = fromExpr;
-                tagExpr = castToTag;
-            }
-
-            Expr* convertedExpr = nullptr;
-            ConversionCost innerCost = kConversionCost_None;
-            if (_coerce(
-                    site,
-                    toType,
-                    outToExpr ? &convertedExpr : nullptr,
-                    QualType(tagType),
-                    tagExpr,
-                    sink,
-                    &innerCost,
-                    nullptr))
-            {
-                // Cost is additive across the two rounds: the enum -> tag leg
-                // reuses kConversionCost_RankPromotion (matching the direct
-                // enum -> tag case above) plus the inner tag -> destination cost.
-                // This keeps enum -> tag (150) cheaper than enum -> float
-                // (150 + 400 = 550), so overload resolution still prefers the
-                // tag. No E30081 "unrecommended implicit conversion" warning
-                // fires on this path: we return here, before the
-                // initializer-overload branch that emits it, and the inner leg
-                // (int -> float, 400) stays below that branch's threshold (500).
                 if (outCost)
-                    *outCost = kConversionCost_RankPromotion + innerCost;
+                {
+                    *outCost = kConversionCost_RankPromotion;
+                }
                 if (outToExpr)
-                    *outToExpr = convertedExpr;
-                setWitnessOfConversionToBuiltinConversion();
+                {
+                    auto rsExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                    rsExpr->type = toType;
+                    rsExpr->loc = fromExpr->loc;
+                    rsExpr->base = fromExpr;
+                    *outToExpr = rsExpr;
+                }
                 return true;
+            }
+
+            // HLSL compatibility: an unscoped enum in an
+            // HLSL-dialect translation unit may also convert implicitly to any
+            // builtin scalar its tag type can reach, performed as two implicit
+            // rounds that mirror the reverse composite below: first enum -> tag,
+            // then tag -> destination. Consider `enum Color { Red, Green, Blue };
+            // float f = Color.Green;` in a `.hlsl` file compiled with
+            // `-unscoped-enum`: `Color` coerces to `int` (its tag), then `int` to
+            // `float`. This fires only at implicit sites; explicit casts such as
+            // `float(Color.Green)` already succeed through the target's initializer path.
+            if (site != CoercionSite::ExplicitCoercion &&
+                isEnumToBuiltinScalarConversionEnabled(enumDecl, toType))
+            {
+                Expr* tagExpr = nullptr;
+                if (fromExpr)
+                {
+                    auto castToTag = getASTBuilder()->create<BuiltinCastExpr>();
+                    castToTag->type = tagType;
+                    castToTag->loc = fromExpr->loc;
+                    castToTag->base = fromExpr;
+                    tagExpr = castToTag;
+                }
+
+                Expr* convertedExpr = nullptr;
+                ConversionCost innerCost = kConversionCost_None;
+                if (_coerce(
+                        site,
+                        toType,
+                        outToExpr ? &convertedExpr : nullptr,
+                        QualType(tagType),
+                        tagExpr,
+                        sink,
+                        &innerCost,
+                        nullptr))
+                {
+                    // Cost is additive across the two rounds: the enum -> tag leg
+                    // reuses kConversionCost_RankPromotion (matching the direct
+                    // enum -> tag case above) plus the inner tag -> destination cost.
+                    // This keeps enum -> tag (150) cheaper than enum -> float
+                    // (150 + 400 = 550), so overload resolution still prefers the
+                    // tag. No E30081 "unrecommended implicit conversion" warning
+                    // fires on this path: we return here, before the
+                    // initializer-overload branch that emits it, and the inner leg
+                    // (int -> float, 400) stays below that branch's threshold (500).
+                    if (outCost)
+                        *outCost = kConversionCost_RankPromotion + innerCost;
+                    if (outToExpr)
+                        *outToExpr = convertedExpr;
+                    setWitnessOfConversionToBuiltinConversion();
+                    return true;
+                }
             }
         }
     }
@@ -2279,7 +2295,15 @@ bool SemanticsVisitor::_coerce(
     {
         if (auto toEnumDeclRef = isDeclRefTypeOf<EnumDecl>(toType))
         {
+            // As above: drive the enum to `ReadyForLookup` so `tagType` is assigned, but skip
+            // that while it is mid-check so an enum reached during its own base resolution
+            // (`enum E : IHasE<E(0)>`) gets the base-pointing cyclic-reference diagnostic rather
+            // than a spurious one on the enum.
+            if (!toEnumDeclRef.getDecl()->checkState.isBeingChecked())
+                ensureDecl(toEnumDeclRef, DeclCheckState::ReadyForLookup);
+
             auto tagType = getTagType(m_astBuilder, toEnumDeclRef);
+            // Null only when skipped above (enum mid-check); decline the conversion.
             if (!tagType)
                 return false;
 
